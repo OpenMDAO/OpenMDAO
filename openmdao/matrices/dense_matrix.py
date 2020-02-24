@@ -118,3 +118,10 @@ class DenseMatrix(COOMatrix):
         """
         # this will add any repeated entries together
         self._matrix = self._coo.toarray()
+
+    def _get_assembled_matrix(self, system):
+        mat = super(DenseMatrix, self)._get_assembled_matrix(system)
+        if mat is None:
+            return mat
+
+        return mat.toarray()

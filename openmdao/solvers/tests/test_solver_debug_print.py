@@ -168,7 +168,7 @@ class TestNonlinearSolvers(unittest.TestCase):
 
         p.setup()
 
-        nl = model.circuit.nonlinear_solver = om.NewtonSolver()
+        nl = model.circuit.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
 
         nl.options['iprint'] = 2
         nl.options['debug_print'] = True

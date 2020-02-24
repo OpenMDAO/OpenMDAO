@@ -96,7 +96,7 @@ class LinesearchSolver(NonlinearSolver):
         alpha : float
             Step size parameter.
         """
-        system = self._system
+        system = self._system()
         options = self.options
         u = system._outputs
         method = options['bound_enforcement']
@@ -142,7 +142,7 @@ class BoundsEnforceLS(LinesearchSolver):
         Run the iterative solver.
         """
         self._iter_count = 0
-        system = self._system
+        system = self._system()
 
         u = system._outputs
         du = system._vectors['output']['linear']
@@ -217,7 +217,7 @@ class ArmijoGoldsteinLS(LinesearchSolver):
         float
             error at the first iteration.
         """
-        system = self._system
+        system = self._system()
         self.alpha = alpha = self.options['alpha']
 
         u = system._outputs
@@ -278,7 +278,7 @@ class ArmijoGoldsteinLS(LinesearchSolver):
         Perform the operations in the iteration loop.
         """
         self._analysis_error_raised = False
-        system = self._system
+        system = self._system()
 
         # Hybrid newton support.
         if self._do_subsolve and self._iter_count > 0:
@@ -354,7 +354,7 @@ class ArmijoGoldsteinLS(LinesearchSolver):
         rho = options['rho']
         method = options['method']
 
-        system = self._system
+        system = self._system()
         u = system._outputs
         du = system._vectors['output']['linear']  # Newton step
 

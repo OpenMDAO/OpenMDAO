@@ -11,6 +11,7 @@ import numpy as np
 from numpy.testing import assert_almost_equal
 
 import openmdao.api as om
+from openmdao.utils.assert_utils import assert_warning, assert_no_warning
 
 
 class TestBalanceComp(unittest.TestCase):
@@ -49,7 +50,7 @@ class TestBalanceComp(unittest.TestCase):
 
         # set an actual solver, and re-setup. Then check derivatives at a converged point
         prob.model.linear_solver = om.DirectSolver()
-        prob.model.nonlinear_solver = om.NewtonSolver()
+        prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
 
         prob.setup()
 
@@ -81,7 +82,7 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.connect('exec.y', 'balance.lhs:x')
 
         prob.model.linear_solver = om.DirectSolver()
-        prob.model.nonlinear_solver = om.NewtonSolver()
+        prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
 
         prob.setup()
 
@@ -96,6 +97,51 @@ class TestBalanceComp(unittest.TestCase):
 
         for (of, wrt) in cpd['balance']:
             assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+
+    def test_balance_comp_options_exclude_no_error(self):
+
+        prob = om.Problem()
+
+        bal = om.BalanceComp()
+        bal.add_balance('x', val=1.0)
+
+        prob.model.add_subsystem(name='balance', subsys=bal)
+
+        recorder = om.SqliteRecorder('cases.sql')
+
+        prob.model.add_recorder(recorder)
+
+        prob.model.recording_options['record_inputs'] = True
+        prob.model.recording_options['record_outputs'] = True
+        prob.model.recording_options['record_residuals'] = True
+        bal.recording_options['record_metadata'] = False
+
+        prob.setup()
+
+        msg = ("Trying to record option 'guess_func' which cannot be pickled on system BalanceComp "
+               "(balance). Set 'recordable' to False. Skipping recording options for this system.")
+
+        with assert_no_warning(UserWarning, msg):
+            prob.run_model()
+
+        prob = om.Problem()
+
+        bal = om.BalanceComp()
+        bal.add_balance('x', val=1.0)
+
+        prob.model.add_subsystem(name='balance', subsys=bal)
+
+        recorder = om.SqliteRecorder('cases.sql')
+
+        prob.model.add_recorder(recorder)
+
+        bal.recording_options['record_metadata'] = True
+        bal.recording_options['options_excludes'] = ['guess_func']
+
+        prob.setup()
+
+        with assert_no_warning(UserWarning, msg):
+            prob.run_model()
 
     def test_create_on_init_no_normalization(self):
 
@@ -118,7 +164,7 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.connect('exec.y', 'balance.lhs:x')
 
         prob.model.linear_solver = om.DirectSolver()
-        prob.model.nonlinear_solver = om.NewtonSolver(iprint=0)
+        prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, iprint=0)
 
         prob.setup()
 
@@ -159,7 +205,7 @@ class TestBalanceComp(unittest.TestCase):
 
         prob.model.linear_solver = om.DirectSolver(assemble_jac=True)
 
-        prob.model.nonlinear_solver = om.NewtonSolver(maxiter=100, iprint=0)
+        prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=100, iprint=0)
 
         prob.setup()
 
@@ -200,7 +246,7 @@ class TestBalanceComp(unittest.TestCase):
 
         prob.model.linear_solver = om.DirectSolver(assemble_jac=True)
 
-        prob.model.nonlinear_solver = om.NewtonSolver(maxiter=100, iprint=0)
+        prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=100, iprint=0)
 
         prob.setup()
 
@@ -245,7 +291,7 @@ class TestBalanceComp(unittest.TestCase):
 
         prob.model.linear_solver = om.DirectSolver(assemble_jac=True)
 
-        prob.model.nonlinear_solver = om.NewtonSolver(maxiter=100, iprint=0)
+        prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=100, iprint=0)
 
         prob.setup()
 
@@ -288,7 +334,7 @@ class TestBalanceComp(unittest.TestCase):
 
         prob.model.linear_solver = om.DirectSolver(assemble_jac=True)
 
-        prob.model.nonlinear_solver = om.NewtonSolver(maxiter=100, iprint=0)
+        prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=100, iprint=0)
 
         prob.setup()
 
@@ -324,7 +370,7 @@ class TestBalanceComp(unittest.TestCase):
         model.connect('exe.y', 'bal.lhs:x')
 
         model.linear_solver = om.DirectSolver(assemble_jac=True)
-        model.nonlinear_solver = om.NewtonSolver(maxiter=100, iprint=0)
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=100, iprint=0)
 
         prob = om.Problem(model)
         prob.setup()
@@ -361,7 +407,7 @@ class TestBalanceComp(unittest.TestCase):
 
         prob.model.linear_solver = om.DirectSolver(assemble_jac=True)
 
-        prob.model.nonlinear_solver = om.NewtonSolver(maxiter=100, iprint=0)
+        prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=100, iprint=0)
 
         prob.setup(force_alloc_complex=True)
 
@@ -402,7 +448,7 @@ class TestBalanceComp(unittest.TestCase):
 
         prob.model.linear_solver = om.DirectSolver(assemble_jac=True)
 
-        prob.model.nonlinear_solver = om.NewtonSolver(maxiter=100, iprint=0)
+        prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=100, iprint=0)
 
         prob.setup()
 
@@ -441,7 +487,7 @@ class TestBalanceComp(unittest.TestCase):
         model.connect('exec.y', 'balance.lhs:x')
 
         model.linear_solver = om.DirectSolver(assemble_jac=True)
-        model.nonlinear_solver = om.NewtonSolver(maxiter=100, iprint=0)
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=100, iprint=0)
 
         prob = om.Problem(model)
         prob.setup()
@@ -482,7 +528,7 @@ class TestBalanceComp(unittest.TestCase):
         model.connect('exec.y', 'balance.lhs:x')
 
         model.linear_solver = om.DirectSolver(assemble_jac=True)
-        model.nonlinear_solver = om.NewtonSolver(maxiter=100, iprint=0)
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=100, iprint=0)
 
         prob = om.Problem(model)
         prob.setup()
@@ -530,7 +576,7 @@ class TestBalanceComp(unittest.TestCase):
         model.connect('lhs_comp.lhs', 'bal_comp.lhs:x')
 
         model.linear_solver = om.DirectSolver()
-        model.nonlinear_solver = om.NewtonSolver(maxiter=100, iprint=0)
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=100, iprint=0)
 
         # first verify behavior of the balance comp without the guess function
         # at initial conditions x=5, x=0 and x=-1
@@ -595,7 +641,7 @@ class TestBalanceComp(unittest.TestCase):
 
         prob.model.linear_solver = om.DirectSolver(assemble_jac=True)
 
-        prob.model.nonlinear_solver = om.NewtonSolver(maxiter=100, iprint=0)
+        prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=100, iprint=0)
 
         prob.setup()
 
@@ -640,7 +686,7 @@ class TestBalanceComp(unittest.TestCase):
 
         prob.model.linear_solver = om.DirectSolver(assemble_jac=True)
 
-        prob.model.nonlinear_solver = om.NewtonSolver(maxiter=100, iprint=0)
+        prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=100, iprint=0)
 
         prob.setup()
 
@@ -685,7 +731,7 @@ class TestBalanceComp(unittest.TestCase):
 
         prob.model.linear_solver = om.DirectSolver(assemble_jac=True)
 
-        prob.model.nonlinear_solver = om.NewtonSolver(maxiter=100, iprint=0)
+        prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=100, iprint=0)
 
         prob.setup()
 
@@ -726,7 +772,7 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.connect('exec.y', 'balance.lhs:x')
 
         prob.model.linear_solver = om.DirectSolver(assemble_jac=True)
-        prob.model.nonlinear_solver = om.NewtonSolver(maxiter=100, iprint=0)
+        prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=100, iprint=0)
 
         prob.setup()
 
@@ -759,7 +805,7 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.connect('exec.y', 'balance.lhs:x')
 
         prob.model.linear_solver = om.DirectSolver(assemble_jac=True)
-        prob.model.nonlinear_solver = om.NewtonSolver(maxiter=100, iprint=0)
+        prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=100, iprint=0)
 
         prob.setup()
 
@@ -793,7 +839,7 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.connect('exec.y', 'balance.lhs:x')
 
         prob.model.linear_solver = om.DirectSolver(assemble_jac=True)
-        prob.model.nonlinear_solver = om.NewtonSolver(maxiter=100, iprint=0)
+        prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=100, iprint=0)
 
         prob.setup()
 
@@ -806,6 +852,50 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_almost_equal(prob['balance.x'], -c/b, decimal=6)
         assert_almost_equal(-c/b, prob['balance.x'], decimal=6)  # expected
+
+    def test_specified_shape(self):
+        shape = (3, 2, 4)
+
+        prob = om.Problem(model=om.Group(assembled_jac_type='dense'))
+
+        bal = om.BalanceComp()
+
+        bal.add_balance('x', val=np.ones(shape), use_mult=True)
+
+        tgt = om.IndepVarComp(name='y_tgt', val=4*np.ones(shape))
+
+        mult_ivc = om.IndepVarComp(name='mult', val=2.0*np.ones(shape))
+
+        exec_comp = om.ExecComp('y=x**2', x={'value': np.ones(shape)}, y={'value': np.ones(shape)})
+
+        prob.model.add_subsystem(name='target', subsys=tgt, promotes_outputs=['y_tgt'])
+        prob.model.add_subsystem(name='mult_comp', subsys=mult_ivc, promotes_outputs=['mult'])
+
+        prob.model.add_subsystem(name='exec', subsys=exec_comp)
+
+        prob.model.add_subsystem(name='balance', subsys=bal)
+
+        prob.model.connect('y_tgt', 'balance.rhs:x')
+        prob.model.connect('mult', 'balance.mult:x')
+        prob.model.connect('balance.x', 'exec.x')
+        prob.model.connect('exec.y', 'balance.lhs:x')
+
+        prob.model.linear_solver = om.DirectSolver(assemble_jac=True)
+
+        prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=100, iprint=0)
+
+        prob.setup()
+
+        prob['balance.x'] = np.random.random(shape)
+
+        prob.run_model()
+
+        assert_almost_equal(prob['balance.x'], np.sqrt(2), decimal=7)
+
+        cpd = prob.check_partials(out_stream=None)
+
+        for (of, wrt) in cpd['balance']:
+            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
 
 
 if __name__ == '__main__':  # pragma: no cover

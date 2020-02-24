@@ -1,0 +1,82 @@
+
+
+from openmdao.surrogate_models.surrogate_model import SurrogateModel
+
+
+class {class_name}(SurrogateModel):
+    """
+    Base class for surrogate models.
+
+    Attributes
+    ----------
+    options : <OptionsDictionary>
+        Dictionary with general pyoptsparse options.
+    trained : bool
+        True when surrogate has been trained.
+    _parent_name : str or None
+        Absolute pathname of metamodel component that owns this surrogate.
+    """
+
+    def __init__(self, **kwargs):
+        """
+        Initialize all attributes.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            options dictionary.
+        """
+        super({class_name}, self).__init__()
+
+        # set any necessary attributes here...
+
+    def train(self, x, y):
+        """
+        Train the surrogate model with the given set of inputs and outputs.
+
+        Parameters
+        ----------
+        x : array-like
+            Training input locations
+        y : array-like
+            Model responses at given inputs.
+        """
+        # train the surrogate model....
+
+        self.trained = True
+
+    def predict(self, x):
+        """
+        Calculate a predicted value of the response based on the current trained model.
+
+        Parameters
+        ----------
+        x : array-like
+            Point(s) at which the surrogate is evaluated.
+        """
+        super({class_name}, self).predict(x)
+
+        # calculate predicted value here...
+
+    def linearize(self, x):
+        """
+        Calculate the jacobian of the interpolant at the requested point.
+
+        Parameters
+        ----------
+        x : array-like
+            Point at which the surrogate Jacobian is evaluated.
+        """
+        # calculate the jacobian here...
+        pass
+
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        # for example...
+        #  self.options.declare('interpolant_type', default='rbf',
+        #                       values=['linear', 'weighted', 'rbf'],
+        #                       desc="Type of interpolant, must be 'linear', 'weighted', or 'rbf'")
+        pass
+

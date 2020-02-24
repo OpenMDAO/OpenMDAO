@@ -709,7 +709,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         """Runs check_partials and compares to analytic derivatives."""
 
         prob.run_model()
-        derivs = prob.check_partials(out_stream=None)
+        derivs = prob.check_partials(method='cs', out_stream=None)
 
         for i in derivs['comp'].keys():
             if verbose:
@@ -998,7 +998,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         # Derivs are large, so ignore atol.
         assert_check_partials(partials, atol=1e10, rtol=1e-10)
 
-    def test_training_gradient(self):
+    def test_training_gradient_lagrange3(self):
         model = om.Group()
         ivc = om.IndepVarComp()
 
@@ -1029,6 +1029,71 @@ class TestMetaModelStructuredPython(unittest.TestCase):
 
         prob = om.Problem(model)
         prob.setup()
+        prob.run_model()
+
+        self.run_and_check_derivs(prob)
+
+    def test_training_gradient_akima(self):
+        model = om.Group()
+        ivc = om.IndepVarComp()
+
+        mapdata = SampleMap()
+
+        params = mapdata.param_data
+        outs = mapdata.output_data
+
+        ivc.add_output('x', np.array([-0.3, 0.7, 1.2]))
+        ivc.add_output('y', np.array([0.14, 0.313, 1.41]))
+        ivc.add_output('z', np.array([-2.11, -1.2, 2.01]))
+
+        ivc.add_output('f_train', outs[0]['values'])
+        ivc.add_output('g_train', outs[1]['values'])
+
+        comp = om.MetaModelStructuredComp(training_data_gradients=True,
+                                          method='akima', vec_size=3)
+        for param in params:
+            comp.add_input(param['name'], param['default'], param['values'])
+
+        for out in outs:
+            comp.add_output(out['name'], out['default'], out['values'])
+
+        model.add_subsystem('ivc', ivc, promotes=["*"])
+        model.add_subsystem('comp',
+                            comp,
+                            promotes=["*"])
+
+        prob = om.Problem(model)
+        prob.setup(force_alloc_complex=True)
+        prob.run_model()
+
+        self.run_and_check_derivs(prob)
+
+    def test_training_gradient_akima_basic(self):
+        # Mimics usage as an order-reducing interpolating polynomial.
+        model = om.Group()
+        ivc = om.IndepVarComp()
+
+        mapdata = SampleMap()
+
+        params = mapdata.param_data
+        outs = mapdata.output_data
+
+        ivc.add_output('x', np.array([.33]))
+
+        ivc.add_output('f_train', np.array([.3, .7, .5, .6, .3, .4, .2]))
+
+        comp = om.MetaModelStructuredComp(training_data_gradients=True,
+                                          method='akima', vec_size=1)
+        comp.add_input('x', 0.0, np.array([.1, .2, .3, .4, .5, .6, .7]))
+        comp.add_output('f', 0.0, np.array([.3, .7, .5, .6, .3, .4, .2]))
+
+        model.add_subsystem('ivc', ivc, promotes=["*"])
+        model.add_subsystem('comp',
+                            comp,
+                            promotes=["*"])
+
+        prob = om.Problem(model)
+        prob.setup(force_alloc_complex=True)
         prob.run_model()
 
         self.run_and_check_derivs(prob)
@@ -1247,6 +1312,35 @@ class TestMetaModelStructuredCompFeature(unittest.TestCase):
 
         # we can verify all gradients by checking against finite-difference
         prob.check_partials(compact_print=True)
+
+    def test_error_messages_scalar_only(self):
+        prob = om.Problem()
+        model = prob.model
+
+        comp = om.MetaModelStructuredComp(training_data_gradients=True,
+                                          method='slinear', vec_size=3)
+
+        with self.assertRaises(ValueError) as cm:
+            comp.add_input('x1', np.array([1.0, 2.0]))
+
+        msg = "MetaModelStructuredComp: Input x1 must either be scalar, or of length equal to vec_size."
+        self.assertEqual(str(cm.exception), msg)
+
+        with self.assertRaises(ValueError) as cm:
+            comp.add_input('x1', np.zeros((3, 3)))
+
+        self.assertEqual(str(cm.exception), msg)
+
+        with self.assertRaises(ValueError) as cm:
+            comp.add_output('x1', np.array([1.0, 2.0]))
+
+        msg = "MetaModelStructuredComp: Output x1 must either be scalar, or of length equal to vec_size."
+        self.assertEqual(str(cm.exception), msg)
+
+        with self.assertRaises(ValueError) as cm:
+            comp.add_output('x1', np.zeros((3, 3)))
+
+        self.assertEqual(str(cm.exception), msg)
 
 
 if __name__ == "__main__":

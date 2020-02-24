@@ -1,5 +1,7 @@
 """Define the base Jacobian class."""
 from __future__ import division
+import weakref
+
 import numpy as np
 from numpy.random import rand
 
@@ -57,7 +59,7 @@ class Jacobian(object):
         system : System
             Parent system to this jacobian.
         """
-        self._system = system
+        self._system = weakref.ref(system)
         self._subjacs_info = system._subjacs_info
         self._override_checks = False
         self._under_complex_step = False
@@ -68,7 +70,7 @@ class Jacobian(object):
     def _get_abs_key(self, key):
         abskey = self._abs_keys[key]
         if not abskey:
-            self._abs_keys[key] = abskey = key2abs_key(self._system, key)
+            self._abs_keys[key] = abskey = key2abs_key(self._system(), key)
         return abskey
 
     def _abs_key2shape(self, abs_key):
@@ -87,10 +89,11 @@ class Jacobian(object):
         in_size : int
             local size of the input variable.
         """
-        abs2meta = self._system._var_allprocs_abs2meta
+        system = self._system()
+        abs2meta = system._var_allprocs_abs2meta
         of, wrt = abs_key
-        if self._system.comm.size > 1:
-            if wrt in self._system._outputs._views:
+        if system.comm.size > 1:
+            if wrt in system._outputs._views:
                 sz = abs2meta[wrt]['global_size']
             else:
                 sz = abs2meta[wrt]['size']
@@ -215,9 +218,9 @@ class Jacobian(object):
         str
             Info to prepend to messages.
         """
-        if self._system is None:
+        if self._system() is None:
             return type(self).__name__
-        return '{} in {}'.format(type(self).__name__, self._system.msginfo)
+        return '{} in {}'.format(type(self).__name__, self._system().msginfo)
 
     def _update(self, system):
         """

@@ -76,7 +76,7 @@ class DistribCompSimple(om.ExplicitComponent):
 
 
 class DistribInputComp(om.ExplicitComponent):
-    """Uses 2 procs and takes input var slices"""
+    """Uses all procs and takes input var slices"""
 
     def initialize(self):
         self.options['distributed'] = True
@@ -171,12 +171,27 @@ class DistribInputDistribOutputComp(om.ExplicitComponent):
         arr_size = self.options['arr_size']
 
         sizes, offsets = evenly_distrib_idxs(comm.size, arr_size)
+        self.sizes = sizes
+        self.offsets = offsets
+
         start = offsets[rank]
         end = start + sizes[rank]
 
         self.add_input('invec', np.ones(sizes[rank], float),
                        src_indices=np.arange(start, end, dtype=int))
         self.add_output('outvec', np.ones(sizes[rank], float))
+
+
+class DistribInputDistribOutputDiscreteComp(DistribInputDistribOutputComp):
+
+    def compute(self, inputs, outputs, discrete_inputs, discrete_outputs):
+        super(DistribInputDistribOutputDiscreteComp, self).compute(inputs, outputs)
+        discrete_outputs['disc_out'] = discrete_inputs['disc_in'] + 'bar'
+
+    def setup(self):
+        super(DistribInputDistribOutputDiscreteComp, self).setup()
+        self.add_discrete_input('disc_in', 'foo')
+        self.add_discrete_output('disc_out', 'foobar')
 
 
 class DistribNoncontiguousComp(om.ExplicitComponent):
@@ -259,7 +274,7 @@ class NonDistribGatherComp(om.ExplicitComponent):
         outputs['outvec'] = inputs['invec']
 
 
-@unittest.skipIf(PETScVector is not None, "Only runs when PETSc is not available")
+@unittest.skipUnless(PETScVector is None, "Only runs when PETSc is not available")
 class NOMPITests(unittest.TestCase):
 
     def test_distrib_idx_in_full_out(self):
@@ -288,7 +303,7 @@ class NOMPITests(unittest.TestCase):
         self.assertTrue(all(C2._outputs['outvec'] == np.array(range(size, 0, -1), float)*4))
 
 
-@unittest.skipUnless(PETScVector, "PETSc is required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class MPITests(unittest.TestCase):
 
     N_PROCS = 2
@@ -312,6 +327,126 @@ class MPITests(unittest.TestCase):
         p.run_model()
 
         self.assertTrue(all(C2._outputs['outvec'] == np.ones(size, float)*7.5))
+
+    def test_list_inputs_outputs(self):
+        size = 11
+
+        test = self
+
+        def verify(inputs, outputs, in_vals=1., out_vals=1., pathnames=False):
+            test.assertEqual(len(inputs), 1)
+            name, meta = inputs[0]
+            test.assertEqual(name, 'C2.invec' if pathnames else 'invec')
+            test.assertTrue(meta['shape'] == (size,))
+            test.assertTrue(all(meta['value'] == in_vals*np.ones(size)))
+
+            test.assertEqual(len(outputs), 1)
+            name, meta = outputs[0]
+            test.assertEqual(name, 'C2.outvec' if pathnames else 'outvec')
+            test.assertTrue(meta['shape'] == (size,))
+            test.assertTrue(all(meta['value'] == out_vals*np.ones(size)))
+
+        class Model(om.Group):
+            def setup(self):
+                C1 = self.add_subsystem("C1", InOutArrayComp(arr_size=size))
+                C2 = self.add_subsystem("C2", DistribCompSimple(arr_size=size))
+                self.connect('C1.outvec', 'C2.invec')
+
+            def configure(self):
+                # verify list_inputs/list_outputs work in configure
+                inputs = self.C2.list_inputs(shape=True, values=True, out_stream=None)
+                outputs = self.C2.list_outputs(shape=True, values=True, out_stream=None)
+                verify(inputs, outputs, pathnames=False)
+
+        p = om.Problem(Model())
+        p.setup()
+
+        # verify list_inputs/list_outputs work before final_setup
+        inputs = p.model.C2.list_inputs(shape=True, values=True, out_stream=None)
+        outputs = p.model.C2.list_outputs(shape=True, values=True, out_stream=None)
+        verify(inputs, outputs, pathnames=False)
+
+        p.final_setup()
+
+        p['C1.invec'] = np.ones(size, float) * 5.0
+
+        # verify list_inputs/list_outputs work before run
+        inputs = p.model.C2.list_inputs(shape=True, values=True, out_stream=None)
+        outputs = p.model.C2.list_outputs(shape=True, values=True, out_stream=None)
+        verify(inputs, outputs, pathnames=True)
+
+        p.run_model()
+
+        # verify list_inputs/list_outputs work after run
+        inputs = p.model.C2.list_inputs(shape=True, values=True, out_stream=None)
+        outputs = p.model.C2.list_outputs(shape=True, values=True, out_stream=None)
+        verify(inputs, outputs, in_vals=10., out_vals=7.5, pathnames=True)
+
+    def test_distrib_list_inputs_outputs(self):
+        size = 11
+
+        test = self
+
+        def verify(inputs, outputs, in_vals=1., out_vals=1., pathnames=False, comm=None, final=True):
+            global_shape = (size, ) if final else 'Unavailable'
+
+            if comm is not None:
+                sizes, offsets = evenly_distrib_idxs(comm.size, size)
+                local_size = sizes[comm.rank]
+            else:
+                local_size = size
+
+            test.assertEqual(len(inputs), 1)
+            name, meta = inputs[0]
+            test.assertEqual(name, 'C2.invec' if pathnames else 'invec')
+            test.assertEqual(meta['shape'], (local_size,))
+            test.assertEqual(meta['global_shape'], global_shape)
+            test.assertTrue(all(meta['value'] == in_vals*np.ones(local_size)))
+
+            test.assertEqual(len(outputs), 1)
+            name, meta = outputs[0]
+            test.assertEqual(name, 'C2.outvec' if pathnames else 'outvec')
+            test.assertEqual(meta['shape'], (local_size,))
+            test.assertEqual(meta['global_shape'], global_shape)
+            test.assertTrue(all(meta['value'] == out_vals*np.ones(local_size)))
+
+        class Model(om.Group):
+            def setup(self):
+                self.add_subsystem("C1", InOutArrayComp(arr_size=size))
+                self.add_subsystem("C2", DistribInputDistribOutputComp(arr_size=size))
+                self.add_subsystem("C3", DistribGatherComp(arr_size=size))
+                self.connect('C1.outvec', 'C2.invec')
+                self.connect('C2.outvec', 'C3.invec')
+
+            def configure(self):
+                # verify list_inputs/list_outputs work in configure for distributed comp
+                inputs = self.C2.list_inputs(shape=True, global_shape=True, values=True, out_stream=None)
+                outputs = self.C2.list_outputs(shape=True, global_shape=True, values=True, out_stream=None)
+                verify(inputs, outputs, pathnames=False, comm=self.comm, final=False)
+
+        p = om.Problem(Model())
+        p.setup()
+
+        # verify list_inputs/list_outputs work before final_setup for distributed comp
+        inputs = p.model.C2.list_inputs(shape=True, global_shape=True, values=True, out_stream=None)
+        outputs = p.model.C2.list_outputs(shape=True, global_shape=True, values=True, out_stream=None)
+        verify(inputs, outputs, pathnames=False, comm=p.comm, final=False)
+
+        p.final_setup()
+
+        p['C1.invec'] = np.ones(size, float) * 5.0
+
+        # verify list_inputs/list_outputs work before run for distributed comp
+        inputs = p.model.C2.list_inputs(shape=True, global_shape=True, values=True, out_stream=None)
+        outputs = p.model.C2.list_outputs(shape=True, global_shape=True, values=True, out_stream=None)
+        verify(inputs, outputs, pathnames=True, comm=p.comm, final=True)
+
+        p.run_model()
+
+        # verify list_inputs/list_outputs work after run for distributed comp
+        inputs = p.model.C2.list_inputs(shape=True, global_shape=True, values=True, out_stream=None)
+        outputs = p.model.C2.list_outputs(shape=True, global_shape=True, values=True, out_stream=None)
+        verify(inputs, outputs, in_vals=10., out_vals=20., pathnames=True, comm=p.comm, final=True)
 
     def test_distrib_idx_in_full_out(self):
         size = 11
@@ -411,7 +546,6 @@ class MPITests(unittest.TestCase):
             self.assertTrue(all(C2._outputs['outvec'] == C1._outputs['outvec']*2.))
             self.assertTrue(all(C3._outputs['outvec'] == C2._outputs['outvec']))
 
-    @unittest.skipUnless(MPI, "MPI is not active.")
     def test_overlapping_inputs_idxs(self):
         # distrib comp with src_indices that overlap, i.e. the same
         # entries are distributed to multiple processes
@@ -427,16 +561,28 @@ class MPITests(unittest.TestCase):
         # Conclude setup but don't run model.
         p.final_setup()
 
-        C1._inputs['invec'] = np.array(range(size, 0, -1), float)
+        input_vec = np.array(range(size, 0, -1), float)
+        C1._inputs['invec'] = input_vec
+
+        # C1 (an InOutArrayComp) doubles the input_vec
+        check_vec = input_vec * 2
 
         p.run_model()
 
-        self.assertTrue(all(C2._outputs['outvec'][:4] == np.array(range(size, 0, -1), float)[:4]*4))
-        self.assertTrue(all(C2._outputs['outvec'][8:] == np.array(range(size, 0, -1), float)[8:]*4))
+        np.testing.assert_allclose(C2._outputs['outvec'][:4], check_vec[:4]*2)
+        np.testing.assert_allclose(C2._outputs['outvec'][8:], check_vec[8:]*2)
 
         # overlapping part should be double size of the rest
-        self.assertTrue(all(C2._outputs['outvec'][4:8] ==
-                            np.array(range(size, 0, -1), float)[4:8]*8))
+        np.testing.assert_allclose(C2._outputs['outvec'][4:8], check_vec[4:8]*4)
+
+        np.testing.assert_allclose(p.get_val('C2.invec', get_remote=True),
+                                   np.hstack((check_vec[0:8], check_vec[4:11])))
+
+        dist_out = p.get_val('C2.outvec', get_remote=True)
+        np.testing.assert_allclose(dist_out[:11], dist_out[11:])
+        np.testing.assert_allclose(dist_out[:4], check_vec[:4] * 2)
+        np.testing.assert_allclose(dist_out[8:11], check_vec[8:] * 2)
+        np.testing.assert_allclose(dist_out[4:8], check_vec[4:8] * 4)
 
     def test_nondistrib_gather(self):
         # regular comp --> distrib comp --> regular comp.  last comp should
@@ -463,6 +609,7 @@ class MPITests(unittest.TestCase):
             self.assertTrue(all(C3._outputs['outvec'] == np.array(range(size, 0, -1), float)*4))
 
 
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class DeprecatedMPITests(unittest.TestCase):
 
     N_PROCS = 2
@@ -538,13 +685,12 @@ class DeprecatedMPITests(unittest.TestCase):
         self.assertTrue(all(C2._outputs['outvec'] == np.array(range(size, 0, -1), float)*4))
 
 
-@unittest.skipUnless(PETScVector, "PETSc is required.")
-@unittest.skipUnless(MPI, "MPI is required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class ProbRemoteTests(unittest.TestCase):
 
     N_PROCS = 4
 
-    def test_prob_getitem_err(self):
+    def test_prob_getval_dist_par(self):
         size = 3
 
         p = om.Problem()
@@ -565,125 +711,154 @@ class ProbRemoteTests(unittest.TestCase):
 
         p.run_model()
 
-        # test that getitem from Problem on a distrib var raises an exception
-        with self.assertRaises(Exception) as context:
-            ans = p.get_val('par.C2.invec', get_remote=True)
-        self.assertEqual(str(context.exception),
-                         "Problem: Retrieval of the full distributed variable 'par.C2.invec' is not supported.")
-        with self.assertRaises(Exception) as context:
-            ans = p.get_val('par.C2.outvec', get_remote=True)
-        self.assertEqual(str(context.exception),
-                         "Problem: Retrieval of the full distributed variable 'par.C2.outvec' is not supported.")
-        with self.assertRaises(Exception) as context:
-            ans = p.get_val('par.C1.invec', get_remote=True)
-        self.assertEqual(str(context.exception),
-                         "Problem: Retrieval of the full distributed variable 'par.C1.invec' is not supported.")
-        with self.assertRaises(Exception) as context:
-            ans = p.get_val('par.C1.outvec', get_remote=True)
-        self.assertEqual(str(context.exception),
-                         "Problem: Retrieval of the full distributed variable 'par.C1.outvec' is not supported.")
+        ans = p.get_val('par.C2.invec', get_remote=True)
+        np.testing.assert_allclose(ans, np.array([6, 3,3], dtype=float))
+        ans = p.get_val('par.C2.outvec', get_remote=True)
+        np.testing.assert_allclose(ans, np.array([12, 6, 6], dtype=float))
+        ans = p.get_val('par.C1.invec', get_remote=True)
+        np.testing.assert_allclose(ans, np.array([2, 1, 1], dtype=float))
+        ans = p.get_val('par.C1.outvec', get_remote=True)
+        np.testing.assert_allclose(ans, np.array([4, 2, 2], dtype=float))
+
+    def test_prob_getval_dist_par_disc(self):
+        size = 3
+
+        p = om.Problem()
+        top = p.model
+        par = top.add_subsystem('par', om.ParallelGroup())
+        C1 = par.add_subsystem("C1", DistribInputDistribOutputDiscreteComp(arr_size=size))
+        C2 = par.add_subsystem("C2", DistribInputDistribOutputDiscreteComp(arr_size=size))
+        p.setup()
+
+        # Conclude setup but don't run model.
+        p.final_setup()
+
+        if C1 in p.model.par._subsystems_myproc:
+            C1._inputs['invec'] = np.array(range(C1._inputs._data.size, 0, -1), float)
+            C1._discrete_inputs['disc_in'] = 'C1foo'
+
+        if C2 in p.model.par._subsystems_myproc:
+            C2._inputs['invec'] = np.array(range(C2._inputs._data.size, 0, -1), float) * 3
+            C2._discrete_inputs['disc_in'] = 'C2foo'
+
+        p.run_model()
+
+        ans = p.get_val('par.C2.invec', get_remote=True)
+        np.testing.assert_allclose(ans, np.array([6, 3,3], dtype=float))
+        ans = p.get_val('par.C2.outvec', get_remote=True)
+        np.testing.assert_allclose(ans, np.array([12, 6, 6], dtype=float))
+        ans = p.get_val('par.C1.invec', get_remote=True)
+        np.testing.assert_allclose(ans, np.array([2, 1, 1], dtype=float))
+        ans = p.get_val('par.C1.outvec', get_remote=True)
+        np.testing.assert_allclose(ans, np.array([4, 2, 2], dtype=float))
+
+        if C1 in p.model.par._subsystems_myproc:
+            ans = p.get_val('par.C1.disc_in', get_remote=False)
+            self.assertEqual(ans, 'C1foo')
+            ans = p.get_val('par.C1.disc_out', get_remote=False)
+            self.assertEqual(ans, 'C1foobar')
+
+        if C2 in p.model.par._subsystems_myproc:
+            ans = p.get_val('par.C2.disc_in', get_remote=False)
+            self.assertEqual(ans, 'C2foo')
+            ans = p.get_val('par.C2.disc_out', get_remote=False)
+            self.assertEqual(ans, 'C2foobar')
+
+        ans = p.get_val('par.C1.disc_in', get_remote=True)
+        self.assertEqual(ans, 'C1foo')
+        ans = p.get_val('par.C2.disc_in', get_remote=True)
+        self.assertEqual(ans, 'C2foo')
+        ans = p.get_val('par.C1.disc_out', get_remote=True)
+        self.assertEqual(ans, 'C1foobar')
+        ans = p.get_val('par.C2.disc_out', get_remote=True)
+        self.assertEqual(ans, 'C2foobar')
+
+    def test_prob_getval_dist_disc(self):
+        size = 14
+
+        p = om.Problem()
+
+        top = p.model
+        C1 = top.add_subsystem("C1", DistribInputDistribOutputDiscreteComp(arr_size=size))
+        p.setup()
+
+        # Conclude setup but don't run model.
+        p.final_setup()
+
+        rank = p.comm.rank
+
+        C1._inputs['invec'] = np.array(range(C1._inputs._data.size, 0, -1), float) * (rank + 1)
+        C1._discrete_inputs['disc_in'] = 'boo'
+
+        p.run_model()
+
+        if rank == 0:
+            ans = p.get_val('C1.invec', get_remote=False)
+            np.testing.assert_allclose(ans, np.array([4,3,2,1], dtype=float))
+            ans = p.get_val('C1.outvec', get_remote=False)
+            np.testing.assert_allclose(ans, np.array([8,6,4,2], dtype=float))
+        elif rank == 1:
+            ans = p.get_val('C1.invec', get_remote=False)
+            np.testing.assert_allclose(ans, np.array([8,6,4,2], dtype=float))
+            ans = p.get_val('C1.outvec', get_remote=False)
+            np.testing.assert_allclose(ans, np.array([16,12,8,4], dtype=float))
+        elif rank == 2:
+            ans = p.get_val('C1.invec', get_remote=False)
+            np.testing.assert_allclose(ans, np.array([9,6,3], dtype=float))
+            ans = p.get_val('C1.outvec', get_remote=False)
+            np.testing.assert_allclose(ans, np.array([18,12,6], dtype=float))
+        elif rank == 3:
+            ans = p.get_val('C1.invec', get_remote=False)
+            np.testing.assert_allclose(ans, np.array([12,8,4], dtype=float))
+            ans = p.get_val('C1.outvec', get_remote=False)
+            np.testing.assert_allclose(ans, np.array([24,16,8], dtype=float))
+
+        ans = p.get_val('C1.invec', get_remote=True)
+        np.testing.assert_allclose(ans, np.array([4,3,2,1,8,6,4,2,9,6,3,12,8,4], dtype=float))
+        ans = p.get_val('C1.outvec', get_remote=True)
+        np.testing.assert_allclose(ans, np.array([8,6,4,2,16,12,8,4,18,12,6,24,16,8], dtype=float))
+
+        ans = p.get_val('C1.disc_in', get_remote=False)
+        self.assertEqual(ans, 'boo')
+        ans = p.get_val('C1.disc_in', get_remote=True)
+        self.assertEqual(ans, 'boo')
+        ans = p.get_val('C1.disc_out', get_remote=False)
+        self.assertEqual(ans, 'boobar')
+        ans = p.get_val('C1.disc_out', get_remote=True)
+        self.assertEqual(ans, 'boobar')
 
 
-@unittest.skipUnless(PETScVector, "PETSc is required.")
-@unittest.skipUnless(MPI, "MPI is required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class MPIFeatureTests(unittest.TestCase):
 
     N_PROCS = 2
 
     def test_distribcomp_feature(self):
         import numpy as np
-
         import openmdao.api as om
-        from openmdao.utils.mpi import MPI
-        from openmdao.utils.array_utils import evenly_distrib_idxs
+        from openmdao.test_suite.components.distributed_components import DistribComp, Summer
 
-        if not MPI:
-            raise unittest.SkipTest()
-
-        rank = MPI.COMM_WORLD.rank
         size = 15
 
-        class DistribComp(om.ExplicitComponent):
-            def initialize(self):
-                self.options['distributed'] = True
+        model = om.Group()
+        model.add_subsystem("indep", om.IndepVarComp('x', np.zeros(size)))
+        model.add_subsystem("C2", DistribComp(size=size))
+        model.add_subsystem("C3", Summer(size=size))
 
-                self.options.declare('size', types=int, default=1,
-                                     desc="Size of input and output vectors.")
+        model.connect('indep.x', 'C2.invec')
+        model.connect('C2.outvec', 'C3.invec')
 
-            def setup(self):
-                comm = self.comm
-                rank = comm.rank
+        prob = om.Problem(model)
+        prob.setup()
 
-                size = self.options['size']
+        prob['indep.x'] = np.ones(size)
+        prob.run_model()
 
-                # results in 8 entries for proc 0 and 7 entries for proc 1 when using 2 processes.
-                sizes, offsets = evenly_distrib_idxs(comm.size, size)
-                start = offsets[rank]
-                end = start + sizes[rank]
-
-                self.add_input('invec', np.ones(sizes[rank], float),
-                               src_indices=np.arange(start, end, dtype=int))
-
-                self.add_output('outvec', np.ones(sizes[rank], float))
-
-            def compute(self, inputs, outputs):
-                if self.comm.rank == 0:
-                    outputs['outvec'] = inputs['invec'] * 2.0
-                else:
-                    outputs['outvec'] = inputs['invec'] * -3.0
-
-        class Summer(om.ExplicitComponent):
-            """Sums a distributed input."""
-
-            def initialize(self):
-                self.options.declare('size', types=int, default=1,
-                                     desc="Size of input and output vectors.")
-
-            def setup(self):
-                comm = self.comm
-                rank = comm.rank
-
-                size = self.options['size']
-
-                # this results in 8 entries for proc 0 and 7 entries for proc 1
-                # when using 2 processes.
-                sizes, offsets = evenly_distrib_idxs(comm.size, size)
-                start = offsets[rank]
-                end = start + sizes[rank]
-
-                # NOTE: you must specify src_indices here for the input. Otherwise,
-                #       you'll connect the input to [0:local_input_size] of the
-                #       full distributed output!
-                self.add_input('invec', np.ones(sizes[rank], float),
-                               src_indices=np.arange(start, end, dtype=int))
-
-                self.add_output('out', 0.0)
-
-            def compute(self, inputs, outputs):
-                data = np.zeros(1)
-                data[0] = np.sum(inputs['invec'])
-
-                total = np.zeros(1)
-                self.comm.Allreduce(data, total, op=MPI.SUM)
-
-                outputs['out'] = total[0]
-
-        p = om.Problem()
-        top = p.model
-        top.add_subsystem("indep", om.IndepVarComp('x', np.zeros(size)))
-        top.add_subsystem("C2", DistribComp(size=size))
-        top.add_subsystem("C3", Summer(size=size))
-
-        top.connect('indep.x', 'C2.invec')
-        top.connect('C2.outvec', 'C3.invec')
-
-        p.setup()
-
-        p['indep.x'] = np.ones(size)
-
-        p.run_model()
-
-        assert_rel_error(self, p['C3.out'], -5.)
+        assert_rel_error(self, prob['C2.invec'],
+                         np.ones((8,)) if model.comm.rank == 0 else np.ones((7,)))
+        assert_rel_error(self, prob['C2.outvec'],
+                         2*np.ones((8,)) if model.comm.rank == 0 else -3*np.ones((7,)))
+        assert_rel_error(self, prob['C3.out'], -5.)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")

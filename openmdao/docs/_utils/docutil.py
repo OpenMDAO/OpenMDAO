@@ -13,6 +13,8 @@ import subprocess
 import tempfile
 import unittest
 import traceback
+import ast
+
 from docutils import nodes
 
 from collections import namedtuple
@@ -575,10 +577,57 @@ def extract_output_blocks(run_output):
 
     return output_blocks
 
+def strip_decorators(src):
+    """
+    Remove any decorators from the source code of the method or function.
+
+    Parameters
+    ----------
+    src : str
+        Source code
+
+    Returns
+    -------
+    str
+        Source code minus any decorators
+    """
+    class Parser(ast.NodeVisitor):
+        def __init__(self):
+            self.function_node = None
+
+        def visit_FunctionDef(self, node):
+            self.function_node = node
+
+        def get_function(self):
+            return self.function_node
+
+    tree = ast.parse(src)
+    parser = Parser()
+    parser.visit(tree)
+
+    # get node for the first function
+    function_node = parser.get_function()
+    if not function_node.decorator_list:  # no decorators so no changes needed
+        return src
+
+    # Unfortunately, the ast library, for a decorated function, returns the line
+    #   number for the first decorator when asking for the line number of the function
+    # So using the line number for the argument for of the function, which is always
+    #   correct. But we assume that the argument is on the same line as the function.
+    # We also assume there IS an argument. If not, we raise an error.
+    if function_node.args.args:
+        function_lineno = function_node.args.args[0].lineno
+    else:
+        raise RuntimeError("Cannot determine line number for decorated function without args")
+    lines = src.splitlines()
+    lines_minus_decorator = lines[function_lineno - 1:]
+    return '\n'.join(lines_minus_decorator)
+
 
 def strip_header(src):
     """
-    Directly manipulating function text to strip header.
+    Directly manipulating function text to strip header, usually or maybe always just the
+    "def" lines for a method or function.
 
     This function assumes that the docstring and header, if any, have already been removed.
 
@@ -697,7 +746,7 @@ def run_code(code_to_run, path, module=None, cls=None, shows_plot=False, imports
             env['OPENMDAO_CURRENT_MODULE'] = module.__name__
             env['OPENMDAO_CODE_TO_RUN'] = code_to_run
 
-            p = subprocess.Popen(['mpirun', '-n', str(N_PROCS), 'python', _sub_runner],
+            p = subprocess.Popen(['mpirun', '-n', str(N_PROCS), sys.executable, _sub_runner],
                                  env=env)
             p.wait()
 
@@ -715,7 +764,7 @@ def run_code(code_to_run, path, module=None, cls=None, shows_plot=False, imports
                 with os.fdopen(fd, 'w') as tmp:
                     tmp.write(code_to_run)
                 try:
-                    p = subprocess.Popen(['python', code_to_run_path],
+                    p = subprocess.Popen([sys.executable, code_to_run_path],
                                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=os.environ)
                     output, _ = p.communicate()
                     if p.returncode != 0:
@@ -729,7 +778,7 @@ def run_code(code_to_run, path, module=None, cls=None, shows_plot=False, imports
                 env['OPENMDAO_CURRENT_MODULE'] = module.__name__
                 env['OPENMDAO_CODE_TO_RUN'] = code_to_run
 
-                p = subprocess.Popen(['python', _sub_runner],
+                p = subprocess.Popen([sys.executable, _sub_runner],
                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
                 output, _ = p.communicate()
                 if p.returncode != 0:

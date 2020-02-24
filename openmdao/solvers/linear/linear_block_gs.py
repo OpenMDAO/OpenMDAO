@@ -19,7 +19,7 @@ class LinearBlockGS(BlockLinearSolver):
         """
         Perform the operations in the iteration loop.
         """
-        system = self._system
+        system = self._system()
         mode = self._mode
         vec_names = self._vec_names
 

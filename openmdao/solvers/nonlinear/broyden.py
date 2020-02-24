@@ -10,11 +10,11 @@ import numpy as np
 
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.solver import NonlinearSolver
-from openmdao.utils.array_utils import sizes2offsets
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import simple_warning, warn_deprecation
 from openmdao.utils.mpi import MPI
 from openmdao.vectors.vector import INT_DTYPE
+
 
 CITATION = """@ARTICLE{
               Broyden1965ACo,
@@ -56,15 +56,10 @@ class BroydenSolver(NonlinearSolver):
         Number of computed jacobians.
     _converge_failures : int
         Number of consecutive iterations that failed to converge to the tol definied in options.
-    _distributed_idx : dict
-        Dictionary keyed by state name, contains a tuple of integers denoting the start and stop
-        index of that variable on that rank. Necessary for states that are distributed.
     _full_inverse : bool
         When True, Broyden considers the whole vector rather than a list of states.
     _recompute_jacobian : bool
         Flag that becomes True when Broyden detects it needs to recompute the inverse Jacobian.
-    _sendcounts : ndarray or None
-        Cached local indices of non duplicated vars under mpi.
     """
 
     SOLVER = 'BROYDEN'
@@ -102,9 +97,6 @@ class BroydenSolver(NonlinearSolver):
         # This gets set to True if the user doesn't declare any states.
         self._full_inverse = False
 
-        self._sendcounts = None
-        self._distributed_idx = {}
-
     def _declare_options(self):
         """
         Declare options before kwargs are processed in the init method.
@@ -141,6 +133,10 @@ class BroydenSolver(NonlinearSolver):
                              desc="Flag controls whether to perform Broyden update to the "
                                   "Jacobian. There are some applications where it may be useful "
                                   "to turn this off.")
+        self.options.declare('reraise_child_analysiserror', types=bool, default=True,
+                             desc='When the option is true, a solver will reraise any '
+                             'AnalysisError that arises during subsolve; when false, it will '
+                             'continue solving.')
 
         self.supports['gradients'] = True
         self.supports['implicit_components'] = True
@@ -161,26 +157,39 @@ class BroydenSolver(NonlinearSolver):
         self._computed_jacobians = 0
         iproc = system.comm.rank
 
+        rank = MPI.COMM_WORLD.rank if MPI is not None else 0
         self._disallow_discrete_outputs()
 
+        if self.options._dict['reraise_child_analysiserror']['value']:
+            pathname = self._system().pathname
+            if pathname:
+                pathname += ': '
+            msg = ("Deprecation warning: In V 3.x, reraise_child_analysiserror will default to "
+                   "False.")
+
+            if rank == 0:
+                warn_deprecation(pathname + msg)
+
         if self.linear_solver is not None:
-            self.linear_solver._setup_solvers(self._system, self._depth + 1)
+            self.linear_solver._setup_solvers(system, self._depth + 1)
         else:
             self.linear_solver = system.linear_solver
 
         if self.linesearch is not None:
-            self.linesearch._setup_solvers(self._system, self._depth + 1)
+            self.linesearch._setup_solvers(system, self._depth + 1)
             self.linesearch._do_subsolve = True
 
         else:
             # In OpenMDAO 3.x, we will be making BoundsEnforceLS the default line search.
             # This deprecation warning is to prepare users for the change.
-            pathname = self._system.pathname
+            pathname = system.pathname
             if pathname:
                 pathname += ': '
             msg = 'Deprecation warning: In V 3.0, the default Broyden solver setup will change ' + \
                   'to use the BoundsEnforceLS line search.'
             warn_deprecation(pathname + msg)
+
+        self._disallow_distrib_solve()
 
         states = self.options['state_vars']
         prom2abs = system._var_allprocs_prom2abs_list['output']
@@ -197,37 +206,14 @@ class BroydenSolver(NonlinearSolver):
             n = 0
             sizes = system._var_allprocs_abs2meta
 
-            self._distributed_idx = {}
             for i, name in enumerate(states):
                 size = sizes[prom2abs[name][0]]['global_size']
                 self._idx[name] = (n, n + size)
                 n += size
-
-                if system.comm.size > 0:
-                    # To handle true distributed variables, each rank where they reside must
-                    # know the index range that it owns.
-                    vsizes = system._var_sizes['nonlinear']['output']
-                    gstart = np.sum(vsizes[:iproc, i])
-                    gend = gstart + vsizes[iproc, i]
-                    self._distributed_idx[name] = (gstart, gend)
-
-            if system.comm.size > 0:
-                abs2idx = system._var_allprocs_abs2idx['nonlinear']
-                local_idx = [abs2idx[prom2abs[name][0]] for name in states]
-                local_idx = np.array(local_idx)
-                owned_size_totals = np.sum(system._owned_sizes[:, local_idx], axis=1)
-                disps = sizes2offsets(owned_size_totals, dtype=INT_DTYPE)
-                self._sendcounts = (owned_size_totals, disps)
-
         else:
             # Full system size.
             self._full_inverse = True
             n = np.sum(system._owned_sizes)
-
-            if system.comm.size > 0:
-                owned_size_totals = np.sum(system._owned_sizes, axis=1)
-                disps = sizes2offsets(owned_size_totals, dtype=INT_DTYPE)
-                self._sendcounts = (owned_size_totals, disps)
 
         self.size = n
         self.Gm = np.empty((n, n))
@@ -326,10 +312,10 @@ class BroydenSolver(NonlinearSolver):
         float
             Initial absolute error in the user-specified residuals.
         """
-        system = self._system
+        system = self._system()
         if self.options['debug_print']:
-            self._err_cache['inputs'] = self._system._inputs._copy_views()
-            self._err_cache['outputs'] = self._system._outputs._copy_views()
+            self._err_cache['inputs'] = system._inputs._copy_views()
+            self._err_cache['outputs'] = system._outputs._copy_views()
 
         # Convert local storage if we are under complex step.
         if system.under_complex_step:
@@ -351,7 +337,7 @@ class BroydenSolver(NonlinearSolver):
         # to trigger reconvergence, so nudge the outputs slightly so that we always get at least
         # one iteration of Broyden.
         if system.under_complex_step and self.options['cs_reconverge']:
-            system._outputs._data += np.linalg.norm(self._system._outputs._data) * 1e-10
+            system._outputs._data += np.linalg.norm(system._outputs._data) * 1e-10
 
         # Start with initial states.
         self.xm = self.get_vector(system._outputs)
@@ -380,10 +366,10 @@ class BroydenSolver(NonlinearSolver):
             Norm of the residuals.
         """
         # Need to cache the initial residuals, which is done in this function.
-        self.fxm = fxm = self.get_vector(self._system._residuals)
+        self.fxm = fxm = self.get_vector(self._system()._residuals)
         if not self._full_inverse:
             # Use full model residual for driving the main loop convergence.
-            fxm = self._system._residuals._data
+            fxm = self._system()._residuals._data
 
         return self.compute_norm(fxm)
 
@@ -404,25 +390,13 @@ class BroydenSolver(NonlinearSolver):
         float
             Norm of vec, computed on rank 0 and broadcast to all other ranks.
         """
-        system = self._system
-
-        if system.comm.size > 1:
-
-            # Norms computed for all vars on rank 0, then broadcast out.
-            if system.comm.rank == 0:
-                norm = np.linalg.norm(vec)
-            else:
-                norm = 0.0
-            norm = system.comm.bcast(norm, root=0)
-            return norm
-
         return np.linalg.norm(vec)
 
     def _single_iteration(self):
         """
         Perform the operations in the iteration loop.
         """
-        system = self._system
+        system = self._system()
         Gm = self._update_inverse_jacobian()
         fxm = self.fxm
 
@@ -496,14 +470,13 @@ class BroydenSolver(NonlinearSolver):
 
         # Apply the Broyden Update approximation to the previous value of the inverse jacobian.
         if self.options['update_broyden'] and not self._recompute_jacobian:
-            if self._system.comm.rank == 0:
-                dfxm = self.delta_fxm
-                fact = np.linalg.norm(dfxm)
+            dfxm = self.delta_fxm
+            fact = np.linalg.norm(dfxm)
 
-                # Sometimes you can get stuck, particularly when enforcing bounds in a linesearch.
-                # Make sure we don't update in this case because of divide by zero.
-                if fact > self.options['atol']:
-                    Gm += np.outer((self.delta_xm - Gm.dot(dfxm)), dfxm * (1.0 / fact**2))
+            # Sometimes you can get stuck, particularly when enforcing bounds in a linesearch.
+            # Make sure we don't update in this case because of divide by zero.
+            if fact > self.options['atol']:
+                Gm += np.outer((self.delta_xm - Gm.dot(dfxm)), dfxm * (1.0 / fact**2))
 
         # Solve for total derivatives of user-requested residuals wrt states.
         elif self.options['compute_jacobian']:
@@ -538,32 +511,10 @@ class BroydenSolver(NonlinearSolver):
         ndarray
             Array containing values of vector at desired states.
         """
-        system = self._system
-        states = self.options['state_vars']
-
-        if system.comm.size > 1:
-            states = None if not states else states
-
-            out_vec = vec._data
-            mpi_typ = MPI.C_DOUBLE_COMPLEX if system.under_complex_step else MPI.DOUBLE
-
-            _, _, local2owned_inds, noncontig_dist_inds = \
-                system._get_nodup_out_ranges(var_list=states)
-
-            # gather the 'owned' parts of out_vec from each process
-            xm = np.empty(self.size, dtype=out_vec.dtype)
-            system.comm.Gatherv((out_vec[local2owned_inds], local2owned_inds.size, mpi_typ),
-                                (xm, self._sendcounts, mpi_typ),
-                                root=0)
-
-            # Convert xm to the same ordering that the matrix expects, where
-            # dist vars are contiguous and other vars appear in 'execution' order.
-            xm = xm[noncontig_dist_inds]
-
-        elif self._full_inverse:
+        if self._full_inverse:
             xm = vec._data.copy()
-
         else:
+            states = self.options['state_vars']
             xm = self.xm.copy()
             for name in states:
                 i, j = self._idx[name]
@@ -580,66 +531,15 @@ class BroydenSolver(NonlinearSolver):
         new_val : ndarray
             New values for states.
         """
-        system = self._system
-        outputs = system._outputs
-        states = self.options['state_vars']
+        outputs = self._system()._outputs
 
-        if system.comm.size > 1:
-            states = None if not states else states
-
-            _, nodup2local_inds, _, _ = system._get_nodup_out_ranges(var_list=states)
-
-            mpi_typ = MPI.C_DOUBLE_COMPLEX if system.under_complex_step else MPI.DOUBLE
-
-            if system.comm.rank > 0:
-                new_val = np.zeros(new_val.shape, dtype=new_val.dtype)
-
-            # This may send more data than necessary, but the alternative is to use a lot
-            # of memory on rank 0 to store the chunk that each proc needs and then do a
-            # Scatterv.
-            system.comm.Bcast((new_val, mpi_typ), root=0)
-
-            outputs._data[:] = new_val[..., nodup2local_inds]
-
-        elif self._full_inverse:
+        if self._full_inverse:
             outputs._data[:] = new_val
-
         else:
             states = self.options['state_vars']
             for name in states:
                 i, j = self._idx[name]
                 outputs[name] = new_val[i:j]
-
-    def get_linear_vector(self):
-        """
-        Return the linear vector outputs for the states specified in options.
-
-        This is only used under mpi when we aren't taking a full inverse.
-
-        Returns
-        -------
-        ndarray
-            Array containing values of residuals.
-        """
-        system = self._system
-        vec = system._vectors['output']['linear']._data
-        states = self.options['state_vars']
-        states = None if not states else states
-
-        mpi_typ = MPI.C_DOUBLE_COMPLEX if system.under_complex_step else MPI.DOUBLE
-
-        _, _, local2owned_inds, noncontig_dist_inds = \
-            system._get_nodup_out_ranges(var_list=states)
-
-        # gather the 'owned' parts of vec from each process
-        dx = np.empty(self.size, dtype=vec.dtype)
-        system.comm.Gatherv((vec[local2owned_inds], local2owned_inds.size, mpi_typ),
-                            (dx, self._sendcounts, mpi_typ),
-                            root=0)
-
-        # Convert dx to the same ordering that the matrix expects, where
-        # dist vars are contiguous and other vars appear in 'execution' order.
-        return dx[noncontig_dist_inds]
 
     def set_linear_vector(self, dx):
         """
@@ -650,34 +550,13 @@ class BroydenSolver(NonlinearSolver):
         dx : ndarray
             Full step in the states for this iteration.
         """
-        system = self._system
-        linear = self._system._vectors['output']['linear']
+        linear = self._system()._vectors['output']['linear']
 
-        if system.comm.size > 1:
-            states = self.options['state_vars']
-            states = None if not states else states
-
-            _, nodup2local_inds, _, _ = system._get_nodup_out_ranges(var_list=states)
-
-            mpi_typ = MPI.C_DOUBLE_COMPLEX if system.under_complex_step else MPI.DOUBLE
-
-            if system.comm.rank > 0:
-                dx = np.zeros(dx.shape, dtype=dx.dtype)
-
-            # This may send more data than necessary, but the alternative is to use a lot
-            # of memory on rank 0 to store the chunk that each proc needs and then do a
-            # Scatterv.
-            system.comm.Bcast((dx, mpi_typ), root=0)
-
-            linear._data[:] = dx[..., nodup2local_inds]
-
-        elif self._full_inverse:
+        if self._full_inverse:
             linear._data[:] = dx
-
         else:
             linear.set_const(0.0)
-            states = self.options['state_vars']
-            for name in states:
+            for name in self.options['state_vars']:
                 i, j = self._idx[name]
                 linear[name] = dx[i:j]
 
@@ -693,8 +572,7 @@ class BroydenSolver(NonlinearSolver):
         # TODO : Consider promoting this capability out into OpenMDAO so other solvers can use the
         # same code.
         # TODO : Can do each state in parallel if procs are available.
-        system = self._system
-        mpi_size = system.comm.size
+        system = self._system()
         states = self.options['state_vars']
         d_res = system._vectors['residual']['linear']
         d_out = system._vectors['output']['linear']
@@ -724,31 +602,18 @@ class BroydenSolver(NonlinearSolver):
 
                 # Increment each variable.
                 if wrt_name in d_res:
-                    if mpi_size > 1:
-                        gstart, gend = self._distributed_idx[wrt_name]
-                        if j >= gstart and j < gend:
-                            d_wrt[j - gstart] = 1.0
-                    else:
-                        d_wrt[j] = 1.0
+                    d_wrt[j] = 1.0
 
                 # Solve for total derivatives.
                 ln_solver.solve(['linear'], 'fwd')
 
                 # Extract results.
-                if system.comm.size > 1:
-                    inv_jac[:, i_wrt + j] = self.get_linear_vector()
-
-                else:
-                    for of_name in states:
-                        i_of, j_of = self._idx[of_name]
-                        inv_jac[i_of:j_of, i_wrt + j] = d_out[of_name]
+                for of_name in states:
+                    i_of, j_of = self._idx[of_name]
+                    inv_jac[i_of:j_of, i_wrt + j] = d_out[of_name]
 
                 if wrt_name in d_res:
-                    if mpi_size > 1:
-                        if j >= gstart and j < gend:
-                            d_wrt[j - gstart] = 0.0
-                    else:
-                        d_wrt[j] = 0.0
+                    d_wrt[j] = 0.0
 
         # Enable local fd
         system._owns_approx_jac = approx_status
@@ -766,7 +631,7 @@ class BroydenSolver(NonlinearSolver):
         ndarray
             New inverse Jacobian.
         """
-        system = self._system
+        system = self._system()
 
         # Disable local fd
         approx_status = system._owns_approx_jac
@@ -791,9 +656,9 @@ class BroydenSolver(NonlinearSolver):
         """
         Print header text before solving.
         """
-        if self.options['iprint'] > 0 and self._system.comm.rank == 0:
+        if self.options['iprint'] > 0 and self._system().comm.rank == 0:
 
-            pathname = self._system.pathname
+            pathname = self._system().pathname
             if pathname:
                 nchar = len(pathname)
                 prefix = self._solver_info.prefix

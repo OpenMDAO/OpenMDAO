@@ -266,7 +266,7 @@ class SqliteRecorder(CaseRecorder):
 
         # grab the system
         if isinstance(recording_requester, Driver):
-            system = recording_requester._problem.model
+            system = recording_requester._problem().model
             driver = recording_requester
         elif isinstance(recording_requester, System):
             system = recording_requester
@@ -274,7 +274,7 @@ class SqliteRecorder(CaseRecorder):
             system = recording_requester.model
             driver = recording_requester.driver
         elif isinstance(recording_requester, Solver):
-            system = recording_requester._system
+            system = recording_requester._system()
         else:
             raise ValueError('Driver encountered a recording_requester it cannot handle'
                              ': {0}'.format(recording_requester))
@@ -351,6 +351,11 @@ class SqliteRecorder(CaseRecorder):
                 self._abs2meta[name]['type'] = ['input']
                 self._abs2meta[name]['explicit'] = True
 
+            # merge current abs2meta with this system's version
+            for name, meta in iteritems(self._abs2meta):
+                if name in system._var_abs2meta:
+                    meta.update(system._var_abs2meta[name])
+
             self._cleanup_abs2meta()
 
             # store the updated abs2prom and prom2abs
@@ -384,8 +389,8 @@ class SqliteRecorder(CaseRecorder):
             Dictionary containing execution metadata.
         """
         if self.connection:
-            outputs = data['out']
-            inputs = data['in']
+            outputs = data['output']
+            inputs = data['input']
 
             # convert to list so this can be dumped as JSON
             for in_out in (inputs, outputs):
@@ -423,7 +428,7 @@ class SqliteRecorder(CaseRecorder):
             Dictionary containing execution metadata.
         """
         if self.connection:
-            outputs = data['out']
+            outputs = data['output']
 
             # convert to list so this can be dumped as JSON
             if outputs is not None:
@@ -455,16 +460,14 @@ class SqliteRecorder(CaseRecorder):
             Dictionary containing execution metadata.
         """
         if self.connection:
-            inputs = data['i']
-            outputs = data['o']
-            residuals = data['r']
+            inputs = data['input']
+            outputs = data['output']
+            residuals = data['residual']
 
             # convert to list so this can be dumped as JSON
             for i_o_r in (inputs, outputs, residuals):
-                if i_o_r is None:
-                    continue
-                for var in i_o_r:
-                    i_o_r[var] = make_serializable(i_o_r[var])
+                for var, dat in i_o_r.items():
+                    i_o_r[var] = make_serializable(dat)
 
             outputs_text = json.dumps(outputs)
             inputs_text = json.dumps(inputs)
@@ -504,9 +507,9 @@ class SqliteRecorder(CaseRecorder):
         if self.connection:
             abs = data['abs']
             rel = data['rel']
-            inputs = data['i']
-            outputs = data['o']
-            residuals = data['r']
+            inputs = data['input']
+            outputs = data['output']
+            residuals = data['residual']
 
             # convert to list so this can be dumped as JSON
             for i_o_r in (inputs, outputs, residuals):
@@ -531,7 +534,7 @@ class SqliteRecorder(CaseRecorder):
                            abs, rel, inputs_text, outputs_text, residuals_text))
 
                 # get the pathname of the source system
-                source_system = recording_requester._system.pathname
+                source_system = recording_requester._system().pathname
                 if source_system == '':
                     source_system = 'root'
 
@@ -591,13 +594,14 @@ class SqliteRecorder(CaseRecorder):
             try:
                 pickled_metadata = pickle.dumps(user_options, self._pickle_version)
             except Exception:
-                pickled_metadata = pickle.dumps(OptionsDictionary(), self._pickle_version)
-                simple_warning("Trying to record options which cannot be pickled "
-                               "on system with name: %s. Use the 'options_excludes' "
-                               "recording option on system objects to avoid attempting "
-                               "to record options which cannot be pickled. Skipping "
-                               "recording options for this system." % recording_requester.name,
-                               RuntimeWarning)
+                try:
+                    for key, values in user_options._dict.items():
+                        pickle.dumps(values, self._pickle_version)
+                except Exception:
+                    pickled_metadata = pickle.dumps(OptionsDictionary(), self._pickle_version)
+                    simple_warning("Trying to record option '%s' which cannot be pickled on system "
+                                   "%s. Set 'recordable' to False. Skipping recording options for "
+                                   "this system." % (key, recording_requester.msginfo))
 
             path = recording_requester.pathname
             if not path:
@@ -625,7 +629,7 @@ class SqliteRecorder(CaseRecorder):
             The Solver that would like to record its metadata.
         """
         if self.connection:
-            path = recording_requester._system.pathname
+            path = recording_requester._system().pathname
             solver_class = type(recording_requester).__name__
             if not path:
                 path = 'root'

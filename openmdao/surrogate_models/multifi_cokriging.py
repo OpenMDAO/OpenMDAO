@@ -400,7 +400,7 @@ class MultiFiCoKriging(object):
         Returns
         -------
         ndarray
-            Correlatioin matrix.
+            Correlation matrix.
         """
         D = self.D[lvl]
         n_samples = self.n_samples[lvl]

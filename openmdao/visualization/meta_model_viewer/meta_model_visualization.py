@@ -584,13 +584,23 @@ class MetaModelVisualization(object):
         right_plot_fig.scatter(x=data[:, 3], y=data[:, 1], line_color=None, fill_color='#000000',
                                fill_alpha=self.right_alphas.tolist())
 
+        span_width = self.dist_range * (max(y_data) - min(y_data))
+
         # Set the right_plot data source to new values
         self.right_plot_scatter_source.data = dict(
-            right_slice_x=np.repeat(x_value, self.resolution), right_slice_y=y_data)
+            right_slice_x=np.repeat(x_value, self.resolution), right_slice_y=y_data,
+            left_dashed=[i - span_width for i in np.repeat(x_value, self.resolution)],
+            right_dashed=[i + span_width for i in np.repeat(x_value, self.resolution)])
 
         self.contour_plot.line(
             'right_slice_x', 'right_slice_y', source=self.right_plot_scatter_source,
             color='black', line_width=2)
+        self.contour_plot.line(
+            'left_dashed', 'right_slice_y', line_dash='dashed',
+            source=self.right_plot_scatter_source, color='black', line_width=2)
+        self.contour_plot.line(
+            'right_dashed', 'right_slice_y', line_dash='dashed',
+            source=self.right_plot_scatter_source, color='black', line_width=2)
 
         return self.right_plot_fig
 
@@ -657,14 +667,23 @@ class MetaModelVisualization(object):
             (self.output_select.value + " (train)", '@y'),
         ]))
 
+        span_width = self.dist_range * (max(x_data) - min(x_data))
+
         # Set the right_plot data source to new values
         self.bottom_plot_scatter_source.data = dict(
-            bot_slice_x=x_data,
-            bot_slice_y=np.repeat(y_value, self.resolution))
+            bot_slice_x=x_data, bot_slice_y=np.repeat(y_value, self.resolution),
+            upper_dashed=[i + span_width for i in np.repeat(y_value, self.resolution)],
+            lower_dashed=[i - span_width for i in np.repeat(y_value, self.resolution)])
 
         self.contour_plot.line(
             'bot_slice_x', 'bot_slice_y', source=self.bottom_plot_scatter_source, color='black',
             line_width=2)
+        self.contour_plot.line(
+            'bot_slice_x', 'upper_dashed', line_dash='dashed',
+            source=self.bottom_plot_scatter_source, color='black', line_width=2)
+        self.contour_plot.line(
+            'bot_slice_x', 'lower_dashed', line_dash='dashed',
+            source=self.bottom_plot_scatter_source, color='black', line_width=2)
 
         return self.bottom_plot_fig
 
@@ -915,7 +934,7 @@ class MetaModelVisualization(object):
         self._update_all_plots()
 
 
-def view_metamodel(meta_model_comp, resolution, port_number):
+def view_metamodel(meta_model_comp, resolution, port_number, browser):
     """
     Visualize a metamodel.
 
@@ -927,6 +946,8 @@ def view_metamodel(meta_model_comp, resolution, port_number):
         Number of points to control contour plot resolution.
     port_number : int
         Bokeh plot port number.
+    browser : bool
+        Boolean to show the browser
     """
     from bokeh.application.application import Application
     from bokeh.application.handlers import FunctionHandler
@@ -934,7 +955,10 @@ def view_metamodel(meta_model_comp, resolution, port_number):
     def make_doc(doc):
         MetaModelVisualization(meta_model_comp, resolution, doc=doc)
 
-    # print('Opening Bokeh application on http://localhost:5006/')
     server = Server({'/': Application(FunctionHandler(make_doc))}, port=int(port_number))
-    server.io_loop.add_callback(server.show, "/")
+    if browser:
+        server.io_loop.add_callback(server.show, "/")
+    else:
+        print('Server started, to view go to http://localhost:{}/'.format(port_number))
+
     server.io_loop.start()

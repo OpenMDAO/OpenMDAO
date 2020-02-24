@@ -512,6 +512,29 @@ class TestEQConstraintComp(unittest.TestCase):
         for (of, wrt) in cpd['equal']:
             assert_almost_equal(cpd['equal'][of, wrt]['abs error'], 0.0, decimal=5)
 
+    def test_specified_shape_rhs_val(self):
+        prob = om.Problem()
+        model = prob.model
+
+        shape = (3, 2, 4)
+
+        rhs = np.zeros(shape)
+
+        model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(shape)))
+        model.add_subsystem('equal', om.EQConstraintComp('y', val=np.ones(shape),
+                                                         rhs_val=rhs))
+
+        model.connect('indep.x', 'equal.lhs:y')
+
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob['equal.y'], np.ones(shape) - rhs, 1e-6)
+
+        cpd = prob.check_partials(out_stream=None)
+        for (of, wrt) in cpd['equal']:
+            assert_almost_equal(cpd['equal'][of, wrt]['abs error'], 0.0, decimal=5)
+
     def test_renamed_vars(self):
         prob = om.Problem()
         model = prob.model

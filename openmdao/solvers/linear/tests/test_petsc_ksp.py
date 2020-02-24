@@ -21,7 +21,7 @@ from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 
 
-@unittest.skipUnless(PETScVector, "PETSc is required.")
+@unittest.skipUnless(PETScVector is not None, "PETSc is required.")
 class TestPETScKrylov(unittest.TestCase):
 
     def test_options(self):
@@ -386,7 +386,7 @@ class TestPETScKrylov(unittest.TestCase):
         model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        model.nonlinear_solver = om.NewtonSolver()
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         model.linear_solver = om.PETScKrylov()
 
         model.approx_totals(method='cs')
@@ -613,7 +613,7 @@ class TestPETScKrylovSolverFeature(unittest.TestCase):
         model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        model.nonlinear_solver = om.NewtonSolver()
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         model.linear_solver = om.PETScKrylov()
 
         model.linear_solver.precon = om.LinearBlockGS()
@@ -648,7 +648,7 @@ class TestPETScKrylovSolverFeature(unittest.TestCase):
         model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        model.nonlinear_solver = om.NewtonSolver()
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         model.linear_solver = om.PETScKrylov()
 
         model.linear_solver.precon = om.DirectSolver()

@@ -7,7 +7,7 @@ import numpy as np
 from numpy.testing import assert_array_almost_equal
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
+from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials, assert_warning
 
 
 class AkimaTestCase(unittest.TestCase):
@@ -42,8 +42,8 @@ class AkimaTestCase(unittest.TestCase):
                         16.63928669, 16.8857123 , 17.1384785 , 17.39751585, 17.66275489,
                         17.93412619, 18.21156029, 18.49498776, 18.78433915, 19.07954501,
                         19.38053589, 19.68724235, 19.99959495, 20.31752423, 20.64096076,
-                        20.96983509, 21.47630381, 22.33596028, 23.44002074, 24.67782685,
-                        25.93872026, 27.11204263, 28.0871356 , 28.75334084, 29.        ]])
+                        20.96983509, 21.37579297, 21.94811407, 22.66809748, 23.51629844,
+                        24.47327219, 25.51957398, 26.63575905, 27.80238264, 29.        ]])
 
 
         assert_array_almost_equal(y, prob['akima.chord:y'])
@@ -71,7 +71,7 @@ class AkimaTestCase(unittest.TestCase):
         prob.run_model()
 
         y = np.array([[ 5.        ,  9.4362525 , 12.        , 13.0012475 , 14.        ,
-                        14.99875415, 16.        , 17.93874585, 21.        , 25.8125    ,
+                        14.99875415, 16.        , 17.93874585, 21.        , 24.625    ,
                         29.        ]])
 
         assert_array_almost_equal(y, prob['akima.chord:y'])
@@ -108,16 +108,30 @@ class AkimaTestCase(unittest.TestCase):
 
         y = np.array([[ 5.        , 12.        , 13.01239669, 14.        , 14.99888393,
                         16.        , 17.06891741, 18.26264881, 19.5750558 , 21.        ,
-                        25.36979167, 29.        ],
+                        24.026042, 29.        ],
                       [ 7.        , 13.        , 11.02673797,  9.        ,  7.09090909,
                         6.        ,  6.73660714,  8.46428571, 10.45982143, 12.        ,
-                        13.26785714, 14.        ]])
+                        13.08035714, 14.        ]])
 
         assert_array_almost_equal(y, prob['akima.chord:y'])
 
         derivs = prob.check_partials(compact_print=True, method='cs')
 
         assert_check_partials(derivs, atol=1e-14, rtol=1e-14)
+
+    def test_akima_spline_comp_deprecation(self):
+        xcp = np.array([1.0, 2.0, 4.0, 6.0, 10.0, 12.0])
+        ycp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
+        ncp = len(xcp)
+        n = 50
+        x = np.linspace(1.0, 12.0, n)
+
+        prob = om.Problem()
+
+        msg = "'AkimaSplineComp' has been deprecated. Use 'SplineComp' instead."
+        with assert_warning(DeprecationWarning, msg):
+            comp = om.AkimaSplineComp(num_control_points=ncp, num_points=n,
+                                      name='chord', input_x=True, input_xcp=True)
 
 
 class TestAkimaFeature(unittest.TestCase):
@@ -156,8 +170,8 @@ class TestAkimaFeature(unittest.TestCase):
                         16.63928669, 16.8857123 , 17.1384785 , 17.39751585, 17.66275489,
                         17.93412619, 18.21156029, 18.49498776, 18.78433915, 19.07954501,
                         19.38053589, 19.68724235, 19.99959495, 20.31752423, 20.64096076,
-                        20.96983509, 21.47630381, 22.33596028, 23.44002074, 24.67782685,
-                        25.93872026, 27.11204263, 28.0871356 , 28.75334084, 29.        ]])
+                        20.96983509, 21.37579297, 21.94811407, 22.66809748, 23.51629844,
+                        24.47327219, 25.51957398, 26.63575905, 27.80238264, 29.        ]])
 
 
         assert_rel_error(self, prob['akima.chord:y'], y, 1e-6)
@@ -185,7 +199,7 @@ class TestAkimaFeature(unittest.TestCase):
         prob.run_model()
 
         y = np.array([[ 5.        ,  9.4362525 , 12.        , 13.0012475 , 14.        ,
-                        14.99875415, 16.        , 17.93874585, 21.        , 25.8125    ,
+                        14.99875415, 16.        , 17.93874585, 21.        , 24.625    ,
                         29.        ]])
 
         assert_rel_error(self, prob['akima.chord:y'], y, 1e-6)

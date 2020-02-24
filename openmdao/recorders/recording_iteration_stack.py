@@ -1,5 +1,9 @@
 """Management of iteration stack for recording."""
+import weakref
+
 from openmdao.utils.mpi import MPI
+
+_norec_funcs = frozenset(['_run_apply', '_compute_totals'])
 
 
 class _RecIteration(object):
@@ -23,6 +27,7 @@ class _RecIteration(object):
         """
         self.stack = []
         self.prefix = None
+        self._norec_refcount = 0
 
     def print_recording_iteration_stack(self):
         """
@@ -66,6 +71,33 @@ class _RecIteration(object):
 
         return prefix + separator.join(coord_list)
 
+    def push(self, iter_coord):
+        """
+        Push the current iteration coordinate onto the stack.
+
+        Parameters
+        ----------
+        iter_coord : tuple
+            (func_name, iter_count) for the current iteration.
+        """
+        self.stack.append(iter_coord)
+        if iter_coord[0] in _norec_funcs:
+            self._norec_refcount += 1
+
+    def pop(self):
+        """
+        Pop the current iteration coordinate off of the stack.
+
+        Returns
+        -------
+        tuple
+            (function_name, iter_count) for current iteration.
+        """
+        iter_coord = self.stack.pop()
+        if iter_coord[0] in _norec_funcs:
+            self._norec_refcount -= 1
+        return iter_coord
+
 
 class Recording(object):
     """
@@ -80,7 +112,7 @@ class Recording(object):
         Name of object getting recorded.
     iter_count : int
         Current counter of iterations completed.
-    recording_requester : object
+    recording_requester : weakref to object
         The object that wants to be recorded.
     stack : list
         Stack containing names and iteration counts.
@@ -107,13 +139,12 @@ class Recording(object):
         """
         self.name = name
         self.iter_count = iter_count
-        self.recording_requester = recording_requester
-        self.stack = recording_requester._recording_iter.stack
+        self.recording_requester = weakref.ref(recording_requester)
         self.abs = 0
         self.rel = 0
 
         from openmdao.solvers.solver import Solver
-        self._is_solver = isinstance(self.recording_requester, Solver)
+        self._is_solver = isinstance(recording_requester, Solver)
 
     def __enter__(self):
         """
@@ -124,7 +155,7 @@ class Recording(object):
         self : object
             self
         """
-        self.stack.append((self.name, self.iter_count))
+        self.recording_requester()._recording_iter.push((self.name, self.iter_count))
         return self
 
     def __exit__(self, *args):
@@ -136,23 +167,14 @@ class Recording(object):
         *args : array
             Solver recording requires extra args.
         """
-        # Determine if recording is justified.
-        do_recording = True
-
-        for stack_item in self.stack:
-            if stack_item[0] in ('_run_apply', '_compute_totals'):
-                do_recording = False
-                break
-
-        if do_recording:
+        requester = self.recording_requester()
+        if requester._recording_iter._norec_refcount == 0:
             if self._is_solver:
-                self.recording_requester.record_iteration(abs=self.abs, rel=self.rel)
+                requester.record_iteration(abs=self.abs, rel=self.rel)
             else:
-                self.recording_requester.record_iteration()
+                requester.record_iteration()
 
         # Enable the following line for stack debugging.
         # print_recording_iteration_stack()
 
-        self.stack.pop()
-
-        self.recording_requester = None
+        requester._recording_iter.pop()

@@ -5,6 +5,7 @@ import unittest
 from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent, ExecComp
 from openmdao.api import NewtonSolver, PETScKrylov, NonlinearBlockGS, LinearBlockGS
 from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.mpi import MPI
 
 try:
     from openmdao.parallel_api import PETScVector
@@ -22,7 +23,7 @@ class ReconfGroup(Group):
     def setup(self):
         self._mpi_proc_allocator.parallel = self.parallel
         if self.parallel:
-            self.nonlinear_solver = NewtonSolver()
+            self.nonlinear_solver = NewtonSolver(solve_subsystems=False)
             self.linear_solver = PETScKrylov()
         else:
             self.nonlinear_solver = NonlinearBlockGS()
@@ -37,7 +38,7 @@ class ReconfGroup(Group):
         self.parallel = not self.parallel
 
 
-@unittest.skipUnless(PETScVector, "PETSc is required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class Test(unittest.TestCase):
 
     N_PROCS = 2

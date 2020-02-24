@@ -156,7 +156,7 @@ class TestFindCitePar(unittest.TestCase):
 
         self.prob = p
 
-    @unittest.skipUnless(MPI and PETScVector, "This test must be run under MPI using PETSc.")
+    @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
     def test_find_cite_petsc(self):
         p = self.prob
         p.setup()

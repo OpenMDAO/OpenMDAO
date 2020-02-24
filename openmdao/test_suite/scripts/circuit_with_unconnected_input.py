@@ -20,7 +20,7 @@ class Circuit(om.Group):
         # self.connect('D1.I', 'n2.I_out:0') # commented out so there is an unconnected input
                                              # example for docs for the N2 diagram
 
-        self.nonlinear_solver = om.NewtonSolver()
+        self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         self.nonlinear_solver.options['iprint'] = 2
         self.nonlinear_solver.options['maxiter'] = 20
         self.linear_solver = om.DirectSolver()

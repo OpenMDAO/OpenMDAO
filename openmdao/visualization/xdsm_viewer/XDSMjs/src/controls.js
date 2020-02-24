@@ -1,49 +1,83 @@
-'use strict';
-import {select} from 'd3-selection';
+
+import { select } from 'd3-selection';
 import Animation from './animation';
+import { VERSION1, VERSION2 } from './xdsm';
 
-function Controls(animation) {
+function Controls(animation, defaultVersion) {
   this.animation = animation;
+  this.defaultVersion = defaultVersion || VERSION2;
 
-  var buttonGroup = select(".xdsm-toolbar")
-      .append("div")
-      .classed("button_group", true);
-  buttonGroup.append("button")
-      .attr("id", "start")
-      .append("i").attr("class", "icon-start");
-  buttonGroup.append("button")
-      .attr("id", "stop")
-      .append("i").attr("class", "icon-stop");
-  buttonGroup.append("button")
-      .attr("id", "step-prev")
-      .append("i").attr("class", "icon-step-prev");
-  buttonGroup.append("button")
-      .attr("id", "step-next")
-      .append("i").attr("class", "icon-step-next");
+  const buttonGroup = select('.xdsm-toolbar')
+    .append('div')
+    .classed('button_group', true);
+  buttonGroup.append('button')
+    .attr('id', 'start')
+    .append('i').attr('class', 'icon-start');
+  buttonGroup.append('button')
+    .attr('id', 'stop')
+    .append('i').attr('class', 'icon-stop');
+  buttonGroup.append('button')
+    .attr('id', 'step-prev')
+    .append('i').attr('class', 'icon-step-prev');
+  buttonGroup.append('button')
+    .attr('id', 'step-next')
+    .append('i').attr('class', 'icon-step-next');
+  buttonGroup.append('label')
+    .text('XDSM')
+    .attr('id', 'xdsm-version-label');
+  buttonGroup.append('select')
+    .attr('id', 'xdsm-version-toggle');
+
 
   this.startButton = select('button#start');
   this.stopButton = select('button#stop');
   this.stepPrevButton = select('button#step-prev');
   this.stepNextButton = select('button#step-next');
+  this.toggleVersionButton = select('select#xdsm-version-toggle');
+  const versions = ['v1', 'v2'];
+  const versionsMap = { v1: VERSION1, v2: VERSION2 };
+  this.toggleVersionButton
+    .selectAll('versions')
+    .data(versions)
+    .enter()
+    .append('option')
+    .text((d) => d)
+    .attr('value', (d) => versionsMap[d])
+    .property('selected', (d) => defaultVersion === versionsMap[d]);
 
-  this.startButton.on('click', (function() {
+  this.startButton.on('click', () => {
     this.animation.start();
-  }).bind(this));
-  this.stopButton.on('click', (function() {
+  });
+  this.stopButton.on('click', () => {
     this.animation.stop();
-  }).bind(this));
-  this.stepPrevButton.on('click', (function() {
+  });
+  this.stepPrevButton.on('click', () => {
     this.animation.stepPrev();
-  }).bind(this));
-  this.stepNextButton.on('click', (function() {
+  });
+  this.stepNextButton.on('click', () => {
     this.animation.stepNext();
-  }).bind(this));
+  });
+  this.toggleVersionButton.on('change', () => {
+    const selectVersion = select('select#xdsm-version-toggle').property('value');
+    let xdsm = select(`.${selectVersion}`);
+    if (xdsm.empty() && selectVersion === VERSION1) {
+      xdsm = select(`.${VERSION2}`);
+      xdsm.classed(VERSION2, false)
+        .classed(VERSION1, true);
+    }
+    if (xdsm.empty() && selectVersion === VERSION2) {
+      xdsm = select(`.${VERSION1}`);
+      xdsm.classed(VERSION1, false)
+        .classed(VERSION2, true);
+    }
+    this.animation.setXdsmVersion(selectVersion);
+  });
 
   this.animation.addObserver(this);
   this.update(this.animation.status);
 }
 
-Controls.prototype.update = function(status) {
+Controls.prototype.update = function update(status) {
   // console.log("Controls receives: "+status);
   switch (status) {
     case Animation.STATUS.STOPPED:
@@ -68,17 +102,17 @@ Controls.prototype.update = function(status) {
       this._enable(this.stepPrevButton);
       break;
     default:
-      console.log("Unexpected Event: " + status);
+      console.log(`Unexpected Event: ${status}`);
       break;
   }
 };
 
-Controls.prototype._enable = function(button) {
-  button.attr("disabled", null);
+Controls.prototype._enable = function _enable(button) {
+  button.attr('disabled', null);
 };
 
-Controls.prototype._disable = function(button) {
-  button.attr("disabled", true);
+Controls.prototype._disable = function _disable(button) {
+  button.attr('disabled', true);
 };
 
 export default Controls;

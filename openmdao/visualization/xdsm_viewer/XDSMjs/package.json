@@ -1,6 +1,6 @@
 {
   "name": "xdsmjs",
-  "version": "0.4.3",
+  "version": "0.7.0",
   "description": "XDSM diagram generator",
   "main": "src/xdsm-factory.js",
   "directories": {
@@ -14,7 +14,6 @@
     "server": "webpack-dev-server --open",
     "test": "babel-tape-runner test/xdsm-test.js | faucet",
     "test2": "babel-tape-runner test/xdsm-test.js",
-    "testall": "testem || true",
     "webpack": "webpack"
   },
   "repository": "git+https://github.com/OneraHub/XDSMjs.git",
@@ -34,11 +33,10 @@
     "babel-core": "^7.0.0-bridge",
     "babel-loader": "^8.0.0",
     "babel-tape-runner": "^3.0.0",
-    "eslint": "^5.9.0",
-    "eslint-config-google": "^0.11.0",
+    "eslint": "^6.2.0",
+    "eslint-config-airbnb": "^18.0.1",
     "faucet": "0.0.1",
     "tape": "^4.9.1",
-    "testem": "^2.14.0",
     "uglify-js": "^3.4.9",
     "uglifyjs-webpack-plugin": "^2.0.1",
     "webpack": "^4.26.0",
@@ -55,6 +53,11 @@
     "extends": [
       "google"
     ],
+    "settings": {
+      "react": {
+        "version": "detect"
+      }
+    },
     "parserOptions": {
       "ecmaVersion": 6,
       "sourceType": "module"

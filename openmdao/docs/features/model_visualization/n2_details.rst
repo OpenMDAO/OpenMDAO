@@ -102,10 +102,13 @@ Here is what section of the legend looks like for both linear and nonlinear solv
 
 |linear_solvers_legend|    |nonlinear_solvers_legend|
 
+When a System has a Newton nonlinear solver and the `solve_subsystems` option is set to True for that solver,
+the Solver Structure box for that System has the text `NL: Newton (sub_solve)`.
+
 Toolbar
 -------
 
-The tool bar above the N2 diagram provides many useful capabilites.
+The tool bar above the N2 diagram provides many useful capabilities.
 
 Zoomed Element
 **************
@@ -289,7 +292,3 @@ the sections in the legend:
     * Finally, there is a column describing the colors for the items in the solver hierarchy on the right of the
       diagram. The colors indicate
       the type of solver, either linear or nonlinear, depending what is being displayed.
-
-
-
-

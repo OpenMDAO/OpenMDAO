@@ -31,6 +31,7 @@ from openmdao.components.meta_model_structured_comp import MetaModelStructuredCo
 from openmdao.components.meta_model_unstructured_comp import MetaModel
 from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructured
 from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
+from openmdao.components.spline_comp import SplineComp
 from openmdao.components.multifi_meta_model_unstructured_comp import MultiFiMetaModelUnStructured
 from openmdao.components.multifi_meta_model_unstructured_comp \
     import MultiFiMetaModelUnStructuredComp
@@ -101,8 +102,7 @@ from openmdao.visualization.partial_deriv_plot import partial_deriv_plot
 import os
 if os.environ.get('OPENMDAO_TRACE'):
     from openmdao.devtools.itrace import setup, start
-    ret = bool(os.environ.get('OPENMDAO_TRACE_RETURN'))
-    setup(os.environ['OPENMDAO_TRACE'], show_return=ret)
+    setup(os.environ['OPENMDAO_TRACE'])
     start()
 elif os.environ.get('OPENMDAO_PROF_MEM'):
     from openmdao.devtools.iprof_mem import setup, start

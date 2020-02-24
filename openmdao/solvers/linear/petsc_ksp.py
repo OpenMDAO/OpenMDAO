@@ -234,7 +234,7 @@ class PETScKrylov(LinearSolver):
         super(PETScKrylov, self)._setup_solvers(system, depth)
 
         if self.precon is not None:
-            self.precon._setup_solvers(self._system, self._depth + 1)
+            self.precon._setup_solvers(self._system(), self._depth + 1)
 
     def _set_solver_print(self, level=2, type_='all'):
         """
@@ -278,7 +278,7 @@ class PETScKrylov(LinearSolver):
             Empty array into which we place the matrix-vector product.
         """
         # assign x and b vectors based on mode
-        system = self._system
+        system = self._system()
         vec_name = self._vec_name
 
         if self._mode == 'fwd':
@@ -320,7 +320,7 @@ class PETScKrylov(LinearSolver):
 
     def solve(self, vec_names, mode, rel_systems=None):
         """
-        Solve the linear system for the problem in self._system.
+        Solve the linear system for the problem in self._system().
 
         The full solution vector is returned.
 
@@ -337,10 +337,10 @@ class PETScKrylov(LinearSolver):
         self._rel_systems = rel_systems
         self._mode = mode
 
-        system = self._system
+        system = self._system()
         options = self.options
 
-        if self._system.under_complex_step:
+        if system.under_complex_step:
             raise RuntimeError('{}: PETScKrylov solver is not supported under '
                                'complex step.'.format(self.msginfo))
 
@@ -393,7 +393,7 @@ class PETScKrylov(LinearSolver):
             Empty vector in which the preconditioned in_vec is stored.
         """
         if self.precon:
-            system = self._system
+            system = self._system()
             vec_name = self._vec_name
             mode = self._mode
 

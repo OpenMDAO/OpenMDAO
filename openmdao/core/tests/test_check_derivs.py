@@ -2186,7 +2186,7 @@ class TestProblemCheckTotals(unittest.TestCase):
                 self.add_subsystem(name='cell', subsys=CellComp(num_nodes=3))
 
                 self.linear_solver = om.ScipyKrylov()
-                self.nonlinear_solver = om.NewtonSolver()
+                self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
                 self.nonlinear_solver.options['maxiter'] = 1
 
             def initialize(self):
@@ -2304,7 +2304,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        sub.nonlinear_solver = om.NewtonSolver()
+        sub.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         sub.linear_solver = om.DirectSolver(assemble_jac=False)
 
         # Need this.
@@ -2418,7 +2418,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         assert_rel_error(self, J['comp.y', 'p.x']['J_fd'], [[0.0]], 1e-6)
 
 
-@unittest.skipUnless(MPI and PETScVector, "only run under MPI with PETSc.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestProblemCheckTotalsMPI(unittest.TestCase):
 
     N_PROCS = 2

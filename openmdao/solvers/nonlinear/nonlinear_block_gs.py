@@ -3,6 +3,8 @@
 import numpy as np
 
 from openmdao.solvers.solver import NonlinearSolver
+from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.mpi import MPI
 
 
 class NonlinearBlockGS(NonlinearSolver):
@@ -48,6 +50,18 @@ class NonlinearBlockGS(NonlinearSolver):
         """
         super(NonlinearBlockGS, self)._setup_solvers(system, depth)
 
+        rank = MPI.COMM_WORLD.rank if MPI is not None else 0
+
+        if self.options._dict['reraise_child_analysiserror']['value']:
+            pathname = self._system().pathname
+            if pathname:
+                pathname += ': '
+            msg = ("Deprecation warning: In V 3.x, reraise_child_analysiserror will default to "
+                   "False.")
+
+            if rank == 0:
+                warn_deprecation(pathname + msg)
+
         if len(system._subsystems_allprocs) != len(system._subsystems_myproc):
             raise RuntimeError('{}: Nonlinear Gauss-Seidel cannot be used on a '
                                'parallel group.'.format(self.msginfo))
@@ -68,8 +82,12 @@ class NonlinearBlockGS(NonlinearSolver):
                              desc='When True, when this driver solves under a complex step, nudge '
                              'the Solution vector by a small amount so that it reconverges.')
         self.options.declare('use_apply_nonlinear', types=bool, default=False,
-                             desc="Set to True to always call apply_linear on the solver's system "
-                             "after solve_nonlinear has been called.")
+                             desc="Set to True to always call apply_nonlinear on the solver's "
+                             "system after solve_nonlinear has been called.")
+        self.options.declare('reraise_child_analysiserror', types=bool, default=True,
+                             desc='When the option is true, a solver will reraise any '
+                             'AnalysisError that arises during subsolve; when false, it will '
+                             'continue solving.')
 
     def _iter_initialize(self):
         """
@@ -82,16 +100,17 @@ class NonlinearBlockGS(NonlinearSolver):
         float
             error at the first iteration.
         """
+        system = self._system()
+
         if self.options['use_aitken']:
-            outputs = self._system._outputs
-            self._delta_outputs_n_1 = outputs._data.copy()
+            self._delta_outputs_n_1 = system._outputs._data.copy()
             self._theta_n_1 = 1.
 
         # When under a complex step from higher in the hierarchy, sometimes the step is too small
         # to trigger reconvergence, so nudge the outputs slightly so that we always get at least
         # one iteration.
-        if self._system.under_complex_step and self.options['cs_reconverge']:
-            self._system._outputs._data += np.linalg.norm(self._system._outputs._data) * 1e-10
+        if system.under_complex_step and self.options['cs_reconverge']:
+            system._outputs._data += np.linalg.norm(system._outputs._data) * 1e-10
 
         return super(NonlinearBlockGS, self)._iter_initialize()
 
@@ -99,7 +118,7 @@ class NonlinearBlockGS(NonlinearSolver):
         """
         Perform the operations in the iteration loop.
         """
-        system = self._system
+        system = self._system()
         outputs = system._outputs
         residuals = system._residuals
         use_aitken = self.options['use_aitken']
@@ -194,20 +213,20 @@ class NonlinearBlockGS(NonlinearSolver):
         """
         Run the apply_nonlinear method on the system.
         """
-        system = self._system
+        system = self._system()
         maxiter = self.options['maxiter']
         itercount = self._iter_count
 
         if self.options['use_apply_nonlinear'] or (itercount < 1 and maxiter < 2):
 
-            # This option runs apply_linear to calculate the residuals, and thus ends up executing
-            # ExplicitComponents twice per iteration.
+            # This option runs apply_nonlinear to calculate the residuals, and thus ends up
+            # executing ExplicitComponents twice per iteration.
 
-            self._recording_iter.stack.append(('_run_apply', 0))
+            self._recording_iter.push(('_run_apply', 0))
             try:
                 system._apply_nonlinear()
             finally:
-                self._recording_iter.stack.pop()
+                self._recording_iter.pop()
 
         elif itercount < 1:
             # Run instead of calling apply, so that we don't "waste" the extra run. This also
@@ -234,9 +253,9 @@ class NonlinearBlockGS(NonlinearSolver):
         """
         Print header text before solving.
         """
-        if (self.options['iprint'] > 0 and self._system.comm.rank == 0):
+        if (self.options['iprint'] > 0 and self._system().comm.rank == 0):
 
-            pathname = self._system.pathname
+            pathname = self._system().pathname
             if pathname:
                 nchar = len(pathname)
                 prefix = self._solver_info.prefix

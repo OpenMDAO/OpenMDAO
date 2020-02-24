@@ -5,6 +5,12 @@ from __future__ import division, print_function
 import unittest
 import itertools
 
+# note: this is a Python 3.3 change, clean this up for OpenMDAO 3.x
+try:
+    from collections.abc import Iterable
+except ImportError:
+    from collections import Iterable
+
 import numpy as np
 
 import openmdao.api as om
@@ -39,11 +45,14 @@ class Noisy(ConvergeDiverge):
 def _test_func_name(func, num, param):
     args = []
     for p in param.args:
-        try:
-            arg = p.__name__
-        except:
-            arg = str(p)
-        args.append(arg)
+        if not isinstance(p, Iterable):
+            p = {p}
+        for item in p:
+            try:
+                arg = item.__name__
+            except:
+                arg = str(item)
+            args.append(arg)
     return func.__name__ + '_' + '_'.join(args)
 
 
@@ -52,16 +61,20 @@ class TestParallelGroups(unittest.TestCase):
 
     N_PROCS = 2
 
-    @parameterized.expand(itertools.product([om.LinearRunOnce, om.DirectSolver],
+    @parameterized.expand(itertools.product([(om.LinearRunOnce, None)],
                                             [om.NonlinearBlockGS, om.NonLinearRunOnce]),
                           name_func=_test_func_name)
-    def test_fan_out_grouped(self, solver, nlsolver):
+    def test_fan_out_grouped(self, solv_tup, nlsolver):
         prob = om.Problem(FanOutGrouped())
 
         of=['c2.y', "c3.y"]
         wrt=['iv.x']
 
+        solver, jactype = solv_tup
+
         prob.model.linear_solver = solver()
+        if jactype is not None:
+            prob.model.options['assembled_jac_type'] = jactype
         prob.model.nonlinear_solver = nlsolver()
 
         prob.setup(check=False, mode='fwd')
@@ -87,7 +100,7 @@ class TestParallelGroups(unittest.TestCase):
         assert_rel_error(self, prob['c2.y'], -6.0, 1e-6)
         assert_rel_error(self, prob['c3.y'], 15.0, 1e-6)
 
-    @parameterized.expand(itertools.product([om.LinearRunOnce, om.DirectSolver],
+    @parameterized.expand(itertools.product([om.LinearRunOnce],
                                             [om.NonlinearBlockGS, om.NonLinearRunOnce]),
                           name_func=_test_func_name)
     def test_fan_in_grouped(self, solver, nlsolver):
@@ -161,7 +174,7 @@ class TestParallelGroups(unittest.TestCase):
 
         assert_rel_error(self, prob['c3.y'], 29.0, 1e-6)
 
-    @parameterized.expand(itertools.product([om.LinearRunOnce, om.DirectSolver],
+    @parameterized.expand(itertools.product([om.LinearRunOnce],
                                             [om.NonlinearBlockGS, om.NonLinearRunOnce]),
                           name_func=_test_func_name)
     def test_diamond(self, solver, nlsolver):
@@ -196,7 +209,7 @@ class TestParallelGroups(unittest.TestCase):
         assert_rel_error(self, J['c4.y1', 'iv.x'][0][0], 25, 1e-6)
         assert_rel_error(self, J['c4.y2', 'iv.x'][0][0], -40.5, 1e-6)
 
-    @parameterized.expand(itertools.product([om.LinearRunOnce, om.DirectSolver],
+    @parameterized.expand(itertools.product([om.LinearRunOnce],
                                             [om.NonlinearBlockGS, om.NonLinearRunOnce]),
                           name_func=_test_func_name)
     def test_converge_diverge(self, solver, nlsolver):
@@ -392,6 +405,7 @@ class MatMatParDevTestCase(unittest.TestCase):
         par.add_objective('C2.y')
         par.add_constraint('C1.y', lower=0.0)
         p.setup(mode='fwd')
+
         p.run_model()
 
         # prior to bug fix, this would raise an exception

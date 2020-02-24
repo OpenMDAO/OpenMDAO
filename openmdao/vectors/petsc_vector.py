@@ -93,30 +93,30 @@ class PETScVector(DefaultVector):
 
         if self._ncol == 1:
             if self._alloc_complex:
-                self._petsc = PETSc.Vec().createWithArray(data.copy(), comm=self._system.comm)
+                self._petsc = PETSc.Vec().createWithArray(data.copy(), comm=self._system().comm)
             else:
-                self._petsc = PETSc.Vec().createWithArray(data, comm=self._system.comm)
+                self._petsc = PETSc.Vec().createWithArray(data, comm=self._system().comm)
         else:
             # for now the petsc array is only the size of one column and we do separate
             # transfers for each column.
             if data.size == 0:
-                self._petsc = PETSc.Vec().createWithArray(data.copy(), comm=self._system.comm)
+                self._petsc = PETSc.Vec().createWithArray(data.copy(), comm=self._system().comm)
             else:
                 self._petsc = PETSc.Vec().createWithArray(data[:, 0].copy(),
-                                                          comm=self._system.comm)
+                                                          comm=self._system().comm)
 
         # Allocate imaginary for complex step
         if self._alloc_complex:
             data = self._cplx_data.imag
             if self._ncol == 1:
-                self._imag_petsc = PETSc.Vec().createWithArray(data, comm=self._system.comm)
+                self._imag_petsc = PETSc.Vec().createWithArray(data, comm=self._system().comm)
             else:
                 if data.size == 0:
                     self._imag_petsc = PETSc.Vec().createWithArray(data.copy(),
-                                                                   comm=self._system.comm)
+                                                                   comm=self._system().comm)
                 else:
                     self._imag_petsc = PETSc.Vec().createWithArray(data[:, 0].copy(),
-                                                                   comm=self._system.comm)
+                                                                   comm=self._system().comm)
 
     def _get_dup_inds(self):
         """
@@ -128,7 +128,7 @@ class PETScVector(DefaultVector):
             Index array corresponding to duplicated variables.
         """
         if self._dup_inds is None:
-            system = self._system
+            system = self._system()
             if system.comm.size > 1:
                 # Here, we find the indices that are not locally owned so that we can
                 # temporarilly zero them out for the norm calculation.
@@ -226,4 +226,4 @@ class PETScVector(DefaultVector):
         """
         nodup = self._get_nodup()
         # we don't need to _resore_dups here since we don't modify _petsc.array.
-        return self._system.comm.allreduce(np.dot(nodup, vec._data))
+        return self._system().comm.allreduce(np.dot(nodup, vec._data))

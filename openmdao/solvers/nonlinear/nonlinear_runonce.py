@@ -22,7 +22,7 @@ class NonlinearRunOnce(NonlinearSolver):
         """
         Run the solver.
         """
-        system = self._system
+        system = self._system()
 
         with Recording('NLRunOnce', 0, self) as rec:
             # If this is a parallel group, transfer all at once then run each subsystem.

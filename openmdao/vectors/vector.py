@@ -4,9 +4,11 @@ from __future__ import division, print_function
 from six import iteritems, PY3
 from copy import deepcopy
 import os
+import weakref
+
 import numpy as np
 
-from openmdao.utils.name_maps import name2abs_name
+from openmdao.utils.name_maps import prom_name2abs_name, rel_name2abs_name
 
 
 _full_slice = slice(None)
@@ -124,7 +126,7 @@ class Vector(object):
         self._icol = None
         self._relevant = relevant
 
-        self._system = system
+        self._system = weakref.ref(system)
 
         self._iproc = system.comm.rank
         self._views = {}
@@ -207,7 +209,7 @@ class Vector(object):
         <Vector>
             instance of the clone; the data is copied.
         """
-        vec = self.__class__(self._name, self._kind, self._system, self._root_vector,
+        vec = self.__class__(self._name, self._kind, self._system(), self._root_vector,
                              alloc_complex=self._alloc_complex, ncol=self._ncol)
         vec._under_complex_step = self._under_complex_step
         vec._clone_data()
@@ -248,6 +250,31 @@ class Vector(object):
         """
         return [v for n, v in iteritems(self._views) if n in self._names]
 
+    def name2abs_name(self, name):
+        """
+        Map the given promoted or relative name to the absolute name.
+
+        This is only valid when the name is unique; otherwise, a KeyError is thrown.
+
+        Parameters
+        ----------
+        name : str
+            Promoted or relative variable name in the owning system's namespace.
+
+        Returns
+        -------
+        str or None
+            Absolute variable name if unique abs_name found or None otherwise.
+        """
+        system = self._system()
+        abs_name = prom_name2abs_name(system, name, self._typ)
+        if abs_name in self._names:
+            return abs_name
+
+        abs_name = rel_name2abs_name(system, name)
+        if abs_name in self._names:
+            return abs_name
+
     def __iter__(self):
         """
         Yield an iterator over variables involved in the current mat-vec product (relative names).
@@ -257,7 +284,7 @@ class Vector(object):
         listiterator
             iterator over the variable names.
         """
-        system = self._system
+        system = self._system()
         path = system.pathname
         idx = len(path) + 1 if path else 0
 
@@ -277,7 +304,7 @@ class Vector(object):
         boolean
             True or False.
         """
-        return name2abs_name(self._system, name, self._names, self._typ) is not None
+        return self.name2abs_name(name) is not None
 
     def __getitem__(self, name):
         """
@@ -293,7 +320,7 @@ class Vector(object):
         float or ndarray
             variable value.
         """
-        abs_name = name2abs_name(self._system, name, self._names, self._typ)
+        abs_name = self.name2abs_name(name)
         if abs_name is not None:
             if self._icol is None:
                 return self._views[abs_name]
@@ -313,7 +340,7 @@ class Vector(object):
         value : float or list or tuple or ndarray
             variable value to set
         """
-        abs_name = name2abs_name(self._system, name, self._names, self._typ)
+        abs_name = self.name2abs_name(name)
         if abs_name is not None:
             if self.read_only:
                 msg = "Attempt to set value of '{}' in {} vector when it is read only."

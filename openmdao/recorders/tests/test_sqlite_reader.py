@@ -142,7 +142,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         driver = prob.driver
 
         driver.recording_options['record_desvars'] = False
-        driver.recording_options['record_responses'] = False
         driver.recording_options['record_objectives'] = False
         driver.recording_options['record_constraints'] = False
         driver.recording_options['record_derivatives'] = False
@@ -185,7 +184,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         driver = prob.driver = om.ScipyOptimizeDriver(tol=1e-9, disp=False)
 
         driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
         driver.recording_options['record_derivatives'] = True
@@ -425,7 +423,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         driver = prob.driver = om.ScipyOptimizeDriver(tol=1e-9, disp=False)
 
         driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
         driver.recording_options['includes'] = ['y2']
@@ -452,7 +449,6 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP', print_results=False)
         driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
         driver.add_recorder(self.recorder)
@@ -964,7 +960,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         outputs = case.list_outputs(explicit=True, implicit=True, values=True,
                                     residuals=True, residuals_tol=None,
-                                    units=True, shape=True, bounds=True,
+                                    units=True, shape=True, bounds=True, desc=True,
                                     scaling=True, hierarchical=True, print_arrays=True,
                                     out_stream=None)
 
@@ -975,7 +971,8 @@ class TestSqliteCaseReader(unittest.TestCase):
                 'ref': 1.0,
                 'resids': [1.318e-10],
                 'shape': (1,),
-                'values': [25.5883024]
+                'values': [25.5883024],
+                'desc': ''
             }
         }
 
@@ -987,6 +984,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(vals['lower'], expected['lower'])
         self.assertEqual(vals['ref'], expected['ref'])
         self.assertEqual(vals['shape'], expected['shape'])
+        self.assertEqual(vals['desc'], expected['desc'])
         np.testing.assert_almost_equal(vals['resids'], expected['resids'])
         np.testing.assert_almost_equal(vals['value'], expected['values'])
 
@@ -998,11 +996,11 @@ class TestSqliteCaseReader(unittest.TestCase):
         # check that output from the Case method matches output from the System method
         # the system for the case should be properly identified as 'd1'
         stream = StringIO()
-        d1.list_outputs(prom_name=True, out_stream=stream)
+        d1.list_outputs(prom_name=True, desc=True, out_stream=stream)
         expected = stream.getvalue().split('\n')
 
         stream = StringIO()
-        case.list_outputs(prom_name=True, out_stream=stream)
+        case.list_outputs(prom_name=True, desc=True, out_stream=stream)
         text = stream.getvalue().split('\n')
 
         for i, line in enumerate(expected):
@@ -1026,29 +1024,30 @@ class TestSqliteCaseReader(unittest.TestCase):
         cr = om.CaseReader(self.filename)
 
         expected_inputs_case = {
-            'd1.z': {'value': [5., 2.]},
-            'd1.x': {'value': [1.]},
-            'd1.y2': {'value': [12.0584882]}
+            'd1.z': {'value': [5., 2.], 'desc': ''},
+            'd1.x': {'value': [1.], 'desc': ''},
+            'd1.y2': {'value': [12.0584882], 'desc': ''}
         }
 
         system_cases = cr.list_cases('root.d1')
 
         case = cr.get_case(system_cases[-1])
 
-        inputs = case.list_inputs(values=True, out_stream=None)
+        inputs = case.list_inputs(values=True, desc=True, out_stream=None)
 
         for name, meta in inputs:
             expected = expected_inputs_case[name]
             np.testing.assert_almost_equal(meta['value'], expected['value'])
+            self.assertEqual(meta['desc'], expected['desc'])
 
         # check that output from the Case method matches output from the System method
         # the system for the case should be properly identified as 'd1'
         stream = StringIO()
-        d1.list_inputs(prom_name=True, out_stream=stream)
+        d1.list_inputs(prom_name=True, desc=True, out_stream=stream)
         expected = stream.getvalue().split('\n')
 
         stream = StringIO()
-        case.list_inputs(prom_name=True, out_stream=stream)
+        case.list_inputs(prom_name=True, desc=True, out_stream=stream)
         text = stream.getvalue().split('\n')
 
         for i, line in enumerate(expected):
@@ -1339,7 +1338,7 @@ class TestSqliteCaseReader(unittest.TestCase):
             "",
             "varname   value",
             "--------  -----",
-            "top",
+            "model",
             "  sub",
             "    expl",
             "      b   [20.]",
@@ -1351,7 +1350,7 @@ class TestSqliteCaseReader(unittest.TestCase):
             "",
             "varname   value",
             "-------   -----",
-            "top",
+            "model",
             "  sub",
             "    impl",
             "      y   2    ",
@@ -1691,7 +1690,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         driver.options['tol'] = 1e-9
         driver.options['disp'] = False
         driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
 
@@ -1809,7 +1807,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         driver.options['tol'] = 1e-9
         driver.options['disp'] = False
         driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
 
@@ -1944,11 +1941,10 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob = om.Problem(model)
         prob.setup()
 
-        msg = "Trying to record options which cannot be pickled on system with name: subs. " \
-              "Use the 'options_excludes' recording option on system objects to avoid " \
-              "attempting to record options which cannot be pickled. Skipping recording " \
-              "options for this system."
-        with assert_warning(RuntimeWarning, msg):
+        msg = ("Trying to record option 'options value to fail' which cannot be pickled on system "
+               "IndepVarComp (subs). Set 'recordable' to False. Skipping recording options for "
+               "this system.")
+        with assert_warning(UserWarning, msg):
             prob.run_model()
 
         prob.cleanup()
@@ -2243,7 +2239,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.driver.options['disp'] = False
 
         prob.driver.recording_options['record_desvars'] = True
-        prob.driver.recording_options['record_responses'] = True
         prob.driver.recording_options['record_objectives'] = True
         prob.driver.recording_options['record_constraints'] = True
         recorder = om.SqliteRecorder("cases.sql")
@@ -2291,7 +2286,6 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # driver
         driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
         driver.add_recorder(self.recorder)
@@ -2552,9 +2546,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         model.add_subsystem('comp', ImplCompTwoStates())
         model.connect('px.x', 'comp.x')
 
-        model.nonlinear_solver = om.NewtonSolver()
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         model.nonlinear_solver.options['maxiter'] = 3
-        # model.nonlinear_solver.options['solve_subsystems'] = True
         model.nonlinear_solver.options['iprint'] = 2
         model.linear_solver = om.ScipyKrylov()
 
@@ -2679,9 +2672,9 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(1, text.count("1 Input(s) in 'model'"))
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
         self.assertEqual(7, num_non_empty_lines)
-        self.assertEqual(1, text.count('top'))
-        self.assertEqual(1, text.count('  mult'))
-        self.assertEqual(1, text.count('    x    |10.0|  inch   (100'))
+        self.assertEqual(1, text.count('\nmodel'))
+        self.assertEqual(1, text.count('\n  mult'))
+        self.assertEqual(1, text.count('\n    x    |10.0|  inch   (100'))
 
         # list outputs
         # out_stream - not hierarchical - extras - no print_arrays
@@ -2727,11 +2720,11 @@ class TestSqliteCaseReader(unittest.TestCase):
                           print_arrays=False,
                           out_stream=stream)
         text = stream.getvalue()
-        self.assertEqual(text.count('top'), 1)
-        self.assertEqual(text.count('  des_vars'), 1)
-        self.assertEqual(text.count('    x'), 1)
-        self.assertEqual(text.count('  mult'), 1)
-        self.assertEqual(text.count('    y'), 1)
+        self.assertEqual(text.count('\nmodel'), 1)
+        self.assertEqual(text.count('\n  des_vars'), 1)
+        self.assertEqual(text.count('\n    x'), 1)
+        self.assertEqual(text.count('\n  mult'), 1)
+        self.assertEqual(text.count('\n    y'), 1)
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
         self.assertEqual(num_non_empty_lines, 11)
 
@@ -2793,11 +2786,11 @@ class TestSqliteCaseReader(unittest.TestCase):
             self.assertEqual(text.count('value:'), 2)
             self.assertEqual(text.count('resids:'), 2)
             self.assertEqual(text.count('['), 4)
-            self.assertEqual(text.count('top'), 1)
-            self.assertEqual(text.count('  des_vars'), 1)
-            self.assertEqual(text.count('    x'), 1)
-            self.assertEqual(text.count('  mult'), 1)
-            self.assertEqual(text.count('    y'), 1)
+            self.assertEqual(text.count('\nmodel'), 1)
+            self.assertEqual(text.count('\n  des_vars'), 1)
+            self.assertEqual(text.count('\n    x'), 1)
+            self.assertEqual(text.count('\n  mult'), 1)
+            self.assertEqual(text.count('\n    y'), 1)
             num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
             self.assertEqual(num_non_empty_lines, 49)
 

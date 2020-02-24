@@ -244,8 +244,8 @@ class FiniteDifference(ApproximationScheme):
         ----------
         system : System
             The system having its derivs approximated.
-        idx_info : tuple of (ndarray of int, ndarray of float)
-            Tuple of wrt indices and corresponding data array to perturb.
+        idx_info : tuple of (Vector, ndarray of int)
+            Tuple of wrt indices and corresponding data vector to perturb.
         data : tuple of float
             Tuple of the form (deltas, coeffs, current_coeff)
         results_array : ndarray
@@ -284,8 +284,8 @@ class FiniteDifference(ApproximationScheme):
         ----------
         system : System
             The system having its derivs approximated.
-        idx_info : tuple of (ndarray of int, ndarray of float)
-            Tuple of wrt indices and corresponding data array to perturb.
+        idx_info : tuple of (Vector, ndarray of int)
+            Tuple of wrt indices and corresponding data vector to perturb.
         delta : float
             Perturbation amount.
         total : bool
@@ -296,9 +296,9 @@ class FiniteDifference(ApproximationScheme):
         ndarray
             The results from running the perturbed system.
         """
-        for arr, idxs in idx_info:
-            if arr is not None:
-                arr._data[idxs] += delta
+        for vec, idxs in idx_info:
+            if vec is not None:
+                vec._data[idxs] += delta
 
         if total:
             system.run_solve_nonlinear()
@@ -315,8 +315,8 @@ class FiniteDifference(ApproximationScheme):
         # if results_vec are the residuals then we need to remove the delta's we added earlier
         # to the outputs
         if not total:
-            for arr, idxs in idx_info:
-                if arr is system._outputs:
-                    arr._data[idxs] -= delta
+            for vec, idxs in idx_info:
+                if vec is system._outputs:
+                    vec._data[idxs] -= delta
 
         return self._results_tmp

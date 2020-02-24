@@ -14,6 +14,12 @@ from openmdao.utils.general_utils import run_model
 from openmdao.utils.mpi import MPI
 
 
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
+
+
 class TestSolverPrint(unittest.TestCase):
 
     def test_feature_iprint_neg1(self):
@@ -25,7 +31,7 @@ class TestSolverPrint(unittest.TestCase):
 
         prob.setup()
 
-        newton = prob.model.nonlinear_solver = om.NewtonSolver()
+        newton = prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         scipy = prob.model.linear_solver = om.ScipyKrylov()
 
         newton.options['maxiter'] = 2
@@ -47,7 +53,7 @@ class TestSolverPrint(unittest.TestCase):
 
         prob.setup()
 
-        newton = prob.model.nonlinear_solver = om.NewtonSolver()
+        newton = prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         scipy = prob.model.linear_solver = om.ScipyKrylov()
 
         newton.options['maxiter'] = 1
@@ -69,7 +75,7 @@ class TestSolverPrint(unittest.TestCase):
 
         prob.setup()
 
-        newton = prob.model.nonlinear_solver = om.NewtonSolver()
+        newton = prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         scipy = prob.model.linear_solver = om.ScipyKrylov()
 
         newton.options['maxiter'] = 20
@@ -90,7 +96,7 @@ class TestSolverPrint(unittest.TestCase):
 
         prob.setup()
 
-        newton = prob.model.nonlinear_solver = om.NewtonSolver()
+        newton = prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         scipy = prob.model.linear_solver = om.ScipyKrylov()
 
         newton.options['maxiter'] = 20
@@ -123,10 +129,10 @@ class TestSolverPrint(unittest.TestCase):
         model.nonlinear_solver.options['solve_subsystems'] = True
         model.nonlinear_solver.options['max_sub_solves'] = 0
 
-        g1.nonlinear_solver = om.NewtonSolver()
+        g1.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         g1.linear_solver = om.LinearBlockGS()
 
-        g2.nonlinear_solver = om.NewtonSolver()
+        g2.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         g2.linear_solver = om.ScipyKrylov()
         g2.linear_solver.precon = om.LinearBlockGS()
         g2.linear_solver.precon.options['maxiter'] = 2
@@ -219,10 +225,10 @@ class TestSolverPrint(unittest.TestCase):
         model.nonlinear_solver.options['solve_subsystems'] = True
         model.nonlinear_solver.options['max_sub_solves'] = 0
 
-        g1.nonlinear_solver = om.NewtonSolver()
+        g1.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         g1.linear_solver = om.LinearBlockGS()
 
-        g2.nonlinear_solver = om.NewtonSolver()
+        g2.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         g2.linear_solver = om.ScipyKrylov()
         g2.linear_solver.precon = om.LinearBlockGS()
         g2.linear_solver.precon.options['maxiter'] = 2
@@ -257,10 +263,10 @@ class TestSolverPrint(unittest.TestCase):
         model.nonlinear_solver.options['solve_subsystems'] = True
         model.nonlinear_solver.options['max_sub_solves'] = 0
 
-        g1.nonlinear_solver = om.NewtonSolver()
+        g1.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         g1.linear_solver = om.LinearBlockGS()
 
-        g2.nonlinear_solver = om.NewtonSolver()
+        g2.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         g2.linear_solver = om.ScipyKrylov()
         g2.linear_solver.precon = om.LinearBlockGS()
         g2.linear_solver.precon.options['maxiter'] = 2
@@ -296,10 +302,10 @@ class TestSolverPrint(unittest.TestCase):
         model.nonlinear_solver.options['solve_subsystems'] = True
         model.nonlinear_solver.options['max_sub_solves'] = 0
 
-        g1.nonlinear_solver = om.NewtonSolver()
+        g1.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         g1.linear_solver = om.LinearBlockGS()
 
-        g2.nonlinear_solver = om.NewtonSolver()
+        g2.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         g2.linear_solver = om.ScipyKrylov()
         g2.linear_solver.precon = om.LinearBlockGS()
         g2.linear_solver.precon.options['maxiter'] = 2
@@ -311,12 +317,11 @@ class TestSolverPrint(unittest.TestCase):
         prob.run_model()
 
 
-@unittest.skipUnless(om.PETScVector, "PETSc is required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class MPITests(unittest.TestCase):
 
     N_PROCS = 2
 
-    @unittest.skipUnless(MPI, "MPI is not active.")
     def test_hierarchy_iprint(self):
         prob = om.Problem()
         model = prob.model
@@ -337,10 +342,10 @@ class MPITests(unittest.TestCase):
         model.nonlinear_solver.options['solve_subsystems'] = True
         model.nonlinear_solver.options['max_sub_solves'] = 0
 
-        g1.nonlinear_solver = om.NewtonSolver()
+        g1.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         g1.linear_solver = om.LinearBlockGS()
 
-        g2.nonlinear_solver = om.NewtonSolver()
+        g2.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         g2.linear_solver = om.PETScKrylov()
         g2.linear_solver.precon = om.LinearBlockGS()
         g2.linear_solver.precon.options['maxiter'] = 2

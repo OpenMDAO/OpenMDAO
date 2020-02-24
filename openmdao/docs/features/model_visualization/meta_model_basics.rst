@@ -8,7 +8,7 @@ When evaluating meta models, it can be useful to determine their fit of the trai
 OpenMDAO has a visualization package to view the training data and meta models generated from it.
 This page explains how to use `view_mm` in the command line.
 
-The metamodel viewer allows a user the ability of reducing a high dimentional input space down
+The metamodel viewer allows a user the ability of reducing a high dimensional input space down
 to three dimensions to enable the user to determine the fit of a meta model to the given
 training data.
 
@@ -74,3 +74,7 @@ want to visualize if there is more than one, and optionally a port number:
 .. embed-shell-cmd::
     :cmd: openmdao view_mm -h
 
+.. note::
+    When using Bash on Windows you are required to set --no_browser option to start the server and
+    then open an internet browser and copy/paste the path to viewer. Bash on Windows does not allow
+    the terminal to access your browser to open the viewer.

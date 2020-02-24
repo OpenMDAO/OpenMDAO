@@ -1,25 +1,25 @@
 /**
- * The outermost N2 class.
+ * Manage all components of the application. The model data, the CSS styles, the
+ * user interface, the layout of the N2 matrix, and the N2 matrix grid itself are
+ * all member objects.
  * @typedef N2Diagram
  * @property {ModelData} model Processed model data received from Python.
  * @property {N2Style} style Manages N2-related styles and functions.
  * @property {N2Layout} layout Sizes and positions of visible elements.
- * @property {N2Matrix} matrix Manages the grid of model elements.
+ * @property {N2Matrix} matrix Manages the grid of visible model parameters.
  * @property {N2TreeNode} zoomedElement The element the diagram is currently based on.
  * @property {N2TreeNode} zoomedElementPrev Reference to last zoomedElement.
  * @property {Object} dom Container for references to web page elements.
- * @property {Object} dom.parentDiv
+ * @property {Object} dom.parentDiv The outermost div we work with.
  * @property {Object} dom.d3ContentDiv The div containing all of the diagram's content.
  * @property {Object} dom.svgDiv The div containing the SVG element.
  * @property {Object} dom.svg The SVG element.
  * @property {Object} dom.svgStyle Object where SVG style changes can be made.
  * @property {Object} dom.toolTip Div to display tooltips.
- * @property {Object} dom.n2TopGroup
+ * @property {Object} dom.n2OuterGroup The outermost div of N2 itself.
  * @property {Object} dom.n2Groups References to <g> SVG elements.
- * @property {Boolean} showPath
- * @property {Array} backButtonHistory
- * @property {Array} forwardButtonHistory
- * @property {number} chosenCollapseDepth
+ * @property {Boolean} showPath If we're currently displaying the path of the zoomed element.
+ * @property {number} chosenCollapseDepth The selected depth from the drop-down.
  * @property {Object} scales Scalers in the X and Y directions to associate the relative
  *   position of an element to actual pixel coordinates.
  * @property {Object} transitCoords
@@ -28,9 +28,9 @@ class N2Diagram {
     constructor(modelJSON) {
         this.model = new ModelData(modelJSON);
         this.zoomedElement = this.zoomedElementPrev = this.model.root;
-
         this.showPath = false;
 
+        // Assign this way because defaultDims is read-only.
         this.dims = JSON.parse(JSON.stringify(defaultDims));
 
         // Find the divs for D3 content in the existing document, and add a style section.
@@ -51,19 +51,22 @@ class N2Diagram {
 
         this.transitionStartDelay = N2TransitionDefaults.startDelay;
 
-        this.backButtonHistory = [];
-        this.forwardButtonHistory = [];
         this.chosenCollapseDepth = -1;
 
         this.showLinearSolverNames = true;
 
         this.style = new N2Style(this.dom.svgStyle, this.dims.size.font);
-        this.layout = new N2Layout(this.model, this.zoomedElement, true, this.dims);
+        this.layout = new N2Layout(this.model, this.zoomedElement, this.showLinearSolverNames, this.dims);
+        this.search = new N2Search(this.zoomedElement, this.model.root);
+
+        this.ui = new N2UserInterface(this);
 
         this._setupSvgElements();
-        this._updateClickedIndices();
 
-        this.matrix = new N2Matrix(this.layout.visibleNodes, this.model, this.layout, this.dom.n2Groups);
+        this.matrix = new N2Matrix(this.model, this.layout, this.dom.n2Groups,
+            true, this.ui.findRootOfChangeFunction);
+
+        // this.matrixMax = this.matrix;
 
         // TODO: Move to N2Layout
         this.scales = {
@@ -147,11 +150,7 @@ class N2Diagram {
      */
     updateZoomedElement(newZoomedElement) {
         this.zoomedElementPrev = this.zoomedElement;
-
-        // TODO: Stop updating the global zoomedElement when we
-        // implement a different place to put it.
         this.zoomedElement = newZoomedElement;
-
         this.layout.zoomedElement = this.zoomedElement;
     }
 
@@ -160,57 +159,51 @@ class N2Diagram {
      * be populated later. Stored in the .doms property.
      */
     _setupSvgElements() {
-        // ids given just so it is easier to see in Chrome dev tools when debugging
-        this.dom.n2TopGroup = this.dom.svg.append('g').attr('id', 'N2');
-        this.dom.pTreeGroup = this.dom.svg.append('g').attr('id', 'tree');
-        this.dom.pSolverTreeGroup = this.dom.svg.append('g').attr('id', 'solver_tree');
+        this.dom.clips = {
+            'partitionTree': this.dom.svg.select("#partitionTreeClip > rect"),
+            'n2Matrix': this.dom.svg.select("#n2MatrixClip > rect"),
+            'solverTree': this.dom.svg.select("#solverTreeClip > rect")
+        };
 
-        this.dom.n2BackgroundRect = this.dom.n2TopGroup.append('rect')
-            .attr('class', 'background')
-            .attr('width', this.layout.size.diagram.width)
-            .attr('height', this.layout.size.diagram.height);
+        // ids given just so it is easier to see in Chrome dev tools when debugging
+        this.dom.n2OuterGroup = this.dom.svg.append('g')
+            .attr('id', 'n2outer');
+
+        this.dom.n2InnerGroup = this.dom.n2OuterGroup.append('g')
+            .attr('id', 'n2inner');
+
+        this.dom.pTreeGroup = this.dom.svg.append('g')
+            .attr('id', 'tree')
+            .attr('clip-path', 'url(#partitionTreeClip');
+
+        this.dom.pSolverTreeGroup = this.dom.svg.append('g')
+            .attr('id', 'solver_tree')
+            .attr('clip-path', 'url(#solverTreeClip');
+
+        this.dom.n2BackgroundRect = this.dom.n2InnerGroup.append('rect')
+            .attr('id', 'backgroundRect')
+            .attr('class', 'background');
 
         this.dom.n2Groups = {};
-        for (let gName of ['elements', 'gridlines', 'componentBoxes', 'arrows', 'dots']) {
-            this.dom.n2Groups[gName] = this.dom.n2TopGroup.append('g').attr('id', 'n2' + gName);
+        for (let gName of ['elements', 'gridlines', 'componentBoxes',
+            'dots', 'highlights', 'arrows']) {
+            this.dom.n2Groups[gName] =
+                this.dom.n2InnerGroup.append('g')
+                    .attr('id', 'n2' + gName);
         };
-    }
 
-    /** Set up for an animated transition by setting and remembering where things were.
-     * TODO: Get rid of the globals
-     */
-    _updateClickedIndices() {
-        enterIndex = exitIndex = 0;
-        if (lastClickWasLeft) { //left click
-            if (leftClickIsForward) {
-                exitIndex = lastLeftClickedElement.rootIndex -
-                    this.zoomedElementPrev.rootIndex;
-            }
-            else {
-                enterIndex = this.zoomedElementPrev.rootIndex -
-                    lastLeftClickedElement.rootIndex;
-            }
+        for (let clippedGrp of ['elements', 'gridlines', 'componentBoxes', 'dots']) {
+            this.dom.n2Groups[clippedGrp].attr('clip-path', 'url(#n2MatrixClip)');
         }
-    }
 
-    /** Make sure UI controls reflect history and current reality. */
-    _updateUI() {
-        this.dom.parentDiv.querySelector('#currentPathId').innerHTML =
-            'PATH: root' + ((this.zoomedElement.parent) ? '.' : '') +
-            this.zoomedElement.absPathName;
-        this.dom.parentDiv.querySelector('#backButtonId').disabled =
-            (this.backButtonHistory.length == 0) ? 'disabled' : false;
-        this.dom.parentDiv.querySelector('#forwardButtonId').disabled =
-            (this.forwardButtonHistory.length == 0) ? 'disabled' : false;
-        this.dom.parentDiv.querySelector('#upOneLevelButtonId').disabled =
-            (this.zoomedElement === this.model.root) ? 'disabled' : false;
-        this.dom.parentDiv.querySelector('#returnToRootButtonId').disabled =
-            (this.zoomedElement === this.model.root) ? 'disabled' : false;
-
-        for (let i = 2; i <= this.model.maxDepth; ++i) {
-            this.dom.parentDiv.querySelector('#idCollapseDepthOption' + i).style.display =
-                (i <= this.zoomedElement.depth) ? 'none' : 'block';
+        let ogg = {};
+        for (let oName of ['top', 'left', 'right', 'bottom']) {
+            ogg[oName] = this.dom.n2OuterGroup.append('g')
+                .attr('id', 'n2' + oName)
+                .attr('class', 'offgridLabel');
         }
+        this.dom.n2Groups.offgrid = ogg;
+
     }
 
     /**
@@ -237,7 +230,7 @@ class N2Diagram {
         this.transitCoords.model.x = (this.zoomedElement.dims.x ?
             this.layout.size.partitionTree.width - this.layout.size.parentNodeWidth :
             this.layout.size.partitionTree.width) / (1 - this.zoomedElement.dims.x);
-        this.transitCoords.model.y = this.layout.size.diagram.height /
+        this.transitCoords.model.y = this.layout.size.partitionTree.height /
             this.zoomedElement.dims.height;
 
         this.scales.model.x
@@ -247,12 +240,12 @@ class N2Diagram {
         this.scales.model.y
             .domain([this.zoomedElement.dims.y, this.zoomedElement.dims.y +
                 this.zoomedElement.dims.height])
-            .range([0, this.layout.size.diagram.height]);
+            .range([0, this.layout.size.partitionTree.height]);
 
         this.transitCoords.solver.x = (this.zoomedElement.solverDims.x ?
             this.layout.size.solverTree.width - this.layout.size.parentNodeWidth :
             this.layout.size.solverTree.width) / (1 - this.zoomedElement.solverDims.x);
-        this.transitCoords.solver.y = this.layout.size.diagram.height /
+        this.transitCoords.solver.y = this.layout.size.solverTree.height /
             this.zoomedElement.solverDims.height;
 
         this.scales.solver.x
@@ -262,300 +255,365 @@ class N2Diagram {
         this.scales.solver.y
             .domain([this.zoomedElement.solverDims.y,
             this.zoomedElement.solverDims.y + this.zoomedElement.solverDims.height])
-            .range([0, this.layout.size.diagram.height]);
+            .range([0, this.layout.size.solverTree.height]);
 
         if (this.scales.firstRun) { // first run, duplicate what we just calculated
             this.scales.firstRun = false;
             this._preservePreviousScale();
 
-            // Update svg dimensions before width changes
-            let svgDivDims = this.layout.newSvgDivDimAttribs();
+            // Update svg dimensions before size changes
+            let outerDims = this.layout.newOuterDims();
+            let innerDims = this.layout.newInnerDims();
+
             this.dom.svgDiv
-                .style("width", svgDivDims.width)
-                .style("height", svgDivDims.height);
+                .style("width", outerDims.width + this.dims.size.unit)
+                .style("height", outerDims.height + this.dims.size.unit);
 
-            let svgElemDims = this.layout.newSvgElemDimAttribs();
             this.dom.svg
-                .attr("width", svgElemDims.width)
-                .attr("height", svgElemDims.height);
+                .attr("width", outerDims.width)
+                .attr("height", outerDims.height)
+                .attr("transform", "translate(0 0)");
 
-            this.dom.n2TopGroup.attr("transform", "translate(" +
-                (this.layout.size.partitionTree.width +
-                    this.layout.size.partitionTreeGap +
-                    this.layout.size.svgMargin) +
-                "," + this.layout.size.svgMargin + ")");
+            this.dom.pTreeGroup
+                .attr("height", innerDims.height)
+                .attr("width", this.dims.size.partitionTree.width)
+                .attr("transform", "translate(0 " + innerDims.margin + ")");
 
-            this.dom.pTreeGroup.attr("transform", "translate(" +
-                this.layout.size.svgMargin + "," + this.layout.size.svgMargin + ")");
+            this.dom.n2OuterGroup
+                .attr("height", outerDims.height)
+                .attr("width", outerDims.height)
+                .attr("transform", "translate(" +
+                    (this.dims.size.partitionTree.width) + " 0)");
 
-            this.dom.pSolverTreeGroup.attr("transform", "translate(" +
-                (this.layout.size.partitionTree.width +
-                    this.layout.size.partitionTreeGap +
-                    this.layout.size.diagram.width +
-                    this.layout.size.svgMargin +
-                    this.layout.size.partitionTreeGap) + "," +
-                this.layout.size.svgMargin + ")");
+            this.dom.n2InnerGroup.transition(sharedTransition)
+                .attr("height", innerDims.height)
+                .attr("width", innerDims.height)
+                .attr("transform", "translate(" + innerDims.margin + " " + innerDims.margin + ")");
+
+            this.dom.n2BackgroundRect
+                .attr("width", innerDims.height)
+                .attr("height", innerDims.height)
+                .attr("transform", "translate(0 0)");
+
+            this.dom.pSolverTreeGroup
+                .attr("height", innerDims.height)
+                .attr("transform", "translate(" + (this.dims.size.partitionTree.width +
+                    innerDims.margin +
+                    innerDims.height +
+                    innerDims.margin) + " " +
+                    innerDims.margin + ")");
+
+            let offgridHeight = this.dims.size.font + 2;
+            this.dom.n2Groups.offgrid.top
+                .attr("transform", "translate(" + innerDims.margin + " 0)")
+                .attr("width", innerDims.height)
+                .attr("height", offgridHeight);
+
+                /*
+            this.dom.n2Groups.offgrid.top
+                .append("text")
+                .attr("x", 0).attr("y", 0)
+                // .attr("transform", "translate(0 0)")
+                //.attr("width", innerDims.height)
+                //.attr("height", offgridHeight)
+                //.style("fill", "black")
+                .text("HOWDY.HOWDY.HOWDY.HOWDY");
+                */
+
+            this.dom.n2Groups.offgrid.bottom
+                .attr("transform", "translate(0 " + innerDims.height + offgridHeight + ")")
+                .attr("width", outerDims.height)
+                .attr("height", offgridHeight);
         }
     }
 
     _createPartitionCells() {
+        let self = this; // For callbacks that change "this". Alternative to using .bind().
+
         let selection = this.dom.pTreeGroup.selectAll(".partition_group")
             .data(this.layout.zoomedNodes, function (node) { return node.id; });
 
         // Create a new SVG group for each node in zoomedNodes
         let nodeEnter = selection.enter().append("svg:g")
             .attr("class", function (d) {
-                return "partition_group " + this.style.getNodeClass(d);
-            }.bind(this))
+                return "partition_group " + self.style.getNodeClass(d);
+            })
             .attr("transform", function (d) {
                 return "translate(" +
-                    this.prevScales.model.x(d.prevDims.x) + "," +
-                    this.prevScales.model.y(d.prevDims.y) + ")";
-            }.bind(this))
-            .on("click", function (d) { LeftClick(d, this); })
-            .on("contextmenu", function (d) { RightClick(d, this); })
+                    self.prevScales.model.x(d.prevDims.x) + " " +
+                    self.prevScales.model.y(d.prevDims.y) + ")";
+            })
+            .on("click", function (d) { self.ui.leftClick(d); })
+            .on("contextmenu", function (d) { self.ui.rightClick(d, this); })
             .on("mouseover", function (d) {
-                if (this.model.abs2prom != undefined) {
+                if (self.model.abs2prom != undefined) {
                     if (d.isParam()) {
-                        return this.dom.toolTip.text(this.model.abs2prom.input[d.absPathName])
+                        return self.dom.toolTip.text(
+                            self.model.abs2prom.input[d.absPathName])
                             .style("visibility", "visible");
                     }
                     if (d.isUnknown()) {
-                        return this.dom.toolTip.text(this.model.abs2prom.output[d.absPathName])
+                        return self.dom.toolTip.text(
+                            self.model.abs2prom.output[d.absPathName])
                             .style("visibility", "visible");
                     }
                 }
-            }.bind(this))
+            })
             .on("mouseleave", function (d) {
-                if (this.model.abs2prom != undefined) {
-                    return this.dom.toolTip.style("visibility", "hidden");
+                if (self.model.abs2prom != undefined) {
+                    return self.dom.toolTip.style("visibility", "hidden");
                 }
-            }.bind(this))
+            })
             .on("mousemove", function () {
-                if (this.model.abs2prom != undefined) {
-                    return this.dom.toolTip.style("top", (d3.event.pageY - 30) + "px")
+                if (self.model.abs2prom != undefined) {
+                    return self.dom.toolTip.style("top", (d3.event.pageY - 30) + "px")
                         .style("left", (d3.event.pageX + 5) + "px");
                 }
-            }.bind(this));
+            });
 
         nodeEnter.append("svg:rect")
             .attr("width", function (d) {
-                return d.prevDims.width * this.prevTransitCoords.model.x;
-            }.bind(this))
+                return d.prevDims.width * self.prevTransitCoords.model.x;
+            })
             .attr("height", function (d) {
-                return d.prevDims.height * this.prevTransitCoords.model.y;
-            }.bind(this));
+                return d.prevDims.height * self.prevTransitCoords.model.y;
+            })
+            .attr("id", function(d) { return d.absPathName.replace(/\./g,'_'); });
 
         nodeEnter.append("svg:text")
             .attr("dy", ".35em")
             .attr("transform", function (d) {
-                let anchorX = d.prevDims.width * this.prevTransitCoords.model.x -
-                    this.layout.size.rightTextMargin;
-                return "translate(" + anchorX + "," + d.prevDims.height *
-                    this.prevTransitCoords.model.y / 2 + ")";
-            }.bind(this))
+                let anchorX = d.prevDims.width * self.prevTransitCoords.model.x -
+                    self.layout.size.rightTextMargin;
+                return "translate(" + anchorX + " " + d.prevDims.height *
+                    self.prevTransitCoords.model.y / 2 + ")";
+            })
             .style("opacity", function (d) {
-                if (d.depth < this.zoomedElement.depth) return 0;
+                if (d.depth < self.zoomedElement.depth) return 0;
                 return d.textOpacity;
-            }.bind(this))
-            .text(this.layout.getText);
+            })
+            .text(self.layout.getText.bind(self.layout));
 
         return { 'selection': selection, 'nodeEnter': nodeEnter };
     }
 
     _setupPartitionTransition(d3Refs) {
-        let nodeUpdate = d3Refs.nodeEnter.merge(d3Refs.selection).transition(sharedTransition)
+        let self = this; // For callbacks that change "this". Alternative to using .bind().
+
+        this.dom.clips.partitionTree
+            .transition(sharedTransition)
+            .attr('height', this.dims.size.partitionTree.height);
+
+        let nodeUpdate = d3Refs.nodeEnter.merge(d3Refs.selection)
+            .transition(sharedTransition)
             .attr("class", function (d) {
-                return "partition_group " + this.style.getNodeClass(d);
-            }.bind(this))
+                return "partition_group " + self.style.getNodeClass(d);
+            })
             .attr("transform", function (d) {
-                return "translate(" + this.scales.model.x(d.dims.x) + "," +
-                    this.scales.model.y(d.dims.y) + ")";
-            }.bind(this));
+                return "translate(" + self.scales.model.x(d.dims.x) + " " +
+                    self.scales.model.y(d.dims.y) + ")";
+            });
 
         nodeUpdate.select("rect")
             .attr("width", function (d) {
-                return d.dims.width * this.transitCoords.model.x;
-            }.bind(this))
+                return d.dims.width * self.transitCoords.model.x;
+            })
             .attr("height", function (d) {
-                return d.dims.height * this.transitCoords.model.y;
-            }.bind(this));
+                return d.dims.height * self.transitCoords.model.y;
+            });
 
         nodeUpdate.select("text")
             .attr("transform", function (d) {
-                let anchorX = d.dims.width * this.transitCoords.model.x - this.layout.size.rightTextMargin;
-                return "translate(" + anchorX + "," + d.dims.height * this.transitCoords.model.y / 2 + ")";
-            }.bind(this))
+                let anchorX = d.dims.width * self.transitCoords.model.x -
+                    self.layout.size.rightTextMargin;
+                return "translate(" + anchorX + " " + d.dims.height *
+                    self.transitCoords.model.y / 2 + ")";
+            })
             .style("opacity", function (d) {
-                if (d.depth < this.zoomedElement.depth) return 0;
+                if (d.depth < self.zoomedElement.depth) return 0;
                 return d.textOpacity;
-            }.bind(this))
-            .text(this.layout.getText);
+            })
+            .text(self.layout.getText.bind(self.layout));
     }
 
     _runPartitionTransition(selection) {
+        let self = this; // For callbacks that change "this". Alternative to using .bind().
+
         // Transition exiting nodes to the parent's new position.
         let nodeExit = selection.exit().transition(sharedTransition)
             .attr("transform", function (d) {
-                return "translate(" + this.scales.model.x(d.dims.x) + "," +
-                    this.scales.model.y(d.dims.y) + ")";
-            }.bind(this))
+                return "translate(" + self.scales.model.x(d.dims.x) + "," +
+                    self.scales.model.y(d.dims.y) + ")";
+            })
             .remove();
 
         nodeExit.select("rect")
             .attr("width", function (d) {
-                return d.dims.width * this.transitCoords.model.x;
-            }.bind(this))
+                return d.dims.width * self.transitCoords.model.x;
+            })
             .attr("height", function (d) {
-                return d.dims.height * this.transitCoords.model.y;
-            }.bind(this));
+                return d.dims.height * self.transitCoords.model.y;
+            });
 
         nodeExit.select("text")
             .attr("transform", function (d) {
-                let anchorX = d.dims.width * this.transitCoords.model.x -
-                    this.layout.size.rightTextMargin;
+                let anchorX = d.dims.width * self.transitCoords.model.x -
+                    self.layout.size.rightTextMargin;
                 return "translate(" + anchorX + "," + d.dims.height *
-                    this.transitCoords.model.y / 2 + ")";
-            }.bind(this))
+                    self.transitCoords.model.y / 2 + ")";
+            })
             .style("opacity", 0);
     }
 
     _createSolverCells() {
-        let selection = this.dom.pSolverTreeGroup.selectAll(".solver_group")
-            .data(this.layout.zoomedSolverNodes, function (d) {
+        let self = this; // For callbacks that change "this". Alternative to using .bind().
+
+        let selection = self.dom.pSolverTreeGroup.selectAll(".solver_group")
+            .data(self.layout.zoomedSolverNodes, function (d) {
                 return d.id;
             });
 
         let nodeEnter = selection.enter().append("svg:g")
             .attr("class", function (d) {
-                let solver_class = this.style.getSolverClass(this.showLinearSolverNames,
-                    { 'linear': d.linear_solver, 'nonLinear': d.nonlinear_solver })
-                return solver_class + " " + "solver_group " + this.style.getNodeClass(d);
-            }.bind(this))
+                let solver_class = self.style.getSolverClass(self.showLinearSolverNames,
+                    { 'linear': d.linear_solver, 'nonLinear': d.nonlinear_solver });
+                return solver_class + " solver_group " + self.style.getNodeClass(d);
+            })
             .attr("transform", function (d) {
                 let x = 1.0 - d.prevSolverDims.x - d.prevSolverDims.width;
                 // The magic for reversing the blocks on the right side
                 // The solver tree goes from the root on the right and expands to the left
-                return "translate(" + this.prevScales.solver.x(x) + "," +
-                    this.prevScales.solver.y(d.prevSolverDims.y) + ")";
-            }.bind(this))
-            .on("click", function (d) { LeftClick(d, this); })
-            .on("contextmenu", function (d) { RightClick(d, this); })
+                return "translate(" + self.prevScales.solver.x(x) + "," +
+                    self.prevScales.solver.y(d.prevSolverDims.y) + ")";
+            })
+            .on("click", function (d) { self.ui.leftClick(d); })
+            .on("contextmenu", function (d) { self.ui.rightClick(d, this); })
             .on("mouseover", function (d) {
-                if (this.model.abs2prom != undefined) {
+                if (self.model.abs2prom != undefined) {
                     if (d.isParam()) {
-                        return this.dom.toolTip.text(this.model.abs2prom.input[d.absPathName])
+                        return self.dom.toolTip.text(self.model.abs2prom.input[d.absPathName])
                             .style("visibility", "visible");
                     }
                     if (d.isUnknown()) {
-                        return this.dom.toolTip.text(this.model.abs2prom.output[d.absPathName])
+                        return self.dom.toolTip.text(self.model.abs2prom.output[d.absPathName])
                             .style("visibility", "visible");
                     }
                 }
-            }.bind(this))
+            })
             .on("mouseleave", function (d) {
-                if (this.model.abs2prom != undefined) {
-                    return this.dom.toolTip.style("visibility", "hidden");
+                if (self.model.abs2prom != undefined) {
+                    return self.dom.toolTip.style("visibility", "hidden");
                 }
-            }.bind(this))
+            })
             .on("mousemove", function () {
-                if (this.model.abs2prom != undefined) {
-                    return this.dom.toolTip.style("top", (d3.event.pageY - 30) + "px")
+                if (self.model.abs2prom != undefined) {
+                    return self.dom.toolTip.style("top", (d3.event.pageY - 30) + "px")
                         .style("left", (d3.event.pageX + 5) + "px");
                 }
-            }.bind(this));
+            });
 
         nodeEnter.append("svg:rect")
             .attr("width", function (d) {
-                return d.prevSolverDims.width * this.prevTransitCoords.solver.x;
-            }.bind(this))
+                return d.prevSolverDims.width * self.prevTransitCoords.solver.x;
+            })
             .attr("height", function (d) {
-                return d.prevSolverDims.height * this.prevTransitCoords.solver.y;
-            }.bind(this));
+                return d.prevSolverDims.height * self.prevTransitCoords.solver.y;
+            })
+            .attr("id", function(d) { return d.absPathName.replace(/\./g, '_'); });
 
         nodeEnter.append("svg:text")
             .attr("dy", ".35em")
             .attr("transform", function (d) {
-                let anchorX = d.prevSolverDims.width * this.prevTransitCoords.solver.x -
-                    this.layout.size.rightTextMargin;
+                let anchorX = d.prevSolverDims.width * self.prevTransitCoords.solver.x -
+                    self.layout.size.rightTextMargin;
                 return "translate(" + anchorX + "," + d.prevSolverDims.height *
-                    this.prevTransitCoords.solver.y / 2 + ")";
-            }.bind(this))
+                    self.prevTransitCoords.solver.y / 2 + ")";
+            })
             .style("opacity", function (d) {
-                if (d.depth < this.zoomedElement.depth) return 0;
+                if (d.depth < self.zoomedElement.depth) return 0;
                 return d.textOpacity;
-            }.bind(this))
-            .text(this.layout.getSolverText.bind(this));
+            })
+            .text(self.layout.getSolverText.bind(self.layout));
 
         return ({ 'selection': selection, 'nodeEnter': nodeEnter });
     }
 
     _setupSolverTransition(d3Refs) {
-        let nodeUpdate = d3Refs.nodeEnter.merge(d3Refs.selection).transition(sharedTransition)
+        let self = this; // For callbacks that change "this". Alternative to using .bind().
+
+        this.dom.clips.solverTree
+            .transition(sharedTransition)
+            .attr('height', this.dims.size.solverTree.height);
+
+        let nodeUpdate = d3Refs.nodeEnter.merge(d3Refs.selection)
+            .transition(sharedTransition)
             .attr("class", function (d) {
-                let solver_class = this.style.getSolverClass(this.showLinearSolverNames,
+                let solver_class = self.style.getSolverClass(self.showLinearSolverNames,
                     { 'linear': d.linear_solver, 'nonLinear': d.nonlinear_solver });
-                return solver_class + " " + "solver_group " + this.style.getNodeClass(d);
-            }.bind(this))
+                return solver_class + " solver_group " + self.style.getNodeClass(d);
+            })
             .attr("transform", function (d) {
                 let x = 1.0 - d.solverDims.x - d.solverDims.width;
                 // The magic for reversing the blocks on the right side
 
-                return "translate(" + this.scales.solver.x(x) + "," +
-                    this.scales.solver.y(d.solverDims.y) + ")";
-            }.bind(this));
+                return "translate(" + self.scales.solver.x(x) + "," +
+                    self.scales.solver.y(d.solverDims.y) + ")";
+            });
 
         nodeUpdate.select("rect")
             .attr("width", function (d) {
-                return d.solverDims.width * this.transitCoords.solver.x;
-            }.bind(this))
+                return d.solverDims.width * self.transitCoords.solver.x;
+            })
             .attr("height", function (d) {
-                return d.solverDims.height * this.transitCoords.solver.y;
-            }.bind(this));
+                return d.solverDims.height * self.transitCoords.solver.y;
+            });
 
         nodeUpdate.select("text")
             .attr("transform", function (d) {
-                let anchorX = d.solverDims.width * this.transitCoords.solver.x -
-                    this.layout.size.rightTextMargin;
+                let anchorX = d.solverDims.width * self.transitCoords.solver.x -
+                    self.layout.size.rightTextMargin;
                 return "translate(" + anchorX + "," + d.solverDims.height *
-                    this.transitCoords.solver.y / 2 + ")";
-            }.bind(this))
+                    self.transitCoords.solver.y / 2 + ")";
+            })
             .style("opacity", function (d) {
-                if (d.depth < this.zoomedElement.depth) return 0;
+                if (d.depth < self.zoomedElement.depth) return 0;
                 return d.textOpacity;
-            }.bind(this))
-            .text(this.layout.getSolverText.bind(this));
+            })
+            .text(self.layout.getSolverText.bind(self.layout));
     }
 
     _runSolverTransition(selection) {
+        let self = this; // For callbacks that change "this". Alternative to using .bind().
+
         // Transition exiting nodes to the parent's new position.
-        let nodeExit = selection.exit().transition(sharedTransition)
+        let nodeExit = selection.exit()
+            .transition(sharedTransition)
             .attr("transform", function (d) {
-                return "translate(" + this.scales.solver.x(d.solverDims.x) + "," +
-                    this.scales.solver.y(d.solverDims.y) + ")";
-            }.bind(this))
+                return "translate(" + self.scales.solver.x(d.solverDims.x) + "," +
+                    self.scales.solver.y(d.solverDims.y) + ")";
+            })
             .remove();
 
         nodeExit.select("rect")
             .attr("width", function (d) {
-                return d.solverDims.width * this.transitCoords.solver.x;
-            }.bind(this))
+                return d.solverDims.width * self.transitCoords.solver.x;
+            })
             .attr("height", function (d) {
-                return d.solverDims.height * this.transitCoords.solver.y;
-            }.bind(this));
+                return d.solverDims.height * self.transitCoords.solver.y;
+            });
 
         nodeExit.select("text")
             .attr("transform", function (d) {
-                let anchorX = d.solverDims.width * this.transitCoords.solver.x -
-                    this.layout.size.rightTextMargin;
+                let anchorX = d.solverDims.width * self.transitCoords.solver.x -
+                    self.layout.size.rightTextMargin;
                 return "translate(" + anchorX + "," + d.solverDims.height *
-                    this.transitCoords.solver.y / 2 + ")";
-            }.bind(this))
+                    self.transitCoords.solver.y / 2 + ")";
+            })
             .style("opacity", 0);
     }
 
     clearArrows() {
-        this.dom.n2TopGroup.selectAll("[class^=n2_hover_elements]").remove();
+        this.dom.n2OuterGroup.selectAll("[class^=n2_hover_elements]").remove();
     }
 
     /**
@@ -564,7 +622,8 @@ class N2Diagram {
      *  matrix objects.
      */
     update(computeNewTreeLayout = true) {
-        this._updateUI();
+        this.ui.update();
+        this.search.update(this.zoomedElement, this.model.root);
 
         // Compute the new tree layout if necessary.
         if (computeNewTreeLayout) {
@@ -572,23 +631,45 @@ class N2Diagram {
 
             this.layout = new N2Layout(this.model, this.zoomedElement,
                 this.showLinearSolverNames, this.dims);
-            this._updateClickedIndices();
-            this.matrix = new N2Matrix(this.layout.visibleNodes, this.model, this.layout,
-                this.dom.n2Groups, this.matrix.nodeSize);
+            this.ui.updateClickedIndices();
+
+            this.matrix = new N2Matrix(this.model, this.layout,
+                this.dom.n2Groups, this.ui.lastClickWasLeft,
+                this.ui.findRootOfChangeFunction, this.matrix.nodeSize);
         }
 
         this._updateScale();
         this.layout.updateTransitionInfo(this.dom, this.transitionStartDelay);
 
-        let d3Refs = this._createPartitionCells();
-        this._setupPartitionTransition(d3Refs);
-        this._runPartitionTransition(d3Refs.selection);
+        let d3PartRefs = this._createPartitionCells();
+        this._setupPartitionTransition(d3PartRefs);
+        this._runPartitionTransition(d3PartRefs.selection);
 
-        d3Refs = this._createSolverCells();
-        this._setupSolverTransition(d3Refs);
-        this._runSolverTransition(d3Refs.selection);
+        let d3SolverRefs = this._createSolverCells();
+        this._setupSolverTransition(d3SolverRefs);
+        this._runSolverTransition(d3SolverRefs.selection);
 
         this.matrix.draw();
+    }
+
+    /**
+     * Updates the intended dimensions of the diagrams and font, but does
+     * not perform rendering itself.
+     * @param {number} height The base height of the diagram without margins.
+     * @param {number} fontSize The new size of the font.
+     */
+    updateSizes(height, fontSize) {
+        let gapSize = fontSize + 4;
+
+        this.dims.size.n2matrix.margin = gapSize;
+        this.dims.size.partitionTreeGap = gapSize;
+
+        this.dims.size.n2matrix.height =
+            this.dims.size.n2matrix.width = // Match base height, keep it looking square
+            this.dims.size.partitionTree.height =
+            this.dims.size.solverTree.height = height;
+
+        this.dims.size.font = fontSize;
     }
 
     /**
@@ -604,15 +685,12 @@ class N2Diagram {
             let newText = (i == height) ? ("<b>" + i + "px</b>") : (i + "px");
             this.dom.parentDiv.querySelector("#idVerticalResize" + i + "px").innerHTML = newText;
         }
-        this.clearArrows();
 
-        this.dims.size.diagram.height =
-            this.dims.size.diagram.width =
-            this.dims.size.partitionTree.height =
-            this.dims.size.solverTree.height = height;
+        this.clearArrows();
+        this.updateSizes(height, this.dims.size.font);
 
         N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
-        this.style.updateSvgStyle(this.layout.size.font);
+        this.style.updateSvgStyle(this.dims.size.font);
         this.update();
     }
 
@@ -625,7 +703,9 @@ class N2Diagram {
             let newText = (i == fontSize) ? ("<b>" + i + "px</b>") : (i + "px");
             this.dom.parentDiv.querySelector("#idFontSize" + i + "px").innerHTML = newText;
         }
-        this.dims.size.font = fontSize;
+
+        this.updateSizes(this.dims.size.n2matrix.height, fontSize);
+
         N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
         this.style.updateSvgStyle(fontSize);
         this.update();
@@ -637,7 +717,8 @@ class N2Diagram {
      * @param {N2MatrixCell} cell The cell the event occured on.
      */
     mouseOverOnDiagonal(cell) {
-        this.matrix.mouseOverOnDiagonal(cell);
+        if (this.matrix.cellExists(cell))
+            this.matrix.mouseOverOnDiagonal(cell);
     }
 
     /**
@@ -645,12 +726,16 @@ class N2Diagram {
      * rather than setting one up that points directly to a specific matrix.
      */
     mouseOverOffDiagonal(cell) {
-        this.matrix.mouseOverOffDiagonal(cell);
+        if (this.matrix.cellExists(cell))
+            this.matrix.mouseOverOffDiagonal(cell);
     }
 
     /** When the mouse leaves a cell, remove all temporary arrows. */
     mouseOut() {
-        this.dom.n2TopGroup.selectAll(".n2_hover_elements").remove();
+        this.dom.n2OuterGroup.selectAll(".n2_hover_elements").remove();
+        d3.selectAll("div.offgrid")
+            .style("visibility", "hidden")
+            .node().innerHTML = '';
     }
 
     /**
@@ -660,12 +745,12 @@ class N2Diagram {
      */
     mouseClick(cell) {
         let newClassName = "n2_hover_elements_" + cell.row + "_" + cell.col;
-        let selection = this.dom.n2TopGroup.selectAll("." + newClassName);
+        let selection = this.dom.n2OuterGroup.selectAll("." + newClassName);
         if (selection.size() > 0) {
             selection.remove();
         }
         else {
-            this.dom.n2TopGroup
+            this.dom.n2OuterGroup
                 .selectAll("path.n2_hover_elements, circle.n2_hover_elements")
                 .attr("class", newClassName);
         }
@@ -676,11 +761,13 @@ class N2Diagram {
      * @returns {Object} Object containing each of the functions.
     */
     getMouseFuncs() {
+        let self = this;
+
         let mf = {
-            'overOffDiag': this.mouseOverOffDiagonal.bind(this),
-            'overOnDiag': this.mouseOverOnDiagonal.bind(this),
-            'out': this.mouseOut.bind(this),
-            'click': this.mouseClick.bind(this)
+            'overOffDiag': self.mouseOverOffDiagonal.bind(self),
+            'overOnDiag': self.mouseOverOnDiagonal.bind(self),
+            'out': self.mouseOut.bind(self),
+            'click': self.mouseClick.bind(self)
         }
 
         return mf;

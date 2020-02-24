@@ -11,6 +11,7 @@ from six import string_types
 import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent
+from openmdao.utils.general_utils import warn_deprecation
 
 
 def abs_smooth_dv(x, x_deriv, delta_x):
@@ -79,6 +80,8 @@ class AkimaSplineComp(ExplicitComponent):
 
         self.x_grid = None
         self.x_cp_grid = None
+
+        warn_deprecation("'AkimaSplineComp' has been deprecated. Use 'SplineComp' instead.")
 
     def initialize(self):
         """
@@ -306,11 +309,10 @@ class AkimaSplineComp(ExplicitComponent):
             ypt_jj = ypt[jj, :]
 
             # Compute segment slopes
-            md[:, 2:ncp + 1] = ((yptd[:, 1:] - yptd[:, :-1]) * (xpt[1:] - xpt[:-1]) -
-                                (ypt_jj[1:] - ypt_jj[:-1]) * (xptd[:, 1:] - xptd[:, :-1])) / \
-                (xpt[1:] - xpt[:-1]) ** 2
+            md[:, 2:ncp + 1] = ((yptd[:, 1:] - yptd[:, :-1]) * dx -
+                                (ypt_jj[1:] - ypt_jj[:-1]) * dxd) / dx2
 
-            m[2:ncp + 1] = (ypt_jj[1:] - ypt_jj[:-1]) / (xpt[1:] - xpt[:-1])
+            m[2:ncp + 1] = (ypt_jj[1:] - ypt_jj[:-1]) / dx
 
             # Estimation for end points.
             md[:, 1] = 2.0 * md[:, 2] - md[:, 3]
@@ -324,7 +326,7 @@ class AkimaSplineComp(ExplicitComponent):
             m[ncp + 2] = 2.0 * m[ncp + 1] - m[ncp]
 
             # Slope at points.
-            for i in range(2, ncp + 1):
+            for i in range(2, ncp + 2):
                 m1d = md[:, i - 2]
                 m2d = md[:, i - 1]
                 m3d = md[:, i]

@@ -18,6 +18,8 @@ import openmdao
 import openmdao.utils.coloring as coloring_mod
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.utils.general_utils import warn_deprecation, simple_warning
+from openmdao.utils.class_util import weak_method_wrapper
+from openmdao.utils.mpi import MPI
 
 # Optimizers in scipy.minimize
 _optimizers = {'Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B',
@@ -93,7 +95,7 @@ class ScipyOptimizeDriver(Driver):
         Result returned from scipy.optimize call.
     opt_settings : dict
         Dictionary of solver-specific options. See the scipy.optimize.minimize documentation.
-    _con_cache : OrderedDict
+    _con_cache : dict
         Cached result of constraint evaluations because scipy asks for them in a separate function.
     _con_idx : dict
         Used for constraint bookkeeping in the presence of 2-sided constraints.
@@ -231,7 +233,7 @@ class ScipyOptimizeDriver(Driver):
         boolean
             Failure flag; True if failed to converge, False is successful.
         """
-        problem = self._problem
+        problem = self._problem()
         opt = self.options['optimizer']
         model = problem.model
         self.iter_count = 0
@@ -249,7 +251,8 @@ class ScipyOptimizeDriver(Driver):
         self._dvlist = list(self._designvars)
 
         # maxiter and disp get passsed into scipy with all the other options.
-        self.opt_settings['maxiter'] = self.options['maxiter']
+        if 'maxiter' not in self.opt_settings:  # lets you override the value in options
+            self.opt_settings['maxiter'] = self.options['maxiter']
         self.opt_settings['disp'] = self.options['disp']
 
         # Size Problem
@@ -318,7 +321,7 @@ class ScipyOptimizeDriver(Driver):
                 upper = meta['upper']
                 lower = meta['lower']
                 equals = meta['equals']
-                if 'linear' in meta and meta['linear']:
+                if opt in _gradient_optimizers and 'linear' in meta and meta['linear']:
                     lincons.append(name)
                     self._con_idx[name] = lin_i
                     lin_i += size
@@ -350,9 +353,11 @@ class ScipyOptimizeDriver(Driver):
                         args = [name, False, j]
                         # TODO linear constraint if meta['linear']
                         # TODO add option for Hessian
-                        con = NonlinearConstraint(fun=signature_extender(self._con_val_func, args),
-                                                  lb=lb, ub=ub,
-                                                  jac=signature_extender(self._congradfunc, args))
+                        con = NonlinearConstraint(
+                            fun=signature_extender(weak_method_wrapper(self, '_con_val_func'),
+                                                   args),
+                            lb=lb, ub=ub,
+                            jac=signature_extender(weak_method_wrapper(self, '_congradfunc'), args))
                         constraints.append(con)
                 else:  # Type of constraints is list of dict
                     # Loop over every index separately,
@@ -363,9 +368,9 @@ class ScipyOptimizeDriver(Driver):
                             con_dict['type'] = 'eq'
                         else:
                             con_dict['type'] = 'ineq'
-                        con_dict['fun'] = self._confunc
+                        con_dict['fun'] = weak_method_wrapper(self, '_confunc')
                         if opt in _constraint_grad_optimizers:
-                            con_dict['jac'] = self._congradfunc
+                            con_dict['jac'] = weak_method_wrapper(self, '_congradfunc')
                         con_dict['args'] = [name, False, j]
                         constraints.append(con_dict)
 
@@ -381,9 +386,9 @@ class ScipyOptimizeDriver(Driver):
                         if dblcon:
                             dcon_dict = {}
                             dcon_dict['type'] = 'ineq'
-                            dcon_dict['fun'] = self._confunc
+                            dcon_dict['fun'] = weak_method_wrapper(self, '_confunc')
                             if opt in _constraint_grad_optimizers:
-                                dcon_dict['jac'] = self._congradfunc
+                                dcon_dict['jac'] = weak_method_wrapper(self, '_congradfunc')
                             dcon_dict['args'] = [name, True, j]
                             constraints.append(dcon_dict)
 
@@ -560,12 +565,14 @@ class ScipyOptimizeDriver(Driver):
         float
             Value of the objective function evaluated at the new design point.
         """
-        model = self._problem.model
+        model = self._problem().model
 
         try:
 
             # Pass in new parameters
             i = 0
+            if MPI:
+                model.comm.Bcast(x_new, root=0)
             for name, meta in iteritems(self._designvars):
                 size = meta['size']
                 self.set_design_var(name, x_new[i:i + size])
@@ -587,8 +594,8 @@ class ScipyOptimizeDriver(Driver):
             return 0
 
         # print("Functions calculated")
-        # print(x_new)
-        # print(f_new)
+        # print('   xnew', x_new)
+        # print('   fnew', f_new)
 
         return f_new
 
@@ -693,9 +700,9 @@ class ScipyOptimizeDriver(Driver):
             self._exc_info = sys.exc_info()
             return np.array([[]])
 
-        # print("Gradients calculated")
-        # print(x_new)
-        # print(grad[0, :])
+        # print("Gradients calculated for objective")
+        # print('   xnew', x_new)
+        # print('   grad', grad[0, :])
 
         return grad[0, :]
 
@@ -734,8 +741,8 @@ class ScipyOptimizeDriver(Driver):
         grad_idx = self._con_idx[name] + idx
 
         # print("Constraint Gradient returned")
-        # print(x_new)
-        # print(name, idx, grad[grad_idx, :])
+        # print('   xnew', x_new)
+        # print('   grad', name, 'idx', idx, grad[grad_idx, :])
 
         # Equality constraints
         if meta['equals'] is not None:

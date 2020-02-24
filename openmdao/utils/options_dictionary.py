@@ -27,6 +27,8 @@ class OptionsDictionary(object):
         If defined, prepend this name to beginning of all exceptions.
     _read_only : bool
         If True, no options can be set after declaration.
+    _all_recordable : bool
+        Flag to determine if all options in UserOptions are recordable.
     """
 
     def __init__(self, parent_name=None, read_only=False):
@@ -43,6 +45,24 @@ class OptionsDictionary(object):
         self._dict = {}
         self._parent_name = parent_name
         self._read_only = read_only
+
+        self._all_recordable = True
+
+    def __getstate__(self):
+        """
+        Return state as a dict.
+
+        Returns
+        -------
+        dict
+            State to get.
+        """
+        if self._all_recordable:
+            return self.__dict__
+        else:
+            state = self.__dict__.copy()
+            state['_dict'] = {key: val for key, val in state['_dict'].items() if val['recordable']}
+            return state
 
     def __repr__(self):
         """
@@ -76,7 +96,7 @@ class OptionsDictionary(object):
             # if the default is an object instance, replace with the (unqualified) object type
             default_str = str(default)
             idx = default_str.find(' object at ')
-            if idx >= 0 and default_str[0] is '<':
+            if idx >= 0 and default_str[0] == '<':
                 parts = default_str[:idx].split('.')
                 default = parts[-1]
 
@@ -266,7 +286,7 @@ class OptionsDictionary(object):
             meta['check_valid'](name, value)
 
     def declare(self, name, default=_undefined, values=None, types=None, type_=None, desc='',
-                upper=None, lower=None, check_valid=None, allow_none=False):
+                upper=None, lower=None, check_valid=None, allow_none=False, recordable=True):
         r"""
         Declare an option.
 
@@ -297,6 +317,8 @@ class OptionsDictionary(object):
             General check function that raises an exception if value is not valid.
         allow_none : bool
             If True, allow None as a value regardless of values or types.
+        recordable : bool
+            If True, add to recorder
         """
         if type_ is not None:
             warn_deprecation("In declaration of option '%s' the '_type' arg is deprecated.  "
@@ -318,6 +340,9 @@ class OptionsDictionary(object):
         if types is bool:
             values = (True, False)
 
+        if not recordable:
+            self._all_recordable = False
+
         default_provided = default is not _undefined
 
         self._dict[name] = {
@@ -330,6 +355,7 @@ class OptionsDictionary(object):
             'check_valid': check_valid,
             'has_been_set': default_provided,
             'allow_none': allow_none,
+            'recordable': recordable,
         }
 
         # If a default is given, check for validity

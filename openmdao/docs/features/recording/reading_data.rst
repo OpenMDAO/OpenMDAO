@@ -79,7 +79,7 @@ This example shows both methods of getting variable data by name.
 .. embed-code::
     openmdao.recorders.tests.test_sqlite_reader.TestFeatureSqliteReader.test_feature_get_val
     :layout: interleave
-    
+
 Getting Derivative Data from a Case
 -----------------------------------
 

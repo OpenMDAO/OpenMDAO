@@ -15,13 +15,14 @@ from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.general_utils import set_pyoptsparse_opt, run_driver
 from openmdao.utils.testing_utils import use_tempdirs
+from openmdao.utils.mpi import MPI
 
 # check that pyoptsparse is installed
 # if it is, try to use SNOPT but fall back to SLSQP
 OPT, OPTIMIZER = set_pyoptsparse_opt('SNOPT')
 
 if OPTIMIZER:
-    from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
+    from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver, UserRequestedException
 
 
 class ParaboloidAE(om.ExplicitComponent):
@@ -84,6 +85,44 @@ class ParaboloidAE(om.ExplicitComponent):
         self.grad_iter_count += 1
 
 
+class DummyComp(om.ExecComp):
+    """
+    Evaluates the equation f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3.
+    """
+    def setup(self):
+        self.add_input('x', val=0.0)
+        self.add_input('y', val=0.0)
+
+        self.add_output('c', val=0.0)
+
+        self.declare_partials('*', '*')
+
+    def compute(self, inputs, outputs):
+        """
+        f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3
+
+        Optimal solution (minimum): x = 6.6667; y = -7.3333
+        """
+        x = inputs['x']
+        y = inputs['y']
+
+        noise = 1e-10
+        if self.comm.rank == 0:
+            outputs['c'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
+        if self.comm.rank == 1:
+            outputs['c'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0 + noise
+
+    def compute_partials(self, inputs, partials):
+        """
+        Jacobian for our paraboloid.
+        """
+        x = inputs['x']
+        y = inputs['y']
+
+        partials['c', 'x'] = 2.0*x - 6.0 + y
+        partials['c', 'y'] = 2.0*y + 8.0 + x
+
+
 class DataSave(om.ExplicitComponent):
     """ Saves run points so that we can verify that initial point is run."""
 
@@ -104,6 +143,37 @@ class DataSave(om.ExplicitComponent):
 
         partials['y', 'x'] = 2.0*x - 6.0
 
+@unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
+@unittest.skipUnless(MPI, "MPI is required.")
+class TestMPIScatter(unittest.TestCase):
+    N_PROCS = 2
+
+    def test_design_vars_on_all_procs_pyopt(self):
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', DummyComp(), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = pyOptSparseDriver(optimizer=OPTIMIZER, print_results=False)
+        if OPTIMIZER == 'SLSQP':
+            prob.driver.opt_settings['ACC'] = 1e-6
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', lower=-15.0)
+
+        prob.setup()
+        prob.run_driver()
+
+        proc_vals = MPI.COMM_WORLD.allgather([prob['x'], prob['y'], prob['c'], prob['f_xy']])
+        np.testing.assert_array_almost_equal(proc_vals[0], proc_vals[1])
 
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
 @use_tempdirs
@@ -1194,7 +1264,6 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_constraint('c', upper=-15.0)
 
         prob.setup()
-
         failed = prob.run_driver()
 
         self.assertFalse(failed, "Optimization failed, info = " +
@@ -1373,8 +1442,9 @@ class TestPyoptSparse(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
 
-        self.assertTrue('Solving variable: comp.f_xy' in output)
-        self.assertTrue('Solving variable: con.c' in output)
+        self.assertTrue('In mode: rev, Solving variable(s):' in output)
+        self.assertTrue("('comp.f_xy', [0])" in output)
+        self.assertTrue('Elapsed Time:' in output)
 
         prob = om.Problem()
         model = prob.model
@@ -1406,8 +1476,9 @@ class TestPyoptSparse(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed, info = " +
                              str(prob.driver.pyopt_solution.optInform))
 
-        self.assertTrue('Solving variable: p1.x' in output)
-        self.assertTrue('Solving variable: p2.y' in output)
+        self.assertTrue('In mode: fwd, Solving variable(s):' in output)
+        self.assertTrue("('p2.y', [1])" in output)
+        self.assertTrue('Elapsed Time:' in output)
 
     def test_debug_print_option(self):
 
@@ -1678,6 +1749,67 @@ class TestPyoptSparse(unittest.TestCase):
         msg = "Driver requires objective to be declared"
 
         self.assertEqual(exception.args[0], msg)
+
+    def test_signal_handler_SNOPT(self):
+        _, local_opt = set_pyoptsparse_opt('SNOPT')
+        if local_opt != 'SNOPT':
+            raise unittest.SkipTest("pyoptsparse is not providing SNOPT")
+
+        import pyoptsparse
+        if not hasattr(pyoptsparse, '__version__') or \
+           LooseVersion(pyoptsparse.__version__) < LooseVersion('1.1.0'):
+            raise unittest.SkipTest("pyoptsparse needs to be updated to 1.1.0")
+
+        class ParaboloidSIG(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_input('x', val=0.0)
+                self.add_input('y', val=0.0)
+
+                self.add_output('f_xy', val=0.0)
+
+                self.declare_partials('*', '*')
+
+                self.iter_count = 0
+
+            def compute(self, inputs, outputs):
+                self.iter_count += 1
+                if self.iter_count == 1:
+                    # Pretends that this was raised by a signal handler triggered by the user.
+                    raise UserRequestedException('This is expected.')
+                elif self.iter_count > 3:
+                    raise RuntimeError('SNOPT should have stopped.')
+                else:
+                    # Post optimization run with optimal params.
+                    pass
+
+            def compute_partials(self, inputs, partials):
+                x = inputs['x']
+                y = inputs['y']
+
+                partials['f_xy', 'x'] = 2.0*x - 6.0 + y
+                partials['f_xy', 'y'] = 2.0*y + 8.0 + x
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('x', om.IndepVarComp('x', 2.0), promotes=['*'])
+        model.add_subsystem('f_x', ParaboloidSIG(), promotes=['*'])
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = 'SNOPT'
+
+        prob.model.add_design_var('x', lower=0)
+        model.add_objective('f_xy')
+        prob.model.add_constraint('x', lower=0)
+
+        prob.setup()
+
+        prob.run_driver()
+
+        # SNOPT return code 71 is a user-requested termination.
+        code = prob.driver.pyopt_solution.optInform['value']
+        self.assertEqual(code, 71)
 
 
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
@@ -2061,6 +2193,17 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
         # Checking that iprint stack gets routinely cleaned.
         output = output.split('\n')
         self.assertEqual(output[-2], ('NL: NLBGS Converged'))
+
+    def test_signal_set(self):
+        import openmdao.api as om
+        import signal
+
+        prob = om.Problem()
+        model = prob.model
+
+        prob.driver = om.pyOptSparseDriver()
+        prob.driver.options['optimizer'] = "SNOPT"
+        prob.driver.options['user_teriminate_signal'] = signal.SIGUSR2
 
 
 if __name__ == "__main__":

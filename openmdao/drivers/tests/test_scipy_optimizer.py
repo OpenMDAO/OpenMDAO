@@ -16,7 +16,100 @@ from openmdao.test_suite.components.simple_comps import NonSquareArrayComp
 from openmdao.test_suite.groups.sin_fitter import SineFitter
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.utils.general_utils import run_driver
+from openmdao.utils.mpi import MPI
 
+rosenbrock_size = 6  # size of the design variable
+
+def rosenbrock(x):
+    x_0 = x[:-1]
+    x_1 = x[1:]
+    return sum((1 - x_0) ** 2) + 100 * sum((x_1 - x_0 ** 2) ** 2)
+
+
+class Rosenbrock(om.ExplicitComponent):
+
+    def setup(self):
+        self.add_input('x', np.ones(rosenbrock_size))
+        self.add_output('f', 0.0)
+
+    def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
+        x = inputs['x']
+        outputs['f'] = rosenbrock(x)
+
+def rastrigin(x):
+    a = 10  # constant
+    return np.sum(np.square(x) - a * np.cos(2 * np.pi * x)) + a * np.size(x)
+
+
+class DummyComp(om.ExecComp):
+    """
+    Evaluates the equation f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3.
+    """
+
+    def setup(self):
+        self.add_input('x', val=0.0)
+        self.add_input('y', val=0.0)
+
+        self.add_output('c', val=0.0)
+
+        self.declare_partials('*', '*')
+
+    def compute(self, inputs, outputs):
+        """
+        f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3
+
+        Optimal solution (minimum): x = 6.6667; y = -7.3333
+        """
+        x = inputs['x']
+        y = inputs['y']
+
+        noise = 1e-10
+        if self.comm.rank == 0:
+            outputs['c'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
+        if self.comm.rank == 1:
+            outputs['c'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0 + noise
+
+    def compute_partials(self, inputs, partials):
+        """
+        Jacobian for our paraboloid.
+        """
+        x = inputs['x']
+        y = inputs['y']
+
+        partials['c', 'x'] = 2.0*x - 6.0 + y
+        partials['c', 'y'] = 2.0*y + 8.0 + x
+
+@unittest.skipUnless(MPI, "MPI is required.")
+class TestMPIScatter(unittest.TestCase):
+    N_PROCS = 2
+
+    def test_design_vars_on_all_procs_scipy(self):
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', DummyComp(), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-6
+        prob.driver.options['disp'] = False
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', lower=-15.0)
+
+        prob.setup()
+        prob.run_driver()
+
+        proc_vals = MPI.COMM_WORLD.allgather([prob['x'], prob['y'], prob['c'], prob['f_xy']])
+        np.testing.assert_array_almost_equal(proc_vals[0], proc_vals[1])
 
 class TestScipyOptimizeDriver(unittest.TestCase):
 
@@ -897,11 +990,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
                          "scipy >= 1.1 is required.")
     def test_trust_constr(self):
 
-        def rosenbrock(x):
-            x_0 = x[:-1]
-            x_1 = x[1:]
-            return sum((1 - x_0) ** 2) + 100 * sum((x_1 - x_0 ** 2) ** 2)
-
         class Rosenbrock(om.ExplicitComponent):
 
             def setup(self):
@@ -943,11 +1031,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     @unittest.skipUnless(LooseVersion(scipy_version) >= LooseVersion("1.1"),
                          "scipy >= 1.1 is required.")
     def test_trust_constr_hess_option(self):
-
-        def rosenbrock(x):
-            x_0 = x[:-1]
-            x_1 = x[1:]
-            return sum((1 - x_0) ** 2) + 100 * sum((x_1 - x_0 ** 2) ** 2)
 
         class Rosenbrock(om.ExplicitComponent):
 
@@ -991,11 +1074,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     @unittest.skipUnless(LooseVersion(scipy_version) >= LooseVersion("1.1"),
                          "scipy >= 1.1 is required.")
     def test_trust_constr_equality_con(self):
-
-        def rosenbrock(x):
-            x_0 = x[:-1]
-            x_1 = x[1:]
-            return sum((1 - x_0) ** 2) + 100 * sum((x_1 - x_0 ** 2) ** 2)
 
         class Rosenbrock(om.ExplicitComponent):
 
@@ -1206,8 +1284,9 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         self.assertFalse(failed, "Optimization failed.")
 
-        self.assertTrue('Solving variable: comp.f_xy' in output)
-        self.assertTrue('Solving variable: con.c' in output)
+        self.assertTrue('In mode: rev, Solving variable(s):' in output)
+        self.assertTrue("('comp.f_xy', [0])" in output)
+        self.assertTrue('Elapsed Time:' in output)
 
         prob = om.Problem()
         model = prob.model
@@ -1237,8 +1316,9 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         self.assertFalse(failed, "Optimization failed.")
 
-        self.assertTrue('Solving variable: p1.x' in output)
-        self.assertTrue('Solving variable: p2.y' in output)
+        self.assertTrue('In mode: fwd, Solving variable(s):' in output)
+        self.assertTrue("('p1.x', [0])" in output)
+        self.assertTrue('Elapsed Time:' in output)
 
     def test_debug_print_option(self):
 
@@ -1353,171 +1433,34 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         self.assertEqual(expected_msg, str(cm.exception))
 
-
-class TestScipyOptimizeDriverFeatures(unittest.TestCase):
-
-    def test_feature_basic(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
-
+    def test_cobyla_linear_constraint(self):
+        # Bug where scipyoptimizer tried to compute and cache the constraint derivatives for the
+        # lower and upper bounds of the desvars even though we were using a non-gradient optimizer.
+        # This causd a KeyError.
         prob = om.Problem()
-        model = prob.model
+        indeps = prob.model.add_subsystem('indeps', om.IndepVarComp())
+        indeps.add_output('x', 3.0)
+        indeps.add_output('y', -4.0)
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
-        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        prob.model.add_subsystem('parab', Paraboloid())
+
+        prob.model.add_subsystem('const', om.ExecComp('g = x + y'))
+
+        prob.model.connect('indeps.x', ['parab.x', 'const.x'])
+        prob.model.connect('indeps.y', ['parab.y', 'const.y'])
 
         prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = True
+        prob.driver.options['optimizer'] = 'COBYLA'
 
-        model.add_design_var('x', lower=-50.0, upper=50.0)
-        model.add_design_var('y', lower=-50.0, upper=50.0)
-        model.add_objective('f_xy')
-
+        prob.model.add_constraint('const.g', lower=0, upper=10.)
+        prob.model.add_design_var('indeps.x', **{'ref0': 0, 'ref': 2, 'lower': -50, 'upper': 50})
+        prob.model.add_design_var('indeps.y', **{'ref0': 0, 'ref': 2, 'lower': -50, 'upper': 50})
+        prob.model.add_objective('parab.f_xy', scaler = 4.0)
         prob.setup()
-
         prob.run_driver()
 
-        assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
-        assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
-
-    def test_feature_optimizer(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
-
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
-        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-
-        prob.driver = om.ScipyOptimizeDriver(optimizer='COBYLA')
-
-        model.add_design_var('x', lower=-50.0, upper=50.0)
-        model.add_design_var('y', lower=-50.0, upper=50.0)
-        model.add_objective('f_xy')
-
-        prob.setup()
-
-        prob.run_driver()
-
-        assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
-        assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
-
-    def test_feature_maxiter(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
-
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
-        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['maxiter'] = 20
-
-        model.add_design_var('x', lower=-50.0, upper=50.0)
-        model.add_design_var('y', lower=-50.0, upper=50.0)
-        model.add_objective('f_xy')
-
-        prob.setup()
-
-        prob.run_driver()
-
-        assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
-        assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
-
-    def test_feature_tol(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
-
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
-        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['tol'] = 1.0e-9
-
-        model.add_design_var('x', lower=-50.0, upper=50.0)
-        model.add_design_var('y', lower=-50.0, upper=50.0)
-        model.add_objective('f_xy')
-
-        prob.setup()
-
-        prob.run_driver()
-
-        assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
-        assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
-
-    def test_debug_print_option(self):
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
-
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
-        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
-
-        prob.set_solver_print(level=0)
-
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
-
-        prob.driver.options['debug_print'] = ['desvars','ln_cons','nl_cons','objs']
-
-        model.add_design_var('x', lower=-50.0, upper=50.0)
-        model.add_design_var('y', lower=-50.0, upper=50.0)
-        model.add_objective('f_xy')
-        model.add_constraint('c', upper=-15.0)
-
-        prob.setup()
-
-        prob.run_driver()
-
-    def test_debug_print_option_totals(self):
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
-
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
-        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
-
-        prob.set_solver_print(level=0)
-
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
-
-        prob.driver.options['debug_print'] = ['totals']
-
-        model.add_design_var('x', lower=-50.0, upper=50.0)
-        model.add_design_var('y', lower=-50.0, upper=50.0)
-        model.add_objective('f_xy')
-        model.add_constraint('c', upper=-15.0)
-
-        prob.setup()
-
-        prob.run_driver()
+        # minimum value
+        assert_rel_error(self, prob['parab.f_xy'], -27, 1e-6)
 
     def test_multiple_objectives_error(self):
 
@@ -1636,34 +1579,16 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         prob.run_driver()
         assert_rel_error(self, prob['x'], np.array([0.234171, -0.1000]), 1e-3)
         assert_rel_error(self, prob['f'], -0.907267, 1e-3)
-
     @unittest.skipUnless(LooseVersion(scipy_version) >= LooseVersion("1.2"),
                          "scipy >= 1.2 is required.")
     def test_dual_annealing(self):
 
         import openmdao.api as om
 
-        size = 6  # size of the design variable
-
-        def rosenbrock(x):
-            x_0 = x[:-1]
-            x_1 = x[1:]
-            return sum((1 - x_0) ** 2) + 100 * sum((x_1 - x_0 ** 2) ** 2)
-
-        class Rosenbrock(om.ExplicitComponent):
-
-            def setup(self):
-                self.add_input('x', 1.5*np.ones(size))
-                self.add_output('f', 0.0)
-
-            def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
-                x = inputs['x']
-                outputs['f'] = rosenbrock(x)
-
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('indeps', om.IndepVarComp('x', np.ones(size)), promotes=['*'])
+        model.add_subsystem('indeps', om.IndepVarComp('x', np.ones(rosenbrock_size)), promotes=['*'])
         model.add_subsystem('rosen', Rosenbrock(), promotes=['*'])
 
         prob.driver = driver = om.ScipyOptimizeDriver()
@@ -1674,11 +1599,11 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         driver.opt_settings['seed'] = 1234
         driver.opt_settings['initial_temp'] = 5230
 
-        model.add_design_var('x', lower=-2*np.ones(size), upper=2*np.ones(size))
+        model.add_design_var('x', lower=-2*np.ones(rosenbrock_size), upper=2*np.ones(rosenbrock_size))
         model.add_objective('f')
         prob.setup()
         prob.run_driver()
-        assert_rel_error(self, prob['x'], np.ones(size), 1e-2)
+        assert_rel_error(self, prob['x'], np.ones(rosenbrock_size), 1e-2)
         assert_rel_error(self, prob['f'], 0.0, 1e-2)
 
     @unittest.skipUnless(LooseVersion(scipy_version) >= LooseVersion("1.2"),
@@ -1688,10 +1613,6 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         # Example from the Scipy documentation
 
         size = 3  # size of the design variable
-
-        def rastrigin(x):
-            a = 10  # constant
-            return np.sum(np.square(x) - a * np.cos(2 * np.pi * x)) + a * np.size(x)
 
         class Rastrigin(om.ExplicitComponent):
 
@@ -1733,10 +1654,6 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
 
         size = 3  # size of the design variable
 
-        def rastrigin(x):
-            a = 10  # constant
-            return np.sum(np.square(x) - a * np.cos(2 * np.pi * x)) + a * np.size(x)
-
         class Rastrigin(om.ExplicitComponent):
 
             def setup(self):
@@ -1774,10 +1691,6 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
 
         size = 3  # size of the design variable
 
-        def rastrigin(x):
-            a = 10  # constant
-            return np.sum(np.square(x) - a * np.cos(2 * np.pi * x)) + a * np.size(x)
-
         class Rastrigin(om.ExplicitComponent):
 
             def setup(self):
@@ -1808,18 +1721,207 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
 
     @unittest.skipUnless(LooseVersion(scipy_version) >= LooseVersion("1.2"),
                          "scipy >= 1.2 is required.")
-    @unittest.skip("temporarily disabled due to test failure.")
-    def test_shgo(self):
+    def test_shgo_rosenbrock(self):
         # Source of example:
-        # https://scipy.github.io/devdocs/generated/scipy.optimize.dual_annealing.html
+        # https://stefan-endres.github.io/shgo/
+        import openmdao.api as om
 
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('indeps', om.IndepVarComp('x', np.ones(rosenbrock_size)), promotes=['*'])
+        model.add_subsystem('rosen', Rosenbrock(), promotes=['*'])
+
+        prob.driver = driver = om.ScipyOptimizeDriver()
+        driver.options['optimizer'] = 'shgo'
+        driver.options['disp'] = False
+        driver.opt_settings['maxiter'] = None
+
+        model.add_design_var('x', lower=np.zeros(rosenbrock_size), upper=2*np.ones(rosenbrock_size))
+        model.add_objective('f')
+        prob.setup()
+        prob.run_driver()
+        assert_rel_error(self, prob['x'], np.ones(rosenbrock_size), 1e-2)
+        assert_rel_error(self, prob['f'], 0.0, 1e-2)
+
+class TestScipyOptimizeDriverFeatures(unittest.TestCase):
+
+    def test_feature_basic(self):
+        import openmdao.api as om
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = True
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+
+        prob.setup()
+
+        prob.run_driver()
+
+        assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
+        assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
+
+    def test_feature_optimizer(self):
+        import openmdao.api as om
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+
+        prob.driver = om.ScipyOptimizeDriver(optimizer='COBYLA')
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+
+        prob.setup()
+
+        prob.run_driver()
+
+        assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
+        assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
+
+    def test_feature_maxiter(self):
+        import openmdao.api as om
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['maxiter'] = 20
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+
+        prob.setup()
+
+        prob.run_driver()
+
+        assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
+        assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
+
+    def test_feature_tol(self):
+        import openmdao.api as om
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['tol'] = 1.0e-9
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+
+        prob.setup()
+
+        prob.run_driver()
+
+        assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
+        assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
+
+    def test_feature_debug_print_option(self):
+
+        import openmdao.api as om
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        prob.driver.options['debug_print'] = ['desvars','ln_cons','nl_cons','objs']
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+
+        prob.setup()
+
+        prob.run_driver()
+
+    def test_feature_debug_print_option_totals(self):
+
+        import openmdao.api as om
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        prob.driver.options['debug_print'] = ['totals']
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+
+        prob.setup()
+
+        prob.run_driver()
+
+    @unittest.skipUnless(LooseVersion(scipy_version) >= LooseVersion("1.2"),
+                         "scipy >= 1.2 is required.")
+    def test_feature_shgo_rastrigin(self):
+        # Source of example: https://stefan-endres.github.io/shgo/
+
+        import numpy as np
         import openmdao.api as om
 
         size = 3  # size of the design variable
 
         def rastrigin(x):
             a = 10  # constant
-            return np.sum(np.square(x) - a*np.cos(2*np.pi*x)) + a*np.size(x)
+            return np.sum(np.square(x) - a * np.cos(2 * np.pi * x)) + a * np.size(x)
 
         class Rastrigin(om.ExplicitComponent):
 
@@ -1840,14 +1942,15 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         prob.driver = driver = om.ScipyOptimizeDriver()
         driver.options['optimizer'] = 'shgo'
         driver.options['disp'] = False
-        driver.options['maxiter'] = 100
         driver.opt_settings['maxtime'] = 10  # seconds
         driver.opt_settings['iters'] = 3
+        driver.opt_settings['maxiter'] = None
 
         model.add_design_var('x', lower=-5.12*np.ones(size), upper=5.12*np.ones(size))
         model.add_objective('f')
         prob.setup()
         prob.run_driver()
+
         assert_rel_error(self, prob['x'], np.zeros(size), 1e-6)
         assert_rel_error(self, prob['f'], 0.0, 1e-6)
 

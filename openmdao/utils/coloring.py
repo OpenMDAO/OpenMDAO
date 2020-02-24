@@ -16,6 +16,7 @@ from itertools import combinations, chain
 from distutils.version import LooseVersion
 from contextlib import contextmanager
 from pprint import pprint
+from itertools import groupby
 
 from six import iteritems, string_types
 from six.moves import range
@@ -28,6 +29,7 @@ from openmdao.utils.array_utils import array_viz
 from openmdao.utils.general_utils import simple_warning
 import openmdao.utils.hooks as hooks
 from openmdao.utils.mpi import MPI
+from openmdao.utils.file_utils import _load_and_exec
 
 
 CITATIONS = """
@@ -133,6 +135,10 @@ class Coloring(object):
         Sizes of row variables.
     _meta : dict
         Dictionary of metadata used to create the coloring.
+    _names_array : ndarray or None:
+        Names of total jacobian rows or columns.
+    _local_array : ndarray or None:
+        Indices of total jacobian rows or columns.
     """
 
     def __init__(self, sparsity, row_vars=None, row_var_sizes=None, col_vars=None,
@@ -166,6 +172,9 @@ class Coloring(object):
         self._fwd = None
         self._rev = None
         self._meta = {}
+
+        self._names_array = None
+        self._local_array = None
 
     def color_iter(self, direction):
         """
@@ -624,9 +633,7 @@ class Coloring(object):
         Display a plot of the sparsity pattern, showing grouping by color.
         """
         try:
-            from matplotlib import pyplot, patches, axes, cm
-            from matplotlib.artist import getp
-            from matplotlib.offsetbox import AnchoredText
+            from matplotlib import pyplot, axes, cm
         except ImportError:
             print("matplotlib is not installed so the coloring viewer is not available. The ascii "
                   "based coloring viewer can be accessed by calling display_txt() on the Coloring "
@@ -907,6 +914,36 @@ class Coloring(object):
                         rev_solves += 1
 
         return fwd_solves, rev_solves
+
+    def _local_indices(self, inds, mode):
+
+        if self._names_array is None and self._local_array is None:
+            col_names = self._col_vars
+            col_sizes = self._col_var_sizes
+            row_names = self._row_vars
+            row_sizes = self._row_var_sizes
+
+            if mode == 'fwd':
+                col_info = zip(col_names, col_sizes)
+            else:
+                col_info = zip(row_names, row_sizes)
+
+            names = []
+            indices = []
+            for i, j in col_info:
+                names.append(np.repeat(i, j))
+                indices.append(np.arange(j))
+
+            self._names_array = np.concatenate(names)
+            self._local_array = np.concatenate(indices)
+
+        if isinstance(inds, list):
+            var_name_and_sub_indices = [(key, [x[1] for x in group]) for key, group in groupby(
+                zip(self._names_array[inds], self._local_array[inds]), key=lambda x: x[0])]
+        else:
+            var_name_and_sub_indices = [(self._names_array[inds], self._local_array[inds])]
+
+        return var_name_and_sub_indices
 
 
 def _order_by_ID(col_matrix):
@@ -1757,7 +1794,7 @@ def dynamic_total_coloring(driver, run_model=True, fname=None):
     Coloring
         The computed coloring.
     """
-    problem = driver._problem
+    problem = driver._problem()
     if not problem.model._use_derivatives:
         simple_warning("Derivatives have been turned off. Skipping dynamic simul coloring.")
         return
@@ -1815,7 +1852,7 @@ def _total_coloring_setup_parser(parser):
                         help="Do profiling on the coloring process.")
 
 
-def _total_coloring_cmd(options):
+def _total_coloring_cmd(options, user_args):
     """
     Return the post_setup hook function for 'openmdao total_coloring'.
 
@@ -1823,11 +1860,8 @@ def _total_coloring_cmd(options):
     ----------
     options : argparse Namespace
         Command line options.
-
-    Returns
-    -------
-    function
-        The hook function.
+    user_args : list of str
+        Args to be passed to the user script.
     """
     from openmdao.core.problem import Problem
     from openmdao.devtools.debug import profiling
@@ -1872,7 +1906,7 @@ def _total_coloring_cmd(options):
 
     hooks._register_hook('final_setup', 'Problem', post=_total_coloring)
 
-    return _total_coloring
+    _load_and_exec(options.file[0], user_args)
 
 
 def _partial_coloring_setup_parser(parser):
@@ -1943,7 +1977,7 @@ def _get_partial_coloring_kwargs(system, options):
     return kwargs
 
 
-def _partial_coloring_cmd(options):
+def _partial_coloring_cmd(options, user_args):
     """
     Return the hook function for 'openmdao partial_color'.
 
@@ -1951,11 +1985,9 @@ def _partial_coloring_cmd(options):
     ----------
     options : argparse Namespace
         Command line options.
+    user_args : list of str
+        Args to be passed to the user script.
 
-    Returns
-    -------
-    function
-        The hook function.
     """
     from openmdao.core.problem import Problem
     from openmdao.core.component import Component
@@ -2046,7 +2078,7 @@ def _partial_coloring_cmd(options):
 
     hooks._register_hook('final_setup', 'Problem', post=_partial_coloring)
 
-    return _partial_coloring
+    _load_and_exec(options.file[0], user_args)
 
 
 def _view_coloring_setup_parser(parser):

@@ -5,10 +5,13 @@ import sys
 import os
 from contextlib import contextmanager
 from collections import OrderedDict, defaultdict
+
+# note: this is a Python 3.3 change, clean this up for OpenMDAO 3.x
 try:
     from collections.abc import Iterable
 except ImportError:
     from collections import Iterable
+
 from fnmatch import fnmatchcase
 import sys
 import os
@@ -30,18 +33,18 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.variable_table import write_var_table
-from openmdao.utils.array_utils import evenly_distrib_idxs, sizes2offsets
-from openmdao.utils.general_utils import make_set, var_name_match_includes_excludes, simple_warning
+from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.graph_utils import all_connected_nodes
-from openmdao.utils.name_maps import rel_name2abs_name
+from openmdao.utils.name_maps import rel_name2abs_name, name2abs_name
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
     _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.general_utils import determine_adder_scaler, find_matches, \
     format_as_float_or_array, warn_deprecation, ContainsAll, all_ancestors, \
-    simple_warning
+    simple_warning, make_set, match_includes_excludes
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
+from openmdao.utils.units import get_conversion
 
 # Use this as a special value to be able to tell if the caller set a value for the optional
 #   out_stream argument. We run into problems running testflo if we use a default of sys.stdout.
@@ -74,6 +77,9 @@ _DEFAULT_COLORING_META = {
 _DEFAULT_COLORING_META.update(_DEF_COMP_SPARSITY_ARGS)
 
 _full_slice = slice(None)
+
+_recordable_funcs = frozenset(['_apply_linear', '_apply_nonlinear', '_solve_linear',
+                               '_solve_nonlinear'])
 
 
 class System(object):
@@ -121,9 +127,8 @@ class System(object):
         List of all subsystems (children of this system).
     _subsystems_myproc : [<System>, ...]
         List of local subsystems that exist on this proc.
-    _subsystems_myproc_inds : [int, ...]
-        List of indices of subsystems on this proc among all of this system's subsystems
-        (i.e. among _subsystems_allprocs).
+    _subsystems_inds : dict
+        Dict mapping subsystem name to index into _subsystems_allprocs.
     _subsystems_proc_range : (int, int)
         List of ranges of each myproc subsystem's processors relative to those of this system.
     _var_promotes : { 'any': [], 'input': [], 'output': [] }
@@ -168,10 +173,6 @@ class System(object):
         owned by this system and num_var is the number of allprocs variables.
     _owned_sizes : ndarray
         Array of local sizes for 'owned' or distributed vars only.
-    _nodup_out_ranges : dict
-        Range of each output/resid in the global non-duplicated array.
-    _nodup2local_out_inds : ndarray
-        Indices that map values from the global non-duplicated array into the local output/resids.
     _var_offsets : {<vecname>: {'input': dict of ndarray, 'output': dict of ndarray}, ...} or None
         Dict of distributed offsets, keyed by var name.  Offsets are stored in an array
         of size nproc x num_var where nproc is the number of processors
@@ -310,19 +311,9 @@ class System(object):
         used if this System does no partial or semi-total coloring.
     _first_call_to_linearize : bool
         If True, this is the first call to _linearize.
-    _nodup_out_ranges : OrderedDict
-        Tuples of the form (start, end) keyed on variable name.
-    _nodup2local_out_inds : ndarray
-        Index array mapping global non-dup outputs/resids to local outputs/resids.
-    _local2owned_inds : ndarray
-        Index array mapping local outputs/resids to owned local outputs/resids.
-    _noncontig_dis_inds : ndarray
-        Index array mapping global stacked (rank order) array to global array where
-        distrib vars are contiguous and all vars appear in global execution order.
-        Execution order is meaningless for systems in ParallelGroups, but for purposes
-        of global ordering, the declared execution order, which is the same across all
-        ranks, is used.
     """
+
+    _undefined = object()
 
     def __init__(self, num_par_fd=1, **kwargs):
         """
@@ -360,10 +351,11 @@ class System(object):
                                        desc='Record metadata for all sub systems in the model',
                                        default=True)
         self.recording_options.declare('includes', types=list, default=['*'],
-                                       desc='Patterns for variables to include in recording')
+                                       desc='Patterns for variables to include in recording. \
+                                       Uses fnmatch wildcards')
         self.recording_options.declare('excludes', types=list, default=[],
                                        desc='Patterns for vars to exclude in recording '
-                                       '(processed post-includes)')
+                                       '(processed post-includes). Uses fnmatch wildcards')
         self.recording_options.declare('options_excludes', types=list, default=[],
                                        desc='User-defined metadata to exclude in recording')
 
@@ -376,7 +368,7 @@ class System(object):
 
         self._subsystems_allprocs = []
         self._subsystems_myproc = []
-        self._subsystems_myproc_inds = []
+        self._subsystems_inds = {}
         self._subsystems_proc_range = []
 
         self._var_promotes = {'input': [], 'output': [], 'any': []}
@@ -397,8 +389,6 @@ class System(object):
         self._var_sizes = None
         self._owned_sizes = None
         self._var_offsets = None
-        self._nodup_out_ranges = None
-        self._nodup2local_out_inds = None
 
         self._full_comm = None
 
@@ -831,7 +821,12 @@ class System(object):
             self._setup_procs(self.pathname, comm, mode, self._problem_options)
 
         # Recurse model from the bottom to the top for configuring.
-        self._configure()
+        # Set static_mode to False in all subsystems because inputs & outputs may be created.
+        with self._static_mode_all(False):
+            self._configure()
+
+        # Recurse model from top to bottom for remaining setup.
+        self._post_configure()
 
         # For updating variable and connection data, setup needs to be performed only
         # in the current system, by gathering data from immediate subsystems,
@@ -843,6 +838,12 @@ class System(object):
         self._setup_var_index_ranges(recurse=recurse)
         self._setup_var_sizes(recurse=recurse)
         self._setup_connections(recurse=recurse)
+
+    def _post_configure(self):
+        """
+        Do any remaining setup that had to wait until after final user configuration.
+        """
+        pass
 
     def _final_setup(self, comm, setup_mode, force_alloc_complex=False):
         """
@@ -1419,58 +1420,46 @@ class System(object):
         return comm
 
     def _setup_recording(self, recurse=True):
-        myinputs = myoutputs = myresiduals = set()
+        if self._rec_mgr._recorders:
+            myinputs = myoutputs = myresiduals = []
 
-        options = self.recording_options
-        incl = options['includes']
-        excl = options['excludes']
+            options = self.recording_options
+            incl = options['includes']
+            excl = options['excludes']
 
-        # includes and excludes for inputs are specified using _absolute_ names
-        # vectors are keyed on absolute name, discretes on relative/promoted name
-        abs2prom = self._var_abs2prom['input']
+            # includes and excludes for inputs are specified using _absolute_ names
+            # vectors are keyed on absolute name, discretes on relative/promoted name
+            if options['record_inputs']:
+                views = self._inputs._views
+                myinputs = sorted([n for n in self._var_abs2prom['input']
+                                   if check_path(n, incl, excl)])
 
-        if options['record_inputs']:
-            myinputs = set()
-            if self._inputs:
-                myinputs.update({n for n in self._inputs._names
-                                 if check_path(n, incl, excl)})
+            # includes and excludes for outputs are specified using _promoted_ names
+            # vectors are keyed on absolute name, discretes on relative/promoted name
+            if options['record_outputs']:
+                views = self._outputs._views
+                myoutputs = sorted([n for n, prom in self._var_abs2prom['output'].items()
+                                    if check_path(prom, incl, excl)])
 
-            if len(self._var_discrete['input']) > 0:
-                for n in self._var_discrete['input']:
-                    abs_name = self.pathname + '.' + n if self.pathname else n
-                    if check_path(abs_name, incl, excl):
-                        myinputs.add(n)
+                if self._var_discrete['output']:
+                    # if we have discrete outputs then residual name set doesn't match output one
+                    if options['record_residuals']:
+                        myresiduals = [n for n in myoutputs if n in views]
+                elif options['record_residuals']:
+                    myresiduals = myoutputs
 
-        # includes and excludes for outputs are specified using _promoted_ names
-        # vectors are keyed on absolute name, discretes on relative/promoted name
-        abs2prom = self._var_abs2prom['output']
+            elif options['record_residuals']:
+                abs2prom = self._var_abs2prom['output']
+                myresiduals = [n for n in self._residuals._views
+                               if check_path(abs2prom[n], incl, excl)]
 
-        if options['record_outputs']:
-            myoutputs = set()
-            if self._outputs:
-                myoutputs.update({n for n in self._outputs._names
-                                  if n in abs2prom and check_path(abs2prom[n], incl, excl)})
+            self._filtered_vars_to_record = {
+                'input': myinputs,
+                'output': myoutputs,
+                'residual': myresiduals
+            }
 
-            # residuals have the same names as the continuous outputs
-            if options['record_residuals']:
-                myresiduals = myoutputs.copy()
-
-            if len(self._var_discrete['output']) > 0:
-                myoutputs.update({n for n in self._var_discrete['output']
-                                  if check_path(n, incl, excl)})
-
-        elif options['record_residuals']:
-            if self._residuals:
-                myresiduals = {n for n in self._residuals._names
-                               if n in abs2prom and check_path(abs2prom[n], incl, excl)}
-
-        self._filtered_vars_to_record = {
-            'i': myinputs,
-            'o': myoutputs,
-            'r': myresiduals
-        }
-
-        self._rec_mgr.startup(self)
+            self._rec_mgr.startup(self)
 
         # Recursion
         if recurse:
@@ -1542,8 +1531,6 @@ class System(object):
         """
         self._var_sizes = {}
         self._owned_sizes = None
-        self._nodup_out_ranges = None
-        self._nodup2local_out_inds = None
         self._owning_rank = defaultdict(int)
 
     def _setup_global_shapes(self):
@@ -1552,35 +1539,36 @@ class System(object):
         """
         meta = self._var_allprocs_abs2meta
 
-        # now set global sizes and shapes into metadata for distributed outputs
-        sizes = self._var_sizes['nonlinear']['output']
-        for idx, abs_name in enumerate(self._var_allprocs_abs_names['output']):
-            mymeta = meta[abs_name]
-            local_shape = mymeta['shape']
-            if not mymeta['distributed']:
-                # not distributed, just use local shape and size
-                mymeta['global_size'] = mymeta['size']
-                mymeta['global_shape'] = local_shape
-                continue
+        for typ in ('input', 'output'):
+            # now set global sizes and shapes into metadata for distributed variables
+            sizes = self._var_sizes['nonlinear'][typ]
+            for idx, abs_name in enumerate(self._var_allprocs_abs_names[typ]):
+                mymeta = meta[abs_name]
+                local_shape = mymeta['shape']
+                if not mymeta['distributed']:
+                    # not distributed, just use local shape and size
+                    mymeta['global_size'] = mymeta['size']
+                    mymeta['global_shape'] = local_shape
+                    continue
 
-            global_size = np.sum(sizes[:, idx])
-            mymeta['global_size'] = global_size
+                global_size = np.sum(sizes[:, idx])
+                mymeta['global_size'] = global_size
 
-            # assume that all but the first dimension of the shape of a
-            # distributed output is the same on all procs
-            high_dims = local_shape[1:]
-            if high_dims:
-                high_size = np.prod(high_dims)
-                dim1 = global_size // high_size
-                if global_size % high_size != 0:
-                    raise RuntimeError("%s: Global size of output '%s' (%s) does not agree "
-                                       "with local shape %s" % (self.msginfo, abs_name,
-                                                                global_size, local_shape))
-                global_shape = tuple([dim1] + list(high_dims))
-            else:
-                high_size = 1
-                global_shape = (global_size,)
-            mymeta['global_shape'] = global_shape
+                # assume that all but the first dimension of the shape of a
+                # distributed variable is the same on all procs
+                high_dims = local_shape[1:]
+                if high_dims:
+                    high_size = np.prod(high_dims)
+                    dim1 = global_size // high_size
+                    if global_size % high_size != 0:
+                        raise RuntimeError("%s: Global size of output '%s' (%s) does not agree "
+                                           "with local shape %s" % (self.msginfo, abs_name,
+                                                                    global_size, local_shape))
+                    global_shape = tuple([dim1] + list(high_dims))
+                else:
+                    high_size = 1
+                    global_shape = (global_size,)
+                mymeta['global_shape'] = global_shape
 
     def _setup_global_connections(self, recurse=True, conns=None):
         """
@@ -2029,9 +2017,27 @@ class System(object):
                     call = 'promotes'
                 else:
                     call = 'promotes_%ss' % io_types[0]
-                raise RuntimeError("%s: '%s' failed to find any matches for the following "
-                                   "names or patterns: %s.%s" %
-                                   (self.msginfo, call, sorted(not_found), empty_group_msg))
+
+                for p in patterns:
+                    for name, alias in renames.items():
+                        if fnmatchcase(name, p):
+                            raise RuntimeError("%s: %s '%s' matched '%s' but '%s' has been aliased "
+                                               "to '%s'." % (self.msginfo, call, p, name,
+                                                             name, alias))
+
+                    for i in names:
+                        if fnmatchcase(i, p):
+                            break
+                    else:
+                        raise RuntimeError("%s: '%s' failed to find any matches for the following "
+                                           "pattern: '%s'.%s" %
+                                           (self.msginfo, call, p, empty_group_msg))
+                    if p == patterns[-1]:
+                        break
+                else:
+                    raise RuntimeError("%s: '%s' failed to find any matches for the following "
+                                       "names or patterns: %s.%s" %
+                                       (self.msginfo, call, sorted(not_found), empty_group_msg))
 
         maps = {'input': {}, 'output': {}}
 
@@ -2175,6 +2181,19 @@ class System(object):
         if self._has_resid_scaling:
             for vec in self._vectors['residual'].values():
                 vec.scale('phys')
+
+    @contextmanager
+    def _static_mode_all(self, static_mode):
+        """
+        Context manager that temporarily sets the static mode of all subsystems.
+        """
+        for system in self.system_iter(include_self=True, recurse=True):
+            system._static_mode = static_mode
+
+        yield
+
+        for system in self.system_iter(include_self=True, recurse=True):
+            system._static_mode = not static_mode
 
     @contextmanager
     def _matvec_context(self, vec_name, scope_out, scope_in, mode, clear=True):
@@ -3090,11 +3109,14 @@ class System(object):
                     prom_name=False,
                     units=False,
                     shape=False,
+                    global_shape=False,
+                    desc=False,
                     hierarchical=True,
                     print_arrays=False,
                     tags=None,
                     includes=None,
                     excludes=None,
+                    all_procs=False,
                     out_stream=_DEFAULT_OUT_STREAM):
         """
         Return and optionally log a list of input names and other optional information.
@@ -3114,6 +3136,10 @@ class System(object):
             When True, display/return units. Default is False.
         shape : bool, optional
             When True, display/return the shape of the value. Default is False.
+        global_shape : bool, optional
+            When True, display/return the global shape of the value. Default is False.
+        desc : bool, optional
+            When True, display/return description. Default is False.
         hierarchical : bool, optional
             When True, human readable output shows variables in hierarchical format.
         print_arrays : bool, optional
@@ -3132,6 +3158,8 @@ class System(object):
         excludes : None or list_like
             List of glob patterns for pathnames to exclude from the check. Default is None, which
             excludes nothing.
+        all_procs : bool, optional
+            When True, display output on all processors. Default is False.
         out_stream : file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
@@ -3142,34 +3170,62 @@ class System(object):
             list of input names and other optional information about those inputs
         """
         if self._inputs is None:
-            raise RuntimeError("{}: Unable to list inputs until model has "
-                               "been run.".format(self.msginfo))
+            # final setup has not been performed
+            if hasattr(self, '_loc_subsys_map'):  # i.e. is a Group
+                raise RuntimeError("{}: Unable to list inputs on a Group until model has "
+                                   "been run.".format(self.msginfo))
 
-        meta = self._var_abs2meta
+            # this is a component; use relative names, including discretes
+            meta = self._var_rel2meta
+            var_names = self._var_rel_names['input'] + list(self._var_discrete['input'].keys())
+            abs2prom = {}
+        else:
+            # final setup has been performed
+            # use absolute names, discretes handled separately
+            # Only gathering up values and metadata from this proc, if MPI
+            meta = self._var_abs2meta
+            var_names = self._inputs._views.keys()
+            abs2prom = self._var_abs2prom['input']
+
+        allprocs_meta = self._var_allprocs_abs2meta
+
         inputs = []
 
-        for var_name, val in iteritems(self._inputs._views):  # This is only over the locals
+        for var_name in var_names:
             # Filter based on tags
             if tags and not (make_set(tags) & meta[var_name]['tags']):
                 continue
 
-            if not var_name_match_includes_excludes(var_name, self._var_abs2prom['input'][var_name],
-                                                    includes, excludes):
+            if abs2prom:
+                var_name_prom = abs2prom[var_name]
+            else:
+                var_name_prom = var_name
+
+            if not match_includes_excludes(var_name, var_name_prom, includes, excludes):
                 continue
+
+            val = self._inputs._views[var_name] if self._inputs else meta[var_name]['value']
 
             var_meta = {}
             if values:
                 var_meta['value'] = val
             if prom_name:
-                var_meta['prom_name'] = self._var_abs2prom['input'][var_name]
+                var_meta['prom_name'] = var_name_prom
             if units:
                 var_meta['units'] = meta[var_name]['units']
             if shape:
                 var_meta['shape'] = val.shape
+            if global_shape:
+                if var_name in allprocs_meta:
+                    var_meta['global_shape'] = allprocs_meta[var_name]['global_shape']
+                else:
+                    var_meta['global_shape'] = 'Unavailable'
+            if desc:
+                var_meta['desc'] = meta[var_name]['desc']
 
             inputs.append((var_name, var_meta))
 
-        if self._discrete_inputs:
+        if self._inputs is not None and self._discrete_inputs:
             disc_meta = self._discrete_inputs._dict
 
             for var_name, val in iteritems(self._discrete_inputs):
@@ -3177,16 +3233,17 @@ class System(object):
                 if tags and not (make_set(tags) & disc_meta[var_name]['tags']):
                     continue
 
-                if not var_name_match_includes_excludes(var_name,
-                                                        self._var_abs2prom['input'][var_name],
-                                                        includes, excludes):
+                var_name_prom = abs2prom[var_name]
+
+                if not match_includes_excludes(var_name, var_name_prom, includes, excludes):
                     continue
 
                 var_meta = {}
                 if values:
                     var_meta['value'] = val
                 if prom_name:
-                    var_meta['prom_name'] = self._var_abs2prom['input'][var_name]
+                    var_meta['prom_name'] = var_name_prom
+
                 # remaining items do not apply for discrete vars
                 if units:
                     var_meta['units'] = ''
@@ -3201,7 +3258,7 @@ class System(object):
             out_stream = sys.stdout
 
         if out_stream:
-            self._write_table('input', inputs, hierarchical, print_arrays, out_stream)
+            self._write_table('input', inputs, hierarchical, print_arrays, all_procs, out_stream)
 
         return inputs
 
@@ -3213,13 +3270,16 @@ class System(object):
                      residuals_tol=None,
                      units=False,
                      shape=False,
+                     global_shape=False,
                      bounds=False,
                      scaling=False,
+                     desc=False,
                      hierarchical=True,
                      print_arrays=False,
                      tags=None,
                      includes=None,
                      excludes=None,
+                     all_procs=False,
                      out_stream=_DEFAULT_OUT_STREAM):
         """
         Return and optionally log a list of output names and other optional information.
@@ -3249,10 +3309,14 @@ class System(object):
             When True, display/return units. Default is False.
         shape : bool, optional
             When True, display/return the shape of the value. Default is False.
+        global_shape : bool, optional
+            When True, display/return the global shape of the value. Default is False.
         bounds : bool, optional
             When True, display/return bounds (lower and upper). Default is False.
         scaling : bool, optional
             When True, display/return scaling (ref, ref0, and res_ref). Default is False.
+        desc : bool, optional
+            When True, display/return description. Default is False.
         hierarchical : bool, optional
             When True, human readable output shows variables in hierarchical format.
         print_arrays : bool, optional
@@ -3271,6 +3335,8 @@ class System(object):
         excludes : None or list_like
             List of glob patterns for pathnames to exclude from the check. Default is None, which
             excludes nothing.
+        all_procs : bool, optional
+            When True, display output on all processors. Default is False.
         out_stream : file-like
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
@@ -3281,41 +3347,65 @@ class System(object):
             list of output names and other optional information about those outputs
         """
         if self._outputs is None:
-            raise RuntimeError("{}: Unable to list outputs until model has "
-                               "been run.".format(self.msginfo))
+            # final setup has not been performed
+            if hasattr(self, '_local_system_set'):  # i.e. is a Group
+                raise RuntimeError("{}: Unable to list outputs on a Group until model has "
+                                   "been run.".format(self.msginfo))
 
-        # Only gathering up values and metadata from this proc, if MPI
-        meta = self._var_abs2meta  # This only includes metadata for this process.
+            # this is a component; use relative names, including discretes
+            meta = self._var_rel2meta
+            var_names = self._var_rel_names['output'] + list(self._var_discrete['output'].keys())
+            abs2prom = {}
+        else:
+            # final setup has been performed
+            # use absolute names, discretes handled separately
+            # Only gathering up values and metadata from this proc, if MPI
+            meta = self._var_abs2meta
+            var_names = self._outputs._views.keys()
+            abs2prom = self._var_abs2prom['output']
+
+        allprocs_meta = self._var_allprocs_abs2meta
         states = self._list_states()
 
         # Go though the hierarchy. Printing Systems
         # If the System owns an output directly, show its output
         expl_outputs = []
         impl_outputs = []
-        for var_name, val in iteritems(self._outputs._views):
+        for var_name in var_names:
             # Filter based on tags
             if tags and not (make_set(tags) & meta[var_name]['tags']):
                 continue
 
-            if not var_name_match_includes_excludes(var_name,
-                                                    self._var_abs2prom['output'][var_name],
-                                                    includes, excludes):
+            if abs2prom:
+                var_name_prom = abs2prom[var_name]
+            else:
+                var_name_prom = var_name
+
+            if not match_includes_excludes(var_name, var_name_prom, includes, excludes):
                 continue
 
-            if residuals_tol and np.linalg.norm(self._residuals._views[var_name]) < residuals_tol:
+            if residuals_tol and self._residuals and \
+               np.linalg.norm(self._residuals._views[var_name]) < residuals_tol:
                 continue
+
+            val = self._outputs._views[var_name] if self._outputs else meta[var_name]['value']
 
             var_meta = {}
             if values:
                 var_meta['value'] = val
             if prom_name:
-                var_meta['prom_name'] = self._var_abs2prom['output'][var_name]
-            if residuals:
+                var_meta['prom_name'] = var_name_prom
+            if residuals and self._residuals:
                 var_meta['resids'] = self._residuals._views[var_name]
             if units:
                 var_meta['units'] = meta[var_name]['units']
             if shape:
                 var_meta['shape'] = val.shape
+            if global_shape:
+                if var_name in allprocs_meta:
+                    var_meta['global_shape'] = allprocs_meta[var_name]['global_shape']
+                else:
+                    var_meta['global_shape'] = 'Unavailable'
             if bounds:
                 var_meta['lower'] = meta[var_name]['lower']
                 var_meta['upper'] = meta[var_name]['upper']
@@ -3323,13 +3413,14 @@ class System(object):
                 var_meta['ref'] = meta[var_name]['ref']
                 var_meta['ref0'] = meta[var_name]['ref0']
                 var_meta['res_ref'] = meta[var_name]['res_ref']
-
+            if desc:
+                var_meta['desc'] = meta[var_name]['desc']
             if var_name in states:
                 impl_outputs.append((var_name, var_meta))
             else:
                 expl_outputs.append((var_name, var_meta))
 
-        if self._discrete_outputs and not residuals_tol:
+        if self._outputs is not None and self._discrete_outputs and not residuals_tol:
             disc_meta = self._discrete_outputs._dict
 
             for var_name, val in iteritems(self._discrete_outputs):
@@ -3337,16 +3428,17 @@ class System(object):
                 if tags and not (make_set(tags) & disc_meta[var_name]['tags']):
                     continue
 
-                if not var_name_match_includes_excludes(var_name,
-                                                        self._var_abs2prom['output'][var_name],
-                                                        includes, excludes):
+                var_name_prom = abs2prom[var_name]
+
+                if not match_includes_excludes(var_name, var_name_prom, includes, excludes):
                     continue
 
                 var_meta = {}
                 if values:
                     var_meta['value'] = val
-                if prom_name:
-                    var_meta['prom_name'] = self._var_abs2prom['output'][var_name]
+                if prom_name and var_name in abs2prom:
+                    var_meta['prom_name'] = var_name_prom
+
                 # remaining items do not apply for discrete vars
                 if residuals:
                     var_meta['resids'] = ''
@@ -3374,9 +3466,11 @@ class System(object):
 
         if out_stream:
             if explicit:
-                self._write_table('explicit', expl_outputs, hierarchical, print_arrays, out_stream)
+                self._write_table('explicit', expl_outputs, hierarchical, print_arrays,
+                                  all_procs, out_stream)
             if implicit:
-                self._write_table('implicit', impl_outputs, hierarchical, print_arrays, out_stream)
+                self._write_table('implicit', impl_outputs, hierarchical, print_arrays,
+                                  all_procs, out_stream)
 
         if explicit and implicit:
             return expl_outputs + impl_outputs
@@ -3388,7 +3482,7 @@ class System(object):
             raise RuntimeError(self.msginfo +
                                ': You have excluded both Explicit and Implicit components.')
 
-    def _write_table(self, var_type, var_data, hierarchical, print_arrays, out_stream):
+    def _write_table(self, var_type, var_data, hierarchical, print_arrays, all_procs, out_stream):
         """
         Write table of variable names, values, residuals, and metadata to out_stream.
 
@@ -3406,6 +3500,8 @@ class System(object):
             When True, also display full values of the ndarray below the row. Format  is affected
             by the values set with numpy.set_printoptions
             Default is False.
+        all_procs : bool, optional
+            When True, display output on all processors.
         out_stream : file-like object
             Where to send human readable output.
             Set to None to suppress.
@@ -3413,26 +3509,41 @@ class System(object):
         if out_stream is None:
             return
 
+        # determine whether setup has been performed
+        if self._outputs is not None:
+            setup = True
+        else:
+            setup = False
+
         # Make a dict of variables. Makes it easier to work with in this method
         var_dict = OrderedDict()
         for name, vals in var_data:
             var_dict[name] = vals
 
         # If parallel, gather up the vars.
-        if MPI:
+        if MPI and self.comm.size > 1:
             # All procs must call this. Returns a list, one per proc.
-            all_var_dicts = self.comm.gather(var_dict, root=0)
+            all_var_dicts = self.comm.gather(var_dict, root=0) if not all_procs \
+                else self.comm.allgather(var_dict)
 
-            if MPI.COMM_WORLD.rank > 0:  # only the root process should print
+            # unless all_procs is requested, only the root process should print
+            if not all_procs and self.comm.rank > 0:
                 return
 
-            # rest of this only done on rank 0
-            meta = self._var_abs2meta
+            if setup:
+                meta = self._var_abs2meta
+            else:
+                meta = self._var_rel2meta
 
-            var_dict = all_var_dicts[0]  # start with rank 0
+            allprocs_meta = self._var_allprocs_abs2meta
 
-            for proc_vars in all_var_dicts[1:]:  # In rank order go through rest of the procs
-                for name, vals in iteritems(proc_vars):
+            var_dict = all_var_dicts[self.comm.rank]  # start with metadata from current rank
+
+            distrib = {'value': {}, 'resids': {}}     # dictionary to collect distributed values
+
+            # Go through data from all procs in order by rank and collect distributed values
+            for rank, proc_vars in enumerate(all_var_dicts):
+                for name in proc_vars:
                     if name not in var_dict:     # If not in the merged dict, add it
                         var_dict[name] = proc_vars[name]
                     else:
@@ -3442,28 +3553,41 @@ class System(object):
                             is_distributed = meta[name]['src_indices'] is not None
                         else:
                             is_distributed = meta[name]['distributed']
-                        if is_distributed:
+
+                        if is_distributed and name in allprocs_meta:
                             # TODO no support for > 1D arrays
                             #   meta.src_indices has the info we need to piece together arrays
-                            if 'value' in var_dict[name]:
-                                var_dict[name]['value'] = \
-                                    np.append(var_dict[name]['value'],
-                                              proc_vars[name]['value'])
-                            if 'shape' in var_dict[name]:
-                                # TODO might want to use allprocs_abs2meta_out[name]['global_shape']
-                                var_dict[name]['shape'] = \
-                                    var_dict[name]['value'].shape
-                            if 'resids' in var_dict[name]:
-                                var_dict[name]['resids'] = \
-                                    np.append(var_dict[name]['resids'],
-                                              proc_vars[name]['resids'])
 
-        inputs = var_type is 'input'
-        outputs = not inputs
-        var_list = self._get_vars_exec_order(inputs=inputs, outputs=outputs, variables=var_dict)
+                            global_shape = allprocs_meta[name]['global_shape']
+
+                            if meta[name]['shape'] != global_shape:
+                                # if the local shape is different than the global shape and the
+                                # global shape matches the concatenation of values from all procs,
+                                # then assume the concatenation, otherwise just use the value from
+                                # the current proc
+                                for key in ('value', 'resids'):
+                                    if key in var_dict[name]:
+                                        if rank == 0:
+                                            distrib[key][name] = proc_vars[name][key]
+                                        else:
+                                            distrib[key][name] = np.append(distrib[key][name],
+                                                                           proc_vars[name][key])
+
+                                        if rank == self.comm.size - 1:
+                                            if distrib[key][name].shape == global_shape:
+                                                var_dict[name][key] = distrib[key][name]
+
+        if setup:
+            inputs = var_type == 'input'
+            outputs = not inputs
+            var_list = self._get_vars_exec_order(inputs=inputs, outputs=outputs, variables=var_dict)
+            top_name = 'model'
+        else:
+            var_list = var_dict.keys()
+            top_name = self.name
 
         write_var_table(self.pathname, var_list, var_type, var_dict,
-                        hierarchical, print_arrays, out_stream)
+                        hierarchical, top_name, print_arrays, out_stream)
 
     def _get_vars_exec_order(self, inputs=False, outputs=False, variables=None):
         """
@@ -3708,89 +3832,41 @@ class System(object):
         """
         Record an iteration of the current System.
         """
-        if self._rec_mgr._recorders:
-            options = self.recording_options
+        global _recordable_funcs
 
+        if self._rec_mgr._recorders:
+            parallel = self._rec_mgr._check_parallel() if self.comm.size > 1 else False
+            options = self.recording_options
             metadata = create_local_meta(self.pathname)
 
             # Get the data to record
             stack_top = self._recording_iter.stack[-1][0]
-            method = stack_top.split('.')[-1]
+            method = stack_top.rsplit('.', 1)[-1]
 
-            if method not in ['_apply_linear', '_apply_nonlinear', '_solve_linear',
-                              '_solve_nonlinear']:
-                raise ValueError("{}: {} must be one of: '_apply_linear, _apply_nonlinear, "
-                                 "_solve_linear, _solve_nonlinear'".format(self.msginfo, method))
+            if method not in _recordable_funcs:
+                raise ValueError("{}: {} must be one of: {}".format(self.msginfo, method,
+                                                                    sorted(_recordable_funcs)))
 
             if 'nonlinear' in method:
                 inputs, outputs, residuals = self.get_nonlinear_vectors()
+                vec_name = 'nonlinear'
             else:
                 inputs, outputs, residuals = self.get_linear_vectors()
+                vec_name = 'linear'
 
             discrete_inputs = self._discrete_inputs
             discrete_outputs = self._discrete_outputs
+            filt = self._filtered_vars_to_record
 
-            data = {}
+            data = {'input': {}, 'output': {}, 'residual': {}}
             if options['record_inputs'] and (inputs._names or len(discrete_inputs) > 0):
-                data['i'] = {}
-                if 'i' in self._filtered_vars_to_record:
-                    # use filtered inputs
-                    for inp in self._filtered_vars_to_record['i']:
-                        if inp in inputs._names:
-                            data['i'][inp] = inputs._views[inp]
-                        elif inp in discrete_inputs:
-                            abs_name = self.pathname + '.' + inp if self.pathname else inp
-                            data['i'][abs_name] = discrete_inputs[inp]
-                else:
-                    # use all the inputs
-                    if len(discrete_inputs) > 0:
-                        for inp in inputs:
-                            data['i'][inp] = inputs._views[inp]
-                        for inp in discrete_inputs:
-                            abs_name = self.pathname + '.' + inp if self.pathname else inp
-                            data['i'][abs_name] = discrete_inputs[inp]
-                    else:
-                        data['i'] = inputs._names
-
-            else:
-                data['i'] = None
+                data['input'] = self._retrieve_data_of_kind(filt, 'input', vec_name, parallel)
 
             if options['record_outputs'] and (outputs._names or len(discrete_outputs) > 0):
-                data['o'] = {}
-                if 'o' in self._filtered_vars_to_record:
-                    # use outputs from filtered list.
-                    for out in self._filtered_vars_to_record['o']:
-                        if out in outputs._names:
-                            data['o'][out] = outputs._views[out]
-                        elif out in discrete_outputs:
-                            abs_name = self.pathname + '.' + out if self.pathname else out
-                            data['o'][abs_name] = discrete_outputs[out]
-                else:
-                    # use all the outputs
-                    if len(discrete_outputs) > 0:
-                        for out in outputs:
-                            data['o'][out] = outputs._views[out]
-                        for out in discrete_outputs:
-                            abs_name = self.pathname + '.' + out if self.pathname else out
-                            data['o'][abs_name] = discrete_outputs[out]
-                    else:
-                        data['o'] = outputs._names
-            else:
-                data['o'] = None
+                data['output'] = self._retrieve_data_of_kind(filt, 'output', vec_name, parallel)
 
             if options['record_residuals'] and residuals._names:
-                data['r'] = {}
-
-                if 'r' in self._filtered_vars_to_record:
-                    # use filtered residuals
-                    for res in self._filtered_vars_to_record['r']:
-                        if res in residuals._names:
-                            data['r'][res] = residuals._views[res]
-                else:
-                    # use all the residuals
-                    data['r'] = residuals._names
-            else:
-                data['r'] = None
+                data['residual'] = self._retrieve_data_of_kind(filt, 'residual', vec_name, parallel)
 
             self._rec_mgr.record_iteration(self, data, metadata)
 
@@ -3941,145 +4017,286 @@ class System(object):
                 new_list.append((abs2prom_in[abs_name], offset, end, idxs))
         return new_list
 
-    def _get_nodup_out_ranges(self, var_list=None):
+    def _abs_get_val(self, abs_name, get_remote=False, rank=None, vec_name=None, kind=None,
+                     flat=False):
         """
-        Compute necessary ranges/indices for working with non-dup global outputs array.
+        Return the value of the variable specified by the given absolute name.
 
         Parameters
         ----------
-        var_list : list
-            Optional list of variables if we want to transfer a subset of the vector.
+        abs_name : str
+            The absolute name of the variable.
+        get_remote : bool
+            If True, return the value even if the variable is remote. NOTE: This function must be
+            called in all procs in the Problem's MPI communicator.
+        rank : int or None
+            If not None, specifies that the value is to be gathered to the given rank only.
+            Otherwise, if get_remote is specified, the value will be broadcast to all procs
+            in the MPI communicator.
+        vec_name : str
+            Name of the vector to use.
+        kind : str or None
+            Kind of variable ('input', 'output', or 'residual').  If None, returned value
+            will be either an input or output.
+        flat : bool
+            If True, return the flattened version of the value.
 
         Returns
         -------
-        OrderedDict
-            Tuples of the form (start, end) keyed on variable name.
-        ndarray
-            Index array mapping global non-dup outputs/resids to local outputs/resids.
-        ndarray
-            Index array mapping local outputs/resids to owned local outputs/resids.
-        ndarray
-            Index array mapping global stacked (rank order) array to global array where
-            distrib vars are contiguous and all vars appear in global execution order.
-            Execution order is meaningless for systems in ParallelGroups, but for purposes
-            of global ordering, the declared execution order, which is the same across all
-            ranks, is used.
+        object or None
+            The value of the requested output/input/resid variable.  None if variable is not found.
         """
-        if var_list:
-            key = tuple(var_list)
-        else:
-            key = 'all'
+        discrete = distrib = False
+        val = System._undefined
+        typ = 'output' if abs_name in self._var_allprocs_abs2prom['output'] else 'input'
 
-        if self._nodup_out_ranges is None:
-            self._nodup_out_ranges = {}
-            self._nodup2local_out_inds = {}
-            self._local2owned_inds = {}
-            self._noncontig_dis_inds = {}
+        try:
+            if get_remote:
+                meta = self._var_allprocs_abs2meta[abs_name]
+                distrib = meta['distributed']
+            else:
+                meta = self._var_abs2meta[abs_name]
+        except KeyError:
+            discrete = True
+            relname = abs_name[len(self.pathname) + 1:] if self.pathname else abs_name
+            if relname in self._discrete_outputs:
+                val = self._discrete_outputs[relname]
+            elif relname in self._discrete_inputs:
+                val = self._discrete_inputs[relname]
+            elif abs_name in self._var_allprocs_discrete['output']:
+                pass  # non-local discrete output
+            elif abs_name in self._var_allprocs_discrete['input']:
+                pass  # non-local discrete input
+            else:
+                return System._undefined
 
-        if key not in self._nodup_out_ranges:
-            iproc = self.comm.rank
-            abs2meta = self._var_allprocs_abs2meta
-            sizes = self._var_sizes['linear']['output']
-            owned_sizes = self._owned_sizes
+        if kind is None:
+            kind = typ
 
-            if var_list:
-                prom2abs = self._var_allprocs_prom2abs_list['output']
-                var_list = [prom2abs[name][0] for name in var_list]
+        if not discrete:
+            vec = self._vectors[kind][vec_name]
+            if abs_name in vec._views:
+                val = vec._views_flat[abs_name] if flat else vec._views[abs_name]
 
-            ranges = OrderedDict()
-            out_views = self._outputs._views
+        if get_remote and self.comm.size > 1:
+            owner = self._owning_rank[abs_name]
+            loc_val = val if val is not System._undefined else np.zeros(0)
+            if rank is None:   # bcast
+                if distrib:
+                    idx = self._var_allprocs_abs2idx['nonlinear'][abs_name]
+                    sizes = self._var_sizes['nonlinear'][typ][:, idx]
+                    # TODO: could cache these offsets
+                    offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
+                    offsets[1:] = np.cumsum(sizes[:-1])
+                    val = np.zeros(np.sum(sizes))
+                    self.comm.Allgatherv(loc_val, [val, sizes, offsets, MPI.DOUBLE])
+                else:
+                    if owner != self.comm.rank:
+                        val = None
+                    # TODO: use Bcast if not discrete for speed
+                    new_val = self.comm.bcast(val, root=owner)
+                    val = new_val
+            else:   # retrieve to rank
+                if distrib:
+                    idx = self._var_allprocs_abs2idx['nonlinear'][abs_name]
+                    sizes = self._var_sizes['nonlinear'][typ][:, idx]
+                    # TODO: could cache these offsets
+                    offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
+                    offsets[1:] = np.cumsum(sizes[:-1])
+                    val = np.zeros(np.sum(sizes))
+                    self.comm.Gatherv(loc_val, [val, sizes, offsets, MPI.DOUBLE], root=rank)
+                else:
+                    if rank != owner:
+                        tag = self._var_allprocs_abs2idx[vec_name][abs_name]
+                        # avoid tag collisions between inputs, outputs, and resids
+                        if kind != 'output':
+                            tag += len(self._var_allprocs_abs_names['output'])
+                            if kind == 'residual':
+                                tag += len(self._var_allprocs_abs_names['input'])
+                        if self.comm.rank == owner:
+                            self.comm.send(val, dest=rank, tag=tag)
+                        elif self.comm.rank == rank:
+                            val = self.comm.recv(source=owner, tag=tag)
 
-            # compute offsets into the full non-dup output/resid array by summing down columns
-            # of owned_sizes array. This results in the distributed vars being contiguous, and
-            # having the same offsets in every proc so that overlapping indices, etc. will be
-            # properly handled.
-            contig_offsets = sizes2offsets(np.sum(owned_sizes, axis=0))
+        if not flat and val is not System._undefined and not discrete:
+            val.shape = meta['global_shape'] if get_remote and distrib else meta['shape']
 
-            # compute offsets into the full non-dup output/resid array where distrib vars are not
-            # contiguous
-            offsets = sizes2offsets(owned_sizes)
+        return val
 
-            # order ranks with our rank first
-            ordered_ranks = [iproc] + [r for r in range(self.comm.size) if r != iproc]
+    def _get_val(self, name, units=None, indices=None, get_remote=False, rank=None,
+                 vec_name='nonlinear', kind=None, flat=False):
+        """
+        Get an output/input/residual variable.
 
-            contig_inds = []
-            non_contig_inds = []
-            # compute ranges/indices into the full non-duplicated output/resid arrays
-            for i, name in enumerate(self._var_allprocs_abs_names['output']):
+        Function is used if you want to specify display units.
 
-                # Skip if we are only interested in a subset of the vars.
-                if var_list and name not in var_list:
-                    continue
+        Parameters
+        ----------
+        name : str
+            Promoted or relative variable name in the root system's namespace.
+        units : str, optional
+            Units to convert to before return.
+        indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
+            Indices or slice to return.
+        get_remote : bool
+            If True, retrieve the value even if it is on a remote process.  Note that if the
+            variable is remote on ANY process, this function must be called on EVERY process
+            in the Problem's MPI communicator.
+        rank : int or None
+            If not None, only gather the value to this rank.
+        vec_name : str
+            Name of the vector to use.   Defaults to 'nonlinear'.
+        kind : str or None
+            Kind of variable ('input', 'output', or 'residual').  If None, returned value
+            will be either an input or output.
+        flat : bool
+            If True, return the flattened version of the value.
 
-                distrib = abs2meta[name]['distributed']
-                found = False
-                # check each rank (this rank first) for the first nonzero size
-                for irank in ordered_ranks:
-                    size = owned_sizes[irank, i]
+        Returns
+        -------
+        object
+            The value of the requested output/input variable.
+        """
+        abs_name, typ = name2abs_name(self, name)
+        if abs_name is None:
+            raise KeyError('{}: Variable "{}" not found.'.format(self.msginfo, name))
 
-                    if size > 0:
-                        if not found:
-                            found = True
-                            dsize = np.sum(owned_sizes[:, i]) if distrib else size
+        val = self._abs_get_val(abs_name, get_remote, rank, vec_name, kind, flat)
 
-                            contig_start = contig_offsets[i]
-                            ranges[name] = (contig_start, contig_start + dsize)
-                            if name in out_views:
-                                if distrib:
-                                    # need offset into the dist var
-                                    dstart = contig_start + np.sum(owned_sizes[:irank, i])
-                                    contig_inds.append(np.arange(dstart, dstart + size, dtype=int))
-                                else:
-                                    contig_inds.append(np.arange(*ranges[name], dtype=int))
+        # TODO: get indexed value BEFORE transferring the variable (might be much smaller)
+        if indices is not None:
+            val = val[indices]
 
-                        non_contig_start = offsets[irank, i]
-                        non_contig_inds.append(np.arange(non_contig_start, non_contig_start + size))
+        if units is not None:
+            val = self.convert2units(abs_name, val, units)
 
-            self._nodup_out_ranges[key] = ranges
-            self._nodup2local_out_inds[key] = _arraylist2array(contig_inds)
+        return val
 
-            # get indices to pull out only the 'owned' values from the local array
-            local2owned_inds = []
-            start = end = 0
-            for owned_sz, sz in zip(owned_sizes[iproc], sizes[iproc]):
-                if sz == 0:
-                    continue
-                end += sz
-                if owned_sz > 0:
-                    local2owned_inds.append(np.arange(start, end, dtype=int))
-                start = end
+    def _retrieve_data_of_kind(self, filtered_vars, kind, vec_name, parallel=False):
+        """
+        Retrieve variables, either local or remote, in the filtered_vars list.
 
-            self._local2owned_inds[key] = _arraylist2array(local2owned_inds)
+        Parameters
+        ----------
+        filtered_vars : dict
+            Dictionary containing entries for 'input', 'output', and/or 'residual'.
+        kind : str
+            Either 'input', 'output', or 'residual'.
+        vec_name : str
+            Either 'nonlinear' or 'linear'.
+        parallel : bool
+            If True, recorders are parallel, so only local values should be saved in each proc.
 
-            # compute inds to map gathered nodup order to nodup ordered by ownership
-            self._noncontig_dis_inds[key] = _arraylist2array(non_contig_inds)
+        Returns
+        -------
+        dict
+            Variable values keyed on absolute name.
+        """
+        vdict = {}
+        variables = filtered_vars.get(kind)
+        if variables:
+            views = self._vectors[kind][vec_name]._views
+            rank = self.comm.rank
+            discrete_vec = None if kind == 'residual' else self._var_discrete[kind]
+            offset = len(self.pathname) + 1 if self.pathname else 0
 
-        return (self._nodup_out_ranges[key], self._nodup2local_out_inds[key],
-                self._local2owned_inds[key], self._noncontig_dis_inds[key])
+            if self.comm.size == 1:
+                if discrete_vec:
+                    vdict = {}
+                    for n in variables:
+                        if n in views:
+                            vdict[n] = views[n]
+                        else:  # discrete
+                            vdict[n] = discrete_vec[n[offset:]]['value']
+                else:
+                    vdict = {n: views[n] for n in variables}
+            elif parallel:
+                sizes = self._var_sizes[vec_name][kind]
+                abs2idx = self._var_allprocs_abs2idx[vec_name]
+                if discrete_vec:
+                    vdict = {}
+                    for n in variables:
+                        if n in views:
+                            if sizes[rank, abs2idx[n]] > 0:
+                                vdict[n] = views[n]
+                        elif n[offset:] in discrete_vec and self._owning_rank[n] == rank:
+                            vdict[n] = discrete_vec[n[offset:]]['value']
+                else:
+                    vdict = {n: views[n] for n in variables if sizes[rank, abs2idx[n]] > 0}
+            else:
+                meta = self._var_allprocs_abs2meta
+                for name in variables:
+                    if self._owning_rank[name] == 0 and not meta[name]['distributed']:
+                        # if using a serial recorder and rank 0 owns the variable,
+                        # use local value on rank 0 and do nothing on other ranks.
+                        if rank == 0:
+                            if name in views:
+                                vdict[name] = views[name]
+                            elif name[offset:] in discrete_vec:
+                                vdict[name] = discrete_vec[name[offset:]]['value']
+                    else:
+                        vdict[name] = self._get_val(name, get_remote=True, rank=0,
+                                                    vec_name=vec_name, kind=kind)
 
+        return vdict
 
-def _arraylist2array(lst, dtype=int):
-    """
-    Given a list of arrays, return a stacked array of the specified dtype.
+    def convert2units(self, name, val, units):
+        """
+        Convert the given value to the specified units.
 
-    Parameters
-    ----------
-    lst : list
-        List of arrays.
-    dtype : type
-        Specified dtype for the return array.
+        Parameters
+        ----------
+        name : str
+            Name of the variable.
+        val : float or ndarray of float
+            The value of the variable.
+        units : str
+            The units to convert to.
 
-    Returns
-    -------
-    ndarray
-        The stacked array.
-    """
-    if len(lst) > 1:
-        return np.hstack(lst)
-    elif lst:
-        return lst[0]
+        Returns
+        -------
+        float or ndarray of float
+            The value converted to the specified units.
+        """
+        meta = self._get_var_meta(name)
 
-    return np.zeros(0, dtype=dtype)
+        base_units = meta['units']
+
+        if base_units is None:
+            msg = "{}: Can't express variable '{}' with units of 'None' in units of '{}'."
+            raise TypeError(msg.format(self.msginfo, name, units))
+
+        try:
+            scale, offset = get_conversion(base_units, units)
+        except Exception:
+            msg = "{}: Can't express variable '{}' with units of '{}' in units of '{}'."
+            raise TypeError(msg.format(self.msginfo, name, base_units, units))
+
+        return (val + offset) * scale
+
+    def _get_var_meta(self, name):
+        """
+        Get the metadata for a variable.
+
+        Parameters
+        ----------
+        name : str
+            Promoted or relative variable name in the root system's namespace.
+
+        Returns
+        -------
+        dict
+            The metadata dictionary for the named variable.
+        """
+        meta = self._var_allprocs_abs2meta
+        if name in meta:
+            return meta[name]
+
+        abs_name, _ = name2abs_name(self, name)
+        if abs_name is not None:
+            return meta[abs_name]
+
+        raise KeyError('{}: Metadata for variable "{}" not found.'.format(self.msginfo, name))
 
 
 def get_relevant_vars(connections, desvars, responses, mode):
