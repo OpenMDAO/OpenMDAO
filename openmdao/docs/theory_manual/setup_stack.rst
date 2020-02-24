@@ -77,6 +77,7 @@ Add subsystems                                                                  
 Delete subsystems                                                                       o
 Issue connections                                                                       o        o
 Set system execution order                                                              o        o
+Directly add inputs and outputs to components within this group                         o        o
 Promote variables from subsystems                                                       o        o
 Assign solvers at **this** group level                                                  o        o
 Assign solvers within subsystems                                                                 o
@@ -93,6 +94,18 @@ Add a case recorder to the group or to a solver in a subsystem                  
  Keep in mind that, when `configure` is being run, you are already done calling `setup` on every group
  and component in the model, so if you add something here, setup will never be called, and it will
  never be fully integrated into the model hierarchy.
+
+.. warning::
+
+    While inputs and outputs can be _directly_ added to a component during configure of a parent Group,
+    take care for those systems which _queue_ the addition of inputs and outputs.
+
+    OpenMDAO components  like BalanceComp and MuxComp which queue things (such as with the
+    `add_balance` method) have a special `_post_configure` method which resolves these queued
+    variables after everything has been configured.
+
+    Your own components which use this behavior should either utilize make use of `_post_configure`
+    or allow another method which directly adds the I/O and doesn't queue it.
 
 
 Problem setup and final_setup
