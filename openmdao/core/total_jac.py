@@ -241,10 +241,9 @@ class _TotalJacInfo(object):
         self.J = J = np.zeros((self.of_size, self.wrt_size))
 
         # create scratch array for jac scatters
-        if self.comm.size > 1 and 'rev' in modes:
-            self.jac_scratch = np.empty(self.wrt_size, dtype=J.dtype)
-        else:
-            self.jac_scratch = None
+        self.jac_scratch = None
+        if self.comm.size > 1:
+            self.jac_scratch = np.empty(max(J.shape), dtype=J.dtype)
 
         if not approx:
             self.sol2jac_map = {}
@@ -591,7 +590,9 @@ class _TotalJacInfo(object):
 
                 if len(ilist) > 1:
                     locs = loc_idxs[ilist]
-                    iterdict['local_in_idxs'] = locs[locs != -1.0]
+                    active = locs != -1
+                    iterdict['local_in_idxs'] = locs[active]
+                    iterdict['seeds'] = seed[ilist][active]
 
                 iterdict['relevant'] = all_rel_systems
                 iterdict['cache_lin_solve'] = cache
@@ -680,7 +681,8 @@ class _TotalJacInfo(object):
                             if fwd:
                                 name2jinds[name] = jac_inds[-1]
                     else:
-                        idx_array = np.arange(slc.start / ncols, slc.stop / ncols, dtype=INT_DTYPE)
+                        idx_array = np.arange(slc.start // ncols, slc.stop // ncols,
+                                              dtype=INT_DTYPE)
                         if indices is not None:
                             idx_array = idx_array[indices]
                         inds.append(idx_array)
@@ -950,7 +952,7 @@ class _TotalJacInfo(object):
 
         self._zero_vecs('linear', mode)
 
-        self.input_vec[mode]['linear']._data[itermeta['local_in_idxs']] = self.seeds[mode][inds]
+        self.input_vec[mode]['linear']._data[itermeta['local_in_idxs']] = itermeta['seeds']
 
         if itermeta['cache_lin_solve']:
             return itermeta['relevant'], ('linear',), (inds[0], mode)
@@ -1135,8 +1137,9 @@ class _TotalJacInfo(object):
                                 addv=False, mode=False)
                 self.J[:, i] = self.tgt_petsc[mode].array
         else:  # rev
-            self.jac_scratch[:] = self.J[i]
-            self.comm.Allreduce(self.jac_scratch, self.J[i], op=MPI.SUM)
+            scratch = self.jac_scratch[:self.J[i].size]
+            scratch[:] = self.J[i]
+            self.comm.Allreduce(scratch, self.J[i], op=MPI.SUM)
 
     def single_jac_setter(self, i, mode):
         """
@@ -1186,26 +1189,30 @@ class _TotalJacInfo(object):
         dist = self.comm.size > 1
 
         J = self.J
-        deriv_idxs, _, _ = self.sol2jac_map[mode]
+        scratch_size = J.shape[0] if fwd else J.shape[1]
+        deriv_idxs, jac_idxs, _ = self.sol2jac_map[mode]
 
+        # because simul_coloring cannot be used with vectorized derivs (matmat) or parallel
+        # deriv coloring, vecname will always be 'linear', and we don't need to check
+        # vecname for each index.
         deriv_val = self.output_vec[mode]['linear']._data
-        reduced_derivs = deriv_val[deriv_idxs['linear']]
+        if self.jac_scratch is None:
+            reduced_derivs = deriv_val[deriv_idxs['linear']]
+        else:
+            reduced_derivs = self.jac_scratch[:scratch_size]
+            reduced_derivs[:] = 0.0
+            reduced_derivs[jac_idxs['linear']] = deriv_val[deriv_idxs['linear']]
 
         if fwd:
-            # because simul_coloring cannot be used with vectorized derivs (matmat) or parallel
-            # deriv coloring, vecname will always be 'linear', and we don't need to check
-            # vecname for each index.
-            scatter = self.jac_scatters[mode]['linear']
-
             for i in inds:
                 J[row_col_map[i], i] = reduced_derivs[row_col_map[i]]
                 if dist:
-                    self._jac_setter_dist(i, 'fwd')
-        else:
+                    self._jac_setter_dist(i, mode)
+        else:  # rev
             for i in inds:
                 J[i, row_col_map[i]] = reduced_derivs[row_col_map[i]]
                 if dist:
-                    self._jac_setter_dist(i, 'rev')
+                    self._jac_setter_dist(i, mode)
 
     def matmat_jac_setter(self, inds, mode):
         """

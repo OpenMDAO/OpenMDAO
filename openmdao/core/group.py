@@ -936,10 +936,10 @@ class Group(System):
                 if isinstance(subsys, Group):
                     if subsys.name in new_conns:
                         subsys._setup_global_connections(recurse=recurse,
-                                                        conns=new_conns[subsys.name])
+                                                         conns=new_conns[subsys.name])
                     else:
                         subsys._setup_global_connections(recurse=recurse)
-                elif subsys.options['distributed']:
+                elif subsys.options['distributed'] and subsys.comm.size > 1:
                     distcomps.append(subsys)
 
         # Compute global_abs_in2out by first adding this group's contributions,
@@ -1207,12 +1207,12 @@ class Group(System):
                                     for i in arr.flat:
                                         if abs(i) >= d_size:
                                             msg = ("%s: The source indices do not specify "
-                                                "a valid index for the connection "
-                                                "'%s' to '%s'. Index "
-                                                "'%d' is out of range for source "
-                                                "dimension of size %d.")
-                                            raise ValueError(msg % (self.msginfo, abs_out, abs_in, i,
-                                                                    d_size))
+                                                   "a valid index for the connection "
+                                                   "'%s' to '%s'. Index "
+                                                   "'%d' is out of range for source "
+                                                   "dimension of size %d.")
+                                            raise ValueError(msg % (self.msginfo, abs_out, abs_in,
+                                                                    i, d_size))
 
     def _transfer(self, vec_name, mode, isub=None):
         """
@@ -1234,7 +1234,7 @@ class Group(System):
 
         if mode == 'fwd':
             if xfer is not None:
-                if vec_inputs._do_scaling:
+                if self._has_input_scaling:
                     vec_inputs.scale('norm')
                     xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
                     vec_inputs.scale('phys')
@@ -1245,7 +1245,7 @@ class Group(System):
 
         else:  # rev
             if xfer is not None:
-                if vec_inputs._do_scaling:
+                if self._has_input_scaling:
                     vec_inputs.scale('phys')
                     xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
                     vec_inputs.scale('norm')
