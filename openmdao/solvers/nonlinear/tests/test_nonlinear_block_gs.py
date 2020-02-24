@@ -73,11 +73,11 @@ class TestNLBGaussSeidel(unittest.TestCase):
         model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        nlgbs = model.nonlinear_solver = om.NonlinearBlockGS()
+        nlbgs = model.nonlinear_solver = om.NonlinearBlockGS()
 
-        nlgbs.options['maxiter'] = 20
-        nlgbs.options['atol'] = 1e-6
-        nlgbs.options['rtol'] = 1e-6
+        nlbgs.options['maxiter'] = 20
+        nlbgs.options['atol'] = 1e-6
+        nlbgs.options['rtol'] = 1e-6
 
         prob.setup()
 
@@ -139,8 +139,8 @@ class TestNLBGaussSeidel(unittest.TestCase):
         model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        nlgbs = model.nonlinear_solver = om.NonlinearBlockGS()
-        nlgbs.options['maxiter'] = 2
+        nlbgs = model.nonlinear_solver = om.NonlinearBlockGS()
+        nlbgs.options['maxiter'] = 2
 
         prob.setup()
         prob.set_solver_print()
@@ -171,8 +171,8 @@ class TestNLBGaussSeidel(unittest.TestCase):
         model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        nlgbs = model.nonlinear_solver = om.NonlinearBlockGS()
-        nlgbs.options['rtol'] = 1e-3
+        nlbgs = model.nonlinear_solver = om.NonlinearBlockGS()
+        nlbgs.options['rtol'] = 1e-3
 
         prob.setup()
 
@@ -203,8 +203,8 @@ class TestNLBGaussSeidel(unittest.TestCase):
         model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        nlgbs = model.nonlinear_solver = om.NonlinearBlockGS()
-        nlgbs.options['atol'] = 1e-4
+        nlbgs = model.nonlinear_solver = om.NonlinearBlockGS()
+        nlbgs.options['atol'] = 1e-4
 
         prob.setup()
 
@@ -232,7 +232,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        nlgbs = model.nonlinear_solver = om.NonlinearBlockGS()
+        nlbgs = model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.setup()
         prob.set_solver_print(level=0)
@@ -265,8 +265,8 @@ class TestNLBGaussSeidel(unittest.TestCase):
         model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        nlgbs = model.nonlinear_solver = om.NonlinearBlockGS()
-        nlgbs.options['use_apply_nonlinear'] = True
+        nlbgs = model.nonlinear_solver = om.NonlinearBlockGS()
+        nlbgs.options['use_apply_nonlinear'] = True
 
         prob.setup()
         prob.set_solver_print(level=0)
@@ -300,9 +300,9 @@ class TestNLBGaussSeidel(unittest.TestCase):
         model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        nlgbs = model.nonlinear_solver = om.NonlinearBlockGS()
-        nlgbs.options['maxiter'] = 2
-        nlgbs.options['err_on_non_converge'] = True
+        nlbgs = model.nonlinear_solver = om.NonlinearBlockGS()
+        nlbgs.options['maxiter'] = 2
+        nlbgs.options['err_on_non_converge'] = True
 
         prob.setup()
         prob.set_solver_print(level=0)

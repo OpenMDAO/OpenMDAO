@@ -904,8 +904,8 @@ class TestNewtonFeatures(unittest.TestCase):
 
         model.linear_solver = om.DirectSolver()
 
-        nlgbs = model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
-        nlgbs.options['maxiter'] = 2
+        newton = model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        newton.options['maxiter'] = 2
 
         prob.setup()
 
@@ -938,8 +938,8 @@ class TestNewtonFeatures(unittest.TestCase):
 
         model.linear_solver = om.DirectSolver()
 
-        nlgbs = model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
-        nlgbs.options['rtol'] = 1e-3
+        newton = model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        newton.options['rtol'] = 1e-3
 
         prob.setup()
 
@@ -972,8 +972,8 @@ class TestNewtonFeatures(unittest.TestCase):
 
         model.linear_solver = om.DirectSolver()
 
-        nlgbs = model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
-        nlgbs.options['atol'] = 1e-4
+        newton = model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        newton.options['atol'] = 1e-4
 
         prob.setup()
 
@@ -1007,9 +1007,9 @@ class TestNewtonFeatures(unittest.TestCase):
 
         model.linear_solver = om.LinearBlockGS()
 
-        nlgbs = model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        newton = model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
 
-        nlgbs.linear_solver = om.DirectSolver()
+        newton.linear_solver = om.DirectSolver()
 
         prob.setup()
 
@@ -1080,9 +1080,9 @@ class TestNewtonFeatures(unittest.TestCase):
 
         model.linear_solver = om.DirectSolver()
 
-        nlgbs = model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
-        nlgbs.options['maxiter'] = 1
-        nlgbs.options['err_on_non_converge'] = True
+        newton = model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        newton.options['maxiter'] = 1
+        newton.options['err_on_non_converge'] = True
 
         prob.setup()
 

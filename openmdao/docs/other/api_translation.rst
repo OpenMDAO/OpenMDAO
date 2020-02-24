@@ -12,8 +12,8 @@ over the lifespan of OpenMDAO 2.x.  The changes are all summarized here.
 Building Component Models
 -------------------------
 
-Declare a Component with distributed variables.
-===============================================
+Declare a Component with distributed variables
+==============================================
 
 .. content-container ::
 
@@ -28,6 +28,23 @@ Declare a Component with distributed variables.
             super(DistribComp, self).__init__()
             self.distributed = True
 
+
+Declare an option with an explicit type
+=======================================
+
+.. content-container ::
+
+  .. embed-compare::
+      openmdao.components.vector_magnitude_comp.VectorMagnitudeComp
+      initialize
+      computed
+
+    def initialize(self):
+        """
+        Declare options.
+        """
+        self.options.declare('vec_size', type_=int, default=1,
+                             desc='The number of points at which the vector magnitude is computed')
 
 
 Component Library
@@ -127,24 +144,83 @@ Create an interpolating component using Bsplines
     prob.run_model()
 
 
-Create an ExecComp with diagonal partials.
-==========================================
+Create an ExecComp with diagonal partials
+=========================================
 
 .. content-container ::
 
   .. embed-compare::
       openmdao.components.tests.test_exec_comp.TestExecComp.test_feature_has_diag_partials
       ExecComp
-      ExecComp
+      np.ones
 
     model.add_subsystem('comp', ExecComp('y=3.0*x + 2.5',
                                          vectorize=True,
                                          x=np.ones(5), y=np.ones(5)))
 
 
+Create an IndepVarComp with multiple outputs
+============================================
 
-Solver Library
---------------
+.. content-container ::
+
+  .. embed-compare::
+      openmdao.core.tests.test_indep_var_comp.TestIndepVarComp.test_add_output
+      IndepVarComp
+      indep_var_2
+
+    comp = om.IndepVarComp((
+        ('indep_var_1', 1.0, {'lower': 0, 'upper': 10}),
+        ('indep_var_2', 2.0, {'lower': 1., 'upper': 20}),
+    ))
+
+
+
+Solvers
+-------
+
+Declare a NewtonSolver with solve_subsystems set to False
+=========================================================
+
+.. content-container ::
+
+  .. embed-compare::
+      openmdao.solvers.nonlinear.tests.test_newton.TestNewtonFeatures.test_feature_linear_solver
+      solve_subsystems
+      solve_subsystems
+
+    newton = model.nonlinear_solver = om.NewtonSolver()
+
+
+Control how a solver handles an error raised in a subsolver
+===========================================================
+
+.. content-container ::
+
+  .. embed-compare::
+      openmdao.solvers.nonlinear.tests.test_newton.TestNewtonFeatures.test_feature_err_on_non_converge
+      NewtonSolver
+      err_on_non_converge
+
+    newton = model.nonlinear_solver = NewtonSolver()
+    newton.options['maxiter'] = 1
+    newton.options['err_on_maxiter'] = True
+
+
+Drivers
+-------
+
+Activate dynamic coloring on a Driver
+=====================================
+
+.. content-container ::
+
+  .. embed-compare::
+      openmdao.core.tests.test_coloring.SimulColoringScipyTestCase.test_simul_coloring_example
+      declare_coloring
+      declare_coloring
+
+    p.driver.options['dynamic_simul_derivs'] = True
 
 
 Working with Derivatives
