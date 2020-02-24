@@ -1234,7 +1234,7 @@ class Group(System):
 
         if mode == 'fwd':
             if xfer is not None:
-                if self._has_input_scaling:
+                if vec_inputs._do_scaling:
                     vec_inputs.scale('norm')
                     xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
                     vec_inputs.scale('phys')
@@ -1245,7 +1245,7 @@ class Group(System):
 
         else:  # rev
             if xfer is not None:
-                if self._has_input_scaling:
+                if vec_inputs._do_scaling:
                     vec_inputs.scale('phys')
                     xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
                     vec_inputs.scale('norm')
