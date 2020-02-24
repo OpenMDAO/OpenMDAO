@@ -910,7 +910,9 @@ class TestExecComp(unittest.TestCase):
         model = p.model
         model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(5)))
 
-        model.add_subsystem('comp', om.ExecComp('y=3.0*x + 2.5', has_diag_partials=True, x=np.ones(5), y=np.ones(5)))
+        model.add_subsystem('comp', om.ExecComp('y=3.0*x + 2.5',
+                                                has_diag_partials=True,
+                                                x=np.ones(5), y=np.ones(5)))
         model.connect('indep.x', 'comp.x')
 
         p.setup()

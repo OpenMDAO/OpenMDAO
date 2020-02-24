@@ -425,13 +425,13 @@ class TestUnitConversion(unittest.TestCase):
 
         #prob = om.Problem()
         #root = prob.model
-        #sub1 = prob.model.add('sub1', om.Group(), promotes=['x2'])
-        #sub2 = prob.model.add('sub2', om.Group(), promotes=['x2'])
-        #sub1.add('src', SrcComp(), promotes = ['x2'])
-        #sub2.add('tgtF', TgtCompFMulti(), promotes=['x2'])
-        #sub2.add('tgtC', TgtCompC(), promotes=['x2'])
-        #sub2.add('tgtK', TgtCompK(), promotes=['x2'])
-        #prob.model.add('px1', om.IndepVarComp('x1', 100.0), promotes=['x1'])
+        #sub1 = prob.model.add_subsystem('sub1', om.Group(), promotes=['x2'])
+        #sub2 = prob.model.add_subsystem('sub2', om.Group(), promotes=['x2'])
+        #sub1.add_subsystem('src', SrcComp(), promotes = ['x2'])
+        #sub2.add_subsystem('tgtF', TgtCompFMulti(), promotes=['x2'])
+        #sub2.add_subsystem('tgtC', TgtCompC(), promotes=['x2'])
+        #sub2.add_subsystem('tgtK', TgtCompK(), promotes=['x2'])
+        #prob.model.add_subsystem('px1', om.IndepVarComp('x1', 100.0), promotes=['x1'])
         #prob.model.connect('x1', 'sub1.src.x1')
 
         #prob.setup()
@@ -553,9 +553,9 @@ class TestUnitConversion(unittest.TestCase):
 
         #prob = om.Problem()
         #root = prob.model
-        #prob.model.add('comp', Attitude_Angular(n=5), promotes=['*'])
-        #prob.model.add('p1', om.IndepVarComp('O_BI', np.ones((3, 3, 5))), promotes=['*'])
-        #prob.model.add('p2', om.IndepVarComp('Odot_BI', np.ones((3, 3, 5))), promotes=['*'])
+        #prob.model.add_subsystem('comp', Attitude_Angular(n=5), promotes=['*'])
+        #prob.model.add_subsystem('p1', om.IndepVarComp('O_BI', np.ones((3, 3, 5))), promotes=['*'])
+        #prob.model.add_subsystem('p2', om.IndepVarComp('Odot_BI', np.ones((3, 3, 5))), promotes=['*'])
 
         #prob.setup()
         #prob.run_model()
@@ -613,12 +613,12 @@ class TestUnitConversion(unittest.TestCase):
 
         #prob = om.Problem()
         #root = prob.model
-        #root.add('p1', om.IndepVarComp('xx', 3.0))
-        #root.add('c1', om.ExecComp(['y1=0.5*x + 0.1*xx', 'y2=0.3*x - 1.0*xx']))
-        #root.add('c2', om.ExecComp(['y=0.5*x']))
-        #sub = root.add('sub', om.Group())
-        #sub.add('cc1', om.ExecComp(['y=0.1*x1 + 0.01*x2']))
-        #sub.add('cc2', om.ExecComp(['y=0.1*x']))
+        #root.add_subsystem('p1', om.IndepVarComp('xx', 3.0))
+        #root.add_subsystem('c1', om.ExecComp(['y1=0.5*x + 0.1*xx', 'y2=0.3*x - 1.0*xx']))
+        #root.add_subsystem('c2', om.ExecComp(['y=0.5*x']))
+        #sub = root.add_subsystem('sub', om.Group())
+        #sub.add_subsystem('cc1', om.ExecComp(['y=0.1*x1 + 0.01*x2']))
+        #sub.add_subsystem('cc2', om.ExecComp(['y=0.1*x']))
 
         #root.connect('p1.xx', 'c1.xx')
         #root.connect('c1.y1', 'c2.x')
@@ -659,12 +659,12 @@ class TestUnitConversion(unittest.TestCase):
 
         #prob = om.Problem()
         #root = prob.model
-        #root.add('p1', om.IndepVarComp('xx', 3.0))
-        #root.add('c1', om.ExecComp(['y1=0.5*x + 1.0*xx', 'y2=0.3*x - 1.0*xx'], units={'y2' : 'km'}))
-        #root.add('c2', om.ExecComp(['y=0.5*x']))
-        #sub = root.add('sub', om.Group())
-        #sub.add('cc1', om.ExecComp(['y=1.01*x1 + 1.01*x2'], units={'x1' : 'nm'}))
-        #sub.add('cc2', om.ExecComp(['y=1.01*x']))
+        #root.add_subsystem('p1', om.IndepVarComp('xx', 3.0))
+        #root.add_subsystem('c1', om.ExecComp(['y1=0.5*x + 1.0*xx', 'y2=0.3*x - 1.0*xx'], units={'y2' : 'km'}))
+        #root.add_subsystem('c2', om.ExecComp(['y=0.5*x']))
+        #sub = root.add_subsystem('sub', om.Group())
+        #sub.add_subsystem('cc1', om.ExecComp(['y=1.01*x1 + 1.01*x2'], units={'x1' : 'nm'}))
+        #sub.add_subsystem('cc2', om.ExecComp(['y=1.01*x']))
 
         #root.connect('p1.xx', 'c1.xx')
         #root.connect('c1.y1', 'c2.x')
@@ -697,12 +697,12 @@ class TestUnitConversion(unittest.TestCase):
 
         #prob = om.Problem()
         #root = prob.model
-        #root.add('p1', om.IndepVarComp('xx', 3.0))
-        #root.add('c1', om.ExecComp(['y1=0.5*x + 1.0*xx', 'y2=0.3*x - 1.0*xx'], units={'y2' : 'km'}))
-        #root.add('c2', om.ExecComp(['y=0.5*x']))
-        #sub = root.add('sub', om.Group())
-        #sub.add('cc1', om.ExecComp(['y=1.01*x1 + 1.01*x2'], units={'x1' : 'nm'}))
-        #sub.add('cc2', om.ExecComp(['y=1.01*x']))
+        #root.add_subsystem('p1', om.IndepVarComp('xx', 3.0))
+        #root.add_subsystem('c1', om.ExecComp(['y1=0.5*x + 1.0*xx', 'y2=0.3*x - 1.0*xx'], units={'y2' : 'km'}))
+        #root.add_subsystem('c2', om.ExecComp(['y=0.5*x']))
+        #sub = root.add_subsystem('sub', om.Group())
+        #sub.add_subsystem('cc1', om.ExecComp(['y=1.01*x1 + 1.01*x2'], units={'x1' : 'nm'}))
+        #sub.add_subsystem('cc2', om.ExecComp(['y=1.01*x']))
 
         #root.connect('p1.xx', 'c1.xx')
         #root.connect('c1.y1', 'c2.x')
@@ -776,12 +776,12 @@ class TestUnitConversion(unittest.TestCase):
 
         #prob = om.Problem()
         #root = prob.model
-        #root.add('p1', om.IndepVarComp('xx', 3.0))
-        #root.add('c1', om.ExecComp(['y1=0.5*x + 1.0*xx', 'y2=0.3*x - 1.0*xx'], units={'y2' : 'km'}))
-        #root.add('c2', om.ExecComp(['y=0.5*x']))
-        #sub = root.add('sub', om.Group())
-        #sub.add('cc1', TestComp())
-        #sub.add('cc2', om.ExecComp(['y=1.01*x']))
+        #root.add_subsystem('p1', om.IndepVarComp('xx', 3.0))
+        #root.add_subsystem('c1', om.ExecComp(['y1=0.5*x + 1.0*xx', 'y2=0.3*x - 1.0*xx'], units={'y2' : 'km'}))
+        #root.add_subsystem('c2', om.ExecComp(['y=0.5*x']))
+        #sub = root.add_subsystem('sub', om.Group())
+        #sub.add_subsystem('cc1', TestComp())
+        #sub.add_subsystem('cc2', om.ExecComp(['y=1.01*x']))
 
         #root.connect('p1.xx', 'c1.xx')
         #root.connect('c1.y1', 'c2.x')
@@ -817,12 +817,12 @@ class TestUnitConversion(unittest.TestCase):
 
         #prob = om.Problem()
         #root = prob.model
-        #root.add('p1', om.IndepVarComp('xx', 3.0))
-        #root.add('c1', om.ExecComp(['y1=0.5*x + 1.0*xx', 'y2=0.3*x - 1.0*xx'], units={'y2' : 'km'}))
-        #root.add('c2', om.ExecComp(['y=0.5*x']))
-        #sub = root.add('sub', om.Group())
-        #sub.add('cc1', om.ExecComp(['y=1.01*x1 + 1.01*x2'], units={'x1' : 'fm'}))
-        #sub.add('cc2', om.ExecComp(['y=1.01*x']))
+        #root.add_subsystem('p1', om.IndepVarComp('xx', 3.0))
+        #root.add_subsystem('c1', om.ExecComp(['y1=0.5*x + 1.0*xx', 'y2=0.3*x - 1.0*xx'], units={'y2' : 'km'}))
+        #root.add_subsystem('c2', om.ExecComp(['y=0.5*x']))
+        #sub = root.add_subsystem('sub', om.Group())
+        #sub.add_subsystem('cc1', om.ExecComp(['y=1.01*x1 + 1.01*x2'], units={'x1' : 'fm'}))
+        #sub.add_subsystem('cc2', om.ExecComp(['y=1.01*x']))
 
         #root.connect('p1.xx', 'c1.xx')
         #root.connect('c1.y1', 'c2.x')
@@ -859,12 +859,12 @@ class TestUnitConversion(unittest.TestCase):
 
         #prob = om.Problem()
         #root = prob.model
-        #root.add('p1', om.IndepVarComp('xx', 3.0))
-        #root.add('c1', om.ExecComp(['y1=0.5*x + 1.0*xx', 'y2=0.3*x - 1.0*xx'], units={'y2' : 'km'}))
-        #root.add('c2', om.ExecComp(['y=0.5*x']))
-        #sub = root.add('sub', om.Group())
-        #sub.add('cc1', om.ExecComp(['y=1.01*x1 + 1.01*x2'], units={'x1' : 'fm'}))
-        #sub.add('cc2', om.ExecComp(['y=1.01*x']))
+        #root.add_subsystem('p1', om.IndepVarComp('xx', 3.0))
+        #root.add_subsystem('c1', om.ExecComp(['y1=0.5*x + 1.0*xx', 'y2=0.3*x - 1.0*xx'], units={'y2' : 'km'}))
+        #root.add_subsystem('c2', om.ExecComp(['y=0.5*x']))
+        #sub = root.add_subsystem('sub', om.Group())
+        #sub.add_subsystem('cc1', om.ExecComp(['y=1.01*x1 + 1.01*x2'], units={'x1' : 'fm'}))
+        #sub.add_subsystem('cc2', om.ExecComp(['y=1.01*x']))
 
         #root.connect('p1.xx', 'c1.xx')
         #root.connect('c1.y1', 'c2.x')

@@ -1,449 +1,184 @@
 .. _`api_translation`:
 
-*************************
-Upgrading from OpenMDAO 1
-*************************
+******************************************
+Upgrading from OpenMDAO 2.10 to OpenMDAO 3
+******************************************
 
-This guide takes how you did things in OpenMDAO 1 and shows how to do them OpenMDAO 2.
-It is not a comprehensive guide to using OpenMDAO 2, but focuses only on the things that have changed in the API.
+In the OpenMDAO 3.0 release, a few changes were made to the API.  In addition, we removed all
+deprecation warnings and fully deprecated the old behavior for all API changes that were made
+over the lifespan of OpenMDAO 2.x.  The changes are all summarized here.
 
 
-Build a Model
--------------
+Building Component Models
+-------------------------
 
-Define an Explicit Component
-============================
-
-.. content-container ::
-
-  .. embed-compare::
-      openmdao.test_suite.components.paraboloid.Paraboloid
-
-    class Paraboloid(Component):
-        """
-        Evaluates the equation f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3.
-        """
-
-        def __init__(self):
-            super(Paraboloid, self).__init__()
-
-            self.add_param('x', val=0.0)
-            self.add_param('y', val=0.0)
-
-            self.add_output('f_xy', val=0.0)
-
-        def solve_nonlinear(self, params, unknowns, resids):
-            """
-            f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3
-
-            Optimal solution (minimum): x = 6.6667; y = -7.3333
-            """
-            x = params['x']
-            y = params['y']
-
-            unknowns['f_xy'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
-
-        def linearize(self, params, unknowns, resids):
-            """
-            Jacobian for our paraboloid.
-            """
-            x = params['x']
-            y = params['y']
-
-            J = {}
-            J['f_xy', 'x'] = 2.0*x - 6.0 + y
-            J['f_xy', 'y'] = 2.0*y + 8.0 + x
-
-            return J
-
-
-Define an Implicit Component
-============================
-
-.. content-container ::
-
-  .. embed-compare::
-      openmdao.test_suite.components.implicit_newton_linesearch.ImplCompOneState
-      ImplCompOneState
-      10.0*exp
-
-    class ImplCompOneState(Component):
-        """
-        A Simple Implicit Component
-
-        R(x,y) = 0.5y^2 + 2y + exp(-16y^2) + 2exp(-5y) - x
-
-        Solution:
-        x = 1.2278849186466743
-        y = 0.3968459
-        """
-
-        def setup(self):
-            self.add_param('x', 1.2278849186466743)
-            self.add_state('y', val=1.0)
-
-        def apply_nonlinear(self, params, unknowns, resids):
-            """
-            Don't solve; just calculate the residual.
-            """
-            x = params['x']
-            y = unknowns['y']
-
-            resids['y'] = 0.5*y*y + 2.0*y + exp(-16.0*y*y) + 2.0*exp(-5.0*y) - x
-
-        def linearize(self, params, unknowns, resids):
-            """
-            Analytical derivatives.
-            """
-            y = unknowns['y']
-
-            J = {}
-
-            # State equation
-            J[('y', 'x')] = -1.0
-            J[('y', 'y')] = y + 2.0 - 32.0*y*exp(-16.0*y*y) - 10.0*exp(-5.0*y)
-
-            return J
-
-Input-Input connections
-============================
-
-See more details in the doc for :ref:`add_subsystem() <feature_adding_subsystem_to_a_group>`.
-
-.. content-container ::
-
-  .. embed-compare::
-      openmdao.core.tests.test_problem.TestProblem.test_feature_simple_run_once_input_input
-      Problem
-      run_model
-
-    prob = Problem()
-    root = prob.root = Group()
-
-    root.add('p1', IndepVarComp('x', 3.0))
-
-    root.add('comp1', Paraboloid())
-    root.add('comp2', Paraboloid())
-
-    #input-input connection
-    root.connect('comp1.x', 'comp2.x')
-    #then connect the indep var to just one of the inputs
-    root.connect('p1.x', 'comp1.x')
-
-    prob.setup()
-    prob.run()
-
-
-Run a Model
------------
-
-Assemble and Run a Simple Model
-===============================
-
-.. content-container ::
-
-  .. embed-compare::
-      openmdao.core.tests.test_problem.TestProblem.test_feature_simple_run_once_no_promote
-      Problem
-      run_model
-
-    prob = Problem()
-    root = prob.root = Group()
-
-    root.add('p1', IndepVarComp('x', 3.0))
-    root.add('p2', IndepVarComp('y', -4.0))
-    root.add('comp', Paraboloid())
-
-    root.connect('p1.x', 'comp.x')
-    root.connect('p2.y', 'comp.y')
-
-    prob.setup()
-    prob.run()
-
-
-Run a Driver
-============
-
-.. content-container ::
-
-  .. embed-compare::
-      openmdao.core.tests.test_driver.TestDriver.test_basic_get
-      run_driver
-      run_driver
-
-    prob.run()
-
-
-Run a Model without Running the Driver
-======================================
-
-.. content-container ::
-
-  .. embed-compare::
-      openmdao.core.tests.test_problem.TestProblem.test_feature_simple_run_once_no_promote
-      run_model
-      run_model
-
-    prob.run_once()
-
-
-Print All Solver Messages
-==========================
-
-.. content-container ::
-
-  .. embed-compare::
-      openmdao.solvers.linesearch.tests.test_backtracking.TestFeatureLineSearch.test_feature_print_bound_enforce
-      set_solver_print
-      set_solver_print
-
-    top.print_all_convergence(level=2)
-
-
-Check a Model
--------------
-
-Specify Finite Difference for all Component Derivatives
-=======================================================
-
-.. content-container ::
-
-  .. embed-compare::
-      openmdao.test_suite.components.sellar_feature.SellarDis1.setup
-
-    def __init__(self):
-        super(SellarDis1, self).__init__()
-
-        # Global Design Variable
-        self.add_param('z', val=np.zeros(2))
-
-        # Local Design Variable
-        self.add_param('x', val=0.)
-
-        # Coupling parameter
-        self.add_param('y2', val=1.0)
-
-        # Coupling output
-        self.add_output('y1', val=1.0)
-
-        # Finite difference all partials.
-        self.deriv_options['type'] = 'fd'
-
-
-Specify FD Form and Step Size on Specific Derivatives
-=====================================================
-
-.. content-container ::
-
-  .. embed-compare::
-      openmdao.jacobians.tests.test_jacobian_features.TestJacobianForDocs.test_fd_options
-      setup
-      central
-
-    def __init__(self):
-        super(PartialComp, self).__init__()
-
-        self.add_param('x', shape=(4,), step_size=1e-4, form='backward')
-        self.add_param('y', shape=(2,), step_size=1e-6, form='central')
-        self.add_param('y2', shape=(2,), step_size=1e-6, form='central')
-        self.add_output('f', shape=(2,))
-
-
-Check Partial Derivatives on All Components
-===========================================
-
-.. content-container ::
-
-  .. embed-compare::
-      openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_feature_incorrect_jacobian
-      check_partials
-      check_partials
-
-      data = prob.check_partials()
-
-
-Check Partial Derivatives with Complex Step
-===========================================
-
-.. content-container ::
-
-  .. embed-compare::
-      openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_set_method_global
-      opts
-      check_partials
-
-        prob.root.deriv_options['check_type'] = 'cs'
-
-        prob.setup()
-        prob.run()
-
-        prob.check_partials()
-
-
-Change Group Level Derivative Behavior
----------------------------------------
-
-Force Group or Model to use Finite Difference
-=============================================
-
-.. content-container ::
-
-  .. embed-compare::
-      openmdao.core.tests.test_approx_derivs.ApproxTotalsFeature.test_basic
-      approx_totals
-      approx_totals
-
-      model.deriv_options['type'] = 'fd'
-
-
-Force Group or Model to use Finite Difference with Specific Options
-===================================================================
-
-.. content-container ::
-
-  .. embed-compare::
-      openmdao.core.tests.test_approx_derivs.ApproxTotalsFeature.test_arguments
-      approx_totals
-      approx_totals
-
-      model.deriv_options['type'] = 'fd'
-      model.deriv_options['step_size'] = '1e-7'
-      model.deriv_options['form'] = 'central'
-      model.deriv_options['step_calc'] = 'relative'
-
-
-Add Design Variables
---------------------
-
-Add a Design Variable to a Model
-================================
-
-.. content-container ::
-
-  .. embed-compare::
-      openmdao.core.tests.test_driver.TestDriver.test_basic_get
-      Problem
-      add_design_var
-
-    prob = Problem()
-    prob.root = SellarDerivatives()
-
-    prob.add_desvar('z')
-
-
-Add a Design Variable with Scale and Offset that Maps [3, 5] to [0, 1]
-======================================================================
-
-.. content-container ::
-
-  .. embed-compare::
-      openmdao.core.tests.test_driver.TestDriver.test_scaled_design_vars
-      Problem
-      add_design_var
-
-    prob = Problem()
-    prob.root = SellarDerivatives()
-
-    prob.add_desvar('z', scaler=0.5, adder=-3.0)
-
-
-Set Solvers
------------
-
-Setup a Problem Using the PETScVector
-=====================================
-
-.. content-container ::
-
-  .. embed-compare::
-      openmdao.core.tests.test_problem.TestProblem.test_feature_basic_setup
-      vector_class
-      vector_class
-
-    prob.setup(impl=PetscImpl)
-
-
-Specify Newton as a Nonlinear Solver in a Group
+Declare a Component with distributed variables.
 ===============================================
 
 .. content-container ::
 
   .. embed-compare::
-      openmdao.solvers.nonlinear.tests.test_newton.TestNewtonFeatures.test_feature_basic
-      NewtonSolver()
-      NewtonSolver()
+      openmdao.test_suite.components.distributed_components.DistribComp
+      DistribComp
+      distributed
 
-    model.nl_solver = Newton()
+    class DistribComp(ExplicitComponent):
 
-
-Specify Block Gauss-Seidel as a Nonlinear Solver in a Group
-===========================================================
-
-.. content-container ::
-
-  .. embed-compare::
-      openmdao.solvers.nonlinear.tests.test_nonlinear_block_gs.TestNLBGaussSeidel.test_feature_basic
-      NonlinearBlockGS()
-      NonlinearBlockGS()
-
-    model.nl_solver = NLGaussSeidel()
+        def __init__(self, size):
+            super(DistribComp, self).__init__()
+            self.distributed = True
 
 
-Specify Scipy GMRES as a Linear Solver in a Group
-=================================================
 
-.. content-container ::
-
-  .. embed-compare::
-      openmdao.solvers.linear.tests.test_scipy_iter_solver.TestScipyKrylovFeature.test_specify_solver
-      ScipyKrylov()
-      ScipyKrylov()
-
-    model.ln_solver = ScipyGMRES()
-
-
-Specify Linear Block Gauss-Seidel as a Linear Solver in a Group
-===============================================================
-
-.. content-container ::
-
-  .. embed-compare::
-      openmdao.solvers.linear.tests.test_linear_block_gs.TestBGSSolverFeature.test_specify_solver
-      LinearBlockGS()
-      LinearBlockGS()
-
-    model.ln_solver = LinearGaussSeidel()
-
-
-Total Derivatives
+Component Library
 -----------------
 
-
-Computing Total Derivatives
-===========================
-
-.. content-container ::
-
-  .. embed-compare::
-      openmdao.core.tests.test_problem.TestProblem.test_feature_simple_run_once_compute_totals
-      prob.compute_totals
-      prob.compute_totals
-
-    prob.calc_gradient(indep_list=['p1.x', 'p2.y'], unknown_list=['comp.f_xy'])
-
-Setting Derivative Computation Mode
-===================================
+Create an interpolating component using Akima spline with uniform grid
+======================================================================
 
 .. content-container ::
 
   .. embed-compare::
-      openmdao.core.tests.test_problem.TestProblem.test_feature_simple_run_once_set_deriv_mode
-      prob.setup
-      prob.compute_totals
+      openmdao.components.tests.test_spline_comp.SplineCompFeatureTestCase.test_2to3doc_fixed_grid
+      ycp
+      run_model
 
-    root.ln_solver.options['mode'] = 'rev'
-    # root.ln_solver.options['mode'] = 'fwd'
-    # root.ln_solver.options['mode'] = 'auto'
+    ycp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
+    ncp = len(ycp)
+    n = 11
+
+    prob = om.Problem()
+
+    comp = om.AkimaSplineComp(num_control_points=ncp, num_points=n,
+                              name='chord')
+
+    prob.model.add_subsystem('comp1', comp)
+
     prob.setup()
-    prob.run()
-    prob.calc_gradient(indep_list=['p1.x', 'p2.y'], unknown_list=['comp.f_xy'])
+    prob['akima.chord:y_cp'] = ycp.reshape((1, ncp))
+    prob.run_model()
+
+
+Create an interpolating component using Akima spline with custom grid
+=====================================================================
+
+.. content-container ::
+
+  .. embed-compare::
+      openmdao.components.tests.test_spline_comp.SplineCompFeatureTestCase.test_basic_example
+      xcp
+      run_model
+
+    xcp = np.array([1.0, 2.0, 4.0, 6.0, 10.0, 12.0])
+    ycp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
+    ncp = len(xcp)
+    n = 50
+    x = np.linspace(1.0, 12.0, n)
+
+    prob = om.Problem()
+
+    comp = om.AkimaSplineComp(num_control_points=ncp, num_points=n,
+                              name='chord', input_x=True,
+                              input_xcp=True)
+
+    prob.model.add_subsystem('akima', comp)
+
+    prob.setup(force_alloc_complex=True)
+
+    prob['akima.chord:x_cp'] = xcp
+    prob['akima.chord:y_cp'] = ycp.reshape((1, ncp))
+    prob['akima.chord:x'] = x
+
+    prob.run_model()
+
+
+Create an interpolating component using Bsplines
+================================================
+
+.. content-container ::
+
+  .. embed-compare::
+      openmdao.components.tests.test_spline_comp.SplineCompFeatureTestCase.test_bsplines_2to3doc
+      sine_distribution
+      run_model
+
+    prob = om.Problem()
+    model = prob.model
+
+    n_cp = 5
+    n_point = 10
+
+    t = np.linspace(0, 0.5*np.pi, n_cp)
+    x = np.empty((2, n_cp))
+    x[0, :] = np.sin(t)
+    x[1, :] = 2.0*np.sin(t)
+
+    comp = om.BsplinesComp(num_control_points=n_cp,
+                           num_points=n_point,
+                           bspline_order=4,
+                           distribution='sine',
+                           vec_size=2,
+                           in_name='h_cp',
+                           out_name='h')
+
+    model.add_subsystem('interp', comp)
+
+    prob.setup()
+    prob.run_model()
+
+
+Create an ExecComp with diagonal partials.
+==========================================
+
+.. content-container ::
+
+  .. embed-compare::
+      openmdao.components.tests.test_exec_comp.TestExecComp.test_feature_has_diag_partials
+      ExecComp
+      ExecComp
+
+    model.add_subsystem('comp', ExecComp('y=3.0*x + 2.5',
+                                         vectorize=True,
+                                         x=np.ones(5), y=np.ones(5)))
+
+
+
+Solver Library
+--------------
+
+
+Working with Derivatives
+------------------------
+
+Use a pre-computed coloring on a model
+======================================
+
+.. content-container ::
+
+  .. embed-compare::
+      openmdao.core.tests.test_coloring.SimulColoringConfigCheckTestCase._build_model
+      use_fixed_coloring
+      use_fixed_coloring
+
+    p.driver.set_simul_deriv_color()
+
+
+Case Reading
+------------
+
+Query the iteration coordinate for a case
+=========================================
+
+.. content-container ::
+
+  .. embed-compare::
+      openmdao.recorders.tests.test_sqlite_reader.TestSqliteCaseReader.test_linesearch
+      CaseReader
+      case.name
+
+    cr = om.CaseReader(self.filename)
+
+    for i, c in enumerate(cr.list_cases()):
+        case = cr.get_case(c)
+
+        coord = case.iteration_coordinate

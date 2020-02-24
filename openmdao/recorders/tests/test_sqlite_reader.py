@@ -2585,7 +2585,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         for i, c in enumerate(cr.list_cases()):
             case = cr.get_case(c)
 
-
             coord = case.name
             self.assertEqual(coord, expected[i])
 
