@@ -49,6 +49,19 @@ class Cuber(om.ExplicitComponent):
         """
         self._vars[name] = {'units': units}
 
+    def config_var(self, name, units='m'):
+        """
+        This is a form of add_var that doesn't queue the IO until setup time.
+
+        This method is intended to be called during configure by parent subsystems.
+        """
+        self._vars[name] = {'units': units}
+        self.add_input(name, units=units)
+        self.add_output('{0}_cubed'.format(name), units='{0}**3'.format(units))
+        self.declare_partials(of='{0}_cubed'.format(name),
+                              wrt=name,
+                              method='cs')
+
     def setup(self):
         for var, options in iteritems(self._vars):
             self.add_input(var, units=options['units'])
@@ -118,6 +131,42 @@ class HostConnectInConfigure(om.Group):
                 self.connect(var, '{0}.{1}'.format(name, var))
 
 
+class GroupQueuesIOInConfigure(om.Group):
+    def initialize(self):
+        self._vars_to_cube = {}
+
+    def add_var_to_cube(self, name, units=None):
+        self._vars_to_cube[name] = {}
+        self._vars_to_cube[name]['units'] = units
+
+    def setup(self):
+        self.add_subsystem('ivc', om.IndepVarComp(), promotes_outputs=['*'])
+        self.add_subsystem('cuber', Cuber(), promotes_inputs=['*'], promotes_outputs=['*'])
+
+    def configure(self):
+        for name, options in iteritems(self._vars_to_cube):
+            self.ivc.add_output(name, units=options['units'])
+            self.cuber.add_var(name, units=options['units'])
+
+
+class GroupAddsIOInConfigure(om.Group):
+    def initialize(self):
+        self._vars_to_cube = {}
+
+    def add_var_to_cube(self, name, units=None):
+        self._vars_to_cube[name] = {}
+        self._vars_to_cube[name]['units'] = units
+
+    def setup(self):
+        self.add_subsystem('ivc', om.IndepVarComp(), promotes_outputs=['*'])
+        self.add_subsystem('cuber', Cuber(), promotes_inputs=['*'], promotes_outputs=['*'])
+
+    def configure(self):
+        for name, options in iteritems(self._vars_to_cube):
+            self.ivc.add_output(name, units=options['units'])
+            self.cuber.config_var(name, units=options['units'])
+
+
 class TestConnectionsInSetup(unittest.TestCase):
 
     def test_connect_in_setup(self):
@@ -179,6 +228,50 @@ class TestConnectionsInSetup(unittest.TestCase):
         assert_rel_error(self, p['h.cuber.b_cubed'], p['h.b'] ** 3)
         assert_rel_error(self, p['h.cuber.x_cubed'], p['h.x'] ** 3)
         assert_rel_error(self, p['h.cuber.y_cubed'], p['h.y'] ** 3)
+
+
+class TestAddSubcomponentIOInConfigure(unittest.TestCase):
+
+    def test_queue_subcomponent_io_in_configure(self):
+        """
+        This test queues IO to a component in configure, but that subcomponent resolves the
+        queued I/O at setup and therefore this will fail.
+        """
+        p = om.Problem(model=om.Group())
+
+        g = GroupQueuesIOInConfigure()
+
+        g.add_var_to_cube('foo', units='m')
+
+        p.model.add_subsystem('g', subsys=g)
+
+        with self.assertRaises(RuntimeError) as e:
+            p.setup()
+
+        err_msg = str(e.exception)
+        expected = "Cuber (g.cuber): 'promotes_inputs' failed to find any matches for the " \
+                   "following pattern: '*'."
+        self.assertEqual(err_msg, expected)
+
+    def test_add_subcomponent_io_in_configure(self):
+        """
+        This test directly adds IO to a component in configure, and should behave as expected.
+        """
+        p = om.Problem(model=om.Group())
+
+        g = GroupAddsIOInConfigure()
+
+        g.add_var_to_cube('foo', units='m')
+
+        p.model.add_subsystem('g', subsys=g)
+
+        p.setup()
+
+        p.set_val('g.foo', 5)
+
+        p.run_model()
+
+        assert_rel_error(self, p.get_val('g.foo_cubed'), p.get_val('g.foo')**3)
 
 
 if __name__ == '__main__':
