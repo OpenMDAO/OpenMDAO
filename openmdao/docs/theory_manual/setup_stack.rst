@@ -97,7 +97,7 @@ Add a case recorder to the group or to a solver in a subsystem                  
 
 .. warning::
 
-    While inputs and outputs can be _directly_ added to a component during configure of a parent Group,
+    While inputs and outputs can be *directly* added to a component during configure of a parent Group,
     take care for those systems which _queue_ the addition of inputs and outputs.
 
     OpenMDAO components  like BalanceComp and MuxComp which queue things (such as with the
