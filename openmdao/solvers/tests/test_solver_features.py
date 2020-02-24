@@ -18,7 +18,7 @@ class TestSolverFeatures(unittest.TestCase):
         prob = om.Problem()
         model = prob.model = SellarDerivatives()
 
-        model.nonlinear_solver = newton = om.NewtonSolver()
+        model.nonlinear_solver = newton = om.NewtonSolver(solve_subsystems=False)
 
         # using a different linear solver for Newton with a looser tolerance
         newton.linear_solver = om.ScipyKrylov(atol=1e-4)
@@ -41,11 +41,11 @@ class TestSolverFeatures(unittest.TestCase):
 
         # each SubSellar group converges itself
         g1 = model.g1
-        g1.nonlinear_solver = om.NewtonSolver()
+        g1.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         g1.linear_solver = om.DirectSolver()  # used for derivatives
 
         g2 = model.g2
-        g2.nonlinear_solver = om.NewtonSolver()
+        g2.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         g2.linear_solver = om.DirectSolver()
 
         # Converge the outer loop with Gauss Seidel, with a looser tolerance.

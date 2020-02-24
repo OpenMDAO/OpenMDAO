@@ -467,7 +467,7 @@ class _TotalJacInfo(object):
 
                 if in_idxs is None:
                     # if the var is not distributed, global_size == local size
-                    irange = np.arange(in_var_meta['global_size'], dtype=int)
+                    irange = np.arange(in_var_meta['global_size'], dtype=INT_DTYPE)
                 else:
                     irange = in_idxs
                     # correct for any negative indices
@@ -475,7 +475,7 @@ class _TotalJacInfo(object):
 
             else:  # name is not a design var or response  (should only happen during testing)
                 end += in_var_meta['global_size']
-                irange = np.arange(in_var_meta['global_size'], dtype=int)
+                irange = np.arange(in_var_meta['global_size'], dtype=INT_DTYPE)
                 in_idxs = parallel_deriv_color = matmat = None
                 cache_lin_sol = False
 
@@ -505,12 +505,12 @@ class _TotalJacInfo(object):
             # indicating we should set the local vector entry to 1.0 before running
             # solve_linear, or it will contain -1, indicating we should not set any
             # value before calling solve_linear.
-            loc_i = np.full(irange.shape, -1, dtype=int)
+            loc_i = np.full(irange.shape, -1, dtype=INT_DTYPE)
             if gend > gstart:
                 loc = np.nonzero(np.logical_and(irange >= gstart, irange < gend))[0]
                 if in_idxs is None:
                     if in_var_meta['distributed']:
-                        loc_i[loc] = np.arange(0, gend - gstart, dtype=int)
+                        loc_i[loc] = np.arange(0, gend - gstart, dtype=INT_DTYPE)
                     else:
                         loc_i[loc] = irange[loc] - gstart
                 else:
@@ -550,14 +550,14 @@ class _TotalJacInfo(object):
                 if name not in idx_iter_dict:
                     imeta = defaultdict(bool)
                     imeta['matmat'] = matmat
-                    imeta['idx_list'] = [np.arange(start, end, dtype=int)]
+                    imeta['idx_list'] = [np.arange(start, end, dtype=INT_DTYPE)]
                     idx_iter_dict[name] = (imeta, self.matmat_iter)
                 else:
                     raise RuntimeError("Variable name '%s' matches a parallel_deriv_color "
                                        "name." % name)
             elif not simul_coloring:  # plain old single index iteration
                 imeta = defaultdict(bool)
-                imeta['idx_list'] = np.arange(start, end, dtype=int)
+                imeta['idx_list'] = np.arange(start, end, dtype=INT_DTYPE)
                 idx_iter_dict[name] = (imeta, self.single_index_iter)
 
             if name in relevant:
@@ -1662,15 +1662,15 @@ def _fix_pdc_lengths(idx_iter_dict):
                 for i, diff in enumerate(diffs):
                     start, end = range_list[i]
                     if diff < 0:
-                        range_list[i] = np.empty(maxlen, dtype=int)
-                        range_list[i][:end - start] = np.arange(start, end, dtype=int)
+                        range_list[i] = np.empty(maxlen, dtype=INT_DTYPE)
+                        range_list[i][:end - start] = np.arange(start, end, dtype=INT_DTYPE)
                         range_list[i][end - start:] = range_list[i][end - start - 1]
                     else:
-                        range_list[i] = np.arange(start, end, dtype=int)
+                        range_list[i] = np.arange(start, end, dtype=INT_DTYPE)
             else:
                 # just convert all (start, end) tuples to aranges
                 for i, (start, end) in enumerate(range_list):
-                    range_list[i] = np.arange(start, end, dtype=int)
+                    range_list[i] = np.arange(start, end, dtype=INT_DTYPE)
 
 
 def _update_rel_systems(all_rel_systems, rel_systems):

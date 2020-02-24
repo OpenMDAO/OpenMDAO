@@ -17,7 +17,7 @@ def rel_name2abs_name(system, rel_name):
     str
         Absolute variable name.
     """
-    return rel_name if system.pathname is '' else system.pathname + '.' + rel_name
+    return rel_name if system.pathname == '' else system.pathname + '.' + rel_name
 
 
 def abs_name2rel_name(system, abs_name):
@@ -36,7 +36,7 @@ def abs_name2rel_name(system, abs_name):
     str
         Relative variable name.
     """
-    return abs_name if system.pathname is '' else abs_name[len(system.pathname) + 1:]
+    return abs_name if system.pathname == '' else abs_name[len(system.pathname) + 1:]
 
 
 def rel_key2abs_key(system, rel_key):

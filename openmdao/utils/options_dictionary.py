@@ -96,7 +96,7 @@ class OptionsDictionary(object):
             # if the default is an object instance, replace with the (unqualified) object type
             default_str = str(default)
             idx = default_str.find(' object at ')
-            if idx >= 0 and default_str[0] is '<':
+            if idx >= 0 and default_str[0] == '<':
                 parts = default_str[:idx].split('.')
                 default = parts[-1]
 
