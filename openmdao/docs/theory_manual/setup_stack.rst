@@ -104,7 +104,7 @@ Add a case recorder to the group or to a solver in a subsystem                  
     `add_balance` method) have a special `_post_configure` method which resolves these queued
     variables after everything has been configured.
 
-    Your own components which use this behavior should either utilize make use of `_post_configure`
+    Your own components which use this behavior should either utilize `_post_configure`
     or allow another method which directly adds the I/O and doesn't queue it.
 
 
