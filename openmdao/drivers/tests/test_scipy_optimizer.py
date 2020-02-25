@@ -1427,7 +1427,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         self.assertEqual(expected_msg, str(cm.exception))
 
     def test_cobyla_linear_constraint(self):
-        # Bug where scipyoptimizer tried to compute and cache the constraint derivatives for the
+        # Bug where ScipyOptimizeDriver tried to compute and cache the constraint derivatives for the
         # lower and upper bounds of the desvars even though we were using a non-gradient optimizer.
         # This causd a KeyError.
         prob = om.Problem()

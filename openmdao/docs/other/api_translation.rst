@@ -42,6 +42,33 @@ Declare a variable that is explicitly unitless
     prob.model.add_subsystem('tgt', om.ExecComp('y = 3 * x', x={'units': 'unitless'}))
 
 
+Add a subsystem to a Group
+==========================
+
+.. content-container ::
+
+  .. embed-compare::
+      openmdao.test_suite.test_examples.basic_opt_paraboloid.BasicOptParaboloid.test_constrained
+      add_subsystem
+      add_subsystem
+
+    indeps = prob.model.add('indeps', om.IndepVarComp())
+
+
+Add a linear or nonlinear solver to a Group
+===========================================
+
+.. content-container ::
+
+  .. embed-compare::
+     openmdao.test_suite.test_examples.test_circuit_analysis_derivs.TestNonlinearCircuit.test_nonlinear_circuit_analysis
+      nonlinear_solver
+      DirectSolver
+
+    self.nl_solver = om.NewtonSolver()
+    self.ln_solver = om.DirectSolver()
+
+
 Declare an option with an explicit type
 =======================================
 
@@ -253,6 +280,59 @@ Create a MetaModelStructured
     interp = om.MetaModelStructured(method='scipy_cubic', vec_size=2)
 
 
+Create a MultiFiMetaModel
+=========================
+
+.. content-container ::
+
+  .. embed-compare::
+      openmdao.components.tests.test_multifi_meta_model_unstructured_comp.MultiFiMetaModelFeatureTestCase.test_2_input_2_fidelity
+      MultiFiMetaModelUnStructuredComp
+      MultiFiMetaModelUnStructuredComp
+
+    mm = om.MultiFiMetaModel(nfi=2)
+
+
+Create a MultiFiMetaModelUnStructured
+=====================================
+
+.. content-container ::
+
+  .. embed-compare::
+      openmdao.components.tests.test_multifi_meta_model_unstructured_comp.MultiFiMetaModelFeatureTestCase.test_2_input_2_fidelity
+      MultiFiMetaModelUnStructuredComp
+      MultiFiMetaModelUnStructuredComp
+
+    mm = om.MultiFiMetaModelUnStructured(nfi=2)
+
+
+Add a FloatKrigingSurrogate to a MetaModelStructuredComp
+========================================================
+
+.. content-container ::
+
+  .. embed-compare::
+    openmdao.components.tests.test_meta_model_unstructured_comp.MetaModelUnstructuredSurrogatesFeatureTestCase.test_kriging
+      KrigingSurrogate
+      KrigingSurrogate
+
+    sin_mm.add_output('f_x', 0., surrogate=om.FloatKrigingSurrogate())
+
+
+Specify a default surrogate model for MetaModelStructuredComp
+=============================================================
+
+.. content-container ::
+
+  .. embed-compare::
+    openmdao.components.tests.test_meta_model_unstructured_comp.MetaModelTestCase.test_metamodel_feature_vector2d
+      KrigingSurrogate
+      KrigingSurrogate
+
+    trig = om.MetaModelUnStructuredComp(vec_size=size)
+    trig.default_surrogate = om.KrigingSurrogate()
+
+
 Solvers
 -------
 
@@ -284,8 +364,8 @@ Control how a solver handles an error raised in a subsolver
     newton.options['err_on_maxiter'] = True
 
 
-Declare a BroydenSolver with the BoundsEnforce line search
-==========================================================
+Declare a BroydenSolver with the BoundsEnforceLS line search
+============================================================
 
 .. content-container ::
 
@@ -298,8 +378,8 @@ Declare a BroydenSolver with the BoundsEnforce line search
     model.circuit.nonlinear_solver.linesearch = om.BoundsEnforceLS()
 
 
-Declare a NewtonSolver with the BoundsEnforce line search
-=========================================================
+Declare a NewtonSolver with the BoundsEnforceLS line search
+===========================================================
 
 .. content-container ::
 
@@ -310,6 +390,90 @@ Declare a NewtonSolver with the BoundsEnforce line search
 
     newton = model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
     newton.linesearch = om.BoundsEnforceLS()
+
+
+Add a preconditioner to PETScKrylov
+===================================
+
+.. content-container ::
+
+  .. embed-compare::
+      openmdao.solvers.linear.tests.test_petsc_ksp.TestPETScKrylovSolverFeature.test_specify_precon
+      PETScKrylov
+      LinearBlockGS
+
+    model.linear_solver = om.PETScKrylov()
+
+    model.linear_solver.preconditioner = om.LinearBlockGS()
+
+
+Add a preconditioner to ScipyKrylov
+===================================
+
+.. content-container ::
+
+  .. embed-compare::
+      openmdao.solvers.linear.tests.test_scipy_iter_solver.TestScipyKrylovFeature.test_specify_precon
+      linear_solver.precon
+      linear_solver.precon
+
+    model.linear_solver.preconditioner = om.LinearBlockGS()
+
+
+Add a ArmijoGoldsteinLS to a NewtonSolver
+=========================================
+
+.. content-container ::
+
+  .. embed-compare::
+      openmdao.solvers.linesearch.tests.test_backtracking.TestFeatureLineSearch.test_feature_goldstein
+      Newton
+      ArmijoGoldsteinLS
+
+        top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        top.model.nonlinear_solver.options['maxiter'] = 10
+        top.model.linear_solver = om.ScipyKrylov()
+
+        ls = top.model.nonlinear_solver.line_search = om.ArmijoGoldsteinLS(bound_enforcement='vector')
+
+
+Create a NonLinearRunOnce
+=========================
+
+.. content-container ::
+
+  .. embed-compare::
+      openmdao.solvers.nonlinear.tests.test_nonlinear_runonce.TestNonlinearRunOnceSolver.test_feature_solver
+      NonlinearRunOnce
+      NonlinearRunOnce
+
+    model.nonlinear_solver = om.NonLinearRunOnce()
+
+
+Create a PetscKSP
+=================
+
+.. content-container ::
+
+  .. embed-compare::
+      openmdao.solvers.linear.tests.test_petsc_ksp.TestPETScKrylovSolverFeature.test_specify_solver
+      PETScKrylov
+      PETScKrylov
+
+    model.linear_solver = om.PetscKSP()
+
+
+Create a ScipyIterativeSolver
+=============================
+
+.. content-container ::
+
+  .. embed-compare::
+      openmdao.solvers.linear.tests.test_scipy_iter_solver.TestScipyKrylovFeature.test_specify_solver
+      ScipyKrylov
+      ScipyKrylov
+
+    model.linear_solver = om.ScipyIterativeSolver()
 
 
 Drivers
@@ -326,6 +490,19 @@ Activate dynamic coloring on a Driver
       declare_coloring
 
     p.driver.options['dynamic_simul_derivs'] = True
+
+
+Add a ScipyOptimizer to a Problem
+=================================
+
+.. content-container ::
+
+  .. embed-compare::
+      openmdao.drivers.tests.test_scipy_optimizer.TestScipyOptimizeDriverFeatures.test_feature_basic
+      ScipyOptimizeDriver
+      ScipyOptimizeDriver
+
+    prob.driver = om.ScipyOptimizer()
 
 
 Working with Derivatives
