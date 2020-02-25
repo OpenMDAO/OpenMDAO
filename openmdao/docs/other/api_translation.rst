@@ -207,6 +207,34 @@ Control how a solver handles an error raised in a subsolver
     newton.options['err_on_maxiter'] = True
 
 
+Declare a BroydenSolver with the BoundsEnforce line search
+==========================================================
+
+.. content-container ::
+
+  .. embed-compare::
+      openmdao.solvers.nonlinear.tests.test_broyden.TestBryodenFeature.test_circuit_options
+      Broyden
+      Broyden
+
+    model.circuit.nonlinear_solver = om.BroydenSolver()
+    model.circuit.nonlinear_solver.linesearch = om.BoundsEnforceLS()
+
+
+Declare a NewtonSolver with the BoundsEnforce line search
+=========================================================
+
+.. content-container ::
+
+  .. embed-compare::
+      openmdao.solvers.nonlinear.tests.test_newton.TestNewtonFeatures.test_feature_rtol
+      NewtonSolver
+      NewtonSolver
+
+    newton = model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+    newton.linesearch = om.BoundsEnforceLS()
+
+
 Drivers
 -------
 
@@ -258,3 +286,32 @@ Query the iteration coordinate for a case
         case = cr.get_case(c)
 
         coord = case.iteration_coordinate
+
+
+Running a Model
+---------------
+
+Run a Driver
+============
+
+.. content-container ::
+
+  .. embed-compare::
+      openmdao.core.tests.test_driver.TestDriver.test_basic_get
+      run_driver
+      run_driver
+
+    prob.run()
+
+
+Run a Model without Running the Driver
+======================================
+
+.. content-container ::
+
+  .. embed-compare::
+      openmdao.core.tests.test_problem.TestProblem.test_feature_simple_run_once_no_promote
+      run_model
+      run_model
+
+    prob.run_once()
