@@ -15,10 +15,10 @@ Backwards Incompatible API Changes:
 - <POEM 004> AkimaSplineComp and BsplineComp have been deprecated, replaced with SplineComp
 
 - <POEM 008>
-  - The user is now requires to set a value for the solver option `solve_subsystems` 
+  - The user is now required to set a value for the solver option `solve_subsystems` 
     on Newton and Broyden solvers. Previously the default was `False`, but you will now get 
-    a deprecation warning if this value is not explicitely set. 
-  - The default for linesearch for Newton and Broyden has been changed from `None` to `BoundsEnforceLS`
+    a deprecation warning if this value is not explicitly set. 
+  - The default linesearch for Newton and Broyden has been changed from `None` to `BoundsEnforceLS`
 
 
 
@@ -30,10 +30,10 @@ Backwards Incompatible NON-API Changes:
 Note: These changes are not technically API related, but 
 still may cause your results to differ when upgrading. 
 
-- <POEM 012>The old implementation of KrigingSurrogate was hard coded to the 
-  `gesdd` method for inverses. Its now an option, but we've changed to 
-  `gesvd` because its more numerically stable. 
-   However this which might introduce slight numerical changes to the kriging fits. 
+- <POEM 012> The old implementation of KrigingSurrogate was hard coded to the 
+  `gesdd` method for inverses. The method is now an option, but we've changed 
+  the default to `gesvd` because its more numerically stable. 
+  This might introduce slight numerical changes to the Kriging fits. 
 
 - Refactor of how reverse mode derivative solves work for parallel components 
   that may require the removal of reduce calls in some components that were 
@@ -45,12 +45,12 @@ still may cause your results to differ when upgrading.
 New Features: 
 -------------
 
-- <POEM 001> astronmical unit (au) and parsec (pc) added to the standard unit definitions. 
+- <POEM 001> astronomical unit (au) and parsec (pc) added to the standard unit definitions. 
 
 - <POEM 002> users can now manually terminate an optimization using operating system signals 
 
 - <POEM 003> 
-  - users can now issue I/O, connections, and promotions in configure 
+  - users can now add I/O, connections, and promotions in configure 
   - new API method added to groups to allow promotions after a subsystem has already been added
 
 - <POEM 004> SplineComp was added to the standard component library, 
@@ -63,7 +63,7 @@ New Features:
   (previously a lists of strings was required) for `command`, `command_apply`, and `command_solve`. 
 
 - <POEM 010> User can now mark some options as `recordable=False` as an alternative to 
-  using `system.options['options_exclude']`
+  using `system.recording_options['options_exclude']`
 
 - <POEM 012> KrigingSurrogate now has a new option `lapack_driver` to determine how an inverse is computed
   The original implementation used a default `gesdd` method, but we've changed to `gesvd`.
