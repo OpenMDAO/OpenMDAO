@@ -148,17 +148,14 @@ and a phase of pi/2.0 clusters the points in the center with fewer points on the
     We have included three different distribution functions for users to replicate functionality that used to
     be built-in to the individual akima and bsplines components.
 
-.. embed-code::
-    openmdao.utils.spline_distributions.sine_distribution
-    :layout: code
+.. autofunction:: openmdao.utils.spline_distributions.sine_distribution
+    :noindex:
 
-.. embed-code::
-    openmdao.utils.spline_distributions.cell_centered
-    :layout: code
+.. autofunction:: openmdao.utils.spline_distributions.cell_centered
+    :noindex:
 
-.. embed-code::
-    openmdao.utils.spline_distributions.node_centered
-    :layout: code
+.. autofunction:: openmdao.utils.spline_distributions.node_centered
+    :noindex:
 
 Below is an example of `sine_distribution`
 
