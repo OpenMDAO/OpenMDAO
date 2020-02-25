@@ -15,7 +15,7 @@ Backwards Incompatible API Changes:
 - <POEM 004> AkimaSplineComp and BsplineComp have been deprecated, replaced with SplineComp
 
 - <POEM 008>
-  - The user is not requires to set a value for the solver option `solve_subsystems` 
+  - The user is now requires to set a value for the solver option `solve_subsystems` 
     on Newton and Broyden solvers. Previously the default was `False`, but you will now get 
     a deprecation warning if this value is not explicitely set. 
   - The default for linesearch for Newton and Broyden has been changed from `None` to `BoundsEnforceLS`
@@ -30,9 +30,10 @@ Backwards Incompatible NON-API Changes:
 Note: These changes are not technically API related, but 
 still may cause your results to differ when upgrading. 
 
-- <POEM 012>The old implementation was hard coded to the `gesdd` method for inverses. 
-  Its now an option, but we've changed to `gesvd`, which might introduce slight 
-  numerical changes to the kriging fits. 
+- <POEM 012>The old implementation of KrigingSurrogate was hard coded to the 
+  `gesdd` method for inverses. Its now an option, but we've changed to 
+  `gesvd` because its more numerically stable. 
+   However this which might introduce slight numerical changes to the kriging fits. 
 
 - Refactor of how reverse mode derivative solves work for parallel components 
   that may require the removal of reduce calls in some components that were 
@@ -50,10 +51,10 @@ New Features:
 
 - <POEM 003> 
   - users can now issue I/O, connections, and promotions in configure 
-  - there was a new API method added to groups to allow promotions after a subsystem has already been added
+  - new API method added to groups to allow promotions after a subsystem has already been added
 
 - <POEM 004> SplineComp was added to the standard component library, 
-  and you can also import the spline utilities to use in your own components
+  and you can also import the interpolation algorithms to use in your own components
 
 - <POEM 005> OpenMDAO plugin system has been defined, so users can now publish their own plugins on github. 
   several utilities added to openmdao command line tools related to plugins
@@ -77,7 +78,7 @@ New Features:
 - Improvements to `debug_print` for driver related to reporting which derivatives 
   are being computed when coloring is active
 
-- The N2 viewer now works, even for models that are run in parallel (i.e. if your using mpi to call python)
+- The N2 viewer now works for models that are run in parallel (i.e. if you're using mpi to call python)
 
 - `list_inputs` and `list_outputs` both have arguments for including local_size and 
   global_size of distributed outputs in their reports
@@ -89,7 +90,7 @@ Bug Fixes:
 - Fixed a bug in SimpleGA related to setting a vector of constraints
 - Various bug-fixes to allow running with Python 3.8
 - Fixed a bug in ScipyOptimizer/Cobyla related to objective and dv scaling
-- Corrected bug prenting the user from passing a list to `set_val` when the variable is an array
+- Corrected bug preventing the user from passing a list to `set_val` when the variable is an array
 
 
 ################################################################################################
