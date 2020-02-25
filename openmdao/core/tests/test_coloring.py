@@ -851,11 +851,11 @@ class MatMultMultipointTestCase(unittest.TestCase):
         p.driver = pyOptSparseDriver()
         p.driver.options['optimizer'] = OPTIMIZER
         p.driver.declare_coloring()
-        if OPTIMIZER == 'SLSQP':
+        if OPTIMIZER == 'SNOPT':
             p.driver.opt_settings['Major iterations limit'] = 100
             p.driver.opt_settings['Major feasibility tolerance'] = 1.0E-6
             p.driver.opt_settings['Major optimality tolerance'] = 1.0E-6
-            p.driver.opt_settings['iSumm'] = 6
+            # p.driver.opt_settings['iSumm'] = 6
 
         model = p.model
         for i in range(num_pts):
@@ -885,25 +885,35 @@ class MatMultMultipointTestCase(unittest.TestCase):
 
         model.add_objective('obj.y')
 
-        try:
-            p.setup()
+        p.setup()
 
-            p.run_driver()
+        p.run_driver()
 
-            J = p.compute_totals()
+        J = p.compute_totals()
 
-            for i in range(num_pts):
-                vname = 'par2.comp%d.A' % i
-                if vname in model._var_abs_names['input']:
-                    norm = np.linalg.norm(J['par2.comp%d.y'%i,'indep%d.x'%i] -
-                                          getattr(par2, 'comp%d'%i)._inputs['A'].dot(getattr(par1, 'comp%d'%i)._inputs['A']))
-                    self.assertLess(norm, 1.e-7)
-                elif vname not in model._var_allprocs_abs_names['input']:
-                    self.fail("Can't find variable par2.comp%d.A" % i)
+        for i in range(num_pts):
+            cname = 'par2.comp%d' % i
+            vname = cname + '.A'
+            if vname in model._var_abs_names['input']:
+                A1 = p.get_val('par1.comp%d.A'%i)
+                A2 = p.get_val('par2.comp%d.A'%i)
+                norm = np.linalg.norm(J['par2.comp%d.y'%i,'indep%d.x'%i] - A2.dot(A1))
+                self.assertLess(norm, 1.e-7)
 
-            print("final obj:", p['obj.y'])
-        except Exception as err:
-            print(str(err))
+        print("final obj:", p['obj.y'])
+
+
+# use_tempdirs is inherited
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class MatMultMultipointMPI2TestCase(MatMultMultipointTestCase):
+    N_PROCS = 2
+
+
+# use_tempdirs is inherited
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class MatMultMultipointMPI4TestCase(MatMultMultipointTestCase):
+    N_PROCS = 4
+
 
 class SimulColoringVarOutputTestClass(unittest.TestCase):
     def test_multi_variable_coloring_debug_print_totals(self):
@@ -917,10 +927,10 @@ class SimulColoringVarOutputTestClass(unittest.TestCase):
         p.driver.options['optimizer'] = 'SLSQP'
         p.driver.declare_coloring()
         p.driver.options['debug_print'] = ['totals']
-        # if OPTIMIZER == 'SLSQP':
-        #     p.driver.opt_settings['Major iterations limit'] = 100
-        #     p.driver.opt_settings['Major feasibility tolerance'] = 1.0E-6
-        #     p.driver.opt_settings['Major optimality tolerance'] = 1.0E-6
+        if OPTIMIZER == 'SNOPT':
+            p.driver.opt_settings['Major iterations limit'] = 100
+            p.driver.opt_settings['Major feasibility tolerance'] = 1.0E-6
+            p.driver.opt_settings['Major optimality tolerance'] = 1.0E-6
         #     p.driver.opt_settings['iSumm'] = 6
 
         model = p.model
@@ -1071,7 +1081,6 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
                               sizes=[3, 4, 5], color='partial', fixed=False)
         p.run_driver()
 
-        print('++++++++++++')
         p = self._build_model(ofnames=['w', 'x', 'y', 'z'], wrtnames=['a', 'b', 'c', 'd'],
                                 sizes=[3, 4, 5, 6], color='partial', fixed=True)
 
@@ -1154,4 +1163,3 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-

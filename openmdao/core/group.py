@@ -945,12 +945,16 @@ class Group(System):
 
         # Recursion
         if recurse:
-            for subsys in self._subgroups_myproc:
-                if subsys.name in new_conns:
-                    subsys._setup_global_connections(recurse=recurse,
-                                                     conns=new_conns[subsys.name])
-                else:
-                    subsys._setup_global_connections(recurse=recurse)
+            distcomps = []
+            for subsys in self._subsystems_myproc:
+                if isinstance(subsys, Group):
+                    if subsys.name in new_conns:
+                        subsys._setup_global_connections(recurse=recurse,
+                                                         conns=new_conns[subsys.name])
+                    else:
+                        subsys._setup_global_connections(recurse=recurse)
+                elif subsys.options['distributed'] and subsys.comm.size > 1:
+                    distcomps.append(subsys)
 
         # Compute global_abs_in2out by first adding this group's contributions,
         # then adding contributions from systems above/below, then allgathering.
@@ -985,6 +989,10 @@ class Group(System):
 
             for myproc_global_abs_in2out in gathered:
                 global_abs_in2out.update(myproc_global_abs_in2out)
+
+            if recurse:
+                for comp in distcomps:
+                    comp._update_dist_src_indices(global_abs_in2out)
 
     def _setup_connections(self, recurse=True):
         """
@@ -1208,15 +1216,17 @@ class Group(System):
                             # when running under MPI, there is a value for each proc
                             d_size = out_shape[d] * self.comm.size
                             if src_indices.size > 0:
-                                for i in src_indices[..., d].flat:
-                                    if abs(i) >= d_size:
-                                        msg = ("%s: The source indices do not specify "
-                                               "a valid index for the connection "
-                                               "'%s' to '%s'. Index "
-                                               "'%d' is out of range for source "
-                                               "dimension of size %d.")
-                                        raise ValueError(msg % (self.msginfo, abs_out, abs_in, i,
-                                                                d_size))
+                                arr = src_indices[..., d]
+                                if np.any(arr >= d_size) or np.any(arr <= -d_size):
+                                    for i in arr.flat:
+                                        if abs(i) >= d_size:
+                                            msg = ("%s: The source indices do not specify "
+                                                   "a valid index for the connection "
+                                                   "'%s' to '%s'. Index "
+                                                   "'%d' is out of range for source "
+                                                   "dimension of size %d.")
+                                            raise ValueError(msg % (self.msginfo, abs_out, abs_in,
+                                                                    i, d_size))
 
     def _transfer(self, vec_name, mode, isub=None):
         """
