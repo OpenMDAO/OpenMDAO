@@ -29,6 +29,19 @@ Declare a Component with distributed variables
             self.distributed = True
 
 
+Declare a variable that is explicitly unitless
+==============================================
+
+.. content-container ::
+
+  .. embed-compare::
+      openmdao.core.tests.test_group.TestConnect.test_connect_units_with_unitless
+      None
+      None
+
+    prob.model.add_subsystem('tgt', om.ExecComp('y = 3 * x', x={'units': 'unitless'}))
+
+
 Declare an option with an explicit type
 =======================================
 
@@ -175,6 +188,70 @@ Create an IndepVarComp with multiple outputs
     ))
 
 
+Create an ExternalCode
+======================
+
+.. content-container ::
+
+  .. embed-compare::
+      openmdao.components.tests.test_external_code_comp.ParaboloidExternalCodeCompDerivs
+      ParaboloidExternalCodeCompDerivs
+      ParaboloidExternalCodeCompDerivs
+
+    class ParaboloidExternalCodeCompDerivs(om.ExternalCode):
+
+
+Create a KSComponent
+====================
+
+.. content-container ::
+
+  .. embed-compare::
+      openmdao.components.tests.test_ks_comp.TestKSFunctionFeatures.test_basic
+      KSComp
+      KSComp
+
+    model.add_subsystem('ks', om.KSComponent(width=2))
+
+
+Create a MetaModel
+==================
+
+.. content-container ::
+
+  .. embed-compare::
+     openmdao.components.tests.test_meta_model_unstructured_comp.MetaModelUnstructuredSurrogatesFeatureTestCase.test_kriging
+      MetaModelUnStructuredComp
+      MetaModelUnStructuredComp
+
+    sin_mm = om.MetaModel()
+
+
+Create a MetaModelUnstructured
+==============================
+
+.. content-container ::
+
+  .. embed-compare::
+     openmdao.components.tests.test_meta_model_unstructured_comp.MetaModelUnstructuredSurrogatesFeatureTestCase.test_kriging
+      MetaModelUnStructuredComp
+      MetaModelUnStructuredComp
+
+    sin_mm = om.MetaModelUnstructured()
+
+
+Create a MetaModelStructured
+============================
+
+.. content-container ::
+
+  .. embed-compare::
+      openmdao.components.tests.test_meta_model_structured_comp.TestMetaModelStructuredCompFeature.test_vectorized
+      MetaModelStructuredComp
+      MetaModelStructuredComp
+
+    interp = om.MetaModelStructured(method='scipy_cubic', vec_size=2)
+
 
 Solvers
 -------
@@ -214,7 +291,7 @@ Declare a BroydenSolver with the BoundsEnforce line search
 
   .. embed-compare::
       openmdao.solvers.nonlinear.tests.test_broyden.TestBryodenFeature.test_circuit_options
-      Broyden
+      om.Broyden
       Broyden
 
     model.circuit.nonlinear_solver = om.BroydenSolver()
