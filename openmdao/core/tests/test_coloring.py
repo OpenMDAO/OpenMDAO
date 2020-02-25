@@ -851,11 +851,11 @@ class MatMultMultipointTestCase(unittest.TestCase):
         p.driver = pyOptSparseDriver()
         p.driver.options['optimizer'] = OPTIMIZER
         p.driver.declare_coloring()
-        if OPTIMIZER == 'SLSQP':
+        if OPTIMIZER == 'SNOPT':
             p.driver.opt_settings['Major iterations limit'] = 100
             p.driver.opt_settings['Major feasibility tolerance'] = 1.0E-6
             p.driver.opt_settings['Major optimality tolerance'] = 1.0E-6
-            p.driver.opt_settings['iSumm'] = 6
+            # p.driver.opt_settings['iSumm'] = 6
 
         model = p.model
         for i in range(num_pts):
@@ -927,10 +927,10 @@ class SimulColoringVarOutputTestClass(unittest.TestCase):
         p.driver.options['optimizer'] = 'SLSQP'
         p.driver.declare_coloring()
         p.driver.options['debug_print'] = ['totals']
-        # if OPTIMIZER == 'SLSQP':
-        #     p.driver.opt_settings['Major iterations limit'] = 100
-        #     p.driver.opt_settings['Major feasibility tolerance'] = 1.0E-6
-        #     p.driver.opt_settings['Major optimality tolerance'] = 1.0E-6
+        if OPTIMIZER == 'SNOPT':
+            p.driver.opt_settings['Major iterations limit'] = 100
+            p.driver.opt_settings['Major feasibility tolerance'] = 1.0E-6
+            p.driver.opt_settings['Major optimality tolerance'] = 1.0E-6
         #     p.driver.opt_settings['iSumm'] = 6
 
         model = p.model
