@@ -57,7 +57,8 @@ class SplineComp(ExplicitComponent):
                              'increasing. Not applicable for bsplines.')
         self.options.declare('num_cp', default=None, types=(int, ), allow_none=True,
                              desc='Number of spline control points. Optional alternative to '
-                             'x_cp_val. Required for bsplines.')
+                             'x_cp_val. Required for bsplines. If None, num_cp will be a linspace '
+                             'from 0 to 1.')
         self.options.declare('interp_options', types=dict, default={},
                              desc='Dict contains the name and value of options specific to the '
                              'chosen interpolation method.')
@@ -127,7 +128,7 @@ class SplineComp(ExplicitComponent):
             elif len(y_cp_val.shape) < 2:
                 y_cp_val = y_cp_val.reshape((vec_size, n_cp))
 
-            self.add_input(name=y_cp_name, val=y_cp_val)
+            self.add_input(name=y_cp_name, val=y_cp_val, units=y_units)
 
             self.interp_to_cp[y_interp_name] = y_cp_name
 

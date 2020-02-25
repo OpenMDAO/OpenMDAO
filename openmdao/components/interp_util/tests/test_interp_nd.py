@@ -6,10 +6,11 @@ from copy import deepcopy
 import unittest
 
 import numpy as np
-from numpy.testing import assert_array_almost_equal, assert_almost_equal, assert_array_equal
+from numpy.testing import assert_array_equal
 
 from openmdao.components.interp_util.interp import InterpND
 from openmdao.components.interp_util.outofbounds_error import OutOfBoundsError
+from openmdao.utils.assert_utils import assert_rel_error, assert_equal_arrays
 
 def rel_error(actual, computed):
     return np.linalg.norm(actual - computed) / np.linalg.norm(actual)
@@ -47,7 +48,7 @@ class InterpNDStandaloneFeatureTestcase(unittest.TestCase):
                             20.96983509, 21.37579297, 21.94811407, 22.66809748, 23.51629844,
                             24.47327219, 25.51957398, 26.63575905, 27.80238264, 29.        ]])
 
-        assert_array_almost_equal(akima_y.flatten(), y.flatten())
+        assert_rel_error(self, akima_y.flatten(), y.flatten(), tolerance=1e-6)
 
     def test_interp_spline_akima_derivs(self):
         import numpy as np
@@ -109,7 +110,7 @@ class InterpNDStandaloneFeatureTestcase(unittest.TestCase):
                           [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,
                             0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
 
-        assert_array_almost_equal(deriv, dy_dycp)
+        assert_rel_error(self, deriv, dy_dycp, tolerance=1e-6)
 
     def test_interp_spline_bsplines(self):
         import numpy as np
@@ -136,7 +137,7 @@ class InterpNDStandaloneFeatureTestcase(unittest.TestCase):
                               20.4965297 , 21.13578243, 21.8400867 , 22.61430372, 23.46329467,
                               24.39192074, 25.40504312, 26.507523  , 27.70422156, 29.        ]])
 
-        assert_array_almost_equal(akima_y.flatten(), y.flatten())
+        assert_rel_error(self, akima_y.flatten(), y.flatten(), tolerance=1e-6)
 
     def test_table_interp(self):
         import numpy as np
@@ -160,8 +161,8 @@ class InterpNDStandaloneFeatureTestcase(unittest.TestCase):
         actual = np.array([6.73306794])
         deriv_actual = np.array([[ 0.06734927, 0.323 , -2.14]])
 
-        assert_almost_equal(f, actual)
-        assert_almost_equal(df_dx, deriv_actual)
+        assert_rel_error(self, f, actual, tolerance=1e-7)
+        assert_rel_error(self, df_dx, deriv_actual, tolerance=1e-7)
 
 
 class TestInterpNDPython(unittest.TestCase):
@@ -355,9 +356,8 @@ class TestInterpNDPython(unittest.TestCase):
             assert r_err < 2.5 * self.tol[method]
 
             # test that gradients have been cached
-            assert_array_equal(interp._xi, test_pt)
-            assert_array_equal(
-                interp._d_dx.flatten(), computed.flatten())
+            assert_equal_arrays(interp._xi, test_pt)
+            assert_equal_arrays(interp._d_dx.flatten(), computed.flatten())
 
     def test_gradients_returned_by_xi(self):
         # verifies that gradients with respect to xi are returned if cached
@@ -369,7 +369,7 @@ class TestInterpNDPython(unittest.TestCase):
             interp._xi = x
             dy = np.array([0.997901, 0.08915])
             interp._d_dx = dy
-            assert_almost_equal(interp.gradient(x), dy)
+            assert_rel_error(self, interp.gradient(x), dy, tolerance=1e-7)
 
     def test_akima_interpolating_spline(self):
         n_cp = 80
@@ -456,7 +456,7 @@ class TestInterpNDPython(unittest.TestCase):
         # should operate as normal
         x = np.array([0.5, 0, 1001])
         result = interp.interpolate(x)
-        assert_almost_equal(result, -0.046325695741704434, decimal=5)
+        assert_rel_error(self, result, -0.046325695741704434, tolerance=1e-5)
 
         interp = InterpND(method='scipy_slinear', points=points, values=values)
         value1 = interp.interpolate(x)
