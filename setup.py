@@ -30,7 +30,7 @@ optional_dependencies = {
         'numpydoc>=0.9.1',
         'pycodestyle>=2.4.0',
         'pydocstyle==2.0.0',
-        'testflo>=1.3.5',
+        'testflo>=1.3.6' if sys.version_info >= (3, 5) else 'testflo==1.3.6'
     ] + (gui_test_deps if sys.version_info > (3, 5) else [])
 }
 

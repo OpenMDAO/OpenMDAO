@@ -881,15 +881,29 @@ class Group(System):
             # (not traceable to a connect statement, so provide context)
             if (prom_out not in allprocs_prom2abs_list_out and
                     prom_out not in self._var_allprocs_discrete['output']):
-                raise NameError(
-                    "%s: Output '%s' does not exist for connection in '%s' from '%s' to '%s'." %
-                    (self.msginfo, prom_out, self.pathname, prom_out, prom_in))
+                if (prom_out in allprocs_prom2abs_list_in or
+                        prom_out in self._var_allprocs_discrete['input']):
+                    raise NameError(
+                        "%s: Attempted to connect from '%s' to '%s', but '%s' is an input. "
+                        "All connections must be from an output to an input." %
+                        (self.msginfo, prom_out, prom_in, prom_out))
+                else:
+                    raise NameError(
+                        "%s: Attempted to connect from '%s' to '%s', but '%s' doesn't exist." %
+                        (self.msginfo, prom_out, prom_in, prom_out))
 
             if (prom_in not in allprocs_prom2abs_list_in and
                     prom_in not in self._var_allprocs_discrete['input']):
-                raise NameError(
-                    "%s: Input '%s' does not exist for connection from '%s' to '%s'." %
-                    (self.msginfo, prom_in, prom_out, prom_in))
+                if (prom_in in allprocs_prom2abs_list_out or
+                        prom_in in self._var_allprocs_discrete['output']):
+                    raise NameError(
+                        "%s: Attempted to connect from '%s' to '%s', but '%s' is an output. "
+                        "All connections must be from an output to an input." %
+                        (self.msginfo, prom_out, prom_in, prom_in))
+                else:
+                    raise NameError(
+                        "%s: Attempted to connect from '%s' to '%s', but '%s' doesn't exist." %
+                        (self.msginfo, prom_out, prom_in, prom_in))
 
             # Throw an exception if output and input are in the same system
             # (not traceable to a connect statement, so provide context)
@@ -1372,6 +1386,42 @@ class Group(System):
         self._vector_class.TRANSFER._setup_transfers(self, recurse=recurse)
         if self._conn_discrete_in2out:
             self._vector_class.TRANSFER._setup_discrete_transfers(self, recurse=recurse)
+
+    def promotes(self, subsys_name, any=None, inputs=None, outputs=None):
+        """
+        Promote a variable in the model tree.
+
+        Parameters
+        ----------
+        subsys_name : str
+            The name of the child subsystem whose inputs/outputs are being promoted.
+        any : Sequence of str or tuple
+            A Sequence of variable names (or tuples) to be promoted, regardless
+            of if they are inputs or outputs. This is equivalent to the items
+            passed via the `promotes=` argument to add_subsystem.  If given as a
+            tuple, we use the "promote as" standard of ('real name', 'promoted name')*[]:
+        inputs : Sequence of str or tuple
+            A Sequence of input names (or tuples) to be promoted. Tuples are
+            used for the "promote as" capability.
+        outputs : Sequence of str or tuple
+            A Sequence of output names (or tuples) to be promoted. Tuples are
+            used for the "promote as" capability.
+        """
+        subsys = getattr(self, subsys_name)
+        if any:
+            subsys._var_promotes['any'].extend(any)
+        if inputs:
+            subsys._var_promotes['input'].extend(inputs)
+        if outputs:
+            subsys._var_promotes['output'].extend(outputs)
+
+        list_comp = [i if isinstance(i, tuple) else (i, i) for i in subsys._var_promotes['input']]
+
+        for original, new in list_comp:
+            for original_inside, new_inside in list_comp:
+                if original == original_inside and new != new_inside:
+                    raise RuntimeError("%s: Trying to promote '%s' when it has been aliased to "
+                                       "'%s'." % (self.msginfo, original_inside, new))
 
     def add(self, name, subsys, promotes=None):
         """
