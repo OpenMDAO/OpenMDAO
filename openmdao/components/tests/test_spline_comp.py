@@ -473,7 +473,7 @@ class SplineCompFeatureTestCase(unittest.TestCase):
 
         prob.model.add_subsystem('interp', comp)
 
-        comp.add_spline(y_cp_name='h_cp', y_interp_name='h', y_cp_val=x, y_units='km')
+        comp.add_spline(y_cp_name='h_cp', y_interp_name='h', y_cp_val=x, y_units=None)
 
         model.connect('px.x', 'interp.h_cp')
 
