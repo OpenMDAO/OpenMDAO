@@ -18,8 +18,6 @@ Backwards Incompatible API Changes:
   - The user is now requires to set a value for the solver option `solve_subsystems` 
     on Newton and Broyden solvers. Previously the default was `False`, but you will now get 
     a deprecation warning if this value is not explicitely set. 
-  - The default for linesearch for Newton and Broyden has been changed from `None` to `BoundsEnforceLS`
-
 
 
 - Specification of `includes` and `excludes` for solver case recording options 
