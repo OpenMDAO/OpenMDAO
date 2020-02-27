@@ -9,8 +9,6 @@ critical step in preparing for the OpenMDAO 3.X releases
 
 Backwards Incompatible API Changes: 
 -----------------------------------
-- <POEM 001> updated definition of light year to correct IAU definition 
-  (very minor change to unit conversions associated with this update)
 
 - <POEM 004> AkimaSplineComp and BsplineComp have been deprecated, replaced with SplineComp
 
