@@ -542,14 +542,7 @@ class Component(System):
             'tags': make_set(tags),
         }
 
-        if src_indices is None:
-            if distributed:
-                simple_warning("{}: Component is distributed but input '{}' was added without "
-                               "src_indices. Setting "
-                               "src_indices to range({}).".format(self.msginfo, name,
-                                                                  metadata['size']))
-                metadata['src_indices'] = np.arange(metadata['size'], dtype=INT_DTYPE)
-        else:
+        if src_indices is not None:
             metadata['src_indices'] = np.asarray(src_indices, dtype=INT_DTYPE)
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
@@ -829,6 +822,37 @@ class Component(System):
         var_rel2meta[name] = self._var_discrete['output'][name] = metadata
 
         return metadata
+
+    def _update_dist_src_indices(self, abs_in2out):
+        """
+        Set default src_indices on distributed components for any inputs where they aren't set.
+
+        Parameters
+        ----------
+        abs_in2out : dict
+            Mapping of connected inputs to their source.  Names are absolute.
+        """
+        if not self.options['distributed']:
+            return
+
+        iproc = self.comm.rank
+        abs2meta = self._var_abs2meta
+        sizes = np.zeros(self.comm.size, dtype=INT_DTYPE)
+        tmp = np.zeros(1, dtype=INT_DTYPE)
+
+        for iname in self._var_allprocs_abs_names['input']:
+            if iname in abs2meta and iname in abs_in2out:
+                if abs2meta[iname]['src_indices'] is None:
+                    metadata = abs2meta[iname]
+                    tmp[0] = metadata['size']
+                    self.comm.Allgather(tmp, sizes)
+                    offset = np.sum(sizes[:iproc])
+                    end = offset + sizes[iproc]
+                    simple_warning("{}: Component is distributed but input '{}' was added without "
+                                   "src_indices. Setting "
+                                   "src_indices to range({}, {}).".format(self.msginfo, iname,
+                                                                          offset, end))
+                    metadata['src_indices'] = np.arange(offset, end, dtype=INT_DTYPE)
 
     def _approx_partials(self, of, wrt, method='fd', **kwargs):
         """
