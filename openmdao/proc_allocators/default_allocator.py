@@ -1,6 +1,4 @@
 """Define the DefaultAllocator class."""
-from __future__ import division, print_function
-
 import warnings
 
 import numpy as np

@@ -1,7 +1,6 @@
 """
 A console script wrapper for multiple openmdao functions.
 """
-from __future__ import print_function
 
 import sys
 import os

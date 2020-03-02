@@ -1,8 +1,6 @@
 """
 Utils for dealing with arrays.
 """
-from __future__ import print_function, division
-
 import sys
 import six
 from six.moves import range

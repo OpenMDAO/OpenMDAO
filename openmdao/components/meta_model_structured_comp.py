@@ -1,6 +1,4 @@
 """Define the MetaModelStructured class."""
-from __future__ import division, print_function, absolute_import
-
 from six import raise_from, iteritems, itervalues
 from six.moves import range
 

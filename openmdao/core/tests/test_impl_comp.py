@@ -1,6 +1,4 @@
 """Simple example demonstrating how to implement an implicit component."""
-from __future__ import division
-
 import unittest
 
 from six import iteritems

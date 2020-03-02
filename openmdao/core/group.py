@@ -1,6 +1,4 @@
 """Define the Group class."""
-from __future__ import division
-
 import os
 from collections import Counter, OrderedDict, defaultdict
 

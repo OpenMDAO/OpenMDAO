@@ -4,7 +4,6 @@ A collection of utilities for file wrapping.
 Note: This is a work in progress.
 """
 
-from __future__ import print_function
 
 import re
 from six.moves import range
