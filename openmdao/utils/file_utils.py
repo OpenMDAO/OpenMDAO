@@ -247,4 +247,3 @@ def _run_test_func(mod, funcpath):
     else:
         funcname = parts[0]
         return getattr(mod, funcname)()
-
