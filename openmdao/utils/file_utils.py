@@ -154,7 +154,7 @@ def _to_filename(spec):
         The filename.
     """
     if ':' in spec and not os.path.isfile(spec):
-        fname, rest = spec.split(':', 1)
+        fname, rest = spec.rsplit(':', 1)
         if not fname.endswith('.py'):
             try:
                 mod = importlib.import_module(fname)
@@ -208,7 +208,7 @@ def _load_and_run_test(testspec):
     """
     syspath_save = sys.path[:]
 
-    modpath, funcpath = testspec.split(':')
+    modpath, funcpath = testspec.rsplit(':', 1)
 
     if modpath.endswith('.py'):
         modpath = get_module_path(modpath)
