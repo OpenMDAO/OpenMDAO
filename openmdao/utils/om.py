@@ -42,7 +42,7 @@ from openmdao.utils.coloring import _total_coloring_setup_parser, _total_colorin
     _view_coloring_setup_parser, _view_coloring_exec
 from openmdao.utils.scaffold import _scaffold_setup_parser, _scaffold_exec
 from openmdao.utils.general_utils import warn_deprecation
-from openmdao.utils.file_utils import _load_and_exec
+from openmdao.utils.file_utils import _load_and_exec, _to_filename
 from openmdao.utils.entry_points import _list_installed_setup_parser, _list_installed_cmd, \
     split_ep, _compute_entry_points_setup_parser, _compute_entry_points_exec, \
         _find_plugins_setup_parser, _find_plugins_exec
@@ -83,7 +83,7 @@ def _n2_cmd(options, user_args):
     user_args : list of str
         Command line options after '--' (if any).  Passed to user script.
     """
-    filename = options.file[0]
+    filename = _to_filename(options.file[0])
 
     if filename.endswith('.py'):
         # the file is a python script, run as a post_setup hook
@@ -95,7 +95,7 @@ def _n2_cmd(options, user_args):
 
         hooks._register_hook('final_setup', 'Problem', post=_viewmod)
 
-        _load_and_exec(filename, user_args)
+        _load_and_exec(options.file[0], user_args)
     else:
         # assume the file is a recording, run standalone
         n2(filename, outfile=options.outfile, title=options.title,
@@ -178,7 +178,7 @@ def _xdsm_cmd(options, user_args):
     user_args : list of str
         Command line options after '--' (if any).  Passed to user script.
     """
-    filename = options.file[0]
+    filename = _to_filename(options.file[0])
 
     kwargs = {}
     for name in ['box_stacking', 'box_width', 'box_lines', 'numbered_comps', 'number_alignment']:
@@ -205,7 +205,7 @@ def _xdsm_cmd(options, user_args):
 
         hooks._register_hook('setup', 'Problem', post=_xdsm)
 
-        _load_and_exec(filename, user_args)
+        _load_and_exec(options.file[0], user_args)
     else:
         # assume the file is a recording, run standalone
         write_xdsm(filename, filename=options.outfile, model_path=options.model_path,
@@ -524,11 +524,6 @@ def _cite_cmd(options, user_args):
         Command line options.
     user_args : list of str
         Args to be passed to the user script.
-
-    Returns
-    -------
-    function
-        The hook function.
     """
     if options.outfile is None:
         out = sys.stdout
