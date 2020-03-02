@@ -1,5 +1,4 @@
 """ Unit tests for the SqliteCaseReader. """
-from __future__ import print_function
 
 import errno
 import os
@@ -2546,9 +2545,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         model.add_subsystem('comp', ImplCompTwoStates())
         model.connect('px.x', 'comp.x')
 
-        model.nonlinear_solver = om.NewtonSolver()
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         model.nonlinear_solver.options['maxiter'] = 3
-        # model.nonlinear_solver.options['solve_subsystems'] = True
         model.nonlinear_solver.options['iprint'] = 2
         model.linear_solver = om.ScipyKrylov()
 

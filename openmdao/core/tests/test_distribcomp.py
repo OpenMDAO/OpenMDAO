@@ -1,4 +1,3 @@
-from __future__ import print_function
 
 import unittest
 import time
@@ -177,8 +176,8 @@ class DistribInputDistribOutputComp(om.ExplicitComponent):
         start = offsets[rank]
         end = start + sizes[rank]
 
-        self.add_input('invec', np.ones(sizes[rank], float),
-                       src_indices=np.arange(start, end, dtype=int))
+        # don't set src_indices on the input and just use default behavior
+        self.add_input('invec', np.ones(sizes[rank], float))
         self.add_output('outvec', np.ones(sizes[rank], float))
 
 

@@ -1,6 +1,4 @@
 """Simple example demonstrating how to implement an implicit component."""
-from __future__ import division
-
 import unittest
 
 from io import StringIO
@@ -486,7 +484,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
         model.connect('p.c', 'fn.c')
         model.connect('comp.x', 'fn.x')
 
-        model.nonlinear_solver = om.NewtonSolver()
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         model.nonlinear_solver.options['rtol'] = 1e-12
         model.nonlinear_solver.options['atol'] = 1e-12
         model.nonlinear_solver.options['maxiter'] = 15
@@ -531,7 +529,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
         group.connect('px.x', 'comp1.x')
         group.connect('comp1.y', 'comp2.x')
 
-        group.nonlinear_solver = om.NewtonSolver()
+        group.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         group.nonlinear_solver.options['maxiter'] = 1
 
         prob = om.Problem(model=group)
@@ -574,7 +572,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
 
         group.add_subsystem('sub', sub)
 
-        group.nonlinear_solver = om.NewtonSolver()
+        group.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         group.nonlinear_solver.options['maxiter'] = 1
 
         prob = om.Problem(model=group)
@@ -617,7 +615,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
 
         group.add_subsystem('sub', sub)
 
-        sub.nonlinear_solver = om.NewtonSolver()
+        sub.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         sub.nonlinear_solver.options['maxiter'] = 1
 
         prob = om.Problem(model=group)
@@ -672,7 +670,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
 
         model.add_subsystem('comp', ImpWithInitial())
 
-        model.nonlinear_solver = om.NewtonSolver()
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         model.linear_solver = om.ScipyKrylov()
 
         prob.setup()
@@ -699,7 +697,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
         group.connect('px.x', 'comp1.x')
         group.connect('comp1.y', 'comp2.x')
 
-        group.nonlinear_solver = om.NewtonSolver()
+        group.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         group.nonlinear_solver.options['maxiter'] = 1
 
         prob = om.Problem(model=group)
@@ -731,7 +729,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
         group.connect('px.x', 'comp1.x')
         group.connect('comp1.y', 'comp2.x')
 
-        group.nonlinear_solver = om.NewtonSolver()
+        group.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         group.nonlinear_solver.options['maxiter'] = 1
 
         prob = om.Problem(model=group)
@@ -763,7 +761,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
         group.connect('px.x', 'comp1.x')
         group.connect('comp1.y', 'comp2.x')
 
-        group.nonlinear_solver = om.NewtonSolver()
+        group.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         group.nonlinear_solver.options['maxiter'] = 1
 
         prob = om.Problem(model=group)
@@ -1326,7 +1324,7 @@ class ListFeatureTestCase(unittest.TestCase):
         model.connect('d1.y1', 'd2.y1')
         model.connect('d2.y2', 'd1.y2')
 
-        model.nonlinear_solver = om.NewtonSolver()
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         model.nonlinear_solver.options['maxiter'] = 5
         model.linear_solver = om.ScipyKrylov()
         model.linear_solver.precon = om.LinearBlockGS()

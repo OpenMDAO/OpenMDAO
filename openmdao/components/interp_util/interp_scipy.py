@@ -1,5 +1,4 @@
 """Grid interpolation using scipy splines."""
-from __future__ import division, print_function, absolute_import
 
 from scipy import __version__ as scipy_version
 try:

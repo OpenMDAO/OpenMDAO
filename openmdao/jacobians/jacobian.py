@@ -1,5 +1,4 @@
 """Define the base Jacobian class."""
-from __future__ import division
 import weakref
 
 import numpy as np

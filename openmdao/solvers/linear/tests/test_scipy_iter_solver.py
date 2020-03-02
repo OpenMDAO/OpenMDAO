@@ -1,7 +1,5 @@
 """Test the ScipyKrylov linear solver class."""
 
-from __future__ import division, print_function
-
 import unittest
 
 import numpy as np
@@ -370,7 +368,7 @@ class TestScipyKrylovFeature(unittest.TestCase):
         model.connect('sub2.q2.x', 'sub2.z2.x')
         model.connect('sub2.z2.y', 'sub1.q1.c')
 
-        model.nonlinear_solver = om.NewtonSolver()
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         model.linear_solver = om.ScipyKrylov()
 
         prob.setup()

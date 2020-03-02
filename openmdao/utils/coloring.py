@@ -1,8 +1,6 @@
 """
 Routines to compute coloring for use with simultaneous derivatives.
 """
-from __future__ import division, print_function
-
 import os
 import sys
 import time

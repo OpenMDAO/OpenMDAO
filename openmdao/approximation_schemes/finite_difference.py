@@ -1,6 +1,4 @@
 """Finite difference derivative approximations."""
-from __future__ import division, print_function
-
 from collections import namedtuple, defaultdict
 
 import numpy as np

@@ -2,8 +2,6 @@
     Optimize locations of Legendre-Gauss-Lobatto points to match a sine curve.
 """
 
-from __future__ import print_function, division, absolute_import
-
 import numpy as np
 
 import openmdao.api as om

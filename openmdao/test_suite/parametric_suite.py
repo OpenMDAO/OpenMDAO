@@ -1,5 +1,3 @@
-from __future__ import division, print_function
-
 import itertools
 import collections
 
@@ -161,7 +159,8 @@ class ParameterizedInstance(object):
         self.problem = None
         self.solver_class = NewtonSolver
         self.solver_options = {
-            'maxiter': 100
+            'maxiter': 100,
+            'solve_subsystems': False
         }
 
         self.linear_solver_class = ScipyKrylov

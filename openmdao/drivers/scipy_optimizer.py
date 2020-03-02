@@ -2,7 +2,6 @@
 OpenMDAO Wrapper for the scipy.optimize.minimize family of local optimizers.
 """
 
-from __future__ import print_function
 
 import sys
 from collections import OrderedDict

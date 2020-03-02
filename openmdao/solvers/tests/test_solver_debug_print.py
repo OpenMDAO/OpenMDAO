@@ -1,9 +1,5 @@
 """Tests the `debug_print` option for Nonlinear solvers."""
 
-from __future__ import division, print_function
-
-from io import StringIO
-
 import os
 import re
 import sys
@@ -12,6 +8,7 @@ import tempfile
 
 import unittest
 from distutils.version import LooseVersion
+from io import StringIO
 
 import numpy as np
 
@@ -168,7 +165,7 @@ class TestNonlinearSolvers(unittest.TestCase):
 
         p.setup()
 
-        nl = model.circuit.nonlinear_solver = om.NewtonSolver()
+        nl = model.circuit.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
 
         nl.options['iprint'] = 2
         nl.options['debug_print'] = True

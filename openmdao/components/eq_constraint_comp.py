@@ -1,7 +1,5 @@
 """Define the EQConstraintComp class."""
 
-from __future__ import print_function, division, absolute_import
-
 from numbers import Number
 
 import numpy as np

@@ -272,7 +272,7 @@ class TestJacobian(unittest.TestCase):
         top.connect('indep.a', 'C2.w', src_indices=[0,2,1])
         top.connect('C1.f', 'C2.z', src_indices=[1])
 
-        top.nonlinear_solver = NewtonSolver()
+        top.nonlinear_solver = NewtonSolver(solve_subsystems=False)
         top.nonlinear_solver.linear_solver = ScipyKrylov(maxiter=100)
         top.linear_solver = ScipyKrylov(
             maxiter=200, atol=1e-10, rtol=1e-10, assemble_jac=True)
@@ -474,7 +474,7 @@ class TestJacobian(unittest.TestCase):
         c2 = prob.model.add_subsystem('C2', ExecComp('d=a*2.0+b+c', a=0., b=0., c=0., d=0.))
         c3 = prob.model.add_subsystem('C3', ExecComp('ee=a*2.0', a=0., ee=0.))
 
-        prob.model.nonlinear_solver = NewtonSolver()
+        prob.model.nonlinear_solver = NewtonSolver(solve_subsystems=False)
         prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
         prob.model.connect('indep.x', 'C1.a')
@@ -497,7 +497,7 @@ class TestJacobian(unittest.TestCase):
         G1.add_subsystem('C1', ExecComp('y=2.0*x*x'))
         G1.add_subsystem('C2', ExecComp('y=3.0*x*x'))
 
-        prob.model.nonlinear_solver = NewtonSolver()
+        prob.model.nonlinear_solver = NewtonSolver(solve_subsystems=False)
         G1.linear_solver = DirectSolver(assemble_jac=True)
 
         # before the fix, we got bad offsets into the _ext_mtx matrix.
@@ -525,11 +525,11 @@ class TestJacobian(unittest.TestCase):
         G1.add_subsystem('C1', ExecComp('y=2.0*x*x'))
         G1.add_subsystem('C2', ExecComp('y=3.0*x*x'))
 
-        # prob.model.nonlinear_solver = NewtonSolver()
+        # prob.model.nonlinear_solver = NewtonSolver(solve_subsystems=False)
         prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
         G1.linear_solver = DirectSolver(assemble_jac=True)
-        G1.nonlinear_solver = NewtonSolver()
+        G1.nonlinear_solver = NewtonSolver(solve_subsystems=False)
 
         # before the fix, we got bad offsets into the _ext_mtx matrix.
         # to get entries in _ext_mtx, there must be at least one connection

@@ -1,6 +1,4 @@
 """Base class used to define the interface for derivative approximation schemes."""
-from __future__ import print_function, division
-
 from collections import defaultdict
 from scipy.sparse import coo_matrix
 import numpy as np

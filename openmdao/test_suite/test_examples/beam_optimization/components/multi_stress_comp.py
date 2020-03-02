@@ -5,8 +5,6 @@ Simple calculation of beam bending stress assuming small angular displacments.
 Vectorized for multiple load cases.
 """
 
-from __future__ import division
-
 import numpy as np
 
 import openmdao.api as om

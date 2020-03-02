@@ -1,6 +1,4 @@
 """Define the Group class."""
-from __future__ import division
-
 import os
 from collections import Counter, OrderedDict, defaultdict
 
@@ -878,15 +876,29 @@ class Group(System):
             # (not traceable to a connect statement, so provide context)
             if (prom_out not in allprocs_prom2abs_list_out and
                     prom_out not in self._var_allprocs_discrete['output']):
-                raise NameError(
-                    "%s: Output '%s' does not exist for connection in '%s' from '%s' to '%s'." %
-                    (self.msginfo, prom_out, self.pathname, prom_out, prom_in))
+                if (prom_out in allprocs_prom2abs_list_in or
+                        prom_out in self._var_allprocs_discrete['input']):
+                    raise NameError(
+                        "%s: Attempted to connect from '%s' to '%s', but '%s' is an input. "
+                        "All connections must be from an output to an input." %
+                        (self.msginfo, prom_out, prom_in, prom_out))
+                else:
+                    raise NameError(
+                        "%s: Attempted to connect from '%s' to '%s', but '%s' doesn't exist." %
+                        (self.msginfo, prom_out, prom_in, prom_out))
 
             if (prom_in not in allprocs_prom2abs_list_in and
                     prom_in not in self._var_allprocs_discrete['input']):
-                raise NameError(
-                    "%s: Input '%s' does not exist for connection from '%s' to '%s'." %
-                    (self.msginfo, prom_in, prom_out, prom_in))
+                if (prom_in in allprocs_prom2abs_list_out or
+                        prom_in in self._var_allprocs_discrete['output']):
+                    raise NameError(
+                        "%s: Attempted to connect from '%s' to '%s', but '%s' is an output. "
+                        "All connections must be from an output to an input." %
+                        (self.msginfo, prom_out, prom_in, prom_in))
+                else:
+                    raise NameError(
+                        "%s: Attempted to connect from '%s' to '%s', but '%s' doesn't exist." %
+                        (self.msginfo, prom_out, prom_in, prom_in))
 
             # Throw an exception if output and input are in the same system
             # (not traceable to a connect statement, so provide context)
@@ -928,12 +940,16 @@ class Group(System):
 
         # Recursion
         if recurse:
-            for subsys in self._subgroups_myproc:
-                if subsys.name in new_conns:
-                    subsys._setup_global_connections(recurse=recurse,
-                                                     conns=new_conns[subsys.name])
-                else:
-                    subsys._setup_global_connections(recurse=recurse)
+            distcomps = []
+            for subsys in self._subsystems_myproc:
+                if isinstance(subsys, Group):
+                    if subsys.name in new_conns:
+                        subsys._setup_global_connections(recurse=recurse,
+                                                         conns=new_conns[subsys.name])
+                    else:
+                        subsys._setup_global_connections(recurse=recurse)
+                elif subsys.options['distributed'] and subsys.comm.size > 1:
+                    distcomps.append(subsys)
 
         # Compute global_abs_in2out by first adding this group's contributions,
         # then adding contributions from systems above/below, then allgathering.
@@ -968,6 +984,10 @@ class Group(System):
 
             for myproc_global_abs_in2out in gathered:
                 global_abs_in2out.update(myproc_global_abs_in2out)
+
+            if recurse:
+                for comp in distcomps:
+                    comp._update_dist_src_indices(global_abs_in2out)
 
     def _setup_connections(self, recurse=True):
         """
@@ -1191,15 +1211,17 @@ class Group(System):
                             # when running under MPI, there is a value for each proc
                             d_size = out_shape[d] * self.comm.size
                             if src_indices.size > 0:
-                                for i in src_indices[..., d].flat:
-                                    if abs(i) >= d_size:
-                                        msg = ("%s: The source indices do not specify "
-                                               "a valid index for the connection "
-                                               "'%s' to '%s'. Index "
-                                               "'%d' is out of range for source "
-                                               "dimension of size %d.")
-                                        raise ValueError(msg % (self.msginfo, abs_out, abs_in, i,
-                                                                d_size))
+                                arr = src_indices[..., d]
+                                if np.any(arr >= d_size) or np.any(arr <= -d_size):
+                                    for i in arr.flat:
+                                        if abs(i) >= d_size:
+                                            msg = ("%s: The source indices do not specify "
+                                                   "a valid index for the connection "
+                                                   "'%s' to '%s'. Index "
+                                                   "'%d' is out of range for source "
+                                                   "dimension of size %d.")
+                                            raise ValueError(msg % (self.msginfo, abs_out, abs_in,
+                                                                    i, d_size))
 
     def _transfer(self, vec_name, mode, isub=None):
         """
@@ -1359,6 +1381,42 @@ class Group(System):
         self._vector_class.TRANSFER._setup_transfers(self, recurse=recurse)
         if self._conn_discrete_in2out:
             self._vector_class.TRANSFER._setup_discrete_transfers(self, recurse=recurse)
+
+    def promotes(self, subsys_name, any=None, inputs=None, outputs=None):
+        """
+        Promote a variable in the model tree.
+
+        Parameters
+        ----------
+        subsys_name : str
+            The name of the child subsystem whose inputs/outputs are being promoted.
+        any : Sequence of str or tuple
+            A Sequence of variable names (or tuples) to be promoted, regardless
+            of if they are inputs or outputs. This is equivalent to the items
+            passed via the `promotes=` argument to add_subsystem.  If given as a
+            tuple, we use the "promote as" standard of ('real name', 'promoted name')*[]:
+        inputs : Sequence of str or tuple
+            A Sequence of input names (or tuples) to be promoted. Tuples are
+            used for the "promote as" capability.
+        outputs : Sequence of str or tuple
+            A Sequence of output names (or tuples) to be promoted. Tuples are
+            used for the "promote as" capability.
+        """
+        subsys = getattr(self, subsys_name)
+        if any:
+            subsys._var_promotes['any'].extend(any)
+        if inputs:
+            subsys._var_promotes['input'].extend(inputs)
+        if outputs:
+            subsys._var_promotes['output'].extend(outputs)
+
+        list_comp = [i if isinstance(i, tuple) else (i, i) for i in subsys._var_promotes['input']]
+
+        for original, new in list_comp:
+            for original_inside, new_inside in list_comp:
+                if original == original_inside and new != new_inside:
+                    raise RuntimeError("%s: Trying to promote '%s' when it has been aliased to "
+                                       "'%s'." % (self.msginfo, original_inside, new))
 
     def add(self, name, subsys, promotes=None):
         """

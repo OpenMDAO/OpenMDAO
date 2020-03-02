@@ -1,6 +1,4 @@
 """Define the base Vector and Transfer classes."""
-from __future__ import division, print_function
-
 from copy import deepcopy
 import os
 import weakref

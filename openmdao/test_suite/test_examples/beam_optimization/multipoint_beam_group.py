@@ -3,8 +3,6 @@ This is a multipoint implementation of the beam optimization problem.
 
 
 """
-from __future__ import division
-
 import numpy as np
 
 import openmdao.api as om

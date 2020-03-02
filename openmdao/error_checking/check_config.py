@@ -1,5 +1,4 @@
 """A module containing various configuration checks for an OpenMDAO Problem."""
-from __future__ import print_function
 
 from collections import defaultdict
 from distutils.version import LooseVersion

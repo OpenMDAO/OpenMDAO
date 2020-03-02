@@ -1,7 +1,5 @@
 """Define the base Solver, NonlinearSolver, and LinearSolver classes."""
 
-from __future__ import division, print_function
-
 from collections import OrderedDict
 import os
 import pprint
@@ -693,7 +691,14 @@ class NonlinearSolver(Solver):
             system._transfer('nonlinear', 'fwd', isub)
 
             if local:
-                subsys._solve_nonlinear()
+
+                try:
+                    subsys._solve_nonlinear()
+                except AnalysisError:
+                    exc = sys.exc_info()
+                    if 'reraise_child_analysiserror' not in self.options or \
+                            self.options['reraise_child_analysiserror']:
+                        raise AnalysisError(exc[1])
 
             system._check_child_reconf(subsys)
 

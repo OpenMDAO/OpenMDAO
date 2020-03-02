@@ -1,7 +1,5 @@
 """Define the BalanceComp class."""
 
-from __future__ import print_function, division, absolute_import
-
 from types import FunctionType
 from numbers import Number
 

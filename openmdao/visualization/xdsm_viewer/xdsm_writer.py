@@ -14,7 +14,6 @@ The pyXDSM package is available at https://github.com/mdolab/pyXDSM.
 XDSMjs is available at https://github.com/OneraHub/XDSMjs.
 """
 
-from __future__ import print_function
 
 import json
 import os

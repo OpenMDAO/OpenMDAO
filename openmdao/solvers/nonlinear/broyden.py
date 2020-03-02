@@ -3,8 +3,6 @@ Define the BroydenSolver class.
 
 Based on implementation in Scipy via OpenMDAO 0.8x with improvements based on NPSS solver.
 """
-from __future__ import print_function
-
 import numpy as np
 
 from openmdao.recorders.recording_iteration_stack import Recording
@@ -13,6 +11,7 @@ from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import simple_warning, warn_deprecation
 from openmdao.utils.mpi import MPI
 from openmdao.vectors.vector import INT_DTYPE
+
 
 CITATION = """@ARTICLE{
               Broyden1965ACo,
@@ -131,6 +130,10 @@ class BroydenSolver(NonlinearSolver):
                              desc="Flag controls whether to perform Broyden update to the "
                                   "Jacobian. There are some applications where it may be useful "
                                   "to turn this off.")
+        self.options.declare('reraise_child_analysiserror', types=bool, default=True,
+                             desc='When the option is true, a solver will reraise any '
+                             'AnalysisError that arises during subsolve; when false, it will '
+                             'continue solving.')
 
         self.supports['gradients'] = True
         self.supports['implicit_components'] = True
@@ -151,7 +154,18 @@ class BroydenSolver(NonlinearSolver):
         self._computed_jacobians = 0
         iproc = system.comm.rank
 
+        rank = MPI.COMM_WORLD.rank if MPI is not None else 0
         self._disallow_discrete_outputs()
+
+        if self.options._dict['reraise_child_analysiserror']['value']:
+            pathname = self._system().pathname
+            if pathname:
+                pathname += ': '
+            msg = ("Deprecation warning: In V 3.x, reraise_child_analysiserror will default to "
+                   "False.")
+
+            if rank == 0:
+                warn_deprecation(pathname + msg)
 
         if self.linear_solver is not None:
             self.linear_solver._setup_solvers(system, self._depth + 1)

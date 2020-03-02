@@ -3,8 +3,6 @@ Interpolate using am Akima spline.
 
 Based on NPSS implementation, with improvements from Andrew Ning (BYU).
 """
-from __future__ import division, print_function, absolute_import
-
 import numpy as np
 
 from openmdao.components.interp_util.interp_algorithm import InterpAlgorithm

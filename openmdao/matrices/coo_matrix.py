@@ -1,6 +1,4 @@
 """Define the COOmatrix class."""
-from __future__ import division, print_function
-
 from collections import Counter, defaultdict
 import numpy as np
 from numpy import ndarray

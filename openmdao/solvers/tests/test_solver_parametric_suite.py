@@ -1,7 +1,5 @@
 """Runs a parametric test over several of the linear solvers."""
 
-from __future__ import division, print_function
-
 import numpy as np
 import unittest
 
@@ -48,7 +46,7 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
         """
         for jac in [None, 'csc', 'dense']:
             prob = Problem(model=ImplComp4Test())
-            prob.model.nonlinear_solver = NewtonSolver()
+            prob.model.nonlinear_solver = NewtonSolver(solve_subsystems=False)
             if jac in ('csc', 'dense'):
                 prob.model.options['assembled_jac_type'] = jac
             prob.model.linear_solver = DirectSolver(assemble_jac=jac in ('csc','dense'))

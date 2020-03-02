@@ -1,7 +1,6 @@
 """
 Various functions to make it easier to build test models.
 """
-from __future__ import print_function
 
 import time
 import numpy

@@ -1,4 +1,3 @@
-from __future__ import print_function, division, absolute_import
 import unittest
 
 import numpy as np
@@ -97,7 +96,7 @@ class Circuit(om.Group):
         self.connect('R2.I', 'n2.I_in:0')
         self.connect('D1.I', 'n2.I_out:0')
 
-        self.nonlinear_solver = om.NewtonSolver()
+        self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         self.nonlinear_solver.options['iprint'] = 2
         self.nonlinear_solver.options['maxiter'] = 20
         self.linear_solver = om.DirectSolver()

@@ -477,8 +477,7 @@ precision. Consider a variable with 15 digits of precision.
 ::
 
     >>> # Python 3 compatibility
-    >>> from __future__ import print_function
-    >>> val = 3.1415926535897932
+    >>>     >>> val = 3.1415926535897932
     >>>
     >>> val
     3.141592653589793...

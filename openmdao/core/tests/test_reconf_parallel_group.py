@@ -1,4 +1,3 @@
-from __future__ import division
 import numpy as np
 import unittest
 
@@ -23,7 +22,7 @@ class ReconfGroup(Group):
     def setup(self):
         self._mpi_proc_allocator.parallel = self.parallel
         if self.parallel:
-            self.nonlinear_solver = NewtonSolver()
+            self.nonlinear_solver = NewtonSolver(solve_subsystems=False)
             self.linear_solver = PETScKrylov()
         else:
             self.nonlinear_solver = NonlinearBlockGS()

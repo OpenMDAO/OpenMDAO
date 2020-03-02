@@ -1,6 +1,4 @@
 """ Unit tests for the design_variable and response interface to system."""
-from __future__ import print_function
-
 import unittest
 
 import numpy as np

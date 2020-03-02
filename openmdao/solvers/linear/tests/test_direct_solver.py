@@ -1,7 +1,5 @@
 """Test the DirectSolver linear solver class."""
 
-from __future__ import division, print_function
-
 import unittest
 
 import numpy as np
@@ -147,7 +145,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
     def test_rev_mode_bug(self):
 
         prob = om.Problem()
-        prob.model = SellarDerivatives(nonlinear_solver=om.NewtonSolver(),
+        prob.model = SellarDerivatives(nonlinear_solver=om.NewtonSolver(solve_subsystems=False),
                                        linear_solver=om.DirectSolver())
 
         prob.setup(check=False, mode='rev')
@@ -596,7 +594,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
                 self.add_subsystem('calcs', RectifierCalcs(), promotes=['P_out', ('V_out', 'Vm_dc')])
 
-                self.nonlinear_solver = om.NewtonSolver()
+                self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
                 self.linear_solver = om.DirectSolver()
 
         prob = om.Problem()

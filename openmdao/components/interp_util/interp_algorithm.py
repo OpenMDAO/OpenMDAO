@@ -1,8 +1,6 @@
 """
 Base class for interpolation methods.  New methods should inherit from this class.
 """
-from __future__ import division, print_function, absolute_import
-
 from openmdao.utils.options_dictionary import OptionsDictionary
 
 

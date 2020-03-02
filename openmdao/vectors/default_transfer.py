@@ -1,7 +1,5 @@
 """Define the default Transfer class."""
 
-from __future__ import division
-
 from itertools import product, chain
 from collections import defaultdict
 

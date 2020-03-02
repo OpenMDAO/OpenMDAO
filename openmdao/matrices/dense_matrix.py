@@ -1,5 +1,4 @@
 """Define the DenseMatrix class."""
-from __future__ import division, print_function
 import numpy as np
 from numpy import ndarray
 

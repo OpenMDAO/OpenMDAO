@@ -1,6 +1,4 @@
 """Some miscellaneous utility functions."""
-from __future__ import division
-
 from contextlib import contextmanager
 import os
 import re

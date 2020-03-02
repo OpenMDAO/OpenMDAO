@@ -3,7 +3,6 @@ Interpolate using a cubic spline polynomial.
 
 Based on NPSS implementation.
 """
-from __future__ import division, print_function, absolute_import
 
 import numpy as np
 
