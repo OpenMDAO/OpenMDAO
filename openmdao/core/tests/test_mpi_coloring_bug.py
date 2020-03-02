@@ -5,6 +5,14 @@ import numpy as np
 import openmdao.api as om
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.general_utils import set_pyoptsparse_opt
+
+
+# check that pyoptsparse is installed
+OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
+
+if OPTIMIZER:
+    from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
 
 class TrajDesignParameterOptionsDictionary(om.OptionsDictionary):
@@ -462,23 +470,23 @@ def make_traj():
     return traj
 
 
-class ColoringOnly(om.pyOptSparseDriver):
-
-    def run(self):
-        """
-        Color the model.
-        """
-        if coloring_mod._use_total_sparsity:
-            if self._coloring_info['coloring'] is None and self._coloring_info['dynamic']:
-                coloring_mod.dynamic_total_coloring(self, run_model=True,
-                                                    fname=self._get_total_coloring_fname())
-                self._setup_tot_jac_sparsity()
-
-
+@unittest.skipUnless(OPTIMIZER, "This test requires pyOptSparseDriver.")
 class TestMPIColoringBug(unittest.TestCase):
     N_PROCS = 2
 
     def test_bug(self):
+        class ColoringOnly(om.pyOptSparseDriver):
+
+            def run(self):
+                """
+                Color the model.
+                """
+                if coloring_mod._use_total_sparsity:
+                    if self._coloring_info['coloring'] is None and self._coloring_info['dynamic']:
+                        coloring_mod.dynamic_total_coloring(self, run_model=True,
+                                                            fname=self._get_total_coloring_fname())
+                        self._setup_tot_jac_sparsity()
+
         p = om.Problem()
 
         p.driver = ColoringOnly()
