@@ -26,15 +26,16 @@ To install the latest release, run `pip install --update openmdao`.
 
 **OpenMDAO 2.10.x** is the last version to support Python2.x and will
 only receive bug fixes going forward.
-To install this older release, run `pip install openmdao<3`.
+To install this older release, run `pip install "openmdao<3"`
+(the quotes around `openmdao<3` are required).
 
 > **PLEASE NOTE**: This repository was previously named **OpenMDAO/blue**. 
 If you had cloned that repository, please update your repository name and
 remotes to reflect these changes. You can find instructions [here][8].
 
 The **OpenMDAO 1.7.4** code repository is now named **OpenMDAO1**, and has moved
-[here][5]. To install it, run: `pip install "openmdao<2"` (the quotes around 
-`openmdao<2` are required). 
+[here][5]. To install it, run: `pip install "openmdao<2"`
+(the quotes around `openmdao<2` are required).
 
 The legacy **OpenMDAO v0.x** (versions 0.13.0 and older) of the 
 **OpenMDAO-Framework** are [here][6].
