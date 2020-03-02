@@ -1,7 +1,5 @@
 """Define the Component class."""
 
-from __future__ import division
-
 from collections import OrderedDict, Counter, defaultdict
 
 # note: this is a Python 3.3 change, clean this up for OpenMDAO 3.x

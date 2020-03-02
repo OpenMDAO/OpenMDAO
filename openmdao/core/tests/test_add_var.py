@@ -1,5 +1,4 @@
 """Acceptance and developer tests for add_input and add_output."""
-from __future__ import division
 import unittest
 
 import numpy as np

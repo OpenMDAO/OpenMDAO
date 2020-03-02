@@ -5,7 +5,6 @@ Simple calculation of beam bending stress assuming small angular displacments.
 Vectorized for multiple load cases.
 """
 
-from __future__ import division
 from six.moves import range
 
 import numpy as np

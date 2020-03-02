@@ -1,6 +1,4 @@
 """Define the base System class."""
-from __future__ import division
-
 import sys
 import os
 from contextlib import contextmanager

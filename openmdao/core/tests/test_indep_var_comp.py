@@ -1,6 +1,4 @@
 """IndepVarComp tests used in the IndepVarComp feature doc."""
-from __future__ import division
-
 import unittest
 
 import openmdao.api as om

@@ -1,4 +1,3 @@
-from __future__ import division
 import unittest
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp

@@ -1,6 +1,4 @@
 """Define the LinearSystemComp class."""
-from __future__ import division, print_function
-
 from six.moves import range
 
 import numpy as np

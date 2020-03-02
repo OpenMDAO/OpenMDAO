@@ -1,7 +1,5 @@
 """Define the scipy iterative solver class."""
 
-from __future__ import division, print_function
-
 from distutils.version import LooseVersion
 import numpy as np
 import scipy

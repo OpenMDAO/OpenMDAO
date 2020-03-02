@@ -44,6 +44,7 @@ class BM(unittest.TestCase):
     def benchmark_comp200_var5_nlbs_lbgs(self):
         suite = _build(
             solver_class=om.NonlinearBlockGS, linear_solver_class=om.LinearBlockGS,
+            solver_options={'maxiter': 100},
             assembled_jac=False,
             jacobian_type='dense',
             connection_type='explicit',

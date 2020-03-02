@@ -1,7 +1,6 @@
 """
 Utilities for working with files.
 """
-from __future__ import print_function
 
 import sys
 import os

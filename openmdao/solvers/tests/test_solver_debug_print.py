@@ -1,7 +1,5 @@
 """Tests the `debug_print` option for Nonlinear solvers."""
 
-from __future__ import division, print_function
-
 from six import StringIO
 
 import os

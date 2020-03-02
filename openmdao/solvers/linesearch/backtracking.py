@@ -5,7 +5,6 @@ BoundsEnforceLS - Only checks bounds and enforces them by one of three methods.
 ArmijoGoldsteinLS -- Like above, but terminates with the ArmijoGoldsteinLS condition.
 
 """
-from __future__ import print_function
 
 import sys
 import numpy as np

@@ -1,6 +1,4 @@
 """Define the explicit test component (simple)."""
-from __future__ import division, print_function
-
 import scipy.sparse
 
 from openmdao.core.explicitcomponent import ExplicitComponent

@@ -12,9 +12,6 @@ environment:
     - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
       PYTHON: 3
 
-    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
-      PYTHON: 2
-
     # - APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu
     #   PYTHON: 3
     #   PETSc: 3.12

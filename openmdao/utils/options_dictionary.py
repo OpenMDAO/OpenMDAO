@@ -1,6 +1,4 @@
 """Define the OptionsDictionary class."""
-from __future__ import division, print_function
-
 from six import iteritems, string_types
 
 # unique object to check if default is given
