@@ -9,9 +9,6 @@ in Scientific Python, by Konrad Hinsen. Modifications by
 Justin Gray.
 """
 
-from __future__ import division, print_function
-
-
 import sys
 
 import re

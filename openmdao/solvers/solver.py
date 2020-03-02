@@ -1,7 +1,5 @@
 """Define the base Solver, NonlinearSolver, and LinearSolver classes."""
 
-from __future__ import division, print_function
-
 from six import iteritems, reraise
 from collections import OrderedDict
 import os

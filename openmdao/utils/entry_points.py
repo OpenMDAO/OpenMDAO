@@ -1,7 +1,6 @@
 """
 Various functions for working with entry points.
 """
-from __future__ import print_function
 
 import sys
 import traceback

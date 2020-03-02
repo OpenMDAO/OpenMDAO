@@ -1,8 +1,6 @@
 """
 Test the B-spline interpolation component.
 """
-from __future__ import print_function
-
 import unittest
 
 import numpy as np

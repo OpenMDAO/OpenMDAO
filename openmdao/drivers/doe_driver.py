@@ -1,7 +1,6 @@
 """
 Design-of-Experiments Driver.
 """
-from __future__ import print_function
 
 import traceback
 import inspect

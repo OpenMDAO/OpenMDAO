@@ -1,8 +1,6 @@
 """
 Test DOE Driver and Generators.
 """
-from __future__ import print_function, division
-
 import unittest
 
 import os

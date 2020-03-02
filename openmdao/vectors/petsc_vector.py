@@ -1,6 +1,4 @@
 """Define the PETSc Vector classe."""
-from __future__ import division
-
 import sys
 import numpy as np
 from petsc4py import PETSc

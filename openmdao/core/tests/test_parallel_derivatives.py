@@ -1,6 +1,5 @@
 """ Test out some specialized parallel derivatives features"""
 
-from __future__ import print_function
 
 from six.moves import cStringIO as StringIO
 import sys

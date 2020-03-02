@@ -1,8 +1,6 @@
 """
 Helper class for total jacobian computation.
 """
-from __future__ import print_function, division
-
 from collections import OrderedDict, defaultdict
 from copy import deepcopy
 import pprint

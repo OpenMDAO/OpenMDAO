@@ -1,7 +1,6 @@
 """
 Unit and feature doc tests for partial derivative specifiation.
 """
-from __future__ import print_function, division
 import itertools
 import unittest
 from six import iteritems

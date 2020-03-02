@@ -1,7 +1,5 @@
 """LinearSolver that uses linalg.solve or LU factor/solve."""
 
-from __future__ import division, print_function
-
 import sys
 import warnings
 from six import reraise, PY2

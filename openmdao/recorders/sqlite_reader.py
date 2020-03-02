@@ -1,8 +1,6 @@
 """
 Definition of the SqliteCaseReader.
 """
-from __future__ import print_function, absolute_import
-
 import sqlite3
 from collections import OrderedDict
 

@@ -1,7 +1,5 @@
 """Test N2 with MPI and more than one process."""
 
-from __future__ import division, print_function
-
 import os
 import unittest
 import openmdao.api as om
