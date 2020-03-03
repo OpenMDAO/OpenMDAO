@@ -3,6 +3,7 @@ build: off
 branches:
   only:
     - master
+    - 2.10
 
 environment:
   matrix:
