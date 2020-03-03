@@ -1,6 +1,7 @@
 branches:
   only:
   - master
+  - 2.10
 
 sudo: false
 
