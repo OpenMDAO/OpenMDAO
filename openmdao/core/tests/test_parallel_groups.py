@@ -414,6 +414,60 @@ class MatMatParDevTestCase(unittest.TestCase):
         np.testing.assert_array_equal(J['par.C2.y', 'indeps.y'], np.array([[3.]]))
 
 
+class ExComp(om.ExplicitComponent):
+    def initialize(self):
+        self.options.declare('num_nodes', types=int)
+
+    def setup(self):
+        nn = self.options['num_nodes']
+        # Inputs
+        self.add_input('accel', val=np.zeros(nn))
+        self.add_output('deltav_dot', val=np.zeros(nn))
+        # Setup partials
+        ar = np.arange(self.options['num_nodes'])
+        self.declare_partials(of='deltav_dot', wrt='accel', rows=ar, cols=ar, val=1.0)
+
+    def compute(self, inputs, outputs):
+        outputs['deltav_dot'] = inputs['accel']
+
+
+class SubGroup(om.Group):
+    def __init__(self, size, **kwargs):
+        super(SubGroup, self).__init__(**kwargs)
+        self.size = size
+
+    def setup(self):
+        ivc = om.IndepVarComp()
+        ivc.add_output('accel', val=np.ones(self.size))
+        self.add_subsystem('rhs', ivc)
+        self.add_subsystem('ode', ExComp(num_nodes=self.size))
+        self.connect('rhs.accel', 'ode.accel')
+        self.add_design_var('rhs.accel', 3.0)
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestParallelJacBug(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def test_par_jac_bug(self):
+
+        p = om.Problem()
+        model = p.model
+        par = model.add_subsystem('par', om.ParallelGroup())
+        par.add_subsystem('p1', SubGroup(1))
+        par.add_subsystem('p2', SubGroup(1))
+        p.setup(mode='rev')
+        p.run_model()
+        J1 = p.driver._compute_totals(of=['par.p1.ode.deltav_dot'], wrt=['par.p1.ode.deltav_dot'],
+                                      return_format='array')
+        Jsave = J1.copy()
+        J2 = p.driver._compute_totals(of=['par.p1.ode.deltav_dot'], wrt=['par.p1.ode.deltav_dot'],
+                                      return_format='array')
+
+        self.assertLess(np.max(np.abs(J2 - Jsave)), 1e-20)
+
+
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests
     mpirun_tests()

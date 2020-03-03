@@ -357,7 +357,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
 
         self.assertFalse(failed, "Optimization failed.")
 
-        self.assertTrue('In mode: fwd, Solving variable(s):' in output)
+        self.assertTrue('In mode: fwd, Solving variable(s) using simul coloring:' in output)
         self.assertTrue("('indeps.y', [1, 3, 5, 7, 9])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
@@ -372,7 +372,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
 
         self.assertFalse(failed, "Optimization failed.")
 
-        self.assertTrue('In mode: rev, Solving variable(s):' in output)
+        self.assertTrue('In mode: rev, Solving variable(s) using simul coloring:' in output)
         self.assertTrue("('r_con.g', [0])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
@@ -966,7 +966,7 @@ class SimulColoringVarOutputTestClass(unittest.TestCase):
 
         self.assertFalse(failed, "Optimization failed.")
 
-        self.assertTrue('In mode: fwd, Solving variable(s):' in output)
+        self.assertTrue('In mode: fwd, Solving variable(s) using simul coloring:' in output)
         self.assertTrue("('indep0.x', [7])" in output)
         self.assertTrue("('indep1.x', [7])" in output)
         self.assertTrue("('indep2.x', [7])" in output)
