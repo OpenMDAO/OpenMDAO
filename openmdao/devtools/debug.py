@@ -451,7 +451,8 @@ def trace_mpi(fname='mpi_trace', skip=(), flush=True):
             print('   ' * len(stack), typestr, "%s.%s.%s" %
                     (c.__module__, c.__name__, arg.__name__),
                     "%s:%d" % (frame.f_code.co_filename, frame.f_code.co_firstlineno),
-                    file=outfile, flush=True)
+                    file=outfile)
+            outfile.flush()
 
 
     def _mpi_trace_callback(frame, event, arg):
@@ -473,12 +474,15 @@ def trace_mpi(fname='mpi_trace', skip=(), flush=True):
                 if pname is not None:
                     if not stack or pname != stack[-1][0]:
                         stack.append([pname, 1])
-                        print('   ' * len(stack), commsize, pname, file=outfile, flush=flush)
+                        print('   ' * len(stack), commsize, pname, file=outfile)
+                        outfile.flush()
                     else:
                         stack[-1][1] += 1
                 print('   ' * len(stack), '-->', frame.f_code.co_name, "%s:%d" %
                       (frame.f_code.co_filename, frame.f_code.co_firstlineno),
-                      file=outfile, flush=flush)
+                      file=outfile)
+                outfile.flush()
+
         elif event == 'return':
             if 'openmdao' in frame.f_code.co_filename:
                 if frame.f_code.co_name in skip:
@@ -494,14 +498,17 @@ def trace_mpi(fname='mpi_trace', skip=(), flush=True):
                         pass
                 print('   ' * len(stack), '<--', frame.f_code.co_name, "%s:%d" %
                       (frame.f_code.co_filename, frame.f_code.co_firstlineno),
-                      file=outfile, flush=flush)
+                      file=outfile)
+                outfile.flush()
+
                 if pname is not None and stack and pname == stack[-1][0]:
                     stack[-1][1] -= 1
                     if stack[-1][1] < 1:
                         stack.pop()
                         if stack:
-                            print('   ' * len(stack), commsize, stack[-1][0], file=outfile,
-                                  flush=flush)
+                            print('   ' * len(stack), commsize, stack[-1][0], file=outfile)
+                            outfile.flush()
+
         else:
             _print_c_func(frame, arg, _c_map[event])
 
