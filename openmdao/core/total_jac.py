@@ -1343,7 +1343,8 @@ class _TotalJacInfo(object):
                             model._solve_linear(model._lin_vec_names, mode, rel_systems)
 
                     if debug_print:
-                        print('Elapsed Time:', time.time() - t0, '\n', flush=True)
+                        print('Elapsed Time:', time.time() - t0, '\n')
+                        sys.stdio.flush()
 
                     jac_setter(inds, mode)
 
