@@ -294,7 +294,7 @@ class ArmijoGoldsteinLS(LinesearchSolver):
 
                 else:
                     exc = sys.exc_info()
-                    raise exc
+                    raise AnalysisError(exc[1])
 
             finally:
                 self._solver_info.pop()
@@ -394,7 +394,7 @@ class ArmijoGoldsteinLS(LinesearchSolver):
                         rec.rel = np.nan
 
                     else:
-                        raise sys.exc_info()
+                        raise AnalysisError(sys.exc_info()[1])
 
             # self._mpi_print(self._iter_count, norm, norm / norm0)
             self._mpi_print(self._iter_count, phi, self.alpha)

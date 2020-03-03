@@ -280,7 +280,7 @@ class DirectSolver(LinearSolver):
                     if 'exactly singular' in str(err):
                         raise RuntimeError(format_singular_csc_error(system, matrix))
                     else:
-                        raise sys.exc_info()
+                        raise RuntimeError(sys.exc_info()[1])
 
             elif isinstance(matrix, np.ndarray):  # dense
                 # During LU decomposition, detect singularities and warn user.
@@ -372,7 +372,7 @@ class DirectSolver(LinearSolver):
                     if 'exactly singular' in str(err):
                         raise RuntimeError(format_singular_csc_error(system, matrix))
                     else:
-                        raise sys.exc_info()
+                        raise RuntimeError(sys.exc_info()[1])
 
                 # to prevent broadcasting errors later, make sure inv_jac is 2D
                 # scipy.sparse.linalg.inv returns a shape (1,) array if matrix is shape (1,1)

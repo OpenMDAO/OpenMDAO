@@ -535,7 +535,7 @@ def run_model(prob, ignore_exception=False):
         prob.run_model()
     except Exception:
         if not ignore_exception:
-            raise sys.exc_info()
+            raise Exception(sys.exc_info()[1])
     finally:
         sys.stdout = stdout
 
