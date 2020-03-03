@@ -68,7 +68,7 @@ class CounterGroup(om.Group):
 
 
 # note: size must be an even number
-SIZE = 10
+sz = 10
 
 
 class DynPartialsComp(om.ExplicitComponent):
@@ -94,7 +94,7 @@ class DynPartialsComp(om.ExplicitComponent):
 
 def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True,
             recorder=None, has_lin_constraint=True, has_diag_partials=True, partial_coloring=False,
-            **options):
+            sz=10, **options):
 
     p = om.Problem(model=CounterGroup())
 
@@ -113,29 +113,29 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True
     indeps.add_output('r', .7)
 
     if partial_coloring:
-        arctan_yox = DynPartialsComp(SIZE)
+        arctan_yox = DynPartialsComp(sz)
     else:
         arctan_yox = om.ExecComp('g=arctan(y/x)', has_diag_partials=has_diag_partials,
-                                 g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE))
+                                 g=np.ones(sz), x=np.ones(sz), y=np.ones(sz))
 
     p.model.add_subsystem('arctan_yox', arctan_yox)
 
     p.model.add_subsystem('circle', om.ExecComp('area=pi*r**2'))
 
     p.model.add_subsystem('r_con', om.ExecComp('g=x**2 + y**2 - r', has_diag_partials=has_diag_partials,
-                                               g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)))
+                                               g=np.ones(sz), x=np.ones(sz), y=np.ones(sz)))
 
-    thetas = np.linspace(0, np.pi/4, SIZE)
+    thetas = np.linspace(0, np.pi/4, sz)
     p.model.add_subsystem('theta_con', om.ExecComp('g = x - theta', has_diag_partials=has_diag_partials,
-                                                   g=np.ones(SIZE), x=np.ones(SIZE),
+                                                   g=np.ones(sz), x=np.ones(sz),
                                                    theta=thetas))
     p.model.add_subsystem('delta_theta_con', om.ExecComp('g = even - odd', has_diag_partials=has_diag_partials,
-                                                         g=np.ones(SIZE//2), even=np.ones(SIZE//2),
-                                                         odd=np.ones(SIZE//2)))
+                                                         g=np.ones(sz//2), even=np.ones(sz//2),
+                                                         odd=np.ones(sz//2)))
 
-    p.model.add_subsystem('l_conx', om.ExecComp('g=x-1', has_diag_partials=has_diag_partials, g=np.ones(SIZE), x=np.ones(SIZE)))
+    p.model.add_subsystem('l_conx', om.ExecComp('g=x-1', has_diag_partials=has_diag_partials, g=np.ones(sz), x=np.ones(sz)))
 
-    IND = np.arange(SIZE, dtype=int)
+    IND = np.arange(sz, dtype=int)
     ODD_IND = IND[1::2]  # all odd indices
     EVEN_IND = IND[0::2]  # all even indices
 
@@ -487,7 +487,7 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         import numpy as np
         import openmdao.api as om
 
-        SIZE = 10
+        sz = 10
 
         p = om.Problem()
 
@@ -502,24 +502,24 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         indeps.add_output('r', .7)
 
         p.model.add_subsystem('arctan_yox', om.ExecComp('g=arctan(y/x)', has_diag_partials=True,
-                                                        g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)))
+                                                        g=np.ones(sz), x=np.ones(sz), y=np.ones(sz)))
 
         p.model.add_subsystem('circle', om.ExecComp('area=pi*r**2'))
 
         p.model.add_subsystem('r_con', om.ExecComp('g=x**2 + y**2 - r', has_diag_partials=True,
-                                                   g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)))
+                                                   g=np.ones(sz), x=np.ones(sz), y=np.ones(sz)))
 
-        thetas = np.linspace(0, np.pi/4, SIZE)
+        thetas = np.linspace(0, np.pi/4, sz)
         p.model.add_subsystem('theta_con', om.ExecComp('g = x - theta', has_diag_partials=True,
-                                                       g=np.ones(SIZE), x=np.ones(SIZE),
+                                                       g=np.ones(sz), x=np.ones(sz),
                                                        theta=thetas))
         p.model.add_subsystem('delta_theta_con', om.ExecComp('g = even - odd', has_diag_partials=True,
-                                                             g=np.ones(SIZE//2), even=np.ones(SIZE//2),
-                                                             odd=np.ones(SIZE//2)))
+                                                             g=np.ones(sz//2), even=np.ones(sz//2),
+                                                             odd=np.ones(sz//2)))
 
-        p.model.add_subsystem('l_conx', om.ExecComp('g=x-1', has_diag_partials=True, g=np.ones(SIZE), x=np.ones(SIZE)))
+        p.model.add_subsystem('l_conx', om.ExecComp('g=x-1', has_diag_partials=True, g=np.ones(sz), x=np.ones(sz)))
 
-        IND = np.arange(SIZE, dtype=int)
+        IND = np.arange(sz, dtype=int)
         ODD_IND = IND[1::2]  # all odd indices
         EVEN_IND = IND[0::2]  # all even indices
 
@@ -587,7 +587,7 @@ class SimulColoringScipyTestCase(unittest.TestCase):
                 self.num_computes += 1
 
 
-        SIZE = 10
+        sz = 10
 
         p = om.Problem()
 
@@ -603,25 +603,25 @@ class SimulColoringScipyTestCase(unittest.TestCase):
 
         ########################################################################
         # DynamicPartialsComp is set up to do dynamic partial coloring
-        arctan_yox = p.model.add_subsystem('arctan_yox', DynamicPartialsComp(SIZE))
+        arctan_yox = p.model.add_subsystem('arctan_yox', DynamicPartialsComp(sz))
         ########################################################################
 
         p.model.add_subsystem('circle', om.ExecComp('area=pi*r**2'))
 
         p.model.add_subsystem('r_con', om.ExecComp('g=x**2 + y**2 - r', has_diag_partials=True,
-                                                   g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)))
+                                                   g=np.ones(sz), x=np.ones(sz), y=np.ones(sz)))
 
-        thetas = np.linspace(0, np.pi/4, SIZE)
+        thetas = np.linspace(0, np.pi/4, sz)
         p.model.add_subsystem('theta_con', om.ExecComp('g = x - theta', has_diag_partials=True,
-                                                       g=np.ones(SIZE), x=np.ones(SIZE),
+                                                       g=np.ones(sz), x=np.ones(sz),
                                                        theta=thetas))
         p.model.add_subsystem('delta_theta_con', om.ExecComp('g = even - odd', has_diag_partials=True,
-                                                             g=np.ones(SIZE//2), even=np.ones(SIZE//2),
-                                                             odd=np.ones(SIZE//2)))
+                                                             g=np.ones(sz//2), even=np.ones(sz//2),
+                                                             odd=np.ones(sz//2)))
 
-        p.model.add_subsystem('l_conx', om.ExecComp('g=x-1', has_diag_partials=True, g=np.ones(SIZE), x=np.ones(SIZE)))
+        p.model.add_subsystem('l_conx', om.ExecComp('g=x-1', has_diag_partials=True, g=np.ones(sz), x=np.ones(sz)))
 
-        IND = np.arange(SIZE, dtype=int)
+        IND = np.arange(sz, dtype=int)
         ODD_IND = IND[1::2]  # all odd indices
         EVEN_IND = IND[0::2]  # all even indices
 
