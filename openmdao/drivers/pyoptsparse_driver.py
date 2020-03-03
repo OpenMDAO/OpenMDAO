@@ -617,7 +617,7 @@ class pyOptSparseDriver(Driver):
             # Exceptions seem to be swallowed by the C code, so this
             # should give the user more info than the dreaded "segfault"
             print("Exception: %s" % str(msg))
-            print(70 * "=", tb, 70 * "=")
+            print(70 * "=", tb, 70 * "=", flush=True)
             sens_dict = {}
 
         # print("Derivatives calculated")

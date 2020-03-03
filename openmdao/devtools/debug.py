@@ -15,10 +15,11 @@ from six.moves import zip_longest
 from openmdao.core.problem import Problem
 from openmdao.core.group import Group, System
 from openmdao.core.implicitcomponent import ImplicitComponent
-from openmdao.utils.mpi import MPI
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.approximation_schemes.complex_step import ComplexStep
+from openmdao.utils.mpi import MPI
 from openmdao.utils.name_maps import abs_key2rel_key, rel_key2abs_key
+from openmdao.utils.general_utils import simple_warning
 
 # an object used to detect when a named value isn't found
 _notfound = object()
@@ -425,7 +426,8 @@ def trace_mpi(fname='mpi_trace', skip=(), flush=True):
         If True, flush print buffer after every print call.
     """
     if MPI is None:
-        raise RuntimeError("MPI is not active.  Trace aborted.")
+        simple_warning("MPI is not active.  Trace aborted.")
+        return
     if sys.getprofile() is not None:
         raise RuntimeError("another profile function is already active.")
 
