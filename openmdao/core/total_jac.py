@@ -1344,7 +1344,7 @@ class _TotalJacInfo(object):
 
                     if debug_print:
                         print('Elapsed Time:', time.time() - t0, '\n')
-                        sys.stdio.flush()
+                        sys.stdout.flush()
 
                     jac_setter(inds, mode)
 
