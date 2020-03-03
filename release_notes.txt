@@ -1,7 +1,19 @@
 ################################################################################################
+Release Notes for OpenMDAO 2.10.1
+
+March 3, 2020
+
+2.10.1 is a bug fix release to correct the following issue:
+
+Bug Fixes:
+----------
+- bug fix for corner case when computing derivatives in reverse mode with MPI and total derivative coloring
+
+
+################################################################################################
 Release Notes for OpenMDAO 2.10.0
 
-February 25, 2020
+February 27, 2020
 
 Note: This is the last release of OpenMDAO 2.X. Updating to this release will be a 
 critical step in preparing for the OpenMDAO 3.X releases
