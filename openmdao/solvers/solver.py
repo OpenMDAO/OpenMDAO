@@ -602,7 +602,6 @@ class NonlinearSolver(Solver):
         try:
             self._solve()
         except Exception as err:
-            exc = sys.exc_info()
             if self.options['debug_print']:
                 self._print_exc_debug_info()
             raise err
@@ -694,11 +693,10 @@ class NonlinearSolver(Solver):
 
                 try:
                     subsys._solve_nonlinear()
-                except AnalysisError:
-                    exc = sys.exc_info()
+                except AnalysisError as err:
                     if 'reraise_child_analysiserror' not in self.options or \
                             self.options['reraise_child_analysiserror']:
-                        raise AnalysisError(exc[1])
+                        raise err
 
             system._check_child_reconf(subsys)
 
