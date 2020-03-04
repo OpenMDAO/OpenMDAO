@@ -36,8 +36,6 @@ class IndepVarComp(ExplicitComponent):
         name : str or None
             name of the variable.
             If None, variables should be defined external to this class by calling add_output.
-            For backwards compatibility with OpenMDAO v1, this can also be a list of tuples
-            in the case of declaring multiple variables at once.
         val : float or ndarray
             value of the variable if a single variable is being defined.
         **kwargs : dict
