@@ -1,7 +1,5 @@
 """Finite difference derivative approximations."""
 from collections import namedtuple, defaultdict
-from six import iteritems
-from six.moves import range, zip
 
 import numpy as np
 

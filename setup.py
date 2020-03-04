@@ -159,7 +159,6 @@ setup(
         'pyDOE2',
         'pyparsing',
         'scipy',
-        'six',
         'requests'
     ],
     entry_points={

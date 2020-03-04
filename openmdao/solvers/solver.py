@@ -1,6 +1,5 @@
 """Define the base Solver, NonlinearSolver, and LinearSolver classes."""
 
-from six import iteritems, reraise
 from collections import OrderedDict
 import os
 import pprint
@@ -592,11 +591,10 @@ class NonlinearSolver(Solver):
         """
         try:
             self._solve()
-        except Exception:
-            exc = sys.exc_info()
+        except Exception as err:
             if self.options['debug_print']:
                 self._print_exc_debug_info()
-            reraise(*exc)
+            raise err
 
     def _iter_initialize(self):
         """
@@ -656,7 +654,7 @@ class NonlinearSolver(Solver):
         coord = self._recording_iter.get_formatted_iteration_coordinate()
 
         out_strs = ["\n# Inputs and outputs at start of iteration '%s':\n" % coord]
-        for vec_type, views in iteritems(self._err_cache):
+        for vec_type, views in self._err_cache.items():
             out_strs.append('\n# nonlinear %s\n' % vec_type)
             out_strs.append(pprint.pformat(views))
             out_strs.append('\n')
@@ -685,11 +683,10 @@ class NonlinearSolver(Solver):
 
                 try:
                     subsys._solve_nonlinear()
-                except AnalysisError:
-                    exc = sys.exc_info()
+                except AnalysisError as err:
                     if 'reraise_child_analysiserror' not in self.options or \
                             self.options['reraise_child_analysiserror']:
-                        reraise(*exc)
+                        raise err
 
             system._check_child_reconf(subsys)
 

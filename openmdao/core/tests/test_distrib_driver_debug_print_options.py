@@ -1,7 +1,7 @@
 import os
 import sys
 import unittest
-from six import StringIO
+from io import StringIO
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ParallelGroup
 from openmdao.utils.general_utils import set_pyoptsparse_opt

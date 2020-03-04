@@ -1,8 +1,6 @@
 """Definition of the Demux Component."""
 
 
-from six import iteritems
-
 import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent
@@ -75,7 +73,7 @@ class DemuxComp(ExplicitComponent):
         opts = self.options
         vec_size = opts['vec_size']
 
-        for var, options in iteritems(self._vars):
+        for var, options in self._vars.items():
             kwgs = dict(options)
             shape = options['shape']
             size = np.prod(shape)

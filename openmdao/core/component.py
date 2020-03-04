@@ -9,7 +9,6 @@ except ImportError:
     from collections import Iterable
 
 from itertools import product
-from six import string_types, iteritems, itervalues
 
 import numpy as np
 from numpy import ndarray, isscalar, atleast_1d, atleast_2d, promote_types
@@ -217,7 +216,7 @@ class Component(System):
         # wasn't.  If declare partials wasn't called, call it with of='*' and wrt='*' so we'll
         # have something to color.
         if self._coloring_info['coloring'] is not None:
-            for key, meta in iteritems(self._declared_partials):
+            for key, meta in self._declared_partials.items():
                 if 'method' in meta and meta['method'] is not None:
                     break
             else:
@@ -275,7 +274,7 @@ class Component(System):
                 # Compute abs2meta
                 abs2meta[abs_name] = metadata
 
-            for prom_name, val in iteritems(self._var_discrete[type_]):
+            for prom_name, val in self._var_discrete[type_].items():
                 abs_name = prefix + prom_name
 
                 # Compute allprocs_abs_names_discrete
@@ -372,7 +371,7 @@ class Component(System):
         self._subjacs_info = {}
         self._jacobian = DictionaryJacobian(system=self)
 
-        for key, dct in iteritems(self._declared_partials):
+        for key, dct in self._declared_partials.items():
             of, wrt = key
             self._declare_partials(of, wrt, dct)
 
@@ -415,9 +414,9 @@ class Component(System):
         """
         # sparsity uses relative names, so we need to convert to absolute
         pathname = self.pathname
-        for of, sub in iteritems(sparsity):
+        for of, sub in sparsity.items():
             of_abs = '.'.join((pathname, of)) if pathname else of
-            for wrt, tup in iteritems(sub):
+            for wrt, tup in sub.items():
                 wrt_abs = '.'.join((pathname, wrt)) if pathname else wrt
                 abs_key = (of_abs, wrt_abs)
                 if abs_key in self._subjacs_info:
@@ -932,7 +931,7 @@ class Component(System):
                 # Check for repeated rows/cols indices.
                 idxset = set(zip(rows, cols))
                 if len(rows) - len(idxset) > 0:
-                    dups = [n for n, val in iteritems(Counter(zip(rows, cols))) if val > 1]
+                    dups = [n for n, val in Counter(zip(rows, cols)).items() if val > 1]
                     raise RuntimeError("{}: d({})/d({}): declare_partials has been called "
                                        "with rows and cols that specify the following duplicate "
                                        "subjacobian entries: {}.".format(self.msginfo, of, wrt,
@@ -1071,7 +1070,7 @@ class Component(System):
             msg = "{}: The value of 'step_calc' must be one of {}, but '{}' was specified."
             raise ValueError(msg.format(self.msginfo, supported_step_calc, step_calc))
 
-        if not isinstance(wrt, (string_types, list, tuple)):
+        if not isinstance(wrt, (str, list, tuple)):
             msg = "{}: The value of 'wrt' must be a string or list of strings, but a type " \
                   "of '{}' was provided."
             raise ValueError(msg.format(self.msginfo, type(wrt).__name__))
@@ -1081,7 +1080,7 @@ class Component(System):
                   "of '{}' was provided."
             raise ValueError(msg.format(self.msginfo, type(directional).__name__))
 
-        wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
+        wrt_list = [wrt] if isinstance(wrt, str) else wrt
         self._declared_partial_checks.append((wrt_list, method, form, step, step_calc,
                                               directional))
 
@@ -1281,8 +1280,8 @@ class Component(System):
             where of_matches is a list of tuples (pattern, matches) and wrt_matches is a list of
             tuples (pattern, output_matches, input_matches).
         """
-        of_list = [of] if isinstance(of, string_types) else of
-        wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
+        of_list = [of] if isinstance(of, str) else of
+        wrt_list = [wrt] if isinstance(wrt, str) else wrt
         of, wrt = self._get_potential_partials_lists()
 
         of_pattern_matches = [(pattern, find_matches(pattern, of)) for pattern in of_list]

@@ -1,6 +1,4 @@
 """Define the MetaModelStructured class."""
-from six import raise_from, iteritems, itervalues
-from six.moves import range
 
 import numpy as np
 
@@ -147,7 +145,7 @@ class MetaModelStructuredComp(ExplicitComponent):
         opts = {}
         if 'interp_options' in self.options:
             opts = self.options['interp_options']
-        for name, train_data in iteritems(self.training_outputs):
+        for name, train_data in self.training_outputs.items():
             self.interps[name] = InterpND(method=interp_method,
                                           points=self.params, values=train_data,
                                           extrapolate=self.options['extrapolate'])
@@ -198,7 +196,7 @@ class MetaModelStructuredComp(ExplicitComponent):
             unscaled, dimensional output variables read via outputs[key]
         """
         pt = np.array([inputs[pname].flatten() for pname in self.pnames]).T
-        for out_name, interp in iteritems(self.interps):
+        for out_name, interp in self.interps.items():
             if self.options['training_data_gradients']:
                 # Training point values may have changed every time we compute.
                 interp.values = inputs["%s_train" % out_name]
@@ -213,7 +211,7 @@ class MetaModelStructuredComp(ExplicitComponent):
                     "was out of bounds ('{}', '{}') with " \
                     "value '{}'".format(self.msginfo, out_name, varname_causing_error,
                                         err.lower, err.upper, err.value)
-                raise_from(AnalysisError(errmsg), None)
+                raise AnalysisError(errmsg)
 
             except ValueError as err:
                 raise ValueError("{}: Error interpolating output '{}':\n{}".format(self.msginfo,
@@ -238,7 +236,7 @@ class MetaModelStructuredComp(ExplicitComponent):
         """
         pt = np.array([inputs[pname].flatten() for pname in self.pnames]).T
 
-        for out_name, interp in iteritems(self.interps):
+        for out_name, interp in self.interps.items():
             dval = interp.gradient(pt).T
             for i, p in enumerate(self.pnames):
                 partials[out_name, p] = dval[i, :]

@@ -7,10 +7,8 @@ from itertools import product, chain
 
 import numpy as np
 from contextlib import contextmanager
-from six import iteritems, iterkeys, itervalues
 from collections import Counter
 
-from six.moves import zip_longest
 from openmdao.core.problem import Problem
 from openmdao.core.group import Group, System
 from openmdao.core.implicitcomponent import ImplicitComponent
@@ -185,7 +183,7 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True, show_approx=T
         if show_approx and s._approx_schemes:
             approx_keys = set()
             keys = set()
-            for k, sjac in iteritems(s._subjacs_info):
+            for k, sjac in s._subjacs_info.items():
                 if 'method' in sjac and sjac['method']:
                     approx_keys.add(k)
                 else:
@@ -280,7 +278,7 @@ def config_summary(problem, stream=sys.stdout):
         con_nonlin_ineq = {}
         con_linear_eq = {}
         con_linear_ineq = {}
-        for con, vals in iteritems(model.get_constraints()):
+        for con, vals in model.get_constraints().items():
             if vals['linear']:
                 if vals['equals'] is not None:
                     con_linear_eq[con] = vals

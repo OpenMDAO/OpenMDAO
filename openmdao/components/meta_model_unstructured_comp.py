@@ -1,6 +1,4 @@
 """MetaModel provides basic meta modeling capability."""
-from six import iteritems
-from six.moves import range
 from copy import deepcopy
 from itertools import chain, product
 
@@ -273,7 +271,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         # Support for user declaring fd partials in a child class and assigning new defaults.
         # We want a warning for all partials that were not explicitly declared.
         declared_partials = set([
-            key for key, dct in iteritems(self._subjacs_info) if 'method' in dct
+            key for key, dct in self._subjacs_info.items() if 'method' in dct
             and dct['method']])
 
         # Gather undeclared fd partials on surrogates that don't support analytic derivatives.

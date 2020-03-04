@@ -8,7 +8,6 @@ ArmijoGoldsteinLS -- Like above, but terminates with the ArmijoGoldsteinLS condi
 
 import sys
 import numpy as np
-from six import iteritems, reraise
 
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.solvers.solver import NonlinearSolver
@@ -28,7 +27,7 @@ def _print_violations(unknowns, lower, upper):
     upper : <Vector>
         Vector containing the upper bounds.
     """
-    for name, val in iteritems(unknowns._views_flat):
+    for name, val in unknowns._views_flat.items():
         if any(val > upper._views_flat[name]):
             print("'%s' exceeds upper bounds" % name)
             print("  Val:", val)
@@ -247,8 +246,7 @@ class ArmijoGoldsteinLS(LinesearchSolver):
             if self.options['retry_on_analysis_error']:
                 self._analysis_error_raised = True
             else:
-                exc = sys.exc_info()
-                reraise(*exc)
+                raise err
 
             phi = np.nan
 
@@ -294,8 +292,7 @@ class ArmijoGoldsteinLS(LinesearchSolver):
                     self._analysis_error_raised = True
 
                 else:
-                    exc = sys.exc_info()
-                    reraise(*exc)
+                    raise err
 
             finally:
                 self._solver_info.pop()
@@ -395,8 +392,7 @@ class ArmijoGoldsteinLS(LinesearchSolver):
                         rec.rel = np.nan
 
                     else:
-                        exc = sys.exc_info()
-                        reraise(*exc)
+                        raise err
 
             # self._mpi_print(self._iter_count, norm, norm / norm0)
             self._mpi_print(self._iter_count, phi, self.alpha)

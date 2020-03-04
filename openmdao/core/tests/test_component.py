@@ -2,9 +2,6 @@
 import numpy as np
 import unittest
 
-from six.moves import range
-from six import assertRaisesRegex
-
 from openmdao.api import Problem, ExplicitComponent, Group, IndepVarComp
 from openmdao.core.component import Component
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimple
@@ -53,31 +50,31 @@ class TestExplicitComponent(unittest.TestCase):
 
         msg = "Incompatible shape for '.*': Expected (.*) but got (.*)"
 
-        with assertRaisesRegex(self, ValueError, msg):
+        with self.assertRaisesRegex(ValueError, msg):
             comp.add_output('arr', val=np.ones((2, 2)), shape=([2]))
 
-        with assertRaisesRegex(self, ValueError, msg):
+        with self.assertRaisesRegex(ValueError, msg):
             comp.add_input('arr', val=np.ones((2, 2)), shape=([2]))
 
         msg = "Shape of indices does not match shape for '.*': Expected (.*) but got (.*)"
 
-        with assertRaisesRegex(self, ValueError, msg):
+        with self.assertRaisesRegex(ValueError, msg):
             comp.add_input('arr', val=np.ones((2, 2)), src_indices=[0, 1])
 
         msg = ("The shape argument should be an int, tuple, or list "
                "but a '<(.*) 'numpy.ndarray'>' was given")
-        with assertRaisesRegex(self, TypeError, msg):
+        with self.assertRaisesRegex(TypeError, msg):
             comp.add_output('arr', shape=np.array([2.]))
 
-        with assertRaisesRegex(self, TypeError, msg):
+        with self.assertRaisesRegex(TypeError, msg):
             comp.add_input('arr', shape=np.array([2.]))
 
         msg = ("The shape argument should be an int, tuple, or list "
                "but a '<(.*) 'float'>' was given")
-        with assertRaisesRegex(self, TypeError, msg):
+        with self.assertRaisesRegex(TypeError, msg):
             comp.add_output('arr', shape=2.)
 
-        with assertRaisesRegex(self, TypeError, msg):
+        with self.assertRaisesRegex(TypeError, msg):
             comp.add_input('arr', shape=2.)
 
         # check that a numpy integer type is accepted for shape
@@ -88,49 +85,49 @@ class TestExplicitComponent(unittest.TestCase):
         msg = 'The val argument should be a float, list, tuple, ndarray or Iterable'
         val = Component
 
-        with assertRaisesRegex(self, TypeError, msg):
+        with self.assertRaisesRegex(TypeError, msg):
             comp.add_input('x', val=val)
 
-        with assertRaisesRegex(self, TypeError, msg):
+        with self.assertRaisesRegex(TypeError, msg):
             comp.add_output('x', val=val)
 
         msg = 'The src_indices argument should be an int, list, tuple, ndarray or Iterable'
         src = Component
 
-        with assertRaisesRegex(self, TypeError, msg):
+        with self.assertRaisesRegex(TypeError, msg):
             comp.add_input('x', val=np.ones((2, 2)), src_indices=src)
 
         msg = 'The units argument should be a str or None'
         units = Component
 
-        with assertRaisesRegex(self, TypeError, msg):
+        with self.assertRaisesRegex(TypeError, msg):
             comp.add_input('x', val=np.ones((2, 2)), units=units)
 
-        with assertRaisesRegex(self, TypeError, msg):
+        with self.assertRaisesRegex(TypeError, msg):
             comp.add_output('x', val=np.ones((2, 2)), units=units)
 
         msg = 'The ref argument should be a float, list, tuple, ndarray or Iterable'
         val = Component
 
-        with assertRaisesRegex(self, TypeError, msg):
+        with self.assertRaisesRegex(TypeError, msg):
             comp.add_output('x', val=5.0, ref=val)
 
         msg = 'The ref0 argument should be a float, list, tuple, ndarray or Iterable'
         val = Component
 
-        with assertRaisesRegex(self, TypeError, msg):
+        with self.assertRaisesRegex(TypeError, msg):
             comp.add_output('x', val=5.0, ref0=val)
 
         msg = 'The res_ref argument should be a float, list, tuple, ndarray or Iterable'
         val = Component
 
-        with assertRaisesRegex(self, TypeError, msg):
+        with self.assertRaisesRegex(TypeError, msg):
             comp.add_output('x', val=5.0, res_ref=val)
 
         msg = 'The res_units argument should be a str or None'
         units = Component
 
-        with assertRaisesRegex(self, TypeError, msg):
+        with self.assertRaisesRegex(TypeError, msg):
             comp.add_output('x', val=5.0, res_units=val)
 
     def test_invalid_name(self):
@@ -232,7 +229,7 @@ class TestExplicitComponent(unittest.TestCase):
         model.connect('px.x', 'comp.x')
 
         msg = "Variable name 'x' already exists."
-        with assertRaisesRegex(self, ValueError, msg):
+        with self.assertRaisesRegex(ValueError, msg):
             prob.setup()
 
         class Comp(ExplicitComponent):
@@ -249,7 +246,7 @@ class TestExplicitComponent(unittest.TestCase):
         model.connect('px.x', 'comp.x')
 
         msg = "Variable name 'y' already exists."
-        with assertRaisesRegex(self, ValueError, msg):
+        with self.assertRaisesRegex(ValueError, msg):
             prob.setup()
 
         class Comp(ExplicitComponent):
@@ -266,7 +263,7 @@ class TestExplicitComponent(unittest.TestCase):
         model.connect('px.x', 'comp.x')
 
         msg = "Variable name 'x' already exists."
-        with assertRaisesRegex(self, ValueError, msg):
+        with self.assertRaisesRegex(ValueError, msg):
             prob.setup()
 
         # Make sure we can reconfigure.

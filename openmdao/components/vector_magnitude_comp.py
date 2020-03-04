@@ -1,8 +1,6 @@
 """Definition of the Vector Magnitude Component."""
 
 
-from six import string_types
-
 import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent
@@ -27,11 +25,11 @@ class VectorMagnitudeComp(ExplicitComponent):
                              desc='The number of points at which the vector magnitude is computed')
         self.options.declare('length', types=int, default=3,
                              desc='The length of the input vector at each point')
-        self.options.declare('in_name', types=string_types, default='a',
+        self.options.declare('in_name', types=str, default='a',
                              desc='The variable name for input vector.')
-        self.options.declare('units', types=string_types, default=None, allow_none=True,
+        self.options.declare('units', types=str, default=None, allow_none=True,
                              desc='The units for vector a.')
-        self.options.declare('mag_name', types=string_types, default='a_mag',
+        self.options.declare('mag_name', types=str, default='a_mag',
                              desc='The variable name for output vector magnitude.')
 
     def setup(self):

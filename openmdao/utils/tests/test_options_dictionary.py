@@ -4,8 +4,6 @@ import unittest
 
 from openmdao.utils.assert_utils import assert_warning
 
-from six import assertRegex
-
 from openmdao.core.explicitcomponent import ExplicitComponent
 
 
@@ -205,7 +203,7 @@ class TestOptionsDict(unittest.TestCase):
 
         expected_msg = ("Value \(<object object at 0x[0-9A-Fa-f]+>\) of option 'test' is not one of \[<object object at 0x[0-9A-Fa-f]+>,"
                         " <object object at 0x[0-9A-Fa-f]+>\].")
-        assertRegex(self, str(context.exception), expected_msg)
+        self.assertRegex(str(context.exception), expected_msg)
 
     def test_read_only(self):
         opt = OptionsDictionary(read_only=True)
@@ -215,7 +213,7 @@ class TestOptionsDict(unittest.TestCase):
             opt['permanent'] = 4.0
 
         expected_msg = ("Tried to set read-only option 'permanent'.")
-        assertRegex(self, str(context.exception), expected_msg)
+        self.assertRegex(str(context.exception), expected_msg)
 
     def test_bounds(self):
         self.dict.declare('x', default=1.0, lower=0.0, upper=2.0)

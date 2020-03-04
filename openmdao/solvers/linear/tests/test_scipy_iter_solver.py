@@ -1,6 +1,5 @@
 """Test the ScipyKrylov linear solver class."""
 
-from six import iteritems
 import unittest
 
 import numpy as np

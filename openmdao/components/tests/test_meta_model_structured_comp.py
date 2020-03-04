@@ -2,7 +2,6 @@
 Unit tests for the structured metamodel component.
 """
 import unittest
-from six import assertRaisesRegex
 
 import numpy as np
 from numpy.testing import assert_almost_equal
@@ -521,7 +520,7 @@ class TestMetaModelStructuredScipy(unittest.TestCase):
         #   dict so no guarantee on the order except for Python 3.6 !
         msg = "MetaModelStructuredComp \(comp\): Error interpolating output '[f|g]' because input 'comp.z' was " \
               "out of bounds \('.*', '.*'\) with value '9.0'"
-        with assertRaisesRegex(self, om.AnalysisError, msg):
+        with self.assertRaisesRegex(om.AnalysisError, msg):
             self.run_and_check_derivs(self.prob)
 
     def test_training_gradient(self):

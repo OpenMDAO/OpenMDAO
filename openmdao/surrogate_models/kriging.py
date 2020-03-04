@@ -1,6 +1,4 @@
 """Surrogate model based on Kriging."""
-from six.moves import zip, range
-
 import numpy as np
 import scipy.linalg as linalg
 from scipy.optimize import minimize

@@ -12,8 +12,6 @@ import signal
 import sys
 import traceback
 
-from six import iteritems, itervalues, string_types, reraise
-
 import numpy as np
 from scipy.sparse import coo_matrix
 
@@ -230,7 +228,7 @@ class pyOptSparseDriver(Driver):
         # doesn't perform one initially.
         con_meta = self._cons
         model_ran = False
-        if optimizer in run_required or np.any([con['linear'] for con in itervalues(self._cons)]):
+        if optimizer in run_required or np.any([con['linear'] for con in self._cons.values()]):
             with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
                 # Initial Run
                 model.run_solve_nonlinear()
@@ -267,7 +265,7 @@ class pyOptSparseDriver(Driver):
         self._indep_list = indep_list = list(param_meta)
         param_vals = self.get_design_var_values()
 
-        for name, meta in iteritems(param_meta):
+        for name, meta in param_meta.items():
             opt_prob.addVarGroup(name, meta['size'], type='c',
                                  value=param_vals[name],
                                  lower=meta['lower'], upper=meta['upper'])
@@ -281,15 +279,15 @@ class pyOptSparseDriver(Driver):
             self._quantities.append(name)
 
         # Calculate and save derivatives for any linear constraints.
-        lcons = [key for (key, con) in iteritems(con_meta) if con['linear']]
+        lcons = [key for (key, con) in con_meta.items() if con['linear']]
         if len(lcons) > 0:
             _lin_jacs = self._compute_totals(of=lcons, wrt=indep_list, return_format='dict')
             # convert all of our linear constraint jacs to COO format. Otherwise pyoptsparse will
             # do it for us and we'll end up with a fully dense COO matrix and very slow evaluation
             # of linear constraints!
             to_remove = []
-            for jacdct in itervalues(_lin_jacs):
-                for n, subjac in iteritems(jacdct):
+            for jacdct in _lin_jacs.values():
+                for n, subjac in jacdct.items():
                     if isinstance(subjac, np.ndarray):
                         # we can safely use coo_matrix to automatically convert the ndarray
                         # since our linear constraint jacs are constant, so zeros won't become
@@ -301,7 +299,7 @@ class pyOptSparseDriver(Driver):
                             jacdct[n] = {'coo': [mat.row, mat.col, mat.data], 'shape': mat.shape}
 
         # Add all equality constraints
-        for name, meta in iteritems(con_meta):
+        for name, meta in con_meta.items():
             if meta['equals'] is None:
                 continue
             size = meta['size']
@@ -326,7 +324,7 @@ class pyOptSparseDriver(Driver):
                 self._quantities.append(name)
 
         # Add all inequality constraints
-        for name, meta in iteritems(con_meta):
+        for name, meta in con_meta.items():
             if meta['equals'] is not None:
                 continue
             size = meta['size']
@@ -363,7 +361,7 @@ class pyOptSparseDriver(Driver):
             # Change whatever pyopt gives us to an ImportError, give it a readable message,
             # but raise with the original traceback.
             msg = "Optimizer %s is not available in this installation." % optimizer
-            reraise(ImportError, ImportError(msg), sys.exc_info()[2])
+            raise ImportError(msg)
 
         # Set optimization options
         for option, value in self.opt_settings.items():
@@ -592,10 +590,10 @@ class pyOptSparseDriver(Driver):
                 # Best we can do is return zeros.
 
                 sens_dict = OrderedDict()
-                for okey, oval in iteritems(func_dict):
+                for okey, oval in func_dict.items():
                     sens_dict[okey] = OrderedDict()
                     osize = len(oval)
-                    for ikey, ival in iteritems(dv_dict):
+                    for ikey, ival in dv_dict.items():
                         isize = len(ival)
                         sens_dict[okey][ikey] = np.zeros((osize, isize))
 
@@ -639,7 +637,7 @@ class pyOptSparseDriver(Driver):
         """
         nl_order = list(self._objs)
         neq_order = []
-        for n, meta in iteritems(self._cons):
+        for n, meta in self._cons.items():
             if 'linear' not in meta or not meta['linear']:
                 if meta['equals'] is not None:
                     nl_order.append(n)
@@ -662,7 +660,7 @@ class pyOptSparseDriver(Driver):
                 raise RuntimeError("Total jac sparsity was set in both _total_coloring"
                                    " and _total_jac_sparsity.")
         elif self._total_jac_sparsity is not None:
-            if isinstance(self._total_jac_sparsity, string_types):
+            if isinstance(self._total_jac_sparsity, str):
                 with open(self._total_jac_sparsity, 'r') as f:
                     self._total_jac_sparsity = json.load(f)
             total_sparsity = self._total_jac_sparsity
@@ -671,11 +669,11 @@ class pyOptSparseDriver(Driver):
             return
 
         self._res_jacs = {}
-        for res, resdict in iteritems(total_sparsity):
+        for res, resdict in total_sparsity.items():
             if res in self._objs:  # skip objectives
                 continue
             self._res_jacs[res] = {}
-            for dv, (rows, cols, shape) in iteritems(resdict):
+            for dv, (rows, cols, shape) in resdict.items():
                 rows = np.array(rows, dtype=int)
                 cols = np.array(cols, dtype=int)
 

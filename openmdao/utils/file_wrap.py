@@ -6,7 +6,6 @@ Note: This is a work in progress.
 
 
 import re
-from six.moves import range
 
 from pyparsing import CaselessLiteral, Combine, OneOrMore, Optional, \
     TokenConverter, Word, nums, oneOf, printables, ParserElement, alphanums

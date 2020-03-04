@@ -1,8 +1,5 @@
 """Definition of the Dot Product Component."""
 
-
-from six import string_types
-
 import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent
@@ -30,17 +27,17 @@ class DotProductComp(ExplicitComponent):
                              desc='The number of points at which the dot product is computed')
         self.options.declare('length', types=int, default=3,
                              desc='The length of vectors a and b')
-        self.options.declare('a_name', types=string_types, default='a',
+        self.options.declare('a_name', types=str, default='a',
                              desc='The variable name for input vector a.')
-        self.options.declare('b_name', types=string_types, default='b',
+        self.options.declare('b_name', types=str, default='b',
                              desc='The variable name for input vector b.')
-        self.options.declare('c_name', types=string_types, default='c',
+        self.options.declare('c_name', types=str, default='c',
                              desc='The variable name for output vector c.')
-        self.options.declare('a_units', types=string_types, default=None, allow_none=True,
+        self.options.declare('a_units', types=str, default=None, allow_none=True,
                              desc='The units for vector a.')
-        self.options.declare('b_units', types=string_types, default=None, allow_none=True,
+        self.options.declare('b_units', types=str, default=None, allow_none=True,
                              desc='The units for vector b.')
-        self.options.declare('c_units', types=string_types, default=None, allow_none=True,
+        self.options.declare('c_units', types=str, default=None, allow_none=True,
                              desc='The units for vector c.')
 
     def setup(self):
