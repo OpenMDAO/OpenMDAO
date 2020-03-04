@@ -9,8 +9,7 @@ from collections import defaultdict, namedtuple
 from fnmatch import fnmatchcase
 from itertools import product
 
-from six import iteritems, iterkeys, itervalues
-from six.moves import range, cStringIO
+from io import StringIO
 
 import numpy as np
 import scipy.sparse as sparse
@@ -488,7 +487,7 @@ class Problem(object):
         """
         Set all initial conditions that have been saved in cache after setup.
         """
-        for name, value in iteritems(self._initial_condition_cache):
+        for name, value in self._initial_condition_cache.items():
             self[name] = value
 
         # Clean up cache
@@ -1222,11 +1221,11 @@ class Problem(object):
                                                                        fd_options)
 
             approx_jac = {}
-            for approximation in itervalues(approximations):
+            for approximation in approximations.values():
                 # Perform the FD here.
                 approximation.compute_approximations(comp, jac=approx_jac)
 
-            for abs_key, partial in iteritems(approx_jac):
+            for abs_key, partial in approx_jac.items():
                 rel_key = abs_key2rel_key(comp, abs_key)
                 partials_data[c_name][rel_key][jac_key] = partial
 
@@ -1238,7 +1237,7 @@ class Problem(object):
                         deriv[key] = np.atleast_2d(np.sum(deriv[key], axis=1)).T
 
         # Conversion of defaultdict to dicts
-        partials_data = {comp_name: dict(outer) for comp_name, outer in iteritems(partials_data)}
+        partials_data = {comp_name: dict(outer) for comp_name, outer in partials_data.items()}
 
         if out_stream == _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
@@ -1362,7 +1361,7 @@ class Problem(object):
         # Assemble and Return all metrics.
         data = {}
         data[''] = {}
-        for key, val in iteritems(Jcalc):
+        for key, val in Jcalc.items():
             data[''][key] = {}
             data[''][key]['J_fwd'] = val
             data[''][key]['J_fd'] = Jfd[key]
@@ -1530,7 +1529,7 @@ class Problem(object):
 
         # Get the values for all the elements in the tables
         rows = []
-        for name, meta in iteritems(vars):
+        for name, meta in vars.items():
             row = {}
             for col_name in col_names:
                 if col_name == 'name':
@@ -1736,13 +1735,13 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             sys_name = 'Full Model'
 
         # Sorted keys ensures deterministic ordering
-        sorted_keys = sorted(iterkeys(derivatives))
+        sorted_keys = sorted(derivatives.keys())
 
         if not suppress_output:
             # Need to capture the output of a component's derivative
             # info so that it can be used if that component is the
             # worst subjac. That info is printed at the bottom of all the output
-            out_buffer = cStringIO()
+            out_buffer = StringIO()
             num_bad_jacs = 0  # Keep track of number of bad derivative values for each component
             if out_stream:
                 header_str = '-' * (len(sys_name) + len(sys_type) + len(sys_class_name) + 5) + '\n'

@@ -1,6 +1,4 @@
 """ Unit tests for the design_variable and response interface to system."""
-from six.moves import range
-
 import unittest
 
 import numpy as np

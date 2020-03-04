@@ -12,8 +12,6 @@ from scikit-learn package here to avoid scikit-learn dependency.
 
 ISAE/DMSM - ONERA/DCPS
 """
-from six.moves import range
-
 import numpy as np
 from numpy import atleast_2d as array2d
 

@@ -4,7 +4,6 @@ networkx==1.11
 numpy==1.12.1
 numpydoc==0.6.0
 parameterized==0.6.1
-six==1.10.0
 sqlitedict==1.5.0
 Sphinx==1.5.6
 sphinx-rtd-theme==0.1.8

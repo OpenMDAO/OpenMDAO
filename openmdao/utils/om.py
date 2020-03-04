@@ -11,7 +11,6 @@ except ImportError:
     pkg_resources = None
 
 from itertools import chain
-from six import iteritems
 
 import openmdao.utils.hooks as hooks
 from openmdao.visualization.n2_viewer.n2_viewer import n2

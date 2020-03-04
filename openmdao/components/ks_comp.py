@@ -1,8 +1,6 @@
 """
 KS Function Component.
 """
-from six.moves import range
-
 import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent

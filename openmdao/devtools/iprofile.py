@@ -8,8 +8,6 @@ import atexit
 from collections import defaultdict
 from itertools import chain
 
-from six import iteritems, string_types
-
 from openmdao.utils.mpi import MPI
 
 from openmdao.utils.webview import webview
@@ -172,7 +170,7 @@ def _finalize_profile():
     _obj_map = {}
     cache = {}
     idents = defaultdict(dict)  # map idents to a smaller number
-    for funcpath, data in iteritems(_inst_data):
+    for funcpath, data in _inst_data.items():
         _inst_data[funcpath] = data = _prof_node(funcpath, data)
         parts = funcpath.rsplit('|', 1)
         fname = parts[-1]
@@ -202,7 +200,7 @@ def _finalize_profile():
 
     fname = os.path.basename(_profile_prefix)
     with open("%s.%d" % (fname, rank), 'w') as f:
-        for name, data in iteritems(_inst_data):
+        for name, data in _inst_data.items():
             new_name = '|'.join([_obj_map[s] for s in name.split('|')])
             f.write("%s %d %f\n" % (new_name, data['count'], data['time']))
 
@@ -302,7 +300,7 @@ def _process_profile(flist):
         grand_total['tot_time'] += nodes['$total']['tot_time']
         grand_total['time'] += nodes['$total']['time']
 
-        for name, node in iteritems(nodes):
+        for name, node in nodes.items():
             newname = _fix_name(name, i)
             node['id'] = newname
             node['depth'] += 1
@@ -314,7 +312,7 @@ def _process_profile(flist):
     tot_names = []
     for i, tot in enumerate(top_totals):
         tot_names.append('$total.%d' % i)
-        for name, tots in iteritems(tot):
+        for name, tots in tot.items():
             if name == '$total':
                 totals[tot_names[-1]] = tots
             else:

@@ -15,9 +15,7 @@ import re
 import os.path
 from collections import OrderedDict
 
-from six import iteritems
-from six.moves import zip
-from six.moves.configparser import RawConfigParser as ConfigParser
+from configparser import RawConfigParser as ConfigParser
 
 # pylint: disable=E0611, F0401
 from math import floor, pi
@@ -91,9 +89,9 @@ class NumberDict(OrderedDict):
             new NumberDict with self+other values
         """
         sum_dict = NumberDict()
-        for k, v in iteritems(self):
+        for k, v in self.items():
             sum_dict[k] = v
-        for k, v in iteritems(other):
+        for k, v in other.items():
             sum_dict[k] = sum_dict[k] + v
         return sum_dict
 
@@ -112,9 +110,9 @@ class NumberDict(OrderedDict):
             new NumberDict instance, with self-other values
         """
         sum_dict = NumberDict()
-        for k, v in iteritems(self):
+        for k, v in self.items():
             sum_dict[k] = v
-        for k, v in iteritems(other):
+        for k, v in other.items():
             sum_dict[k] = sum_dict[k] - v
         return sum_dict
 
@@ -133,9 +131,9 @@ class NumberDict(OrderedDict):
             new NumberDict instance, with other-self values
         """
         sum_dict = NumberDict()
-        for k, v in iteritems(other):
+        for k, v in other.items():
             sum_dict[k] = v
-        for k, v in iteritems(self):
+        for k, v in self.items():
             sum_dict[k] = sum_dict[k] - v
         return sum_dict
 
@@ -154,7 +152,7 @@ class NumberDict(OrderedDict):
             new NumberDict instance, with other*self values
         """
         new = NumberDict()
-        for key, value in iteritems(self):
+        for key, value in self.items():
             new[key] = other * value
         return new
 
@@ -175,7 +173,7 @@ class NumberDict(OrderedDict):
             new NumberDict instance, with self/other values
         """
         new = NumberDict()
-        for key, value in iteritems(self):
+        for key, value in self.items():
             new[key] = value / other
         return new
 
@@ -569,7 +567,7 @@ class PhysicalUnit(object):
         """
         num = ''
         denom = ''
-        for unit, power in iteritems(self._names):
+        for unit, power in self._names.items():
             if power < 0:
                 denom = denom + '/' + unit
                 if power < -1:

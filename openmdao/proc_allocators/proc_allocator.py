@@ -1,6 +1,5 @@
 """Define the base ProcAllocator class."""
 import numpy as np
-from six.moves import range
 
 
 class ProcAllocationError(Exception):

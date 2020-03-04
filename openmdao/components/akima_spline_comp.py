@@ -5,9 +5,6 @@ Includes derivatives wrt training points.  Akima spline is regenerated during ea
 
 https://github.com/andrewning/akima
 """
-from six.moves import range
-from six import string_types
-
 import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent
@@ -99,9 +96,9 @@ class AkimaSplineComp(ExplicitComponent):
                              desc="When True, the interpolated x grid is a component input.")
         self.options.declare('input_xcp', types=bool, default=False,
                              desc="When True, the x control point grid is a component input.")
-        self.options.declare('units', types=string_types, default=None, allow_none=True,
+        self.options.declare('units', types=str, default=None, allow_none=True,
                              desc="Units to use for the y and ycp variables.")
-        self.options.declare('x_units', types=string_types, default=None, allow_none=True,
+        self.options.declare('x_units', types=str, default=None, allow_none=True,
                              desc="Units to use for the x and xcp variables.")
         self.options.declare('delta_x', default=0.1,
                              desc="half-width of the smoothing interval added in the valley of "

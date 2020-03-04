@@ -1,7 +1,6 @@
 """Test the DirectSolver linear solver class."""
 
 import unittest
-from six import assertRaisesRegex, iteritems
 
 import numpy as np
 
@@ -168,7 +167,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         Jbase['obj', 'z'] = np.array([[9.61001155, 1.78448534]])
 
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-        for key, val in iteritems(Jbase):
+        for key, val in Jbase.items():
             assert_rel_error(self, J[key], val, .00001)
 
         # In the bug, the solver mode got switched from fwd to rev when it shouldn't
@@ -627,7 +626,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         prob['width'] = 2.0
 
         msg = "AssembledJacobian not supported for matrix-free subcomponent."
-        with assertRaisesRegex(self, Exception, msg):
+        with self.assertRaisesRegex(Exception, msg):
             prob.run_model()
 
 

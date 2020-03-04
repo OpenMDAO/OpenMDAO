@@ -1,6 +1,4 @@
 """Define the OptionsDictionary class."""
-from six import iteritems, string_types
-
 from openmdao.utils.general_utils import warn_deprecation
 
 # unique object to check if default is given
@@ -83,7 +81,7 @@ class OptionsDictionary(object):
             A rendition of the options as an rST table.
         """
         outputs = []
-        for option_name, option_data in sorted(iteritems(self._dict)):
+        for option_name, option_data in sorted(self._dict.items()):
             name = option_name
             default = option_data['value'] if option_data['value'] is not _undefined \
                 else '**Required**'
@@ -134,7 +132,7 @@ class OptionsDictionary(object):
 
         header = ""
         titles = ""
-        for key, val in iteritems(max_sizes):
+        for key, val in max_sizes.items():
             header += '=' * val + ' '
 
         for j, head in enumerate(col_heads):
@@ -244,7 +242,7 @@ class OptionsDictionary(object):
             # If only values is declared
             if values is not None:
                 if value not in values:
-                    if isinstance(value, string_types):
+                    if isinstance(value, str):
                         value = "'{}'".format(value)
                     self._raise("Value ({}) of option '{}' is not one of {}.".format(value, name,
                                                                                      values),
@@ -254,7 +252,7 @@ class OptionsDictionary(object):
                 if not isinstance(value, types):
                     vtype = type(value).__name__
 
-                    if isinstance(value, string_types):
+                    if isinstance(value, str):
                         value = "'{}'".format(value)
 
                     if isinstance(types, (set, tuple, list)):

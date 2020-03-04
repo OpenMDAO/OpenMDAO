@@ -5,9 +5,6 @@ Unit tests for Group.
 import itertools
 import unittest
 
-from six import assertRaisesRegex, iteritems
-from six.moves import range
-
 import numpy as np
 
 try:
@@ -799,7 +796,7 @@ class TestGroup(unittest.TestCase):
         G1.add_subsystem("C1", om.ExecComp("y=2.0*x"), promotes=['y'])
         G1.add_subsystem("C2", om.ExecComp("y=2.0*x"), promotes=['y'])
         msg = r"Output name 'y' refers to multiple outputs: \['G1.C1.y', 'G1.C2.y'\]."
-        with assertRaisesRegex(self, Exception, msg):
+        with self.assertRaisesRegex(Exception, msg):
             prob.setup()
 
     def test_basic_connect_units(self):
@@ -1423,7 +1420,7 @@ class TestGroup(unittest.TestCase):
 
         totals = p.check_totals(of=['discipline.comp1.z'], wrt=['parameters.input_value'], method='cs', out_stream=None)
 
-        for key, val in iteritems(totals):
+        for key, val in totals.items():
             assert_rel_error(self, val['rel error'][0], 0.0, 1e-15)
 
 
@@ -1487,28 +1484,28 @@ class TestConnect(unittest.TestCase):
         msg = "src_indices must contain integers, but src_indices for " + \
               "connection from 'src.x' to 'tgt.x' is <.* 'numpy.float64'>."
 
-        with assertRaisesRegex(self, TypeError, msg):
+        with self.assertRaisesRegex(TypeError, msg):
             self.sub.connect('src.x', 'tgt.x', src_indices=[1.0])
 
     def test_src_indices_as_float_array(self):
         msg = "src_indices must contain integers, but src_indices for " + \
               "connection from 'src.x' to 'tgt.x' is <.* 'numpy.float64'>."
 
-        with assertRaisesRegex(self, TypeError, msg):
+        with self.assertRaisesRegex(TypeError, msg):
             self.sub.connect('src.x', 'tgt.x', src_indices=np.zeros(1))
 
     def test_src_indices_as_str(self):
         msg = "src_indices must be an index array, " + \
               "did you mean connect('src.x', [tgt.x, cmp.x])?"
 
-        with assertRaisesRegex(self, TypeError, msg):
+        with self.assertRaisesRegex(TypeError, msg):
             self.sub.connect('src.x', 'tgt.x', 'cmp.x')
 
     def test_already_connected(self):
         msg = "Input 'tgt.x' is already connected to 'src.x'."
 
         self.sub.connect('src.x', 'tgt.x', src_indices=[1])
-        with assertRaisesRegex(self, RuntimeError, msg):
+        with self.assertRaisesRegex(RuntimeError, msg):
             self.sub.connect('cmp.x', 'tgt.x', src_indices=[1])
 
     def test_invalid_source(self):
@@ -1517,7 +1514,7 @@ class TestConnect(unittest.TestCase):
         # source and target names can't be checked until setup
         # because setup is not called until then
         self.sub.connect('src.z', 'tgt.x', src_indices=[1])
-        with assertRaisesRegex(self, NameError, msg):
+        with self.assertRaisesRegex(NameError, msg):
             self.prob.setup()
 
     def test_connect_to_output(self):
@@ -1526,7 +1523,7 @@ class TestConnect(unittest.TestCase):
         # source and target names can't be checked until setup
         # because setup is not called until then
         self.sub.connect('tgt.y', 'cmp.z')
-        with assertRaisesRegex(self, NameError, msg):
+        with self.assertRaisesRegex(NameError, msg):
             self.prob.setup()
 
     def test_connect_from_input(self):
@@ -1535,7 +1532,7 @@ class TestConnect(unittest.TestCase):
         # source and target names can't be checked until setup
         # because setup is not called until then
         self.sub.connect('tgt.x', 'cmp.x')
-        with assertRaisesRegex(self, NameError, msg):
+        with self.assertRaisesRegex(NameError, msg):
             self.prob.setup()
 
     def test_invalid_target(self):
@@ -1544,14 +1541,14 @@ class TestConnect(unittest.TestCase):
         # source and target names can't be checked until setup
         # because setup is not called until then
         self.sub.connect('src.x', 'tgt.z', src_indices=[1])
-        with assertRaisesRegex(self, NameError, msg):
+        with self.assertRaisesRegex(NameError, msg):
             self.prob.setup()
 
     def test_connect_within_system(self):
         msg = "Output and input are in the same System for connection " + \
               "from 'tgt.y' to 'tgt.x'."
 
-        with assertRaisesRegex(self, RuntimeError, msg):
+        with self.assertRaisesRegex(RuntimeError, msg):
             self.sub.connect('tgt.y', 'tgt.x', src_indices=[1])
 
     def test_connect_within_system_with_promotes(self):
@@ -1595,7 +1592,7 @@ class TestConnect(unittest.TestCase):
         prob.model.connect('px1.x1', 'src.x1')
         prob.model.connect('src.x2', 'tgt.x')
 
-        with assertRaisesRegex(self, RuntimeError, msg):
+        with self.assertRaisesRegex(RuntimeError, msg):
             prob.setup()
 
     def test_connect_units_with_nounits(self):
@@ -1689,7 +1686,7 @@ class TestConnect(unittest.TestCase):
         msg = ("The source and target shapes do not match or are ambiguous for the connection "
                "'sub.src.s' to 'sub.arr.x'.")
 
-        with assertRaisesRegex(self, ValueError, msg):
+        with self.assertRaisesRegex(ValueError, msg):
             self.prob.setup()
 
     def test_bad_indices_shape(self):
@@ -1703,7 +1700,7 @@ class TestConnect(unittest.TestCase):
                r"the connection 'IV.x' to 'C1.x'. The target "
                r"shape is \(2.*, 2.*\) but indices are \(1.*, 2.*\).")
 
-        with assertRaisesRegex(self, ValueError, msg):
+        with self.assertRaisesRegex(ValueError, msg):
             p.setup()
 
     def test_bad_indices_dimensions(self):

@@ -10,8 +10,6 @@ from distutils.version import LooseVersion
 import numpy as np
 from scipy import __version__ as scipy_version
 from scipy.optimize import minimize
-from six import itervalues, iteritems, reraise
-from six.moves import range
 
 import openmdao
 import openmdao.utils.coloring as coloring_mod
@@ -207,7 +205,7 @@ class ScipyOptimizeDriver(Driver):
         #   need to add to the _cons metadata for any bounds that
         #   need to be translated into a constraint
         if opt == 'COBYLA':
-            for name, meta in iteritems(self._designvars):
+            for name, meta in self._designvars.items():
                 lower = meta['lower']
                 upper = meta['upper']
                 if isinstance(lower, np.ndarray) or lower >= -openmdao.INF_BOUND \
@@ -256,7 +254,7 @@ class ScipyOptimizeDriver(Driver):
 
         # Size Problem
         nparam = 0
-        for param in itervalues(self._designvars):
+        for param in self._designvars.values():
             nparam += param['size']
         x_init = np.empty(nparam)
 
@@ -268,7 +266,7 @@ class ScipyOptimizeDriver(Driver):
         else:
             bounds = None
 
-        for name, meta in iteritems(self._designvars):
+        for name, meta in self._designvars.items():
             size = meta['size']
             x_init[i:i + size] = desvar_vals[name]
             i += size
@@ -315,7 +313,7 @@ class ScipyOptimizeDriver(Driver):
         self._obj_and_nlcons = list(self._objs)
 
         if opt in _constraint_optimizers:
-            for name, meta in iteritems(self._cons):
+            for name, meta in self._cons.items():
                 size = meta['size']
                 upper = meta['upper']
                 lower = meta['lower']
@@ -572,7 +570,7 @@ class ScipyOptimizeDriver(Driver):
             i = 0
             if MPI:
                 model.comm.Bcast(x_new, root=0)
-            for name, meta in iteritems(self._designvars):
+            for name, meta in self._designvars.items():
                 size = meta['size']
                 self.set_design_var(name, x_new[i:i + size])
                 i += size
@@ -582,14 +580,14 @@ class ScipyOptimizeDriver(Driver):
                 model.run_solve_nonlinear()
 
             # Get the objective function evaluations
-            for obj in itervalues(self.get_objective_values()):
+            for obj in self.get_objective_values().values():
                 f_new = obj
                 break
 
             self._con_cache = self.get_constraint_values()
 
         except Exception as msg:
-            self._exc_info = sys.exc_info()
+            self._exc_info = msg
             return 0
 
         # print("Functions calculated")
@@ -696,7 +694,7 @@ class ScipyOptimizeDriver(Driver):
             self._grad_cache = grad
 
         except Exception as msg:
-            self._exc_info = sys.exc_info()
+            self._exc_info = msg
             return np.array([[]])
 
         # print("Gradients calculated for objective")
@@ -763,8 +761,7 @@ class ScipyOptimizeDriver(Driver):
         Reraise any exception encountered when scipy calls back into our method.
         """
         exc = self._exc_info
-        self._exc_info = None
-        reraise(*exc)
+        raise exc
 
 
 def signature_extender(fcn, extra_args):

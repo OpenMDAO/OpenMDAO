@@ -7,8 +7,6 @@ from functools import wraps
 import inspect
 import warnings
 
-from six import iteritems
-
 
 def _reset_all_hooks():
     global _hooks, _hook_skip_classes
@@ -73,7 +71,7 @@ def _setup_hooks(obj):
         else:
             return
 
-        for name, hook in iteritems(hk):
+        for name, hook in hk.items():
             method = getattr(obj, name, None)
             if method is not None:
                 # if _hook_ attr is present, we've already wrapped this method

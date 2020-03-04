@@ -1,7 +1,7 @@
 """ Test out some specialized parallel derivatives features"""
 
 
-from six.moves import cStringIO as StringIO
+from io import StringIO
 import sys
 import unittest
 import time

@@ -1,5 +1,5 @@
 import unittest
-from six.moves import cStringIO as StringIO
+from io import StringIO
 
 from openmdao.api import Problem, Group, ParallelGroup, ExecComp, IndepVarComp, NonlinearRunOnce, LinearRunOnce, NewtonSolver
 from openmdao.utils.mpi import MPI

@@ -14,9 +14,6 @@ import inspect
 from fnmatch import fnmatchcase
 import copy
 
-from six import iteritems, string_types, itervalues
-from six.moves import range
-
 import numpy as np
 import networkx as nx
 
@@ -220,7 +217,7 @@ class Group(System):
         if self._has_input_scaling:
             abs2meta_in = self._var_abs2meta
             allprocs_meta_out = self._var_allprocs_abs2meta
-            for abs_in, abs_out in iteritems(self._conn_global_abs_in2out):
+            for abs_in, abs_out in self._conn_global_abs_in2out.items():
                 if abs_in not in abs2meta_in:
                     # we only perform scaling on local, non-discrete arrays, so skip
                     continue
@@ -621,9 +618,9 @@ class Group(System):
                 abs_names_discrete[type_].extend(subsys._var_abs_names_discrete[type_])
 
                 allprocs_discrete[type_].update({k: v for k, v in
-                                                 iteritems(subsys._var_allprocs_discrete[type_])})
+                                                 subsys._var_allprocs_discrete[type_].items()})
                 var_discrete[type_].update({sub_prefix + k: v for k, v in
-                                            iteritems(subsys._var_discrete[type_])})
+                                            subsys._var_discrete[type_].items()})
 
                 # Assemble abs2prom
                 sub_loc_proms = subsys._var_abs2prom[type_]
@@ -636,13 +633,13 @@ class Group(System):
                     allprocs_abs2prom[type_][abs_name] = var_maps[type_][sub_proms[abs_name]]
 
                 # Assemble allprocs_prom2abs_list
-                for sub_prom, sub_abs in iteritems(subsys._var_allprocs_prom2abs_list[type_]):
+                for sub_prom, sub_abs in subsys._var_allprocs_prom2abs_list[type_].items():
                     prom_name = var_maps[type_][sub_prom]
                     if prom_name not in allprocs_prom2abs_list[type_]:
                         allprocs_prom2abs_list[type_][prom_name] = []
                     allprocs_prom2abs_list[type_][prom_name].extend(sub_abs)
 
-        for prom_name, abs_list in iteritems(allprocs_prom2abs_list['output']):
+        for prom_name, abs_list in allprocs_prom2abs_list['output'].items():
             if len(abs_list) > 1:
                 raise RuntimeError("{}: Output name '{}' refers to "
                                    "multiple outputs: {}.".format(self.msginfo, prom_name,
@@ -691,7 +688,7 @@ class Group(System):
                     allprocs_abs2prom[type_].update(all_abs2prom[type_])
 
                     # Assemble in parallel allprocs_prom2abs_list
-                    for prom_name, abs_names_list in iteritems(myproc_prom2abs_list[type_]):
+                    for prom_name, abs_names_list in myproc_prom2abs_list[type_].items():
                         if prom_name not in allprocs_prom2abs_list[type_]:
                             allprocs_prom2abs_list[type_][prom_name] = []
                         allprocs_prom2abs_list[type_][prom_name].extend(abs_names_list)
@@ -849,7 +846,7 @@ class Group(System):
         new_conns = defaultdict(dict)
 
         if conns is not None:
-            for abs_in, abs_out in iteritems(conns):
+            for abs_in, abs_out in conns.items():
                 inparts = abs_in.split('.')
                 outparts = abs_out.split('.')
 
@@ -873,7 +870,7 @@ class Group(System):
 
         # Add explicit connections (only ones declared by this group)
         for prom_in, (prom_out, src_indices, flat_src_indices) in \
-                iteritems(self._manual_connections):
+                self._manual_connections.items():
 
             # throw an exception if either output or input doesn't exist
             # (not traceable to a connect statement, so provide context)
@@ -956,22 +953,22 @@ class Group(System):
 
         # Compute global_abs_in2out by first adding this group's contributions,
         # then adding contributions from systems above/below, then allgathering.
-        conn_list = list(iteritems(global_abs_in2out))
-        conn_list.extend(iteritems(abs_in2out))
+        conn_list = list(global_abs_in2out.items())
+        conn_list.extend(abs_in2out.items())
         global_abs_in2out.update(abs_in2out)
 
         for subsys in self._subgroups_myproc:
             global_abs_in2out.update(subsys._conn_global_abs_in2out)
-            conn_list.extend(iteritems(subsys._conn_global_abs_in2out))
+            conn_list.extend(subsys._conn_global_abs_in2out.items())
 
         if len(conn_list) > len(global_abs_in2out):
-            dupes = [n for n, val in iteritems(Counter(tgt for tgt, src in conn_list)) if val > 1]
+            dupes = [n for n, val in Counter(tgt for tgt, src in conn_list).items() if val > 1]
             dup_info = defaultdict(set)
             for tgt, src in conn_list:
                 for dup in dupes:
                     if tgt == dup:
                         dup_info[tgt].add(src)
-            dup_info = [(n, srcs) for n, srcs in iteritems(dup_info) if len(srcs) > 1]
+            dup_info = [(n, srcs) for n, srcs in dup_info.items() if len(srcs) > 1]
             if dup_info:
                 msg = ["%s from %s" % (tgt, sorted(srcs)) for tgt, srcs in dup_info]
                 raise RuntimeError("%s: The following inputs have multiple connections: %s" %
@@ -1033,7 +1030,7 @@ class Group(System):
         # Check input/output units here, and set _has_input_scaling
         # to True for this Group if units are defined and different, or if
         # ref or ref0 are defined for the output.
-        for abs_in, abs_out in iteritems(global_abs_in2out):
+        for abs_in, abs_out in global_abs_in2out.items():
 
             # First, check that this system owns both the input and output.
             if abs_in[:path_len] == path_dot and abs_out[:path_len] == path_dot:
@@ -1096,7 +1093,7 @@ class Group(System):
                 self._has_input_scaling = needs_input_scaling
 
         # check compatability for any discrete connections
-        for abs_in, abs_out in iteritems(self._conn_discrete_in2out):
+        for abs_in, abs_out in self._conn_discrete_in2out.items():
             in_type = self._var_allprocs_discrete['input'][abs_in]['type']
             try:
                 out_type = self._var_allprocs_discrete['output'][abs_out]['type']
@@ -1114,7 +1111,7 @@ class Group(System):
         # This way, we don't repeat the error checking in multiple groups.
         abs2meta = self._var_abs2meta
 
-        for abs_in, abs_out in iteritems(abs_in2out):
+        for abs_in, abs_out in abs_in2out.items():
             # check unit compatibility
             out_units = allprocs_abs2meta[abs_out]['units']
             in_units = allprocs_abs2meta[abs_in]['units']
@@ -1301,7 +1298,7 @@ class Group(System):
                         for i in range(comm.size):
                             allprocs_dict.update(allprocs_send[i])
                         recvs = [{} for i in range(comm.size)]
-                        for rname, ranks in iteritems(allprocs_recv):
+                        for rname, ranks in allprocs_recv.items():
                             val = allprocs_dict[rname]
                             for i in ranks:
                                 recvs[i][rname] = val
@@ -1514,9 +1511,9 @@ class Group(System):
 
         subsys.name = subsys.pathname = name
 
-        if isinstance(promotes, string_types) or \
-           isinstance(promotes_inputs, string_types) or \
-           isinstance(promotes_outputs, string_types):
+        if isinstance(promotes, str) or \
+           isinstance(promotes_inputs, str) or \
+           isinstance(promotes_outputs, str):
             raise RuntimeError("%s: promotes must be an iterator of strings and/or tuples."
                                % self.msginfo)
         if promotes:
@@ -1569,8 +1566,8 @@ class Group(System):
             to the number of dimensions of the source.
         """
         # if src_indices argument is given, it should be valid
-        if isinstance(src_indices, string_types):
-            if isinstance(tgt_name, string_types):
+        if isinstance(src_indices, str):
+            if isinstance(tgt_name, str):
                 tgt_name = [tgt_name]
             tgt_name.append(src_indices)
             raise TypeError("%s: src_indices must be an index array, did you mean"
@@ -1586,7 +1583,7 @@ class Group(System):
                                 (self.msginfo, src_name, tgt_name, src_indices.dtype.type))
 
         # if multiple targets are given, recursively connect to each
-        if not isinstance(tgt_name, string_types) and isinstance(tgt_name, Iterable):
+        if not isinstance(tgt_name, str) and isinstance(tgt_name, Iterable):
             for name in tgt_name:
                 self.connect(src_name, name, src_indices, flat_src_indices=flat_src_indices)
             return
@@ -1647,7 +1644,7 @@ class Group(System):
 
         # Don't allow duplicates either.
         if len(newset) < len(new_order):
-            dupes = [key for key, val in iteritems(Counter(new_order)) if val > 1]
+            dupes = [key for key, val in Counter(new_order).items() if val > 1]
             raise ValueError("%s: Duplicate name(s) found in subsystem order list: %s" %
                              (self.msginfo, sorted(dupes)))
 
@@ -1864,13 +1861,13 @@ class Group(System):
 
             jac = self._jacobian
             if self.pathname == "":
-                for approximation in itervalues(self._approx_schemes):
+                for approximation in self._approx_schemes.values():
                     approximation.compute_approximations(self, jac=jac, total=True)
             else:
                 # When an approximation exists in a submodel (instead of in root), the model is
                 # in a scaled state.
                 with self._unscaled_context(outputs=[self._outputs]):
-                    for approximation in itervalues(self._approx_schemes):
+                    for approximation in self._approx_schemes.values():
                         approximation.compute_approximations(self, jac=jac, total=True)
 
         else:
@@ -2262,7 +2259,7 @@ class Group(System):
 
         edge_data = defaultdict(lambda: defaultdict(list))
 
-        for in_abs, src_abs in iteritems(input_srcs):
+        for in_abs, src_abs in input_srcs.items():
             if src_abs is not None:
                 if comps_only:
                     src = src_abs.rsplit('.', 1)[0]

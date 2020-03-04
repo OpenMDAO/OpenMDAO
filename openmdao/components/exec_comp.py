@@ -5,9 +5,6 @@ from itertools import product
 import numpy as np
 from numpy import ndarray, imag, complex as npcomplex
 
-from six import string_types
-from six.moves import range
-
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.units import valid_units
 from openmdao.utils.general_utils import warn_deprecation
@@ -222,7 +219,7 @@ class ExecComp(ExplicitComponent):
         # if complex step is used for derivatives, this is the stepsize
         self.complex_stepsize = 1.e-40
 
-        if isinstance(exprs, string_types):
+        if isinstance(exprs, str):
             exprs = [exprs]
 
         self._exprs = exprs[:]

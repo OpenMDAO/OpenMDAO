@@ -1,6 +1,4 @@
 """Define the LinearBlockJac class."""
-from six import iteritems
-
 from openmdao.solvers.solver import BlockLinearSolver
 
 

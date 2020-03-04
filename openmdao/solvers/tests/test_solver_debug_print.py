@@ -1,7 +1,5 @@
 """Tests the `debug_print` option for Nonlinear solvers."""
 
-from six import StringIO
-
 import os
 import re
 import sys
@@ -10,6 +8,7 @@ import tempfile
 
 import unittest
 from distutils.version import LooseVersion
+from io import StringIO
 
 import numpy as np
 

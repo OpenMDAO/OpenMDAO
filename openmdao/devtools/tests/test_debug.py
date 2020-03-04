@@ -1,6 +1,6 @@
 import unittest
 
-from six import StringIO
+from io import StringIO
 
 from openmdao.api import Problem
 from openmdao.test_suite.scripts.circle_opt import CircleOpt

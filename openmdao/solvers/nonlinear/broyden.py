@@ -3,8 +3,6 @@ Define the BroydenSolver class.
 
 Based on implementation in Scipy via OpenMDAO 0.8x with improvements based on NPSS solver.
 """
-from six.moves import range
-
 import numpy as np
 
 from openmdao.recorders.recording_iteration_stack import Recording

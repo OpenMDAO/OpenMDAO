@@ -17,8 +17,6 @@ import time
 from numbers import Integral
 import itertools
 
-from six import iteritems, itervalues, string_types
-
 import numpy as np
 import networkx as nx
 
@@ -519,7 +517,7 @@ class System(object):
 
                 # Reload input and output values where possible
                 for vold, vnew in [(old_in, new_in), (old_out, new_out)]:
-                    for abs_name, old_view in iteritems(vold._views_flat):
+                    for abs_name, old_view in vold._views_flat.items():
                         if abs_name in vnew._views_flat:
                             new_view = vnew._views_flat[abs_name]
 
@@ -680,8 +678,8 @@ class System(object):
                                                                ncol=ncol, relevant=rel)
         else:
 
-            for key, vardict in iteritems(self._vectors):
-                for vec_name, vec in iteritems(vardict):
+            for key, vardict in self._vectors.items():
+                for vec_name, vec in vardict.items():
                     root_vectors[key][vec_name] = vec._root_vector
 
         lower, upper = self._get_bounds_root_vectors(self._local_vector_class, initial)
@@ -1015,7 +1013,7 @@ class System(object):
             options['dynamic'] = False
             options['static'] = self._coloring_info['static']
 
-        options['wrt_patterns'] = [wrt] if isinstance(wrt, string_types) else wrt
+        options['wrt_patterns'] = [wrt] if isinstance(wrt, str) else wrt
         options['method'] = method
         options['per_instance'] = per_instance
         options['repeat'] = num_full_jacs
@@ -1074,7 +1072,7 @@ class System(object):
         info = self._coloring_info
 
         info.update(**overrides)
-        if isinstance(info['wrt_patterns'], string_types):
+        if isinstance(info['wrt_patterns'], str):
             info['wrt_patterns'] = [info['wrt_patterns']]
 
         if info['method'] is None and self._approx_schemes:
@@ -1335,7 +1333,7 @@ class System(object):
             return coloring
 
         static = info['static']
-        if static is _STD_COLORING_FNAME or isinstance(static, string_types):
+        if static is _STD_COLORING_FNAME or isinstance(static, str):
             if static is _STD_COLORING_FNAME:
                 fname = self.get_approx_coloring_fname()
             else:
@@ -1610,7 +1608,7 @@ class System(object):
                     self._vois = vois = self.get_design_vars(recurse=True, get_sizes=False)
                 else:  # rev
                     self._vois = vois = self.get_responses(recurse=True, get_sizes=False)
-                vec_names.extend(sorted(set(voi for voi, data in iteritems(vois)
+                vec_names.extend(sorted(set(voi for voi, data in vois.items()
                                             if data['parallel_deriv_color'] is not None
                                             or data['vectorize_derivs'])))
             else:
@@ -1956,7 +1954,7 @@ class System(object):
             patterns = []
             renames = {}
             for entry in lst:
-                if isinstance(entry, string_types):
+                if isinstance(entry, str):
                     if '*' in entry or '?' in entry or '[' in entry:
                         patterns.append(entry)
                     else:
@@ -2539,7 +2537,7 @@ class System(object):
             raise RuntimeError(msg.format(self.msginfo, name))
 
         # Name must be a string
-        if not isinstance(name, string_types):
+        if not isinstance(name, str):
             raise TypeError('{}: The name argument should be a string, got {}'.format(self.msginfo,
                                                                                       name))
 
@@ -2670,12 +2668,12 @@ class System(object):
             solution from the previous linear solve.
         """
         # Name must be a string
-        if not isinstance(name, string_types):
+        if not isinstance(name, str):
             raise TypeError('{}: The name argument should be a string, '
                             'got {}'.format(self.msginfo, name))
 
         # Type must be a string and one of 'con' or 'obj'
-        if not isinstance(type_, string_types):
+        if not isinstance(type_, str):
             raise TypeError('{}: The type argument should be a string'.format(self.msginfo))
         elif type_ not in ('con', 'obj'):
             raise ValueError('{}: The type must be one of \'con\' or \'obj\': '
@@ -2964,7 +2962,7 @@ class System(object):
         # Human readable error message during Driver setup.
         try:
             out = OrderedDict((pro2abs[name][0], data) for name, data in
-                              iteritems(self._design_vars))
+                              self._design_vars.items())
         except KeyError as err:
             msg = "{}: Output not found for design variable {}."
             raise RuntimeError(msg.format(self.msginfo, str(err)))
@@ -3019,7 +3017,7 @@ class System(object):
         # Human readable error message during Driver setup.
         try:
             out = OrderedDict((prom2abs[name][0], data) for name, data in
-                              iteritems(self._responses))
+                              self._responses.items())
         except KeyError as err:
             msg = "{}: Output not found for response {}."
             raise RuntimeError(msg.format(self.msginfo, str(err)))
@@ -3226,7 +3224,7 @@ class System(object):
         if self._inputs is not None and self._discrete_inputs:
             disc_meta = self._discrete_inputs._dict
 
-            for var_name, val in iteritems(self._discrete_inputs):
+            for var_name, val in self._discrete_inputs.items():
                 # Filter based on tags
                 if tags and not (make_set(tags) & disc_meta[var_name]['tags']):
                     continue
@@ -3421,7 +3419,7 @@ class System(object):
         if self._outputs is not None and self._discrete_outputs and not residuals_tol:
             disc_meta = self._discrete_outputs._dict
 
-            for var_name, val in iteritems(self._discrete_outputs):
+            for var_name, val in self._discrete_outputs.items():
                 # Filter based on tags
                 if tags and not (make_set(tags) & disc_meta[var_name]['tags']):
                     continue
@@ -4325,7 +4323,7 @@ def get_relevant_vars(connections, desvars, responses, mode):
     # Create a hybrid graph with components and all connected vars.  If a var is connected,
     # also connect it to its corresponding component.
     graph = nx.DiGraph()
-    for tgt, src in iteritems(connections):
+    for tgt, src in connections.items():
         if src not in graph:
             graph.add_node(src, type_='out')
         graph.add_node(tgt, type_='in')

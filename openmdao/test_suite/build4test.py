@@ -4,7 +4,6 @@ Various functions to make it easier to build test models.
 
 import time
 import numpy
-from six.moves import range
 
 from openmdao.core.group import Group
 from openmdao.core.parallel_group import ParallelGroup

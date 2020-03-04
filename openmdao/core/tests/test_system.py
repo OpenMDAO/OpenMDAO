@@ -1,8 +1,6 @@
 """ Unit tests for the system interface."""
 
 import unittest
-from six import assertRaisesRegex
-from six.moves import cStringIO
 
 import numpy as np
 
@@ -128,7 +126,7 @@ class TestSystem(unittest.TestCase):
         #
 
         # assign array to scalar
-        with assertRaisesRegex(self, ValueError, msg):
+        with self.assertRaisesRegex(ValueError, msg):
             inputs['C1.a'] = arr_val
 
         # assign scalar to array
@@ -140,7 +138,7 @@ class TestSystem(unittest.TestCase):
         assert_rel_error(self, inputs['C2.x'], arr_val, 1e-10)
 
         # assign bad array shape to array
-        with assertRaisesRegex(self, ValueError, msg):
+        with self.assertRaisesRegex(ValueError, msg):
             inputs['C2.x'] = bad_val
 
         # assign list to array
@@ -148,7 +146,7 @@ class TestSystem(unittest.TestCase):
         assert_rel_error(self, inputs['C2.x'], arr_val, 1e-10)
 
         # assign bad list shape to array
-        with assertRaisesRegex(self, ValueError, msg):
+        with self.assertRaisesRegex(ValueError, msg):
             inputs['C2.x'] = bad_val.tolist()
 
         #
@@ -156,7 +154,7 @@ class TestSystem(unittest.TestCase):
         #
 
         # assign array to scalar
-        with assertRaisesRegex(self, ValueError, msg):
+        with self.assertRaisesRegex(ValueError, msg):
             outputs['C1.b'] = arr_val
 
         # assign scalar to array
@@ -168,7 +166,7 @@ class TestSystem(unittest.TestCase):
         assert_rel_error(self, outputs['C2.y'], arr_val, 1e-10)
 
         # assign bad array shape to array
-        with assertRaisesRegex(self, ValueError, msg):
+        with self.assertRaisesRegex(ValueError, msg):
             outputs['C2.y'] = bad_val
 
         # assign list to array
@@ -176,7 +174,7 @@ class TestSystem(unittest.TestCase):
         assert_rel_error(self, outputs['C2.y'], arr_val, 1e-10)
 
         # assign bad list shape to array
-        with assertRaisesRegex(self, ValueError, msg):
+        with self.assertRaisesRegex(ValueError, msg):
             outputs['C2.y'] = bad_val.tolist()
 
         #
@@ -184,7 +182,7 @@ class TestSystem(unittest.TestCase):
         #
 
         # assign array to scalar
-        with assertRaisesRegex(self, ValueError, msg):
+        with self.assertRaisesRegex(ValueError, msg):
             residuals['C1.b'] = arr_val
 
         # assign scalar to array
@@ -196,7 +194,7 @@ class TestSystem(unittest.TestCase):
         assert_rel_error(self, residuals['C2.y'], arr_val, 1e-10)
 
         # assign bad array shape to array
-        with assertRaisesRegex(self, ValueError, msg):
+        with self.assertRaisesRegex(ValueError, msg):
             residuals['C2.y'] = bad_val
 
         # assign list to array
@@ -204,7 +202,7 @@ class TestSystem(unittest.TestCase):
         assert_rel_error(self, residuals['C2.y'], arr_val, 1e-10)
 
         # assign bad list shape to array
-        with assertRaisesRegex(self, ValueError, msg):
+        with self.assertRaisesRegex(ValueError, msg):
             residuals['C2.y'] = bad_val.tolist()
 
     def test_deprecated_solver_names(self):

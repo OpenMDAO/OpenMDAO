@@ -4,9 +4,6 @@ import numpy as np
 from numpy import ndarray
 from scipy.sparse import coo_matrix, csc_matrix
 
-from six import iteritems
-from six.moves import range
-
 from collections import OrderedDict
 
 from openmdao.matrices.matrix import Matrix, _compute_index_map, sparse_types
@@ -66,7 +63,7 @@ class COOMatrix(Matrix):
             abs2meta = system._var_allprocs_abs2meta
 
         start = end = 0
-        for key, (info, loc, src_indices, shape, factor) in iteritems(submats):
+        for key, (info, loc, src_indices, shape, factor) in submats.items():
             wrt_dist = abs2meta[key[1]]['distributed'] if abs2meta and owns else False
             if owns and not (owns[key[1]] == iproc or wrt_dist or abs2meta[key[0]]['distributed']):
                 continue  # only keep stuff that this rank owns
@@ -100,7 +97,7 @@ class COOMatrix(Matrix):
         rows = np.empty(end, dtype=int)
         cols = np.empty(end, dtype=int)
 
-        for key, (start, end, dense, jrows) in iteritems(pre_metadata):
+        for key, (start, end, dense, jrows) in pre_metadata.items():
             info, loc, src_indices, shape, factor = submats[key]
             irow, icol = loc
             val = info['value']
@@ -167,7 +164,7 @@ class COOMatrix(Matrix):
         data, rows, cols = self._build_coo(system)
 
         metadata = self._metadata
-        for key, (start, end, idxs, jac_type, factor) in iteritems(metadata):
+        for key, (start, end, idxs, jac_type, factor) in metadata.items():
             if idxs is None:
                 metadata[key] = (slice(start, end), jac_type, factor)
             else:
@@ -267,7 +264,7 @@ class COOMatrix(Matrix):
         if len(d_inputs._views) > len(d_inputs._names):
             input_names = d_inputs._names
             mask = None
-            for key, val in iteritems(self._key_ranges):
+            for key, val in self._key_ranges.items():
                 if key[1] in input_names:
                     if mask is None:
                         mask = np.ones(self._matrix.data.size, dtype=np.bool)
