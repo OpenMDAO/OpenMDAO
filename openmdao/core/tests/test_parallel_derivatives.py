@@ -1,7 +1,7 @@
 """ Test out some specialized parallel derivatives features"""
 
 
-from six.moves import cStringIO as StringIO
+from io import StringIO
 import sys
 import unittest
 import time
@@ -170,7 +170,7 @@ class ParDerivTestCase(unittest.TestCase):
 
         if not prob.comm.rank:
             self.assertTrue('Solving color: par_dv (iv.x1, iv.x2)' in output)
-            self.assertTrue('In mode: fwd, Solving variable(s):' in output)
+            self.assertTrue('In mode: fwd, Solving variable(s) using simul coloring:' in output)
             self.assertTrue("('iv.x3', [2])" in output)
 
     def test_fan_out_parallel_sets_rev(self):

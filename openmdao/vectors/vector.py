@@ -1,5 +1,4 @@
 """Define the base Vector and Transfer classes."""
-from six import iteritems, PY3
 from copy import deepcopy
 import os
 import weakref
@@ -235,7 +234,7 @@ class Vector(object):
         listiterator (Python 3.x) or list (Python 2.x)
             the variable names.
         """
-        return self.__iter__() if PY3 else list(self.__iter__())
+        return self.__iter__()
 
     def values(self):
         """
@@ -246,7 +245,7 @@ class Vector(object):
         list
             the variable values.
         """
-        return [v for n, v in iteritems(self._views) if n in self._names]
+        return [v for n, v in self._views.items() if n in self._names]
 
     def name2abs_name(self, name):
         """

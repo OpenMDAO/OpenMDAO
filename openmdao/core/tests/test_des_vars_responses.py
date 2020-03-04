@@ -1,6 +1,4 @@
 """ Unit tests for the design_variable and response interface to system."""
-from six.moves import range
-
 import unittest
 
 import numpy as np
@@ -20,31 +18,6 @@ except ImportError:
 
 
 class TestDesVarsResponses(unittest.TestCase):
-
-    def test_api_backwards_compatible(self):
-        raise unittest.SkipTest("api not implemented yet")
-
-        prob = Problem()
-        prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
-
-        prob.driver = ScipyOpt()
-        prob.driver.options['method'] = 'slsqp'
-        prob.driver.add_design_var('x', lower=-100, upper=100)
-        prob.driver.add_design_var('z', lower=-100, upper=100)
-        prob.driver.add_objective('obj')
-        prob.driver.add_constraint('con1')
-        prob.driver.add_constraint('con2')
-
-        prob.setup()
-
-        des_vars = prob.model.get_des_vars()
-        obj = prob.model.get_objectives()
-        constraints = prob.model.get_constraints()
-
-        self.assertItemsEqual(des_vars.keys(), ('x', 'z'))
-        self.assertItemsEqual(obj.keys(), ('obj',))
-        self.assertItemsEqual(constraints.keys(), ('con1', 'con2'))
 
     def test_api_on_model(self):
 

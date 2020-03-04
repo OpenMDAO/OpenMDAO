@@ -7,7 +7,6 @@ from numpy import array, linspace, sin, cos, pi
 
 from openmdao.api import ResponseSurface
 from openmdao.utils.assert_utils import assert_rel_error
-from six.moves import zip
 
 
 def branin(x):

@@ -2,7 +2,6 @@
 Definition of the Add/Subtract Component.
 """
 import collections
-from six import string_types
 
 import numpy as np
 from scipy import sparse as sp
@@ -71,7 +70,7 @@ class AddSubtractComp(ExplicitComponent):
 
         self._add_systems = []
 
-        if isinstance(output_name, string_types):
+        if isinstance(output_name, str):
             self._add_systems.append((output_name, input_names, vec_size, length, val,
                                       scaling_factors, kwargs))
         elif isinstance(output_name, collections.Iterable):
@@ -174,7 +173,7 @@ class AddSubtractComp(ExplicitComponent):
 
         for (output_name, input_names, vec_size, length, val,
              scaling_factors, kwargs) in self._add_systems:
-            if isinstance(input_names, string_types):
+            if isinstance(input_names, str):
                 input_names = [input_names]
 
             units = kwargs['units']
@@ -218,7 +217,7 @@ class AddSubtractComp(ExplicitComponent):
         complexify = self.options['complex']
         for (output_name, input_names, vec_size, length, val, scaling_factors,
              kwargs) in self._add_systems:
-            if isinstance(input_names, string_types):
+            if isinstance(input_names, str):
                 input_names = [input_names]
 
             if scaling_factors is None:

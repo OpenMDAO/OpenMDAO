@@ -1,5 +1,4 @@
 """Grid interpolation using scipy splines."""
-from six.moves import range
 
 from scipy import __version__ as scipy_version
 try:

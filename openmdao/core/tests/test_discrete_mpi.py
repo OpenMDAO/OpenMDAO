@@ -3,7 +3,6 @@
 import sys
 import unittest
 import warnings
-from six import assertRaisesRegex, StringIO, assertRegex
 
 import numpy as np
 

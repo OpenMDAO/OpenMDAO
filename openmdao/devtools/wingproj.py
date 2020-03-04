@@ -8,8 +8,7 @@ import sys
 import fnmatch
 import logging
 from subprocess import Popen
-from six.moves.configparser import ConfigParser
-from six import text_type
+from configparser import ConfigParser
 from optparse import OptionParser
 
 
@@ -49,9 +48,9 @@ def _modify_wpr_file(template, outfile, version):
     config.read(template)
     if sys.platform == 'darwin':
         config.set('user attributes', 'proj.pyexec',
-                   text_type(dict({None: ('custom', sys.executable)})))
+                   str(dict({None: ('custom', sys.executable)})))
         config.set('user attributes', 'proj.pypath',
-                   text_type(dict({None: ('custom',
+                   str(dict({None: ('custom',
                                           os.pathsep.join(sys.path))})))
 
     with open(outfile, 'w') as fp:

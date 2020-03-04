@@ -10,13 +10,11 @@ from distutils.version import LooseVersion
 import numpy as np
 from scipy import __version__ as scipy_version
 from scipy.optimize import minimize
-from six import itervalues, iteritems, reraise
-from six.moves import range
 
 import openmdao
 import openmdao.utils.coloring as coloring_mod
 from openmdao.core.driver import Driver, RecordingDebugging
-from openmdao.utils.general_utils import warn_deprecation, simple_warning
+from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.class_util import weak_method_wrapper
 from openmdao.utils.mpi import MPI
 
@@ -164,9 +162,6 @@ class ScipyOptimizeDriver(Driver):
                              desc='Maximum number of iterations.')
         self.options.declare('disp', True, types=bool,
                              desc='Set to False to prevent printing of Scipy convergence messages')
-        self.options.declare('dynamic_simul_derivs', default=False, types=bool,
-                             desc='Compute simultaneous derivative coloring dynamically if True '
-                             '(deprecated)')
 
     def _get_name(self):
         """
@@ -207,7 +202,7 @@ class ScipyOptimizeDriver(Driver):
         #   need to add to the _cons metadata for any bounds that
         #   need to be translated into a constraint
         if opt == 'COBYLA':
-            for name, meta in iteritems(self._designvars):
+            for name, meta in self._designvars.items():
                 lower = meta['lower']
                 upper = meta['upper']
                 if isinstance(lower, np.ndarray) or lower >= -openmdao.INF_BOUND \
@@ -256,7 +251,7 @@ class ScipyOptimizeDriver(Driver):
 
         # Size Problem
         nparam = 0
-        for param in itervalues(self._designvars):
+        for param in self._designvars.values():
             nparam += param['size']
         x_init = np.empty(nparam)
 
@@ -268,7 +263,7 @@ class ScipyOptimizeDriver(Driver):
         else:
             bounds = None
 
-        for name, meta in iteritems(self._designvars):
+        for name, meta in self._designvars.items():
             size = meta['size']
             x_init[i:i + size] = desvar_vals[name]
             i += size
@@ -315,7 +310,7 @@ class ScipyOptimizeDriver(Driver):
         self._obj_and_nlcons = list(self._objs)
 
         if opt in _constraint_optimizers:
-            for name, meta in iteritems(self._cons):
+            for name, meta in self._cons.items():
                 size = meta['size']
                 upper = meta['upper']
                 lower = meta['lower']
@@ -417,11 +412,7 @@ class ScipyOptimizeDriver(Driver):
 
         # compute dynamic simul deriv coloring if option is set
         if coloring_mod._use_total_sparsity:
-            if ((self._coloring_info['coloring'] is None and self._coloring_info['dynamic']) or
-                    self.options['dynamic_simul_derivs']):
-                if self.options['dynamic_simul_derivs']:
-                    warn_deprecation("The 'dynamic_simul_derivs' option has been deprecated. Call "
-                                     "the 'declare_coloring' function instead.")
+            if ((self._coloring_info['coloring'] is None and self._coloring_info['dynamic'])):
                 coloring_mod.dynamic_total_coloring(self, run_model=False,
                                                     fname=self._get_total_coloring_fname())
 
@@ -572,7 +563,7 @@ class ScipyOptimizeDriver(Driver):
             i = 0
             if MPI:
                 model.comm.Bcast(x_new, root=0)
-            for name, meta in iteritems(self._designvars):
+            for name, meta in self._designvars.items():
                 size = meta['size']
                 self.set_design_var(name, x_new[i:i + size])
                 i += size
@@ -582,14 +573,14 @@ class ScipyOptimizeDriver(Driver):
                 model.run_solve_nonlinear()
 
             # Get the objective function evaluations
-            for obj in itervalues(self.get_objective_values()):
+            for obj in self.get_objective_values().values():
                 f_new = obj
                 break
 
             self._con_cache = self.get_constraint_values()
 
         except Exception as msg:
-            self._exc_info = sys.exc_info()
+            self._exc_info = msg
             return 0
 
         # print("Functions calculated")
@@ -696,7 +687,7 @@ class ScipyOptimizeDriver(Driver):
             self._grad_cache = grad
 
         except Exception as msg:
-            self._exc_info = sys.exc_info()
+            self._exc_info = msg
             return np.array([[]])
 
         # print("Gradients calculated for objective")
@@ -763,8 +754,7 @@ class ScipyOptimizeDriver(Driver):
         Reraise any exception encountered when scipy calls back into our method.
         """
         exc = self._exc_info
-        self._exc_info = None
-        reraise(*exc)
+        raise exc
 
 
 def signature_extender(fcn, extra_args):
@@ -794,22 +784,3 @@ def signature_extender(fcn, extra_args):
         return fcn(x, *extra_args)
 
     return closure
-
-
-class ScipyOptimizer(ScipyOptimizeDriver):
-    """
-    Deprecated.  Use ScipyOptimizeDriver.
-    """
-
-    def __init__(self, **kwargs):
-        """
-        Initialize attributes.
-
-        Parameters
-        ----------
-        **kwargs : dict
-            Named args.
-        """
-        super(ScipyOptimizer, self).__init__(**kwargs)
-        warn_deprecation("'ScipyOptimizer' provides backwards compatibility "
-                         "with OpenMDAO <= 2.2 ; use 'ScipyOptimizeDriver' instead.")

@@ -2,8 +2,6 @@
 import sys
 import unittest
 
-from six import assertRaisesRegex, StringIO, assertRegex, iteritems
-
 import numpy as np
 
 import openmdao.api as om

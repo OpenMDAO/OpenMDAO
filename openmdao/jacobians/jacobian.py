@@ -6,7 +6,6 @@ from numpy.random import rand
 
 from collections import OrderedDict, defaultdict
 from scipy.sparse import issparse
-from six import itervalues, iteritems
 
 from openmdao.utils.name_maps import key2abs_key, rel_name2abs_name
 from openmdao.matrices.matrix import sparse_types
@@ -382,7 +381,7 @@ class Jacobian(object):
         active : bool
             Complex mode flag; set to True prior to commencing complex step.
         """
-        for meta in itervalues(self._subjacs_info):
+        for meta in self._subjacs_info.values():
             if active:
                 meta['value'] = meta['value'].astype(np.complex)
             else:

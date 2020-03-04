@@ -1,8 +1,6 @@
 """Define the ImplicitComponent class."""
 
 import numpy as np
-from six import itervalues, iteritems
-from six.moves import range
 
 from openmdao.core.component import Component
 from openmdao.recorders.recording_iteration_stack import Recording
@@ -257,7 +255,7 @@ class ImplicitComponent(Component):
                         d_outputs.read_only = d_residuals.read_only = False
 
     def _approx_subjac_keys_iter(self):
-        for abs_key, meta in iteritems(self._subjacs_info):
+        for abs_key, meta in self._subjacs_info.items():
             if 'method' in meta:
                 method = meta['method']
                 if method is not None and method in self._approx_schemes:
@@ -279,7 +277,7 @@ class ImplicitComponent(Component):
         with self._unscaled_context(outputs=[self._outputs]):
             # Computing the approximation before the call to compute_partials allows users to
             # override FD'd values.
-            for approximation in itervalues(self._approx_schemes):
+            for approximation in self._approx_schemes.values():
                 approximation.compute_approximations(self, jac=self._jacobian)
 
             self._inputs.read_only = self._outputs.read_only = True

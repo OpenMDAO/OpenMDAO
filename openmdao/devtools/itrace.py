@@ -8,8 +8,7 @@ import warnings
 from contextlib import contextmanager
 from collections import defaultdict, OrderedDict
 
-from six import string_types, PY2
-from six.moves import cStringIO
+from io import StringIO
 from numpy import ndarray
 try:
     import objgraph
@@ -49,7 +48,7 @@ def _indented_print(f_locals, d, indent, excludes=set(['__init__', 'self', '__cl
     for name in sorted(d, key=lambda a: str(a)):
         if name not in excludes:
             if isinstance(d[name], (dict, OrderedDict)):
-                f = cStringIO()
+                f = StringIO()
                 save = _printer
                 _printer = _get_printer(f)
                 _indented_print(f_locals, d[name], 0, show_ptrs=show_ptrs)
@@ -80,12 +79,8 @@ def _get_printer(stream, rank=-1):
 
     # rank < 0 means output on all ranks
     if not MPI or rank < 0 or MPI.COMM_WORLD.rank == rank:
-        if PY2:  # python 2 doesn't like the flush arg
-            def prt(*args, **kwargs):
-                print(*args, file=stream, **kwargs)
-        else:
-            def prt(*args, **kwargs):
-                print(*args, file=stream, flush=True, **kwargs)
+        def prt(*args, **kwargs):
+            print(*args, file=stream, flush=True, **kwargs)
     else:
         def prt(*args, **kwargs):
             pass

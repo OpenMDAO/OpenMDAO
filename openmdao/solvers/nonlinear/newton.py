@@ -3,9 +3,9 @@
 
 import numpy as np
 
+from openmdao.solvers.linesearch.backtracking import BoundsEnforceLS
 from openmdao.solvers.solver import NonlinearSolver
 from openmdao.recorders.recording_iteration_stack import Recording
-from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.mpi import MPI
 
 
@@ -41,25 +41,7 @@ class NewtonSolver(NonlinearSolver):
         self.linear_solver = None
 
         # Slot for linesearch
-        self.linesearch = None
-
-    @property
-    def line_search(self):
-        """
-        Return the current linesearch object.
-        """
-        warn_deprecation("The 'line_search' attribute provides backwards compatibility "
-                         "with OpenMDAO 1.x ; use 'linesearch' instead.")
-        return self.linesearch
-
-    @line_search.setter
-    def line_search(self, solver):
-        """
-        Set the linesearch solver.
-        """
-        warn_deprecation("The 'line_search' attribute provides backwards compatibility "
-                         "with OpenMDAO 1.x ; use 'linesearch' instead.")
-        self.linesearch = solver
+        self.linesearch = BoundsEnforceLS()
 
     def _declare_options(self):
         """
@@ -74,7 +56,7 @@ class NewtonSolver(NonlinearSolver):
         self.options.declare('cs_reconverge', types=bool, default=True,
                              desc='When True, when this driver solves under a complex step, nudge '
                              'the Solution vector by a small amount so that it reconverges.')
-        self.options.declare('reraise_child_analysiserror', types=bool, default=True,
+        self.options.declare('reraise_child_analysiserror', types=bool, default=False,
                              desc='When the option is true, a solver will reraise any '
                              'AnalysisError that arises during subsolve; when false, it will '
                              'continue solving.')
@@ -98,25 +80,9 @@ class NewtonSolver(NonlinearSolver):
 
         self._disallow_discrete_outputs()
 
-        if self.options._dict['reraise_child_analysiserror']['value']:
-            pathname = self._system().pathname
-            if pathname:
-                pathname += ': '
-            msg = ("Deprecation warning: In V 3.x, reraise_child_analysiserror will default to "
-                   "False.")
-
-            if rank == 0:
-                warn_deprecation(pathname + msg)
-
         if not isinstance(self.options._dict['solve_subsystems']['value'], bool):
-            pathname = self._system().pathname
-            if pathname:
-                pathname += ': '
-            msg = 'Deprecation warning: In V 3.x, solve_subsystems must be set by the user.'
-
-            if rank == 0:
-                warn_deprecation(pathname + msg)
-            self.options['solve_subsystems'] = False
+            msg = '{}: solve_subsystems must be set by the user.'
+            raise ValueError(msg.format(self.msginfo))
 
         if self.linear_solver is not None:
             self.linear_solver._setup_solvers(self._system(), self._depth + 1)
@@ -125,18 +91,6 @@ class NewtonSolver(NonlinearSolver):
 
         if self.linesearch is not None:
             self.linesearch._setup_solvers(self._system(), self._depth + 1)
-
-        else:
-            # In OpenMDAO 3.x, we will be making BoundsEnforceLS the default line search.
-            # This deprecation warning is to prepare users for the change.
-            pathname = self._system().pathname
-            if pathname:
-                pathname += ': '
-            msg = 'Deprecation warning: In V 3.0, the default Newton solver setup will change ' + \
-                  'to use the BoundsEnforceLS line search.'
-
-            if rank == 0:
-                warn_deprecation(pathname + msg)
 
     def _assembled_jac_solver_iter(self):
         """

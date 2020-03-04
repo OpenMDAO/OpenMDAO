@@ -2,7 +2,6 @@
 import sys
 import importlib
 
-from six import iteritems
 from docutils import nodes
 
 import sphinx

@@ -4,8 +4,6 @@ Helper class for total jacobian computation.
 from collections import OrderedDict, defaultdict
 from copy import deepcopy
 import pprint
-from six import iteritems, itervalues
-from six.moves import zip
 import sys
 import time
 import traceback
@@ -241,12 +239,14 @@ class _TotalJacInfo(object):
         # create scratch array for jac scatters
         self.jac_scratch = None
         if self.comm.size > 1:
-            scratch = np.empty(max(J.shape), dtype=J.dtype)
+            # need 2 scratch vectors of the same size here
+            scratch = np.zeros(max(J.shape), dtype=J.dtype)
+            scratch2 = scratch.copy()
             self.jac_scratch = {}
             if 'fwd' in modes:
-                self.jac_scratch['fwd'] = scratch[:J.shape[0]]
+                self.jac_scratch['fwd'] = (scratch[:J.shape[0]], scratch2[:J.shape[0]])
             if 'rev' in modes:
-                self.jac_scratch['rev'] = scratch[:J.shape[1]]
+                self.jac_scratch['rev'] = (scratch[:J.shape[1]], scratch2[:J.shape[1]])
 
         if not approx:
             self.sol2jac_map = {}
@@ -1140,7 +1140,7 @@ class _TotalJacInfo(object):
                                 addv=False, mode=False)
                 self.J[:, i] = self.tgt_petsc[mode].array
         else:  # rev
-            scratch = self.jac_scratch['rev']
+            scratch = self.jac_scratch['rev'][1]
             scratch[:] = self.J[i]
             self.comm.Allreduce(scratch, self.J[i], op=MPI.SUM)
 
@@ -1192,7 +1192,6 @@ class _TotalJacInfo(object):
         dist = self.comm.size > 1
 
         J = self.J
-        scratch_size = J.shape[0] if fwd else J.shape[1]
         deriv_idxs, jac_idxs, _ = self.sol2jac_map[mode]
 
         # because simul_coloring cannot be used with vectorized derivs (matmat) or parallel
@@ -1202,7 +1201,7 @@ class _TotalJacInfo(object):
         if self.jac_scratch is None:
             reduced_derivs = deriv_val[deriv_idxs['linear']]
         else:
-            reduced_derivs = self.jac_scratch[mode]
+            reduced_derivs = self.jac_scratch[mode][0]
             reduced_derivs[:] = 0.0
             reduced_derivs[jac_idxs['linear']] = deriv_val[deriv_idxs['linear']]
 
@@ -1304,10 +1303,11 @@ class _TotalJacInfo(object):
             model._linearize(model._assembled_jac,
                              sub_do_ln=model._linear_solver._linearize_children())
         model._linear_solver._linearize()
+        self.J[:] = 0.0
 
         # Main loop over columns (fwd) or rows (rev) of the jacobian
         for mode in self.idx_iter_dict:
-            for key, idx_info in iteritems(self.idx_iter_dict[mode]):
+            for key, idx_info in self.idx_iter_dict[mode].items():
                 imeta, idx_iter = idx_info
                 for inds, input_setter, jac_setter, itermeta in idx_iter(imeta, mode):
                     rel_systems, vec_names, cache_key = input_setter(inds, itermeta, mode)
@@ -1317,12 +1317,11 @@ class _TotalJacInfo(object):
                             varlist = '(' + ', '.join([name for name in par_deriv[key]]) + ')'
                             print('Solving color:', key, varlist)
                         else:
-                            print('In mode: {0}, Solving variable(s):'.format(
-                                  mode))
+                            print('In mode: %s, Solving variable(s) using simul coloring:' % mode)
                             if key == '@simul_coloring':
-                                local_inds = imeta['coloring']._local_indices(
-                                    inds=inds, mode=self.mode)
-                                print(*local_inds, sep='\n')
+                                for local_ind in imeta['coloring']._local_indices(inds=inds,
+                                                                                  mode=self.mode):
+                                    print("   {}".format(local_ind))
                             else:
                                 print("('{0}', [{1}])".format(key, inds))
 
@@ -1340,8 +1339,7 @@ class _TotalJacInfo(object):
                             model._solve_linear(model._lin_vec_names, mode, rel_systems)
 
                     if debug_print:
-                        print('Elapsed Time:', time.time() - t0, '\n')
-                        sys.stdout.flush()
+                        print('Elapsed Time:', time.time() - t0, '\n', flush=True)
 
                     jac_setter(inds, mode)
 
@@ -1353,7 +1351,7 @@ class _TotalJacInfo(object):
             # Debug outputs scaled derivatives.
             self._print_derivatives()
 
-        # np.save("total_jac.npy", self.J)
+        # np.save("total_jac%d.npy" % self.comm.rank, self.J)
 
         return self.J_final
 
@@ -1518,10 +1516,10 @@ class _TotalJacInfo(object):
         responses = self.prom_responses
 
         if self.return_format in ('dict', 'array'):
-            for prom_out, odict in iteritems(J):
+            for prom_out, odict in J.items():
                 oscaler = responses[prom_out]['scaler']
 
-                for prom_in, val in iteritems(odict):
+                for prom_in, val in odict.items():
                     iscaler = desvars[prom_in]['scaler']
 
                     # Scale response side
@@ -1533,7 +1531,7 @@ class _TotalJacInfo(object):
                         val *= 1.0 / iscaler
 
         elif self.return_format == 'flat_dict':
-            for tup, val in iteritems(J):
+            for tup, val in J.items():
                 prom_out, prom_in = tup
                 oscaler = responses[prom_out]['scaler']
                 iscaler = desvars[prom_in]['scaler']
@@ -1659,7 +1657,7 @@ def _fix_pdc_lengths(idx_iter_dict):
     idx_iter_dict : dict
         Dict of a name/color mapped to indexing information.
     """
-    for imeta, _ in itervalues(idx_iter_dict):
+    for imeta, _ in idx_iter_dict.values():
         par_deriv_color = imeta['par_deriv_color']
         matmat = imeta['matmat']
         range_list = imeta['idx_list']

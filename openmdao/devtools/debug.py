@@ -7,17 +7,16 @@ from itertools import product, chain
 
 import numpy as np
 from contextlib import contextmanager
-from six import iteritems, iterkeys, itervalues
 from collections import Counter
 
-from six.moves import zip_longest
 from openmdao.core.problem import Problem
 from openmdao.core.group import Group, System
 from openmdao.core.implicitcomponent import ImplicitComponent
-from openmdao.utils.mpi import MPI
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.approximation_schemes.complex_step import ComplexStep
+from openmdao.utils.mpi import MPI
 from openmdao.utils.name_maps import abs_key2rel_key, rel_key2abs_key
+from openmdao.utils.general_utils import simple_warning
 
 # an object used to detect when a named value isn't found
 _notfound = object()
@@ -184,7 +183,7 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True, show_approx=T
         if show_approx and s._approx_schemes:
             approx_keys = set()
             keys = set()
-            for k, sjac in iteritems(s._subjacs_info):
+            for k, sjac in s._subjacs_info.items():
                 if 'method' in sjac and sjac['method']:
                     approx_keys.add(k)
                 else:
@@ -279,7 +278,7 @@ def config_summary(problem, stream=sys.stdout):
         con_nonlin_ineq = {}
         con_linear_eq = {}
         con_linear_ineq = {}
-        for con, vals in iteritems(model.get_constraints()):
+        for con, vals in model.get_constraints().items():
             if vals['linear']:
                 if vals['equals'] is not None:
                     con_linear_eq[con] = vals
@@ -424,7 +423,8 @@ def trace_mpi(fname='mpi_trace', skip=(), flush=True):
         If True, flush print buffer after every print call.
     """
     if MPI is None:
-        raise RuntimeError("MPI is not active.  Trace aborted.")
+        simple_warning("MPI is not active.  Trace aborted.")
+        return
     if sys.getprofile() is not None:
         raise RuntimeError("another profile function is already active.")
 
