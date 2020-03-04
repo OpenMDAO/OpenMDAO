@@ -719,7 +719,6 @@ class TestColoring(unittest.TestCase):
             self.assertEqual(6, comp._nruns - start_nruns)
             self.assertEqual(comp._coloring_info['coloring'], None)
             self.assertEqual(comp._coloring_info['static'], None)
-            self.assertEqual(comp._coloring_info['dynamic'], None)
 
             jac = comp._jacobian._subjacs_info
             _check_partial_matrix(comp, jac, sparsity, 'cs')
