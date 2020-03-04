@@ -656,6 +656,7 @@ class pyOptSparseDriver(Driver):
             Current coloring.
         """
         total_sparsity = None
+        self._res_jacs = {}
         coloring = coloring if coloring is not None else self._get_static_coloring()
         if coloring is not None:
             total_sparsity = coloring.get_subjac_sparsity()
