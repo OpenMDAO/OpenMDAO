@@ -1,5 +1,4 @@
 """Base class used to define the interface for derivative approximation schemes."""
-from six import iteritems
 from collections import defaultdict
 from scipy.sparse import coo_matrix
 import numpy as np
@@ -149,7 +148,7 @@ class ApproximationScheme(object):
 
         data = None
         keys = set()
-        for key, apprx in iteritems(self._exec_dict):
+        for key, apprx in self._exec_dict.items():
             if key[0] in wrt_matches:
                 if data is None:
                     # data is the same for all colored approxs so we only need the first
@@ -353,7 +352,7 @@ class ApproximationScheme(object):
                                              data, results_array, total)
 
                     if is_parallel:
-                        for of, (oview, out_idxs, _, _) in iteritems(J['ofs']):
+                        for of, (oview, out_idxs, _, _) in J['ofs'].items():
                             if owns[of] == iproc:
                                 results[(of, wrt)].append(
                                     (i_count,

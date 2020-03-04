@@ -1,7 +1,6 @@
 
 import importlib
 
-from six import iteritems
 from docutils import nodes
 from docutils.statemachine import ViewList
 

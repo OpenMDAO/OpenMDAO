@@ -3,7 +3,6 @@ Interpolate using a cubic spline polynomial.
 
 Based on NPSS implementation.
 """
-from six.moves import range
 
 import numpy as np
 

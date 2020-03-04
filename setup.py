@@ -159,7 +159,6 @@ setup(
         'pyDOE2',
         'pyparsing',
         'scipy',
-        'six',
         'requests'
     ],
     entry_points={
@@ -177,9 +176,7 @@ setup(
         ],
         'openmdao_component': [
             'addsubtractcomp=openmdao.components.add_subtract_comp:AddSubtractComp',
-            'akimasplinecomp=openmdao.components.akima_spline_comp:AkimaSplineComp',
             'balancecomp=openmdao.components.balance_comp:BalanceComp',
-            'bsplinescomp=openmdao.components.bsplines_comp:BsplinesComp',
             'crossproductcomp=openmdao.components.cross_product_comp:CrossProductComp',
             'demuxcomp=openmdao.components.demux_comp:DemuxComp',
             'dotproductcomp=openmdao.components.dot_product_comp:DotProductComp',

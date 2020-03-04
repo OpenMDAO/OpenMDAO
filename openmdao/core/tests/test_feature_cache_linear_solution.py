@@ -2,7 +2,8 @@
 from distutils.version import LooseVersion
 import unittest
 from copy import deepcopy
-from six.moves import cStringIO
+from io import StringIO
+
 
 import numpy as np
 import scipy

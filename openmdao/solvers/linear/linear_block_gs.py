@@ -1,9 +1,5 @@
 """Define the LinearBlockGS class."""
 
-from six import iteritems
-from six.moves import range
-
-
 from openmdao.solvers.solver import BlockLinearSolver
 
 

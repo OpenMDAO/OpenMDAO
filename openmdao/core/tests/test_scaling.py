@@ -1,7 +1,6 @@
 """Define the units/scaling tests."""
 import unittest
 from copy import deepcopy
-from six import assertRaisesRegex
 
 import numpy as np
 

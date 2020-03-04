@@ -4,9 +4,6 @@ import itertools
 import sys
 import unittest
 
-from six import assertRaisesRegex, StringIO
-from six.moves import range
-
 import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix
 
@@ -604,7 +601,7 @@ class TestJacobian(unittest.TestCase):
         msg = "Comp1 \(comp\): d\(y\)/d\(x\): declare_partials has been called with rows and cols, which" + \
               " should be arrays of equal length, but rows is length 2 while " + \
               "cols is length 1."
-        with assertRaisesRegex(self, RuntimeError, msg):
+        with self.assertRaisesRegex(RuntimeError, msg):
             prob.setup()
 
         prob = Problem()
@@ -614,7 +611,7 @@ class TestJacobian(unittest.TestCase):
         msg = "Comp2 \(comp\): d\(y\)/d\(x\): declare_partials has been called with rows and cols, which" + \
             " should be arrays of equal length, but rows is length 1 while " + \
             "cols is length 2."
-        with assertRaisesRegex(self, RuntimeError, msg):
+        with self.assertRaisesRegex(RuntimeError, msg):
             prob.setup()
 
     def test_assembled_jacobian_unsupported_cases(self):
@@ -651,7 +648,7 @@ class TestJacobian(unittest.TestCase):
         prob.setup()
 
         msg = "AssembledJacobian not supported for matrix-free subcomponent."
-        with assertRaisesRegex(self, Exception, msg):
+        with self.assertRaisesRegex(Exception, msg):
             prob.run_model()
 
         # Nested
@@ -672,7 +669,7 @@ class TestJacobian(unittest.TestCase):
         prob.setup()
 
         msg = "AssembledJacobian not supported for matrix-free subcomponent."
-        with assertRaisesRegex(self, Exception, msg):
+        with self.assertRaisesRegex(Exception, msg):
             prob.run_model()
 
         # Try a component that is derived from a matrix-free one
@@ -695,7 +692,7 @@ class TestJacobian(unittest.TestCase):
         prob.setup()
 
         msg = "AssembledJacobian not supported for matrix-free subcomponent."
-        with assertRaisesRegex(self, Exception, msg):
+        with self.assertRaisesRegex(Exception, msg):
             prob.run_model()
 
         # Make sure regular comps don't give an error.
@@ -739,7 +736,7 @@ class TestJacobian(unittest.TestCase):
         prob.setup()
 
         msg = "AssembledJacobian not supported for matrix-free subcomponent."
-        with assertRaisesRegex(self, Exception, msg):
+        with self.assertRaisesRegex(Exception, msg):
             prob.run_model()
 
     def test_access_undeclared_subjac(self):
@@ -769,7 +766,7 @@ class TestJacobian(unittest.TestCase):
         prob.run_model()
 
         msg = 'Variable name pair \("{}", "{}"\) must first be declared.'
-        with assertRaisesRegex(self, KeyError, msg.format('y', 'x')):
+        with self.assertRaisesRegex(KeyError, msg.format('y', 'x')):
             J = prob.compute_totals(of=['comp.y'], wrt=['p1.x'])
 
     def test_one_src_2_tgts_with_src_indices_densejac(self):

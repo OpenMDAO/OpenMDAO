@@ -4,7 +4,6 @@ Various functions to make it easier to build test models.
 
 import time
 import numpy
-from six.moves import range
 
 from openmdao.core.group import Group
 from openmdao.core.parallel_group import ParallelGroup
@@ -104,7 +103,7 @@ if __name__ == '__main__':
 
     if 'gmres' in sys.argv:
         from openmdao.solvers.linear.scipy_iter_solver import ScipyKrylov
-        p.root.linear_solver = ScipyKrylov()
+        g.linear_solver = ScipyKrylov()
 
     g.add_subsystem("P", IndepVarComp('x', numpy.ones(vec_size)))
 

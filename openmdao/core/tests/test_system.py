@@ -1,8 +1,6 @@
 """ Unit tests for the system interface."""
 
 import unittest
-from six import assertRaisesRegex
-from six.moves import cStringIO
 
 import numpy as np
 
@@ -128,7 +126,7 @@ class TestSystem(unittest.TestCase):
         #
 
         # assign array to scalar
-        with assertRaisesRegex(self, ValueError, msg):
+        with self.assertRaisesRegex(ValueError, msg):
             inputs['C1.a'] = arr_val
 
         # assign scalar to array
@@ -140,7 +138,7 @@ class TestSystem(unittest.TestCase):
         assert_rel_error(self, inputs['C2.x'], arr_val, 1e-10)
 
         # assign bad array shape to array
-        with assertRaisesRegex(self, ValueError, msg):
+        with self.assertRaisesRegex(ValueError, msg):
             inputs['C2.x'] = bad_val
 
         # assign list to array
@@ -148,7 +146,7 @@ class TestSystem(unittest.TestCase):
         assert_rel_error(self, inputs['C2.x'], arr_val, 1e-10)
 
         # assign bad list shape to array
-        with assertRaisesRegex(self, ValueError, msg):
+        with self.assertRaisesRegex(ValueError, msg):
             inputs['C2.x'] = bad_val.tolist()
 
         #
@@ -156,7 +154,7 @@ class TestSystem(unittest.TestCase):
         #
 
         # assign array to scalar
-        with assertRaisesRegex(self, ValueError, msg):
+        with self.assertRaisesRegex(ValueError, msg):
             outputs['C1.b'] = arr_val
 
         # assign scalar to array
@@ -168,7 +166,7 @@ class TestSystem(unittest.TestCase):
         assert_rel_error(self, outputs['C2.y'], arr_val, 1e-10)
 
         # assign bad array shape to array
-        with assertRaisesRegex(self, ValueError, msg):
+        with self.assertRaisesRegex(ValueError, msg):
             outputs['C2.y'] = bad_val
 
         # assign list to array
@@ -176,7 +174,7 @@ class TestSystem(unittest.TestCase):
         assert_rel_error(self, outputs['C2.y'], arr_val, 1e-10)
 
         # assign bad list shape to array
-        with assertRaisesRegex(self, ValueError, msg):
+        with self.assertRaisesRegex(ValueError, msg):
             outputs['C2.y'] = bad_val.tolist()
 
         #
@@ -184,7 +182,7 @@ class TestSystem(unittest.TestCase):
         #
 
         # assign array to scalar
-        with assertRaisesRegex(self, ValueError, msg):
+        with self.assertRaisesRegex(ValueError, msg):
             residuals['C1.b'] = arr_val
 
         # assign scalar to array
@@ -196,7 +194,7 @@ class TestSystem(unittest.TestCase):
         assert_rel_error(self, residuals['C2.y'], arr_val, 1e-10)
 
         # assign bad array shape to array
-        with assertRaisesRegex(self, ValueError, msg):
+        with self.assertRaisesRegex(ValueError, msg):
             residuals['C2.y'] = bad_val
 
         # assign list to array
@@ -204,57 +202,8 @@ class TestSystem(unittest.TestCase):
         assert_rel_error(self, residuals['C2.y'], arr_val, 1e-10)
 
         # assign bad list shape to array
-        with assertRaisesRegex(self, ValueError, msg):
+        with self.assertRaisesRegex(ValueError, msg):
             residuals['C2.y'] = bad_val.tolist()
-
-    def test_deprecated_solver_names(self):
-        class DummySolver():
-            pass
-
-        model = Group()
-
-        # check nl_solver setter & getter
-        msg = "The 'nl_solver' attribute provides backwards compatibility " \
-              "with OpenMDAO 1.x ; use 'nonlinear_solver' instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            model.nl_solver = DummySolver()
-
-        with assert_warning(DeprecationWarning, msg):
-            solver = model.nl_solver
-
-        self.assertTrue(isinstance(solver, DummySolver))
-
-        # check ln_solver setter & getter
-        msg = "The 'ln_solver' attribute provides backwards compatibility " \
-              "with OpenMDAO 1.x ; use 'linear_solver' instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            model.ln_solver = DummySolver()
-
-        with assert_warning(DeprecationWarning, msg):
-            solver = model.ln_solver
-
-        self.assertTrue(isinstance(solver, DummySolver))
-
-    def test_deprecated_metadata(self):
-        prob = Problem()
-        prob.model.add_subsystem('inputs', IndepVarComp('x', shape=3))
-        prob.model.add_subsystem('double', VectorDoublingComp())
-
-        msg = "The 'metadata' attribute provides backwards compatibility " \
-              "with earlier version of OpenMDAO; use 'options' instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            prob.model.double.metadata['size'] = 3
-
-        prob.model.connect('inputs.x', 'double.x')
-        prob.setup()
-
-        prob['inputs.x'] = [1., 2., 3.]
-
-        prob.run_model()
-        assert_rel_error(self, prob['double.y'], [2., 4., 6.])
 
     def test_list_inputs_output_with_includes_excludes(self):
         from openmdao.test_suite.scripts.circuit_analysis import Circuit

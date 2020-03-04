@@ -2,7 +2,6 @@
 Unit tests for the structured metamodel component.
 """
 import unittest
-from six import assertRaisesRegex
 
 import numpy as np
 from numpy.testing import assert_almost_equal
@@ -521,7 +520,7 @@ class TestMetaModelStructuredScipy(unittest.TestCase):
         #   dict so no guarantee on the order except for Python 3.6 !
         msg = "MetaModelStructuredComp \(comp\): Error interpolating output '[f|g]' because input 'comp.z' was " \
               "out of bounds \('.*', '.*'\) with value '9.0'"
-        with assertRaisesRegex(self, om.AnalysisError, msg):
+        with self.assertRaisesRegex(om.AnalysisError, msg):
             self.run_and_check_derivs(self.prob)
 
     def test_training_gradient(self):
@@ -1265,47 +1264,6 @@ class TestMetaModelStructuredCompFeature(unittest.TestCase):
 
         computed = prob['f']
         actual = 6.73306472
-
-        assert_almost_equal(computed, actual)
-
-        # we can verify all gradients by checking against finite-difference
-        prob.check_partials(compact_print=True)
-
-    @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
-    def test_meta_model_structured_deprecated(self):
-        # run same test as above, only with the deprecated component,
-        # to ensure we get the warning and the correct answer.
-        # self-contained, to be removed when class name goes away.
-
-        msg = "'MetaModelStructured' has been deprecated. Use 'MetaModelStructuredComp' instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            xor_interp = om.MetaModelStructured(method='scipy_slinear')
-
-        # set up inputs and outputs
-        xor_interp.add_input('x', 0.0, training_data=np.array([0.0, 1.0]), units=None)
-        xor_interp.add_input('y', 1.0, training_data=np.array([0.0, 1.0]), units=None)
-
-        xor_interp.add_output('xor', 1.0, training_data=np.array([[0.0, 1.0], [1.0, 0.0]]), units=None)
-
-        # Set up the OpenMDAO model
-        model = om.Group()
-        ivc = om.IndepVarComp()
-        ivc.add_output('x', 0.0)
-        ivc.add_output('y', 1.0)
-        model.add_subsystem('ivc', ivc, promotes=["*"])
-        model.add_subsystem('comp', xor_interp, promotes=["*"])
-        prob = om.Problem(model)
-        prob.setup()
-
-        # Now test out a 'fuzzy' XOR
-        prob['x'] = 0.9
-        prob['y'] = 0.001242
-
-        prob.run_model()
-
-        computed = prob['xor']
-        actual = 0.8990064
 
         assert_almost_equal(computed, actual)
 

@@ -6,8 +6,6 @@ import numpy as np
 import unittest
 TestCase = unittest.TestCase
 
-from six import iterkeys
-
 import openmdao.api as om
 from openmdao.utils.mpi import MPI
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
