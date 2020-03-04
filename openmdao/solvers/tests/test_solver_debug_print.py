@@ -1,7 +1,5 @@
 """Tests the `debug_print` option for Nonlinear solvers."""
 
-from six import StringIO
-
 import os
 import re
 import sys
@@ -10,6 +8,7 @@ import tempfile
 
 import unittest
 from distutils.version import LooseVersion
+from io import StringIO
 
 import numpy as np
 
@@ -107,6 +106,9 @@ class TestNonlinearSolvers(unittest.TestCase):
 
         if name == 'NonlinearBlockGS':
             nl.options['use_apply_nonlinear'] = True
+
+        if name == 'NewtonSolver':
+            nl.options['solve_subsystems'] = True
 
         # suppress solver output for test
         nl.options['iprint'] = model.circuit.linear_solver.options['iprint'] = -1

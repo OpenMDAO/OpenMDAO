@@ -5,8 +5,6 @@ HTML file writing to create standalone XDSMjs output file.
 import json
 import os
 
-from six import itervalues
-
 from openmdao.visualization.html_utils import (
     read_files,
     write_div,
@@ -76,7 +74,7 @@ def write_html(outfile, source_data=None, data_file=None, embeddable=False):
 
     # grab the style
     styles = read_files(("fontello", "xdsm"), style_dir, "css")
-    styles_elem = write_style(content="\n\n".join(itervalues(styles)))
+    styles_elem = write_style(content="\n\n".join(styles.values()))
 
     # put all style and JS into index
     toolbar_div = write_div(attrs={"class": "xdsm-toolbar"})

@@ -1,8 +1,7 @@
 """Simple example demonstrating how to implement an implicit component."""
 import unittest
 
-from six import iteritems
-from six.moves import cStringIO
+from io import StringIO
 
 import numpy as np
 
@@ -235,7 +234,7 @@ class ImplicitCompTestCase(unittest.TestCase):
     def test_list_inputs(self):
         self.prob.run_model()
 
-        stream = cStringIO()
+        stream = StringIO()
         inputs = self.prob.model.list_inputs(hierarchical=False, desc=True, out_stream=stream)
         self.assertEqual(sorted(inputs), [
             ('comp2.a', {'value':  [1.], 'desc': ''}),
@@ -278,7 +277,7 @@ class ImplicitCompTestCase(unittest.TestCase):
     def test_list_inputs_prom_name(self):
         self.prob.run_model()
 
-        stream = cStringIO()
+        stream = StringIO()
         states = self.prob.model.list_inputs(prom_name=True, shape=True, hierarchical=True,
                                              out_stream=stream)
 
@@ -297,7 +296,7 @@ class ImplicitCompTestCase(unittest.TestCase):
     def test_list_explicit_outputs(self):
         self.prob.run_model()
 
-        stream = cStringIO()
+        stream = StringIO()
         outputs = self.prob.model.list_outputs(implicit=False, hierarchical=False, out_stream=stream)
         self.assertEqual(sorted(outputs), [
             ('comp1.a', {'value': [1.]}),
@@ -335,7 +334,7 @@ class ImplicitCompTestCase(unittest.TestCase):
     def test_list_implicit_outputs(self):
         self.prob.run_model()
 
-        stream = cStringIO()
+        stream = StringIO()
         states = self.prob.model.list_outputs(explicit=False, residuals=True,
                                               hierarchical=False, out_stream=stream)
         self.assertTrue(('comp2.x', {'value': [3.], 'resids': [0.]}) in states, msg=None)
@@ -349,7 +348,7 @@ class ImplicitCompTestCase(unittest.TestCase):
     def test_list_outputs_prom_name(self):
         self.prob.run_model()
 
-        stream = cStringIO()
+        stream = StringIO()
         states = self.prob.model.list_outputs(explicit=False, residuals=True,
                                               prom_name=True, hierarchical=True,
                                               out_stream=stream)
@@ -363,7 +362,7 @@ class ImplicitCompTestCase(unittest.TestCase):
     def test_list_residuals(self):
         self.prob.run_model()
 
-        stream = cStringIO()
+        stream = StringIO()
         resids = self.prob.model.list_outputs(values=False, residuals=True, hierarchical=False,
                                               out_stream=stream)
         self.assertEqual(sorted(resids), [
@@ -498,7 +497,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
 
         totals = prob.check_totals(of=['fn.y'], wrt=['p.a'], method='cs', out_stream=None)
 
-        for key, val in iteritems(totals):
+        for key, val in totals.items():
             assert_rel_error(self, val['rel error'][0], 0.0, 1e-9)
 
     def test_guess_nonlinear_transfer(self):
@@ -1277,7 +1276,7 @@ class ListFeatureTestCase(unittest.TestCase):
         prob.run_model()
 
         # list_inputs test
-        stream = cStringIO()
+        stream = StringIO()
         inputs = prob.model.list_inputs(values=False, out_stream=stream)
         text = stream.getvalue()
         self.assertEqual(sorted(inputs), [
@@ -1305,7 +1304,7 @@ class ListFeatureTestCase(unittest.TestCase):
             ('sub.comp3.x', {'value': [3.]})
         ])
         # list explicit outputs
-        stream = cStringIO()
+        stream = StringIO()
         outputs = prob.model.list_outputs(implicit=False, out_stream=None)
         self.assertEqual(sorted(outputs), [
             ('comp1.a', {'value': [1.]}),

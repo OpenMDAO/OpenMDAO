@@ -1,5 +1,3 @@
-from six.moves import range
-
 import numpy as np
 
 import openmdao.api as om

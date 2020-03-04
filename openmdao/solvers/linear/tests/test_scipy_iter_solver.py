@@ -1,6 +1,5 @@
 """Test the ScipyKrylov linear solver class."""
 
-from six import iteritems
 import unittest
 
 import numpy as np
@@ -36,13 +35,7 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
 
     def test_solve_linear_scipy(self):
         """Solve implicit system with ScipyKrylov."""
-
-        # use ScipyIterativeSolver here to check for deprecation warning and verify that the deprecated
-        # class still gets the right answer without duplicating this test.
-        msg = "ScipyIterativeSolver is deprecated.  Use ScipyKrylov instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            group = TestImplicitGroup(lnSolverClass=lambda : om.ScipyIterativeSolver(solver=self.linear_solver_name))
+        group = TestImplicitGroup(lnSolverClass=lambda : om.ScipyKrylov(solver=self.linear_solver_name))
 
         p = om.Problem(group)
         p.setup()
@@ -135,20 +128,6 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
 
         output = d_residuals._data
         assert_rel_error(self, output, g1.expected_solution, 3e-15)
-
-    def test_preconditioner_deprecation(self):
-
-        group = TestImplicitGroup(lnSolverClass=self.linear_solver_class)
-
-        msg = "The 'preconditioner' property provides backwards compatibility " \
-            + "with OpenMDAO <= 1.x ; use 'precon' instead."
-
-        # check deprecation on setter & getter
-        with assert_warning(DeprecationWarning, msg):
-            group.linear_solver.preconditioner = om.LinearBlockGS()
-
-        with assert_warning(DeprecationWarning, msg):
-            group.linear_solver.preconditioner
 
     def test_linear_solution_cache(self):
         # Test derivatives across a converged Sellar model. When caching

@@ -4,8 +4,6 @@ This is a multipoint implementation of the beam optimization problem.
 This version minimizes volume while satisfying a max bending stress constraint in each element
 for each loadcase.
 """
-from six.moves import range
-
 import numpy as np
 
 import openmdao.api as om

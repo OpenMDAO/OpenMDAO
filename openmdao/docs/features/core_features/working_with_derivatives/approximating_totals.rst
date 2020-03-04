@@ -58,7 +58,7 @@ You can also complex step your model or group, though there are some important r
 **If you complex step around a solver that requires gradients, the solver must not get its gradients from complex step:**
   When you complex step around a nonlinear solver that requires gradients (like Newton), the
   nonlinear solver must solve a complex linear system rather than a real one. Most of OpenMDAO's linear solvers
-  (with the exception of `PetscKSP`) support the solution of such a system.  However, when you linearize the submodel
+  (with the exception of `PETScKrylov`) support the solution of such a system.  However, when you linearize the submodel
   to determine derivatives around a complex point, the application of complex step loses some of its robust properties
   when compared to real-valued finite difference (in particular, you get subtractive cancelation which causes
   increased inaccuracy for smaller step sizes.) When OpenMDAO encounters this situation, it will warn the user, and the

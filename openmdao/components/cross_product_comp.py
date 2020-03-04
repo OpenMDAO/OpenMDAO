@@ -1,7 +1,5 @@
 """Definition of the Cross Product Component."""
 
-from six import string_types
-
 import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent
@@ -33,17 +31,17 @@ class CrossProductComp(ExplicitComponent):
         """
         self.options.declare('vec_size', types=int, default=1,
                              desc='The number of points at which the cross product is computed')
-        self.options.declare('a_name', types=string_types, default='a',
+        self.options.declare('a_name', types=str, default='a',
                              desc='The variable name for vector a.')
-        self.options.declare('b_name', types=string_types, default='b',
+        self.options.declare('b_name', types=str, default='b',
                              desc='The variable name for vector b.')
-        self.options.declare('c_name', types=string_types, default='c',
+        self.options.declare('c_name', types=str, default='c',
                              desc='The variable name for vector c.')
-        self.options.declare('a_units', types=string_types, default=None, allow_none=True,
+        self.options.declare('a_units', types=str, default=None, allow_none=True,
                              desc='The units for vector a.')
-        self.options.declare('b_units', types=string_types, default=None, allow_none=True,
+        self.options.declare('b_units', types=str, default=None, allow_none=True,
                              desc='The units for vector b.')
-        self.options.declare('c_units', types=string_types, default=None, allow_none=True,
+        self.options.declare('c_units', types=str, default=None, allow_none=True,
                              desc='The units for vector c.')
 
         self._k = np.array([[0, 0, 0, -1, 0, 1],

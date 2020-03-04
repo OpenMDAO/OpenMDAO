@@ -1,5 +1,3 @@
-from six.moves import range
-
 import numpy as np
 from scipy.sparse import coo_matrix
 from scipy.sparse.linalg import splu

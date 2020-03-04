@@ -1,5 +1,5 @@
 import unittest
-from six.moves import cStringIO
+from io import StringIO
 import openmdao.api as om
 
 class TestRootComponentListOutputs(unittest.TestCase):
@@ -17,7 +17,7 @@ class TestRootComponentListOutputs(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        stream = cStringIO()
+        stream = StringIO()
         outputs = prob.model.list_outputs(hierarchical=False, out_stream=stream)
 
         self.assertEqual(sorted(outputs), [

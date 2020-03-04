@@ -4,7 +4,7 @@ Unit tests for the unstructured metamodel component.
 import sys
 import unittest
 from math import sin
-from six import StringIO
+from io import StringIO
 
 import numpy as np
 
@@ -741,175 +741,6 @@ class MetaModelTestCase(unittest.TestCase):
         self.assertEqual(prob['trig.x'], [5.])
         assert_rel_error(self, prob['trig.sin_x'], [.0], 1e-6)
 
-    def test_meta_model_unstructured_deprecated(self):
-        # run same test as above, only with the deprecated component,
-        # to ensure we get the warning and the correct answer.
-        # self-contained, to be removed when class name goes away.
-        from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructured  # deprecated
-
-        msg = "'MetaModelUnStructured' has been deprecated. Use 'MetaModelUnStructuredComp' instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            mm = MetaModelUnStructured()
-
-        mm.add_input('x1', 0.)
-        mm.add_input('x2', 0.)
-
-        mm.add_output('y1', 0.)
-        mm.add_output('y2', 0., surrogate=om.KrigingSurrogate())
-
-        msg = "The 'default_surrogate' attribute provides backwards compatibility " \
-              "with earlier version of OpenMDAO; use options['default_surrogate'] " \
-              "instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            mm.default_surrogate = om.ResponseSurface()
-
-        # add metamodel to a problem
-        prob = om.Problem()
-        prob.model.add_subsystem('mm', mm)
-        prob.setup()
-
-        # check that surrogates were properly assigned
-        surrogate = mm._metadata('y1').get('surrogate')
-        self.assertTrue(isinstance(surrogate, om.ResponseSurface))
-
-        surrogate = mm._metadata('y2').get('surrogate')
-        self.assertTrue(isinstance(surrogate, om.KrigingSurrogate))
-
-        # populate training data
-        msg = "The 'metadata' attribute provides backwards compatibility " \
-              "with earlier version of OpenMDAO; use 'options' instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            mm.metadata['train:x1'] = [1.0, 2.0, 3.0]
-            mm.metadata['train:x2'] = [1.0, 3.0, 4.0]
-            mm.metadata['train:y1'] = [3.0, 2.0, 1.0]
-            mm.metadata['train:y2'] = [1.0, 4.0, 7.0]
-
-        # run problem for provided data point and check prediction
-        prob['mm.x1'] = 2.0
-        prob['mm.x2'] = 3.0
-
-        self.assertTrue(mm.train)   # training will occur before 1st run
-        prob.run_model()
-
-        assert_rel_error(self, prob['mm.y1'], 2.0, .00001)
-        assert_rel_error(self, prob['mm.y2'], 4.0, .00001)
-
-        # run problem for interpolated data point and check prediction
-        prob['mm.x1'] = 2.5
-        prob['mm.x2'] = 3.5
-
-        self.assertFalse(mm.train)  # training will not occur before 2nd run
-        prob.run_model()
-
-        assert_rel_error(self, prob['mm.y1'], 1.5934, .001)
-
-        # change default surrogate, re-setup and check that metamodel re-trains
-        msg = "The 'default_surrogate' attribute provides backwards compatibility with " \
-              "earlier version of OpenMDAO; use options['default_surrogate'] instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            mm.default_surrogate = om.KrigingSurrogate()
-
-        prob.setup()
-
-        surrogate = mm._metadata('y1').get('surrogate')
-        self.assertTrue(isinstance(surrogate, om.KrigingSurrogate))
-
-        self.assertTrue(mm.train)  # training will occur after re-setup
-
-        prob['mm.x1'] = 2.5
-        prob['mm.x2'] = 3.5
-
-        prob.run_model()
-        assert_rel_error(self, prob['mm.y1'], 1.5, 1e-2)
-
-    def test_metamodel_deprecated(self):
-        # run same test as above, only with the deprecated component,
-        # to ensure we get the warning and the correct answer.
-        # self-contained, to be removed when class name goes away.
-        from openmdao.components.meta_model_unstructured_comp import MetaModel  # deprecated
-
-        msg = "'MetaModel' has been deprecated. Use 'MetaModelUnStructuredComp' instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            mm = MetaModel()
-
-        mm.add_input('x1', 0.)
-        mm.add_input('x2', 0.)
-
-        mm.add_output('y1', 0.)
-        mm.add_output('y2', 0., surrogate=om.KrigingSurrogate())
-
-        msg = "The 'default_surrogate' attribute provides backwards compatibility with " \
-              "earlier version of OpenMDAO; use options['default_surrogate'] instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            mm.default_surrogate = om.ResponseSurface()
-
-        # add metamodel to a problem
-        prob = om.Problem()
-        prob.model.add_subsystem('mm', mm)
-        prob.setup()
-
-        # check that surrogates were properly assigned
-        surrogate = mm._metadata('y1').get('surrogate')
-        self.assertTrue(isinstance(surrogate, om.ResponseSurface))
-
-        surrogate = mm._metadata('y2').get('surrogate')
-        self.assertTrue(isinstance(surrogate, om.KrigingSurrogate))
-
-        # populate training data
-        msg = "The 'metadata' attribute provides backwards compatibility " \
-              "with earlier version of OpenMDAO; use 'options' instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            mm.metadata['train:x1'] = [1.0, 2.0, 3.0]
-            mm.metadata['train:x2'] = [1.0, 3.0, 4.0]
-            mm.metadata['train:y1'] = [3.0, 2.0, 1.0]
-            mm.metadata['train:y2'] = [1.0, 4.0, 7.0]
-
-        # run problem for provided data point and check prediction
-        prob['mm.x1'] = 2.0
-        prob['mm.x2'] = 3.0
-
-        self.assertTrue(mm.train)   # training will occur before 1st run
-        prob.run_model()
-
-        assert_rel_error(self, prob['mm.y1'], 2.0, .00001)
-        assert_rel_error(self, prob['mm.y2'], 4.0, .00001)
-
-        # run problem for interpolated data point and check prediction
-        prob['mm.x1'] = 2.5
-        prob['mm.x2'] = 3.5
-
-        self.assertFalse(mm.train)  # training will not occur before 2nd run
-        prob.run_model()
-
-        assert_rel_error(self, prob['mm.y1'], 1.5934, .001)
-
-        # change default surrogate, re-setup and check that metamodel re-trains
-        msg = "The 'default_surrogate' attribute provides backwards compatibility with " \
-              "earlier version of OpenMDAO; use options['default_surrogate'] instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            mm.default_surrogate = om.KrigingSurrogate()
-
-        prob.setup()
-
-        surrogate = mm._metadata('y1').get('surrogate')
-        self.assertTrue(isinstance(surrogate, om.KrigingSurrogate))
-
-        self.assertTrue(mm.train)  # training will occur after re-setup
-
-        prob['mm.x1'] = 2.5
-        prob['mm.x2'] = 3.5
-
-        prob.run_model()
-        assert_rel_error(self, prob['mm.y1'], 1.5, 1e-2)
-
     def test_metamodel_use_fd_if_no_surrogate_linearize(self):
         class SinSurrogate(om.SurrogateModel):
             def train(self, x, y):
@@ -1423,23 +1254,6 @@ class MetaModelUnstructuredSurrogatesFeatureTestCase(unittest.TestCase):
         prob.run_model()
 
         assert_rel_error(self, prob['sin_mm.f_x'], .5*np.sin(prob['sin_mm.x']), 5e-3)
-
-
-class MetaModelUnstructuredFloatKrigingDeprecation(unittest.TestCase):
-
-    def test_deprecated(self):
-
-        prob = om.Problem()
-
-        prob.model.add_subsystem('p', om.IndepVarComp('x', 2.1))
-
-        sin_mm = om.MetaModelUnStructuredComp()
-        sin_mm.add_input('x', 0.)
-
-        msg = "'FloatKrigingSurrogate' has been deprecated. Use 'KrigingSurrogate' instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            sin_mm.add_output('f_x', 0., surrogate=om.FloatKrigingSurrogate())
 
 
 if __name__ == "__main__":

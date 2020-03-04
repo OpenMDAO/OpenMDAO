@@ -6,7 +6,6 @@ import ast
 from inspect import getmembers
 from fnmatch import fnmatchcase
 from collections import defaultdict
-from six import string_types
 
 
 class _Options(object):
@@ -323,7 +322,7 @@ def _create_profile_callback(stack, matches=None, do_call=None, do_ret=None, con
 def _get_methods(options, default):
     if options.methods is None:
         methods = func_group[default]
-    elif isinstance(options.methods, string_types):
+    elif isinstance(options.methods, str):
         try:
             methods = func_group[options.methods]
         except KeyError:

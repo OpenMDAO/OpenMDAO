@@ -1,6 +1,4 @@
 import itertools
-from six.moves import zip
-from six import iteritems, iterkeys, itervalues, string_types
 import collections
 
 try:
@@ -30,7 +28,7 @@ def _nice_name(obj):
     if isinstance(obj, type):
         return obj.__name__
     elif isinstance(obj, dict):
-        return str({_nice_name(k): _nice_name(v) for k, v in iteritems(obj)})
+        return str({_nice_name(k): _nice_name(v) for k, v in obj.items()})
     return str(obj)
 
 
@@ -45,9 +43,9 @@ def _test_suite(*args, **kwargs):
     Arguments that are not specified will have a reasonable default chosen.
     """
     full_suite = args and args[0] == '*'
-    groups = kwargs.pop('group_type', iterkeys(MODELS))
+    groups = kwargs.pop('group_type', MODELS.keys())
 
-    if isinstance(groups, string_types):
+    if isinstance(groups, str):
         groups = (groups, )
 
     for group_type in groups:
@@ -59,12 +57,12 @@ def _test_suite(*args, **kwargs):
             if kwargs:
                 raise ValueError('Cannot specify "*" and kwargs')
         else:
-            for arg, default_val in iteritems(default_params):
+            for arg, default_val in default_params.items():
                 if arg in kwargs:
                     arg_value = kwargs.pop(arg)
                     if arg_value == '*':
                         opts[arg] = default_val
-                    elif isinstance(arg_value, string_types) \
+                    elif isinstance(arg_value, str) \
                             or not isinstance(arg_value, collections.Iterable):
                         # itertools.product expects iterables, so make 1-item tuple
                         opts[arg] = (arg_value,)
@@ -87,7 +85,7 @@ def _test_suite(*args, **kwargs):
 
 def _cartesian_dict_product(dicts):
     # From http://stackoverflow.com/a/5228294
-    return (dict(zip(dicts, x)) for x in itertools.product(*itervalues(dicts)))
+    return (dict(zip(dicts, x)) for x in itertools.product(*dicts.values()))
 
 
 def _test_name(run_by_default):
@@ -155,7 +153,7 @@ class ParameterizedInstance(object):
         self.args = kwargs.copy()
 
         self.name = '_'.join(
-            '{0}_{1}'.format(key, _nice_name(value)) for key, value in iteritems(self.args)
+            '{0}_{1}'.format(key, _nice_name(value)) for key, value in self.args.items()
         )
 
         self.problem = None
