@@ -1824,9 +1824,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.driver = om.pyOptSparseDriver()
         prob.driver.options['optimizer'] = "IPOPT"
-        prob.driver.opt_settings['hessian_approximation'] = 'limited-memory'
-        prob.driver.opt_settings['nlp_scaling_method'] = 'user-scaling'
-        prob.driver.opt_settings['linear_solver'] = 'mumps'
+        prob.driver.opt_settings['print_level'] = 0
 
         model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
         model.add_design_var('x', lower=0.0, upper=10.0)
