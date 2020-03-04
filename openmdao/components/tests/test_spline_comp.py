@@ -69,7 +69,7 @@ class SplineCompTestCase(unittest.TestCase):
         self.prob.setup(force_alloc_complex=True)
         self.prob.run_model()
 
-        # Verification array from AkimaSplineComp
+        # Verification array from openmdao 2.x using AkimaSplineComp
         akima_y = np.array([[ 5.       ,  7.20902005,  9.21276849, 10.81097162, 11.80335574,
                             12.1278001 , 12.35869145, 12.58588536, 12.81022332, 13.03254681,
                             13.25369732, 13.47451633, 13.69584534, 13.91852582, 14.14281484,
@@ -261,7 +261,6 @@ class SplineCompTestCase(unittest.TestCase):
         x = np.sin(t)
 
         prob = om.Problem()
-        model = prob.model
 
         comp = om.SplineComp(method='bsplines', x_interp_val=tt, x_cp_val=t)
 
@@ -277,7 +276,6 @@ class SplineCompTestCase(unittest.TestCase):
         self.assertEqual(str(cm.exception), msg)
 
         prob = om.Problem()
-        model = prob.model
 
         comp = om.SplineComp(method='akima', x_interp_val=tt, num_cp=n_cp, x_cp_val=t)
 
@@ -292,7 +290,6 @@ class SplineCompTestCase(unittest.TestCase):
         self.assertEqual(str(cm.exception), msg)
 
         prob = om.Problem()
-        model = prob.model
 
         comp = om.SplineComp(method='akima', x_interp_val=tt)
 
@@ -398,6 +395,7 @@ class SplineCompFeatureTestCase(unittest.TestCase):
         import numpy as np
 
         import openmdao.api as om
+        from openmdao.utils.spline_distributions import sine_distribution
 
         x_cp = np.linspace(0., 1., 6)
         y_cp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
@@ -465,7 +463,7 @@ class SplineCompFeatureTestCase(unittest.TestCase):
 
         model.add_subsystem('px', om.IndepVarComp('x', val=x))
 
-        # Set options specific to akima
+        # Set options specific to bsplines
         bspline_options = {'order': 3}
 
         comp = om.SplineComp(method='bsplines', x_interp_val=tt, num_cp=n_cp,
@@ -479,6 +477,80 @@ class SplineCompFeatureTestCase(unittest.TestCase):
 
         prob.setup(force_alloc_complex=True)
         prob.run_model()
+
+    def test_2to3doc_fixed_grid(self):
+        ycp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
+        ncp = len(ycp)
+        n = 11
+
+        prob = om.Problem()
+
+        akima_option = {'delta_x': 0.1}
+        comp = om.SplineComp(method='akima', num_cp=ncp, x_interp_val=np.linspace(0.0, 1.0, n),
+                             interp_options=akima_option)
+
+        prob.model.add_subsystem('comp1', comp)
+
+        comp.add_spline(y_cp_name='chord_cp', y_interp_name='chord', y_cp_val=ycp)
+
+        prob.setup()
+        prob.run_model()
+
+        y = np.array([[ 5.        ,  9.4362525 , 12.        , 13.0012475 , 14.        ,
+                        14.99875415, 16.        , 17.93874585, 21.        , 24.625    ,
+                        29.        ]])
+
+        assert_rel_error(self, prob['comp1.chord'], y, 1e-6)
+
+    def test_bsplines_2to3doc(self):
+        from openmdao.utils.spline_distributions import sine_distribution
+
+        prob = om.Problem()
+        model = prob.model
+
+        n_cp = 5
+        n_point = 10
+
+        t = np.linspace(0, 0.5 * np.pi, n_cp)
+        x = np.empty((2, n_cp))
+        x[0, :] = np.sin(t)
+        x[1, :] = 2.0 * np.sin(t)
+
+        # In 2.x, the BsplinesComp had a built-in sinusoidal distribution.
+        t_sin = sine_distribution(n_point) * np.pi * 0.5
+
+        bspline_options = {'order': 4}
+        comp = om.SplineComp(method='bsplines',
+                             x_interp_val=t_sin,
+                             num_cp=n_cp,
+                             vec_size=2,
+                             interp_options=bspline_options)
+
+        prob.model.add_subsystem('interp', comp)
+
+        comp.add_spline(y_cp_name='h_cp', y_interp_name='h', y_cp_val=x, y_units='km')
+
+        prob.setup()
+        prob.run_model()
+
+        xx = prob['interp.h']
+
+        with printoptions(precision=3, floatmode='fixed'):
+            assert_rel_error(self, x[0, :], np.array([
+                0., 0.38268343, 0.70710678, 0.92387953, 1.
+            ]), 1e-5)
+            assert_rel_error(self, x[1, :], 2.0*np.array([
+                0., 0.38268343, 0.70710678, 0.92387953, 1.
+            ]), 1e-5)
+
+            assert_rel_error(self, xx[0, :], np.array([
+                0., 0.06687281, 0.23486869, 0.43286622, 0.6062628,
+                0.74821484, 0.86228902, 0.94134389, 0.98587725, 1.
+            ]), 1e-5)
+            assert_rel_error(self, xx[1, :], 2.0*np.array([
+                0., 0.06687281, 0.23486869, 0.43286622, 0.6062628,
+                0.74821484, 0.86228902, 0.94134389, 0.98587725, 1.
+            ]), 1e-5)
 
 
 if __name__ == '__main__':

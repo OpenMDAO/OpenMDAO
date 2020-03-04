@@ -321,16 +321,6 @@ class TestGroup(unittest.TestCase):
         else:
             self.fail('Exception expected.')
 
-    def test_deprecated_runonce(self):
-        p = om.Problem()
-        p.model.add_subsystem('indep', om.IndepVarComp('x', 5.0))
-        p.model.add_subsystem('comp', om.ExecComp('b=2*a'))
-
-        msg = "NonLinearRunOnce is deprecated.  Use NonlinearRunOnce instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            p.model.nonlinear_solver = om.NonLinearRunOnce()
-
     def test_group_simple(self):
         import openmdao.api as om
 
@@ -341,18 +331,6 @@ class TestGroup(unittest.TestCase):
 
         self.assertEqual(p['comp1.a'], 3.0)
         self.assertEqual(p['comp1.b'], 6.0)
-
-    def test_group_add(self):
-        model = om.Group()
-        ecomp = om.ExecComp('b=2.0*a', a=3.0, b=6.0)
-
-        msg = "The 'add' method provides backwards compatibility with OpenMDAO <= 1.x ; " \
-              "use 'add_subsystem' instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            comp1 = model.add('comp1', ecomp)
-
-        self.assertTrue(ecomp is comp1)
 
     def test_group_simple_promoted(self):
         import openmdao.api as om
@@ -631,8 +609,12 @@ class TestGroup(unittest.TestCase):
     def test_group_promotes(self):
         """Promoting a single variable."""
         p = om.Problem()
-        p.model.add_subsystem('comp1', om.IndepVarComp([('a', 2.0), ('x', 5.0)]),
-                              promotes_outputs=['x'])
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('a', 2.0)
+        ivc.add_output('x', 5.0)
+
+        p.model.add_subsystem('comp1', ivc, promotes_outputs=['x'])
         p.model.add_subsystem('comp2', om.ExecComp('y=2*x'), promotes_inputs=['x'])
         p.setup()
 
@@ -691,8 +673,12 @@ class TestGroup(unittest.TestCase):
     def test_group_promotes_multiple(self):
         """Promoting multiple variables."""
         p = om.Problem()
-        p.model.add_subsystem('comp1', om.IndepVarComp([('a', 2.0), ('x', 5.0)]),
-                              promotes_outputs=['a', 'x'])
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('a', 2.0)
+        ivc.add_output('x', 5.0)
+
+        p.model.add_subsystem('comp1', ivc, promotes_outputs=['a', 'x'])
         p.model.add_subsystem('comp2', om.ExecComp('y=2*x'),
                               promotes_inputs=['x'])
         p.setup()
@@ -707,8 +693,12 @@ class TestGroup(unittest.TestCase):
     def test_group_promotes_all(self):
         """Promoting all variables with asterisk."""
         p = om.Problem()
-        p.model.add_subsystem('comp1', om.IndepVarComp([('a', 2.0), ('x', 5.0)]),
-                              promotes_outputs=['*'])
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('a', 2.0)
+        ivc.add_output('x', 5.0)
+
+        p.model.add_subsystem('comp1', ivc, promotes_outputs=['*'])
         p.model.add_subsystem('comp2', om.ExecComp('y=2*x'),
                               promotes_inputs=['x'])
         p.setup()
@@ -1569,7 +1559,7 @@ class TestConnect(unittest.TestCase):
         prob = om.Problem()
         prob.model.add_subsystem('px1', om.IndepVarComp('x1', 100.0))
         prob.model.add_subsystem('src', om.ExecComp('x2 = 2 * x1', x2={'units': 'degC'}))
-        prob.model.add_subsystem('tgt', om.ExecComp('y = 3 * x', x={'units': 'unitless'}))
+        prob.model.add_subsystem('tgt', om.ExecComp('y = 3 * x', x={'units': None}))
 
         prob.model.connect('px1.x1', 'src.x1')
         prob.model.connect('src.x2', 'tgt.x')

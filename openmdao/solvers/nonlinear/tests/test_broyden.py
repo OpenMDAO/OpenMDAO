@@ -11,13 +11,14 @@ from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStates
 from openmdao.test_suite.components.sellar import SellarStateConnection, SellarDerivatives, \
      SellarDis1withDerivatives, SellarDis2withDerivatives
-from openmdao.utils.assert_utils import assert_rel_error, assert_warning, assert_check_partials
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
 except ImportError:
     PETScVector = None
 from openmdao.utils.mpi import MPI
+
 
 class VectorEquation(om.ImplicitComponent):
     """Equation with 5 states in a single vector. Should converge to x=[0,0,0,0,0]"""
@@ -159,21 +160,6 @@ class TestBryoden(unittest.TestCase):
 
         msg = "Solver 'BROYDEN' on system 'g1' failed to converge in 1 iterations."
         self.assertEqual(str(context.exception), msg)
-
-    def test_reraise_child_analysiserror_deprecation_warning(self):
-
-        prob = om.Problem()
-        model = prob.model
-
-        model.nonlinear_solver = om.BroydenSolver(compute_jacobian=False)
-        model.linear_solver = om.DirectSolver()
-        model.nonlinear_solver.options['err_on_non_converge'] = True
-
-        prob.setup()
-
-        msg = "Deprecation warning: In V 3.x, reraise_child_analysiserror will default to False."
-        with assert_warning(DeprecationWarning, msg):
-            prob.final_setup()
 
     def test_error_badname(self):
         # Test top level Sellar (i.e., not grouped).
@@ -574,7 +560,6 @@ class TestBryoden(unittest.TestCase):
         top.model.linear_solver = om.DirectSolver()
 
         top.setup()
-        top.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='vector')
 
         # Setup again because we assigned a new linesearch
         top.setup()
@@ -759,21 +744,6 @@ class TestBryoden(unittest.TestCase):
 
         for key, val in totals.items():
             assert_rel_error(self, val['rel error'][0], 0.0, 1e-7)
-
-    def test_linsearch_3_deprecation(self):
-        prob = om.Problem()
-        model = prob.model = SellarStateConnection(nonlinear_solver=om.BroydenSolver(),
-                                                   linear_solver=om.LinearRunOnce())
-        prob.setup()
-
-        model.nonlinear_solver.options['state_vars'] = ['state_eq.y2_command']
-        model.nonlinear_solver.options['compute_jacobian'] = False
-
-        msg = 'Deprecation warning: In V 3.0, the default Broyden solver setup will change ' + \
-              'to use the BoundsEnforceLS line search.'
-
-        with assert_warning(DeprecationWarning, msg):
-            prob.final_setup()
 
 
 @unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")

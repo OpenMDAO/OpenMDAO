@@ -140,22 +140,6 @@ class TestOptionsDict(unittest.TestCase):
         expected_msg = "Option 'even_test' with value 3 is not an even number."
         self.assertEqual(expected_msg, str(context.exception))
 
-    def test_isvalid_deprecated_type(self):
-
-        msg = "In declaration of option 'even_test' the '_type' arg is deprecated.  Use 'types' instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            self.dict.declare('even_test', type_=int, check_valid=check_even)
-
-        self.dict['even_test'] = 2
-        self.dict['even_test'] = 4
-
-        with self.assertRaises(ValueError) as context:
-            self.dict['even_test'] = 3
-
-        expected_msg = "Option 'even_test' with value 3 is not an even number."
-        self.assertEqual(expected_msg, str(context.exception))
-
     def test_unnamed_args(self):
         with self.assertRaises(KeyError) as context:
             self.dict['test'] = 1

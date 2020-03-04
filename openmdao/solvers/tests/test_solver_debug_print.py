@@ -107,6 +107,9 @@ class TestNonlinearSolvers(unittest.TestCase):
         if name == 'NonlinearBlockGS':
             nl.options['use_apply_nonlinear'] = True
 
+        if name == 'NewtonSolver':
+            nl.options['solve_subsystems'] = True
+
         # suppress solver output for test
         nl.options['iprint'] = model.circuit.linear_solver.options['iprint'] = -1
 

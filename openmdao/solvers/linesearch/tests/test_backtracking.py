@@ -34,6 +34,7 @@ class TestArmejoGoldsteinBounds(unittest.TestCase):
 
     def test_nolinesearch(self):
         top = self.top
+        top.model.nonlinear_solver.linesearch = None
 
         # Run without a line search at x=2.0
         top['px.x'] = 2.0
@@ -275,10 +276,12 @@ class TestAnalysisErrorImplicit(unittest.TestCase):
         top.model.nonlinear_solver = om.NewtonSolver()
         top.model.nonlinear_solver.options['maxiter'] = 2
         top.model.nonlinear_solver.options['solve_subsystems'] = True
+        top.model.nonlinear_solver.linesearch = None
         top.model.linear_solver = om.ScipyKrylov()
 
         sub.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         sub.nonlinear_solver.options['maxiter'] = 2
+        sub.nonlinear_solver.linesearch = None
         sub.linear_solver = om.ScipyKrylov()
 
         ls = top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='wall')
@@ -324,10 +327,12 @@ class TestAnalysisErrorImplicit(unittest.TestCase):
         top.model.nonlinear_solver = om.NewtonSolver()
         top.model.nonlinear_solver.options['maxiter'] = 2
         top.model.nonlinear_solver.options['solve_subsystems'] = True
+        top.model.nonlinear_solver.linesearch = None
         top.model.linear_solver = om.ScipyKrylov()
 
         sub.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         sub.nonlinear_solver.options['maxiter'] = 2
+        sub.nonlinear_solver.linesearch = None
         sub.linear_solver = om.ScipyKrylov()
 
         ls = top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='wall')

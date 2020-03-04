@@ -7,7 +7,6 @@ from numpy import ndarray, imag, complex as npcomplex
 
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.units import valid_units
-from openmdao.utils.general_utils import warn_deprecation
 
 # regex to check for variable names.
 VAR_RGX = re.compile(r'([.]*[_a-zA-Z]\w*[ ]*\(?)')
@@ -18,7 +17,7 @@ _allowed_meta = {'value', 'shape', 'units', 'res_units', 'desc',
                  'flat_src_indices', 'tags'}
 
 # Names that are not allowed for input or output variables (keywords for options)
-_disallowed_names = {'has_diag_partials', 'vectorize', 'units', 'shape'}
+_disallowed_names = {'has_diag_partials', 'units', 'shape'}
 
 
 def check_option(option, value):
@@ -203,12 +202,6 @@ class ExecComp(ExplicitComponent):
                               x={'value': numpy.ones(10,dtype=float),
                                  'units': 'ft'})
         """
-        # separate disallowed var names from kwargs, pass them as options to __init__
-        if 'vectorize' in kwargs:
-            warn_deprecation("The 'vectorize' option is deprecated.  "
-                             "Please use 'has_diag_partials' instead.")
-            kwargs['has_diag_partials'] = kwargs.pop('vectorize')
-
         options = {}
         for name in _disallowed_names:
             if name in kwargs:

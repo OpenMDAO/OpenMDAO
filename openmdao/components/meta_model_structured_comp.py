@@ -6,7 +6,6 @@ from openmdao.components.interp_util.outofbounds_error import OutOfBoundsError
 from openmdao.components.interp_util.interp import InterpND, TABLE_METHODS
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.explicitcomponent import ExplicitComponent
-from openmdao.utils.general_utils import warn_deprecation
 
 
 class MetaModelStructuredComp(ExplicitComponent):
@@ -257,24 +256,3 @@ class MetaModelStructuredComp(ExplicitComponent):
                         dy_ddata[j] = val.reshape(self.grad_shape[1:])
 
                 partials[out_name, "%s_train" % out_name] = dy_ddata
-
-
-class MetaModelStructured(MetaModelStructuredComp):
-    """
-    Deprecated.
-    """
-
-    def __init__(self, *args, **kwargs):
-        """
-        Capture Initialize to throw warning.
-
-        Parameters
-        ----------
-        *args : list
-            Deprecated arguments.
-        **kwargs : dict
-            Deprecated arguments.
-        """
-        warn_deprecation("'MetaModelStructured' has been deprecated. Use "
-                         "'MetaModelStructuredComp' instead.")
-        super(MetaModelStructured, self).__init__(*args, **kwargs)

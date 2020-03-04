@@ -4,7 +4,6 @@ import scipy.linalg as linalg
 from scipy.optimize import minimize
 
 from openmdao.surrogate_models.surrogate_model import SurrogateModel
-from openmdao.utils.general_utils import warn_deprecation
 
 MACHINE_EPSILON = np.finfo(np.double).eps
 
@@ -285,22 +284,3 @@ class KrigingSurrogate(SurrogateModel):
         jac = np.einsum('i,j,ij->ij', self.Y_std, 1. /
                         self.X_std, gradr.dot(self.alpha).T)
         return jac
-
-
-class FloatKrigingSurrogate(KrigingSurrogate):
-    """
-    Deprecated.
-    """
-
-    def __init__(self, **kwargs):
-        """
-        Capture Initialize to throw warning.
-
-        Parameters
-        ----------
-        **kwargs : dict
-            Deprecated arguments.
-        """
-        warn_deprecation("'FloatKrigingSurrogate' has been deprecated. Use "
-                         "'KrigingSurrogate' instead.")
-        super(FloatKrigingSurrogate, self).__init__(**kwargs)

@@ -1018,6 +1018,8 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
         if color == 'total':
             p.driver.declare_coloring()
             if fixed:
+                # NOTE: This call line is embedded in the 2.x->3.x api conversion guide. Do not
+                # modify without carefully checking the guide.
                 p.driver.use_fixed_coloring()
 
         indeps = model.add_subsystem('indeps', om.IndepVarComp())

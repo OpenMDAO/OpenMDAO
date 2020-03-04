@@ -1965,8 +1965,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         self.assertEqual(metadata['name'], 'ScipyOptimizeDriver')
         self.assertEqual(metadata['type'], 'optimization')
         self.assertEqual(metadata['options'], {"debug_print": [], "optimizer": "SLSQP",
-                                               "tol": 1e-03, "maxiter": 200, "disp": True,
-                                               "dynamic_simul_derivs": False})
+                                               "tol": 1e-03, "maxiter": 200, "disp": True})
         self.assertEqual(metadata['opt_settings'], {"ACC": 1e-06})
 
     def test_feature_solver_metadata(self):

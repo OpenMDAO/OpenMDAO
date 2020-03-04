@@ -1265,34 +1265,6 @@ class TestProblem(unittest.TestCase):
         else:
             self.fail('Expecting TypeError')
 
-    def test_root_deprecated(self):
-        # testing the root property
-        msg = "The 'root' property provides backwards compatibility " \
-              "with OpenMDAO <= 1.x ; use 'model' instead."
-
-        prob = om.Problem()
-
-        # check deprecation on setter & getter
-        with assert_warning(DeprecationWarning, msg):
-            prob.root = om.Group()
-
-        with assert_warning(DeprecationWarning, msg):
-            prob.root
-
-        # testing the root kwarg
-        with self.assertRaises(ValueError) as cm:
-            prob = om.Problem(root=om.Group(), model=om.Group())
-
-        self.assertEqual(str(cm.exception),
-                         "Problem: Cannot specify both 'root' and 'model'. "
-                         "'root' has been deprecated, please use 'model'.")
-
-        msg = "The 'root' argument provides backwards " \
-              "compatibility with OpenMDAO <= 1.x ; use 'model' instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            prob = om.Problem(root=om.Group())
-
     def test_args(self):
         # defaults
         prob = om.Problem()

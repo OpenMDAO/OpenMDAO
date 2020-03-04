@@ -344,56 +344,6 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
 
         assert_rel_error(self, prob['mm.y'], [[26.26], [36.1031735]], tolerance=0.02)
 
-    def test_multifi_meta_model_unstructured_deprecated(self):
-        # run same test as above, only with the deprecated component,
-        # to ensure we get the warning and the correct answer.
-        # self-contained, to be removed when class name goes away.
-        from openmdao.components.multifi_meta_model_unstructured_comp import MultiFiMetaModelUnStructured  # deprecated
-
-        msg = "'MultiFiMetaModelUnStructured' has been deprecated. Use 'MultiFiMetaModelUnStructuredComp' instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            mm = MultiFiMetaModelUnStructured(nfi=3)
-
-        mm.add_input('x', 0.)
-        mm.add_output('y', 0.)
-
-        prob = om.Problem()
-        prob.model.add_subsystem('mm', mm)
-        prob.setup()
-
-        self.assertEqual(mm.options['train:x'], None)
-        self.assertEqual(mm.options['train:x_fi2'], None)
-        self.assertEqual(mm.options['train:x_fi3'], None)
-        self.assertEqual(mm.options['train:y'], None)
-        self.assertEqual(mm.options['train:y_fi2'], None)
-        self.assertEqual(mm.options['train:y_fi3'], None)
-
-    def test_multifi_meta_model_deprecated(self):
-        # run same test as above, only with the deprecated component,
-        # to ensure we get the warning and the correct answer.
-        # self-contained, to be removed when class name goes away.
-        from openmdao.components.multifi_meta_model_unstructured_comp import MultiFiMetaModel  # deprecated
-
-        msg = "'MultiFiMetaModel' component has been deprecated. Use 'MultiFiMetaModelUnStructuredComp' instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            mm = MultiFiMetaModel(nfi=3)
-
-        mm.add_input('x', 0.)
-        mm.add_output('y', 0.)
-
-        prob = om.Problem()
-        prob.model.add_subsystem('mm', mm)
-        prob.setup()
-
-        self.assertEqual(mm.options['train:x'], None)
-        self.assertEqual(mm.options['train:x_fi2'], None)
-        self.assertEqual(mm.options['train:x_fi3'], None)
-        self.assertEqual(mm.options['train:y'], None)
-        self.assertEqual(mm.options['train:y_fi2'], None)
-        self.assertEqual(mm.options['train:y_fi3'], None)
-
     def test_surrogate_message_format(self):
         mm = om.MultiFiMetaModelUnStructuredComp(nfi=2)
         mm.add_input('x', np.zeros((1, 2)))

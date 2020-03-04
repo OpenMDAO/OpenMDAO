@@ -4,7 +4,6 @@ KS Function Component.
 import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent
-from openmdao.utils.general_utils import warn_deprecation
 
 
 CITATIONS = """
@@ -208,24 +207,3 @@ class KSComp(ExplicitComponent):
             derivs = -derivs
 
         partials['KS', 'g'] = derivs.flatten()
-
-
-class KSComponent(KSComp):
-    """
-    Deprecated.
-    """
-
-    def __init__(self, *args, **kwargs):
-        """
-        Capture Initialize to throw warning.
-
-        Parameters
-        ----------
-        *args : list
-            Deprecated arguments.
-        **kwargs : dict
-            Deprecated arguments.
-        """
-        warn_deprecation("'KSComponent' has been deprecated. Use "
-                         "'KSComp' instead.")
-        super(KSComponent, self).__init__(*args, **kwargs)

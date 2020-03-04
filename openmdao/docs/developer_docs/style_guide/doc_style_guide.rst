@@ -155,7 +155,7 @@ is detailed in the following example code:
 
     **AUTOMETHOD EXAMPLE:**
 
-      .. automethod:: openmdao.core.group.Group.add
+      .. automethod:: openmdao.core.group.Group.add_subsystem
         :noindex:
 
 
@@ -173,7 +173,7 @@ source documentation.  The above syntax will pull docstring info and produce the
     :noindex:
 
 **AUTOMETHOD EXAMPLE:**
-  .. automethod:: openmdao.core.group.Group.add
+  .. automethod:: openmdao.core.group.Group.add_subsystem
     :noindex:
 
 

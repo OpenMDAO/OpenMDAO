@@ -131,8 +131,7 @@ class BoundsEnforceLS(LinesearchSolver):
 
         # Remove unused options from base options here, so that users
         # attempting to set them will get KeyErrors.
-        # "err_on_maxiter" is a deprecated option
-        for unused_option in ("atol", "rtol", "maxiter", "err_on_maxiter", "err_on_non_converge"):
+        for unused_option in ("atol", "rtol", "maxiter", "err_on_non_converge"):
             opt.undeclare(unused_option)
 
     def _solve(self):

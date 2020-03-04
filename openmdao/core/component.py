@@ -23,7 +23,7 @@ from openmdao.utils.units import valid_units
 from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key, rel_name2abs_name
 from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
-    warn_deprecation, find_matches, simple_warning, make_set
+    find_matches, simple_warning, make_set
 import openmdao.utils.coloring as coloring_mod
 
 
@@ -120,34 +120,6 @@ class Component(System):
         self.options.declare('distributed', types=bool, default=False,
                              desc='True if the component has variables that are distributed '
                                   'across multiple processes.')
-
-    @property
-    def distributed(self):
-        """
-        Provide 'distributed' property for backwards compatibility.
-
-        Returns
-        -------
-        bool
-            reference to the 'distributed' option.
-        """
-        warn_deprecation("The 'distributed' property provides backwards compatibility "
-                         "with OpenMDAO <= 2.4.0 ; use the 'distributed' option instead.")
-        return self.options['distributed']
-
-    @distributed.setter
-    def distributed(self, val):
-        """
-        Provide for setting of the 'distributed' property for backwards compatibility.
-
-        Parameters
-        ----------
-        val : bool
-            True if the component has variables that are distributed across multiple processes.
-        """
-        warn_deprecation("The 'distributed' property provides backwards compatibility "
-                         "with OpenMDAO <= 2.4.0 ; use the 'distributed' option instead.")
-        self.options['distributed'] = val
 
     def setup(self):
         """
@@ -489,15 +461,6 @@ class Component(System):
         dict
             metadata for added variable
         """
-        if units == 'unitless':
-            warn_deprecation("Input '%s' has units='unitless' but 'unitless' "
-                             "has been deprecated. Use "
-                             "units=None instead.  Note that connecting a "
-                             "unitless variable to one with units is no longer "
-                             "an error, but will issue a warning instead." %
-                             name)
-            units = None
-
         # First, type check all arguments
         if not isinstance(name, str):
             raise TypeError('%s: The name argument should be a string.' % self.msginfo)
@@ -658,15 +621,6 @@ class Component(System):
         dict
             metadata for added variable
         """
-        if units == 'unitless':
-            warn_deprecation("Output '%s' has units='unitless' but 'unitless' "
-                             "has been deprecated. Use "
-                             "units=None instead.  Note that connecting a "
-                             "unitless variable to one with units is no longer "
-                             "an error, but will issue a warning instead." %
-                             name)
-            units = None
-
         if not isinstance(name, str):
             raise TypeError('%s: The name argument should be a string.' % self.msginfo)
         if not _valid_var_name(name):

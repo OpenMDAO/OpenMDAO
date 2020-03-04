@@ -29,8 +29,7 @@ from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import convert_neg, array_connection_compatible, \
     _flatten_src_indices
-from openmdao.utils.general_utils import warn_deprecation, ContainsAll, all_ancestors, \
-    simple_warning
+from openmdao.utils.general_utils import ContainsAll, all_ancestors, simple_warning
 from openmdao.utils.units import is_compatible, get_conversion
 from openmdao.utils.mpi import MPI
 from openmdao.utils.coloring import Coloring, _STD_COLORING_FNAME
@@ -1417,31 +1416,6 @@ class Group(System):
                 if original == original_inside and new != new_inside:
                     raise RuntimeError("%s: Trying to promote '%s' when it has been aliased to "
                                        "'%s'." % (self.msginfo, original_inside, new))
-
-    def add(self, name, subsys, promotes=None):
-        """
-        Add a subsystem (deprecated version of <Group.add_subsystem>).
-
-        Parameters
-        ----------
-        name : str
-            Name of the subsystem being added
-        subsys : System
-            An instantiated, but not-yet-set up system object.
-        promotes : iter of str, optional
-            A list of variable names specifying which subsystem variables
-            to 'promote' up to this group. This is for backwards compatibility
-            with older versions of OpenMDAO.
-
-        Returns
-        -------
-        System
-            The System that was passed in.
-        """
-        warn_deprecation("The 'add' method provides backwards compatibility with "
-                         "OpenMDAO <= 1.x ; use 'add_subsystem' instead.")
-
-        return self.add_subsystem(name, subsys, promotes=promotes)
 
     def add_subsystem(self, name, subsys, promotes=None,
                       promotes_inputs=None, promotes_outputs=None,

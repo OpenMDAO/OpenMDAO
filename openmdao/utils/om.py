@@ -39,7 +39,6 @@ from openmdao.utils.coloring import _total_coloring_setup_parser, _total_colorin
     _partial_coloring_setup_parser, _partial_coloring_cmd, \
     _view_coloring_setup_parser, _view_coloring_exec
 from openmdao.utils.scaffold import _scaffold_setup_parser, _scaffold_exec
-from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.file_utils import _load_and_exec
 from openmdao.utils.entry_points import _list_installed_setup_parser, _list_installed_cmd, \
     split_ep, _compute_entry_points_setup_parser, _compute_entry_points_exec, \
@@ -99,11 +98,6 @@ def _n2_cmd(options, user_args):
         n2(filename, outfile=options.outfile, title=options.title,
            show_browser=not options.no_browser, embeddable=options.embeddable,
            use_declare_partial_info=options.use_declare_partial_info)
-
-
-def _view_model_cmd(options, user_args):
-    warn_deprecation("The 'view_model' command has been deprecated. Use 'n2' instead.")
-    _n2_cmd(options, user_args)
 
 
 def _xdsm_setup_parser(parser):
@@ -583,9 +577,6 @@ _command_map = {
     'view_connections': (_view_connections_setup_parser, _view_connections_cmd,
                          'View connections showing values and source/target units.'),
     'view_mm': (_meta_model_parser, _meta_model_cmd, "View a metamodel."),
-    'view_model': (_n2_setup_parser, _view_model_cmd,
-                   'Display an interactive N2 diagram of the problem. '
-                   '(Deprecated, please use n2 instead.)'),
     'xdsm': (_xdsm_setup_parser, _xdsm_cmd, 'Generate an XDSM diagram of a model.'),
 }
 
