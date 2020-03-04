@@ -1818,7 +1818,7 @@ def dynamic_total_coloring(driver, run_model=True, fname=None):
 
         driver._coloring_info['coloring'] = coloring
         driver._setup_simul_coloring()
-        driver._setup_tot_jac_sparsity()
+        driver._setup_tot_jac_sparsity(coloring)
 
     return coloring
 
@@ -2162,3 +2162,12 @@ def _initialize_model_approx(model, driver, of=None, wrt=None):
             key: val['indices'] for key, val in iteritems(driver._designvars)
             if val['indices'] is not None
         }
+
+
+def _get_coloring_meta(coloring=None):
+    if coloring is None:
+        dct = _DEF_COMP_SPARSITY_ARGS.copy()
+        dct['coloring'] = None
+        dct['dynamic'] = False
+        dct['static'] = None
+        return dct

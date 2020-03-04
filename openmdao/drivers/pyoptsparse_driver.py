@@ -21,7 +21,7 @@ from pyoptsparse import Optimization
 
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.driver import Driver, RecordingDebugging
-import openmdao.utils.coloring as coloring_mod
+import openmdao.utils.coloring as c_mod
 from openmdao.utils.general_utils import warn_deprecation, simple_warning
 from openmdao.utils.class_util import weak_method_wrapper
 from openmdao.utils.mpi import FakeComm
@@ -243,21 +243,21 @@ class pyOptSparseDriver(Driver):
             self.iter_count += 1
 
         # compute dynamic simul deriv coloring or just sparsity if option is set
-        if coloring_mod._use_total_sparsity:
+        if c_mod._use_total_sparsity:
             coloring = None
             if self._coloring_info['coloring'] is None and self._coloring_info['dynamic']:
-                coloring_mod.dynamic_total_coloring(self, run_model=not model_ran,
-                                                    fname=self._get_total_coloring_fname())
-                coloring = self._coloring_info['coloring']
-                self._setup_tot_jac_sparsity()
+                coloring = c_mod.dynamic_total_coloring(self, run_model=not model_ran,
+                                                        fname=self._get_total_coloring_fname())
+                #coloring = self._coloring_info['coloring']
+                # self._setup_tot_jac_sparsity(coloring)
             elif self.options['dynamic_simul_derivs']:
                 warn_deprecation("The 'dynamic_simul_derivs' option has been deprecated. Call "
                                  "the 'declare_coloring' function instead.")
-                coloring_mod.dynamic_total_coloring(self, run_model=not model_ran,
-                                                    fname=self._get_total_coloring_fname())
-                coloring = self._coloring_info['coloring']
+                coloring = c_mod.dynamic_total_coloring(self, run_model=not model_ran,
+                                                        fname=self._get_total_coloring_fname())
+                #coloring = self._coloring_info['coloring']
 
-                self._setup_tot_jac_sparsity()
+                # self._setup_tot_jac_sparsity(coloring)
 
             if coloring is not None:
                 # if the improvement wasn't large enough, don't use coloring
@@ -661,12 +661,17 @@ class pyOptSparseDriver(Driver):
 
         return nl_order
 
-    def _setup_tot_jac_sparsity(self):
+    def _setup_tot_jac_sparsity(self, coloring=None):
         """
         Set up total jacobian subjac sparsity.
+
+        Parameters
+        ----------
+        coloring : Coloring or None
+            Current coloring.
         """
         total_sparsity = None
-        coloring = self._get_static_coloring()
+        coloring = coloring if coloring is not None else self._get_static_coloring()
         if coloring is not None:
             total_sparsity = coloring.get_subjac_sparsity()
             if self._total_jac_sparsity is not None:
@@ -681,7 +686,6 @@ class pyOptSparseDriver(Driver):
         if total_sparsity is None:
             return
 
-        self._res_jacs = {}
         for res, resdict in iteritems(total_sparsity):
             if res in self._objs:  # skip objectives
                 continue

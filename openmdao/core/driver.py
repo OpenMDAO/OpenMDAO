@@ -164,10 +164,7 @@ class Driver(object):
         self.iter_count = 0
         self.cite = ""
 
-        self._coloring_info = coloring_mod._DEF_COMP_SPARSITY_ARGS.copy()
-        self._coloring_info['coloring'] = None
-        self._coloring_info['dynamic'] = False
-        self._coloring_info['static'] = None
+        self._coloring_info = coloring_mod._get_coloring_meta()
 
         self._total_jac_sparsity = None
         self._res_jacs = {}
@@ -859,11 +856,16 @@ class Driver(object):
         warn_deprecation("set_simul_deriv_color is deprecated.  Use use_fixed_coloring instead.")
         self.use_fixed_coloring(coloring)
 
-    def _setup_tot_jac_sparsity(self):
+    def _setup_tot_jac_sparsity(self, coloring=None):
         """
         Set up total jacobian subjac sparsity.
 
         Drivers that can use subjac sparsity should override this.
+
+        Parameters
+        ----------
+        coloring : Coloring or None
+            Current coloring.
         """
         pass
 
