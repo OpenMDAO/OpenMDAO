@@ -37,7 +37,7 @@ class TestEntryPoints(unittest.TestCase):
 
     # test if all relevant classes have been registered as entry points
     def test_ep_registered(self):
-        skip = set()  # Add deprecated classes here.
+        skip = set(['openmdao.surrogate_models.surrogate_model:MultiFiSurrogateModel'])
 
         # if mpi4py isn't installed, then the pyopstsparse_driver import will fail
         try:
