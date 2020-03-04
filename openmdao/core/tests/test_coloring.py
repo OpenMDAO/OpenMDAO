@@ -1023,8 +1023,8 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
                 p.driver.use_fixed_coloring()
 
         indeps = model.add_subsystem('indeps', om.IndepVarComp())
-        for name, SIZE in zip(wrtnames, sizes):
-            indeps.add_output(name, val=np.ones(SIZE))
+        for name, sz in zip(wrtnames, sizes):
+            indeps.add_output(name, val=np.ones(sz))
             model.add_design_var('indeps.' + name)
 
         for name in ofnames:
