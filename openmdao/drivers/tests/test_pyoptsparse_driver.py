@@ -1838,7 +1838,6 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-
         prob.setup(check=False, mode='rev')
         prob.run_driver()
 
