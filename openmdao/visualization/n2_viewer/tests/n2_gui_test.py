@@ -37,7 +37,7 @@ class N2GUITestCase(unittest.TestCase):
                 'height': 900
             },
             'args': ['--start-fullscreen'],
-            'headless': False
+            'headless': True
         })
         userAgentStr = await self.browser.userAgent()
         print("Browser: " + userAgentStr + "\n")
