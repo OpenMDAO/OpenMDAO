@@ -14,14 +14,12 @@ The pyXDSM package is available at https://github.com/mdolab/pyXDSM.
 XDSMjs is available at https://github.com/OneraHub/XDSMjs.
 """
 
-from __future__ import print_function
 
 import json
 import os
 from distutils.version import LooseVersion
 
 from numpy.distutils.exec_command import find_executable
-from six import iteritems, string_types
 
 from openmdao.core.problem import Problem
 from openmdao.utils.general_utils import simple_warning
@@ -793,7 +791,7 @@ else:
                                             class_name=comp['class'])
 
                 # Convert from math mode to regular text, if it is a one liner wrapped in math mode
-                if isinstance(label, string_types):
+                if isinstance(label, str):
                     label = _textify(label)
                 comp['label'] = label  # Now the label is finished.
                 # Now really add the system with the XDSM class' method
@@ -1056,7 +1054,7 @@ else:
             str or list(str)
                 Label to be used for this item. List, if it is multiline.
             """
-            if isinstance(txt, string_types):
+            if isinstance(txt, str):
                 txt = [txt]  # Make iterable, it will be converted back if there is only 1 line.
 
             if self.class_names and (class_name is not None):
@@ -1386,7 +1384,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
 
     error_msg = ('Undefined XDSM writer "{}". '
                  'Provide  a valid name or a BaseXDSMWriter instance.')
-    if isinstance(writer, string_types):  # Standard writers (XDSMjs or pyXDSM)
+    if isinstance(writer, str):  # Standard writers (XDSMjs or pyXDSM)
         if writer.lower() == 'pyxdsm':  # pyXDSM
             x = XDSMWriter(box_stacking=box_stacking,
                            number_alignment=number_alignment,
@@ -1409,7 +1407,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
                               box_stacking=box_stacking, **kwargs)
 
     def get_output_side(component_name):
-        if isinstance(output_side, string_types):
+        if isinstance(output_side, str):
             return output_side
         elif isinstance(output_side, dict):
             # Gets the specified key, or the default in the dictionary, or the global default
@@ -1449,7 +1447,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         comp_names = [_format_name(c['abs_name']) for c in solver_dct['comps']]
         solver_label = _format_solver_str(solver_dct, stacking=box_stacking)
 
-        if isinstance(solver_label, string_types):
+        if isinstance(solver_label, str):
             solver_label = _replace_chars(solver_label, subs)
         else:
             solver_label = [_replace_chars(i, subs) for i in solver_label]
@@ -1461,8 +1459,8 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
             x.add_solver(name=solver_name, label=solver_label)
 
             # Add the connections
-            for src, dct in iteritems(conns2):
-                for tgt, conn_vars in iteritems(dct):
+            for src, dct in conns2.items():
+                for tgt, conn_vars in dct.items():
                     formatted_conns = format_block(conn_vars)
                     if (src in comp_names) and (tgt in comp_names):
                         formatted_targets = format_block([x.format_var_str(c, 'target')
@@ -1484,7 +1482,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         responses2 = _collect_connections(responses, recurse=recurse, model_path=model_path)
 
         # Design variables
-        for comp, conn_vars in iteritems(design_vars2):
+        for comp, conn_vars in design_vars2.items():
             # Format var names
             conn_vars = [_replace_chars(var, subs) for var in conn_vars]
             # Optimal var names
@@ -1500,7 +1498,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
             x.add_input(driver_name, format_block(init_con_vars))
 
         # Responses
-        for comp, conn_vars in iteritems(responses2):
+        for comp, conn_vars in responses2.items():
             # Optimal var names
             conn_vars = [_replace_chars(var, subs) for var in conn_vars]
             opt_con_vars = [x.format_var_str(var, 'optimal') for var in conn_vars]
@@ -1566,8 +1564,8 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
             x.add_workflow(s)  # Solver workflows
 
     # Add the connections
-    for src, dct in iteritems(conns2):
-        for tgt, conn_vars in iteritems(dct):
+    for src, dct in conns2.items():
+        for tgt, conn_vars in dct.items():
             if src and tgt:
                 stack = show_parallel and \
                     (comps_dct[src]['is_parallel'] or comps_dct[tgt]['is_parallel'])
@@ -1577,8 +1575,8 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
                 simple_warning(msg.format(src=src, tgt=tgt, conn=conn_vars))
 
     # Add the externally sourced inputs
-    for src, tgts in iteritems(external_inputs2):
-        for tgt, conn_vars in iteritems(tgts):
+    for src, tgts in external_inputs2.items():
+        for tgt, conn_vars in tgts.items():
             formatted_conn_vars = [_replace_chars(o, substitutes=subs) for o in conn_vars]
             if tgt:
                 stack = comps_dct[tgt]['is_parallel'] and show_parallel
@@ -1589,9 +1587,9 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
 
     # Add the externally connected outputs
     if include_external_outputs:
-        for src, tgts in iteritems(external_outputs2):
+        for src, tgts in external_outputs2.items():
             output_vars = set()
-            for tgt, conn_vars in iteritems(tgts):
+            for tgt, conn_vars in tgts.items():
                 output_vars |= set(conn_vars)
             formatted_outputs = [_replace_chars(o, subs) for o in output_vars]
             if src:
@@ -1607,7 +1605,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         # path will be specified based on the "out_format", if all required inputs where
         # provided for showing the results.
         ext = x.extension
-        if not isinstance(ext, string_types):
+        if not isinstance(ext, str):
             err_msg = '"{}" is an invalid extension.'
             raise ValueError(err_msg.format(writer))
         path = '.'.join([filename, ext])
@@ -1631,7 +1629,7 @@ def _process_connections(conns, recurse=True, subs=None):
         return _convert_name(x, recurse=recurse, subs=subs)
 
     conns_new = [
-        {k: convert(v) for k, v in iteritems(conn) if k in ('src', 'tgt')} for conn in conns
+        {k: convert(v) for k, v in conn.items() if k in ('src', 'tgt')} for conn in conns
     ]
     return _accumulate_connections(conns_new)
 
@@ -1726,7 +1724,7 @@ def _convert_name(name, recurse=True, subs=None):
 def _format_name(name):
     # Replaces illegal characters in names for pyXDSM component and connection names
     # This does not effect the labels, only reference names TikZ
-    if isinstance(name, string_types):  # from an SQL reader the name will be in unicode
+    if isinstance(name, str):  # from an SQL reader the name will be in unicode
         for char in ('.', ' ', '-', '_', ':'):
             name = name.replace(char, '@')
     return name
@@ -1844,7 +1842,7 @@ def _get_comps(tree, model_path=None, recurse=True, include_solver=False):
                 if include_solver:
                     solver_names = []
                     solver_dct = {}
-                    for solver_typ, default_solver in iteritems(_DEFAULT_SOLVER_NAMES):
+                    for solver_typ, default_solver in _DEFAULT_SOLVER_NAMES.items():
                         k = '{}_solver'.format(solver_typ)
                         if ch[k] != default_solver:
                             solver_names.append(ch[k])

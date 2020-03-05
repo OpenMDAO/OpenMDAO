@@ -1,7 +1,5 @@
 """Define the Component class."""
 
-from __future__ import division
-
 from collections import OrderedDict, Counter, defaultdict
 
 # note: this is a Python 3.3 change, clean this up for OpenMDAO 3.x
@@ -11,7 +9,6 @@ except ImportError:
     from collections import Iterable
 
 from itertools import product
-from six import string_types, iteritems, itervalues
 
 import numpy as np
 from numpy import ndarray, isscalar, atleast_1d, atleast_2d, promote_types
@@ -26,7 +23,7 @@ from openmdao.utils.units import valid_units
 from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key, rel_name2abs_name
 from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
-    warn_deprecation, find_matches, simple_warning, make_set
+    find_matches, simple_warning, make_set
 import openmdao.utils.coloring as coloring_mod
 
 
@@ -124,34 +121,6 @@ class Component(System):
                              desc='True if the component has variables that are distributed '
                                   'across multiple processes.')
 
-    @property
-    def distributed(self):
-        """
-        Provide 'distributed' property for backwards compatibility.
-
-        Returns
-        -------
-        bool
-            reference to the 'distributed' option.
-        """
-        warn_deprecation("The 'distributed' property provides backwards compatibility "
-                         "with OpenMDAO <= 2.4.0 ; use the 'distributed' option instead.")
-        return self.options['distributed']
-
-    @distributed.setter
-    def distributed(self, val):
-        """
-        Provide for setting of the 'distributed' property for backwards compatibility.
-
-        Parameters
-        ----------
-        val : bool
-            True if the component has variables that are distributed across multiple processes.
-        """
-        warn_deprecation("The 'distributed' property provides backwards compatibility "
-                         "with OpenMDAO <= 2.4.0 ; use the 'distributed' option instead.")
-        self.options['distributed'] = val
-
     def setup(self):
         """
         Declare inputs and outputs.
@@ -247,7 +216,7 @@ class Component(System):
         # wasn't.  If declare partials wasn't called, call it with of='*' and wrt='*' so we'll
         # have something to color.
         if self._coloring_info['coloring'] is not None:
-            for key, meta in iteritems(self._declared_partials):
+            for key, meta in self._declared_partials.items():
                 if 'method' in meta and meta['method'] is not None:
                     break
             else:
@@ -305,7 +274,7 @@ class Component(System):
                 # Compute abs2meta
                 abs2meta[abs_name] = metadata
 
-            for prom_name, val in iteritems(self._var_discrete[type_]):
+            for prom_name, val in self._var_discrete[type_].items():
                 abs_name = prefix + prom_name
 
                 # Compute allprocs_abs_names_discrete
@@ -329,17 +298,6 @@ class Component(System):
             self._discrete_outputs = _DictValues(self._var_discrete['output'])
         else:
             self._discrete_inputs = self._discrete_outputs = ()
-
-    def _use_owned_sizes(self):
-        """
-        Return True if owned_sizes array should be used to determine non-duplicated vec sizes.
-
-        Returns
-        -------
-        bool
-            True if owned_sizes array should be used to determine non-duplicated vec sizes.
-        """
-        return self.comm.size > 1 and self.options['distributed']
 
     def _setup_var_sizes(self, recurse=True):
         """
@@ -413,7 +371,7 @@ class Component(System):
         self._subjacs_info = {}
         self._jacobian = DictionaryJacobian(system=self)
 
-        for key, dct in iteritems(self._declared_partials):
+        for key, dct in self._declared_partials.items():
             of, wrt = key
             self._declare_partials(of, wrt, dct)
 
@@ -456,9 +414,9 @@ class Component(System):
         """
         # sparsity uses relative names, so we need to convert to absolute
         pathname = self.pathname
-        for of, sub in iteritems(sparsity):
+        for of, sub in sparsity.items():
             of_abs = '.'.join((pathname, of)) if pathname else of
-            for wrt, tup in iteritems(sub):
+            for wrt, tup in sub.items():
                 wrt_abs = '.'.join((pathname, wrt)) if pathname else wrt
                 abs_key = (of_abs, wrt_abs)
                 if abs_key in self._subjacs_info:
@@ -503,15 +461,6 @@ class Component(System):
         dict
             metadata for added variable
         """
-        if units == 'unitless':
-            warn_deprecation("Input '%s' has units='unitless' but 'unitless' "
-                             "has been deprecated. Use "
-                             "units=None instead.  Note that connecting a "
-                             "unitless variable to one with units is no longer "
-                             "an error, but will issue a warning instead." %
-                             name)
-            units = None
-
         # First, type check all arguments
         if not isinstance(name, str):
             raise TypeError('%s: The name argument should be a string.' % self.msginfo)
@@ -537,25 +486,24 @@ class Component(System):
         if tags is not None and not isinstance(tags, (str, list)):
             raise TypeError('The tags argument should be a str or list')
 
-        metadata = {}
-
         # value, shape: based on args, making sure they are compatible
-        metadata['value'], metadata['shape'], src_indices = ensure_compatible(name, val, shape,
-                                                                              src_indices)
-        metadata['size'] = np.prod(metadata['shape'])
+        value, shape, src_indices = ensure_compatible(name, val, shape, src_indices)
+        distributed = self.options['distributed']
 
-        # src_indices: None or ndarray
-        if src_indices is None:
-            metadata['src_indices'] = None
-        else:
+        metadata = {
+            'value': value,
+            'shape': shape,
+            'size': np.prod(shape),
+            'src_indices': None,
+            'flat_src_indices': flat_src_indices,
+            'units': units,
+            'desc': desc,
+            'distributed': distributed,
+            'tags': make_set(tags),
+        }
+
+        if src_indices is not None:
             metadata['src_indices'] = np.asarray(src_indices, dtype=INT_DTYPE)
-        metadata['flat_src_indices'] = flat_src_indices
-
-        metadata['units'] = units
-        metadata['desc'] = desc
-        metadata['distributed'] = self.options['distributed']
-
-        metadata['tags'] = make_set(tags)
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:
@@ -673,15 +621,6 @@ class Component(System):
         dict
             metadata for added variable
         """
-        if units == 'unitless':
-            warn_deprecation("Output '%s' has units='unitless' but 'unitless' "
-                             "has been deprecated. Use "
-                             "units=None instead.  Note that connecting a "
-                             "unitless variable to one with units is no longer "
-                             "an error, but will issue a warning instead." %
-                             name)
-            units = None
-
         if not isinstance(name, str):
             raise TypeError('%s: The name argument should be a string.' % self.msginfo)
         if not _valid_var_name(name):
@@ -713,37 +652,24 @@ class Component(System):
         if tags is not None and not isinstance(tags, (str, set, list)):
             raise TypeError('The tags argument should be a str, set, or list')
 
-        metadata = {}
-
         # value, shape: based on args, making sure they are compatible
-        metadata['value'], metadata['shape'], _ = ensure_compatible(name, val, shape)
-        metadata['size'] = np.prod(metadata['shape'])
-
-        # units, res_units: taken as is
-        metadata['units'] = units
-        metadata['res_units'] = res_units
-
-        # desc: taken as is
-        metadata['desc'] = desc
+        value, shape, _ = ensure_compatible(name, val, shape)
 
         if lower is not None:
-            lower = ensure_compatible(name, lower, metadata['shape'])[0]
+            lower = ensure_compatible(name, lower, shape)[0]
             self._has_bounds = True
         if upper is not None:
-            upper = ensure_compatible(name, upper, metadata['shape'])[0]
+            upper = ensure_compatible(name, upper, shape)[0]
             self._has_bounds = True
-
-        metadata['lower'] = lower
-        metadata['upper'] = upper
 
         # All refs: check the shape if necessary
         for item, item_name in zip([ref, ref0, res_ref], ['ref', 'ref0', 'res_ref']):
             if not isscalar(item):
                 it = atleast_1d(item)
-                if it.shape != metadata['shape']:
+                if it.shape != shape:
                     raise ValueError("{}: When adding output '{}', expected shape {} but got "
                                      "shape {} for argument '{}'.".format(self.msginfo, name,
-                                                                          metadata['shape'],
+                                                                          shape,
                                                                           it.shape, item_name))
 
         if isscalar(ref):
@@ -765,13 +691,23 @@ class Component(System):
         ref0 = format_as_float_or_array('ref0', ref0, flatten=True)
         res_ref = format_as_float_or_array('res_ref', res_ref, flatten=True)
 
-        metadata['ref'] = ref
-        metadata['ref0'] = ref0
-        metadata['res_ref'] = res_ref
+        distributed = self.options['distributed']
 
-        metadata['distributed'] = self.options['distributed']
-
-        metadata['tags'] = make_set(tags)
+        metadata = {
+            'value': value,
+            'shape': shape,
+            'size': np.prod(shape),
+            'units': units,
+            'res_units': res_units,
+            'desc': desc,
+            'distributed': distributed,
+            'tags': make_set(tags),
+            'ref': ref,
+            'ref0': ref0,
+            'res_ref': res_ref,
+            'lower': lower,
+            'upper': upper,
+        }
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:
@@ -837,6 +773,37 @@ class Component(System):
         var_rel2meta[name] = self._var_discrete['output'][name] = metadata
 
         return metadata
+
+    def _update_dist_src_indices(self, abs_in2out):
+        """
+        Set default src_indices on distributed components for any inputs where they aren't set.
+
+        Parameters
+        ----------
+        abs_in2out : dict
+            Mapping of connected inputs to their source.  Names are absolute.
+        """
+        if not self.options['distributed']:
+            return
+
+        iproc = self.comm.rank
+        abs2meta = self._var_abs2meta
+        sizes = np.zeros(self.comm.size, dtype=INT_DTYPE)
+        tmp = np.zeros(1, dtype=INT_DTYPE)
+
+        for iname in self._var_allprocs_abs_names['input']:
+            if iname in abs2meta and iname in abs_in2out:
+                if abs2meta[iname]['src_indices'] is None:
+                    metadata = abs2meta[iname]
+                    tmp[0] = metadata['size']
+                    self.comm.Allgather(tmp, sizes)
+                    offset = np.sum(sizes[:iproc])
+                    end = offset + sizes[iproc]
+                    simple_warning("{}: Component is distributed but input '{}' was added without "
+                                   "src_indices. Setting "
+                                   "src_indices to range({}, {}).".format(self.msginfo, iname,
+                                                                          offset, end))
+                    metadata['src_indices'] = np.arange(offset, end, dtype=INT_DTYPE)
 
     def _approx_partials(self, of, wrt, method='fd', **kwargs):
         """
@@ -964,7 +931,7 @@ class Component(System):
                 # Check for repeated rows/cols indices.
                 idxset = set(zip(rows, cols))
                 if len(rows) - len(idxset) > 0:
-                    dups = [n for n, val in iteritems(Counter(zip(rows, cols))) if val > 1]
+                    dups = [n for n, val in Counter(zip(rows, cols)).items() if val > 1]
                     raise RuntimeError("{}: d({})/d({}): declare_partials has been called "
                                        "with rows and cols that specify the following duplicate "
                                        "subjacobian entries: {}.".format(self.msginfo, of, wrt,
@@ -1103,7 +1070,7 @@ class Component(System):
             msg = "{}: The value of 'step_calc' must be one of {}, but '{}' was specified."
             raise ValueError(msg.format(self.msginfo, supported_step_calc, step_calc))
 
-        if not isinstance(wrt, (string_types, list, tuple)):
+        if not isinstance(wrt, (str, list, tuple)):
             msg = "{}: The value of 'wrt' must be a string or list of strings, but a type " \
                   "of '{}' was provided."
             raise ValueError(msg.format(self.msginfo, type(wrt).__name__))
@@ -1113,7 +1080,7 @@ class Component(System):
                   "of '{}' was provided."
             raise ValueError(msg.format(self.msginfo, type(directional).__name__))
 
-        wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
+        wrt_list = [wrt] if isinstance(wrt, str) else wrt
         self._declared_partial_checks.append((wrt_list, method, form, step, step_calc,
                                               directional))
 
@@ -1313,8 +1280,8 @@ class Component(System):
             where of_matches is a list of tuples (pattern, matches) and wrt_matches is a list of
             tuples (pattern, output_matches, input_matches).
         """
-        of_list = [of] if isinstance(of, string_types) else of
-        wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
+        of_list = [of] if isinstance(of, str) else of
+        wrt_list = [wrt] if isinstance(wrt, str) else wrt
         of, wrt = self._get_potential_partials_lists()
 
         of_pattern_matches = [(pattern, find_matches(pattern, of)) for pattern in of_list]

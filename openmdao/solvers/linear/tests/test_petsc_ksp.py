@@ -1,7 +1,5 @@
 """Test the PetsKSP linear solver class."""
 
-from __future__ import division, print_function
-
 import unittest
 
 import numpy as np
@@ -21,7 +19,7 @@ from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 
 
-@unittest.skipUnless(PETScVector, "PETSc is required.")
+@unittest.skipUnless(PETScVector is not None, "PETSc is required.")
 class TestPETScKrylov(unittest.TestCase):
 
     def test_options(self):
@@ -35,12 +33,7 @@ class TestPETScKrylov(unittest.TestCase):
     def test_solve_linear_ksp_default(self):
         """Solve implicit system with PETScKrylov using default method."""
 
-        # use PetscKSP here to check for deprecation warning and verify that the deprecated
-        # class still gets the right answer without duplicating this test.
-        msg = "PetscKSP is deprecated.  Use PETScKrylov instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            group = TestImplicitGroup(lnSolverClass=om.PetscKSP)
+        group = TestImplicitGroup(lnSolverClass=om.PETScKrylov)
 
         p = om.Problem(group)
         p.setup()
@@ -254,20 +247,6 @@ class TestPETScKrylov(unittest.TestCase):
         output = d_residuals._data
         assert_rel_error(self, output, group.expected_solution, 3e-15)
 
-    def test_preconditioner_deprecation(self):
-
-        group = TestImplicitGroup(lnSolverClass=om.PETScKrylov)
-
-        msg = "The 'preconditioner' property provides backwards compatibility " \
-              "with OpenMDAO <= 1.x ; use 'precon' instead."
-
-        # check deprecation on setter & getter
-        with assert_warning(DeprecationWarning, msg):
-            precon = group.linear_solver.preconditioner = om.LinearBlockGS()
-
-        with assert_warning(DeprecationWarning, msg):
-            pre = group.linear_solver.preconditioner
-
     def test_solve_on_subsystem(self):
         """solve an implicit system with KSP attached anywhere but the root"""
 
@@ -386,7 +365,7 @@ class TestPETScKrylov(unittest.TestCase):
         model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        model.nonlinear_solver = om.NewtonSolver()
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         model.linear_solver = om.PETScKrylov()
 
         model.approx_totals(method='cs')
@@ -613,7 +592,7 @@ class TestPETScKrylovSolverFeature(unittest.TestCase):
         model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        model.nonlinear_solver = om.NewtonSolver()
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         model.linear_solver = om.PETScKrylov()
 
         model.linear_solver.precon = om.LinearBlockGS()
@@ -648,7 +627,7 @@ class TestPETScKrylovSolverFeature(unittest.TestCase):
         model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        model.nonlinear_solver = om.NewtonSolver()
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         model.linear_solver = om.PETScKrylov()
 
         model.linear_solver.precon = om.DirectSolver()

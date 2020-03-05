@@ -1,8 +1,4 @@
 """Common tests for linear solvers."""
-
-from __future__ import division, print_function
-from six import iteritems
-
 import unittest
 
 import numpy as np
@@ -433,14 +429,14 @@ class LinearSolverTests(object):
             Jbase['obj', 'z'] = np.array([[9.61001155, 1.78448534]])
 
             J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-            for key, val in iteritems(Jbase):
+            for key, val in Jbase.items():
                 assert_rel_error(self, J[key], val, .00001)
 
             prob.setup(check=False, mode='rev')
             prob.run_model()
 
             J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-            for key, val in iteritems(Jbase):
+            for key, val in Jbase.items():
                 assert_rel_error(self, J[key], val, .00001)
 
         def test_sellar_state_connection(self):
@@ -469,12 +465,12 @@ class LinearSolverTests(object):
             Jbase['obj', 'z'] = np.array([[9.61001155, 1.78448534]])
 
             J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-            for key, val in iteritems(Jbase):
+            for key, val in Jbase.items():
                 assert_rel_error(self, J[key], val, .00001)
 
             prob.setup(check=False, mode='rev')
             prob.run_model()
 
             J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-            for key, val in iteritems(Jbase):
+            for key, val in Jbase.items():
                 assert_rel_error(self, J[key], val, .00001)

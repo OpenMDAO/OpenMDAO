@@ -1,11 +1,15 @@
-from __future__ import division, print_function
-
 import unittest
 
 import numpy as np
 
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_check_partials
+from openmdao.utils.mpi import MPI
+
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
 
 class QuadraticComp(om.ImplicitComponent):
@@ -47,6 +51,7 @@ class QuadraticComp(om.ImplicitComponent):
         self.inv_jac = 1.0 / (2 * a * x + b)
 
 
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class NondistribDirectCompTestCase(unittest.TestCase):
     N_PROCS = 2
 
@@ -54,7 +59,7 @@ class NondistribDirectCompTestCase(unittest.TestCase):
         p = om.Problem()
 
         comp = p.model.add_subsystem('comp', QuadraticComp())
-        comp.nonlinear_solver = om.NewtonSolver()
+        comp.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         comp.linear_solver = om.DirectSolver()
 
         p.setup(force_alloc_complex=True)

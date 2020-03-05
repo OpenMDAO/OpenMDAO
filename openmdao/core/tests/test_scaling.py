@@ -1,9 +1,6 @@
 """Define the units/scaling tests."""
-from __future__ import division, print_function
-
 import unittest
 from copy import deepcopy
-from six import assertRaisesRegex
 
 import numpy as np
 
@@ -285,7 +282,7 @@ class TestScaling(unittest.TestCase):
                                                              use_scal=use_scal))
             prob.model.connect('row1.y', 'row2.x')
             prob.model.connect('row2.y', 'row1.x')
-            prob.model.nonlinear_solver = om.NewtonSolver(maxiter=2, atol=1e-5, rtol=0)
+            prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=2, atol=1e-5, rtol=0)
             prob.model.nonlinear_solver.linear_solver = om.ScipyKrylov(maxiter=1)
 
             prob.set_solver_print(level=0)
@@ -854,7 +851,7 @@ class TestScaling(unittest.TestCase):
 
         model.connect('p1.x', 'comp.x')
 
-        model.nonlinear_solver = om.NewtonSolver()
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         model.linear_solver = om.DirectSolver()
 
         prob.setup()
@@ -872,7 +869,7 @@ class TestScaling(unittest.TestCase):
 
         model.connect('p1.x', 'comp.x')
 
-        model.nonlinear_solver = om.NewtonSolver()
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         model.linear_solver = om.DirectSolver(assemble_jac=True)
 
         prob.setup()
@@ -1198,7 +1195,7 @@ class TestScalingOverhaul(unittest.TestCase):
         model.connect('p.x1_u', 'comp.x2_u')
 
         model.linear_solver = om.DirectSolver()
-        model.nonlinear_solver = om.NewtonSolver()
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         model.nonlinear_solver.options['atol'] = 1e-12
         model.nonlinear_solver.options['rtol'] = 1e-12
 

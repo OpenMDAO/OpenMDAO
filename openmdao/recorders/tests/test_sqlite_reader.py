@@ -1,5 +1,4 @@
 """ Unit tests for the SqliteCaseReader. """
-from __future__ import print_function
 
 import errno
 import os
@@ -10,7 +9,7 @@ from tempfile import mkdtemp, mkstemp
 from collections import OrderedDict
 
 import numpy as np
-from six import iteritems, assertRaisesRegex, StringIO
+from io import StringIO
 
 
 import openmdao.api as om
@@ -131,10 +130,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(case.abs_err, None)
         self.assertEqual(case.rel_err, None)
 
-        msg = "'iteration_coordinate' has been deprecated. Use 'name' instead."
-        with assert_warning(DeprecationWarning, msg):
-            case.iteration_coordinate
-
     def test_invalid_source(self):
         """ Tests that the reader returns params correctly. """
         prob = SellarProblem(SellarDerivativesGrouped)
@@ -161,20 +156,20 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(sorted(source_vars['inputs']), [])
         self.assertEqual(sorted(source_vars['outputs']), [])
 
-        with assertRaisesRegex(self, RuntimeError, "No cases recorded for problem"):
+        with self.assertRaisesRegex(RuntimeError, "No cases recorded for problem"):
             cr.list_source_vars('problem')
 
-        with assertRaisesRegex(self, RuntimeError, "Source not found: root"):
+        with self.assertRaisesRegex(RuntimeError, "Source not found: root"):
             cr.list_source_vars('root')
 
-        with assertRaisesRegex(self, RuntimeError, "Source not found: root.nonlinear_solver"):
+        with self.assertRaisesRegex(RuntimeError, "Source not found: root.nonlinear_solver"):
             cr.list_source_vars('root.nonlinear_solver')
 
         # check list cases
-        with assertRaisesRegex(self, RuntimeError, "Source not found: foo"):
+        with self.assertRaisesRegex(RuntimeError, "Source not found: foo"):
             cr.list_cases('foo')
 
-        with assertRaisesRegex(self, TypeError, "Source parameter must be a string, 999 is type int"):
+        with self.assertRaisesRegex(TypeError, "Source parameter must be a string, 999 is type int"):
             cr.list_cases(999)
 
     def test_reading_driver_cases(self):
@@ -1338,7 +1333,7 @@ class TestSqliteCaseReader(unittest.TestCase):
             "",
             "varname   value",
             "--------  -----",
-            "top",
+            "model",
             "  sub",
             "    expl",
             "      b   [20.]",
@@ -1350,7 +1345,7 @@ class TestSqliteCaseReader(unittest.TestCase):
             "",
             "varname   value",
             "-------   -----",
-            "top",
+            "model",
             "  sub",
             "    impl",
             "      y   2    ",
@@ -1707,7 +1702,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.setup()
 
         error_msg = "Input variable, '[^']+', recorded in the case is not found in the model"
-        with assertRaisesRegex(self, KeyError, error_msg):
+        with self.assertRaisesRegex(KeyError, error_msg):
             prob.load_case(case)
 
     def test_subsystem_load_system_cases(self):
@@ -1941,11 +1936,10 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob = om.Problem(model)
         prob.setup()
 
-        msg = "Trying to record options which cannot be pickled on system with name: subs. " \
-              "Use the 'options_excludes' recording option on system objects to avoid " \
-              "attempting to record options which cannot be pickled. Skipping recording " \
-              "options for this system."
-        with assert_warning(RuntimeWarning, msg):
+        msg = ("Trying to record option 'options value to fail' which cannot be pickled on system "
+               "IndepVarComp (subs). Set 'recordable' to False. Skipping recording options for "
+               "this system.")
+        with assert_warning(UserWarning, msg):
             prob.run_model()
 
         prob.cleanup()
@@ -2547,9 +2541,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         model.add_subsystem('comp', ImplCompTwoStates())
         model.connect('px.x', 'comp.x')
 
-        model.nonlinear_solver = om.NewtonSolver()
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         model.nonlinear_solver.options['maxiter'] = 3
-        # model.nonlinear_solver.options['solve_subsystems'] = True
         model.nonlinear_solver.options['iprint'] = 2
         model.linear_solver = om.ScipyKrylov()
 
@@ -2590,7 +2583,6 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         for i, c in enumerate(cr.list_cases()):
             case = cr.get_case(c)
-
 
             coord = case.name
             self.assertEqual(coord, expected[i])
@@ -2674,9 +2666,9 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(1, text.count("1 Input(s) in 'model'"))
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
         self.assertEqual(7, num_non_empty_lines)
-        self.assertEqual(1, text.count('top'))
-        self.assertEqual(1, text.count('  mult'))
-        self.assertEqual(1, text.count('    x    |10.0|  inch   (100'))
+        self.assertEqual(1, text.count('\nmodel'))
+        self.assertEqual(1, text.count('\n  mult'))
+        self.assertEqual(1, text.count('\n    x    |10.0|  inch   (100'))
 
         # list outputs
         # out_stream - not hierarchical - extras - no print_arrays
@@ -2722,11 +2714,11 @@ class TestSqliteCaseReader(unittest.TestCase):
                           print_arrays=False,
                           out_stream=stream)
         text = stream.getvalue()
-        self.assertEqual(text.count('top'), 1)
-        self.assertEqual(text.count('  des_vars'), 1)
-        self.assertEqual(text.count('    x'), 1)
-        self.assertEqual(text.count('  mult'), 1)
-        self.assertEqual(text.count('    y'), 1)
+        self.assertEqual(text.count('\nmodel'), 1)
+        self.assertEqual(text.count('\n  des_vars'), 1)
+        self.assertEqual(text.count('\n    x'), 1)
+        self.assertEqual(text.count('\n  mult'), 1)
+        self.assertEqual(text.count('\n    y'), 1)
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
         self.assertEqual(num_non_empty_lines, 11)
 
@@ -2788,11 +2780,11 @@ class TestSqliteCaseReader(unittest.TestCase):
             self.assertEqual(text.count('value:'), 2)
             self.assertEqual(text.count('resids:'), 2)
             self.assertEqual(text.count('['), 4)
-            self.assertEqual(text.count('top'), 1)
-            self.assertEqual(text.count('  des_vars'), 1)
-            self.assertEqual(text.count('    x'), 1)
-            self.assertEqual(text.count('  mult'), 1)
-            self.assertEqual(text.count('    y'), 1)
+            self.assertEqual(text.count('\nmodel'), 1)
+            self.assertEqual(text.count('\n  des_vars'), 1)
+            self.assertEqual(text.count('\n    x'), 1)
+            self.assertEqual(text.count('\n  mult'), 1)
+            self.assertEqual(text.count('\n    y'), 1)
             num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
             self.assertEqual(num_non_empty_lines, 49)
 
@@ -3410,12 +3402,12 @@ def _assert_model_matches_case(case, system):
     """
     case_inputs = case.inputs
     model_inputs = system._inputs
-    for name, model_input in iteritems(model_inputs._views):
+    for name, model_input in model_inputs._views.items():
         np.testing.assert_almost_equal(case_inputs[name], model_input)
 
     case_outputs = case.outputs
     model_outputs = system._outputs
-    for name, model_output in iteritems(model_outputs._views):
+    for name, model_output in model_outputs._views.items():
         np.testing.assert_almost_equal(case_outputs[name], model_output)
 
 

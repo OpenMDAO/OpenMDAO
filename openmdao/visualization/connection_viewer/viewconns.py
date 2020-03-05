@@ -7,8 +7,6 @@ import contextlib
 from itertools import chain
 from collections import defaultdict
 
-from six import iteritems
-
 import numpy as np
 
 from openmdao.core.problem import Problem
@@ -69,12 +67,12 @@ def view_connections(root, outfile='connections.html', show_browser=True,
     input_srcs = system._conn_global_abs_in2out
 
     connections = {
-        tgt: src for tgt, src in iteritems(input_srcs) if src is not None
+        tgt: src for tgt, src in input_srcs.items() if src is not None
     }
 
     src2tgts = defaultdict(list)
     units = {}
-    for n, data in iteritems(system._var_allprocs_abs2meta):
+    for n, data in system._var_allprocs_abs2meta.items():
         u = data.get('units', '')
         if u is None:
             u = ''
@@ -128,7 +126,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
     table = []
     idx = 1  # unique ID for use by Tabulator
-    for tgt, src in iteritems(connections):
+    for tgt, src in connections.items():
         usrc = units[src]
         utgt = units[tgt]
         if usrc != utgt:

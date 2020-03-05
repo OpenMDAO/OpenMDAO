@@ -1,8 +1,6 @@
 """
 Routines to compute coloring for use with simultaneous derivatives.
 """
-from __future__ import division, print_function
-
 import os
 import sys
 import time
@@ -18,9 +16,6 @@ from contextlib import contextmanager
 from pprint import pprint
 from itertools import groupby
 
-from six import iteritems, string_types
-from six.moves import range
-
 import numpy as np
 from scipy.sparse.compressed import get_index_dtype
 
@@ -29,6 +24,7 @@ from openmdao.utils.array_utils import array_viz
 from openmdao.utils.general_utils import simple_warning
 import openmdao.utils.hooks as hooks
 from openmdao.utils.mpi import MPI
+from openmdao.utils.file_utils import _load_and_exec
 
 
 CITATIONS = """
@@ -373,7 +369,7 @@ class Coloring(object):
         fname : str
             File to save to.
         """
-        if isinstance(fname, string_types):
+        if isinstance(fname, str):
             color_dir = os.path.dirname(os.path.abspath(fname))
             if not os.path.exists(color_dir):
                 os.makedirs(color_dir)
@@ -632,9 +628,7 @@ class Coloring(object):
         Display a plot of the sparsity pattern, showing grouping by color.
         """
         try:
-            from matplotlib import pyplot, patches, axes, cm
-            from matplotlib.artist import getp
-            from matplotlib.offsetbox import AnchoredText
+            from matplotlib import pyplot, axes, cm
         except ImportError:
             print("matplotlib is not installed so the coloring viewer is not available. The ascii "
                   "based coloring viewer can be accessed by calling display_txt() on the Coloring "
@@ -829,9 +823,9 @@ class Coloring(object):
             raise RuntimeError("Coloring doesn't have enough info to compute subjac sparsity.")
 
         ostart = oend = 0
-        for of, sub in iteritems(subjac_sparsity):
+        for of, sub in subjac_sparsity.items():
             istart = iend = 0
-            for i, (wrt, tup) in enumerate(iteritems(sub)):
+            for i, (wrt, tup) in enumerate(sub.items()):
                 nzrows, nzcols, shape = tup
                 iend += shape[1]
                 if i == 0:
@@ -1853,7 +1847,7 @@ def _total_coloring_setup_parser(parser):
                         help="Do profiling on the coloring process.")
 
 
-def _total_coloring_cmd(options):
+def _total_coloring_cmd(options, user_args):
     """
     Return the post_setup hook function for 'openmdao total_coloring'.
 
@@ -1861,11 +1855,8 @@ def _total_coloring_cmd(options):
     ----------
     options : argparse Namespace
         Command line options.
-
-    Returns
-    -------
-    function
-        The hook function.
+    user_args : list of str
+        Args to be passed to the user script.
     """
     from openmdao.core.problem import Problem
     from openmdao.devtools.debug import profiling
@@ -1910,7 +1901,7 @@ def _total_coloring_cmd(options):
 
     hooks._register_hook('final_setup', 'Problem', post=_total_coloring)
 
-    return _total_coloring
+    _load_and_exec(options.file[0], user_args)
 
 
 def _partial_coloring_setup_parser(parser):
@@ -1981,7 +1972,7 @@ def _get_partial_coloring_kwargs(system, options):
     return kwargs
 
 
-def _partial_coloring_cmd(options):
+def _partial_coloring_cmd(options, user_args):
     """
     Return the hook function for 'openmdao partial_color'.
 
@@ -1989,11 +1980,9 @@ def _partial_coloring_cmd(options):
     ----------
     options : argparse Namespace
         Command line options.
+    user_args : list of str
+        Args to be passed to the user script.
 
-    Returns
-    -------
-    function
-        The hook function.
     """
     from openmdao.core.problem import Problem
     from openmdao.core.component import Component
@@ -2084,7 +2073,7 @@ def _partial_coloring_cmd(options):
 
     hooks._register_hook('final_setup', 'Problem', post=_partial_coloring)
 
-    return _partial_coloring
+    _load_and_exec(options.file[0], user_args)
 
 
 def _view_coloring_setup_parser(parser):
@@ -2163,10 +2152,10 @@ def _initialize_model_approx(model, driver, of=None, wrt=None):
 
         # Support for indices defined on driver vars.
         model._owns_approx_of_idx = {
-            key: val['indices'] for key, val in iteritems(driver._responses)
+            key: val['indices'] for key, val in driver._responses.items()
             if val['indices'] is not None
         }
         model._owns_approx_wrt_idx = {
-            key: val['indices'] for key, val in iteritems(driver._designvars)
+            key: val['indices'] for key, val in driver._designvars.items()
             if val['indices'] is not None
         }

@@ -1,6 +1,4 @@
 """Define the test group classes."""
-from __future__ import division, print_function
-
 from openmdao.core.group import Group
 
 

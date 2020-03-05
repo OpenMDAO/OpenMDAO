@@ -1,6 +1,4 @@
 """Define the implicit test component (simple)."""
-from __future__ import division, print_function
-
 import numpy as np
 import scipy.sparse
 import scipy.optimize

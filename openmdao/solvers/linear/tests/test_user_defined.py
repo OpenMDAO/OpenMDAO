@@ -1,7 +1,5 @@
 """Test the LinearUserDefined linear solver class."""
 
-from __future__ import division, print_function
-
 import unittest
 
 import numpy as np
@@ -115,7 +113,7 @@ class DistribStateImplicit(om.ImplicitComponent):
             d_residuals.set_vec(d_outputs)
 
 
-@unittest.skipUnless(PETScVector, "PETSc is required.")
+@unittest.skipUnless(PETScVector is not None, "PETSc is required.")
 class TestUserDefinedSolver(unittest.TestCase):
 
     def test_method(self):

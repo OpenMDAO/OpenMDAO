@@ -1,14 +1,11 @@
 """Define the scipy iterative solver class."""
 
-from __future__ import division, print_function
-
 from distutils.version import LooseVersion
 import numpy as np
 import scipy
 from scipy.sparse.linalg import LinearOperator, gmres
 
 from openmdao.solvers.solver import LinearSolver
-from openmdao.utils.general_utils import warn_deprecation
 
 _SOLVER_TYPES = {
     # 'bicg': bicg,
@@ -288,51 +285,3 @@ class ScipyKrylov(LinearSolver):
 
         # return resulting value of x vector
         return x_vec._data.copy()
-
-    @property
-    def preconditioner(self):
-        """
-        Provide 'preconditioner' property for backwards compatibility.
-
-        Returns
-        -------
-        LinearSolver
-            reference to the 'precon' property.
-        """
-        warn_deprecation("The 'preconditioner' property provides backwards compatibility "
-                         "with OpenMDAO <= 1.x ; use 'precon' instead.")
-        return self.precon
-
-    @preconditioner.setter
-    def preconditioner(self, precon):
-        """
-        Provide for setting the 'preconditioner' property for backwards compatibility.
-
-        Parameters
-        ----------
-        precon : LinearSolver
-            reference to a <LinearSolver> to be assigned to the 'precon' property.
-        """
-        warn_deprecation("The 'preconditioner' property provides backwards compatibility "
-                         "with OpenMDAO <= 1.x ; use 'precon' instead.")
-        self.precon = precon
-
-
-class ScipyIterativeSolver(ScipyKrylov):
-    """
-    Deprecated.  See ScipyKrylov.
-    """
-
-    def __init__(self, *args, **kwargs):
-        """
-        Deprecated.
-
-        Parameters
-        ----------
-        *args : list of object
-            Positional args.
-        **kwargs : dict
-            Named args.
-        """
-        super(ScipyIterativeSolver, self).__init__(*args, **kwargs)
-        warn_deprecation('ScipyIterativeSolver is deprecated.  Use ScipyKrylov instead.')

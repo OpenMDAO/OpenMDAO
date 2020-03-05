@@ -1,6 +1,4 @@
 """Define the ExternalCodeComp and ExternalCodeImplicitComp classes."""
-from __future__ import print_function
-
 import os
 import sys
 import re
@@ -12,7 +10,6 @@ from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.utils.shell_proc import STDOUT, DEV_NULL, ShellProc
-from openmdao.utils.general_utils import warn_deprecation
 
 
 class ExternalCodeDelegate(object):
@@ -197,7 +194,7 @@ class ExternalCodeDelegate(object):
         comp = self._comp
 
         if isinstance(command, str):
-            program_to_execute = re.findall("^([\w\-]+)", command)[0]
+            program_to_execute = re.findall(r"^([\w\-]+)", command)[0]
         else:
             program_to_execute = command[0]
 
@@ -310,27 +307,6 @@ class ExternalCodeComp(ExplicitComponent):
             Unscaled, dimensional output variables read via outputs[key].
         """
         self._external_code_runner.run_component()
-
-
-class ExternalCode(ExternalCodeComp):
-    """
-    Deprecated.
-    """
-
-    def __init__(self, *args, **kwargs):
-        """
-        Capture Initialize to throw warning.
-
-        Parameters
-        ----------
-        *args : list
-            Deprecated arguments.
-        **kwargs : dict
-            Deprecated arguments.
-        """
-        warn_deprecation("'ExternalCode' has been deprecated. Use "
-                         "'ExternalCodeComp' instead.")
-        super(ExternalCode, self).__init__(*args, **kwargs)
 
 
 class ExternalCodeImplicitComp(ImplicitComponent):

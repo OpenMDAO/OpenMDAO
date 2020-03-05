@@ -1,95 +1,25 @@
 """Various debugging functions."""
 
-from __future__ import print_function
 
 import sys
 import os
 from itertools import product, chain
 
 import numpy as np
-import cProfile
 from contextlib import contextmanager
-from six import iteritems, iterkeys, itervalues
 from collections import Counter
 
-from six.moves import zip_longest
 from openmdao.core.problem import Problem
 from openmdao.core.group import Group, System
 from openmdao.core.implicitcomponent import ImplicitComponent
-from openmdao.utils.mpi import MPI
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.approximation_schemes.complex_step import ComplexStep
+from openmdao.utils.mpi import MPI
 from openmdao.utils.name_maps import abs_key2rel_key, rel_key2abs_key
+from openmdao.utils.general_utils import simple_warning
 
 # an object used to detect when a named value isn't found
 _notfound = object()
-
-def dump_dist_idxs(problem, vec_name='nonlinear', stream=sys.stdout):  # pragma: no cover
-    """Print out the distributed idxs for each variable in input and output vecs.
-
-    Output looks like this:
-
-    C3.y     24
-    C2.y     21
-    sub.C3.y 18
-    C1.y     17     18 C3.x
-    P.x      14     15 C2.x
-    C3.y     12     12 sub.C3.x
-    C3.y     11     11 C1.x
-    C2.y      8      8 C3.x
-    sub.C2.y  5      5 C2.x
-    C1.y      3      2 sub.C2.x
-    P.x       0      0 C1.x
-
-    Parameters
-    ----------
-    problem : <Problem>
-        The problem object that contains the model.
-    vec_name : str
-        Name of vector to dump (when there are multiple vectors due to parallel derivs)
-    stream : File-like
-        Where dump output will go.
-    """
-    def _get_data(g, type_):
-
-        sizes = g._var_sizes[vec_name]
-        vnames = g._var_allprocs_abs_names
-        abs2meta = g._var_allprocs_abs2meta
-
-        idx = 0
-        data = []
-        nwid = 0
-        iwid = 0
-        total = 0
-        for rank in range(g.comm.size):
-            for ivar, vname in enumerate(vnames[type_]):
-                sz = sizes[type_][rank, ivar]
-                if sz > 0:
-                    data.append((vname, str(total)))
-                nwid = max(nwid, len(vname))
-                iwid = max(iwid, len(data[-1][1]))
-                total += sz
-
-        return data, nwid, iwid
-
-    def _dump(g, stream):
-
-        pdata, pnwid, piwid = _get_data(g, 'input')
-        udata, unwid, uiwid = _get_data(g, 'output')
-
-        data = []
-        for u, p in zip_longest(udata, pdata, fillvalue=('', '')):
-            data.append((u[0], u[1], p[1], p[0]))
-
-        template = "{0:<{wid0}} {1:>{wid1}}     {2:>{wid2}} {3:<{wid3}}\n"
-        for d in data[::-1]:
-            stream.write(template.format(d[0], d[1], d[2], d[3],
-                                         wid0=unwid, wid1=uiwid,
-                                         wid2=piwid, wid3=pnwid))
-        stream.write("\n\n")
-
-    if not MPI or MPI.COMM_WORLD.rank == 0:
-        _dump(problem.model, stream)
 
 
 class _NoColor(object):
@@ -253,7 +183,7 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True, show_approx=T
         if show_approx and s._approx_schemes:
             approx_keys = set()
             keys = set()
-            for k, sjac in iteritems(s._subjacs_info):
+            for k, sjac in s._subjacs_info.items():
                 if 'method' in sjac and sjac['method']:
                     approx_keys.add(k)
                 else:
@@ -348,7 +278,7 @@ def config_summary(problem, stream=sys.stdout):
         con_nonlin_ineq = {}
         con_linear_eq = {}
         con_linear_ineq = {}
-        for con, vals in iteritems(model.get_constraints()):
+        for con, vals in model.get_constraints().items():
             if vals['linear']:
                 if vals['equals'] is not None:
                     con_linear_eq[con] = vals
@@ -436,6 +366,7 @@ def profiling(outname='prof.out'):
     outname : str
         Name of the output file containing profiling stats.
     """
+    import cProfile
     prof = cProfile.Profile()
     prof.enable()
 
@@ -492,7 +423,8 @@ def trace_mpi(fname='mpi_trace', skip=(), flush=True):
         If True, flush print buffer after every print call.
     """
     if MPI is None:
-        raise RuntimeError("MPI is not active.  Trace aborted.")
+        simple_warning("MPI is not active.  Trace aborted.")
+        return
     if sys.getprofile() is not None:
         raise RuntimeError("another profile function is already active.")
 
@@ -521,6 +453,7 @@ def trace_mpi(fname='mpi_trace', skip=(), flush=True):
 
     def _mpi_trace_callback(frame, event, arg):
         pname = None
+        commsize = ''
         if event == 'call':
             if 'openmdao' in frame.f_code.co_filename:
                 if frame.f_code.co_name in skip:
@@ -530,10 +463,14 @@ def trace_mpi(fname='mpi_trace', skip=(), flush=True):
                         pname = frame.f_locals['self'].msginfo
                     except:
                         pass
+                    try:
+                        commsize = frame.f_locals['self'].comm.size
+                    except:
+                        pass
                 if pname is not None:
                     if not stack or pname != stack[-1][0]:
                         stack.append([pname, 1])
-                        print('   ' * len(stack), pname, file=outfile, flush=flush)
+                        print('   ' * len(stack), commsize, pname, file=outfile, flush=flush)
                     else:
                         stack[-1][1] += 1
                 print('   ' * len(stack), '-->', frame.f_code.co_name, "%s:%d" %
@@ -548,6 +485,10 @@ def trace_mpi(fname='mpi_trace', skip=(), flush=True):
                         pname = frame.f_locals['self'].msginfo
                     except:
                         pass
+                    try:
+                        commsize = frame.f_locals['self'].comm.size
+                    except:
+                        pass
                 print('   ' * len(stack), '<--', frame.f_code.co_name, "%s:%d" %
                       (frame.f_code.co_filename, frame.f_code.co_firstlineno),
                       file=outfile, flush=flush)
@@ -556,7 +497,8 @@ def trace_mpi(fname='mpi_trace', skip=(), flush=True):
                     if stack[-1][1] < 1:
                         stack.pop()
                         if stack:
-                            print('   ' * len(stack), stack[-1][0], file=outfile, flush=flush)
+                            print('   ' * len(stack), commsize, stack[-1][0], file=outfile,
+                                  flush=flush)
         else:
             _print_c_func(frame, arg, _c_map[event])
 

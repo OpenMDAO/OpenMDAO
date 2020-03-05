@@ -1,8 +1,7 @@
 """ Test out some specialized parallel derivatives features"""
 
-from __future__ import print_function
 
-from six.moves import cStringIO as StringIO
+from io import StringIO
 import sys
 import unittest
 import time
@@ -26,7 +25,7 @@ if MPI:
         PETScVector = None
 
 
-@unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class ParDerivTestCase(unittest.TestCase):
 
     N_PROCS = 2
@@ -171,7 +170,7 @@ class ParDerivTestCase(unittest.TestCase):
 
         if not prob.comm.rank:
             self.assertTrue('Solving color: par_dv (iv.x1, iv.x2)' in output)
-            self.assertTrue('In mode: fwd, Solving variable(s):' in output)
+            self.assertTrue('In mode: fwd, Solving variable(s) using simul coloring:' in output)
             self.assertTrue("('iv.x3', [2])" in output)
 
     def test_fan_out_parallel_sets_rev(self):
@@ -198,10 +197,12 @@ class ParDerivTestCase(unittest.TestCase):
         # Piggyback to make sure the distributed norm calculation is correct.
         vec = prob.model._vectors['residual']['c2.y']
         norm_val = vec.get_norm()
-        assert_rel_error(self, norm_val, 6.480740698, 1e-6)
+        # NOTE: BAN updated the norm value for the PR that added seed splitting, i.e.
+        # the seed, c2.y in this case, is half what it was before (-.5 vs. -1).
+        assert_rel_error(self, norm_val, 6.422616289332565, 1e-6)
 
 
-@unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class DecoupledTestCase(unittest.TestCase):
     N_PROCS = 2
     asize = 3
@@ -335,7 +336,7 @@ class DecoupledTestCase(unittest.TestCase):
         assert_rel_error(self, J['Con2.y', 'Indep2.x'], expected, 1e-6)
 
 
-@unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class IndicesTestCase(unittest.TestCase):
 
     N_PROCS = 2
@@ -391,7 +392,7 @@ class IndicesTestCase(unittest.TestCase):
         assert_rel_error(self, J['c4.y', 'p.x'][0], np.array([8., 0.]), 1e-6)
 
 
-@unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class IndicesTestCase2(unittest.TestCase):
 
     N_PROCS = 2
@@ -464,7 +465,7 @@ class IndicesTestCase2(unittest.TestCase):
         assert_rel_error(self, J['G1.par1.c4.y', 'G1.par1.p.x'][0], np.array([8., 0.]), 1e-6)
 
 
-@unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class MatMatTestCase(unittest.TestCase):
     N_PROCS = 2
     asize = 3

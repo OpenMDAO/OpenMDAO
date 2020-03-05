@@ -1,14 +1,11 @@
 """Define the PETSc Transfer class."""
-from __future__ import division
-
 import numpy as np
 from petsc4py import PETSc
-from six import iteritems, itervalues
 from itertools import product, chain
 from collections import defaultdict
 
 from openmdao.vectors.transfer import Transfer
-from openmdao.vectors.default_transfer import DefaultTransfer
+from openmdao.vectors.default_transfer import DefaultTransfer, _merge
 from openmdao.vectors.vector import INT_DTYPE
 from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import convert_neg, _flatten_src_indices
@@ -67,24 +64,11 @@ class PETScTransfer(DefaultTransfer):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        rev = group._mode == 'rev' or group._mode == 'auto'
-
-        def merge(indices_list):
-            if len(indices_list) > 0:
-                return np.concatenate(indices_list)
-            else:
-                return _empty_idx_array
+        rev = group._mode != 'fwd'
 
         if recurse:
             for subsys in group._subgroups_myproc:
                 subsys._setup_transfers(recurse)
-
-        # Pre-compute map from abs_names to the index of the containing subsystem
-        abs2isub = {}
-        for subsys, isub in zip(group._subsystems_myproc, group._subsystems_myproc_inds):
-            for type_ in ['input', 'output']:
-                for abs_name in subsys._var_allprocs_abs_names[type_]:
-                    abs2isub[abs_name] = isub
 
         abs2meta = group._var_abs2meta
         allprocs_abs2meta = group._var_allprocs_abs2meta
@@ -96,6 +80,9 @@ class PETScTransfer(DefaultTransfer):
 
         vec_names = group._lin_rel_vec_name_list if group._use_derivatives else group._vec_names
 
+        mypathlen = len(group.pathname + '.' if group.pathname else '')
+        sub_inds = group._subsystems_inds
+
         for vec_name in vec_names:
             relvars, _ = group._relevant[vec_name]['@all']
 
@@ -103,11 +90,11 @@ class PETScTransfer(DefaultTransfer):
             nsub_allprocs = len(group._subsystems_allprocs)
             xfer_in = []
             xfer_out = []
-            fwd_xfer_in = [[] for i in range(nsub_allprocs)]
-            fwd_xfer_out = [[] for i in range(nsub_allprocs)]
+            fwd_xfer_in = [[] for s in group._subsystems_allprocs]
+            fwd_xfer_out = [[] for s in group._subsystems_allprocs]
             if rev:
-                rev_xfer_in = [[] for i in range(nsub_allprocs)]
-                rev_xfer_out = [[] for i in range(nsub_allprocs)]
+                rev_xfer_in = [[] for s in group._subsystems_allprocs]
+                rev_xfer_out = [[] for s in group._subsystems_allprocs]
 
             allprocs_abs2idx = group._var_allprocs_abs2idx[vec_name]
             sizes_in = group._var_sizes[vec_name]['input']
@@ -116,12 +103,12 @@ class PETScTransfer(DefaultTransfer):
             offsets_out = offsets[vec_name]['output']
 
             # Loop through all connections owned by this system
-            for abs_in, abs_out in iteritems(group._conn_abs_in2out):
-                if abs_out not in relvars['output']:
+            for abs_in, abs_out in group._conn_abs_in2out.items():
+                if abs_out not in relvars['output'] or abs_in not in relvars['input']:
                     continue
 
                 # Only continue if the input exists on this processor
-                if abs_in in abs2meta and abs_in in relvars['input']:
+                if abs_in in abs2meta:
 
                     # Get meta
                     meta_in = abs2meta[abs_in]
@@ -148,14 +135,16 @@ class PETScTransfer(DefaultTransfer):
 
                     # 1. Compute the output indices
                     if src_indices is None:
-                        start = 0 if owner == 0 else np.sum(sizes_out[:owner, idx_out])
-                        offset = offsets_out[owner, idx_out] - start
+                        rank = myproc if abs_out in abs2meta else owner
+                        offset = offsets_out[rank, idx_out]
                         output_inds = np.arange(offset, offset + meta_in['size'], dtype=INT_DTYPE)
                     else:
                         output_inds = np.zeros(src_indices.size, INT_DTYPE)
                         start = end = 0
                         for iproc in range(group.comm.size):
                             end += sizes_out[iproc, idx_out]
+                            if start == end:
+                                continue
 
                             # The part of src on iproc
                             on_iproc = np.logical_and(start <= src_indices, src_indices < end)
@@ -180,34 +169,37 @@ class PETScTransfer(DefaultTransfer):
                                            sizes_in[myproc, idx_in], dtype=INT_DTYPE)
 
                     # Now the indices are ready - input_inds, output_inds
-                    xfer_in.append(input_inds)
-                    xfer_out.append(output_inds)
-
-                    isub = abs2isub[abs_in]
+                    sub_in = abs_in[mypathlen:].split('.', 1)[0]
+                    isub = sub_inds[sub_in]
                     fwd_xfer_in[isub].append(input_inds)
                     fwd_xfer_out[isub].append(output_inds)
-                    if rev and abs_out in abs2isub:
-                        isub = abs2isub[abs_out]
+                    if rev:
+                        sub_out = abs_out[mypathlen:].split('.', 1)[0]
+                        isub = sub_inds[sub_out]
                         rev_xfer_in[isub].append(input_inds)
                         rev_xfer_out[isub].append(output_inds)
 
-            xfer_in = merge(xfer_in)
-            xfer_out = merge(xfer_out)
+            transfers[vec_name] = {}
+
             for isub in range(nsub_allprocs):
-                fwd_xfer_in[isub] = merge(fwd_xfer_in[isub])
-                fwd_xfer_out[isub] = merge(fwd_xfer_out[isub])
+                fwd_xfer_in[isub] = _merge(fwd_xfer_in[isub])
+                fwd_xfer_out[isub] = _merge(fwd_xfer_out[isub])
                 if rev:
-                    rev_xfer_in[isub] = merge(rev_xfer_in[isub])
-                    rev_xfer_out[isub] = merge(rev_xfer_out[isub])
+                    rev_xfer_in[isub] = _merge(rev_xfer_in[isub])
+                    rev_xfer_out[isub] = _merge(rev_xfer_out[isub])
+
+            xfer_in = np.concatenate(fwd_xfer_in)
+            xfer_out = np.concatenate(fwd_xfer_out)
 
             out_vec = vectors['output'][vec_name]
 
-            transfers[vec_name] = {}
             xfer_all = PETScTransfer(vectors['input'][vec_name], out_vec,
                                      xfer_in, xfer_out, group.comm)
+
             transfers[vec_name]['fwd', None] = xfer_all
             if rev:
                 transfers[vec_name]['rev', None] = xfer_all
+
             for isub in range(nsub_allprocs):
                 transfers[vec_name]['fwd', isub] = PETScTransfer(
                     vectors['input'][vec_name], vectors['output'][vec_name],
@@ -219,80 +211,6 @@ class PETScTransfer(DefaultTransfer):
 
         if group._use_derivatives:
             transfers['nonlinear'] = transfers['linear']
-
-    @staticmethod
-    def _setup_discrete_transfers(group, recurse=True):
-        """
-        Compute all transfers that are owned by our parent group.
-
-        Parameters
-        ----------
-        group : <Group>
-            Parent group.
-        recurse : bool
-            Whether to call this method in subsystems.
-        """
-        group._discrete_transfers = transfers = defaultdict(list)
-        name_offset = len(group.pathname) + 1 if group.pathname else 0
-
-        iproc = group.comm.rank
-        owns = group._owning_rank
-
-        # collect all xfers for each tgt system
-        for tgt, src in iteritems(group._conn_discrete_in2out):
-            src_sys, src_var = src[name_offset:].split('.', 1)
-            tgt_sys, tgt_var = tgt[name_offset:].split('.', 1)
-            xfer = (src_sys, src_var, tgt_sys, tgt_var)
-            transfers[tgt_sys].append(xfer)
-
-        total_send = set()
-        total_recv = []
-        total_xfers = []
-
-        for tgt_sys, xfers in iteritems(transfers):
-            send = set()
-            recv = []
-            for src_sys, src_var, tgt_sys, tgt_var in xfers:
-                if group.pathname:
-                    src_abs = '.'.join([group.pathname, src_sys, src_var])
-                else:
-                    src_abs = '.'.join([src_sys, src_var])
-                tgt_rel = '.'.join((tgt_sys, tgt_var))
-                src_rel = '.'.join((src_sys, src_var))
-                if iproc == owns[src_abs]:
-                    # we own this var, so we'll send it out to others
-                    send.add(src_rel)
-                if (tgt_rel in group._var_discrete['input'] and
-                        src_rel not in group._var_discrete['output']):
-                    # we have the target locally, but not the source, so we need someone
-                    # to send it to us.
-                    recv.append(src_rel)
-
-            transfers[tgt_sys] = (xfers, send, recv)
-            total_xfers.extend(xfers)
-            total_send.update(send)
-            total_recv.extend(recv)
-
-        transfers[None] = (total_xfers, total_send, total_recv)
-
-        # find out all ranks that need to receive each discrete source var
-        allproc_xfers = group.comm.allgather(transfers)
-        allprocs_recv = defaultdict(lambda: defaultdict(list))
-        for rank, rank_transfers in enumerate(allproc_xfers):
-            for tgt_sys, (_, _, recvs) in iteritems(rank_transfers):
-                for recv in recvs:
-                    allprocs_recv[tgt_sys][recv].append(rank)
-
-        group._allprocs_discrete_recv = allprocs_recv
-
-        # if we own a src var but it's local for every rank, we don't need to send it to anyone.
-        total_send = total_send.intersection(allprocs_recv)
-
-        for tgt_sys in transfers:
-            xfers, send, _ = transfers[tgt_sys]
-            # update send list to remove any vars that don't have a remote receiver,
-            # and get rid of recv list because allprocs_recv has the necessary info.
-            transfers[tgt_sys] = (xfers, send.intersection(allprocs_recv[tgt_sys]))
 
     def _transfer(self, in_vec, out_vec, mode='fwd'):
         """

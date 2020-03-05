@@ -1,11 +1,10 @@
-from __future__ import print_function, division, absolute_import
-
 import unittest
 
 import openmdao.api as om
 from openmdao.test_suite.test_examples.beam_optimization.beam_group import BeamGroup
 from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group import MultipointBeamGroup
 from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
+from openmdao.utils.mpi import MPI
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -192,7 +191,7 @@ class TestCase(unittest.TestCase):
         assert_check_partials(derivs, rtol=1e-15)
 
 
-@unittest.skipUnless(PETScVector, "PETSc is required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestParallelGroups(unittest.TestCase):
 
     N_PROCS = 2

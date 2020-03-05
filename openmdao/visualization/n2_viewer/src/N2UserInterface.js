@@ -187,22 +187,39 @@ class N2UserInterface {
 
         // Check to see if the node is a collapsed node or not
         if (node.collapsable) {
-            this.leftClickedNode = node;
+            this.leftClickedNode = node; <<
+            << << < HEAD
             this.forwardButtonHistory.push({
                 node: this.leftClickedNode,
             });
             this.collapse();
         } else {
             this.n2Diag.dom.parentDiv.querySelector('#undo-graph').disabled =
-                this.backButtonHistory.length == 0 ? 'disabled' : false;
+                this.backButtonHistory.length == 0 ? 'disabled' : false; ===
+            === =
+            this.forwardButtonHistory.push({
+                node: this.leftClickedNode
+            });
+            this.collapse();
+        } else {
+            this.n2Diag.dom.parentDiv.querySelector("#backButtonId").disabled =
+                this.backButtonHistory.length == 0 ? "disabled" : false; >>>
+            >>> > 7 a7705bc9c0a3518dc124de8e42e1956ad6015b2
             for (let obj = node; obj != null; obj = obj.parent) {
                 //make sure history item is not minimized
                 if (obj.isMinimized) return;
             }
 
+            <<
+            << << < HEAD
             this.forwardButtonHistory.push({
                 node: this.n2Diag.zoomedElement,
-            });
+            }); ===
+            === =
+            this.forwardButtonHistory.push({
+                node: this.n2Diag.zoomedElement
+            }); >>>
+            >>> > 7 a7705bc9c0a3518dc124de8e42e1956ad6015b2
             this._setupLeftClick(node);
         }
 

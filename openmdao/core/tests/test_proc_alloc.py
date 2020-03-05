@@ -1,4 +1,3 @@
-from __future__ import print_function
 
 import unittest
 
@@ -53,24 +52,7 @@ def _get_which_procs(group):
     return MPI.COMM_WORLD.allgather(sub_inds)
 
 
-@unittest.skipUnless(MPI and PETScVector, "only run under MPI with PETSc.")
-class ProcTestCase1(unittest.TestCase):
-
-    N_PROCS = 1
-
-    def test_4_subs(self):
-        p = _build_model(nsubs=4)
-        all_inds = _get_which_procs(p.model.par)
-        self.assertEqual(all_inds, [[0,1,2,3]])
-
-        p.run_model()
-        assert_rel_error(self, p['objective.y'], 8.0)
-
-        J = p.compute_totals(['objective.y'], ['indep.x'], return_format='dict')
-        assert_rel_error(self, J['objective.y']['indep.x'][0][0], 8.0, 1e-6)
-
-
-@unittest.skipUnless(MPI and PETScVector, "only run under MPI with PETSc.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class ProcTestCase2(unittest.TestCase):
 
     N_PROCS = 2
@@ -87,7 +69,7 @@ class ProcTestCase2(unittest.TestCase):
         assert_rel_error(self, J['objective.y']['indep.x'][0][0], 8.0, 1e-6)
 
 
-@unittest.skipUnless(MPI and PETScVector, "only run under MPI with PETSc.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class ProcTestCase3(unittest.TestCase):
 
     N_PROCS = 3
@@ -175,7 +157,7 @@ class ProcTestCase3(unittest.TestCase):
         assert_rel_error(self, J['objective.y']['indep.x'][0][0], 8.0, 1e-6)
 
 
-@unittest.skipUnless(MPI and PETScVector, "only run under MPI with PETSc.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class ProcTestCase5(unittest.TestCase):
 
     N_PROCS = 5
@@ -192,7 +174,7 @@ class ProcTestCase5(unittest.TestCase):
         assert_rel_error(self, J['objective.y']['indep.x'][0][0], 8.0, 1e-6)
 
 
-@unittest.skipUnless(MPI and PETScVector, "only run under MPI with PETSc.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class ProcTestCase6(unittest.TestCase):
 
     N_PROCS = 6
@@ -206,7 +188,7 @@ class ProcTestCase6(unittest.TestCase):
             self.fail("Exception expected.")
 
 
-@unittest.skipUnless(MPI and PETScVector, "only run under MPI with PETSc.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class ProcTestCase8(unittest.TestCase):
 
     N_PROCS = 8

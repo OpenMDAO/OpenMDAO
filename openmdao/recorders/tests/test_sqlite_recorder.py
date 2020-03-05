@@ -952,7 +952,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.model.add_subsystem('comp', ImplCompTwoStates())
         prob.model.connect('px.x', 'comp.x')
 
-        prob.model.nonlinear_solver = om.NewtonSolver()
+        prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         prob.model.nonlinear_solver.options['maxiter'] = 10
         prob.model.linear_solver = om.ScipyKrylov()
 
@@ -1135,7 +1135,7 @@ class TestSqliteRecorder(unittest.TestCase):
         assertSolverIterDataRecorded(self, expected_data, self.eps)
 
     def test_record_solver_nonlinear_newton(self):
-        prob = SellarProblem(linear_solver=om.LinearBlockGS, nonlinear_solver=om.NewtonSolver)
+        prob = SellarProblem(linear_solver=om.LinearBlockGS, nonlinear_solver=om.NewtonSolver(solve_subsystems=False))
         prob.setup()
 
         prob.model.nonlinear_solver.add_recorder(self.recorder)
@@ -1202,7 +1202,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob = SellarProblem()
         prob.setup()
 
-        nl = prob.model.nonlinear_solver = om.NewtonSolver()
+        nl = prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
 
         linear_solvers = [
             om.DirectSolver, om.ScipyKrylov, om.PETScKrylov,
@@ -1965,8 +1965,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         self.assertEqual(metadata['name'], 'ScipyOptimizeDriver')
         self.assertEqual(metadata['type'], 'optimization')
         self.assertEqual(metadata['options'], {"debug_print": [], "optimizer": "SLSQP",
-                                               "tol": 1e-03, "maxiter": 200, "disp": True,
-                                               "dynamic_simul_derivs": False})
+                                               "tol": 1e-03, "maxiter": 200, "disp": True})
         self.assertEqual(metadata['opt_settings'], {"ACC": 1e-06})
 
     def test_feature_solver_metadata(self):
@@ -2161,7 +2160,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
                 self.connect('R2.I', 'n2.I_in:0')
                 self.connect('D1.I', 'n2.I_out:0')
 
-                self.nonlinear_solver = om.NewtonSolver()
+                self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
                 self.nonlinear_solver.options['iprint'] = 2
                 self.nonlinear_solver.options['maxiter'] = 20
                 self.linear_solver = om.DirectSolver()

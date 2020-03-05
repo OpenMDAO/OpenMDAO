@@ -74,8 +74,8 @@ class TestNLBlockJacobi(unittest.TestCase):
 
         model.linear_solver = om.LinearBlockGS()
 
-        nlgbs = model.nonlinear_solver = om.NonlinearBlockJac()
-        nlgbs.options['maxiter'] = 4
+        nlbgs = model.nonlinear_solver = om.NonlinearBlockJac()
+        nlbgs.options['maxiter'] = 4
 
         prob.setup()
 
@@ -108,8 +108,8 @@ class TestNLBlockJacobi(unittest.TestCase):
 
         model.linear_solver = om.LinearBlockGS()
 
-        nlgbs = model.nonlinear_solver = om.NonlinearBlockJac()
-        nlgbs.options['rtol'] = 1e-3
+        nlbgs = model.nonlinear_solver = om.NonlinearBlockJac()
+        nlbgs.options['rtol'] = 1e-3
 
         prob.setup()
 
@@ -142,8 +142,8 @@ class TestNLBlockJacobi(unittest.TestCase):
 
         model.linear_solver = om.LinearBlockGS()
 
-        nlgbs = model.nonlinear_solver = om.NonlinearBlockJac()
-        nlgbs.options['atol'] = 1e-2
+        nlbgs = model.nonlinear_solver = om.NonlinearBlockJac()
+        nlbgs.options['atol'] = 1e-2
 
         prob.setup()
 
@@ -153,12 +153,11 @@ class TestNLBlockJacobi(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
 
-@unittest.skipUnless(PETScVector, "PETSc is required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestNonlinearBlockJacobiMPI(unittest.TestCase):
 
     N_PROCS = 2
 
-    @unittest.skipUnless(MPI, "MPI is not active.")
     def test_reraise_analylsis_error(self):
         prob = om.Problem()
         model = prob.model

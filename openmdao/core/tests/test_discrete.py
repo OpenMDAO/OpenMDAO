@@ -4,8 +4,7 @@ import sys
 import unittest
 import copy
 
-from six import assertRaisesRegex, StringIO, assertRegex
-
+from io import StringIO
 import numpy as np
 
 import openmdao.api as om
@@ -293,11 +292,11 @@ class DiscreteTestCase(unittest.TestCase):
         text = stream.getvalue()
 
         self.assertEqual(1, text.count("3 Input(s) in 'model'"))
-        self.assertEqual(1, text.count('top'))
-        self.assertEqual(1, text.count('  expl'))
-        self.assertEqual(1, text.count('    a'))
-        self.assertEqual(1, text.count('  impl'))
-        self.assertEqual(2, text.count('    x'))      # both implicit & explicit
+        self.assertEqual(1, text.count('\nmodel'))
+        self.assertEqual(1, text.count('\n  expl'))
+        self.assertEqual(1, text.count('\n    a'))
+        self.assertEqual(1, text.count('\n  impl'))
+        self.assertEqual(2, text.count('\n    x'))      # both implicit & explicit
 
         #
         # list outputs, not hierarchical
@@ -320,13 +319,13 @@ class DiscreteTestCase(unittest.TestCase):
         prob.model.list_outputs(values=True, residuals=True, hierarchical=True, out_stream=stream)
         text = stream.getvalue()
 
-        self.assertEqual(text.count('top'), 2)        # both implicit & explicit
-        self.assertEqual(text.count('  indep'), 1)
-        self.assertEqual(text.count('    x'), 1)
-        self.assertEqual(text.count('  expl'), 1)
-        self.assertEqual(text.count('    b'), 1)
-        self.assertEqual(text.count('  impl'), 1)
-        self.assertEqual(text.count('    y'), 2)      # both implicit & explicit
+        self.assertEqual(text.count('\nmodel'), 2)      # both implicit & explicit
+        self.assertEqual(text.count('\n  indep'), 1)
+        self.assertEqual(text.count('\n    x'), 1)
+        self.assertEqual(text.count('\n  expl'), 1)
+        self.assertEqual(text.count('\n    b'), 1)
+        self.assertEqual(text.count('\n  impl'), 1)
+        self.assertEqual(text.count('\n    y'), 2)      # both implicit & explicit
 
     def test_list_inputs_outputs_promoted(self):
         model = om.Group()
@@ -382,7 +381,7 @@ class DiscreteTestCase(unittest.TestCase):
             "",
             "varname  value  prom_name",
             "-------  -----  ---------",
-            "top",
+            "model",
             "  indep",
             "    x    11     x",
             "  expl",
@@ -395,7 +394,7 @@ class DiscreteTestCase(unittest.TestCase):
             "",
             "varname  value  prom_name",
             "-------  -----  ---------",
-            "top",
+            "model",
             "  impl",
             "    y    2      impl.y",
         ]
@@ -639,6 +638,36 @@ class DiscreteTestCase(unittest.TestCase):
             J = prob.compute_totals()
         self.assertEqual(str(ctx.exception),
                          "Total derivative with respect to 'indep.x' depends upon discrete output variables ['G.G1.C1.y'].")
+
+    def test_connection_to_output(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('C1', ModCompEx(modval=2))
+        model.add_subsystem('C2', ModCompEx(modval=2))
+
+        model.connect('C1.y', 'C2.y')
+
+        with self.assertRaises(Exception) as cm:
+            prob.setup()
+
+        msg = "Group (<model>): Attempted to connect from 'C1.y' to 'C2.y', but 'C2.y' is an output. All connections must be from an output to an input."
+        self.assertEqual(str(cm.exception), msg)
+
+    def test_connection_from_input(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('C1', ModCompEx(modval=2))
+        model.add_subsystem('C2', ModCompEx(modval=2))
+
+        model.connect('C1.x', 'C2.x')
+
+        with self.assertRaises(Exception) as cm:
+            prob.setup()
+
+        msg = "Group (<model>): Attempted to connect from 'C1.x' to 'C2.x', but 'C1.x' is an input. All connections must be from an output to an input."
+        self.assertEqual(str(cm.exception), msg)
 
 
 class SolverDiscreteTestCase(unittest.TestCase):
@@ -887,7 +916,7 @@ class DiscreteFeatureTestCase(unittest.TestCase):
 
         model.add_subsystem('comp', ImpWithInitial())
 
-        model.nonlinear_solver = om.NewtonSolver()
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         model.linear_solver = om.ScipyKrylov()
 
         prob.setup()

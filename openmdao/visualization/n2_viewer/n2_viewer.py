@@ -7,11 +7,7 @@ from collections import OrderedDict
 from itertools import chain
 import networkx as nx
 from six import iteritems, itervalues
-try:
-    import h5py
-except ImportError:
-    # Necessary for the file to parse
-    h5py = None
+
 
 from openmdao.components.exec_comp import ExecComp
 from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
@@ -27,7 +23,7 @@ from openmdao.drivers.doe_driver import DOEDriver
 from openmdao.recorders.case_reader import CaseReader
 from openmdao.solvers.nonlinear.newton import NewtonSolver
 from openmdao.utils.class_util import overrides_method
-from openmdao.utils.general_utils import warn_deprecation, simple_warning, make_serializable
+from openmdao.utils.general_utils import simple_warning, make_serializable
 from openmdao.utils.record_util import check_valid_sqlite3_db
 from openmdao.utils.mpi import MPI
 from openmdao.visualization.html_utils import read_files, write_script, DiagramWriter
@@ -175,7 +171,7 @@ def _get_declare_partials(system):
     def recurse_get_partials(system, dpl):
         if isinstance(system, Component):
             subjacs = system._subjacs_info
-            for abs_key, meta in iteritems(subjacs):
+            for abs_key, meta in subjacs.items():
                 dpl.append("{} > {}".format(abs_key[0], abs_key[1]))
         elif isinstance(system, Group):
             for s in system._subsystems_myproc:
@@ -216,7 +212,7 @@ def _get_viewer_data(data_source):
             driver, DOEDriver) else 'optimization'
         driver_options = {k: driver.options[k] for k in driver.options}
         driver_opt_settings = None
-        if driver_type is 'optimization' and 'opt_settings' in dir(driver):
+        if driver_type == 'optimization' and 'opt_settings' in dir(driver):
             driver_opt_settings = driver.opt_settings
 
     elif isinstance(data_source, Group):
@@ -282,12 +278,12 @@ def _get_viewer_data(data_source):
                     exe_low <= orders[t] <= exe_high and
                     not (s == src and t == tgt) and t in sys_pathnames_dict
                 ]
-                for vsrc, vtgtlist in iteritems(G.get_edge_data(src, tgt)['conns']):
+                for vsrc, vtgtlist in G.get_edge_data(src, tgt)['conns'].items():
                     for vtgt in vtgtlist:
                         connections_list.append({'src': vsrc, 'tgt': vtgt,
                                                  'cycle_arrows': edges_list})
             else:  # edge is out of the SCC
-                for vsrc, vtgtlist in iteritems(G.get_edge_data(src, tgt)['conns']):
+                for vsrc, vtgtlist in G.get_edge_data(src, tgt)['conns'].items():
                     for vtgt in vtgtlist:
                         connections_list.append({'src': vsrc, 'tgt': vtgt})
 
@@ -303,36 +299,6 @@ def _get_viewer_data(data_source):
     data_dict['declare_partials_list'] = _get_declare_partials(root_group)
 
     return data_dict
-
-
-def view_tree(*args, **kwargs):
-    """
-    view_tree was renamed to n2, but left here for backwards compatibility.
-
-    Parameters
-    ----------
-    *args : dict
-        Positional args.
-    **kwargs : dict
-        Keyword args.
-    """
-    warn_deprecation("view_tree is deprecated. Please switch to n2.")
-    n2(*args, **kwargs)
-
-
-def view_model(*args, **kwargs):
-    """
-    view_model was renamed to n2, but left here for backwards compatibility.
-
-    Parameters
-    ----------
-    *args : dict
-        Positional args.
-    **kwargs : dict
-        Keyword args.
-    """
-    warn_deprecation("view_model is deprecated. Please switch to n2.")
-    n2(*args, **kwargs)
 
 
 def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
@@ -390,7 +356,7 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     # grab the libraries, src and style
     lib_dct = {'d3': 'd3.v5.min', 'awesomplete': 'awesomplete',
                'vk_beautify': 'vkBeautify'}
-    libs = read_files(itervalues(lib_dct), libs_dir, 'js')
+    libs = read_files(lib_dct.values(), libs_dir, 'js')
     src_names = \
         'modal', \
         'utils', \
@@ -427,10 +393,10 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     # put all style and JS into index
     h.insert('{{fontello}}', encoded_font)
 
-    for k, v in iteritems(lib_dct):
+    for k, v in lib_dct.items():
         h.insert('{{{}_lib}}'.format(k), write_script(libs[v], indent=_IND))
 
-    for name, code in iteritems(srcs):
+    for name, code in srcs.items():
         h.insert('{{{}_lib}}'.format(name.lower()),
                  write_script(code, indent=_IND))
 

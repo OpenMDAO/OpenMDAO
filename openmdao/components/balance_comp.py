@@ -1,10 +1,7 @@
 """Define the BalanceComp class."""
 
-from __future__ import print_function, division, absolute_import
-
 from types import FunctionType
 from numbers import Number
-from six import iteritems
 
 import numpy as np
 
@@ -27,9 +24,10 @@ class BalanceComp(ImplicitComponent):
         Declare options.
         """
         self.options.declare('guess_func', types=FunctionType, allow_none=True, default=None,
-                             desc='A callable function in the form f(inputs, outputs, residuals) '
-                                  'that can provide an initial "guess" value of the state '
-                                  'variable(s) based on the inputs, outputs and residuals.')
+                             recordable=False, desc='A callable function in the form '
+                             'f(inputs, outputs, residuals) that can provide an initial "guess" '
+                             'value of the state variable(s) based on the inputs, outputs and '
+                             'residuals.')
 
     def __init__(self, name=None, eq_units=None, lhs_name=None, rhs_name=None, rhs_val=0.0,
                  use_mult=False, mult_name=None, mult_val=1.0, normalize=True, **kwargs):
@@ -154,7 +152,7 @@ class BalanceComp(ImplicitComponent):
         # set static mode to False because we are doing things that would normally be done in setup
         self._static_mode = False
 
-        for name, options in iteritems(self._state_vars):
+        for name, options in self._state_vars.items():
 
             meta = self.add_output(name, **options['kwargs'])
 
@@ -209,7 +207,7 @@ class BalanceComp(ImplicitComponent):
         else:
             self._scale_factor = self._scale_factor.real
 
-        for name, options in iteritems(self._state_vars):
+        for name, options in self._state_vars.items():
             lhs = inputs[options['lhs_name']]
             rhs = inputs[options['rhs_name']]
 
@@ -248,7 +246,7 @@ class BalanceComp(ImplicitComponent):
         else:
             self._dscale_drhs = self._dscale_drhs.real
 
-        for name, options in iteritems(self._state_vars):
+        for name, options in self._state_vars.items():
             lhs_name = options['lhs_name']
             rhs_name = options['rhs_name']
 

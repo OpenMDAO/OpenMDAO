@@ -1,20 +1,11 @@
 """Define the MetaModelStructured class."""
-from __future__ import division, print_function, absolute_import
-
-from six import raise_from, iteritems, itervalues
-from six.moves import range
 
 import numpy as np
 
 from openmdao.components.interp_util.outofbounds_error import OutOfBoundsError
-from openmdao.components.interp_util.interp import InterpND
+from openmdao.components.interp_util.interp import InterpND, TABLE_METHODS
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.explicitcomponent import ExplicitComponent
-from openmdao.utils.general_utils import warn_deprecation
-
-
-ALL_METHODS = ('cubic', 'slinear', 'lagrange2', 'lagrange3', 'akima',
-               'scipy_cubic', 'scipy_slinear', 'scipy_quintic')
 
 
 class MetaModelStructuredComp(ExplicitComponent):
@@ -31,6 +22,7 @@ class MetaModelStructuredComp(ExplicitComponent):
 
     Extrapolation is supported, but disabled by default. It can be enabled via initialization
     option.
+
 
     Attributes
     ----------
@@ -75,7 +67,7 @@ class MetaModelStructuredComp(ExplicitComponent):
                                   'training data should be computed.')
         self.options.declare('vec_size', types=int, default=1,
                              desc='Number of points to evaluate at once.')
-        self.options.declare('method', values=ALL_METHODS, default='scipy_cubic',
+        self.options.declare('method', values=TABLE_METHODS, default='scipy_cubic',
                              desc='Spline interpolation method to use for all outputs.')
 
     def add_input(self, name, val=1.0, training_data=None, **kwargs):
@@ -150,10 +142,13 @@ class MetaModelStructuredComp(ExplicitComponent):
         """
         interp_method = self.options['method']
 
-        for name, train_data in iteritems(self.training_outputs):
-            self.interps[name] = InterpND(self.params, train_data,
-                                          interp_method=interp_method,
-                                          bounds_error=not self.options['extrapolate'])
+        opts = {}
+        if 'interp_options' in self.options:
+            opts = self.options['interp_options']
+        for name, train_data in self.training_outputs.items():
+            self.interps[name] = InterpND(method=interp_method,
+                                          points=self.params, values=train_data,
+                                          extrapolate=self.options['extrapolate'])
 
         if self.options['training_data_gradients']:
             self.grad_shape = tuple([self.options['vec_size']] + [i.size for i in self.params])
@@ -201,14 +196,14 @@ class MetaModelStructuredComp(ExplicitComponent):
             unscaled, dimensional output variables read via outputs[key]
         """
         pt = np.array([inputs[pname].flatten() for pname in self.pnames]).T
-        for out_name, interp in iteritems(self.interps):
+        for out_name, interp in self.interps.items():
             if self.options['training_data_gradients']:
                 # Training point values may have changed every time we compute.
                 interp.values = inputs["%s_train" % out_name]
-                interp.training_data_gradients = True
+                interp._compute_d_dvalues = True
 
             try:
-                val = interp.interpolate(pt)
+                val = interp._interpolate(pt)
 
             except OutOfBoundsError as err:
                 varname_causing_error = '.'.join((self.pathname, self.pnames[err.idx]))
@@ -216,7 +211,7 @@ class MetaModelStructuredComp(ExplicitComponent):
                     "was out of bounds ('{}', '{}') with " \
                     "value '{}'".format(self.msginfo, out_name, varname_causing_error,
                                         err.lower, err.upper, err.value)
-                raise_from(AnalysisError(errmsg), None)
+                raise AnalysisError(errmsg)
 
             except ValueError as err:
                 raise ValueError("{}: Error interpolating output '{}':\n{}".format(self.msginfo,
@@ -240,47 +235,24 @@ class MetaModelStructuredComp(ExplicitComponent):
             sub-jac components written to partials[output_name, input_name]
         """
         pt = np.array([inputs[pname].flatten() for pname in self.pnames]).T
-        dy_data = None
 
-        for out_name, interp in iteritems(self.interps):
+        for out_name, interp in self.interps.items():
             dval = interp.gradient(pt).T
             for i, p in enumerate(self.pnames):
                 partials[out_name, p] = dval[i, :]
 
             if self.options['training_data_gradients']:
 
-                if dy_data is None or interp._d_dvalues is not None:
-                    dy_ddata = np.zeros(self.grad_shape)
+                dy_ddata = np.zeros(self.grad_shape)
 
-                    if interp._d_dvalues is not None:
-                        # Akima must be handled individually.
-                        dy_ddata[:] = interp._d_dvalues
+                if interp._d_dvalues is not None:
+                    # Akima must be handled individually.
+                    dy_ddata[:] = interp._d_dvalues
 
-                    else:
-                        # This way works for most of the interpolation methods.
-                        for j in range(self.options['vec_size']):
-                            val = interp.training_gradients(pt[j, :])
-                            dy_ddata[j] = val.reshape(self.grad_shape[1:])
+                else:
+                    # This way works for most of the interpolation methods.
+                    for j in range(self.options['vec_size']):
+                        val = interp.training_gradients(pt[j, :])
+                        dy_ddata[j] = val.reshape(self.grad_shape[1:])
 
                 partials[out_name, "%s_train" % out_name] = dy_ddata
-
-
-class MetaModelStructured(MetaModelStructuredComp):
-    """
-    Deprecated.
-    """
-
-    def __init__(self, *args, **kwargs):
-        """
-        Capture Initialize to throw warning.
-
-        Parameters
-        ----------
-        *args : list
-            Deprecated arguments.
-        **kwargs : dict
-            Deprecated arguments.
-        """
-        warn_deprecation("'MetaModelStructured' has been deprecated. Use "
-                         "'MetaModelStructuredComp' instead.")
-        super(MetaModelStructured, self).__init__(*args, **kwargs)

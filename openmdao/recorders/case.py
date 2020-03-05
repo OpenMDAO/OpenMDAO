@@ -13,8 +13,7 @@ import numpy as np
 from openmdao.recorders.sqlite_recorder import blob_to_array
 from openmdao.utils.record_util import deserialize, get_source_system
 from openmdao.utils.variable_table import write_var_table
-from openmdao.utils.general_utils import warn_deprecation, make_set, \
-    match_includes_excludes
+from openmdao.utils.general_utils import make_set, match_includes_excludes
 from openmdao.utils.units import get_conversion
 
 _DEFAULT_OUT_STREAM = object()
@@ -181,19 +180,6 @@ class Case(object):
 
         # save VOI dict reference for use by self._scale()
         self._var_info = var_info
-
-    @property
-    def iteration_coordinate(self):
-        """
-        Deprecate the 'iteration_coordinate' attribute.
-
-        Returns
-        -------
-        str
-            The unique identifier for this case.
-        """
-        warn_deprecation("'iteration_coordinate' has been deprecated. Use 'name' instead.")
-        return self.name
 
     def __str__(self):
         """
@@ -471,7 +457,7 @@ class Case(object):
             out_stream = sys.stdout
 
         if out_stream:
-            if self.inputs is None or len(self.inputs) is 0:
+            if self.inputs is None or len(self.inputs) == 0:
                 out_stream.write('WARNING: Inputs not recorded. Make sure your recording ' +
                                  'settings have record_inputs set to True\n')
 
@@ -606,7 +592,7 @@ class Case(object):
             out_stream = sys.stdout
 
         if out_stream:
-            if self.outputs is None or len(self.outputs) is 0:
+            if self.outputs is None or len(self.outputs) == 0:
                 out_stream.write('WARNING: Outputs not recorded. Make sure your recording ' +
                                  'settings have record_outputs set to True\n')
             if explicit:
@@ -672,7 +658,8 @@ class Case(object):
             var_list = sorted(var_dict.keys())
 
         write_var_table(pathname, var_list, var_type, var_dict,
-                        hierarchical, print_arrays, out_stream)
+                        hierarchical=hierarchical, top_name='model',
+                        print_arrays=print_arrays, out_stream=out_stream)
 
     def _get_variables_of_type(self, var_type, scaled=False, use_indices=False):
         """

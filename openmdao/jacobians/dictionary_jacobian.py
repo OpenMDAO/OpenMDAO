@@ -1,8 +1,5 @@
 """Define the DictionaryJacobian class."""
-from __future__ import division
-
 import numpy as np
-from six.moves import range
 from scipy.sparse import csc_matrix
 
 from openmdao.jacobians.jacobian import Jacobian

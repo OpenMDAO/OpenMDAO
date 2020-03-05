@@ -37,7 +37,6 @@ Preamble
 ---------
 ::
 
-    from __future__ import division, print_function
     import openmdao.api as om
 
 At the top of any script you'll see these lines (or lines very similar to these) which import needed classes and functions.

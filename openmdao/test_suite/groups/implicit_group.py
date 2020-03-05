@@ -1,7 +1,5 @@
 """Define a `Group` with two interconnected `ImplicitComponent`s for testing"""
 
-from __future__ import division, print_function
-
 import openmdao.api as om
 
 

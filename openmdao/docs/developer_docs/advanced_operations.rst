@@ -12,7 +12,7 @@ The following process is a one-time setup for the owner of a project to complete
 transparent to other developers and users. The process outlined here is to get a project's docs to build on Travis CI, and then
 transfer the built docs off to a web server. (This example illustrates OpenMDAO's process.)
 The reason you'd use this method instead of just setting up readthedocs.org, is because on Travis, you can very specifically
-customize the installation of your project.  Certain advanced items in OpenMDAO 2.0 just can't be installed on readthedocs, but can be on Travis.
+customize the installation of your project.  Certain advanced items in OpenMDAO just can't be installed on readthedocs, but can be on Travis.
 Having a full install means that the docs will be more complete, because embedded tests that rely on, for instance, MPI, will actually work on Travis CI,
 whereas they currently do not on readthedocs.org.
 

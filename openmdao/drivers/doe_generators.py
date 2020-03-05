@@ -4,9 +4,6 @@ Case generators for Design-of-Experiments Driver.
 
 import numpy as np
 
-from six import iteritems
-from six.moves import range
-
 import os.path
 import csv
 import re
@@ -14,6 +11,8 @@ import re
 import pyDOE2
 
 from openmdao.utils.name_maps import prom_name2abs_name
+
+_LEVELS = 2  # default number of levels for pyDOE generators
 
 
 class DOEGenerator(object):
@@ -27,7 +26,7 @@ class DOEGenerator(object):
 
         Parameters
         ----------
-        design_vars : dict
+        design_vars : OrderedDict
             Dictionary of design variables for which to generate values.
 
         model : Group
@@ -67,8 +66,8 @@ class ListGenerator(DOEGenerator):
         super(ListGenerator, self).__init__()
 
         if not isinstance(data, list):
-            raise RuntimeError("Invalid DOE case data, expected a list but got a %s." %
-                               type(data).__name__)
+            msg = "Invalid DOE case data, expected a list but got a {}."
+            raise RuntimeError(msg.format(data.__class__.__name__))
 
         self._data = data
 
@@ -78,7 +77,7 @@ class ListGenerator(DOEGenerator):
 
         Parameters
         ----------
-        design_vars : dict
+        design_vars : OrderedDict
             Dictionary of design variables for which to generate values.
 
         model : Group
@@ -97,7 +96,7 @@ class ListGenerator(DOEGenerator):
             name_map = {}
 
             for tup in case:
-                if type(tup) not in (tuple, list, set) or len(tup) != 2:
+                if type(tup) not in (tuple, list) or len(tup) != 2:
                     msg = "Invalid DOE case found, expecting a list of name/value pairs:\n%s"
                     raise RuntimeError(msg % str(case))
 
@@ -110,7 +109,7 @@ class ListGenerator(DOEGenerator):
                         name_map[name] = abs_name
 
             # any names not found in name_map are invalid design vars
-            invalid_desvars = [name for name, val in case if name_map.get(name) is None]
+            invalid_desvars = [name for name, _ in case if name not in name_map]
             if invalid_desvars:
                 if len(invalid_desvars) > 1:
                     msg = "Invalid DOE case found, %s are not valid design variables:\n%s"
@@ -162,7 +161,7 @@ class CSVGenerator(DOEGenerator):
 
         Parameters
         ----------
-        design_vars : dict
+        design_vars : OrderedDict
             Dictionary of design variables for which to generate values.
 
         model : Group
@@ -187,7 +186,7 @@ class CSVGenerator(DOEGenerator):
                         name_map[name] = abs_name
 
             # any names not found in name_map are invalid design vars
-            invalid_desvars = [name for name in names if name_map.get(name) is None]
+            invalid_desvars = [name for name in names if name not in name_map]
             if invalid_desvars:
                 if len(invalid_desvars) > 1:
                     msg = "Invalid DOE case file, %s are not valid design variables."
@@ -228,7 +227,7 @@ class UniformGenerator(DOEGenerator):
             The number of samples to run. Defaults to 1.
 
         seed : int or None, optional
-            Seed for randon number generator.
+            Seed for random number generator.
         """
         super(UniformGenerator, self).__init__()
 
@@ -241,7 +240,7 @@ class UniformGenerator(DOEGenerator):
 
         Parameters
         ----------
-        design_vars : dict
+        design_vars : OrderedDict
             Dictionary of design variables for which to generate values.
 
         model : Group
@@ -255,24 +254,21 @@ class UniformGenerator(DOEGenerator):
         if self._seed is not None:
             np.random.seed(self._seed)
 
-        for i in range(self._num_samples):
+        for _ in range(self._num_samples):
             sample = []
 
-            for (name, meta) in iteritems(design_vars):
-                values = []
+            for name, meta in design_vars.items():
+                size = meta['size']
 
-                for k in range(meta['size']):
-                    lower = meta['lower']
-                    if isinstance(lower, np.ndarray):
-                        lower = lower[k]
+                lower = meta['lower']
+                if not isinstance(lower, np.ndarray):
+                    lower = lower * np.ones(size)
 
-                    upper = meta['upper']
-                    if isinstance(upper, np.ndarray):
-                        upper = upper[k]
+                upper = meta['upper']
+                if not isinstance(upper, np.ndarray):
+                    upper = upper * np.ones(size)
 
-                    values.append(np.random.uniform(lower, upper))
-
-                sample.append((name, np.array(values)))
+                sample.append((name, np.random.uniform(lower, upper)))
 
             yield sample
 
@@ -283,12 +279,12 @@ class _pyDOE_Generator(DOEGenerator):
 
     Attributes
     ----------
-    _levels : int
+    _levels : int or dict(str, int)
         The number of evenly spaced levels between each design variable
         lower and upper bound.
     """
 
-    def __init__(self, levels=2):
+    def __init__(self, levels=_LEVELS):
         """
         Initialize the FullFactorialGenerator.
 
@@ -300,6 +296,7 @@ class _pyDOE_Generator(DOEGenerator):
         """
         super(_pyDOE_Generator, self).__init__()
         self._levels = levels
+        self._level_lst = None
 
     def __call__(self, design_vars, model=None):
         """
@@ -307,7 +304,7 @@ class _pyDOE_Generator(DOEGenerator):
 
         Parameters
         ----------
-        design_vars : dict
+        design_vars : OrderedDict
             Dictionary of design variables for which to generate values.
 
         model : Group
@@ -318,18 +315,18 @@ class _pyDOE_Generator(DOEGenerator):
         list
             list of name, value tuples for the design variables.
         """
-        size = sum([meta['size'] for name, meta in iteritems(design_vars)])
+        size = sum([meta['size'] for name, meta in design_vars.items()])
 
         doe = self._generate_design(size)
 
         # generate values for each level for each design variable
-        # over the range of that varable's lower to upper bound
+        # over the range of that variable's lower to upper bound
 
         # rows = vars (# rows/var = var size), cols = levels
         values = np.empty((size, self._levels))
 
         row = 0
-        for name, meta in iteritems(design_vars):
+        for name, meta in design_vars.items():
             size = meta['size']
 
             for k in range(size):
@@ -347,17 +344,15 @@ class _pyDOE_Generator(DOEGenerator):
         # yield values for doe generated indices
         for idxs in doe.astype('int'):
             retval = []
-            var = row = 0
-            for name, meta in iteritems(design_vars):
+            row = 0
+            for name, meta in design_vars.items():
                 size = meta['size']
                 val = np.empty(size)
                 for k in range(size):
-                    idx = idxs[var + k]
+                    idx = idxs[row + k]
                     val[k] = values[row + k][idx]
                 retval.append((name, val))
-                var += 1
                 row += size
-
             yield retval
 
     def _generate_design(self, size):
@@ -542,7 +537,7 @@ class LatinHypercubeGenerator(DOEGenerator):
 
         Parameters
         ----------
-        design_vars : dict
+        design_vars : OrderedDict
             Dictionary of design variables for which to generate values.
 
         model : Group
@@ -556,7 +551,7 @@ class LatinHypercubeGenerator(DOEGenerator):
         if self._seed is not None:
             np.random.seed(self._seed)
 
-        size = sum([meta['size'] for name, meta in iteritems(design_vars)])
+        size = sum([meta['size'] for meta in design_vars.values()])
 
         if self._samples is None:
             self._samples = size
@@ -571,25 +566,21 @@ class LatinHypercubeGenerator(DOEGenerator):
         for row in doe:
             retval = []
             col = 0
-            var = 0
-            for name, meta in iteritems(design_vars):
+            for name, meta in design_vars.items():
                 size = meta['size']
-                val = np.empty(size)
-                for k in range(size):
-                    sample = row[col + k]
+                sample = row[col:col + size]
 
-                    lower = meta['lower']
-                    if isinstance(lower, np.ndarray):
-                        lower = lower[k]
+                lower = meta['lower']
+                if not isinstance(lower, np.ndarray):
+                    lower = lower * np.ones(size)
 
-                    upper = meta['upper']
-                    if isinstance(upper, np.ndarray):
-                        upper = upper[k]
+                upper = meta['upper']
+                if not isinstance(upper, np.ndarray):
+                    upper = upper * np.ones(size)
 
-                    val[k] = lower + sample * (upper - lower)
+                val = lower + sample * (upper - lower)
 
                 retval.append((name, val))
-                var += 1
                 col += size
 
             yield retval

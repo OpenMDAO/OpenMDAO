@@ -1,7 +1,6 @@
 """
 A collection of functions for modifying source code that is embeded into the Sphinx documentation.
 """
-from __future__ import print_function
 
 import sys
 import os
@@ -13,12 +12,13 @@ import subprocess
 import tempfile
 import unittest
 import traceback
+import ast
+
 from docutils import nodes
 
 from collections import namedtuple
 
-from six import StringIO
-from six.moves import range, zip, cStringIO as cStringIO
+from io import StringIO
 
 from sphinx.errors import SphinxError
 from sphinx.writers.html import HTMLTranslator
@@ -575,10 +575,57 @@ def extract_output_blocks(run_output):
 
     return output_blocks
 
+def strip_decorators(src):
+    """
+    Remove any decorators from the source code of the method or function.
+
+    Parameters
+    ----------
+    src : str
+        Source code
+
+    Returns
+    -------
+    str
+        Source code minus any decorators
+    """
+    class Parser(ast.NodeVisitor):
+        def __init__(self):
+            self.function_node = None
+
+        def visit_FunctionDef(self, node):
+            self.function_node = node
+
+        def get_function(self):
+            return self.function_node
+
+    tree = ast.parse(src)
+    parser = Parser()
+    parser.visit(tree)
+
+    # get node for the first function
+    function_node = parser.get_function()
+    if not function_node.decorator_list:  # no decorators so no changes needed
+        return src
+
+    # Unfortunately, the ast library, for a decorated function, returns the line
+    #   number for the first decorator when asking for the line number of the function
+    # So using the line number for the argument for of the function, which is always
+    #   correct. But we assume that the argument is on the same line as the function.
+    # We also assume there IS an argument. If not, we raise an error.
+    if function_node.args.args:
+        function_lineno = function_node.args.args[0].lineno
+    else:
+        raise RuntimeError("Cannot determine line number for decorated function without args")
+    lines = src.splitlines()
+    lines_minus_decorator = lines[function_lineno - 1:]
+    return '\n'.join(lines_minus_decorator)
+
 
 def strip_header(src):
     """
-    Directly manipulating function text to strip header.
+    Directly manipulating function text to strip header, usually or maybe always just the
+    "def" lines for a method or function.
 
     This function assumes that the docstring and header, if any, have already been removed.
 
@@ -742,7 +789,7 @@ def run_code(code_to_run, path, module=None, cls=None, shows_plot=False, imports
             # capture all output
             stdout = sys.stdout
             stderr = sys.stderr
-            strout = cStringIO()
+            strout = StringIO()
             sys.stdout = strout
             sys.stderr = strout
 

@@ -4,8 +4,7 @@ import sys
 import unittest
 from math import atan
 
-from six.moves import cStringIO as StringIO
-from six.moves import range
+from io import StringIO
 
 import numpy as np
 
@@ -25,7 +24,7 @@ class TestArmejoGoldsteinBounds(unittest.TestCase):
         top.model.add_subsystem('comp', ImplCompTwoStates())
         top.model.connect('px.x', 'comp.x')
 
-        top.model.nonlinear_solver = om.NewtonSolver()
+        top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         top.model.nonlinear_solver.options['maxiter'] = 10
         top.model.linear_solver = om.ScipyKrylov()
 
@@ -35,6 +34,7 @@ class TestArmejoGoldsteinBounds(unittest.TestCase):
 
     def test_nolinesearch(self):
         top = self.top
+        top.model.nonlinear_solver.linesearch = None
 
         # Run without a line search at x=2.0
         top['px.x'] = 2.0
@@ -167,7 +167,7 @@ class TestAnalysisErrorExplicit(unittest.TestCase):
         top.model.connect('px.x', 'comp.x')
         top.model.connect('comp.z', 'par.x')
 
-        top.model.nonlinear_solver = om.NewtonSolver()
+        top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         top.model.nonlinear_solver.options['maxiter'] = 1
         top.model.linear_solver = om.ScipyKrylov()
 
@@ -276,10 +276,12 @@ class TestAnalysisErrorImplicit(unittest.TestCase):
         top.model.nonlinear_solver = om.NewtonSolver()
         top.model.nonlinear_solver.options['maxiter'] = 2
         top.model.nonlinear_solver.options['solve_subsystems'] = True
+        top.model.nonlinear_solver.linesearch = None
         top.model.linear_solver = om.ScipyKrylov()
 
-        sub.nonlinear_solver = om.NewtonSolver()
+        sub.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         sub.nonlinear_solver.options['maxiter'] = 2
+        sub.nonlinear_solver.linesearch = None
         sub.linear_solver = om.ScipyKrylov()
 
         ls = top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='wall')
@@ -325,10 +327,12 @@ class TestAnalysisErrorImplicit(unittest.TestCase):
         top.model.nonlinear_solver = om.NewtonSolver()
         top.model.nonlinear_solver.options['maxiter'] = 2
         top.model.nonlinear_solver.options['solve_subsystems'] = True
+        top.model.nonlinear_solver.linesearch = None
         top.model.linear_solver = om.ScipyKrylov()
 
-        sub.nonlinear_solver = om.NewtonSolver()
+        sub.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         sub.nonlinear_solver.options['maxiter'] = 2
+        sub.nonlinear_solver.linesearch = None
         sub.linear_solver = om.ScipyKrylov()
 
         ls = top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='wall')
@@ -368,7 +372,7 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 
-        top.model.nonlinear_solver = om.NewtonSolver()
+        top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         top.model.nonlinear_solver.options['maxiter'] = 10
         top.model.linear_solver = om.ScipyKrylov()
 
@@ -503,7 +507,7 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
         top.model.connect('px.x', 'comp.x')
         top.model.connect('comp.z', 'par.x')
 
-        top.model.nonlinear_solver = om.NewtonSolver()
+        top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         top.model.nonlinear_solver.options['maxiter'] = 3
 
         top.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='vector')
@@ -580,7 +584,7 @@ class DoubleSellarMod(om.Group):
         self.connect('g2.y2', 'g1.x')
 
         # Converge the outer loop with Gauss Seidel, with a looser tolerance.
-        self.nonlinear_solver = om.NewtonSolver()
+        self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         self.linear_solver = om.DirectSolver()
 
 
@@ -592,7 +596,7 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 
-        top.model.nonlinear_solver = om.NewtonSolver()
+        top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         top.model.nonlinear_solver.options['maxiter'] = 10
         top.model.linear_solver = om.ScipyKrylov()
 
@@ -681,12 +685,12 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
         model = prob.model = DoubleSellarMod()
 
         g1 = model.g1
-        g1.nonlinear_solver = om.NewtonSolver()
+        g1.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         g1.nonlinear_solver.options['rtol'] = 1.0e-5
         g1.linear_solver = om.DirectSolver()
 
         g2 = model.g2
-        g2.nonlinear_solver = om.NewtonSolver()
+        g2.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         g2.nonlinear_solver.options['rtol'] = 1.0e-5
         g2.linear_solver = om.DirectSolver()
 
@@ -788,7 +792,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 
-        top.model.nonlinear_solver = om.NewtonSolver()
+        top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         top.model.nonlinear_solver.options['maxiter'] = 10
         top.model.linear_solver = om.ScipyKrylov()
 
@@ -816,7 +820,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 
-        top.model.nonlinear_solver = om.NewtonSolver()
+        top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         top.model.nonlinear_solver.options['maxiter'] = 10
         top.model.linear_solver = om.ScipyKrylov()
 
@@ -844,7 +848,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 
-        top.model.nonlinear_solver = om.NewtonSolver()
+        top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         top.model.nonlinear_solver.options['maxiter'] = 10
         top.model.linear_solver = om.ScipyKrylov()
 
@@ -872,7 +876,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 
-        top.model.nonlinear_solver = om.NewtonSolver()
+        top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         top.model.nonlinear_solver.options['maxiter'] = 10
         top.model.linear_solver = om.ScipyKrylov()
 
@@ -900,7 +904,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 
-        top.model.nonlinear_solver = om.NewtonSolver()
+        top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         top.model.nonlinear_solver.options['maxiter'] = 10
         top.model.linear_solver = om.ScipyKrylov()
 
@@ -929,7 +933,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 
-        top.model.nonlinear_solver = om.NewtonSolver()
+        top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         top.model.nonlinear_solver.options['maxiter'] = 10
         top.model.linear_solver = om.ScipyKrylov()
 
@@ -955,7 +959,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 
-        newt = top.model.nonlinear_solver = om.NewtonSolver()
+        newt = top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         top.model.nonlinear_solver.options['maxiter'] = 2
         top.model.linear_solver = om.ScipyKrylov()
 
@@ -985,7 +989,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 
-        top.model.nonlinear_solver = om.NewtonSolver()
+        top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         top.model.nonlinear_solver.options['maxiter'] = 10
         top.model.linear_solver = om.ScipyKrylov()
 
@@ -1013,7 +1017,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 
-        top.model.nonlinear_solver = om.NewtonSolver()
+        top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         top.model.nonlinear_solver.options['maxiter'] = 10
         top.model.linear_solver = om.ScipyKrylov()
 
@@ -1042,7 +1046,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 
-        top.model.nonlinear_solver = om.NewtonSolver()
+        top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         top.model.nonlinear_solver.options['maxiter'] = 10
         top.model.linear_solver = om.ScipyKrylov()
 
@@ -1068,7 +1072,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 
-        newt = top.model.nonlinear_solver = om.NewtonSolver()
+        newt = top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         top.model.nonlinear_solver.options['maxiter'] = 2
         top.model.linear_solver = om.ScipyKrylov()
 
@@ -1098,7 +1102,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 
-        top.model.nonlinear_solver = om.NewtonSolver()
+        top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         top.model.nonlinear_solver.options['maxiter'] = 10
         top.model.linear_solver = om.ScipyKrylov()
 

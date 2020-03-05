@@ -1,5 +1,3 @@
-from __future__ import print_function, division
-
 import unittest
 import numpy as np
 
@@ -7,11 +5,10 @@ import openmdao.api as om
 from openmdao.utils.mpi import MPI
 
 
-if MPI:
-    try:
-        from openmdao.vectors.petsc_vector import PETScVector
-    except ImportError:
-        PETScVector = None
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
 
 def _get_problem():
@@ -23,7 +20,7 @@ def _get_problem():
     sa.add_subsystem('C3', om.ExecComp('y = x', x=6))
 
     # the bug only appears if there is a NewtonSolver here...
-    sa.nonlinear_solver = om.NewtonSolver()
+    sa.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
 
     par = p.model.add_subsystem('par', om.ParallelGroup())
 
@@ -54,7 +51,7 @@ class SerialTestCase(unittest.TestCase):
         np.testing.assert_allclose(J, np.array([[1.0]]), rtol=1e-7, atol=0, equal_nan=True,
                                    err_msg='', verbose=True)
 
-@unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class ParallelTestCase(unittest.TestCase):
 
     N_PROCS = 2

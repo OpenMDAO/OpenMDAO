@@ -1,8 +1,6 @@
 """A module containing various configuration checks for an OpenMDAO Problem."""
-from __future__ import print_function
 
 from collections import defaultdict
-from six import iteritems
 from distutils.version import LooseVersion
 
 import numpy as np
@@ -18,6 +16,7 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.hooks import _register_hook
 from openmdao.utils.general_utils import printoptions
 from openmdao.utils.units import convert_units
+from openmdao.utils.file_utils import _load_and_exec
 
 
 _UNSET = object()
@@ -160,7 +159,7 @@ def _get_used_before_calc_subs(group, input_srcs):
     glen = len(group.pathname.split('.')) if group.pathname else 0
 
     ubcs = defaultdict(set)
-    for tgt_abs, src_abs in iteritems(input_srcs):
+    for tgt_abs, src_abs in input_srcs.items():
         if src_abs is not None:
             iparts = tgt_abs.split('.')
             oparts = src_abs.split('.')
@@ -189,17 +188,17 @@ def _check_dup_comp_inputs(problem, logger):
 
     input_srcs = problem.model._conn_global_abs_in2out
     src2inps = defaultdict(list)
-    for inp, src in iteritems(input_srcs):
+    for inp, src in input_srcs.items():
         src2inps[src].append(inp)
 
     msgs = []
-    for src, inps in iteritems(src2inps):
+    for src, inps in src2inps.items():
         comps = defaultdict(list)
         for inp in inps:
             comp, vname = inp.rsplit('.', 1)
             comps[comp].append(vname)
 
-        dups = sorted([(c, v) for c, v in iteritems(comps) if len(v) > 1], key=lambda x: x[0])
+        dups = sorted([(c, v) for c, v in comps.items() if len(v) > 1], key=lambda x: x[0])
         if dups:
             for comp, vnames in dups:
                 msgs.append("   %s has inputs %s connected to %s\n" % (comp, sorted(vnames), src))
@@ -313,7 +312,7 @@ def _check_hanging_inputs(problem, logger):
     unconns = []
     nwid = uwid = 0
 
-    for prom, abslist in iteritems(prom_ins):
+    for prom, abslist in prom_ins.items():
         unconn = [a for a in abslist if a not in input_srcs or len(input_srcs[a]) == 0]
         if unconn:
             w = max([len(u) for u in unconn])
@@ -529,7 +528,7 @@ def _get_promoted_connected_ins(g):
 
     for subsys in g._subgroups_myproc:
         sub_prom_conn_ins = _get_promoted_connected_ins(subsys)
-        for n, tup in iteritems(sub_prom_conn_ins):
+        for n, tup in sub_prom_conn_ins.items():
             proms, mans = tup
             mytup = prom_conn_ins[n]
             mytup[0].extend(proms)
@@ -537,7 +536,7 @@ def _get_promoted_connected_ins(g):
 
         sub_abs2prom_in = subsys._var_abs2prom['input']
 
-        for inp, sub_prom_inp in iteritems(sub_abs2prom_in):
+        for inp, sub_prom_inp in sub_abs2prom_in.items():
             if abs2prom_in[inp] == sub_prom_inp:  # inp is promoted up from sub
                 if inp in sub_prom_conn_ins and len(sub_prom_conn_ins[inp][1]) > 0:
                     prom_conn_ins[inp][0].append(subsys.pathname)
@@ -558,7 +557,7 @@ def _check_explicitly_connected_promoted_inputs(problem, logger):
     """
     prom_conn_ins = _get_promoted_connected_ins(problem.model)
 
-    for inp, lst in iteritems(prom_conn_ins):
+    for inp, lst in prom_conn_ins.items():
         proms, mans = lst
         if proms:
             # there can only be one manual connection (else an exception would've been raised)
@@ -613,7 +612,7 @@ def _check_config_setup_parser(parser):
                         (sorted(_default_checks), sorted(set(_all_checks) - set(_default_checks))))
 
 
-def _check_config_cmd(options):
+def _check_config_cmd(options, user_args):
     """
     Return the post_setup hook function for 'openmdao check'.
 
@@ -621,6 +620,8 @@ def _check_config_cmd(options):
     ----------
     options : argparse Namespace
         Command line options.
+    user_args : list of str
+        Args to be passed to the user script.
 
     Returns
     -------
@@ -647,7 +648,7 @@ def _check_config_cmd(options):
     # register the hook
     _register_hook('final_setup', class_name='Problem', inst_id=options.problem, post=_check_config)
 
-    return _check_config
+    _load_and_exec(options.file[0], user_args)
 
 
 def check_allocate_complex_ln(model, under_cs):

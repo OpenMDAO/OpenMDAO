@@ -1,7 +1,7 @@
 import os
 import sys
 import unittest
-from six import StringIO
+from io import StringIO
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ParallelGroup
 from openmdao.utils.general_utils import set_pyoptsparse_opt
@@ -13,7 +13,7 @@ except ImportError:
     PETScVector = None
 
 
-@unittest.skipIf(PETScVector is None, "PETSc is required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 @unittest.skipIf(os.environ.get("TRAVIS"), "Unreliable on Travis CI.")
 class DistributedDriverDebugPrintOptionsTest(unittest.TestCase):
 

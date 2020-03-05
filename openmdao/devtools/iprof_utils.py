@@ -1,4 +1,3 @@
-from __future__ import print_function
 
 import os
 import sys
@@ -7,7 +6,6 @@ import ast
 from inspect import getmembers
 from fnmatch import fnmatchcase
 from collections import defaultdict
-from six import string_types
 
 
 class _Options(object):
@@ -38,6 +36,11 @@ class FunctionFinder(ast.NodeVisitor):
         else:
             qual = ("<%s:%d>" % (self.fname, node.lineno), None, node.name)
         self.cache[node.lineno] = qual
+        # some versions of python report different line numbers for funnctions/classes with
+        # decorators, so just put keys in the cache dict for all of the decorator line numbers
+        # as well in order to avoid any KeyErrors.
+        for d in node.decorator_list:
+            self.cache[d.lineno] = qual
 
         self.stack.append(node.name)
         for bnode in node.body:
@@ -319,7 +322,7 @@ def _create_profile_callback(stack, matches=None, do_call=None, do_ret=None, con
 def _get_methods(options, default):
     if options.methods is None:
         methods = func_group[default]
-    elif isinstance(options.methods, string_types):
+    elif isinstance(options.methods, str):
         try:
             methods = func_group[options.methods]
         except KeyError:
