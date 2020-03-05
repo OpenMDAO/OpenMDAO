@@ -1536,7 +1536,7 @@ class TestPyoptSparse(unittest.TestCase):
 
     def test_show_exception_bad_opt(self):
 
-        # First, check if we have the optimizer for this test. If the do, then just skip it.
+        # First, check if we have the optimizer for this test. If they do, then just skip it.
         _, loc_opt = set_pyoptsparse_opt('NOMAD')
         if loc_opt == 'NOMAD':
             raise unittest.SkipTest("Skipping because user has this optimizer.")
