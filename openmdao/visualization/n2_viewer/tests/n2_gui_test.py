@@ -43,6 +43,7 @@ class N2GUITestCase(unittest.TestCase):
         print("Browser: " + userAgentStr + "\n")
 
         self.page = await self.browser.newPage()
+        await self.page.bringToFront()
         await self.setup_error_handlers()
 
     def log_test(self, msg):
@@ -203,19 +204,26 @@ class N2GUITestCase(unittest.TestCase):
         Enter a string in the search textbox and check that the expected
         number of elements are shown in the N2 matrix.
         """
+        searchString = options['searchString']
         self.log_test(options['desc'] if 'desc' in options else
                       "Searching for '" + options['searchString'] +
                       "' and checking for " +
                       str(options['n2ElementCount']) + " N2 elements after.")
 
-        hndl = await self.get_handle("input#awesompleteId")
         await self.page.hover(".searchbar-container")
         await self.page.click(".searchbar")
-        await self.page.keyboard.type('R1.I')
-        # await self.page.waitFor(self.transition_wait + 500)
+        await self.page.waitFor(500)
 
-        # await self.assert_element_count("g#n2elements > g.n2cell",
-        #                                 options['n2ElementCount'])
+        searchbar = await self.page.querySelector('#awesompleteId')
+        await self.page.evaluate('(element, searchString, page) => element.value = searchString + " "', searchbar, searchString, page)
+
+        await self.page.waitFor(500)
+
+        await self.page.keyboard.press('Backspace')
+        await self.page.keyboard.press("Enter")
+        await self.page.waitFor(self.transition_wait + 500)
+        await self.assert_element_count("g#n2elements > g.n2cell",
+                                        options['n2ElementCount'])
 
     async def run_model_script(self, script):
         """
