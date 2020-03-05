@@ -2252,8 +2252,8 @@ class MyGroup(om.Group):
     def setup(self):
         size = self.size
         self.add_subsystem('indeps', om.IndepVarComp('x', np.ones(size)))
-        r = np.random.random(size * size)
-        self.add_subsystem('comp1', MatMultCompExact(r.reshape((size, size)), sparse=True))
+        A = np.ones((size, size))  # force coloring to fail
+        self.add_subsystem('comp1', MatMultCompExact(A))
         self.add_subsystem('comp2', om.ExecComp('y=x-1.0', x=np.zeros(size), y=np.zeros(size), has_diag_partials=True))
         self.connect('indeps.x', 'comp1.x')
         self.connect('comp1.y', 'comp2.x')
@@ -2272,9 +2272,8 @@ class TestResizingTestCase(unittest.TestCase):
         p = om.Problem()
         model = p.model
         p.driver = om.pyOptSparseDriver()
-        p.driver.declare_coloring(show_sparsity=True)
+        p.driver.declare_coloring()
 
-        np.random.seed(6543)
         G = model.add_subsystem("G", MyGroup(5))
         p.setup()
         p.run_driver()
