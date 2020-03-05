@@ -19,7 +19,7 @@ class MatMultComp(om.ExplicitComponent):
         self.add_input('x', val=np.ones(self.mat.shape[1]))
         self.add_output('y', val=np.zeros(self.mat.shape[0]))
 
-        self.declare_partials(of='y', wrt='x', method=self.approx_method)
+        self.declare_partials('*', '*', method=self.approx_method)
         self.num_computes = 0
 
     def compute(self, inputs, outputs):
