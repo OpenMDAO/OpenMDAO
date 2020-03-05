@@ -12,9 +12,6 @@ When upgrading to OpenMDAO 3.0.0, users should
 2. Make necessary changes to remove any OpenMDAO-specific deprecation warnings
 3. Upgrade to OpenMDAO 3.0.0 and verify that their models are working as expected.
 
-Note: This is the last release of OpenMDAO 2.X. Updating to this release will be a
-critical step in preparing for the OpenMDAO 3.X releases
-
 
 ## Backwards Incompatible API Changes:
 
@@ -23,8 +20,8 @@ The following are deprecated functionality since 2.0 that has been officially re
 - <POEM 004> AkimaSplineComp and BsplineComp have been **removed**, replaced with SplineComp.
 
 - <POEM 008> The user is now **required** to set a value for the solver option `solve_subsystems`
-    on Newton and Broyden solvers. Previously the default was `False`, but you will now get
-    a deprecation warning if this value is not explicitly set.
+    on Newton and Broyden solvers. Previously the default was `False`, but you would get
+    a deprecation warning if this value was not explicitly set.
 
 - The class for the PETSc linear solver `PetscKSP` is renamed `PetscKrylov`.
 
@@ -74,6 +71,13 @@ The following are deprecated functionality since 2.0 that has been officially re
 
 - NewtonSolver attribute `line_search` is now `linesearch`.
 
+- Multi-variable speicifcation via list or tuple to IndepVarComp is now invalid. Use add_output for each variable instead.
+
+- Driver method `set_simul_deriv_color` is removed. Use `use_fixed_coloring` instead.
+
+- Problem setup method argument `vector_class` removed. Use `distributed_vector_class` instead.
+
+- pyOptSparseDriver method `dynamic_simul_derivs`'` removed. Use `'`declare_coloring`'` instead.
 
 ## Backwards Incompatible NON-API Changes:
 
@@ -85,17 +89,30 @@ still may cause your results to differ when upgrading.
   the default to `gesvd` because its more numerically stable.
   This might introduce slight numerical changes to the Kriging fits.
 
-- Refactor of how reverse mode derivative solves work for parallel components
-  that may require the removal of reduce calls in some components that were
-  needed previously
-
-- Change to the way SimpleGA does crossover to be more correct (was basically just mutuation before)
-
-
 ## New Features:
 
 - None
 
+
+## Bug Fixes:
+- None
+
+***********************************
+# Release Notes for OpenMDAO 2.10.1
+
+March 03, 2020
+
+## Backwards Incompatible API Changes:
+
+None
+
+## Backwards Incompatible NON-API Changes:
+
+None
+
+## New Features:
+
+None
 
 ## Bug Fixes:
 - Fixed a bug that caused errors in jacobian values in certain models when computing derivatives in reverse mode under MPI.
