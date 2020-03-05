@@ -58,8 +58,6 @@ def _get_var_dict(system, typ, name):
         var_dict['implicit'] = isimplicit
 
     var_dict['dtype'] = type(meta['value']).__name__
-
-
     return var_dict
 
 
@@ -172,7 +170,6 @@ def _get_declare_partials(system):
         A list containing all the declared partials (strings in the form "of > wrt" )
         beginning from the given system on down.
     """
-
     declare_partials_list = []
 
     def recurse_get_partials(system, dpl):
@@ -203,11 +200,10 @@ def _get_viewer_data(data_source):
     dict
         A dictionary containing information about the model for use by the viewer.
     """
-
     if isinstance(data_source, Problem):
         root_group = data_source.model
 
-        #print(root_group.list_outputs())
+        # print(root_group.list_outputs())
 
         if not isinstance(root_group, Group):
             simple_warning(
