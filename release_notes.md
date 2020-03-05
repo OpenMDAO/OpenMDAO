@@ -77,7 +77,7 @@ The following are deprecated functionality since 2.0 that has been officially re
 
 - Problem setup method argument `vector_class` removed. Use `distributed_vector_class` instead.
 
-- pyOptSparseDriver method `dynamic_simul_derivs`'` removed. Use `'`declare_coloring`'` instead.
+- pyOptSparseDriver method `dynamic_simul_derivs` removed. Use `declare_coloring` instead.
 
 ## Backwards Incompatible NON-API Changes:
 
@@ -120,7 +120,7 @@ None
 ***********************************
 # Release Notes for OpenMDAO 2.10.0
 
-February 25, 2020
+February 27, 2020
 
 Note: This is the last release of OpenMDAO 2.X. Updating to this release will be a 
 critical step in preparing for the OpenMDAO 3.X releases
@@ -156,8 +156,6 @@ still may cause your results to differ when upgrading.
 
 
 ## New Features:
-
-- <POEM 001> astronomical unit (au) and parsec (pc) added to the standard unit definitions. 
 
 - <POEM 002> users can now manually terminate an optimization using operating system signals 
 
