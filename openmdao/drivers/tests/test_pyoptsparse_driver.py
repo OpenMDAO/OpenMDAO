@@ -2218,7 +2218,6 @@ class MyGroup(om.Group):
         size = self.size
         self.add_subsystem('indeps', om.IndepVarComp('x', np.ones(size)))
         r = np.random.random(size * size)
-        r[r > .3] = 0.0  # make it fairly sparse
         self.add_subsystem('comp1', MatMultComp(r.reshape((size, size)), sparse=True,
                                                 approx_method='exact'))
         self.add_subsystem('comp2', om.ExecComp('y=x-1.0', x=np.zeros(size), y=np.zeros(size), has_diag_partials=True))
@@ -2233,24 +2232,24 @@ class MyGroup(om.Group):
 @use_tempdirs
 class TestResizingTestCase(unittest.TestCase):
     def test_resize(self):
+        # this test just verifies that pyoptsparsedriver doesn't raise an exception due
+        # to mismatched sizes in the sparsity definition, so this test passes as long as
+        # an exception isn't raised.
         p = om.Problem()
         model = p.model
         p.driver = om.pyOptSparseDriver()
         p.driver.declare_coloring(show_sparsity=True)
 
+        np.random.seed(6543)
         G = model.add_subsystem("G", MyGroup(5))
         p.setup()
         p.run_driver()
-        J = p.compute_totals()
-        print(J)
+        p.compute_totals()
 
         G.size = 10
         p.setup()
         p.run_driver()
-        J = p.compute_totals()
-        print(J)
-
-
+        p.compute_totals()
 
 
 if __name__ == "__main__":
