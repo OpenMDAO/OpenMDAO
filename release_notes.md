@@ -71,7 +71,7 @@ The following are deprecated functionality since 2.0 that has been officially re
 
 - NewtonSolver attribute `line_search` is now `linesearch`.
 
-- Multi-variable speicifcation via list or tuple to IndepVarComp is now invalid. Use add_output for each variable instead.
+- Multi-variable specification via list or tuple to IndepVarComp is now invalid. Use add_output for each variable instead.
 
 - Driver method `set_simul_deriv_color` is removed. Use `use_fixed_coloring` instead.
 
