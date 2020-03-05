@@ -503,6 +503,7 @@ class SimulColoringScipyTestCase(unittest.TestCase):
                                               'l_conx.g', 'y', 'circle.area'],
                                           wrt=['x', 'y', 'r'])
         self.assertEqual(coloring.total_solves(), 5)
+        coloring.display_txt()  # leave this in because at one point it caused an exception
 
     def test_simul_coloring_example(self):
 

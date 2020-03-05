@@ -1336,11 +1336,11 @@ class Problem(object):
             self.final_setup()
 
         if self.model._owns_approx_jac:
-            total_info = _TotalJacInfo(self, of, wrt, False, return_format,
+            total_info = _TotalJacInfo(self, of, wrt, global_names, return_format,
                                        approx=True, driver_scaling=driver_scaling)
             return total_info.compute_totals_approx(initialize=True)
         else:
-            total_info = _TotalJacInfo(self, of, wrt, False, return_format,
+            total_info = _TotalJacInfo(self, of, wrt, global_names, return_format,
                                        debug_print=debug_print, driver_scaling=driver_scaling)
             return total_info.compute_totals()
 
