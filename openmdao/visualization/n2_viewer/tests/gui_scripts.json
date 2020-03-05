@@ -1,73 +1,71 @@
 {
-    "__toolbar": [
-        {
+    "__toolbar": [{
             "desc": "Collapse All Outputs button",
-            "id": "collapseAllButtonId",
+            "id": "collapse-all",
             "waitForTransition": true
         },
         {
             "desc": "Uncollapse All button",
-            "id": "uncollapseAllButtonId",
+            "id": "expand-all",
             "waitForTransition": true
         },
         {
             "desc": "Collapse Outputs in View Only button",
-            "id": "collapseInViewButtonId",
+            "id": "collapse-element",
             "waitForTransition": true
         },
         {
             "desc": "Uncollapse In View Only button",
-            "id": "uncollapseInViewButtonId",
+            "id": "expand-element",
             "waitForTransition": true
         },
         {
-            "desc": "Show Legend (on) button",
-            "id": "showLegendButtonId",
+            "desc": "Show Legend (off) button",
+            "id": "legend-button",
             "waitForTransition": false
         },
         {
-            "desc": "Show Legend (off) button",
-            "id": "showLegendButtonId",
+            "desc": "Show Legend (on) button",
+            "id": "legend-button",
             "waitForTransition": false
         },
         {
             "desc": "Show Path (on) button",
-            "id": "showCurrentPathButtonId",
+            "id": "info-button",
             "waitForTransition": false
         },
         {
             "desc": "Show Path (off) button",
-            "id": "showCurrentPathButtonId",
+            "id": "info-button",
             "waitForTransition": false
         },
         {
             "desc": "Toggle Solver Names (on) button",
-            "id": "toggleSolverNamesButtonId",
+            "id": "linear-solver-button",
             "waitForTransition": true
         },
         {
             "desc": "Toggle Solver Names (off) button",
-            "id": "toggleSolverNamesButtonId",
+            "id": "linear-solver-button",
             "waitForTransition": true
         },
         {
             "desc": "Clear Arrows and Connection button",
-            "id": "clearArrowsAndConnectsButtonId",
+            "id": "hide-connections",
             "waitForTransition": false
         },
         {
             "desc": "Help (on) button",
-            "id": "helpButtonId",
+            "id": "question-button",
             "waitForTransition": false
         },
         {
             "desc": "Help (off) button",
-            "id": "helpButtonId",
+            "id": "question-button",
             "waitForTransition": false
         }
     ],
-    "circuit": [
-        {
+    "circuit": [{
             "desc": "Hover on N2 matrix element and check arrow count",
             "test": "hoverArrow",
             "selector": "g#n2elements rect#cellShape_24_24.vMid",
@@ -145,8 +143,7 @@
             "n2ElementCount": 16
         }
     ],
-    "bug_arrow": [
-        {
+    "bug_arrow": [{
             "desc": "Hover on N2 matrix element and check arrow count",
             "test": "hoverArrow",
             "selector": "g#n2elements rect#cellShape_11_11.vMid",
@@ -224,8 +221,7 @@
             "n2ElementCount": 4
         }
     ],
-    "double_sellar": [
-        {
+    "double_sellar": [{
             "desc": "Hover on N2 matrix element and check arrow count",
             "test": "hoverArrow",
             "selector": "g#n2elements rect#cellShape_11_11.vMid",
@@ -303,50 +299,47 @@
             "n2ElementCount": 8
         }
     ],
-    "udpi_circuit": [
+    "udpi_circuit": [{
+        "desc": "Check the number of cells in the N2 Matrix",
+        "test": "count",
+        "selector": "g#n2elements > g.n2cell",
+        "count": 29
+    }],
+    "parabaloid": [{
+            "desc": "Collapse the indeps view",
+            "test": "click",
+            "selector": "rect#indeps",
+            "button": "right"
+        },
         {
-            "desc": "Check the number of cells in the N2 Matrix",
-            "test": "count",
-            "selector": "g#n2elements > g.n2cell",
-            "count": 29
+            "desc": "Hit back button to uncollapse the indeps view",
+            "test": "click",
+            "selector": "#backButtonId",
+            "button": "left"
+        },
+        {
+            "desc": "Collapse the indeps view",
+            "test": "click",
+            "selector": "rect#indeps",
+            "button": "right"
+        },
+        {
+            "desc": "Zoom into the indeps view",
+            "test": "click",
+            "selector": "rect#indeps",
+            "button": "left"
+        },
+        {
+            "desc": "Uncollapse the indeps view",
+            "test": "click",
+            "selector": "rect#indeps",
+            "button": "right"
+        },
+        {
+            "desc": "There should be two elements visible in indeps view",
+            "test": "uncollapse_zoomed_element",
+            "selector": "rect#indeps",
+            "n2ElementCount": 2
         }
-    ],
-    "parabaloid": [
-        {
-          "desc": "Collapse the indeps view",
-          "test": "click",
-          "selector": "rect#indeps",
-          "button": "right"
-        },
-        {
-          "desc": "Hit back button to uncollapse the indeps view",
-          "test": "click",
-          "selector": "#backButtonId",
-          "button": "left"
-        },
-        {
-          "desc": "Collapse the indeps view",
-          "test": "click",
-          "selector": "rect#indeps",
-          "button": "right"
-        },
-        {
-          "desc": "Zoom into the indeps view",
-          "test": "click",
-          "selector": "rect#indeps",
-          "button": "left"
-        },
-        {
-          "desc": "Uncollapse the indeps view",
-          "test": "click",
-          "selector": "rect#indeps",
-          "button": "right"
-        },
-        {
-          "desc": "There should be two elements visible in indeps view",
-          "test": "uncollapse_zoomed_element",
-          "selector": "rect#indeps",
-          "n2ElementCount": 2
-        }
-      ]
+    ]
 }

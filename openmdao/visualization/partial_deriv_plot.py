@@ -3,7 +3,6 @@ Visualization of data functions.
 """
 import numpy as np
 
-
 def partial_deriv_plot(of, wrt, check_partials_data, title=None, jac_method='J_fwd', tol=1e-10,
                        binary=True):
     """

@@ -20,7 +20,7 @@ class N2UserInterface {
     constructor(n2Diag) {
         this.n2Diag = n2Diag;
 
-        this.leftClickedNode = document.getElementById("ptN2ContentDivId");
+        this.leftClickedNode = document.getElementById('ptN2ContentDivId');
         this.rightClickedNode = null;
         this.lastClickWasLeft = true;
         this.leftClickIsForward = true;
@@ -30,34 +30,38 @@ class N2UserInterface {
         this.backButtonHistory = [];
         this.forwardButtonHistory = [];
 
-        this._setupCollapseDepthElement();
+        // this._setupCollapseDepthElement();
         this.updateClickedIndices();
 
-        document.getElementById("searchButtonId").onclick = this.searchButtonClicked.bind(this);
+        document.getElementById(
+            'searchButtonId'
+        ).onclick = this.searchButtonClicked.bind(this);
         this._setupToolbar();
         this._setupSearch();
 
-        this.legend = new N2Legend();
+        this.legend = new N2Legend(this.n2Diag.modelData);
+        this.toggleLegend();
     }
 
     /** Set up the menu for selecting an arbitrary depth to collapse to. */
     _setupCollapseDepthElement() {
         let self = this;
 
-        let collapseDepthElement =
-            this.n2Diag.dom.parentDiv.querySelector("#idCollapseDepthDiv");
+        let collapseDepthElement = this.n2Diag.dom.parentDiv.querySelector(
+            '#idCollapseDepthDiv'
+        );
 
         for (let i = 2; i <= this.n2Diag.model.maxDepth; ++i) {
-            let option = document.createElement("span");
-            option.className = "fakeLink";
-            option.id = "idCollapseDepthOption" + i + "";
-            option.innerHTML = "" + i + "";
+            let option = document.createElement('span');
+            option.className = 'fakeLink';
+            option.id = 'idCollapseDepthOption' + i + '';
+            option.innerHTML = '' + i + '';
 
-            let f = function (idx) {
-                return function () {
+            let f = (function(idx) {
+                return function() {
                     self.collapseToDepthSelectChange(idx);
                 };
-            }(i);
+            })(i);
             option.onclick = f;
             collapseDepthElement.appendChild(option);
         }
@@ -69,43 +73,45 @@ class N2UserInterface {
      * the diagram drawing.
      */
     collapse() {
-        testThis(this, "N2UserInterface", "collapse");
+        testThis(this, 'N2UserInterface', 'collapse');
 
         let node = this.leftClickedNode;
 
         if (!node.hasChildren()) return;
 
         // Don't allow minimizing of root node
-        if (node.depth > this.n2Diag.zoomedElement.depth || node.type !== "root") {
-        this.rightClickedNode = node;
+        if (node.depth > this.n2Diag.zoomedElement.depth || node.type !== 'root') {
+            this.rightClickedNode = node;
 
-        if (this.collapsedRightClickNode !== undefined) {
-            this.rightClickedNode = this.collapsedRightClickNode;
-            this.collapsedRightClickNode = undefined;
-        }
+            if (this.collapsedRightClickNode !== undefined) {
+                this.rightClickedNode = this.collapsedRightClickNode;
+                this.collapsedRightClickNode = undefined;
+            }
 
-        this.findRootOfChangeFunction = this.findRootOfChangeForRightClick.bind(
-            this
-        );
+            this.findRootOfChangeFunction = this.findRootOfChangeForRightClick.bind(
+                this
+            );
 
-        N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
-        this.lastClickWasLeft = false;
-        node.toggleMinimize();
-        this.n2Diag.update();
+            N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
+            this.lastClickWasLeft = false;
+            node.toggleMinimize();
+            this.n2Diag.update();
         }
     }
 
     /* When a node is right-clicked, collapse it. */
     rightClick(node1, node2) {
-        testThis(this, "N2UserInterface", "rightClick");
+        testThis(this, 'N2UserInterface', 'rightClick');
 
         this.leftClickedNode = node1;
         this.rightClickedNode = node2;
 
         let node = this.leftClickedNode;
-        node["collapsable"] = true;
+        node['collapsable'] = true;
 
-        this.backButtonHistory.push({ "node": node });
+        this.backButtonHistory.push({
+            node: node,
+        });
 
         d3.event.preventDefault();
         d3.event.stopPropagation();
@@ -122,8 +128,7 @@ class N2UserInterface {
         this.lastClickWasLeft = true;
         if (this.leftClickedNode.depth > this.n2Diag.zoomedElement.depth) {
             this.leftClickIsForward = true; // forward
-        }
-        else if (this.leftClickedNode.depth < this.n2Diag.zoomedElement.depth) {
+        } else if (this.leftClickedNode.depth < this.n2Diag.zoomedElement.depth) {
             this.leftClickIsForward = false; // backwards
         }
         this.n2Diag.updateZoomedElement(node);
@@ -139,7 +144,9 @@ class N2UserInterface {
 
         if (!node.hasChildren() || node.isParam()) return;
         if (d3.event.button != 0) return;
-        this.backButtonHistory.push({ "node": this.n2Diag.zoomedElement });
+        this.backButtonHistory.push({
+            node: this.n2Diag.zoomedElement,
+        });
         this.forwardButtonHistory = [];
         this._setupLeftClick(node);
         d3.event.preventDefault();
@@ -154,11 +161,12 @@ class N2UserInterface {
         enterIndex = exitIndex = 0;
         if (this.lastClickWasLeft) {
             if (this.leftClickIsForward) {
-                exitIndex = this.leftClickedNode.rootIndex -
+                exitIndex =
+                    this.leftClickedNode.rootIndex -
                     this.n2Diag.zoomedElementPrev.rootIndex;
-            }
-            else {
-                enterIndex = this.n2Diag.zoomedElementPrev.rootIndex -
+            } else {
+                enterIndex =
+                    this.n2Diag.zoomedElementPrev.rootIndex -
                     this.leftClickedNode.rootIndex;
             }
         }
@@ -171,7 +179,7 @@ class N2UserInterface {
      * Add the previous zoomed node to the forward history stack.
      */
     backButtonPressed() {
-        testThis(this, "N2UserInterface", "backButtonPressed");
+        testThis(this, 'N2UserInterface', 'backButtonPressed');
 
         if (this.backButtonHistory.length == 0) return;
 
@@ -180,22 +188,26 @@ class N2UserInterface {
         // Check to see if the node is a collapsed node or not
         if (node.collapsable) {
             this.leftClickedNode = node;
-            this.forwardButtonHistory.push({ node: this.leftClickedNode });
-        this.collapse();
+            this.forwardButtonHistory.push({
+                node: this.leftClickedNode,
+            });
+            this.collapse();
         } else {
-            this.n2Diag.dom.parentDiv.querySelector("#backButtonId").disabled =
-            this.backButtonHistory.length == 0 ? "disabled" : false;
+            this.n2Diag.dom.parentDiv.querySelector('#undo-graph').disabled =
+                this.backButtonHistory.length == 0 ? 'disabled' : false;
             for (let obj = node; obj != null; obj = obj.parent) {
                 //make sure history item is not minimized
                 if (obj.isMinimized) return;
+            }
+
+            this.forwardButtonHistory.push({
+                node: this.n2Diag.zoomedElement,
+            });
+            this._setupLeftClick(node);
         }
 
-        this.forwardButtonHistory.push({ node: this.n2Diag.zoomedElement });
-        this._setupLeftClick(node);
-    }
-
-    this.backButtonHistory.pop();
-    this.n2Diag.update();
+        this.backButtonHistory.pop();
+        this.n2Diag.update();
     }
 
     /**
@@ -209,12 +221,15 @@ class N2UserInterface {
 
         if (this.forwardButtonHistory.length == 0) return;
         let node = this.forwardButtonHistory.pop().node;
-        this.n2Diag.dom.parentDiv.querySelector("#forwardButtonId").disabled =
-            (this.forwardButtonHistory.length == 0) ? "disabled" : false;
-        for (let obj = node; obj != null; obj = obj.parent) { // make sure history item is not minimized
+        this.n2Diag.dom.parentDiv.querySelector('#forwardButtonId').disabled =
+            this.forwardButtonHistory.length == 0 ? 'disabled' : false;
+        for (let obj = node; obj != null; obj = obj.parent) {
+            // make sure history item is not minimized
             if (obj.isMinimized) return;
         }
-        this.backButtonHistory.push({ "node": this.n2Diag.zoomedElement });
+        this.backButtonHistory.push({
+            node: this.n2Diag.zoomedElement,
+        });
         this._setupLeftClick(node);
         this.n2Diag.update();
     }
@@ -235,7 +250,8 @@ class N2UserInterface {
      * @returns The node that has the selected depth if it exists.
      */
     findRootOfChangeForCollapseDepth(node) {
-        for (let obj = node; obj != null; obj = obj.parent) { //make sure history item is not minimized
+        for (let obj = node; obj != null; obj = obj.parent) {
+            //make sure history item is not minimized
             if (obj.depth == this.n2Diag.chosenCollapseDepth) return obj;
         }
         return node;
@@ -248,7 +264,7 @@ class N2UserInterface {
      * @returns Parent component of output node or node itself.
      */
     findRootOfChangeForCollapseUncollapseOutputs(node) {
-        return (node.hasOwnProperty("parentComponent")) ? node.parentComponent : node;
+        return node.hasOwnProperty('parentComponent') ? node.parentComponent : node;
     }
 
     /**
@@ -258,9 +274,12 @@ class N2UserInterface {
     homeButtonClick() {
         testThis(this, 'N2UserInterface', 'homeButtonClick');
 
-        this.backButtonHistory.push({ "node": this.n2Diag.zoomedElement });
+        this.backButtonHistory.push({
+            node: this.n2Diag.zoomedElement,
+        });
         this.forwardButtonHistory = [];
         this._setupLeftClick(this.n2Diag.model.root);
+        this.uncollapseButtonClick(this.n2Diag.model.root);
         this.n2Diag.update();
     }
 
@@ -272,7 +291,9 @@ class N2UserInterface {
         testThis(this, 'N2UserInterface', 'upOneLevelButtonClick');
 
         if (this.n2Diag.zoomedElement === this.n2Diag.model.root) return;
-        this.backButtonHistory.push({ "node": this.n2Diag.zoomedElement });
+        this.backButtonHistory.push({
+            node: this.n2Diag.zoomedElement,
+        });
         this.forwardButtonHistory = [];
         this._setupLeftClick(this.n2Diag.zoomedElement.parent);
         this.n2Diag.update();
@@ -283,7 +304,7 @@ class N2UserInterface {
      * @param {N2TreeNode} node The current node to operate on.
      */
     _collapseOutputs(node) {
-        if (node.subsystem_type && node.subsystem_type == "component") {
+        if (node.subsystem_type && node.subsystem_type == 'component') {
             node.isMinimized = true;
         }
         if (node.hasChildren()) {
@@ -300,8 +321,7 @@ class N2UserInterface {
     collapseOutputsButtonClick(startNode) {
         testThis(this, 'N2UserInterface', 'collapseOutputsButtonClick');
 
-        this.findRootOfChangeFunction =
-            this.findRootOfChangeForCollapseUncollapseOutputs;
+        this.findRootOfChangeFunction = this.findRootOfChangeForCollapseUncollapseOutputs;
         N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
         this.lastClickWasLeft = false;
         this._collapseOutputs(startNode);
@@ -313,7 +333,9 @@ class N2UserInterface {
      * @param {N2TreeNode} node The node to operate on.
      */
     _uncollapse(node) {
-        if (!node.isParam()) { node.isMinimized = false; }
+        if (!node.isParam()) {
+            node.isMinimized = false;
+        }
 
         if (node.hasChildren()) {
             for (let child of node.children) {
@@ -329,8 +351,7 @@ class N2UserInterface {
     uncollapseButtonClick(startNode) {
         testThis(this, 'N2UserInterface', 'uncollapseButtonClick');
 
-        this.findRootOfChangeFunction =
-            this.findRootOfChangeForCollapseUncollapseOutputs;
+        this.findRootOfChangeFunction = this.findRootOfChangeForCollapseUncollapseOutputs;
         N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
         this.lastClickWasLeft = false;
         this._uncollapse(startNode);
@@ -343,9 +364,11 @@ class N2UserInterface {
      * @param {Number} depth If the node's depth is the same or more, collapse it.
      */
     _collapseToDepth(node, depth) {
-        if (node.isParamOrUnknown()) { return; }
+        if (node.isParamOrUnknown()) {
+            return;
+        }
 
-        node.isMinimized = (node.depth < depth) ? false : true;
+        node.isMinimized = node.depth < depth ? false : true;
 
         if (node.hasChildren()) {
             for (let child of node.children) {
@@ -363,11 +386,14 @@ class N2UserInterface {
 
         this.n2Diag.chosenCollapseDepth = newChosenCollapseDepth;
         if (this.n2Diag.chosenCollapseDepth > this.n2Diag.zoomedElement.depth) {
-            this._collapseToDepth(this.n2Diag.model.root,
-                this.n2Diag.chosenCollapseDepth);
+            this._collapseToDepth(
+                this.n2Diag.model.root,
+                this.n2Diag.chosenCollapseDepth
+            );
         }
-        this.findRootOfChangeFunction =
-            this.findRootOfChangeForCollapseDepth.bind(this);
+        this.findRootOfChangeFunction = this.findRootOfChangeForCollapseDepth.bind(
+            this
+        );
         N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
         this.lastClickWasLeft = false;
         this.n2Diag.update();
@@ -381,10 +407,19 @@ class N2UserInterface {
         testThis(this, 'N2UserInterface', 'toggleSolverNamesCheckboxChange');
 
         this.n2Diag.toggleSolverNameType();
-        this.n2Diag.dom.parentDiv.querySelector("#toggleSolverNamesButtonId").className =
-            !this.n2Diag.showLinearSolverNames ? "myButton myButtonToggledOn" : "myButton";
+        this.n2Diag.dom.parentDiv.querySelector(
+                '#linear-solver-button'
+            ).className = !this.n2Diag.showLinearSolverNames ?
+            'fas icon-nonlinear-solver solver-button' :
+            'fas icon-linear-solver solver-button';
+
+        this.legend.toggleSolvers(this.n2Diag.showLinearSolverNames);
+
         if (this.legend.shown)
-            this.legend.show(this.n2Diag.showLinearSolverNames, this.n2Diag.style.solvers);
+            this.legend.show(
+                this.n2Diag.showLinearSolverNames,
+                this.n2Diag.style.solvers
+            );
         this.n2Diag.update();
     }
 
@@ -392,120 +427,186 @@ class N2UserInterface {
      * React to the show path button press and show paths if they're not already
      * show, and vice-versa.
      */
-    showPathCheckboxChange() {
-        testThis(this, 'N2UserInterface', 'showPathCheckboxChange');
+    // showPathCheckboxChange() {
+    //     testThis(this, 'N2UserInterface', 'showPathCheckboxChange');
 
-        this.n2Diag.showPath = !this.n2Diag.showPath;
-        this.n2Diag.dom.parentDiv.querySelector("#currentPathId").style.display =
-            this.n2Diag.showPath ? "block" : "none";
-        this.n2Diag.dom.parentDiv.querySelector("#showCurrentPathButtonId").className =
-            this.n2Diag.showPath ? "myButton myButtonToggledOn" : "myButton";
-    }
+    //     this.n2Diag.showPath = !this.n2Diag.showPath;
+    //     this.n2Diag.dom.parentDiv.querySelector(
+    //         '#currentPathId'
+    //     ).style.display = this.n2Diag.showPath ? 'block' : 'none';
+    //     this.n2Diag.dom.parentDiv.querySelector(
+    //             '#showCurrentPathButtonId'
+    //         ).className = this.n2Diag.showPath ?
+    //         'myButton myButtonToggledOn' :
+    //         'myButton';
+    // }
 
     /** React to the toggle legend button, and show or hide the legend below the N2. */
     toggleLegend() {
         testThis(this, 'N2UserInterface', 'toggleLegend');
-        this.legend.toggle(this.n2Diag.showLinearSolverNames, this.n2Diag.style.solvers);
+        this.legend.toggle(
+            this.n2Diag.showLinearSolverNames,
+            this.n2Diag.style.solvers
+        );
 
-        this.n2Diag.dom.parentDiv.querySelector("#showLegendButtonId").className =
-            (this.legend.shown) ? "myButton myButtonToggledOn" : "myButton";
+        this.n2Diag.dom.parentDiv.querySelector('#legend-button').className = this
+            .legend.shown ?
+            'fas fa-key active-tab-icon' :
+            'fas fa-key';
+    }
 
+    toggleNodeData() {
+        testThis(this, 'N2UserInterface', 'toggleNodeData');
+
+        const infoButton = document.querySelector("#info-button");
+        const nodeData = document.querySelector("#node-data-container");
+        const nodeDataClassName = nodeData.className;
+
+        if (nodeDataClassName.includes("hide-node-data")) {
+            nodeData.className = "node-info-container";
+            infoButton.className = "fas fa-info-circle active-tab-icon"
+        } else {
+            nodeData.className = "node-info-container hide-node-data";
+            infoButton.className = "fas fa-info-circle"
+        }
     }
 
     /** Associate all of the buttons on the toolbar with a method in N2UserInterface. */
     _setupToolbar() {
         let self = this; // For callbacks that change "this". Alternative to using .bind().
-        let toolbar = document.getElementById("toolbarDiv");
+        // let toolbar = document.getElementById('toolbarDiv');
 
-        toolbar.querySelector("#returnToRootButtonId").onclick =
-            function () { self.homeButtonClick(); };
-        toolbar.querySelector("#backButtonId").onclick =
-            function () { self.backButtonPressed(); };
-        toolbar.querySelector("#forwardButtonId").onclick =
-            function () { self.forwardButtonPressed(); };
-        toolbar.querySelector("#upOneLevelButtonId").onclick =
-            function () { self.upOneLevelButtonClick(); };
-        toolbar.querySelector("#uncollapseInViewButtonId").onclick =
-            function () { self.uncollapseButtonClick(self.n2Diag.zoomedElement); };
-        toolbar.querySelector("#uncollapseAllButtonId").onclick =
-            function () { self.uncollapseButtonClick(self.n2Diag.model.root); };
-        toolbar.querySelector("#collapseInViewButtonId").onclick =
-            function () { self.collapseOutputsButtonClick(self.n2Diag.zoomedElement); };
-        toolbar.querySelector("#collapseAllButtonId").onclick =
-            function () { self.collapseOutputsButtonClick(self.n2Diag.model.root); };
-        toolbar.querySelector("#clearArrowsAndConnectsButtonId").onclick =
-            function () { self.n2Diag.clearArrows() };
-        toolbar.querySelector("#showCurrentPathButtonId").onclick =
-            function () { self.showPathCheckboxChange(); };
-        toolbar.querySelector("#showLegendButtonId").onclick =
-            function () { self.toggleLegend(); };
-        toolbar.querySelector("#toggleSolverNamesButtonId").onclick =
-            function () { self.toggleSolverNamesCheckboxChange(); }
+        let toolbar = document.getElementById('true-toolbar');
 
-        // Set up the font-size drop-down selector.
-        for (let i = 8; i <= 14; ++i) {
-            let f = function (idx) {
-                return function () { self.n2Diag.fontSizeSelectChange(idx); };
-            }(i);
-            toolbar.querySelector("#idFontSize" + i + "px").onclick = f;
+        toolbar.querySelector('#reset-graph').onclick = function() {
+            self.homeButtonClick();
+        };
+        toolbar.querySelector('#undo-graph').onclick = function() {
+            self.backButtonPressed();
+        };
+        toolbar.querySelector('#redo-graph').onclick = function() {
+            self.forwardButtonPressed();
+        };
+        // trueToolbar.querySelector("#upOneLevelButtonId").onclick =
+        //     function() {
+        //         self.upOneLevelButtonClick();
+        //     };
+        toolbar.querySelector('#expand-element').onclick = function() {
+            self.uncollapseButtonClick(self.n2Diag.zoomedElement);
+        };
+        toolbar.querySelector('#expand-all').onclick = function() {
+            self.uncollapseButtonClick(self.n2Diag.model.root);
+        };
+        toolbar.querySelector('#collapse-element').onclick = function() {
+            self.collapseOutputsButtonClick(self.n2Diag.zoomedElement);
+        };
+        toolbar.querySelector('#collapse-element-2').onclick = function() {
+            self.collapseOutputsButtonClick(self.n2Diag.zoomedElement);
+        };
+        toolbar.querySelector('#collapse-all').onclick = function() {
+            self.collapseOutputsButtonClick(self.n2Diag.model.root);
+        };
+        toolbar.querySelector('#expand-element').onclick = function() {
+            self.uncollapseButtonClick(self.n2Diag.zoomedElement);
+        };
+        toolbar.querySelector('#expand-all').onclick = function() {
+            self.uncollapseButtonClick(self.n2Diag.model.root);
+        };
+        toolbar.querySelector('#collapse-element').onclick = function() {
+            self.collapseOutputsButtonClick(self.n2Diag.zoomedElement);
+        };
+        toolbar.querySelector('#collapse-all').onclick = function() {
+            self.collapseOutputsButtonClick(self.n2Diag.model.root);
+        };
+        toolbar.querySelector('#hide-connections').onclick = function() {
+            self.n2Diag.clearArrows();
+        };
+        toolbar.querySelector('#show-connections').onclick = function() {
+            self.n2Diag.showArrows();
+        };
+        toolbar.querySelector('#show-all-connections').onclick = function() {
+            self.n2Diag.showAllArrows();
+        };
+        // toolbar.querySelector('#showCurrentPathButtonId').onclick = function() {
+        //     self.showPathCheckboxChange();
+        // };
+        toolbar.querySelector('#legend-button').onclick = function() {
+            self.toggleLegend();
+        };
+        toolbar.querySelector('#linear-solver-button').onclick = function() {
+            self.toggleSolverNamesCheckboxChange();
+        };
+
+        toolbar.querySelector("#text-slider").oninput = function(e) {
+            const fontSize = e.target.value;
+            self.n2Diag.fontSizeSelectChange(fontSize);
+
+            const fontSizeIndicator = trueToolbar.querySelector("#font-size-indicator");
+            fontSizeIndicator.innerHTML = fontSize + " px";
+        };
+
+        toolbar.querySelector("#model-slider").onmouseup = function(e) {
+            const modelHeight = parseInt(e.target.value);
+            self.n2Diag.verticalResize(modelHeight);
         }
 
-        // Set up the N2 vertical height drop-down selector.
-        for (let i = 600; i <= 1000; i += 50) {
-            let f = function (idx) {
-                return function () { self.n2Diag.verticalResize(idx); };
-            }(i);
-            toolbar.querySelector("#idVerticalResize" + i + "px").onclick = f;
+        toolbar.querySelector('#save-button').onclick = function() {
+            self.n2Diag.saveSvg();
+        };
+
+        toolbar.querySelector("#info-button").onclick = function() {
+            self.toggleNodeData();
         }
 
-        for (let i = 2000; i <= 4000; i += 1000) {
-            let f = function (idx) {
-                return function () { self.n2Diag.verticalResize(idx); };
-            }(i);
-            toolbar.querySelector("#idVerticalResize" + i + "px").onclick = f;
-        }
-
-        toolbar.querySelector("#saveSvgButtonId").onclick =
-            function () { self.n2Diag.saveSvg(); }
-        toolbar.querySelector("#helpButtonId").onclick = DisplayModal;
+        document.getElementById('question-button').onclick = DisplayModal;
     }
 
     _setupSearch() {
         let self = this; // For callbacks that change "this". Alternative to using .bind().
 
         // Keyup so it will be after the input and awesomplete-selectcomplete event listeners
-        window.addEventListener('keyup', self.searchEnterKeyUpEventListener.bind(self), true);
+        window.addEventListener(
+            'keyup',
+            self.searchEnterKeyUpEventListener.bind(self),
+            true
+        );
 
         // Keydown so it will be before the input and awesomplete-selectcomplete event listeners
-        window.addEventListener('keydown', self.searchEnterKeyDownEventListener.bind(self), true);
+        window.addEventListener(
+            'keydown',
+            self.searchEnterKeyDownEventListener.bind(self),
+            true
+        );
     }
 
     /** Make sure UI controls reflect history and current reality. */
     update() {
         testThis(this, 'N2UserInterface', 'update');
 
-        this.n2Diag.dom.parentDiv.querySelector('#currentPathId').innerHTML =
-            'PATH: root' + ((this.n2Diag.zoomedElement.parent) ? '.' : '') +
-            this.n2Diag.zoomedElement.absPathName;
-        this.n2Diag.dom.parentDiv.querySelector('#backButtonId').disabled =
-            (this.backButtonHistory.length == 0) ? 'disabled' : false;
-        this.n2Diag.dom.parentDiv.querySelector('#forwardButtonId').disabled =
-            (this.forwardButtonHistory.length == 0) ? 'disabled' : false;
-        this.n2Diag.dom.parentDiv.querySelector('#upOneLevelButtonId').disabled =
-            (this.n2Diag.zoomedElement === this.n2Diag.model.root) ? 'disabled' : false;
-        this.n2Diag.dom.parentDiv.querySelector('#returnToRootButtonId').disabled =
-            (this.n2Diag.zoomedElement === this.n2Diag.model.root) ? 'disabled' : false;
+        // this.n2Diag.dom.parentDiv.querySelector('#currentPathId').innerHTML =
+        //     'PATH: root' +
+        //     (this.n2Diag.zoomedElement.parent ? '.' : '') +
+        //     this.n2Diag.zoomedElement.absPathName;
+        this.n2Diag.dom.parentDiv.querySelector('#undo-graph').disabled =
+            this.backButtonHistory.length == 0 ? 'disabled' : false;
+        this.n2Diag.dom.parentDiv.querySelector('#redo-graph').disabled =
+            this.forwardButtonHistory.length == 0 ? 'disabled' : false;
+        // this.n2Diag.dom.parentDiv.querySelector('#upOneLevelButtonId').disabled =
+        //     this.n2Diag.zoomedElement === this.n2Diag.model.root ? 'disabled' : false;
+        this.n2Diag.dom.parentDiv.querySelector('#reset-graph').disabled =
+            this.n2Diag.zoomedElement === this.n2Diag.model.root ? 'disabled' : false;
 
-        for (let i = 2; i <= this.n2Diag.model.maxDepth; ++i) {
-            this.n2Diag.dom.parentDiv.querySelector('#idCollapseDepthOption' + i).style.display =
-                (i <= this.n2Diag.zoomedElement.depth) ? 'none' : 'block';
-        }
+        // for (let i = 2; i <= this.n2Diag.model.maxDepth; ++i) {
+        //     this.n2Diag.dom.parentDiv.querySelector(
+        //         '#idCollapseDepthOption' + i
+        //     ).style.display = i <= this.n2Diag.zoomedElement.depth ? 'none' : 'block';
+        // }
     }
 
     /** Called when the search button is actually or effectively clicked to start a search. */
     searchButtonClicked() {
         testThis(this, 'N2UserInterface', 'searchButtonClicked');
-        
+
         this.n2Diag.search.performSearch();
 
         this.findRootOfChangeFunction = this.n2Diag.search.findRootOfChangeForSearch;
@@ -523,9 +624,10 @@ class N2UserInterface {
         testThis(this, 'N2UserInterface', 'searchEnterKeyDownEventListener');
 
         let target = e.target;
-        if (target.id == "awesompleteId") {
+        if (target.id == 'awesompleteId') {
             let key = e.which || e.keyCode;
-            if (key === 13) { // 13 is enter
+            if (key === 13) {
+                // 13 is enter
                 this.callSearchFromEnterKeyPressed = true;
             }
         }
@@ -535,9 +637,10 @@ class N2UserInterface {
         testThis(this, 'N2UserInterface', 'searchEnterKeyUpEventListener');
 
         let target = e.target;
-        if (target.id == "awesompleteId") {
+        if (target.id == 'awesompleteId') {
             let key = e.which || e.keyCode;
-            if (key == 13) { // 13 is enter
+            if (key == 13) {
+                // 13 is enter
                 if (this.callSearchFromEnterKeyPressed) {
                     this.searchButtonClicked();
                 }

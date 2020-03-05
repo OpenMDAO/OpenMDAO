@@ -5,10 +5,8 @@ import json
 import os
 from collections import OrderedDict
 from itertools import chain
-
 import networkx as nx
 from six import iteritems, itervalues
-
 try:
     import h5py
 except ImportError:
@@ -50,6 +48,7 @@ def _get_var_dict(system, typ, name):
         name = system._var_abs2prom[typ][name]
 
     var_dict = OrderedDict()
+
     var_dict['name'] = name
     if typ == 'input':
         var_dict['type'] = 'param'
@@ -59,6 +58,7 @@ def _get_var_dict(system, typ, name):
         var_dict['implicit'] = isimplicit
 
     var_dict['dtype'] = type(meta['value']).__name__
+
 
     return var_dict
 
@@ -172,10 +172,10 @@ def _get_declare_partials(system):
         A list containing all the declared partials (strings in the form "of > wrt" )
         beginning from the given system on down.
     """
+
     declare_partials_list = []
 
     def recurse_get_partials(system, dpl):
-
         if isinstance(system, Component):
             subjacs = system._subjacs_info
             for abs_key, meta in iteritems(subjacs):
@@ -203,8 +203,11 @@ def _get_viewer_data(data_source):
     dict
         A dictionary containing information about the model for use by the viewer.
     """
+
     if isinstance(data_source, Problem):
         root_group = data_source.model
+
+        #print(root_group.list_outputs())
 
         if not isinstance(root_group, Group):
             simple_warning(
@@ -408,11 +411,12 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
         'N2Diagram', \
         'N2UserInterface', \
         'defaults', \
-        'ptN2'
+        'ptN2', \
+        'Toolbar'
     srcs = read_files(src_names, src_dir, 'js')
     styles = read_files(('awesomplete', 'partition_tree'), style_dir, 'css')
 
-    with open(os.path.join(style_dir, "fontello.woff"), "rb") as f:
+    with open(os.path.join(style_dir, "icomoon.woff"), "rb") as f:
         encoded_font = str(base64.b64encode(f.read()).decode("ascii"))
 
     if title:
@@ -435,53 +439,6 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
                  write_script(code, indent=_IND))
 
     h.insert('{{model_data}}', write_script(model_data, indent=_IND))
-
-    # Toolbar
-    toolbar = h.toolbar
-    group1 = toolbar.add_button_group()
-    group1.add_button("Return To Root", uid="returnToRootButtonId", disabled="disabled",
-                      content="icon-home")
-    group1.add_button("Back", uid="backButtonId",
-                      disabled="disabled", content="icon-left-big")
-    group1.add_button("Forward", uid="forwardButtonId", disabled="disabled",
-                      content="icon-right-big")
-    group1.add_button("Up One Level", uid="upOneLevelButtonId", disabled="disabled",
-                      content="icon-up-big")
-
-    group2 = toolbar.add_button_group()
-    group2.add_button("Uncollapse In View Only", uid="uncollapseInViewButtonId",
-                      content="icon-resize-full")
-    group2.add_button("Uncollapse All", uid="uncollapseAllButtonId",
-                      content="icon-resize-full bigger-font")
-    group2.add_button("Collapse Outputs In View Only", uid="collapseInViewButtonId",
-                      content="icon-resize-small")
-    group2.add_button("Collapse All Outputs", uid="collapseAllButtonId",
-                      content="icon-resize-small bigger-font")
-    group2.add_dropdown("Collapse Depth", button_content="icon-sort-number-up",
-                        uid="idCollapseDepthDiv")
-
-    group3 = toolbar.add_button_group()
-    group3.add_button("Clear Arrows and Connections", uid="clearArrowsAndConnectsButtonId",
-                      content="icon-eraser")
-    group3.add_button(
-        "Show Path", uid="showCurrentPathButtonId", content="icon-terminal")
-    group3.add_button("Show Legend", uid="showLegendButtonId",
-                      content="icon-map-signs")
-    group3.add_button("Toggle Solver Names",
-                      uid="toggleSolverNamesButtonId", content="icon-minus")
-    group3.add_dropdown("Font Size", id_naming="idFontSize", options=_FONT_SIZES,
-                        option_formatter=lambda x: '{}px'.format(x),
-                        button_content="icon-text-height")
-    group3.add_dropdown("Vertically Resize", id_naming="idVerticalResize",
-                        options=_MODEL_HEIGHTS, option_formatter=lambda x: '{}px'.format(
-                            x),
-                        button_content="icon-resize-vertical", header="Model Height")
-
-    group4 = toolbar.add_button_group()
-    group4.add_button("Save SVG", uid="saveSvgButtonId", content="icon-floppy")
-
-    group5 = toolbar.add_button_group()
-    group5.add_button("Help", uid="helpButtonId", content="icon-help")
 
     # Help
     help_txt = ('Left clicking on a node in the partition tree will navigate to that node. '
