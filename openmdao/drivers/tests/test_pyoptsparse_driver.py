@@ -2206,5 +2206,52 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
         prob.driver.options['user_teriminate_signal'] = signal.SIGUSR2
 
 
+from openmdao.test_suite.components.matmultcomp import MatMultComp
+
+
+class MyGroup(om.Group):
+    def __init__(self, size=5):
+        super(MyGroup, self).__init__()
+        self.size = size
+
+    def setup(self):
+        size = self.size
+        self.add_subsystem('indeps', om.IndepVarComp('x', np.ones(size)))
+        r = np.random.random(size * size)
+        r[r > .3] = 0.0  # make it fairly sparse
+        self.add_subsystem('comp1', MatMultComp(r.reshape((size, size)), sparse=True,
+                                                approx_method='exact'))
+        self.add_subsystem('comp2', om.ExecComp('y=x-1.0', x=np.zeros(size), y=np.zeros(size), has_diag_partials=True))
+        self.connect('indeps.x', 'comp1.x')
+        self.connect('comp1.y', 'comp2.x')
+        self.add_design_var('indeps.x')
+        self.add_objective('comp2.y', index=0)
+        self.add_constraint('comp1.y', indices=list(range(1, size)), lower=5., upper=10.)
+
+
+@unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
+@use_tempdirs
+class TestResizingTestCase(unittest.TestCase):
+    def test_resize(self):
+        p = om.Problem()
+        model = p.model
+        p.driver = om.pyOptSparseDriver()
+        p.driver.declare_coloring(show_sparsity=True)
+
+        G = model.add_subsystem("G", MyGroup(5))
+        p.setup()
+        p.run_driver()
+        J = p.compute_totals()
+        print(J)
+
+        G.size = 10
+        p.setup()
+        p.run_driver()
+        J = p.compute_totals()
+        print(J)
+
+
+
+
 if __name__ == "__main__":
     unittest.main()
