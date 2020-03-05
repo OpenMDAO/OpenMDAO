@@ -47,7 +47,6 @@ class MatMultComp(om.ExplicitComponent):
             sub-jac components written to partials[output_name, input_name]
         """
         if self.sparse:
-            print("SPARSE!!")
             partials['y', 'x'] = self.mat[self.rows]
         else:
             partials['y', 'x'] = self.mat
