@@ -1819,6 +1819,10 @@ class TestPyoptSparse(unittest.TestCase):
         self.assertEqual(code, 71)
 
     def test_IPOPT_basic(self):
+        _, local_opt = set_pyoptsparse_opt('IPOPT')
+        if local_opt != 'IPOPT':
+            raise unittest.SkipTest("pyoptsparse is not providing IPOPT")
+
         prob = om.Problem()
         model = prob.model = SellarDerivativesGrouped()
 
