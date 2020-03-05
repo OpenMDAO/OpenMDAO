@@ -2206,7 +2206,42 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
         prob.driver.options['user_teriminate_signal'] = signal.SIGUSR2
 
 
-from openmdao.test_suite.components.matmultcomp import MatMultComp
+class MatMultCompExact(om.ExplicitComponent):
+    def __init__(self, mat, sparse=False, **kwargs):
+        super(MatMultCompExact, self).__init__(**kwargs)
+        self.mat = mat
+        self.sparse = sparse
+
+    def setup(self):
+        self.add_input('x', val=np.ones(self.mat.shape[1]))
+        self.add_output('y', val=np.zeros(self.mat.shape[0]))
+
+        if self.sparse:
+            self.rows, self.cols = np.nonzero(self.mat)
+            self.declare_partials(of='y', wrt='x', rows=self.rows, cols=self.cols)
+        else:
+            self.declare_partials(of='y', wrt='x')
+        self.num_computes = 0
+
+    def compute(self, inputs, outputs):
+        outputs['y'] = self.mat.dot(inputs['x'])
+        self.num_computes += 1
+
+    def compute_partials(self, inputs, partials):
+        """
+        Compute the sparse partials.
+
+        Parameters
+        ----------
+        inputs : Vector
+            unscaled, dimensional input variables read via inputs[key]
+        partials : Jacobian
+            sub-jac components written to partials[output_name, input_name]
+        """
+        if self.sparse:
+            partials['y', 'x'] = self.mat[self.rows, self.cols]
+        else:
+            partials['y', 'x'] = self.mat
 
 
 class MyGroup(om.Group):
@@ -2218,8 +2253,7 @@ class MyGroup(om.Group):
         size = self.size
         self.add_subsystem('indeps', om.IndepVarComp('x', np.ones(size)))
         r = np.random.random(size * size)
-        self.add_subsystem('comp1', MatMultComp(r.reshape((size, size)), sparse=True,
-                                                approx_method='exact'))
+        self.add_subsystem('comp1', MatMultCompExact(r.reshape((size, size)), sparse=True))
         self.add_subsystem('comp2', om.ExecComp('y=x-1.0', x=np.zeros(size), y=np.zeros(size), has_diag_partials=True))
         self.connect('indeps.x', 'comp1.x')
         self.connect('comp1.y', 'comp2.x')

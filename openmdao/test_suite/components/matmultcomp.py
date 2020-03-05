@@ -9,47 +9,23 @@ import openmdao.api as om
 
 
 class MatMultComp(om.ExplicitComponent):
-    def __init__(self, mat, approx_method='exact', sleep_time=0.1, sparse=False, **kwargs):
+    def __init__(self, mat, approx_method='exact', sleep_time=0.1, **kwargs):
         super(MatMultComp, self).__init__(**kwargs)
         self.mat = mat
-        self.sparse = sparse
         self.approx_method = approx_method
         self.sleep_time = sleep_time
-        if approx_method == 'exact':
-            self.compute_partials = self._comp_partials_exact
 
     def setup(self):
         self.add_input('x', val=np.ones(self.mat.shape[1]))
         self.add_output('y', val=np.zeros(self.mat.shape[0]))
 
-        if self.sparse:
-            self.rows, self.cols = np.nonzero(self.mat)
-            self.declare_partials(of='y', wrt='x', rows=self.rows, cols=self.cols,
-                                  method=self.approx_method)
-        else:
-            self.declare_partials(of='y', wrt='x', method=self.approx_method)
+        self.declare_partials(of='y', wrt='x', method=self.approx_method)
         self.num_computes = 0
 
     def compute(self, inputs, outputs):
         outputs['y'] = self.mat.dot(inputs['x'])
         self.num_computes += 1
         time.sleep(self.sleep_time)
-
-    def _comp_partials_exact(self, inputs, partials):
-        """
-        Compute the sparse partials.
-
-        Parameters
-        ----------
-        inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
-        partials : Jacobian
-            sub-jac components written to partials[output_name, input_name]
-        """
-        if self.sparse:
-            partials['y', 'x'] = self.mat[self.rows]
-        else:
-            partials['y', 'x'] = self.mat
 
 
 if __name__ == '__main__':
