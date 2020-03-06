@@ -4,8 +4,6 @@ import os
 import importlib
 from subprocess import check_call
 
-from six import iteritems
-
 import openmdao.api as om
 from openmdao.utils.scaffold import _camel_case_split, _write_template
 from openmdao.utils.testing_utils import use_tempdirs

@@ -1,6 +1,4 @@
 """Define the LinearInterpolator class."""
-from six.moves import range
-
 import numpy as np
 
 from openmdao.surrogate_models.nn_interpolators.nn_base import NNBase

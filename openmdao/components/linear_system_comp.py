@@ -1,5 +1,4 @@
 """Define the LinearSystemComp class."""
-from six.moves import range
 
 import numpy as np
 from scipy import linalg

@@ -2,7 +2,6 @@
 import warnings
 
 import numpy as np
-from six.moves import range
 
 from openmdao.proc_allocators.proc_allocator import ProcAllocator, ProcAllocationError
 from openmdao.utils.mpi import MPI

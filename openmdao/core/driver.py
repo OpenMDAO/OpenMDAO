@@ -5,15 +5,13 @@ import sys
 import os
 import weakref
 
-from six import iteritems, itervalues, string_types
-
 import numpy as np
 
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.record_util import create_local_meta, check_path
-from openmdao.utils.general_utils import simple_warning, warn_deprecation
+from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 import openmdao.utils.coloring as coloring_mod
@@ -250,8 +248,8 @@ class Driver(object):
         self._total_jac = None
 
         self._has_scaling = (
-            np.any([r['scaler'] is not None for r in itervalues(self._responses)]) or
-            np.any([dv['scaler'] is not None for dv in itervalues(self._designvars)])
+            np.any([r['scaler'] is not None for r in self._responses.values()]) or
+            np.any([dv['scaler'] is not None for dv in self._designvars.values()])
         )
 
         # Determine if any design variables are discrete.
@@ -612,7 +610,7 @@ class Driver(object):
             The nonlinear response names in order.
         """
         order = list(self._objs)
-        order.extend(n for n, meta in iteritems(self._cons)
+        order.extend(n for n, meta in self._cons.items()
                      if not ('linear' in meta and meta['linear']))
         return order
 
@@ -636,7 +634,7 @@ class Driver(object):
         self._cons = cons = OrderedDict()
 
         self._responses = resps = model.get_responses(recurse=True)
-        for name, data in iteritems(resps):
+        for name, data in resps.items():
             if data['type'] == 'con':
                 cons[name] = data
             else:
@@ -646,7 +644,7 @@ class Driver(object):
 
         # Gather up the information for design vars.
         self._designvars = designvars = model.get_design_vars(recurse=True)
-        desvar_size = sum(data['size'] for data in itervalues(designvars))
+        desvar_size = sum(data['size'] for data in designvars.values())
 
         return response_size, desvar_size
 
@@ -843,22 +841,6 @@ class Driver(object):
             raise RuntimeError("Driver '%s' does not support simultaneous derivatives." %
                                self._get_name())
 
-    def set_simul_deriv_color(self, coloring):
-        """
-        See use_fixed_coloring. This method is deprecated.
-
-        Parameters
-        ----------
-        coloring : str or Coloring
-            Information about simultaneous coloring for design vars and responses.  If a
-            string, then coloring is assumed to be the name of a file that contains the
-            coloring information in pickle format. Otherwise it must be a Coloring object.
-            See the docstring for Coloring for details.
-
-        """
-        warn_deprecation("set_simul_deriv_color is deprecated.  Use use_fixed_coloring instead.")
-        self.use_fixed_coloring(coloring)
-
     def _setup_tot_jac_sparsity(self):
         """
         Set up total jacobian subjac sparsity.
@@ -890,7 +872,7 @@ class Driver(object):
         if coloring is not None:
             return coloring
 
-        if static is coloring_mod._STD_COLORING_FNAME or isinstance(static, string_types):
+        if static is coloring_mod._STD_COLORING_FNAME or isinstance(static, str):
             if static is coloring_mod._STD_COLORING_FNAME:
                 fname = self._get_total_coloring_fname()
             else:

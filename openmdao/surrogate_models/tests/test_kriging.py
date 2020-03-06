@@ -7,7 +7,6 @@ import numpy as np
 
 from openmdao.api import KrigingSurrogate
 from openmdao.utils.assert_utils import assert_rel_error
-from six.moves import zip
 
 
 def branin(x):

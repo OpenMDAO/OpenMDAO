@@ -2,7 +2,7 @@ import os
 
 import unittest
 import numpy as np
-from six.moves import cStringIO
+from io import StringIO
 
 from distutils.version import LooseVersion
 
@@ -102,7 +102,7 @@ class DistributedListVarsTest(unittest.TestCase):
 
         prob.run_driver()
 
-        stream = cStringIO()
+        stream = StringIO()
         inputs = sorted(prob.model.list_inputs(values=True, print_arrays=True, out_stream=stream))
         self.assertEqual(inputs[0][0], 'plus.x')
         self.assertEqual(inputs[1][0], 'summer.y')
@@ -123,7 +123,7 @@ class DistributedListVarsTest(unittest.TestCase):
             self.assertEqual(len(text.split('[')[1].split(']')[0].split()), 100)
             self.assertEqual(len(text.split('[')[2].split(']')[0].split()), 100)
 
-        stream = cStringIO()
+        stream = StringIO()
         outputs = sorted(prob.model.list_outputs(values=True,
                                                  units=True,
                                                  shape=True,
@@ -200,7 +200,7 @@ class DistributedListVarsTest(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        stream = cStringIO()
+        stream = StringIO()
         inputs = sorted(prob.model.list_inputs(values=True, print_arrays=True, out_stream=stream))
         self.assertEqual(inputs[0][0], 'Obj.y1')
         self.assertEqual(inputs[1][0], 'Obj.y2')
@@ -229,7 +229,7 @@ class DistributedListVarsTest(unittest.TestCase):
             self.assertEqual(1, text.count('    y1'))
             self.assertEqual(1, text.count('    y2'))
 
-        stream = cStringIO()
+        stream = StringIO()
         outputs = sorted(prob.model.list_outputs(values=True,
                                                  units=True,
                                                  shape=True,
@@ -290,7 +290,7 @@ class DistributedListVarsTest(unittest.TestCase):
         #
         # list inputs, not hierarchical
         #
-        stream = cStringIO()
+        stream = StringIO()
         with printoptions(**print_opts):
             prob.model.list_inputs(values=True, hierarchical=False, out_stream=stream)
 
@@ -319,7 +319,7 @@ class DistributedListVarsTest(unittest.TestCase):
         #
         # list inputs, hierarchical
         #
-        stream = cStringIO()
+        stream = StringIO()
         with printoptions(**print_opts):
             prob.model.list_inputs(values=True, hierarchical=True, out_stream=stream)
 
@@ -356,7 +356,7 @@ class DistributedListVarsTest(unittest.TestCase):
         #
         # list outputs, not hierarchical
         #
-        stream = cStringIO()
+        stream = StringIO()
         with printoptions(**print_opts):
             prob.model.list_outputs(values=True, residuals=True, hierarchical=False, out_stream=stream)
 
@@ -390,7 +390,7 @@ class DistributedListVarsTest(unittest.TestCase):
         #
         # list outputs, hierarchical
         #
-        stream = cStringIO()
+        stream = StringIO()
         with printoptions(**print_opts):
             prob.model.list_outputs(values=True, residuals=True, hierarchical=True, out_stream=stream)
 
@@ -454,7 +454,7 @@ class DistributedListVarsTest(unittest.TestCase):
 
         # prior to model execution, the global shape of a distributed variable is not available
         # and only the local portion of the value is available
-        stream = cStringIO()
+        stream = StringIO()
         with printoptions(**print_opts):
             model.C2.list_inputs(hierarchical=False, shape=True, global_shape=True,
                                  print_arrays=True, out_stream=stream)
@@ -478,7 +478,7 @@ class DistributedListVarsTest(unittest.TestCase):
                     self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line),
                                      '\nExpected: %s\nReceived: %s\n' % (line, text[i]))
 
-        stream = cStringIO()
+        stream = StringIO()
         with printoptions(**print_opts):
             model.C2.list_outputs(hierarchical=False, shape=True, global_shape=True,
                                   print_arrays=True, out_stream=stream)
@@ -508,7 +508,7 @@ class DistributedListVarsTest(unittest.TestCase):
 
         # after model execution, the global shape of a distributed variable is available
         # and the complete global value is available
-        stream = cStringIO()
+        stream = StringIO()
         with printoptions(**print_opts):
             model.C2.list_inputs(hierarchical=False, shape=True, global_shape=True,
                                  print_arrays=True, out_stream=stream)
@@ -531,7 +531,7 @@ class DistributedListVarsTest(unittest.TestCase):
                     self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line),
                                      '\nExpected: %s\nReceived: %s\n' % (line, text[i]))
 
-        stream = cStringIO()
+        stream = StringIO()
         with printoptions(**print_opts):
             model.C2.list_outputs(hierarchical=False, shape=True, global_shape=True,
                                   print_arrays=True, out_stream=stream)
@@ -556,7 +556,7 @@ class DistributedListVarsTest(unittest.TestCase):
 
         # note that the shape of the input variable for the non-distributed Summer component
         # is different on each processor, use the all_procs argument to display on all processors
-        stream = cStringIO()
+        stream = StringIO()
         with printoptions(**print_opts):
             model.C3.list_inputs(hierarchical=False, shape=True, global_shape=True, all_procs=True,
                                  print_arrays=True, out_stream=stream)

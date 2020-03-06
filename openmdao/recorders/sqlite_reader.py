@@ -4,9 +4,6 @@ Definition of the SqliteCaseReader.
 import sqlite3
 from collections import OrderedDict
 
-from six import PY2, PY3, iteritems, string_types
-from six.moves import range
-
 import numpy as np
 
 from openmdao.recorders.base_case_reader import BaseCaseReader
@@ -17,12 +14,8 @@ from openmdao.utils.record_util import check_valid_sqlite3_db, get_source_system
 
 from openmdao.recorders.sqlite_recorder import format_version
 
-if PY2:
-    import cPickle as pickle
-    from openmdao.utils.general_utils import json_loads_byteified as json_loads
-elif PY3:
-    import pickle
-    from json import loads as json_loads
+import pickle
+from json import loads as json_loads
 
 
 class SqliteCaseReader(BaseCaseReader):
@@ -183,7 +176,7 @@ class SqliteCaseReader(BaseCaseReader):
             self._abs2meta = json_loads(row['abs2meta'])
 
             # need to convert bounds to numpy arrays
-            for name, meta in iteritems(self._abs2meta):
+            for name, meta in self._abs2meta.items():
                 if 'lower' in meta and meta['lower'] is not None:
                     meta['lower'] = np.resize(np.array(meta['lower']), meta['shape'])
                 if 'upper' in meta and meta['upper'] is not None:
@@ -194,29 +187,15 @@ class SqliteCaseReader(BaseCaseReader):
             prom2abs = row['prom2abs']
             abs2meta = row['abs2meta']
 
-            if PY2:
-                try:
-                    self._abs2prom = pickle.loads(str(abs2prom))
-                    self._prom2abs = pickle.loads(str(prom2abs))
-                    self._abs2meta = pickle.loads(str(abs2meta))
-                except ValueError as err:
-                    if err.message.startswith('unsupported pickle protocol'):
-                        raise ValueError("This data appears to have been recorded with "
-                                         "Python 3 and cannot be read with Python 2 "
-                                         "(%s)." % err.message)
-                    else:
-                        raise err
-
-            if PY3:
-                try:
-                    self._abs2prom = pickle.loads(abs2prom)
-                    self._prom2abs = pickle.loads(prom2abs)
-                    self._abs2meta = pickle.loads(abs2meta)
-                except TypeError:
-                    # Reading in a python 2 pickle recorded pre-OpenMDAO 2.4.
-                    self._abs2prom = pickle.loads(abs2prom.encode())
-                    self._prom2abs = pickle.loads(prom2abs.encode())
-                    self._abs2meta = pickle.loads(abs2meta.encode())
+            try:
+                self._abs2prom = pickle.loads(abs2prom)
+                self._prom2abs = pickle.loads(prom2abs)
+                self._abs2meta = pickle.loads(abs2meta)
+            except TypeError:
+                # Reading in a python 2 pickle recorded pre-OpenMDAO 2.4.
+                self._abs2prom = pickle.loads(abs2prom.encode())
+                self._prom2abs = pickle.loads(prom2abs.encode())
+                self._abs2meta = pickle.loads(abs2meta.encode())
 
     def _collect_driver_metadata(self, cur):
         """
@@ -236,10 +215,7 @@ class SqliteCaseReader(BaseCaseReader):
             if self._format_version >= 3:
                 driver_metadata = json_loads(row[0])
             elif self._format_version in (1, 2):
-                if PY2:
-                    driver_metadata = pickle.loads(str(row[0]))
-                if PY3:
-                    driver_metadata = pickle.loads(row[0])
+                driver_metadata = pickle.loads(row[0])
 
             self.problem_metadata.update(driver_metadata)
 
@@ -259,12 +235,8 @@ class SqliteCaseReader(BaseCaseReader):
             id = row[0]
             self.system_metadata[id] = {}
 
-            if PY2:
-                self.system_metadata[id]['scaling_factors'] = pickle.loads(str(row[1]))
-                self.system_metadata[id]['component_options'] = pickle.loads(str(row[2]))
-            if PY3:
-                self.system_metadata[id]['scaling_factors'] = pickle.loads(row[1])
-                self.system_metadata[id]['component_options'] = pickle.loads(row[2])
+            self.system_metadata[id]['scaling_factors'] = pickle.loads(row[1])
+            self.system_metadata[id]['component_options'] = pickle.loads(row[2])
 
     def _collect_solver_metadata(self, cur):
         """
@@ -280,10 +252,7 @@ class SqliteCaseReader(BaseCaseReader):
         cur.execute("SELECT id, solver_options, solver_class FROM solver_metadata")
         for row in cur:
             id = row[0]
-            if PY2:
-                solver_options = pickle.loads(str(row[1]))
-            if PY3:
-                solver_options = pickle.loads(row[1])
+            solver_options = pickle.loads(row[1])
             solver_class = row[2]
             self.solver_metadata[id] = {
                 'solver_options': solver_options,
@@ -423,7 +392,7 @@ class SqliteCaseReader(BaseCaseReader):
                                        "specify another source (system or solver) for the cases "
                                        "you want to see.")
 
-        if not isinstance(source, string_types):
+        if not isinstance(source, str):
             raise TypeError("Source parameter must be a string, %s is type %s." %
                             (source, type(source).__name__))
 

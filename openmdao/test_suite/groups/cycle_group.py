@@ -26,8 +26,6 @@ Note: 'theta' is unique only up to equivalence mod (2*pi)/(num_comp - 1). Test a
 depend on particular values of 'theta' (or 'x_i'/'y_i' values) without taking this in to account.
 """
 
-from six.moves import range
-
 import numpy as np
 
 import openmdao.api as om

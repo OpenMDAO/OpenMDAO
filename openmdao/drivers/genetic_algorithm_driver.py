@@ -23,9 +23,6 @@ John Wiley & Sons, Ltd.
 import os
 import copy
 
-from six import iteritems, itervalues, next
-from six.moves import range, zip
-
 import numpy as np
 from pyDOE2 import lhs
 
@@ -235,7 +232,7 @@ class SimpleGADriver(Driver):
         desvar_vals = self.get_design_var_values()
 
         count = 0
-        for name, meta in iteritems(desvars):
+        for name, meta in desvars.items():
             if name in self._designvars_discrete:
                 val = desvar_vals[name]
                 if np.isscalar(val):
@@ -254,7 +251,7 @@ class SimpleGADriver(Driver):
         x0 = np.empty(count)
 
         # Figure out bounds vectors and initial design vars
-        for name, meta in iteritems(desvars):
+        for name, meta in desvars.items():
             i, j = self._desvar_idx[name]
             lower_bound[i:j] = meta['lower']
             upper_bound[i:j] = meta['upper']
@@ -263,7 +260,7 @@ class SimpleGADriver(Driver):
         # Bits of resolution
         abs2prom = model._var_abs2prom['output']
 
-        for name, meta in iteritems(desvars):
+        for name, meta in desvars.items():
             i, j = self._desvar_idx[name]
 
             if name in self._designvars_discrete:
@@ -391,7 +388,7 @@ class SimpleGADriver(Driver):
         nr_objectives = len(objs)
 
         # Single objective, if there is nly one objective, which has only one element
-        is_single_objective = (nr_objectives == 1) and (len(next(itervalues(objs))) == 1)
+        is_single_objective = (nr_objectives == 1) and (len(objs) == 1)
 
         obj_exponent = self.options['multi_obj_exponent']
         if self.options['multi_obj_weights']:  # not empty
@@ -399,7 +396,7 @@ class SimpleGADriver(Driver):
         else:
             # Same weight for all objectives, if not specified
             obj_weights = {name: 1. for name in objs.keys()}
-        sum_weights = sum(itervalues(obj_weights))
+        sum_weights = sum(obj_weights.values())
 
         for name in self._designvars:
             i, j = self._desvar_idx[name]
@@ -421,10 +418,11 @@ class SimpleGADriver(Driver):
 
             obj_values = self.get_objective_values()
             if is_single_objective:  # Single objective optimization
-                obj = next(itervalues(obj_values))  # First and only key in the dict
+                for i in obj_values.values():
+                    obj = i  # First and only key in the dict
             else:  # Multi-objective optimization with weighted sums
                 weighted_objectives = np.array([])
-                for name, val in iteritems(obj_values):
+                for name, val in obj_values.items():
                     # element-wise multiplication with scalar
                     # takes the average, if an objective is a vector
                     try:
@@ -445,7 +443,7 @@ class SimpleGADriver(Driver):
                 fun = obj
             else:
                 constraint_violations = np.array([])
-                for name, val in iteritems(self.get_constraint_values()):
+                for name, val in self.get_constraint_values().items():
                     con = self._cons[name]
                     # The not used fields will either None or a very large number
                     if (con['lower'] is not None) and np.any(con['lower'] > -almost_inf):

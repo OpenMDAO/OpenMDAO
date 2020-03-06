@@ -7,8 +7,6 @@ import sys
 import traceback
 import unittest
 
-from six import PY3
-
 from openmdao.core.analysis_error import AnalysisError
 
 
@@ -35,12 +33,8 @@ def _redirect_streams(to_fd):
     os.dup2(to_fd, original_stderr_fd)
 
     # Create a new sys.stdout that points to the redirected fd
-    if PY3:
-        sys.stdout = io.TextIOWrapper(os.fdopen(original_stdout_fd, 'wb'))
-        sys.stderr = io.TextIOWrapper(os.fdopen(original_stdout_fd, 'wb'))
-    else:
-        sys.stdout = os.fdopen(original_stdout_fd, 'wb', 0)  # 0 makes them unbuffered
-        sys.stderr = os.fdopen(original_stderr_fd, 'wb', 0)
+    sys.stdout = io.TextIOWrapper(os.fdopen(original_stdout_fd, 'wb'))
+    sys.stderr = io.TextIOWrapper(os.fdopen(original_stdout_fd, 'wb'))
 
 
 def use_proc_files():

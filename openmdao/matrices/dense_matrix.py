@@ -1,7 +1,6 @@
 """Define the DenseMatrix class."""
 import numpy as np
 from numpy import ndarray
-from six import iteritems
 
 from scipy.sparse import coo_matrix
 
@@ -99,7 +98,7 @@ class DenseMatrix(COOMatrix):
         if len(d_inputs._views) > len(d_inputs._names):
             sub = d_inputs._names
             mask = np.ones(len(d_inputs), dtype=np.bool)
-            for key, val in iteritems(self._metadata):
+            for key, val in self._metadata.items():
                 if key[1] in sub:
                     mask[val[1]] = False
 
