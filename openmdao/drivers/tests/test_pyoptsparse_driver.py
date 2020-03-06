@@ -143,6 +143,7 @@ class DataSave(om.ExplicitComponent):
 
         partials['y', 'x'] = 2.0*x - 6.0
 
+
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
 @unittest.skipUnless(MPI, "MPI is required.")
 class TestMPIScatter(unittest.TestCase):
@@ -174,6 +175,7 @@ class TestMPIScatter(unittest.TestCase):
 
         proc_vals = MPI.COMM_WORLD.allgather([prob['x'], prob['y'], prob['c'], prob['f_xy']])
         np.testing.assert_array_almost_equal(proc_vals[0], proc_vals[1])
+
 
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
 @use_tempdirs
@@ -1534,6 +1536,11 @@ class TestPyoptSparse(unittest.TestCase):
 
     def test_show_exception_bad_opt(self):
 
+        # First, check if we have the optimizer for this test. If they do, then just skip it.
+        _, loc_opt = set_pyoptsparse_opt('NOMAD')
+        if loc_opt == 'NOMAD':
+            raise unittest.SkipTest("Skipping because user has this optimizer.")
+
         prob = om.Problem()
         model = prob.model
 
@@ -1551,15 +1558,15 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.driver = pyOptSparseDriver()
 
-        # We generally don't hae a working IPOPT install.
-        prob.driver.options['optimizer'] = 'IPOPT'
+        # We generally don't hae a working NOMAD install.
+        prob.driver.options['optimizer'] = 'NOMAD'
         prob.setup()
 
         # Test that we get exception.
         with self.assertRaises(ImportError) as raises_cm:
             prob.run_driver()
 
-        self.assertTrue("IPOPT is not available" in str(raises_cm.exception))
+        self.assertTrue("NOMAD is not available" in str(raises_cm.exception))
 
     # Travis testing core dumps on many of the machines. Probabaly a build problem with the NSGA source.
     # Limiting this to the single travis 1.14 machine for now.
@@ -1810,6 +1817,31 @@ class TestPyoptSparse(unittest.TestCase):
         # SNOPT return code 71 is a user-requested termination.
         code = prob.driver.pyopt_solution.optInform['value']
         self.assertEqual(code, 71)
+
+    def test_IPOPT_basic(self):
+        _, local_opt = set_pyoptsparse_opt('IPOPT')
+        if local_opt != 'IPOPT':
+            raise unittest.SkipTest("pyoptsparse is not providing IPOPT")
+
+        prob = om.Problem()
+        model = prob.model = SellarDerivativesGrouped()
+
+        prob.driver = om.pyOptSparseDriver()
+        prob.driver.options['optimizer'] = "IPOPT"
+        prob.driver.opt_settings['print_level'] = 0
+
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        prob.set_solver_print(level=0)
+
+        prob.setup(check=False, mode='rev')
+        prob.run_driver()
+
+        assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
 
 
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
