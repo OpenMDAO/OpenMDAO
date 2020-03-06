@@ -88,6 +88,24 @@ will generate an :math:`N^2` diagram like the one below.
     ../test_suite/scripts/circuit.py
 
 
+It's also possible to generate an :math:`N^2` diagram for a particular test function rather than
+for a standalone script.  This is done by providing the test spec for the test function instead
+of the filename of the script.  For example, if we had a test located in a file called
+`test_mystuff.py`, and the test named `test_my_stuff` was inside of a TestCase class called
+`MyTestCase`, we could generate the :math:`N^2` diagram for it using the following command:
+
+.. code-block:: none
+
+    openmdao n2 test_mystuff.py:MyTestCase.test_my_stuff
+
+
+If the test module happens to be part of a python package, then you can also use the dotted
+module pathname of the test module instead of the filename.
+
+A number of other openmdao commands, includng `view_connections` and `tree`, also support this
+functionality.
+
+
 .. _om-command-view_connections:
 
 openmdao view_connections
