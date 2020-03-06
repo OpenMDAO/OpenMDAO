@@ -25,7 +25,6 @@ except ImportError:
 
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.logger_utils import TestLogger
-from openmdao.utils.coloring import compute_total_coloring
 from openmdao.error_checking.check_config import _default_checks
 from openmdao.core.tests.test_distrib_derivs import DistribExecComp
 
@@ -284,6 +283,7 @@ class TestParallelGroups(unittest.TestCase):
                          np.array([-3.75,-3.75,-5.25], dtype=float), 1e-6)
 
         J = prob.compute_totals(of=of, wrt=wrt)
+
         expected = np.array([[-3.75, 0, 0], [0, -3.75, 0], [0,0,-5.25]], dtype=float)
 
         assert_rel_error(self, J['sink.y', 'indep.x'], expected, 1e-6)
