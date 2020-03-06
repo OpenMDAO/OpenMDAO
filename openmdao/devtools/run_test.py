@@ -19,7 +19,6 @@ for example:
 
     mpirun -n 4 run_test /foo/bar/mypackage/mypackage/mysubpackage/mymod.py:MyTestCase.test_foo
 """
-from __future__ import print_function
 
 import sys
 import importlib

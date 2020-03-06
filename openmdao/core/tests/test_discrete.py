@@ -4,8 +4,7 @@ import sys
 import unittest
 import copy
 
-from six import assertRaisesRegex, StringIO, assertRegex
-
+from io import StringIO
 import numpy as np
 
 import openmdao.api as om

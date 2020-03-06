@@ -1,8 +1,6 @@
 """
 Routines to compute coloring for use with simultaneous derivatives.
 """
-from __future__ import division, print_function
-
 import os
 import sys
 import time
@@ -17,9 +15,6 @@ from distutils.version import LooseVersion
 from contextlib import contextmanager
 from pprint import pprint
 from itertools import groupby
-
-from six import iteritems, string_types
-from six.moves import range
 
 import numpy as np
 from scipy.sparse.compressed import get_index_dtype
@@ -374,7 +369,7 @@ class Coloring(object):
         fname : str
             File to save to.
         """
-        if isinstance(fname, string_types):
+        if isinstance(fname, str):
             color_dir = os.path.dirname(os.path.abspath(fname))
             if not os.path.exists(color_dir):
                 os.makedirs(color_dir)
@@ -828,9 +823,9 @@ class Coloring(object):
             raise RuntimeError("Coloring doesn't have enough info to compute subjac sparsity.")
 
         ostart = oend = 0
-        for of, sub in iteritems(subjac_sparsity):
+        for of, sub in subjac_sparsity.items():
             istart = iend = 0
-            for i, (wrt, tup) in enumerate(iteritems(sub)):
+            for i, (wrt, tup) in enumerate(sub.items()):
                 nzrows, nzcols, shape = tup
                 iend += shape[1]
                 if i == 0:
@@ -2157,10 +2152,10 @@ def _initialize_model_approx(model, driver, of=None, wrt=None):
 
         # Support for indices defined on driver vars.
         model._owns_approx_of_idx = {
-            key: val['indices'] for key, val in iteritems(driver._responses)
+            key: val['indices'] for key, val in driver._responses.items()
             if val['indices'] is not None
         }
         model._owns_approx_wrt_idx = {
-            key: val['indices'] for key, val in iteritems(driver._designvars)
+            key: val['indices'] for key, val in driver._designvars.items()
             if val['indices'] is not None
         }

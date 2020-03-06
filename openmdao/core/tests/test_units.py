@@ -2,8 +2,6 @@
 
 import unittest
 
-from six import iteritems
-
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.test_suite.components.unit_conv import UnitConvGroup, SrcComp, TgtCompC, TgtCompF, \
@@ -127,8 +125,8 @@ class TestUnitConversion(unittest.TestCase):
         # Make sure check partials handles conversion
         data = prob.check_partials()
 
-        for key1, val1 in iteritems(data):
-            for key2, val2 in iteritems(val1):
+        for key1, val1 in data.items():
+            for key2, val2 in val1.items():
                 assert_rel_error(self, val2['abs error'][0], 0.0, 1e-6)
                 assert_rel_error(self, val2['abs error'][1], 0.0, 1e-6)
                 assert_rel_error(self, val2['abs error'][2], 0.0, 1e-6)
@@ -257,8 +255,8 @@ class TestUnitConversion(unittest.TestCase):
         # Make sure check partials handles conversion
         data = prob.check_partials()
 
-        for key1, val1 in iteritems(data):
-            for key2, val2 in iteritems(val1):
+        for key1, val1 in data.items():
+            for key2, val2 in val1.items():
                 assert_rel_error(self, val2['abs error'][0], 0.0, 1e-6)
                 assert_rel_error(self, val2['abs error'][1], 0.0, 1e-6)
                 assert_rel_error(self, val2['abs error'][2], 0.0, 1e-6)
@@ -288,34 +286,12 @@ class TestUnitConversion(unittest.TestCase):
         expected_msg = "The units 'junk' are invalid"
         self.assertTrue(expected_msg in str(cm.exception))
 
-    def test_add_unitless_output(self):
-        prob = om.Problem()
-        prob.model.add_subsystem('indep', om.IndepVarComp('x', 0.0, units='unitless'))
-
-        msg = "Output 'x' has units='unitless' but 'unitless' has been deprecated. " \
-              "Use units=None instead.  Note that connecting a unitless variable to " \
-              "one with units is no longer an error, but will issue a warning instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            prob.setup()
-
-    def test_add_unitless_input(self):
-        prob = om.Problem()
-        prob.model.add_subsystem('C1', om.ExecComp('y=x', x={'units': 'unitless'}))
-
-        msg = "Input 'x' has units='unitless' but 'unitless' has been deprecated. " \
-              "Use units=None instead.  Note that connecting a unitless variable to " \
-              "one with units is no longer an error, but will issue a warning instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            prob.setup()
-
     def test_incompatible_units(self):
         """Test error handling when only one of src and tgt have units."""
         prob = om.Problem()
         prob.model.add_subsystem('px1', om.IndepVarComp('x1', 100.0), promotes_outputs=['x1'])
         prob.model.add_subsystem('src', SrcComp(), promotes_inputs=['x1'])
-        prob.model.add_subsystem('tgt', om.ExecComp('yy=xx', xx={'value': 0.0, 'units': 'unitless'}))
+        prob.model.add_subsystem('tgt', om.ExecComp('yy=xx', xx={'value': 0.0, 'units': None}))
         prob.model.connect('src.x2', 'tgt.xx')
 
         msg = "Group (<model>): Output 'src.x2' with units of 'degC' is connected to input 'tgt.xx' which has no units."
@@ -447,17 +423,17 @@ class TestUnitConversion(unittest.TestCase):
 
         #prob = om.Problem()
         #root = prob.model
-        #sub1 = prob.model.add('sub1', om.Group(), promotes=['x2'])
-        #sub2 = prob.model.add('sub2', om.Group(), promotes=['x2'])
-        #sub1.add('src', SrcComp(), promotes = ['x2'])
-        #sub2.add('tgtF', TgtCompFMulti(), promotes=['x2'])
-        #sub2.add('tgtC', TgtCompC(), promotes=['x2'])
-        #sub2.add('tgtK', TgtCompK(), promotes=['x2'])
-        #prob.model.add('px1', om.IndepVarComp('x1', 100.0), promotes=['x1'])
+        #sub1 = prob.model.add_subsystem('sub1', om.Group(), promotes=['x2'])
+        #sub2 = prob.model.add_subsystem('sub2', om.Group(), promotes=['x2'])
+        #sub1.add_subsystem('src', SrcComp(), promotes = ['x2'])
+        #sub2.add_subsystem('tgtF', TgtCompFMulti(), promotes=['x2'])
+        #sub2.add_subsystem('tgtC', TgtCompC(), promotes=['x2'])
+        #sub2.add_subsystem('tgtK', TgtCompK(), promotes=['x2'])
+        #prob.model.add_subsystem('px1', om.IndepVarComp('x1', 100.0), promotes=['x1'])
         #prob.model.connect('x1', 'sub1.src.x1')
 
         #prob.setup()
-        #prob.run()
+        #prob.run_model()
 
         #assert_rel_error(self, prob['x2'], 100.0, 1e-6)
         #assert_rel_error(self, prob['sub2.tgtF.x3'], 212.0, 1e-6)
@@ -575,12 +551,12 @@ class TestUnitConversion(unittest.TestCase):
 
         #prob = om.Problem()
         #root = prob.model
-        #prob.model.add('comp', Attitude_Angular(n=5), promotes=['*'])
-        #prob.model.add('p1', om.IndepVarComp('O_BI', np.ones((3, 3, 5))), promotes=['*'])
-        #prob.model.add('p2', om.IndepVarComp('Odot_BI', np.ones((3, 3, 5))), promotes=['*'])
+        #prob.model.add_subsystem('comp', Attitude_Angular(n=5), promotes=['*'])
+        #prob.model.add_subsystem('p1', om.IndepVarComp('O_BI', np.ones((3, 3, 5))), promotes=['*'])
+        #prob.model.add_subsystem('p2', om.IndepVarComp('Odot_BI', np.ones((3, 3, 5))), promotes=['*'])
 
         #prob.setup()
-        #prob.run()
+        #prob.run_model()
 
         #indep_list = ['O_BI', 'Odot_BI']
         #unknown_list = ['w_B']
@@ -592,7 +568,7 @@ class TestUnitConversion(unittest.TestCase):
         #Jr = prob.calc_gradient(indep_list, unknown_list, mode='rev',
                                 #return_format='dict')
 
-        #for key, val in iteritems(Jr):
+        #for key, val in Jr.items():
             #for key2 in val:
                 #diff = abs(Jf[key][key2] - Jr[key][key2])
                 #assert_rel_error(self, diff, 0.0, 1e-10)
@@ -635,12 +611,12 @@ class TestUnitConversion(unittest.TestCase):
 
         #prob = om.Problem()
         #root = prob.model
-        #root.add('p1', om.IndepVarComp('xx', 3.0))
-        #root.add('c1', om.ExecComp(['y1=0.5*x + 0.1*xx', 'y2=0.3*x - 1.0*xx']))
-        #root.add('c2', om.ExecComp(['y=0.5*x']))
-        #sub = root.add('sub', om.Group())
-        #sub.add('cc1', om.ExecComp(['y=0.1*x1 + 0.01*x2']))
-        #sub.add('cc2', om.ExecComp(['y=0.1*x']))
+        #root.add_subsystem('p1', om.IndepVarComp('xx', 3.0))
+        #root.add_subsystem('c1', om.ExecComp(['y1=0.5*x + 0.1*xx', 'y2=0.3*x - 1.0*xx']))
+        #root.add_subsystem('c2', om.ExecComp(['y=0.5*x']))
+        #sub = root.add_subsystem('sub', om.Group())
+        #sub.add_subsystem('cc1', om.ExecComp(['y=0.1*x1 + 0.01*x2']))
+        #sub.add_subsystem('cc2', om.ExecComp(['y=0.1*x']))
 
         #root.connect('p1.xx', 'c1.xx')
         #root.connect('c1.y1', 'c2.x')
@@ -660,7 +636,7 @@ class TestUnitConversion(unittest.TestCase):
 
         #prob.setup()
 
-        #prob.run()
+        #prob.run_model()
 
         ## Pollute the dpvec
         #sub.dpmat[None]['cc1.x1'] = 1e10
@@ -681,12 +657,12 @@ class TestUnitConversion(unittest.TestCase):
 
         #prob = om.Problem()
         #root = prob.model
-        #root.add('p1', om.IndepVarComp('xx', 3.0))
-        #root.add('c1', om.ExecComp(['y1=0.5*x + 1.0*xx', 'y2=0.3*x - 1.0*xx'], units={'y2' : 'km'}))
-        #root.add('c2', om.ExecComp(['y=0.5*x']))
-        #sub = root.add('sub', om.Group())
-        #sub.add('cc1', om.ExecComp(['y=1.01*x1 + 1.01*x2'], units={'x1' : 'nm'}))
-        #sub.add('cc2', om.ExecComp(['y=1.01*x']))
+        #root.add_subsystem('p1', om.IndepVarComp('xx', 3.0))
+        #root.add_subsystem('c1', om.ExecComp(['y1=0.5*x + 1.0*xx', 'y2=0.3*x - 1.0*xx'], units={'y2' : 'km'}))
+        #root.add_subsystem('c2', om.ExecComp(['y=0.5*x']))
+        #sub = root.add_subsystem('sub', om.Group())
+        #sub.add_subsystem('cc1', om.ExecComp(['y=1.01*x1 + 1.01*x2'], units={'x1' : 'nm'}))
+        #sub.add_subsystem('cc2', om.ExecComp(['y=1.01*x']))
 
         #root.connect('p1.xx', 'c1.xx')
         #root.connect('c1.y1', 'c2.x')
@@ -708,7 +684,7 @@ class TestUnitConversion(unittest.TestCase):
 
         #prob.setup()
 
-        #prob.run()
+        #prob.run_model()
         #self.assertTrue(not np.isnan(prob['sub.cc2.y']))
 
     #def test_nested_relevancy_adjoint(self):
@@ -719,12 +695,12 @@ class TestUnitConversion(unittest.TestCase):
 
         #prob = om.Problem()
         #root = prob.model
-        #root.add('p1', om.IndepVarComp('xx', 3.0))
-        #root.add('c1', om.ExecComp(['y1=0.5*x + 1.0*xx', 'y2=0.3*x - 1.0*xx'], units={'y2' : 'km'}))
-        #root.add('c2', om.ExecComp(['y=0.5*x']))
-        #sub = root.add('sub', om.Group())
-        #sub.add('cc1', om.ExecComp(['y=1.01*x1 + 1.01*x2'], units={'x1' : 'nm'}))
-        #sub.add('cc2', om.ExecComp(['y=1.01*x']))
+        #root.add_subsystem('p1', om.IndepVarComp('xx', 3.0))
+        #root.add_subsystem('c1', om.ExecComp(['y1=0.5*x + 1.0*xx', 'y2=0.3*x - 1.0*xx'], units={'y2' : 'km'}))
+        #root.add_subsystem('c2', om.ExecComp(['y=0.5*x']))
+        #sub = root.add_subsystem('sub', om.Group())
+        #sub.add_subsystem('cc1', om.ExecComp(['y=1.01*x1 + 1.01*x2'], units={'x1' : 'nm'}))
+        #sub.add_subsystem('cc2', om.ExecComp(['y=1.01*x']))
 
         #root.connect('p1.xx', 'c1.xx')
         #root.connect('c1.y1', 'c2.x')
@@ -747,7 +723,7 @@ class TestUnitConversion(unittest.TestCase):
 
         #prob.setup()
 
-        #prob.run()
+        #prob.run_model()
         #self.assertTrue(not np.isnan(prob['sub.cc2.y']))
 
     #def test_nested_relevancy_adjoint_apply_linear(self):
@@ -798,12 +774,12 @@ class TestUnitConversion(unittest.TestCase):
 
         #prob = om.Problem()
         #root = prob.model
-        #root.add('p1', om.IndepVarComp('xx', 3.0))
-        #root.add('c1', om.ExecComp(['y1=0.5*x + 1.0*xx', 'y2=0.3*x - 1.0*xx'], units={'y2' : 'km'}))
-        #root.add('c2', om.ExecComp(['y=0.5*x']))
-        #sub = root.add('sub', om.Group())
-        #sub.add('cc1', TestComp())
-        #sub.add('cc2', om.ExecComp(['y=1.01*x']))
+        #root.add_subsystem('p1', om.IndepVarComp('xx', 3.0))
+        #root.add_subsystem('c1', om.ExecComp(['y1=0.5*x + 1.0*xx', 'y2=0.3*x - 1.0*xx'], units={'y2' : 'km'}))
+        #root.add_subsystem('c2', om.ExecComp(['y=0.5*x']))
+        #sub = root.add_subsystem('sub', om.Group())
+        #sub.add_subsystem('cc1', TestComp())
+        #sub.add_subsystem('cc2', om.ExecComp(['y=1.01*x']))
 
         #root.connect('p1.xx', 'c1.xx')
         #root.connect('c1.y1', 'c2.x')
@@ -825,7 +801,7 @@ class TestUnitConversion(unittest.TestCase):
         #prob.driver.add_objective('sub.cc2.y')
 
         #prob.setup()
-        #prob.run()
+        #prob.run_model()
 
         ## x1 deriv code should be called less if the dinputs vec only
         ## considers sub relevancy
@@ -839,12 +815,12 @@ class TestUnitConversion(unittest.TestCase):
 
         #prob = om.Problem()
         #root = prob.model
-        #root.add('p1', om.IndepVarComp('xx', 3.0))
-        #root.add('c1', om.ExecComp(['y1=0.5*x + 1.0*xx', 'y2=0.3*x - 1.0*xx'], units={'y2' : 'km'}))
-        #root.add('c2', om.ExecComp(['y=0.5*x']))
-        #sub = root.add('sub', om.Group())
-        #sub.add('cc1', om.ExecComp(['y=1.01*x1 + 1.01*x2'], units={'x1' : 'fm'}))
-        #sub.add('cc2', om.ExecComp(['y=1.01*x']))
+        #root.add_subsystem('p1', om.IndepVarComp('xx', 3.0))
+        #root.add_subsystem('c1', om.ExecComp(['y1=0.5*x + 1.0*xx', 'y2=0.3*x - 1.0*xx'], units={'y2' : 'km'}))
+        #root.add_subsystem('c2', om.ExecComp(['y=0.5*x']))
+        #sub = root.add_subsystem('sub', om.Group())
+        #sub.add_subsystem('cc1', om.ExecComp(['y=1.01*x1 + 1.01*x2'], units={'x1' : 'fm'}))
+        #sub.add_subsystem('cc2', om.ExecComp(['y=1.01*x']))
 
         #root.connect('p1.xx', 'c1.xx')
         #root.connect('c1.y1', 'c2.x')
@@ -866,7 +842,7 @@ class TestUnitConversion(unittest.TestCase):
 
         #prob.setup()
 
-        #prob.run()
+        #prob.run_model()
 
         ## GMRES doesn't cause a successive build-up in the value of an out-of
         ## scope param, but the linear solver doesn't converge. We can test to
@@ -881,12 +857,12 @@ class TestUnitConversion(unittest.TestCase):
 
         #prob = om.Problem()
         #root = prob.model
-        #root.add('p1', om.IndepVarComp('xx', 3.0))
-        #root.add('c1', om.ExecComp(['y1=0.5*x + 1.0*xx', 'y2=0.3*x - 1.0*xx'], units={'y2' : 'km'}))
-        #root.add('c2', om.ExecComp(['y=0.5*x']))
-        #sub = root.add('sub', om.Group())
-        #sub.add('cc1', om.ExecComp(['y=1.01*x1 + 1.01*x2'], units={'x1' : 'fm'}))
-        #sub.add('cc2', om.ExecComp(['y=1.01*x']))
+        #root.add_subsystem('p1', om.IndepVarComp('xx', 3.0))
+        #root.add_subsystem('c1', om.ExecComp(['y1=0.5*x + 1.0*xx', 'y2=0.3*x - 1.0*xx'], units={'y2' : 'km'}))
+        #root.add_subsystem('c2', om.ExecComp(['y=0.5*x']))
+        #sub = root.add_subsystem('sub', om.Group())
+        #sub.add_subsystem('cc1', om.ExecComp(['y=1.01*x1 + 1.01*x2'], units={'x1' : 'fm'}))
+        #sub.add_subsystem('cc2', om.ExecComp(['y=1.01*x']))
 
         #root.connect('p1.xx', 'c1.xx')
         #root.connect('c1.y1', 'c2.x')
@@ -909,7 +885,7 @@ class TestUnitConversion(unittest.TestCase):
 
         #prob.setup()
 
-        #prob.run()
+        #prob.run_model()
 
         ## GMRES doesn't cause a successive build-up in the value of an out-of
         ## scope param, but the linear solver doesn't converge. We can test to
@@ -917,113 +893,6 @@ class TestUnitConversion(unittest.TestCase):
         #iter_count = sub.linear_solver.iter_count
         #self.assertTrue(iter_count < 20)
         #self.assertTrue(not np.isnan(prob['sub.cc2.y']))
-
-#class PBOSrcComp(Component):
-
-    #def __init__(self):
-        #super(PBOSrcComp, self).__init__()
-
-        #self.add_param('x1', 100.0)
-        #self.add_output('x2', 100.0, units='degC', pass_by_obj=True)
-        #self.deriv_options['type'] = 'fd'
-
-    #def solve_nonlinear(self, inputs, outputs, resids):
-        #""" No action."""
-        #outputs['x2'] = inputs['x1']
-
-
-#class PBOTgtCompF(Component):
-
-    #def __init__(self):
-        #super(PBOTgtCompF, self).__init__()
-
-        #self.add_param('x2', 100.0, units='degF', pass_by_obj=True)
-        #self.add_output('x3', 100.0)
-        #self.deriv_options['type'] = 'fd'
-
-    #def solve_nonlinear(self, inputs, outputs, resids):
-        #""" No action."""
-        #outputs['x3'] = inputs['x2']
-
-
-#class TestUnitConversionPBO(unittest.TestCase):
-    #""" Tests support for unit conversions on pass_by_obj connections."""
-
-    #def test_basic(self):
-
-        #prob = om.Problem()
-        #prob.model.add('src', PBOSrcComp())
-        #prob.model.add('tgtF', PBOTgtCompF())
-        #prob.model.add('px1', om.IndepVarComp('x1', 100.0), promotes=['x1'])
-        #prob.model.connect('x1', 'src.x1')
-        #prob.model.connect('src.x2', 'tgtF.x2')
-
-        #prob.model.deriv_options['type'] = 'fd'
-
-        #prob.setup()
-        #prob.run()
-
-        #assert_rel_error(self, prob['src.x2'], 100.0, 1e-6)
-        #assert_rel_error(self, prob['tgtF.x3'], 212.0, 1e-6)
-
-        #indep_list = ['x1']
-        #unknown_list = ['tgtF.x3']
-        #J = prob.calc_gradient(indep_list, unknown_list, mode='fwd',
-                               #return_format='dict')
-
-        #assert_rel_error(self, J['tgtF.x3']['x1'][0][0], 1.8, 1e-6)
-
-        #stream = cStringIO()
-        #conv = prob.model.list_unit_conv(stream=stream)
-        #self.assertTrue((('src.x2', 'tgtF.x2'), ('degC', 'degF')) in conv)
-
-
-    #def test_radian_bug(self):
-
-        #class Src(Component):
-
-            #def __init__(self):
-                #super(Src, self).__init__()
-
-                #self.add_output('x1', 180.0, units='deg')
-                #self.add_output('x2', np.pi, units='rad')
-                #self.add_output('x3', 2.0, units='m')
-                #self.deriv_options['type'] = 'fd'
-
-            #def solve_nonlinear(self, inputs, outputs, resids):
-                #""" No action."""
-                #pass
-
-
-        #class Tgt(Component):
-
-            #def __init__(self):
-                #super(Tgt, self).__init__()
-
-                #self.add_param('x1', 0.0, units='rad')
-                #self.add_param('x2', 0.0, units='deg')
-                #self.add_param('x3', 0.0, units='ft')
-                #self.deriv_options['type'] = 'fd'
-
-            #def solve_nonlinear(self, inputs, outputs, resids):
-                #""" No action."""
-                #pass
-
-        #top = om.Problem()
-        #root = top.root = om.Group()
-        #root.add('src', Src())
-        #root.add('tgt', Tgt())
-
-        #root.connect('src.x1', 'tgt.x1')
-        #root.connect('src.x2', 'tgt.x2')
-        #root.connect('src.x3', 'tgt.x3')
-
-        #top.setup()
-        #top.run()
-
-        #assert_rel_error(self, top['tgt.x1'], np.pi, 1e-6)
-        #assert_rel_error(self, top['tgt.x2'], 180.0, 1e-6)
-        #assert_rel_error(self, top['tgt.x3'], 2.0/0.3048, 1e-6)
 
 
 if __name__ == "__main__":

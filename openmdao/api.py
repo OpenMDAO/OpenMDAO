@@ -11,28 +11,20 @@ from openmdao.core.analysis_error import AnalysisError
 
 # Components
 from openmdao.components.add_subtract_comp import AddSubtractComp
-from openmdao.components.akima_spline_comp import AkimaSplineComp
 from openmdao.components.balance_comp import BalanceComp
-from openmdao.components.bsplines_comp import BsplinesComp
 from openmdao.components.cross_product_comp import CrossProductComp
 from openmdao.components.demux_comp import DemuxComp
 from openmdao.components.dot_product_comp import DotProductComp
 from openmdao.components.eq_constraint_comp import EQConstraintComp
 from openmdao.components.exec_comp import ExecComp
-from openmdao.components.external_code_comp import ExternalCode
 from openmdao.components.external_code_comp import ExternalCodeComp
 from openmdao.components.external_code_comp import ExternalCodeImplicitComp
 from openmdao.components.ks_comp import KSComp
-from openmdao.components.ks_comp import KSComponent
 from openmdao.components.linear_system_comp import LinearSystemComp
 from openmdao.components.matrix_vector_product_comp import MatrixVectorProductComp
-from openmdao.components.meta_model_structured_comp import MetaModelStructured
 from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
-from openmdao.components.meta_model_unstructured_comp import MetaModel
-from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructured
 from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
 from openmdao.components.spline_comp import SplineComp
-from openmdao.components.multifi_meta_model_unstructured_comp import MultiFiMetaModelUnStructured
 from openmdao.components.multifi_meta_model_unstructured_comp \
     import MultiFiMetaModelUnStructuredComp
 from openmdao.components.mux_comp import MuxComp
@@ -43,9 +35,9 @@ from openmdao.components.vector_magnitude_comp import VectorMagnitudeComp
 from openmdao.solvers.linear.linear_block_gs import LinearBlockGS
 from openmdao.solvers.linear.linear_block_jac import LinearBlockJac
 from openmdao.solvers.linear.direct import DirectSolver
-from openmdao.solvers.linear.petsc_ksp import PETScKrylov, PetscKSP
+from openmdao.solvers.linear.petsc_ksp import PETScKrylov
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
-from openmdao.solvers.linear.scipy_iter_solver import ScipyKrylov, ScipyIterativeSolver
+from openmdao.solvers.linear.scipy_iter_solver import ScipyKrylov
 from openmdao.solvers.linear.user_defined import LinearUserDefined
 from openmdao.solvers.linesearch.backtracking import ArmijoGoldsteinLS
 from openmdao.solvers.linesearch.backtracking import BoundsEnforceLS
@@ -53,10 +45,10 @@ from openmdao.solvers.nonlinear.broyden import BroydenSolver
 from openmdao.solvers.nonlinear.nonlinear_block_gs import NonlinearBlockGS
 from openmdao.solvers.nonlinear.nonlinear_block_jac import NonlinearBlockJac
 from openmdao.solvers.nonlinear.newton import NewtonSolver
-from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce, NonLinearRunOnce
+from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 
 # Surrogate Models
-from openmdao.surrogate_models.kriging import KrigingSurrogate, FloatKrigingSurrogate
+from openmdao.surrogate_models.kriging import KrigingSurrogate
 from openmdao.surrogate_models.multifi_cokriging import MultiFiCoKrigingSurrogate
 from openmdao.surrogate_models.nearest_neighbor import NearestNeighbor
 from openmdao.surrogate_models.response_surface import ResponseSurface
@@ -76,7 +68,7 @@ except ImportError:
     PETScVector = None
 
 # Developer Tools
-from openmdao.visualization.n2_viewer.n2_viewer import view_model, n2
+from openmdao.visualization.n2_viewer.n2_viewer import n2
 from openmdao.visualization.connection_viewer.viewconns import view_connections
 
 # Drivers
@@ -84,7 +76,7 @@ try:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 except ImportError:
     pass
-from openmdao.drivers.scipy_optimizer import ScipyOptimizer, ScipyOptimizeDriver
+from openmdao.drivers.scipy_optimizer import ScipyOptimizeDriver
 from openmdao.drivers.genetic_algorithm_driver import SimpleGADriver
 from openmdao.drivers.doe_driver import DOEDriver
 from openmdao.drivers.doe_generators import ListGenerator, CSVGenerator, UniformGenerator, \

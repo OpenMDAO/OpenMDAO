@@ -1,7 +1,5 @@
 """Define `Group`s with parallel topologies for testing"""
 
-from __future__ import division, print_function
-
 import openmdao.api as om
 
 class FanOut(om.Group):

@@ -1,5 +1,3 @@
-from __future__ import print_function, division, absolute_import
-
 import unittest
 
 from openmdao.utils.assert_utils import assert_rel_error
@@ -43,9 +41,7 @@ class TestParaboloidTLDR(unittest.TestCase):
         except AssertionError as err:
             msg = str(err) + "\n If the code in this test must be changed, please go change sister example, " \
                              "tldr_paraboloid.py, and also the front page of the OpenMDAO website!"
-            from six import reraise
-            from sys import exc_info
-            reraise(AssertionError, AssertionError(msg), exc_info()[2])
+            raise AssertionError(msg)
 
 if __name__ == "__main__":
 

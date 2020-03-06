@@ -1,9 +1,6 @@
 """Define the PETSc Transfer class."""
-from __future__ import division
-
 import numpy as np
 from petsc4py import PETSc
-from six import iteritems, itervalues
 from itertools import product, chain
 from collections import defaultdict
 
@@ -106,7 +103,7 @@ class PETScTransfer(DefaultTransfer):
             offsets_out = offsets[vec_name]['output']
 
             # Loop through all connections owned by this system
-            for abs_in, abs_out in iteritems(group._conn_abs_in2out):
+            for abs_in, abs_out in group._conn_abs_in2out.items():
                 if abs_out not in relvars['output'] or abs_in not in relvars['input']:
                     continue
 

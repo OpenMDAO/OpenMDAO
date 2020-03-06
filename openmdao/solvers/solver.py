@@ -1,8 +1,5 @@
 """Define the base Solver, NonlinearSolver, and LinearSolver classes."""
 
-from __future__ import division, print_function
-
-from six import iteritems, reraise
 from collections import OrderedDict
 import os
 import pprint
@@ -15,7 +12,6 @@ import numpy as np
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.recorders.recording_manager import RecordingManager
-from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
@@ -173,8 +169,6 @@ class Solver(object):
                              desc='relative error tolerance')
         self.options.declare('iprint', types=int, default=1,
                              desc='whether to print output')
-        self.options.declare('err_on_maxiter', types=bool, default=None, allow_none=True,
-                             desc="Deprecated. Use 'err_on_non_converge'.")
         self.options.declare('err_on_non_converge', types=bool, default=False,
                              desc="When True, AnalysisError will be raised if we don't converge.")
 
@@ -316,13 +310,6 @@ class Solver(object):
             'output': myoutputs,
             'residual': myresiduals
         }
-
-        # Raise a deprecation warning for changed option.
-        if 'err_on_maxiter' in self.options and self.options['err_on_maxiter'] is not None:
-            self.options['err_on_non_converge'] = self.options['err_on_maxiter']
-            warn_deprecation("The 'err_on_maxiter' option provides backwards compatibility "
-                             "with earlier version of OpenMDAO; use options['err_on_non_converge'] "
-                             "instead.")
 
     def _set_solver_print(self, level=2, type_='all'):
         """
@@ -604,11 +591,10 @@ class NonlinearSolver(Solver):
         """
         try:
             self._solve()
-        except Exception:
-            exc = sys.exc_info()
+        except Exception as err:
             if self.options['debug_print']:
                 self._print_exc_debug_info()
-            reraise(*exc)
+            raise err
 
     def _iter_initialize(self):
         """
@@ -668,7 +654,7 @@ class NonlinearSolver(Solver):
         coord = self._recording_iter.get_formatted_iteration_coordinate()
 
         out_strs = ["\n# Inputs and outputs at start of iteration '%s':\n" % coord]
-        for vec_type, views in iteritems(self._err_cache):
+        for vec_type, views in self._err_cache.items():
             out_strs.append('\n# nonlinear %s\n' % vec_type)
             out_strs.append(pprint.pformat(views))
             out_strs.append('\n')
@@ -697,11 +683,10 @@ class NonlinearSolver(Solver):
 
                 try:
                     subsys._solve_nonlinear()
-                except AnalysisError:
-                    exc = sys.exc_info()
+                except AnalysisError as err:
                     if 'reraise_child_analysiserror' not in self.options or \
                             self.options['reraise_child_analysiserror']:
-                        reraise(*exc)
+                        raise err
 
             system._check_child_reconf(subsys)
 

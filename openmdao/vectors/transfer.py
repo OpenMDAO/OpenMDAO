@@ -1,7 +1,5 @@
 """Define the Transfer base class."""
 
-from __future__ import division
-
 
 class Transfer(object):
     """

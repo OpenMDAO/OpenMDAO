@@ -1,4 +1,3 @@
-from __future__ import print_function
 
 import os
 import sys
@@ -10,7 +9,7 @@ import unittest
 import numpy as np
 import math
 
-from six import StringIO
+from io import StringIO
 
 from distutils.version import LooseVersion
 from numpy.testing import assert_array_almost_equal, assert_almost_equal
@@ -358,7 +357,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
 
         self.assertFalse(failed, "Optimization failed.")
 
-        self.assertTrue('In mode: fwd, Solving variable(s):' in output)
+        self.assertTrue('In mode: fwd, Solving variable(s) using simul coloring:' in output)
         self.assertTrue("('indeps.y', [1, 3, 5, 7, 9])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
@@ -373,7 +372,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
 
         self.assertFalse(failed, "Optimization failed.")
 
-        self.assertTrue('In mode: rev, Solving variable(s):' in output)
+        self.assertTrue('In mode: rev, Solving variable(s) using simul coloring:' in output)
         self.assertTrue("('r_con.g', [0])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
@@ -967,7 +966,7 @@ class SimulColoringVarOutputTestClass(unittest.TestCase):
 
         self.assertFalse(failed, "Optimization failed.")
 
-        self.assertTrue('In mode: fwd, Solving variable(s):' in output)
+        self.assertTrue('In mode: fwd, Solving variable(s) using simul coloring:' in output)
         self.assertTrue("('indep0.x', [7])" in output)
         self.assertTrue("('indep1.x', [7])" in output)
         self.assertTrue("('indep2.x', [7])" in output)
@@ -1019,6 +1018,8 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
         if color == 'total':
             p.driver.declare_coloring()
             if fixed:
+                # NOTE: This call line is embedded in the 2.x->3.x api conversion guide. Do not
+                # modify without carefully checking the guide.
                 p.driver.use_fixed_coloring()
 
         indeps = model.add_subsystem('indeps', om.IndepVarComp())

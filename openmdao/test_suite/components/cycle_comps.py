@@ -1,8 +1,4 @@
 """Components for use in `CycleGroup`. For details, see `CycleGroup`."""
-from __future__ import division, print_function
-
-from six.moves import range
-
 import numpy as np
 import scipy.sparse as sparse
 

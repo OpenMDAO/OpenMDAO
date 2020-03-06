@@ -1,10 +1,7 @@
 """Define the default Transfer class."""
 
-from __future__ import division
-
 from itertools import product, chain
 from collections import defaultdict
-from six import iteritems, itervalues
 
 import numpy as np
 
@@ -81,7 +78,7 @@ class DefaultTransfer(Transfer):
             offsets_out = offsets[vec_name]['output']
 
             # Loop through all connections owned by this group
-            for abs_in, abs_out in iteritems(group._conn_abs_in2out):
+            for abs_in, abs_out in group._conn_abs_in2out.items():
                 if abs_out not in relvars_out or abs_in not in relvars_in:
                     continue
 
@@ -189,7 +186,7 @@ class DefaultTransfer(Transfer):
         iproc = group.comm.rank
         owns = group._owning_rank
 
-        for tgt, src in iteritems(group._conn_discrete_in2out):
+        for tgt, src in group._conn_discrete_in2out.items():
             src_sys, src_var = src[name_offset:].split('.', 1)
             tgt_sys, tgt_var = tgt[name_offset:].split('.', 1)
             xfer = (src_sys, src_var, tgt_sys, tgt_var)
@@ -197,7 +194,7 @@ class DefaultTransfer(Transfer):
 
         if group.comm.size > 1:
             # collect all xfers for each tgt system
-            for tgt, src in iteritems(group._conn_discrete_in2out):
+            for tgt, src in group._conn_discrete_in2out.items():
                 src_sys, src_var = src[name_offset:].split('.', 1)
                 tgt_sys, tgt_var = tgt[name_offset:].split('.', 1)
                 xfer = (src_sys, src_var, tgt_sys, tgt_var)
@@ -207,7 +204,7 @@ class DefaultTransfer(Transfer):
             total_recv = []
             total_xfers = []
 
-            for tgt_sys, xfers in iteritems(transfers):
+            for tgt_sys, xfers in transfers.items():
                 send = set()
                 recv = []
                 for src_sys, src_var, tgt_sys, tgt_var in xfers:
@@ -237,7 +234,7 @@ class DefaultTransfer(Transfer):
             allproc_xfers = group.comm.allgather(transfers)
             allprocs_recv = defaultdict(lambda: defaultdict(list))
             for rank, rank_transfers in enumerate(allproc_xfers):
-                for tgt_sys, (_, _, recvs) in iteritems(rank_transfers):
+                for tgt_sys, (_, _, recvs) in rank_transfers.items():
                     for recv in recvs:
                         allprocs_recv[tgt_sys][recv].append(rank)
 

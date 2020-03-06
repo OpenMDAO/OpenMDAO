@@ -2,7 +2,6 @@
 Utility functions and constants related to writing a table of variable metadata.
 """
 import pprint
-from six import iteritems
 
 import numpy as np
 
@@ -88,12 +87,12 @@ def write_var_table(pathname, var_list, var_type, var_dict,
     #    Need to look through all the possible varnames to find the max width
     max_varname_len = max(len(top_name), len('varname'))
     if hierarchical:
-        for name, outs in iteritems(var_dict):
+        for name, outs in var_dict.items():
             for i, name_part in enumerate(name.split('.')):
                 total_len = (i + 1) * indent_inc + len(name_part)
                 max_varname_len = max(max_varname_len, total_len)
     else:
-        for name, outs in iteritems(var_dict):
+        for name, outs in var_dict.items():
             max_varname_len = max(max_varname_len, len(name))
 
     # Determine the column widths of the data fields by finding the max width for all rows

@@ -39,7 +39,6 @@ cmd_tests = [
     'openmdao trace {}'.format(os.path.join(scriptdir, 'circle_opt.py')),
     'openmdao tree -c {}'.format(os.path.join(scriptdir, 'circle_opt.py')),
     'openmdao view_connections --no_browser {}'.format(os.path.join(scriptdir, 'circle_opt.py')),
-    'openmdao view_model --no_browser {}'.format(os.path.join(scriptdir, 'circle_opt.py')),
 ]
 
 

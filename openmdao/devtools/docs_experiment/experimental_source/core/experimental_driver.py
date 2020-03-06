@@ -1,9 +1,6 @@
 """Define a base class for all Drivers in OpenMDAO."""
-from __future__ import print_function
 from collections import OrderedDict
 import warnings
-
-from six import iteritems, itervalues
 
 import numpy as np
 
@@ -173,7 +170,7 @@ class ExperimentalDriver(object):
         self._cons = cons = OrderedDict()
         self._responses = model.get_responses(recurse=True)
         response_size = 0
-        for name, data in iteritems(self._responses):
+        for name, data in self._responses.items():
             if data['type'] == 'con':
                 cons[name] = data
             else:
@@ -182,7 +179,7 @@ class ExperimentalDriver(object):
 
         # Gather up the information for design vars.
         self._designvars = model.get_design_vars(recurse=True)
-        desvar_size = np.sum(data['size'] for data in itervalues(self._designvars))
+        desvar_size = np.sum(data['size'] for data in self._designvars.values())
 
         if ((problem._mode == 'fwd' and desvar_size > response_size) or
                 (problem._mode == 'rev' and response_size > desvar_size)):
@@ -539,9 +536,9 @@ class ExperimentalDriver(object):
         do_wrt = True
         islices = {}
         oslices = {}
-        for okey, oval in iteritems(derivs):
+        for okey, oval in derivs.items():
             if do_wrt:
-                for ikey, val in iteritems(oval):
+                for ikey, val in oval.items():
                     istart = isize
                     isize += val.shape[1]
                     islices[ikey] = slice(istart, isize)
@@ -554,8 +551,8 @@ class ExperimentalDriver(object):
 
         relevant = self._problem.model._relevant
 
-        for okey, odict in iteritems(derivs):
-            for ikey, val in iteritems(odict):
+        for okey, odict in derivs.items():
+            for ikey, val in odict.items():
                 if okey in relevant[ikey] or ikey in relevant[okey]:
                     new_derivs[oslices[okey], islices[ikey]] = val
 
@@ -600,8 +597,8 @@ class ExperimentalDriver(object):
         # ... then convert to whatever the driver needs.
         if return_format in ('dict', 'array'):
             if self._has_scaling:
-                for okey, odict in iteritems(derivs):
-                    for ikey, val in iteritems(odict):
+                for okey, odict in derivs.items():
+                    for ikey, val in odict.items():
 
                         iscaler = self._designvars[ikey]['scaler']
                         oscaler = self._responses[okey]['scaler']
@@ -669,7 +666,7 @@ class ExperimentalDriver(object):
             outputs = root._outputs
             # outputsinputs, outputs, residuals = root.get_nonlinear_vectors()
             sysvars = {}
-            for name, value in iteritems(outputs._names):
+            for name, value in outputs._names.items():
                 if name in self._filtered_vars_to_record['sys']:
                     sysvars[name] = value
         else:

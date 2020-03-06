@@ -9,7 +9,9 @@ import openmdao.api as om
 from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import evenly_distrib_idxs
 
+
 class DistribComp(om.ExplicitComponent):
+
     def initialize(self):
         self.options['distributed'] = True
 
@@ -37,6 +39,7 @@ class DistribComp(om.ExplicitComponent):
             outputs['outvec'] = inputs['invec'] * 2.0
         else:
             outputs['outvec'] = inputs['invec'] * -3.0
+
 
 class Summer(om.ExplicitComponent):
     """Sums a distributed input."""

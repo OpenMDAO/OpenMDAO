@@ -12,8 +12,12 @@ def _build(solver_class=om.NewtonSolver, linear_solver_class=om.ScipyKrylov,
     suite.solver_class = solver_class
     if solver_options is not None:
         suite.solver_options = solver_options
+    if solver_class == om.NewtonSolver:
+        if 'solve_subsystems' not in suite.solver_options:
+            suite.solver_options['solve_subsystems'] = False
     if linear_solver_options is not None:
         suite.linear_solver_options = linear_solver_options
+
     suite.linear_solver_class = linear_solver_class
     suite.setup()
     return suite

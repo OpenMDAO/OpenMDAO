@@ -1,6 +1,4 @@
 """MetaModel provides basic meta modeling capability."""
-from six import iteritems
-from six.moves import range
 from copy import deepcopy
 from itertools import chain, product
 
@@ -9,7 +7,7 @@ import numpy as np
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.surrogate_models.surrogate_model import SurrogateModel
 from openmdao.utils.class_util import overrides_method
-from openmdao.utils.general_utils import warn_deprecation, simple_warning
+from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.name_maps import rel_key2abs_key
 
 
@@ -273,7 +271,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         # Support for user declaring fd partials in a child class and assigning new defaults.
         # We want a warning for all partials that were not explicitly declared.
         declared_partials = set([
-            key for key, dct in iteritems(self._subjacs_info) if 'method' in dct
+            key for key, dct in self._subjacs_info.items() if 'method' in dct
             and dct['method']])
 
         # Gather undeclared fd partials on surrogates that don't support analytic derivatives.
@@ -613,62 +611,3 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
     def _metadata(self, name):
         return self._var_rel2meta[name]
-
-    @property
-    def default_surrogate(self):
-        """
-        Get the default surrogate for this MetaModel.
-        """
-        warn_deprecation("The 'default_surrogate' attribute provides backwards compatibility "
-                         "with earlier version of OpenMDAO; use options['default_surrogate'] "
-                         "instead.")
-        return self.options['default_surrogate']
-
-    @default_surrogate.setter
-    def default_surrogate(self, value):
-        warn_deprecation("The 'default_surrogate' attribute provides backwards compatibility "
-                         "with earlier version of OpenMDAO; use options['default_surrogate'] "
-                         "instead.")
-        self.options['default_surrogate'] = value
-
-
-class MetaModel(MetaModelUnStructuredComp):
-    """
-    Deprecated.
-    """
-
-    def __init__(self, *args, **kwargs):
-        """
-        Capture Initialize to throw warning.
-
-        Parameters
-        ----------
-        *args : list
-            Deprecated arguments.
-        **kwargs : dict
-            Deprecated arguments.
-        """
-        warn_deprecation("'MetaModel' has been deprecated. Use "
-                         "'MetaModelUnStructuredComp' instead.")
-        super(MetaModel, self).__init__(*args, **kwargs)
-
-
-class MetaModelUnStructured(MetaModelUnStructuredComp):
-    """
-    Deprecated.
-    """
-
-    def __init__(self, *args, **kwargs):
-        """
-        Capture Initialize to throw warning.
-
-        Parameters
-        ----------
-        *args : list
-            Deprecated arguments.
-        **kwargs : dict
-            Deprecated arguments.
-        """
-        warn_deprecation("'MetaModelUnStructured' has been deprecated. Use "
-                         "'MetaModelUnStructuredComp' instead.")
-        super(MetaModelUnStructured, self).__init__(*args, **kwargs)

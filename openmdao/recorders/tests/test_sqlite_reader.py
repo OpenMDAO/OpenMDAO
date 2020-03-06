@@ -1,5 +1,4 @@
 """ Unit tests for the SqliteCaseReader. """
-from __future__ import print_function
 
 import errno
 import os
@@ -10,7 +9,7 @@ from tempfile import mkdtemp, mkstemp
 from collections import OrderedDict
 
 import numpy as np
-from six import iteritems, assertRaisesRegex, StringIO
+from io import StringIO
 
 
 import openmdao.api as om
@@ -131,10 +130,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(case.abs_err, None)
         self.assertEqual(case.rel_err, None)
 
-        msg = "'iteration_coordinate' has been deprecated. Use 'name' instead."
-        with assert_warning(DeprecationWarning, msg):
-            case.iteration_coordinate
-
     def test_invalid_source(self):
         """ Tests that the reader returns params correctly. """
         prob = SellarProblem(SellarDerivativesGrouped)
@@ -161,20 +156,20 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(sorted(source_vars['inputs']), [])
         self.assertEqual(sorted(source_vars['outputs']), [])
 
-        with assertRaisesRegex(self, RuntimeError, "No cases recorded for problem"):
+        with self.assertRaisesRegex(RuntimeError, "No cases recorded for problem"):
             cr.list_source_vars('problem')
 
-        with assertRaisesRegex(self, RuntimeError, "Source not found: root"):
+        with self.assertRaisesRegex(RuntimeError, "Source not found: root"):
             cr.list_source_vars('root')
 
-        with assertRaisesRegex(self, RuntimeError, "Source not found: root.nonlinear_solver"):
+        with self.assertRaisesRegex(RuntimeError, "Source not found: root.nonlinear_solver"):
             cr.list_source_vars('root.nonlinear_solver')
 
         # check list cases
-        with assertRaisesRegex(self, RuntimeError, "Source not found: foo"):
+        with self.assertRaisesRegex(RuntimeError, "Source not found: foo"):
             cr.list_cases('foo')
 
-        with assertRaisesRegex(self, TypeError, "Source parameter must be a string, 999 is type int"):
+        with self.assertRaisesRegex(TypeError, "Source parameter must be a string, 999 is type int"):
             cr.list_cases(999)
 
     def test_reading_driver_cases(self):
@@ -1707,7 +1702,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.setup()
 
         error_msg = "Input variable, '[^']+', recorded in the case is not found in the model"
-        with assertRaisesRegex(self, KeyError, error_msg):
+        with self.assertRaisesRegex(KeyError, error_msg):
             prob.load_case(case)
 
     def test_subsystem_load_system_cases(self):
@@ -2589,7 +2584,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         for i, c in enumerate(cr.list_cases()):
             case = cr.get_case(c)
 
-
             coord = case.name
             self.assertEqual(coord, expected[i])
 
@@ -3408,12 +3402,12 @@ def _assert_model_matches_case(case, system):
     """
     case_inputs = case.inputs
     model_inputs = system._inputs
-    for name, model_input in iteritems(model_inputs._views):
+    for name, model_input in model_inputs._views.items():
         np.testing.assert_almost_equal(case_inputs[name], model_input)
 
     case_outputs = case.outputs
     model_outputs = system._outputs
-    for name, model_output in iteritems(model_outputs._views):
+    for name, model_output in model_outputs._views.items():
         np.testing.assert_almost_equal(case_outputs[name], model_output)
 
 

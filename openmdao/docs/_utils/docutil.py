@@ -1,7 +1,6 @@
 """
 A collection of functions for modifying source code that is embeded into the Sphinx documentation.
 """
-from __future__ import print_function
 
 import sys
 import os
@@ -19,8 +18,7 @@ from docutils import nodes
 
 from collections import namedtuple
 
-from six import StringIO
-from six.moves import range, zip, cStringIO as cStringIO
+from io import StringIO
 
 from sphinx.errors import SphinxError
 from sphinx.writers.html import HTMLTranslator
@@ -791,7 +789,7 @@ def run_code(code_to_run, path, module=None, cls=None, shows_plot=False, imports
             # capture all output
             stdout = sys.stdout
             stderr = sys.stderr
-            strout = cStringIO()
+            strout = StringIO()
             sys.stdout = strout
             sys.stderr = strout
 

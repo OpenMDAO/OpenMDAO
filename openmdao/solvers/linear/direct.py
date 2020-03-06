@@ -1,11 +1,7 @@
 """LinearSolver that uses linalg.solve or LU factor/solve."""
 
-from __future__ import division, print_function
-
 import sys
 import warnings
-from six import reraise, PY2
-from six.moves import range
 
 import numpy as np
 import scipy.linalg
@@ -76,10 +72,7 @@ def format_singular_error(err, system, mtx):
     str
         New error string.
     """
-    if PY2:
-        err_msg = err.message
-    else:
-        err_msg = err.args[0]
+    err_msg = err.args[0]
 
     loc = int(err_msg.split('number ')[1].split(' is exactly')[0])
 
@@ -190,7 +183,6 @@ class DirectSolver(LinearSolver):
 
         # this solver does not iterate
         self.options.undeclare("maxiter")
-        self.options.undeclare("err_on_maxiter")    # Deprecated option.
         self.options.undeclare("err_on_non_converge")
 
         self.options.undeclare("atol")
@@ -287,7 +279,7 @@ class DirectSolver(LinearSolver):
                     if 'exactly singular' in str(err):
                         raise RuntimeError(format_singular_csc_error(system, matrix))
                     else:
-                        reraise(*sys.exc_info())
+                        raise err
 
             elif isinstance(matrix, np.ndarray):  # dense
                 # During LU decomposition, detect singularities and warn user.
@@ -379,7 +371,7 @@ class DirectSolver(LinearSolver):
                     if 'exactly singular' in str(err):
                         raise RuntimeError(format_singular_csc_error(system, matrix))
                     else:
-                        reraise(*sys.exc_info())
+                        raise err
 
                 # to prevent broadcasting errors later, make sure inv_jac is 2D
                 # scipy.sparse.linalg.inv returns a shape (1,) array if matrix is shape (1,1)

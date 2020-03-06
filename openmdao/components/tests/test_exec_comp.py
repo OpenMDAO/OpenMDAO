@@ -1,9 +1,6 @@
-from __future__ import print_function, division, absolute_import
-
 import itertools
 import unittest
 import math
-from six import iteritems
 
 import numpy as np
 from numpy.testing import assert_almost_equal
@@ -910,7 +907,9 @@ class TestExecComp(unittest.TestCase):
         model = p.model
         model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(5)))
 
-        model.add_subsystem('comp', om.ExecComp('y=3.0*x + 2.5', has_diag_partials=True, x=np.ones(5), y=np.ones(5)))
+        model.add_subsystem('comp', om.ExecComp('y=3.0*x + 2.5',
+                                                has_diag_partials=True,
+                                                x=np.ones(5), y=np.ones(5)))
         model.connect('indep.x', 'comp.x')
 
         p.setup()
@@ -1076,7 +1075,7 @@ class TestExecCompParameterized(unittest.TestCase):
 
         if len(test_data['args']) > 1:
             ivc = model.add_subsystem(name='ivc', subsys=om.IndepVarComp())
-            for arg_name, arg_value in iteritems(test_data['args']):
+            for arg_name, arg_value in test_data['args'].items():
                 if arg_name == 'f':
                     continue
                 ivc.add_output(name=arg_name, val=arg_value['value'])
@@ -1121,7 +1120,7 @@ class TestExecCompParameterized(unittest.TestCase):
 
         if len(test_data['args']) > 1:
             ivc = model.add_subsystem(name='ivc', subsys=om.IndepVarComp())
-            for arg_name, arg_value in iteritems(test_data['args']):
+            for arg_name, arg_value in test_data['args'].items():
                 if arg_name == 'f':
                     continue
                 ivc.add_output(name=arg_name, val=arg_value['value'])

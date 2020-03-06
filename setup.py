@@ -10,9 +10,6 @@ __version__ = re.findall(
     open('openmdao/__init__.py').read(),
 )[0]
 
-# Pyppeteer GUI testing only works with Python 3.6+
-gui_test_deps = ['websockets>6', 'pyppeteer_fork']
-
 optional_dependencies = {
     'docs': [
         'matplotlib',
@@ -30,8 +27,10 @@ optional_dependencies = {
         'numpydoc>=0.9.1',
         'pycodestyle>=2.4.0',
         'pydocstyle==2.0.0',
-        'testflo>=1.3.6' if sys.version_info >= (3, 5) else 'testflo==1.3.6'
-    ] + (gui_test_deps if sys.version_info > (3, 5) else [])
+        'testflo>=1.3.6'
+        'websockets>6',
+        'pyppeteer_fork'
+    ]
 }
 
 # Add an optional dependency that concatenates all others
@@ -44,14 +43,14 @@ optional_dependencies['all'] = sorted([
 setup(
     name='openmdao',
     version=__version__,
-    description="OpenMDAO v2 framework infrastructure",
+    description="OpenMDAO framework infrastructure",
     long_description="""OpenMDAO is an open-source high-performance computing platform
     for systems analysis and multidisciplinary optimization, written in Python. It
     enables you to decompose your models, making them easier to build and maintain,
     while still solving them in a tightly coupled manner with efficient parallel numerical methods.
     """,
     classifiers=[
-        'Development Status :: 4 - Beta',
+        'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Science/Research',
         'License :: OSI Approved :: Apache Software License',
         'Natural Language :: English',
@@ -60,8 +59,9 @@ setup(
         'Operating System :: Microsoft :: Windows',
         'Topic :: Scientific/Engineering',
         'Programming Language :: Python',
-        'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: Implementation :: CPython',
     ],
     keywords='optimization multidisciplinary multi-disciplinary analysis',
@@ -142,6 +142,7 @@ setup(
         ],
         'openmdao': ['*/tests/*.py', '*/*/tests/*.py', '*/*/*/tests/*.py']
     },
+    python_requires=">=3.6",
     install_requires=[
         'urllib3<1.25',  # this is to prevent urllib version conflict between
                          # requests, numpydoc, and pyppeteer
@@ -150,7 +151,6 @@ setup(
         'pyDOE2',
         'pyparsing',
         'scipy',
-        'six',
         'requests'
     ],
     entry_points={
@@ -168,9 +168,7 @@ setup(
         ],
         'openmdao_component': [
             'addsubtractcomp=openmdao.components.add_subtract_comp:AddSubtractComp',
-            'akimasplinecomp=openmdao.components.akima_spline_comp:AkimaSplineComp',
             'balancecomp=openmdao.components.balance_comp:BalanceComp',
-            'bsplinescomp=openmdao.components.bsplines_comp:BsplinesComp',
             'crossproductcomp=openmdao.components.cross_product_comp:CrossProductComp',
             'demuxcomp=openmdao.components.demux_comp:DemuxComp',
             'dotproductcomp=openmdao.components.dot_product_comp:DotProductComp',
