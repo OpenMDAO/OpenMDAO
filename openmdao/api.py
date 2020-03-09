@@ -70,7 +70,6 @@ except ImportError:
 # Developer Tools
 from openmdao.visualization.n2_viewer.n2_viewer import n2
 from openmdao.visualization.connection_viewer.viewconns import view_connections
-from openmdao.visualization.xdsm_viewer.xdsm_writer import write_xdsm
 
 # Drivers
 try:
