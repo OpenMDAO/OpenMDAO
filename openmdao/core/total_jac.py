@@ -77,7 +77,7 @@ class _TotalJacInfo(object):
         Contains all data necessary to simultaneously solve for groups of total derivatives.
     """
 
-    def __init__(self, problem, of, wrt, global_names, return_format, approx=False,
+    def __init__(self, problem, of, wrt, use_abs_names, return_format, approx=False,
                  debug_print=False, driver_scaling=True):
         """
         Initialize object.
@@ -90,8 +90,8 @@ class _TotalJacInfo(object):
             Response names.
         wrt : iter of str
             Design variable names.
-        global_names : bool
-            If True, names in of and wrt are global names.
+        use_abs_names : bool
+            If True, names in of and wrt are absolute names.
         return_format : str
             Indicates the desired return format of the total jacobian. Can have value of
             'array', 'dict', or 'flat_dict'.
@@ -142,7 +142,7 @@ class _TotalJacInfo(object):
                                    "for compute_totals.")
         else:
             prom_wrt = wrt
-            if not global_names:
+            if not use_abs_names:
                 wrt = [prom2abs[name][0] for name in prom_wrt]
 
         if of is None:
@@ -153,7 +153,7 @@ class _TotalJacInfo(object):
                                    "for compute_totals.")
         else:
             prom_of = of
-            if not global_names:
+            if not use_abs_names:
                 of = [prom2abs[name][0] for name in prom_of]
 
         # raise an exception if we depend on any discrete outputs
