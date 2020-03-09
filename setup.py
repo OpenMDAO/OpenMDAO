@@ -6,7 +6,7 @@ from subprocess import check_call
 import distutils.spawn
 
 __version__ = re.findall(
-    r"""__version__ = ["']+([0-9\.]*)["']+""",
+    r"""__version__ = ["']+([0-9\.\-dev]*)["']+""",
     open('openmdao/__init__.py').read(),
 )[0]
 
@@ -68,7 +68,6 @@ setup(
     author='OpenMDAO Team',
     author_email='openmdao@openmdao.org',
     url='http://openmdao.org',
-    download_url='http://github.com/OpenMDAO/OpenMDAO/tarball/'+__version__,
     license='Apache License, Version 2.0',
     packages=[
         'openmdao',
