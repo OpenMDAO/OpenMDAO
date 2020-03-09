@@ -1302,7 +1302,7 @@ class Problem(object):
         return data['']
 
     def compute_totals(self, of=None, wrt=None, return_format='flat_dict', debug_print=False,
-                       driver_scaling=False):
+                       driver_scaling=False, global_names=False):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -1324,6 +1324,8 @@ class Problem(object):
             When True, return derivatives that are scaled according to either the adder and scaler
             or the ref and ref0 values that were specified when add_design_var, add_objective, and
             add_constraint were called on the model. Default is False, which is unscaled.
+        global_names : bool
+            Set to True when passing in absolute names to skip some translation steps.
 
         Returns
         -------
@@ -1334,11 +1336,11 @@ class Problem(object):
             self.final_setup()
 
         if self.model._owns_approx_jac:
-            total_info = _TotalJacInfo(self, of, wrt, False, return_format,
+            total_info = _TotalJacInfo(self, of, wrt, global_names, return_format,
                                        approx=True, driver_scaling=driver_scaling)
             return total_info.compute_totals_approx(initialize=True)
         else:
-            total_info = _TotalJacInfo(self, of, wrt, False, return_format,
+            total_info = _TotalJacInfo(self, of, wrt, global_names, return_format,
                                        debug_print=debug_print, driver_scaling=driver_scaling)
             return total_info.compute_totals()
 

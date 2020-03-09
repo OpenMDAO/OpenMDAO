@@ -22,7 +22,7 @@ except ImportError:
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.utils.general_utils import set_pyoptsparse_opt
-from openmdao.utils.coloring import Coloring, _compute_coloring, array_viz
+from openmdao.utils.coloring import Coloring, _compute_coloring, array_viz, compute_total_coloring
 from openmdao.utils.mpi import MPI
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.test_suite.tot_jac_builder import TotJacBuilder
@@ -94,7 +94,7 @@ class DynPartialsComp(om.ExplicitComponent):
 
 def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True,
             recorder=None, has_lin_constraint=True, has_diag_partials=True, partial_coloring=False,
-            **options):
+            use_vois=True, **options):
 
     p = om.Problem(model=CounterGroup())
 
@@ -158,23 +158,24 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True
     p.driver.options['debug_print'] = ['totals']
     p.driver.options.update(options)
 
-    p.model.add_design_var('x')
-    p.model.add_design_var('y')
-    p.model.add_design_var('r', lower=.5, upper=10)
+    if use_vois:
+        p.model.add_design_var('x')
+        p.model.add_design_var('y')
+        p.model.add_design_var('r', lower=.5, upper=10)
 
-    # nonlinear constraints
-    p.model.add_constraint('r_con.g', equals=0)
+        # nonlinear constraints
+        p.model.add_constraint('r_con.g', equals=0)
 
-    p.model.add_constraint('theta_con.g', lower=-1e-5, upper=1e-5, indices=EVEN_IND)
-    p.model.add_constraint('delta_theta_con.g', lower=-1e-5, upper=1e-5)
+        p.model.add_constraint('theta_con.g', lower=-1e-5, upper=1e-5, indices=EVEN_IND)
+        p.model.add_constraint('delta_theta_con.g', lower=-1e-5, upper=1e-5)
 
-    # this constrains x[0] to be 1 (see definition of l_conx)
-    p.model.add_constraint('l_conx.g', equals=0, linear=False, indices=[0,])
+        # this constrains x[0] to be 1 (see definition of l_conx)
+        p.model.add_constraint('l_conx.g', equals=0, linear=False, indices=[0,])
 
-    # linear constraint (if has_lin_constraint is set)
-    p.model.add_constraint('y', equals=0, indices=[0,], linear=has_lin_constraint)
+        # linear constraint (if has_lin_constraint is set)
+        p.model.add_constraint('y', equals=0, indices=[0,], linear=has_lin_constraint)
 
-    p.model.add_objective('circle.area', ref=-1)
+        p.model.add_objective('circle.area', ref=-1)
 
     # # setup coloring
     if color_info is not None:
@@ -184,7 +185,10 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True
         p.driver.add_recorder(recorder)
 
     p.setup(mode=mode, derivatives=derivs)
-    p.run_driver()
+    if use_vois:
+        p.run_driver()
+    else:
+        p.run_model()
 
     return p
 
@@ -481,6 +485,25 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         # - where N is 21 for the uncolored case and 21 * 4 for the dynamic colored case.
         self.assertEqual((p.model._solve_count - 21) / 21,
                          (p_color.model._solve_count - 21 * 4) / 5)
+
+    def test_problem_total_coloring_auto(self):
+
+        p = run_opt(om.ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False, use_vois=False)
+        coloring = compute_total_coloring(p,
+                                          of=['r_con.g', 'theta_con.g', 'delta_theta_con.g',
+                                              'l_conx.g', 'y', 'circle.area'],
+                                          wrt=['x', 'y', 'r'])
+        self.assertEqual(coloring.total_solves(), 5)
+
+    def test_problem_total_coloring_auto_mixed_vois(self):
+
+        p = run_opt(om.ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False,)
+        coloring = compute_total_coloring(p,
+                                          of=['r_con.g', 'theta_con.g', 'delta_theta_con.g',
+                                              'l_conx.g', 'y', 'circle.area'],
+                                          wrt=['x', 'y', 'r'])
+        self.assertEqual(coloring.total_solves(), 5)
+        coloring.display_txt()  # leave this in because at one point it caused an exception
 
     def test_simul_coloring_example(self):
 
