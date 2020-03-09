@@ -39,6 +39,13 @@ optlist = ['ALPSO', 'CONMIN', 'FSQP', 'IPOPT', 'NLPQLP',
 # All optimizers that require an initial run
 run_required = ['NSGA2', 'ALPSO']
 
+DEFAULT_OPT_SETTINGS = {}
+DEFAULT_OPT_SETTINGS['IPOPT'] = {
+    'hessian_approximation': 'limited-memory',
+    'nlp_scaling_method': 'user-scaling',
+    'linear_solver': 'mumps'
+}
+
 CITATIONS = """@article{Hwang_maud_2018
  author = {Hwang, John T. and Martins, Joaquim R.R.A.},
  title = "{A Computational Architecture for Coupling Heterogeneous
@@ -362,6 +369,12 @@ class pyOptSparseDriver(Driver):
             # but raise with the original traceback.
             msg = "Optimizer %s is not available in this installation." % optimizer
             raise ImportError(msg)
+
+        # Process any default optimizer-specific settings.
+        if optimizer in DEFAULT_OPT_SETTINGS:
+            for name, value in DEFAULT_OPT_SETTINGS[optimizer].items():
+                if name not in self.opt_settings:
+                    self.opt_settings[name] = value
 
         # Set optimization options
         for option, value in self.opt_settings.items():
