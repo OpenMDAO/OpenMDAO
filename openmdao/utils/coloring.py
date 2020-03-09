@@ -1687,18 +1687,18 @@ def _compute_coloring(J, mode):
     """
     start_time = time.time()
     nrows, ncols = J.shape
-    best_nocolor = min(nrows, ncols)  # lowest number of solves possible if we don't use coloring
 
-    fallback = False
     if mode == 'auto':  # use bidirectional coloring
         coloring = MNCO_bidir(J)
-        if coloring.total_solves() < best_nocolor:
-            return coloring
-        elif ncols <= nrows:
-            mode = 'fwd'
-        else:
-            mode = 'rev'
-        fallback = True
+        fwdcoloring = _compute_coloring(J, 'fwd')
+        if coloring.total_solves() >= fwdcoloring.total_solves():
+            coloring = fwdcoloring
+            coloring._meta['fallback'] = True
+        revcoloring = _compute_coloring(J, 'rev')
+        if coloring.total_solves() > revcoloring.total_solves():
+            coloring = revcoloring
+            coloring._meta['fallback'] = True
+        return coloring
 
     rev = mode == 'rev'
 
@@ -1721,8 +1721,6 @@ def _compute_coloring(J, mode):
         coloring._fwd = (col_groups, col2rows)
 
     coloring._meta['coloring_time'] = time.time() - start_time
-    if fallback:
-        coloring._meta['fallback'] = True
 
     return coloring
 
@@ -1850,7 +1848,6 @@ def dynamic_total_coloring(driver, run_model=True, fname=None):
     driver._total_jac = None
 
     problem.driver._coloring_info['coloring'] = None
-    problem.driver._res_jacs = {}
 
     num_full_jacs = driver._coloring_info.get('num_full_jacs',
                                               _DEF_COMP_SPARSITY_ARGS['num_full_jacs'])
@@ -1869,7 +1866,7 @@ def dynamic_total_coloring(driver, run_model=True, fname=None):
 
         driver._coloring_info['coloring'] = coloring
         driver._setup_simul_coloring()
-        driver._setup_tot_jac_sparsity()
+        driver._setup_tot_jac_sparsity(coloring)
 
     return coloring
 
@@ -2214,3 +2211,14 @@ def _initialize_model_approx(model, driver, of=None, wrt=None):
             key: val['indices'] for key, val in driver._designvars.items()
             if val['indices'] is not None
         }
+
+
+def _get_coloring_meta(coloring=None):
+    if coloring is None:
+        dct = _DEF_COMP_SPARSITY_ARGS.copy()
+        dct['coloring'] = None
+        dct['dynamic'] = False
+        dct['static'] = None
+        return dct
+
+    return coloring._meta.copy()

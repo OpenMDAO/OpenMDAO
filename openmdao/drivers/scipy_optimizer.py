@@ -421,7 +421,7 @@ class ScipyOptimizeDriver(Driver):
                 if info['coloring'] is not None:
                     pct = info['coloring']._solves_info()[-1]
                     if info['min_improve_pct'] > pct:
-                        info['coloring'] = info['static'] = info['dynamic'] = None
+                        info['coloring'] = info['static'] = None
                         simple_warning("%s: Coloring was deactivated.  Improvement of %.1f%% was "
                                        "less than min allowed (%.1f%%)." %
                                        (self.msginfo, pct, info['min_improve_pct']))

@@ -1109,7 +1109,7 @@ class System(object):
             if coloring is None:
                 print("\nClass coloring for class '{}' wasn't good enough, "
                       "so skipping for '{}'".format(type(self).__name__, self.pathname))
-                info['static'] = info['dynamic'] = None
+                info['static'] = None
             else:
                 print("\n{} using class coloring for class '{}'".format(self.pathname,
                                                                         type(self).__name__))
@@ -1187,7 +1187,7 @@ class System(object):
         # if the improvement wasn't large enough, don't use coloring
         pct = coloring._solves_info()[-1]
         if info['min_improve_pct'] > pct:
-            info['coloring'] = info['static'] = info['dynamic'] = None
+            info['coloring'] = info['static'] = None
             simple_warning("%s: Coloring was deactivated.  Improvement of %.1f%% was less than min "
                            "allowed (%.1f%%)." % (self.msginfo, pct, info['min_improve_pct']))
             if not info['per_instance']:

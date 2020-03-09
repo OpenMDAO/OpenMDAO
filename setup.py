@@ -105,7 +105,6 @@ setup(
         'openmdao.visualization',
         'openmdao.visualization.connection_viewer',
         'openmdao.visualization.n2_viewer',
-        'openmdao.visualization.xdsm_viewer',
         'openmdao.visualization.meta_model_viewer',
     ],
     package_data={
@@ -124,14 +123,6 @@ setup(
             '*.html',
             'libs/*.js',
             'style/*.css'
-        ],
-        'openmdao.visualization.xdsm_viewer': [
-            'XDSMjs/*',
-            'XDSMjs/src/*.js',
-            'XDSMjs/build/*.js',
-            'XDSMjs/test/*.js',
-            'XDSMjs/test/*.html',
-            'XDSMjs/examples/*.json',
         ],
         'openmdao.visualization.meta_model_viewer': [
             'tests/known_data_point_files/*.csv',
