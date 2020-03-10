@@ -6,8 +6,6 @@ import os
 from collections import OrderedDict
 from itertools import chain
 import networkx as nx
-from six import iteritems, itervalues
-
 
 from openmdao.components.exec_comp import ExecComp
 from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
