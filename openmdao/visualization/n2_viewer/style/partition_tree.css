@@ -15,6 +15,10 @@
     -moz-osx-font-smoothing: grayscale;
 }
 
+.icon-collapse-depth:before {
+    content: "\e905";
+}
+
 .icon-hide-connections:before {
     content: "\e900";
 }
@@ -354,6 +358,25 @@ body {
     margin-left: 5px;
     width: 20px;
     font-weight: 600;
+}
+
+#model-depth-expandable {
+    background-color: #42926b;
+    display: flex;
+    align-items: center;
+}
+
+#model-depth-expandable p {
+    color: white;
+    margin-left: 5px;
+    width: 20px;
+    font-weight: 600;
+}
+
+#depth-slider {
+    -webkit-transform: rotate(-180deg);
+    -moz-transform: rotate(-180deg);
+    transform: rotate(-180deg);
 }
 
 /* Icon Styling */
