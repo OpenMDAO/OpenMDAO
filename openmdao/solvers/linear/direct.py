@@ -116,6 +116,11 @@ def format_singular_csc_error(system, matrix):
     if zero_cols.size <= zero_rows.size:
 
         if zero_rows.size == 0:
+            u, s, v = np.linalg.svd(dense)
+            idx1 = np.where(np.abs(u[:, -1]) > 1e-15)[0]
+            idx2 = np.where(np.abs(v[-1, :]) > 1e-15)[0]
+            idx = set(idx1).intersection(idx2)
+
             # Underdetermined: duplicate columns or rows.
             msg = "Identical rows or columns found in jacobian in '{}'. Problem is " + \
                   "underdetermined."
