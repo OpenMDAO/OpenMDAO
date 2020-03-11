@@ -248,23 +248,26 @@ class TestOptionsDict(unittest.TestCase):
         expected_msg = "\"Option 'test' cannot be found\""
         self.assertEqual(expected_msg, str(context.exception))
 
-    def test_deprecated(self):
-        msg = 'Option "test" is deprecated.'
-        self.dict.declare('test', deprecation=msg)
+    def test_deprecated_option(self):
+        msg = 'Option "test1" is deprecated.'
+        self.dict.declare('test1', deprecation=msg)
 
-        # First setting option
+        # test double set
         with assert_warning(DeprecationWarning, msg):
-            self.dict['test'] = None
-        # Should only generate warning first time through
+            self.dict['test1'] = None
+        # Should only generate warning first time
         with assert_no_warning(DeprecationWarning, msg):
-            self.dict['test'] = None
+            self.dict['test1'] = None
 
-        # Second getting option
+        # Also test set and then get
+        msg = 'Option "test2" is deprecated.'
+        self.dict.declare('test2', deprecation=msg)
+
         with assert_warning(DeprecationWarning, msg):
-            option = self.dict['test']
-        # Should only generate warning first time through
+            self.dict['test2'] = None
+        # Should only generate warning first time
         with assert_no_warning(DeprecationWarning, msg):
-            option = self.dict['test']
+            option = self.dict['test2']
 
 if __name__ == "__main__":
     unittest.main()
