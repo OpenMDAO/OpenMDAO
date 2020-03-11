@@ -197,8 +197,6 @@ def _get_viewer_data(data_source):
     if isinstance(data_source, Problem):
         root_group = data_source.model
 
-        # print(root_group.list_outputs())
-
         if not isinstance(root_group, Group):
             simple_warning(
                 "The model is not a Group, viewer data is unavailable.")

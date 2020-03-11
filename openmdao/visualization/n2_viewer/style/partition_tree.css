@@ -1,6 +1,6 @@
 /******************* Document styling *******************/
-[class^="icon-"],
-[class*=" icon-"] {
+[class^='icon-'],
+[class*=' icon-'] {
     /* use !important to prevent issues with browser extensions that change fonts */
     font-family: 'icomoon' !important;
     speak: none;
@@ -13,6 +13,55 @@
     /* Better Font Rendering =========== */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+}
+
+
+.icon-question-circle:before {
+    content: "\e90d";
+}
+
+.icon-bezier-curve:before {
+    content: "\e908";
+}
+
+.icon-caret-right:before {
+    content: "\e909";
+}
+
+.icon-chevron-left:before {
+    content: "\e90a";
+}
+
+.icon-info-circle:before {
+    content: "\e90b";
+}
+
+.icon-info-circle {
+    color: #42926B !important;
+}
+
+.icon-key:before {
+    content: "\e90c";
+}
+
+.icon-save:before {
+    content: "\e90e";
+}
+
+.icon-forward:before {
+    content: '\e906';
+}
+
+.icon-forward {
+    font-size: 13px !important;
+}
+
+.icon-backward:before {
+    content: '\e907';
+}
+
+.icon-backward {
+    font-size: 13px !important;
 }
 
 .icon-collapse-depth:before {
@@ -67,30 +116,9 @@
     content: "\e98c";
 }
 
-.icon-key:before {
-    content: "\e98d";
-}
-
-.icon-question:before {
-    content: "\ea09";
-}
-
-.icon-info:before {
-    content: "\ea0c";
-}
-
-.icon-backward2:before {
-    content: "\ea1f";
-}
-
-.icon-forward3:before {
-    content: "\ea20";
-}
-
 .icon-text-height:before {
     content: "\ea5f";
 }
-
 
 input:focus,
 select:focus,
@@ -391,7 +419,7 @@ body {
     padding: 0px 8px;
 }
 
-.fa-search {
+.icon-search {
     color: #78d3a6;
     font-size: 24px;
 }
@@ -433,7 +461,7 @@ body {
 
 #info-button {
     font-size: 30px !important;
-    color: #98DABA;
+    color: #98daba;
     margin-top: 15px;
     opacity: 1;
     transition: opacity 0.5s, color 0.5s;
@@ -651,37 +679,35 @@ body {
 }
 
 .scalar {
-    border: 2px solid #CECECE;
+    border: 2px solid #cecece;
 }
 
 .scalar .symbol-inner {
     width: 14px;
     height: 14px;
     border-radius: 50%;
-    background-color: #9FC4C6;
+    background-color: #9fc4c6;
 }
 
 .vector {
-    border: 2px solid #CECECE;
+    border: 2px solid #cecece;
 }
 
 .vector .symbol-inner {
     width: 12px;
     height: 12px;
-    background-color: #9FC4C6;
+    background-color: #9fc4c6;
 }
 
 .collapsed {
-    border: 2px solid #9FC4C6;
+    border: 2px solid #9fc4c6;
 }
 
 .collapsed .symbol-inner {
     width: 12px;
     height: 12px;
-    background-color: #9FC4C6;
+    background-color: #9fc4c6;
 }
-
-
 
 /* Linear Solvers Group */
 .linear-solvers-container {
@@ -785,12 +811,12 @@ body {
     background-color: white;
     border-top-left-radius: 20px;
     border-bottom-left-radius: 20px;
-    border-top: 1px solid #42926B;
-    border-left: 1px solid #42926B;
-    border-bottom: 1px solid #42926B;
+    border-top: 1px solid #42926b;
+    border-left: 1px solid #42926b;
+    border-bottom: 1px solid #42926b;
     width: 200px;
     z-index: 10;
-    transition: opacity .25s;
+    transition: opacity 0.25s;
 }
 
 .hide-node-data {
@@ -798,7 +824,7 @@ body {
 }
 
 .info-header {
-    background-color: #42926B;
+    background-color: #42926b;
     padding: 6px 12px;
 }
 
@@ -919,20 +945,12 @@ body {
     content: '\e805';
 }
 
-.icon-text-height:before {
-    content: '\e806';
-}
-
 .icon-resize-vertical:before {
     content: '\e807';
 }
 
 .icon-floppy:before {
     content: '\e808';
-}
-
-.icon-search:before {
-    content: '\e809';
 }
 
 .icon-minus:before {

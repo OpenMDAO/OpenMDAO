@@ -241,11 +241,11 @@ class N2Legend {
     }
 
 
-    // /**
-    //  * If legend is shown, hide it; if it's hidden, show it.
-    //  * @param {Boolean} showLinearSolverNames Determines solver name type displayed.
-    //  * @param {Object} solverStyles Solver names, types, and styles including color.
-    //  */
+    /**
+     * If legend is shown, hide it; if it's hidden, show it.
+     * @param {Boolean} showLinearSolverNames Determines solver name type displayed.
+     * @param {Object} solverStyles Solver names, types, and styles including color.
+     */
     toggle(showLinearSolverNames, solverStyles) {
         if (this.shown) {
             this.hide();
