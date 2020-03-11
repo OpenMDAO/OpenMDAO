@@ -288,7 +288,7 @@ class OptionsDictionary(object):
 
     def declare(self, name, default=_undefined, values=None, types=None, desc='',
                 upper=None, lower=None, check_valid=None, allow_none=False, recordable=True,
-                deprecation=True):
+                deprecation=None):
         r"""
         Declare an option.
 
