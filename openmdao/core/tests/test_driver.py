@@ -10,7 +10,7 @@ import numpy as np
 
 import openmdao
 from openmdao.api import Problem, IndepVarComp, Group, ExecComp, ScipyOptimizeDriver
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.utils.general_utils import printoptions
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp, NonSquareArrayComp
@@ -144,8 +144,9 @@ class TestDriver(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        derivs = prob.driver._compute_totals(of=['comp.y1'], wrt=['px.x'],
-                                             return_format='dict')
+        with assert_warning(DeprecationWarning, "'global_names' is deprecated in calls to _compute_totals. Use 'use_abs_names' instead."):
+            derivs = prob.driver._compute_totals(of=['comp.y1'], wrt=['px.x'], global_names=True,
+                                                 return_format='dict')
 
         oscale = np.array([1.0/(7.0-5.2), 1.0/(11.0-6.3)])
         iscale = np.array([2.0-0.5, 3.0-1.5])

@@ -309,10 +309,10 @@ class TestPETScKrylov(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        J = prob.driver._compute_totals(of=['y'], wrt=['x'], global_names=False,
+        J = prob.driver._compute_totals(of=['y'], wrt=['x'], use_abs_names=False,
                                         return_format='flat_dict')
         icount1 = prob.model.linear_solver._iter_count
-        J = prob.driver._compute_totals(of=['y'], wrt=['x'], global_names=False,
+        J = prob.driver._compute_totals(of=['y'], wrt=['x'], use_abs_names=False,
                                         return_format='flat_dict')
         icount2 = prob.model.linear_solver._iter_count
 
@@ -337,10 +337,10 @@ class TestPETScKrylov(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        J = prob.driver._compute_totals(of=['y'], wrt=['x'], global_names=False,
+        J = prob.driver._compute_totals(of=['y'], wrt=['x'], use_abs_names=False,
                                         return_format='flat_dict')
         icount1 = prob.model.linear_solver._iter_count
-        J = prob.driver._compute_totals(of=['y'], wrt=['x'], global_names=False,
+        J = prob.driver._compute_totals(of=['y'], wrt=['x'], use_abs_names=False,
                                         return_format='flat_dict')
         icount2 = prob.model.linear_solver._iter_count
 
