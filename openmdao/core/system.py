@@ -342,9 +342,15 @@ class System(object):
         self.recording_options.declare('record_residuals', types=bool, default=True,
                                        desc='Set to True to record residuals at the system level')
         self.recording_options.declare('record_metadata', types=bool,
-                                       desc='Record metadata for this system', default=True)
+                                       desc='Record metadata for this system', default=True,
+                                       deprecation="The recording option 'record_metadata' \
+                                       on System is \
+                                       deprecated. Recording of metadata will always be done")
         self.recording_options.declare('record_model_metadata', types=bool,
                                        desc='Record metadata for all sub systems in the model',
+                                       deprecation="The recording option 'record_model_metadata' \
+                                       on System is deprecated. Recording of metadata will always \
+                                       be done",
                                        default=True)
         self.recording_options.declare('includes', types=list, default=['*'],
                                        desc='Patterns for variables to include in recording. \

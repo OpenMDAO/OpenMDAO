@@ -207,7 +207,7 @@ class DistributedRecorderTest(unittest.TestCase):
         prob.setup(mode='fwd')
 
         t0, t1 = run_driver(prob)
-        prob.record_iteration('final')
+        prob.record_state('final')
         t2 = time()
 
         prob.cleanup()

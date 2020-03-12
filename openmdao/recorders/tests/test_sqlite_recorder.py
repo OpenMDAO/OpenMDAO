@@ -24,7 +24,8 @@ from openmdao.recorders.tests.sqlite_recorder_test_utils import assertMetadataRe
     assertDriverDerivDataRecorded
 
 from openmdao.recorders.tests.recorder_test_utils import run_driver
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning
+
 from openmdao.utils.general_utils import determine_adder_scaler
 from openmdao.utils.testing_utils import use_tempdirs
 
@@ -460,21 +461,21 @@ class TestSqliteRecorder(unittest.TestCase):
         }
         assertViewerDataRecorded(self, expected_problem_metadata)
 
-    def test_system_records_no_metadata(self):
-        prob = om.Problem(model=SellarDerivatives())
-
-        recorder = om.SqliteRecorder("cases.sql")
-        prob.model.add_recorder(recorder)
-        prob.model.recording_options['record_model_metadata'] = False
-        prob.model.recording_options['record_metadata'] = False
-
-        prob.setup()
-        prob.set_solver_print(level=0)
-        prob.run_model()
-        prob.cleanup()
-
-        cr = om.CaseReader("cases.sql")
-        self.assertEqual(len(cr.system_metadata.keys()), 0)
+    # def test_system_records_no_metadata(self):
+    #     prob = om.Problem(model=SellarDerivatives())
+    #
+    #     recorder = om.SqliteRecorder("cases.sql")
+    #     prob.model.add_recorder(recorder)
+    #     prob.model.recording_options['record_model_metadata'] = False
+    #     prob.model.recording_options['record_metadata'] = False
+    #
+    #     prob.setup()
+    #     prob.set_solver_print(level=0)
+    #     prob.run_model()
+    #     prob.cleanup()
+    #
+    #     cr = om.CaseReader("cases.sql")
+    #     self.assertEqual(len(cr.system_metadata.keys()), 0)
 
     def test_system_record_model_metadata(self):
         # first check to see if recorded recursively, which is the default
@@ -1682,7 +1683,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        prob.record_iteration('final')
+        prob.record_state('final')
         prob.cleanup()
 
         cr = om.CaseReader("cases.sql")
@@ -1705,6 +1706,34 @@ class TestSqliteRecorder(unittest.TestCase):
         self.assertEqual(set(final_case.outputs.keys()),
                          {'con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z'})
 
+    def test_problem_record_iteration_deprecated(self):
+        prob = om.Problem(model=SellarDerivatives())
+
+        prob.add_recorder(om.SqliteRecorder("cases.sql"))
+
+        prob.setup()
+        prob.run_driver()
+
+        msg = "'Problem.record_iteration' has been deprecated. Use 'Problem.record_state' instead."
+
+        with assert_warning(DeprecationWarning, msg):
+            prob.record_iteration('final')
+        prob.cleanup()
+
+        cr = om.CaseReader("cases.sql")
+
+        # Just do some simple tests to make sure things were recorded
+        problem_cases = cr.list_cases('problem')
+        self.assertEqual(len(problem_cases), 1)
+
+        final_case = cr.get_case('final')
+
+        # by default we should get all outputs
+        self.assertEqual(set(final_case.outputs.keys()),
+                         {'con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z'})
+
+
+
     def test_problem_record_with_options(self):
         prob = om.Problem(model=SellarDerivatives())
 
@@ -1725,7 +1754,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        prob.record_iteration('final')
+        prob.record_state('final')
         prob.cleanup()
 
         cr = om.CaseReader("cases.sql")
@@ -1764,7 +1793,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        prob.record_iteration('final')
+        prob.record_state('final')
         prob.cleanup()
 
         cr = om.CaseReader("cases.sql")
@@ -2340,7 +2369,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         prob.setup()
         prob.run_driver()
-        prob.record_iteration('final')
+        prob.record_state('final')
         prob.cleanup()
 
         cr = om.CaseReader("cases.sql")
@@ -2394,7 +2423,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         prob.setup()
         prob.run_driver()
-        prob.record_iteration('final')
+        prob.record_state('final')
         prob.cleanup()
 
         cr = om.CaseReader("cases.sql")
@@ -2525,7 +2554,7 @@ class TestFeatureBasicRecording(unittest.TestCase):
         prob.run_driver()
 
         # record the final state of the problem
-        prob.record_iteration('final')
+        prob.record_state('final')
 
         # clean up and shut down
         prob.cleanup()

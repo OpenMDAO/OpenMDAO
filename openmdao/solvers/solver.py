@@ -187,6 +187,9 @@ class Solver(object):
         self.recording_options.declare('record_solver_residuals', types=bool, default=False,
                                        desc='Set to True to record residuals at the solver level')
         self.recording_options.declare('record_metadata', types=bool, desc='Record metadata',
+                                       deprecation="The recording option 'record_metadata' on \
+                                       Solver is \
+                                       deprecated. Recording of metadata will always be done",
                                        default=True)
         self.recording_options.declare('includes', types=list, default=['*'],
                                        desc="Patterns for variables to include in recording. \

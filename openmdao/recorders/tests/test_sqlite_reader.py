@@ -125,7 +125,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertTrue(isinstance(case.outputs, PromAbsDict))
         self.assertEqual(case.inputs, None)
         self.assertEqual(case.residuals, None)
-        self.assertEqual(case.jacobian, None)
+        self.assertEqual(case.derivatives, None)
         self.assertEqual(case.parent, None)
         self.assertEqual(case.abs_err, None)
         self.assertEqual(case.rel_err, None)
@@ -213,11 +213,11 @@ class TestSqliteCaseReader(unittest.TestCase):
                                        [1.97846296, -2.21388305e-13], decimal=2)
 
         deriv_case = cr.get_case('rank0:ScipyOptimize_SLSQP|4')
-        np.testing.assert_almost_equal(deriv_case.jacobian['obj', 'pz.z'],
+        np.testing.assert_almost_equal(deriv_case.derivatives['obj', 'pz.z'],
                                        [[3.8178954, 1.73971323]], decimal=2)
 
         # While thinking about derivatives, let's get them all.
-        derivs = deriv_case.jacobian
+        derivs = deriv_case.derivatives
 
         self.assertEqual(set(derivs.keys()), set([
             ('obj', 'z'), ('con2', 'z'), ('con1', 'x'),
@@ -1421,7 +1421,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         prob.run_driver()
 
-        prob.record_iteration('final')
+        prob.record_state('final')
         prob.cleanup()
 
         # expected input and output values after run_once
@@ -1961,8 +1961,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.model.nonlinear_solver.add_recorder(recorder)
 
         prob.run_driver()
-        prob.record_iteration('c_1')
-        prob.record_iteration('c_2')
+        prob.record_state('c_1')
+        prob.record_state('c_2')
         prob.cleanup()
 
         # without pre_load, we should get format_version and metadata but no cases
@@ -2037,8 +2037,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.model.nonlinear_solver.add_recorder(self.recorder)
 
         prob.run_driver()
-        prob.record_iteration('c_1')
-        prob.record_iteration('c_2')
+        prob.record_state('c_1')
+        prob.record_state('c_2')
         prob.cleanup()
 
         cr = om.CaseReader(self.filename, pre_load=False)
@@ -2318,7 +2318,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         fail = prob.run_driver()
 
-        prob.record_iteration('final')
+        prob.record_state('final')
         prob.cleanup()
 
         self.assertFalse(fail, 'Problem optimization failed.')
@@ -2988,7 +2988,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         cr = om.CaseReader('cases.sql')
 
         # Get derivatives associated with the last iteration.
-        derivs = cr.get_case(-1).jacobian
+        derivs = cr.get_case(-1).derivatives
 
         # check that derivatives have been recorded.
         self.assertEqual(set(derivs.keys()), set([
@@ -3323,7 +3323,7 @@ class TestPromAbsDict(unittest.TestCase):
         driver_case = cr.get_case(driver_cases[-1])
 
         dvs = driver_case.get_design_vars()
-        derivs = driver_case.jacobian
+        derivs = driver_case.derivatives
 
         # verify that map looks and acts like a regular dict
         self.assertTrue(isinstance(dvs, dict))

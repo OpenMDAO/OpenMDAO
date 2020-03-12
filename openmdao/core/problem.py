@@ -27,7 +27,8 @@ from openmdao.error_checking.check_config import _default_checks, _all_checks
 from openmdao.recorders.recording_iteration_stack import _RecIteration
 from openmdao.recorders.recording_manager import RecordingManager, record_viewer_data
 from openmdao.utils.record_util import create_local_meta
-from openmdao.utils.general_utils import ContainsAll, pad_name, simple_warning
+from openmdao.utils.general_utils import ContainsAll, pad_name, simple_warning, warn_deprecation
+
 from openmdao.utils.mpi import FakeComm
 from openmdao.utils.mpi import MPI
 from openmdao.utils.name_maps import prom_name2abs_name
@@ -636,6 +637,17 @@ class Problem(object):
         for system in self.model.system_iter(include_self=True, recurse=True):
             system.cleanup()
 
+    def record_state(self, case_name):
+        """
+        Record the variables at the Problem level.
+
+        Parameters
+        ----------
+        case_name : str
+            Name used to identify this Problem case.
+        """
+        record_iteration(self, self, case_name)
+
     def record_iteration(self, case_name):
         """
         Record the variables at the Problem level.
@@ -645,6 +657,9 @@ class Problem(object):
         case_name : str
             Name used to identify this Problem case.
         """
+        warn_deprecation("'Problem.record_iteration' has been deprecated. "
+                         "Use 'Problem.record_state' instead.")
+
         record_iteration(self, self, case_name)
 
     def _get_recorder_metadata(self, case_name):
