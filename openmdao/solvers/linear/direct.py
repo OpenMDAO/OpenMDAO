@@ -1,24 +1,50 @@
 """LinearSolver that uses linalg.solve or LU factor/solve."""
 
-import sys
 import warnings
 
 import numpy as np
 import scipy.linalg
 import scipy.sparse.linalg
-from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
+from scipy.sparse import csc_matrix
 
 from openmdao.solvers.solver import LinearSolver
-from openmdao.matrices.coo_matrix import COOMatrix
-from openmdao.matrices.csr_matrix import CSRMatrix
-from openmdao.matrices.csc_matrix import CSCMatrix
 from openmdao.matrices.dense_matrix import DenseMatrix
-from openmdao.utils.mpi import MPI
-from openmdao.utils.general_utils import do_nothing_context
-from openmdao.vectors.vector import INT_DTYPE
 
 
-def loc2error_msg(system, loc_txt, loc):
+def index_to_varname(system, loc):
+    """
+    Given a matrix location, return the name of the variable associated with that index.
+
+    Parameters
+    ----------
+    system : <System>
+        System containing the Directsolver.
+    loc : int
+        Index of row or column.
+
+    Returns
+    -------
+    str
+        Sting containing variable absolute name (and promoted name if there is one) and index.
+    """
+    start = end = 0
+    varsizes = np.sum(system._owned_sizes, axis=0)
+    for i, name in enumerate(system._var_allprocs_abs_names['output']):
+        end += varsizes[i]
+        if loc < end:
+            varname = system._var_allprocs_abs2prom['output'][name]
+            break
+        start = end
+
+    if varname == name:
+        name_string = "'{}' index {}.".format(varname, loc - start)
+    else:
+        name_string = "'{}' ('{}') index {}.".format(varname, name, loc - start)
+
+    return name_string
+
+
+def loc_to_error_msg(system, loc_txt, loc):
     """
     Given a matrix location, format a coherent error message when matrix is singular.
 
@@ -36,20 +62,7 @@ def loc2error_msg(system, loc_txt, loc):
     str
         New error string.
     """
-    start = end = 0
-    varsizes = np.sum(system._owned_sizes, axis=0)
-    for i, name in enumerate(system._var_allprocs_abs_names['output']):
-        end += varsizes[i]
-        if loc < end:
-            varname = system._var_allprocs_abs2prom['output'][name]
-            break
-        start = end
-
-    if varname == name:
-        names = "'{}' index {}.".format(varname, loc - start)
-    else:
-        names = "'{}' ('{}') index {}.".format(varname, name, loc - start)
-
+    names = index_to_varname(system, loc)
     msg = "Singular entry found in {} for {} associated with state/residual " + names
     return msg.format(system.msginfo, loc_txt)
 
@@ -87,7 +100,7 @@ def format_singular_error(err, system, mtx):
     else:
         loc_txt = "row/col"
 
-    return loc2error_msg(system, loc_txt, loc)
+    return loc_to_error_msg(system, loc_txt, loc)
 
 
 def format_singular_csc_error(system, matrix):
@@ -116,14 +129,29 @@ def format_singular_csc_error(system, matrix):
     if zero_cols.size <= zero_rows.size:
 
         if zero_rows.size == 0:
-            u, s, v = np.linalg.svd(dense)
-            idx1 = np.where(np.abs(u[:, -1]) > 1e-15)[0]
-            idx2 = np.where(np.abs(v[-1, :]) > 1e-15)[0]
-            idx = set(idx1).intersection(idx2)
+            # In this case, some row is a linear combination of the other rows.
+
+            # SVD gives us some information that may help locate the source of the problem.
+            u, _, v = np.linalg.svd(dense)
+
+            # Compare left and right singular vector for lowest singular value.
+            # Nonzero elements in these vectors occur at the rows/cols that contribute strongly to
+            # the singular subspace. Note that sometimes extra rows/cols are included in the set,
+            # but taking the intersection of the left and right singular vector seems to remove
+            # these.
+            tol = 1e-15
+            left_idx = np.where(np.abs(u[:, -1]) > tol)[0]
+            right_idx = np.where(np.abs(v[-1, :]) > tol)[0]
+            idx = set(left_idx).intersection(right_idx)
 
             # Underdetermined: duplicate columns or rows.
-            msg = "Identical rows or columns found in jacobian in '{}'. Problem is " + \
-                  "underdetermined."
+            msg = "Jacobian in '{}' is not full rank. The following set of states/residuals " + \
+                  "contains one or more equations that is a linear combination of the others: \n"
+
+            for loc in left_idx:
+                name = index_to_varname(system, loc)
+                msg += ' ' + name + '\n'
+
             return msg.format(system.pathname)
 
         loc_txt = "row"
@@ -132,7 +160,7 @@ def format_singular_csc_error(system, matrix):
         loc_txt = "column"
         loc = zero_cols[0]
 
-    return loc2error_msg(system, loc_txt, loc)
+    return loc_to_error_msg(system, loc_txt, loc)
 
 
 def format_nan_error(system, matrix):
