@@ -558,7 +558,7 @@ class ExperimentalDriver(object):
 
         return new_derivs
 
-    def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', global_names=True):
+    def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', use_abs_names=True):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -576,7 +576,7 @@ class ExperimentalDriver(object):
             Format to return the derivatives. Default is a 'flat_dict', which
             returns them in a dictionary whose keys are tuples of form (of, wrt). For
             the scipy optimizer, 'array' is also supported.
-        global_names : bool
+        use_abs_names : bool
             Set to True when passing in global names to skip some translation steps.
 
         Returns
@@ -589,10 +589,10 @@ class ExperimentalDriver(object):
         # Compute the derivatives in dict format...
         if prob.model._owns_approx_jac:
             derivs = prob._compute_totals_approx(of=of, wrt=wrt, return_format='dict',
-                                                 global_names=global_names)
+                                                 use_abs_names=use_abs_names)
         else:
             derivs = prob._compute_totals(of=of, wrt=wrt, return_format='dict',
-                                          global_names=global_names)
+                                          use_abs_names=use_abs_names)
 
         # ... then convert to whatever the driver needs.
         if return_format in ('dict', 'array'):

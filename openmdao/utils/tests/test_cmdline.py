@@ -4,6 +4,7 @@ import unittest
 import subprocess
 
 from openmdao.utils.testing_utils import use_tempdirs
+import openmdao.core.tests.test_coloring as coloring_test_mod
 
 try:
     from parameterized import parameterized
@@ -39,7 +40,6 @@ cmd_tests = [
     'openmdao trace {}'.format(os.path.join(scriptdir, 'circle_opt.py')),
     'openmdao tree -c {}'.format(os.path.join(scriptdir, 'circle_opt.py')),
     'openmdao view_connections --no_browser {}'.format(os.path.join(scriptdir, 'circle_opt.py')),
-    'openmdao xdsm --no_browser {}'.format(os.path.join(scriptdir, 'circle_opt.py')),
 ]
 
 
@@ -48,6 +48,7 @@ mem_cmd_tests = [
     'openmdao mem --tree {}'.format(os.path.join(scriptdir, 'circle_opt.py')),
     'openmdao trace -m {}'.format(os.path.join(scriptdir, 'circle_opt.py')),
 ]
+
 
 try:
     import psutil
@@ -77,6 +78,27 @@ class CmdlineTestCase(unittest.TestCase):
             output = subprocess.check_output(cmd.split())
         except subprocess.CalledProcessError as err:
             self.fail("Command '{}' failed.  Return code: {}".format(cmd, err.returncode))
+
+
+col_test_file = coloring_test_mod.__file__
+
+test_cmd_tests = [
+    'openmdao tree {}:SimulColoringScipyTestCase.test_dynamic_total_coloring_auto'.format(col_test_file),
+    'openmdao tree -c {}:SimulColoringScipyTestCase.test_dynamic_total_coloring_auto'.format(coloring_test_mod.__name__),
+]
+
+@use_tempdirs
+class CmdlineTestfuncTestCase(unittest.TestCase):
+    @parameterized.expand(test_cmd_tests, name_func=_test_func_name)
+    def test_cmd(self, cmd):
+        # this only tests that a given command line tool returns a 0 return code. It doesn't
+        # check the expected output at all.  The underlying functions that implement the
+        # commands should be tested seperately.
+        try:
+            output = subprocess.check_output(cmd.split())
+        except subprocess.CalledProcessError as err:
+            self.fail("Command '{}' failed.  Return code: {}".format(cmd, err.returncode))
+
 
 if __name__ == '__main__':
     unittest.main()

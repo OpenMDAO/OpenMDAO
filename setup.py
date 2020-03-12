@@ -6,7 +6,7 @@ from subprocess import check_call
 import distutils.spawn
 
 __version__ = re.findall(
-    r"""__version__ = ["']+([0-9\.]*)["']+""",
+    r"""__version__ = ["']+([0-9\.\-dev]*)["']+""",
     open('openmdao/__init__.py').read(),
 )[0]
 
@@ -68,7 +68,6 @@ setup(
     author='OpenMDAO Team',
     author_email='openmdao@openmdao.org',
     url='http://openmdao.org',
-    download_url='http://github.com/OpenMDAO/OpenMDAO/tarball/'+__version__,
     license='Apache License, Version 2.0',
     packages=[
         'openmdao',
@@ -106,7 +105,6 @@ setup(
         'openmdao.visualization',
         'openmdao.visualization.connection_viewer',
         'openmdao.visualization.n2_viewer',
-        'openmdao.visualization.xdsm_viewer',
         'openmdao.visualization.meta_model_viewer',
     ],
     package_data={
@@ -125,14 +123,6 @@ setup(
             '*.html',
             'libs/*.js',
             'style/*.css'
-        ],
-        'openmdao.visualization.xdsm_viewer': [
-            'XDSMjs/*',
-            'XDSMjs/src/*.js',
-            'XDSMjs/build/*.js',
-            'XDSMjs/test/*.js',
-            'XDSMjs/test/*.html',
-            'XDSMjs/examples/*.json',
         ],
         'openmdao.visualization.meta_model_viewer': [
             'tests/known_data_point_files/*.csv',

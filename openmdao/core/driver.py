@@ -11,7 +11,7 @@ from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.record_util import create_local_meta, check_path
-from openmdao.utils.general_utils import simple_warning
+from openmdao.utils.general_utils import simple_warning, warn_deprecation
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 import openmdao.utils.coloring as coloring_mod
@@ -166,10 +166,7 @@ class Driver(object):
         self.iter_count = 0
         self.cite = ""
 
-        self._coloring_info = coloring_mod._DEF_COMP_SPARSITY_ARGS.copy()
-        self._coloring_info['coloring'] = None
-        self._coloring_info['dynamic'] = False
-        self._coloring_info['static'] = None
+        self._coloring_info = coloring_mod._get_coloring_meta()
 
         self._total_jac_sparsity = None
         self._res_jacs = {}
@@ -670,7 +667,8 @@ class Driver(object):
         self.iter_count += 1
         return False
 
-    def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', global_names=True):
+    def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', global_names=None,
+                        use_abs_names=True):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -689,7 +687,9 @@ class Driver(object):
             returns them in a dictionary whose keys are tuples of form (of, wrt). For
             the scipy optimizer, 'array' is also supported.
         global_names : bool
-            Set to True when passing in global names to skip some translation steps.
+            Deprecated.  Use 'use_abs_names' instead.
+        use_abs_names : bool
+            Set to True when passing in absolute names to skip some translation steps.
 
         Returns
         -------
@@ -706,12 +706,17 @@ class Driver(object):
             print(header)
             print(len(header) * '-' + '\n')
 
+        if global_names is not None:
+            warn_deprecation("'global_names' is deprecated in calls to _compute_totals. "
+                             "Use 'use_abs_names' instead.")
+            use_abs_names = global_names
+
         if problem.model._owns_approx_jac:
             self._recording_iter.push(('_compute_totals_approx', 0))
 
             try:
                 if total_jac is None:
-                    total_jac = _TotalJacInfo(problem, of, wrt, global_names,
+                    total_jac = _TotalJacInfo(problem, of, wrt, use_abs_names,
                                               return_format, approx=True, debug_print=debug_print)
 
                     # Don't cache linear constraint jacobian
@@ -726,7 +731,7 @@ class Driver(object):
 
         else:
             if total_jac is None:
-                total_jac = _TotalJacInfo(problem, of, wrt, global_names, return_format,
+                total_jac = _TotalJacInfo(problem, of, wrt, use_abs_names, return_format,
                                           debug_print=debug_print)
 
                 # don't cache linear constraint jacobian
@@ -845,11 +850,16 @@ class Driver(object):
             raise RuntimeError("Driver '%s' does not support simultaneous derivatives." %
                                self._get_name())
 
-    def _setup_tot_jac_sparsity(self):
+    def _setup_tot_jac_sparsity(self, coloring=None):
         """
         Set up total jacobian subjac sparsity.
 
         Drivers that can use subjac sparsity should override this.
+
+        Parameters
+        ----------
+        coloring : Coloring or None
+            Current coloring.
         """
         pass
 

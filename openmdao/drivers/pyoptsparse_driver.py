@@ -19,7 +19,7 @@ from pyoptsparse import Optimization
 
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.driver import Driver, RecordingDebugging
-import openmdao.utils.coloring as coloring_mod
+import openmdao.utils.coloring as c_mod
 from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.class_util import weak_method_wrapper
 from openmdao.utils.mpi import FakeComm
@@ -38,6 +38,13 @@ optlist = ['ALPSO', 'CONMIN', 'FSQP', 'IPOPT', 'NLPQLP',
 
 # All optimizers that require an initial run
 run_required = ['NSGA2', 'ALPSO']
+
+DEFAULT_OPT_SETTINGS = {}
+DEFAULT_OPT_SETTINGS['IPOPT'] = {
+    'hessian_approximation': 'limited-memory',
+    'nlp_scaling_method': 'user-scaling',
+    'linear_solver': 'mumps'
+}
 
 CITATIONS = """@article{Hwang_maud_2018
  author = {Hwang, John T. and Martins, Joaquim R.R.A.},
@@ -238,20 +245,18 @@ class pyOptSparseDriver(Driver):
             self.iter_count += 1
 
         # compute dynamic simul deriv coloring or just sparsity if option is set
-        if coloring_mod._use_total_sparsity:
+        if c_mod._use_total_sparsity:
             coloring = None
             if self._coloring_info['coloring'] is None and self._coloring_info['dynamic']:
-                coloring_mod.dynamic_total_coloring(self, run_model=not model_ran,
-                                                    fname=self._get_total_coloring_fname())
-                coloring = self._coloring_info['coloring']
-                self._setup_tot_jac_sparsity()
+                coloring = c_mod.dynamic_total_coloring(self, run_model=not model_ran,
+                                                        fname=self._get_total_coloring_fname())
 
             if coloring is not None:
                 # if the improvement wasn't large enough, don't use coloring
                 pct = coloring._solves_info()[-1]
                 info = self._coloring_info
                 if info['min_improve_pct'] > pct:
-                    info['coloring'] = info['static'] = info['dynamic'] = None
+                    info['coloring'] = info['static'] = None
                     simple_warning("%s: Coloring was deactivated.  Improvement of %.1f%% was less "
                                    "than min allowed (%.1f%%)." % (self.msginfo, pct,
                                                                    info['min_improve_pct']))
@@ -362,6 +367,12 @@ class pyOptSparseDriver(Driver):
             # but raise with the original traceback.
             msg = "Optimizer %s is not available in this installation." % optimizer
             raise ImportError(msg)
+
+        # Process any default optimizer-specific settings.
+        if optimizer in DEFAULT_OPT_SETTINGS:
+            for name, value in DEFAULT_OPT_SETTINGS[optimizer].items():
+                if name not in self.opt_settings:
+                    self.opt_settings[name] = value
 
         # Set optimization options
         for option, value in self.opt_settings.items():
@@ -648,12 +659,18 @@ class pyOptSparseDriver(Driver):
 
         return nl_order
 
-    def _setup_tot_jac_sparsity(self):
+    def _setup_tot_jac_sparsity(self, coloring=None):
         """
         Set up total jacobian subjac sparsity.
+
+        Parameters
+        ----------
+        coloring : Coloring or None
+            Current coloring.
         """
         total_sparsity = None
-        coloring = self._get_static_coloring()
+        self._res_jacs = {}
+        coloring = coloring if coloring is not None else self._get_static_coloring()
         if coloring is not None:
             total_sparsity = coloring.get_subjac_sparsity()
             if self._total_jac_sparsity is not None:
@@ -668,7 +685,6 @@ class pyOptSparseDriver(Driver):
         if total_sparsity is None:
             return
 
-        self._res_jacs = {}
         for res, resdict in total_sparsity.items():
             if res in self._objs:  # skip objectives
                 continue
