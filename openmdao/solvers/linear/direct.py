@@ -67,45 +67,9 @@ def loc_to_error_msg(system, loc_txt, loc):
     return msg.format(system.msginfo, loc_txt)
 
 
-def format_singular_error(err, system, mtx):
+def format_singular_error(system, matrix):
     """
-    Format a coherent error message when the matrix is singular.
-
-    Parameters
-    ----------
-    err : Exception
-        Exception object
-    system : <System>
-        System containing the Directsolver.
-    mtx : ndarray
-        Matrix of interest.
-
-    Returns
-    -------
-    str
-        New error string.
-    """
-    err_msg = err.args[0]
-
-    loc = int(err_msg.split('number ')[1].split(' is exactly')[0])
-
-    # Lapack:DGETRF outputs INFO, which uses fortran numbering.
-    loc -= 1
-
-    col_norm = np.linalg.norm(mtx[:, loc])
-    row_norm = np.linalg.norm(mtx[loc, :])
-
-    if (col_norm == 0. or row_norm == 0.) and col_norm != row_norm:
-        loc_txt = "row" if row_norm <= col_norm else "column"
-    else:
-        loc_txt = "row/col"
-
-    return loc_to_error_msg(system, loc_txt, loc)
-
-
-def format_singular_csc_error(system, matrix):
-    """
-    Format a coherent error message when the CSC matrix is singular.
+    Format a coherent error message for any ill-conditioned mmatrix.
 
     Parameters
     ----------
@@ -119,20 +83,22 @@ def format_singular_csc_error(system, matrix):
     str
         New error string.
     """
-    dense = matrix.toarray()
-    if np.any(np.isnan(dense)):
-        # There is a nan in the matrix.
-        return(format_nan_error(system, dense))
+    if scipy.sparse.issparse(matrix):
+        matrix = matrix.toarray()
 
-    zero_rows = np.where(~dense.any(axis=1))[0]
-    zero_cols = np.where(~dense.any(axis=0))[0]
+    if np.any(np.isnan(matrix)):
+        # There is a nan in the matrix.
+        return(format_nan_error(system, matrix))
+
+    zero_rows = np.where(~matrix.any(axis=1))[0]
+    zero_cols = np.where(~matrix.any(axis=0))[0]
     if zero_cols.size <= zero_rows.size:
 
         if zero_rows.size == 0:
             # In this case, some row is a linear combination of the other rows.
 
             # SVD gives us some information that may help locate the source of the problem.
-            u, _, _ = np.linalg.svd(dense)
+            u, _, _ = np.linalg.svd(matrix)
 
             # Nonzero elements in the left singular vector show the rows that contribute strongly to
             # the singular subspace. Note that sometimes extra rows/cols are included in the set,
@@ -309,7 +275,7 @@ class DirectSolver(LinearSolver):
                     self._lu = scipy.sparse.linalg.splu(matrix)
                 except RuntimeError as err:
                     if 'exactly singular' in str(err):
-                        raise RuntimeError(format_singular_csc_error(system, matrix))
+                        raise RuntimeError(format_singular_error(system, matrix))
                     else:
                         raise err
 
@@ -321,7 +287,7 @@ class DirectSolver(LinearSolver):
                     try:
                         self._lup = scipy.linalg.lu_factor(matrix)
                     except RuntimeWarning as err:
-                        raise RuntimeError(format_singular_error(err, system, matrix))
+                        raise RuntimeError(format_singular_error(system, matrix))
 
                     # NaN in matrix.
                     except ValueError as err:
@@ -350,7 +316,7 @@ class DirectSolver(LinearSolver):
                     self._lup = scipy.linalg.lu_factor(mtx)
 
                 except RuntimeWarning as err:
-                    raise RuntimeError(format_singular_error(err, system, mtx))
+                    raise RuntimeError(format_singular_error(system, mtx))
 
                 # NaN in matrix.
                 except ValueError as err:
@@ -390,7 +356,7 @@ class DirectSolver(LinearSolver):
                     try:
                         inv_jac = scipy.linalg.inv(matrix)
                     except RuntimeWarning as err:
-                        raise RuntimeError(format_singular_error(err, system, matrix))
+                        raise RuntimeError(format_singular_error(system, matrix))
 
                     # NaN in matrix.
                     except ValueError as err:
@@ -401,7 +367,7 @@ class DirectSolver(LinearSolver):
                     inv_jac = scipy.sparse.linalg.inv(matrix)
                 except RuntimeError as err:
                     if 'exactly singular' in str(err):
-                        raise RuntimeError(format_singular_csc_error(system, matrix))
+                        raise RuntimeError(format_singular_error(system, matrix))
                     else:
                         raise err
 
@@ -429,7 +395,7 @@ class DirectSolver(LinearSolver):
                     inv_jac = scipy.linalg.inv(mtx)
 
                 except RuntimeWarning as err:
-                    raise RuntimeError(format_singular_error(err, system, mtx))
+                    raise RuntimeError(format_singular_error(system, mtx))
 
                 # NaN in matrix.
                 except ValueError as err:

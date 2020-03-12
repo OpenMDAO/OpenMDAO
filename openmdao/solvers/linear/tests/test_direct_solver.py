@@ -539,7 +539,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.compute_totals(of=['c5.y'], wrt=['p.x'])
 
-        expected_msg = "Singular entry found in Group (<model>) for row/col associated with state/residual 'c5.y' index 0."
+        expected_msg = "Singular entry found in Group (<model>) for row associated with state/residual 'c5.y' index 0."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -689,6 +689,47 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         # Configuration 1
         p = om.Problem()
         model = p.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('aa', 1.0)
+        model.add_subsystem('p', ivc, promotes=['aa'])
+
+        sub1 = model.add_subsystem('sub1', om.Group())
+        sub2 = model.add_subsystem('sub2', om.Group())
+        sub3 = model.add_subsystem('sub3', om.Group())
+
+        sub1.add_subsystem('e1', E1(), promotes=['*'])
+        sub1.add_subsystem('e2', E2(), promotes=['*'])
+        sub1.add_subsystem('e3', E3(), promotes=['*'])
+
+        sub2.add_subsystem('e1', E1(), promotes=['*'])
+        sub2.add_subsystem('e2', E2(), promotes=['*'])
+        sub2.add_subsystem('e3', E3bad(), promotes=['*'])
+
+        sub3.add_subsystem('e1', E1(), promotes=['*'])
+        sub3.add_subsystem('e2', E2(), promotes=['*'])
+        sub3.add_subsystem('e3', E3(), promotes=['*'])
+
+        model.connect('sub1.z', 'sub2.a')
+        model.connect('sub2.z', 'sub3.a')
+        model.connect('sub3.z', 'sub1.a')
+        model.linear_solver = om.DirectSolver()
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+
+        p.setup()
+        with self.assertRaises(RuntimeError) as cm:
+            p.run_model()
+
+        expected = "Jacobian in '' is not full rank. The following set of states/residuals contains one or more equations that is a linear combination of the others: \n"
+        expected += " 'sub2.x' ('sub2.e1.x') index 0.\n"
+        expected += " 'sub2.z' ('sub2.e3.z') index 0.\n"
+
+        self.assertEqual(expected, str(cm.exception))
+
+        # Configuration 1 Dense
+        p = om.Problem()
+        model = p.model
+        model.options['assembled_jac_type'] = 'dense'
 
         ivc = om.IndepVarComp()
         ivc.add_output('aa', 1.0)
