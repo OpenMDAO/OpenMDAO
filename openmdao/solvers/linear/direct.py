@@ -132,25 +132,24 @@ def format_singular_csc_error(system, matrix):
             # In this case, some row is a linear combination of the other rows.
 
             # SVD gives us some information that may help locate the source of the problem.
-            u, _, v = np.linalg.svd(dense)
+            u, _, _ = np.linalg.svd(dense)
 
-            # Compare left and right singular vector for lowest singular value.
-            # Nonzero elements in these vectors occur at the rows/cols that contribute strongly to
+            # Nonzero elements in the left singular vector show the rows that contribute strongly to
             # the singular subspace. Note that sometimes extra rows/cols are included in the set,
-            # but taking the intersection of the left and right singular vector seems to remove
-            # these.
+            # currently don't have a good way to pare them down.
             tol = 1e-15
-            left_idx = np.where(np.abs(u[:, -1]) > tol)[0]
-            right_idx = np.where(np.abs(v[-1, :]) > tol)[0]
-            idx = set(left_idx).intersection(right_idx)
+            u_sing = np.abs(u[:, -1])
+            left_idx = np.where(u_sing > tol)[0]
 
-            # Underdetermined: duplicate columns or rows.
             msg = "Jacobian in '{}' is not full rank. The following set of states/residuals " + \
                   "contains one or more equations that is a linear combination of the others: \n"
 
             for loc in left_idx:
                 name = index_to_varname(system, loc)
                 msg += ' ' + name + '\n'
+
+            if len(left_idx) > 2:
+                msg += "Note that the problem may be in a single Component."
 
             return msg.format(system.pathname)
 
