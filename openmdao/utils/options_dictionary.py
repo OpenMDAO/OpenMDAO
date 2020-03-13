@@ -1,5 +1,7 @@
 """Define the OptionsDictionary class."""
 
+from openmdao.utils.general_utils import warn_deprecation
+
 # unique object to check if default is given
 _undefined = object()
 
@@ -24,6 +26,8 @@ class OptionsDictionary(object):
         If True, no options can be set after declaration.
     _all_recordable : bool
         Flag to determine if all options in UserOptions are recordable.
+    _deprecation_warning_issued : list
+        Option names that are deprecated and a warning has been issued for their use.
     """
 
     def __init__(self, parent_name=None, read_only=False):
@@ -42,6 +46,8 @@ class OptionsDictionary(object):
         self._read_only = read_only
 
         self._all_recordable = True
+
+        self._deprecation_warning_issued = []
 
     def __getstate__(self):
         """
@@ -281,7 +287,8 @@ class OptionsDictionary(object):
             meta['check_valid'](name, value)
 
     def declare(self, name, default=_undefined, values=None, types=None, desc='',
-                upper=None, lower=None, check_valid=None, allow_none=False, recordable=True):
+                upper=None, lower=None, check_valid=None, allow_none=False, recordable=True,
+                deprecation=None):
         r"""
         Declare an option.
 
@@ -312,6 +319,9 @@ class OptionsDictionary(object):
             If True, allow None as a value regardless of values or types.
         recordable : bool
             If True, add to recorder
+        deprecation : str or None
+            If None, it is not deprecated. If a str, use as a DeprecationWarning
+            during __setitem__ and __getitem__
         """
         if values is not None and not isinstance(values, (set, list, tuple)):
             self._raise("In declaration of option '%s', the 'values' arg must be of type None,"
@@ -343,6 +353,7 @@ class OptionsDictionary(object):
             'has_been_set': default_provided,
             'allow_none': allow_none,
             'recordable': recordable,
+            'deprecation': deprecation,
         }
 
         # If a default is given, check for validity
@@ -419,6 +430,10 @@ class OptionsDictionary(object):
             msg = "Option '{}' cannot be set because it has not been declared."
             self._raise(msg.format(name), exc_type=KeyError)
 
+        if meta['deprecation'] is not None and name not in self._deprecation_warning_issued:
+            warn_deprecation(meta['deprecation'])
+            self._deprecation_warning_issued.append(name)
+
         if self._read_only:
             self._raise("Tried to set read-only option '{}'.".format(name), exc_type=KeyError)
 
@@ -444,6 +459,9 @@ class OptionsDictionary(object):
         # If the option has been set in this system, return the set value
         try:
             meta = self._dict[name]
+            if meta['deprecation'] is not None and name not in self._deprecation_warning_issued:
+                warn_deprecation(meta['deprecation'])
+                self._deprecation_warning_issued.append(name)
             if meta['has_been_set']:
                 return meta['value']
             else:

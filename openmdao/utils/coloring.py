@@ -1382,7 +1382,7 @@ def _compute_total_coloring_context(top):
 def _get_bool_total_jac(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_jacs'],
                         tol=_DEF_COMP_SPARSITY_ARGS['tol'],
                         orders=_DEF_COMP_SPARSITY_ARGS['orders'], setup=False, run_model=False,
-                        of=None, wrt=None, global_names=True):
+                        of=None, wrt=None, use_abs_names=True):
     """
     Return a boolean version of the total jacobian.
 
@@ -1448,10 +1448,10 @@ def _get_bool_total_jac(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_ja
         for i in range(num_full_jacs):
             if use_driver:
                 J = prob.driver._compute_totals(of=of, wrt=wrt, return_format='array',
-                                                global_names=global_names)
+                                                use_abs_names=use_abs_names)
             else:
                 J = prob.compute_totals(of=of, wrt=wrt, return_format='array',
-                                        global_names=global_names)
+                                        use_abs_names=use_abs_names)
             if fullJ is None:
                 fullJ = np.abs(J)
             else:
@@ -1559,7 +1559,7 @@ def _write_sparsity(sparsity, stream):
     stream.write("}\n")
 
 
-def _get_desvar_info(driver, names=None, global_names=True):
+def _get_desvar_info(driver, names=None, use_abs_names=True):
     desvars = driver._designvars
     if names is None:
         abs_names = list(desvars)
@@ -1568,7 +1568,7 @@ def _get_desvar_info(driver, names=None, global_names=True):
     model = driver._problem().model
     abs2meta = model._var_allprocs_abs2meta
 
-    if global_names:
+    if use_abs_names:
         abs_names = names
     else:
         prom2abs = model._var_allprocs_prom2abs_list['output']
@@ -1585,7 +1585,7 @@ def _get_desvar_info(driver, names=None, global_names=True):
     return abs_names, sizes
 
 
-def _get_response_info(driver, names=None, global_names=True):
+def _get_response_info(driver, names=None, use_abs_names=True):
     responses = driver._responses
     if names is None:
         abs_names = driver._get_ordered_nl_responses()
@@ -1594,7 +1594,7 @@ def _get_response_info(driver, names=None, global_names=True):
     model = driver._problem().model
     abs2meta = model._var_allprocs_abs2meta
 
-    if global_names:
+    if use_abs_names:
         abs_names = names
     else:
         prom2abs = model._var_allprocs_prom2abs_list['output']
@@ -1729,7 +1729,7 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
                            num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_jacs'],
                            tol=_DEF_COMP_SPARSITY_ARGS['tol'],
                            orders=_DEF_COMP_SPARSITY_ARGS['orders'],
-                           setup=False, run_model=False, fname=None, global_names=False):
+                           setup=False, run_model=False, fname=None, use_abs_names=False):
     """
     Compute simultaneous derivative colorings for the total jacobian of the given problem.
 
@@ -1755,7 +1755,7 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
         If True, run run_model before calling compute_totals.
     fname : filename or None
         File where output coloring info will be written. If None, no info will be written.
-    global_names : bool
+    use_abs_names : bool
         If True, use absolute naming for of and wrt variables.
 
     Returns
@@ -1765,8 +1765,8 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
     """
     driver = problem.driver
 
-    abs_ofs, of_sizes = _get_response_info(driver, of, global_names)
-    abs_wrts, wrt_sizes = _get_desvar_info(driver, wrt, global_names)
+    abs_ofs, of_sizes = _get_response_info(driver, of, use_abs_names)
+    abs_wrts, wrt_sizes = _get_desvar_info(driver, wrt, use_abs_names)
 
     model = problem.model
 
@@ -1800,7 +1800,7 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
         J, sparsity_info = _get_bool_total_jac(problem, num_full_jacs=num_full_jacs, tol=tol,
                                                orders=orders, setup=setup,
                                                run_model=run_model, of=abs_ofs, wrt=abs_wrts,
-                                               global_names=True)
+                                               use_abs_names=True)
         coloring = _compute_coloring(J, mode)
         if coloring is not None:
             coloring._row_vars = abs_ofs
@@ -1856,7 +1856,7 @@ def dynamic_total_coloring(driver, run_model=True, fname=None):
 
     coloring = compute_total_coloring(problem, num_full_jacs=num_full_jacs, tol=tol, orders=orders,
                                       setup=False, run_model=run_model, fname=fname,
-                                      global_names=True)
+                                      use_abs_names=True)
 
     if coloring is not None:
         if driver._coloring_info['show_sparsity']:
@@ -1939,7 +1939,7 @@ def _total_coloring_cmd(options, user_args):
                                                   tol=options.tolerance,
                                                   orders=options.orders,
                                                   setup=False, run_model=True, fname=outfile,
-                                                  global_names=True)
+                                                  use_abs_names=True)
 
             if coloring is not None:
                 if options.show_sparsity_text:
