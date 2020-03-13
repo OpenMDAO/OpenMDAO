@@ -1875,6 +1875,18 @@ class TestProblemCheckTotals(unittest.TestCase):
         assert_rel_error(self, totals['con_cmp2.con2', 'px.x']['J_fwd'], [[0.09692762]], 1e-5)
         assert_rel_error(self, totals['con_cmp2.con2', 'px.x']['J_fd'], [[0.09692762]], 1e-5)
 
+        # Test compact_print output
+        compact_stream = StringIO()
+        compact_totals = prob.check_totals(method='fd', out_stream=compact_stream,
+            compact_print=True)
+
+        compact_lines = compact_stream.getvalue().splitlines()
+
+        self.assertTrue('<output>' in compact_lines[3],
+            "'<output>' not found in '%s'" % compact_lines[4])
+        self.assertTrue('9.7743e+00' in compact_lines[11],
+            "'9.7743e+00' not found in '%s'" % compact_lines[11])
+
     def test_desvar_as_obj(self):
         prob = om.Problem()
         prob.model = SellarDerivatives()
