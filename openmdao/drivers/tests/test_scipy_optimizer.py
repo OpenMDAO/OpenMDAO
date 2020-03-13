@@ -111,15 +111,8 @@ class TestMPIScatter(unittest.TestCase):
         proc_vals = MPI.COMM_WORLD.allgather([prob['x'], prob['y'], prob['c'], prob['f_xy']])
         np.testing.assert_array_almost_equal(proc_vals[0], proc_vals[1])
 
+
 class TestScipyOptimizeDriver(unittest.TestCase):
-
-    def test_scipyoptimizer_deprecation(self):
-
-        msg = "'ScipyOptimizer' provides backwards compatibility " \
-              "with OpenMDAO <= 2.2 ; use 'ScipyOptimizeDriver' instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            om.ScipyOptimizer()
 
     def test_compute_totals_basic_return_array(self):
         # Make sure 'array' return_format works.
@@ -228,7 +221,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = om.ScipyOptimizer(optimizer='SLSQP', tol=1e-9, disp=False)
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -1284,7 +1277,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         self.assertFalse(failed, "Optimization failed.")
 
-        self.assertTrue('In mode: rev, Solving variable(s):' in output)
+        self.assertTrue('In mode: rev, Solving variable(s) using simul coloring:' in output)
         self.assertTrue("('comp.f_xy', [0])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
@@ -1316,7 +1309,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         self.assertFalse(failed, "Optimization failed.")
 
-        self.assertTrue('In mode: fwd, Solving variable(s):' in output)
+        self.assertTrue('In mode: fwd, Solving variable(s) using simul coloring:' in output)
         self.assertTrue("('p1.x', [0])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
@@ -1434,7 +1427,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         self.assertEqual(expected_msg, str(cm.exception))
 
     def test_cobyla_linear_constraint(self):
-        # Bug where scipyoptimizer tried to compute and cache the constraint derivatives for the
+        # Bug where ScipyOptimizeDriver tried to compute and cache the constraint derivatives for the
         # lower and upper bounds of the desvars even though we were using a non-gradient optimizer.
         # This causd a KeyError.
         prob = om.Problem()

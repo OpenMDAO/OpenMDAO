@@ -1,6 +1,4 @@
 """Define the base System class."""
-from __future__ import division
-
 import sys
 import os
 from contextlib import contextmanager
@@ -18,8 +16,6 @@ import os
 import time
 from numbers import Integral
 import itertools
-
-from six import iteritems, itervalues, string_types
 
 import numpy as np
 import networkx as nx
@@ -40,7 +36,7 @@ from openmdao.utils.coloring import _compute_coloring, Coloring, \
     _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.general_utils import determine_adder_scaler, find_matches, \
-    format_as_float_or_array, warn_deprecation, ContainsAll, all_ancestors, \
+    format_as_float_or_array, ContainsAll, all_ancestors, \
     simple_warning, make_set, match_includes_excludes
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
@@ -521,7 +517,7 @@ class System(object):
 
                 # Reload input and output values where possible
                 for vold, vnew in [(old_in, new_in), (old_out, new_out)]:
-                    for abs_name, old_view in iteritems(vold._views_flat):
+                    for abs_name, old_view in vold._views_flat.items():
                         if abs_name in vnew._views_flat:
                             new_view = vnew._views_flat[abs_name]
 
@@ -682,8 +678,8 @@ class System(object):
                                                                ncol=ncol, relevant=rel)
         else:
 
-            for key, vardict in iteritems(self._vectors):
-                for vec_name, vec in iteritems(vardict):
+            for key, vardict in self._vectors.items():
+                for vec_name, vec in vardict.items():
                     root_vectors[key][vec_name] = vec._root_vector
 
         lower, upper = self._get_bounds_root_vectors(self._local_vector_class, initial)
@@ -1017,7 +1013,7 @@ class System(object):
             options['dynamic'] = False
             options['static'] = self._coloring_info['static']
 
-        options['wrt_patterns'] = [wrt] if isinstance(wrt, string_types) else wrt
+        options['wrt_patterns'] = [wrt] if isinstance(wrt, str) else wrt
         options['method'] = method
         options['per_instance'] = per_instance
         options['repeat'] = num_full_jacs
@@ -1076,7 +1072,7 @@ class System(object):
         info = self._coloring_info
 
         info.update(**overrides)
-        if isinstance(info['wrt_patterns'], string_types):
+        if isinstance(info['wrt_patterns'], str):
             info['wrt_patterns'] = [info['wrt_patterns']]
 
         if info['method'] is None and self._approx_schemes:
@@ -1113,7 +1109,7 @@ class System(object):
             if coloring is None:
                 print("\nClass coloring for class '{}' wasn't good enough, "
                       "so skipping for '{}'".format(type(self).__name__, self.pathname))
-                info['static'] = info['dynamic'] = None
+                info['static'] = None
             else:
                 print("\n{} using class coloring for class '{}'".format(self.pathname,
                                                                         type(self).__name__))
@@ -1191,7 +1187,7 @@ class System(object):
         # if the improvement wasn't large enough, don't use coloring
         pct = coloring._solves_info()[-1]
         if info['min_improve_pct'] > pct:
-            info['coloring'] = info['static'] = info['dynamic'] = None
+            info['coloring'] = info['static'] = None
             simple_warning("%s: Coloring was deactivated.  Improvement of %.1f%% was less than min "
                            "allowed (%.1f%%)." % (self.msginfo, pct, info['min_improve_pct']))
             if not info['per_instance']:
@@ -1337,7 +1333,7 @@ class System(object):
             return coloring
 
         static = info['static']
-        if static is _STD_COLORING_FNAME or isinstance(static, string_types):
+        if static is _STD_COLORING_FNAME or isinstance(static, str):
             if static is _STD_COLORING_FNAME:
                 fname = self.get_approx_coloring_fname()
             else:
@@ -1612,7 +1608,7 @@ class System(object):
                     self._vois = vois = self.get_design_vars(recurse=True, get_sizes=False)
                 else:  # rev
                     self._vois = vois = self.get_responses(recurse=True, get_sizes=False)
-                vec_names.extend(sorted(set(voi for voi, data in iteritems(vois)
+                vec_names.extend(sorted(set(voi for voi, data in vois.items()
                                             if data['parallel_deriv_color'] is not None
                                             or data['vectorize_derivs'])))
             else:
@@ -1958,7 +1954,7 @@ class System(object):
             patterns = []
             renames = {}
             for entry in lst:
-                if isinstance(entry, string_types):
+                if isinstance(entry, str):
                     if '*' in entry or '?' in entry or '[' in entry:
                         patterns.append(entry)
                     else:
@@ -2017,9 +2013,27 @@ class System(object):
                     call = 'promotes'
                 else:
                     call = 'promotes_%ss' % io_types[0]
-                raise RuntimeError("%s: '%s' failed to find any matches for the following "
-                                   "names or patterns: %s.%s" %
-                                   (self.msginfo, call, sorted(not_found), empty_group_msg))
+
+                for p in patterns:
+                    for name, alias in renames.items():
+                        if fnmatchcase(name, p):
+                            raise RuntimeError("%s: %s '%s' matched '%s' but '%s' has been aliased "
+                                               "to '%s'." % (self.msginfo, call, p, name,
+                                                             name, alias))
+
+                    for i in names:
+                        if fnmatchcase(i, p):
+                            break
+                    else:
+                        raise RuntimeError("%s: '%s' failed to find any matches for the following "
+                                           "pattern: '%s'.%s" %
+                                           (self.msginfo, call, p, empty_group_msg))
+                    if p == patterns[-1]:
+                        break
+                else:
+                    raise RuntimeError("%s: '%s' failed to find any matches for the following "
+                                       "names or patterns: %s.%s" %
+                                       (self.msginfo, call, sorted(not_found), empty_group_msg))
 
         maps = {'input': {}, 'output': {}}
 
@@ -2080,15 +2094,6 @@ class System(object):
             wrt_list = of_list + wrt_list
 
         return of_list, wrt_list
-
-    @property
-    def metadata(self):
-        """
-        Get the options for this System.
-        """
-        warn_deprecation("The 'metadata' attribute provides backwards compatibility "
-                         "with earlier version of OpenMDAO; use 'options' instead.")
-        return self.options
 
     @contextmanager
     def _unscaled_context(self, outputs=(), residuals=()):
@@ -2336,42 +2341,6 @@ class System(object):
         """
         self._linear_solver = solver
 
-    @property
-    def nl_solver(self):
-        """
-        Get the nonlinear solver for this system.
-        """
-        warn_deprecation("The 'nl_solver' attribute provides backwards compatibility "
-                         "with OpenMDAO 1.x ; use 'nonlinear_solver' instead.")
-        return self._nonlinear_solver
-
-    @nl_solver.setter
-    def nl_solver(self, solver):
-        """
-        Set this system's nonlinear solver.
-        """
-        warn_deprecation("The 'nl_solver' attribute provides backwards compatibility "
-                         "with OpenMDAO 1.x ; use 'nonlinear_solver' instead.")
-        self._nonlinear_solver = solver
-
-    @property
-    def ln_solver(self):
-        """
-        Get the linear solver for this system.
-        """
-        warn_deprecation("The 'ln_solver' attribute provides backwards compatibility "
-                         "with OpenMDAO 1.x ; use 'linear_solver' instead.")
-        return self._linear_solver
-
-    @ln_solver.setter
-    def ln_solver(self, solver):
-        """
-        Set this system's linear solver.
-        """
-        warn_deprecation("The 'ln_solver' attribute provides backwards compatibility "
-                         "with OpenMDAO 1.x ; use 'linear_solver' instead.")
-        self._linear_solver = solver
-
     def _set_solver_print(self, level=2, depth=1e99, type_='all'):
         """
         Control printing for solvers and subsolvers in the model.
@@ -2523,7 +2492,7 @@ class System(object):
             raise RuntimeError(msg.format(self.msginfo, name))
 
         # Name must be a string
-        if not isinstance(name, string_types):
+        if not isinstance(name, str):
             raise TypeError('{}: The name argument should be a string, got {}'.format(self.msginfo,
                                                                                       name))
 
@@ -2654,12 +2623,12 @@ class System(object):
             solution from the previous linear solve.
         """
         # Name must be a string
-        if not isinstance(name, string_types):
+        if not isinstance(name, str):
             raise TypeError('{}: The name argument should be a string, '
                             'got {}'.format(self.msginfo, name))
 
         # Type must be a string and one of 'con' or 'obj'
-        if not isinstance(type_, string_types):
+        if not isinstance(type_, str):
             raise TypeError('{}: The type argument should be a string'.format(self.msginfo))
         elif type_ not in ('con', 'obj'):
             raise ValueError('{}: The type must be one of \'con\' or \'obj\': '
@@ -2948,7 +2917,7 @@ class System(object):
         # Human readable error message during Driver setup.
         try:
             out = OrderedDict((pro2abs[name][0], data) for name, data in
-                              iteritems(self._design_vars))
+                              self._design_vars.items())
         except KeyError as err:
             msg = "{}: Output not found for design variable {}."
             raise RuntimeError(msg.format(self.msginfo, str(err)))
@@ -3003,7 +2972,7 @@ class System(object):
         # Human readable error message during Driver setup.
         try:
             out = OrderedDict((prom2abs[name][0], data) for name, data in
-                              iteritems(self._responses))
+                              self._responses.items())
         except KeyError as err:
             msg = "{}: Output not found for response {}."
             raise RuntimeError(msg.format(self.msginfo, str(err)))
@@ -3210,7 +3179,7 @@ class System(object):
         if self._inputs is not None and self._discrete_inputs:
             disc_meta = self._discrete_inputs._dict
 
-            for var_name, val in iteritems(self._discrete_inputs):
+            for var_name, val in self._discrete_inputs.items():
                 # Filter based on tags
                 if tags and not (make_set(tags) & disc_meta[var_name]['tags']):
                     continue
@@ -3405,7 +3374,7 @@ class System(object):
         if self._outputs is not None and self._discrete_outputs and not residuals_tol:
             disc_meta = self._discrete_outputs._dict
 
-            for var_name, val in iteritems(self._discrete_outputs):
+            for var_name, val in self._discrete_outputs.items():
                 # Filter based on tags
                 if tags and not (make_set(tags) & disc_meta[var_name]['tags']):
                     continue
@@ -4309,7 +4278,7 @@ def get_relevant_vars(connections, desvars, responses, mode):
     # Create a hybrid graph with components and all connected vars.  If a var is connected,
     # also connect it to its corresponding component.
     graph = nx.DiGraph()
-    for tgt, src in iteritems(connections):
+    for tgt, src in connections.items():
         if src not in graph:
             graph.add_node(src, type_='out')
         graph.add_node(tgt, type_='in')

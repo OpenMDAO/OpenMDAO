@@ -6,8 +6,6 @@ Tests for absolute and promoted connections, for different nonlinear solvers.
 # FIXME With NonlinearRunOnce run_model() fails with ValueError (P.O.)
 # FIXME With Newton solver and NLBGS variable sizes are not updated. (P.O.)
 
-from __future__ import division
-
 import numpy as np
 import unittest
 
@@ -119,7 +117,7 @@ class TestReconfConnections(unittest.TestCase):
 
         p.model = model = Group()
         model.linear_solver = DirectSolver()
-        model.nonlinear_solver = NewtonSolver()
+        model.nonlinear_solver = NewtonSolver(solve_subsystems=False)
         model.add_subsystem('c1', IndepVarComp('x', 1.0), promotes_outputs=['x'])
         model.add_subsystem('c2', ReconfComp1(), promotes_inputs=['x'])
         model.add_subsystem('c3', ReconfComp2(), promotes_outputs=['f'])
@@ -171,7 +169,7 @@ class TestReconfConnections(unittest.TestCase):
 
         p.model = model = Group()
         model.linear_solver = DirectSolver()
-        model.nonlinear_solver = NewtonSolver()
+        model.nonlinear_solver = NewtonSolver(solve_subsystems=False)
         model.add_subsystem('c1', IndepVarComp('x', 1.0), promotes_outputs=['x'])
         model.add_subsystem('c2', ReconfComp1(), promotes_inputs=['x'], promotes_outputs=['y'])
         model.add_subsystem('c3', ReconfComp2(), promotes_inputs=['y'], promotes_outputs=['f'])
@@ -194,6 +192,7 @@ class TestReconfConnections(unittest.TestCase):
         p.model = model = Group()
         model.linear_solver = DirectSolver()
         model.nonlinear_solver = NonlinearBlockGS()
+        model.nonlinear_solver.options['reraise_child_analysiserror'] = True
         model.add_subsystem('c1', IndepVarComp('x', 1.0), promotes_outputs=['x'])
         model.add_subsystem('c2', ReconfComp1(), promotes_inputs=['x'], promotes_outputs=['y'])
         model.add_subsystem('c3', ReconfComp2(), promotes_inputs=['y'], promotes_outputs=['f'])

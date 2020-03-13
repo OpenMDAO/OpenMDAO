@@ -82,7 +82,7 @@ author = u'openmdao.org'
 
 # The full version, including alpha/beta/rc tags.
 import openmdao
-release = openmdao.__version__ + ' Beta'
+release = openmdao.__version__
 print('Release: %s' % release)
 
 # Will be the Release version (x.y.z) or the commit ID if not a release build.

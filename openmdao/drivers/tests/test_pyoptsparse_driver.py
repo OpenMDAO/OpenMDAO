@@ -143,6 +143,7 @@ class DataSave(om.ExplicitComponent):
 
         partials['y', 'x'] = 2.0*x - 6.0
 
+
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
 @unittest.skipUnless(MPI, "MPI is required.")
 class TestMPIScatter(unittest.TestCase):
@@ -174,6 +175,7 @@ class TestMPIScatter(unittest.TestCase):
 
         proc_vals = MPI.COMM_WORLD.allgather([prob['x'], prob['y'], prob['c'], prob['f_xy']])
         np.testing.assert_array_almost_equal(proc_vals[0], proc_vals[1])
+
 
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
 @use_tempdirs
@@ -1264,7 +1266,6 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_constraint('c', upper=-15.0)
 
         prob.setup()
-
         failed = prob.run_driver()
 
         self.assertFalse(failed, "Optimization failed, info = " +
@@ -1443,7 +1444,7 @@ class TestPyoptSparse(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
 
-        self.assertTrue('In mode: rev, Solving variable(s):' in output)
+        self.assertTrue('In mode: rev, Solving variable(s) using simul coloring:' in output)
         self.assertTrue("('comp.f_xy', [0])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
@@ -1477,7 +1478,7 @@ class TestPyoptSparse(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed, info = " +
                              str(prob.driver.pyopt_solution.optInform))
 
-        self.assertTrue('In mode: fwd, Solving variable(s):' in output)
+        self.assertTrue('In mode: fwd, Solving variable(s) using simul coloring:' in output)
         self.assertTrue("('p2.y', [1])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
@@ -1535,6 +1536,11 @@ class TestPyoptSparse(unittest.TestCase):
 
     def test_show_exception_bad_opt(self):
 
+        # First, check if we have the optimizer for this test. If they do, then just skip it.
+        _, loc_opt = set_pyoptsparse_opt('NOMAD')
+        if loc_opt == 'NOMAD':
+            raise unittest.SkipTest("Skipping because user has this optimizer.")
+
         prob = om.Problem()
         model = prob.model
 
@@ -1552,15 +1558,15 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.driver = pyOptSparseDriver()
 
-        # We generally don't hae a working IPOPT install.
-        prob.driver.options['optimizer'] = 'IPOPT'
+        # We generally don't hae a working NOMAD install.
+        prob.driver.options['optimizer'] = 'NOMAD'
         prob.setup()
 
         # Test that we get exception.
         with self.assertRaises(ImportError) as raises_cm:
             prob.run_driver()
 
-        self.assertTrue("IPOPT is not available" in str(raises_cm.exception))
+        self.assertTrue("NOMAD is not available" in str(raises_cm.exception))
 
     # Travis testing core dumps on many of the machines. Probabaly a build problem with the NSGA source.
     # Limiting this to the single travis 1.14 machine for now.
@@ -1811,6 +1817,31 @@ class TestPyoptSparse(unittest.TestCase):
         # SNOPT return code 71 is a user-requested termination.
         code = prob.driver.pyopt_solution.optInform['value']
         self.assertEqual(code, 71)
+
+    def test_IPOPT_basic(self):
+        _, local_opt = set_pyoptsparse_opt('IPOPT')
+        if local_opt != 'IPOPT':
+            raise unittest.SkipTest("pyoptsparse is not providing IPOPT")
+
+        prob = om.Problem()
+        model = prob.model = SellarDerivativesGrouped()
+
+        prob.driver = om.pyOptSparseDriver()
+        prob.driver.options['optimizer'] = "IPOPT"
+        prob.driver.opt_settings['print_level'] = 0
+
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        prob.set_solver_print(level=0)
+
+        prob.setup(check=False, mode='rev')
+        prob.run_driver()
+
+        assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
 
 
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
@@ -2205,6 +2236,85 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
         prob.driver = om.pyOptSparseDriver()
         prob.driver.options['optimizer'] = "SNOPT"
         prob.driver.options['user_teriminate_signal'] = signal.SIGUSR2
+
+
+class MatMultCompExact(om.ExplicitComponent):
+    def __init__(self, mat, sparse=False, **kwargs):
+        super(MatMultCompExact, self).__init__(**kwargs)
+        self.mat = mat
+        self.sparse = sparse
+
+    def setup(self):
+        self.add_input('x', val=np.ones(self.mat.shape[1]))
+        self.add_output('y', val=np.zeros(self.mat.shape[0]))
+
+        if self.sparse:
+            self.rows, self.cols = np.nonzero(self.mat)
+            self.declare_partials(of='y', wrt='x', rows=self.rows, cols=self.cols)
+        else:
+            self.declare_partials(of='y', wrt='x')
+        self.num_computes = 0
+
+    def compute(self, inputs, outputs):
+        outputs['y'] = self.mat.dot(inputs['x'])
+        self.num_computes += 1
+
+    def compute_partials(self, inputs, partials):
+        """
+        Compute the sparse partials.
+
+        Parameters
+        ----------
+        inputs : Vector
+            unscaled, dimensional input variables read via inputs[key]
+        partials : Jacobian
+            sub-jac components written to partials[output_name, input_name]
+        """
+        if self.sparse:
+            partials['y', 'x'] = self.mat[self.rows, self.cols]
+        else:
+            partials['y', 'x'] = self.mat
+
+
+class MyGroup(om.Group):
+    def __init__(self, size=5):
+        super(MyGroup, self).__init__()
+        self.size = size
+
+    def setup(self):
+        size = self.size
+        self.add_subsystem('indeps', om.IndepVarComp('x', np.ones(size)))
+        A = np.ones((size, size))  # force coloring to fail
+        self.add_subsystem('comp1', MatMultCompExact(A))
+        self.add_subsystem('comp2', om.ExecComp('y=x-1.0', x=np.zeros(size), y=np.zeros(size), has_diag_partials=True))
+        self.connect('indeps.x', 'comp1.x')
+        self.connect('comp1.y', 'comp2.x')
+        self.add_design_var('indeps.x')
+        self.add_objective('comp2.y', index=0)
+        self.add_constraint('comp1.y', indices=list(range(1, size)), lower=5., upper=10.)
+
+
+@unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
+@use_tempdirs
+class TestResizingTestCase(unittest.TestCase):
+    def test_resize(self):
+        # this test just verifies that pyoptsparsedriver doesn't raise an exception due
+        # to mismatched sizes in the sparsity definition, so this test passes as long as
+        # an exception isn't raised.
+        p = om.Problem()
+        model = p.model
+        p.driver = om.pyOptSparseDriver()
+        p.driver.declare_coloring()
+
+        G = model.add_subsystem("G", MyGroup(5))
+        p.setup()
+        p.run_driver()
+        p.compute_totals()
+
+        G.size = 10
+        p.setup()
+        p.run_driver()
+        p.compute_totals()
 
 
 if __name__ == "__main__":

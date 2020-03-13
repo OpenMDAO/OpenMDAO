@@ -1,6 +1,5 @@
 """Test the LinearBlockGS linear solver class."""
 
-from __future__ import division, print_function
 import unittest
 
 import numpy as np
@@ -78,7 +77,7 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
         model.connect('d1.y1', 'd2.y1')
         model.connect('d2.y2', 'd1.y2')
 
-        model.nonlinear_solver = om.NewtonSolver()
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         model.nonlinear_solver.options['maxiter'] = 5
         model.linear_solver = self.linear_solver_class()
 
@@ -101,7 +100,7 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
         model.connect('d1.y1', 'd2.y1')
         model.connect('d2.y2', 'd1.y2')
 
-        model.nonlinear_solver = om.NewtonSolver()
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         model.nonlinear_solver.options['maxiter'] = 5
         model.nonlinear_solver.linesearch = om.BoundsEnforceLS()
         model.linear_solver = om.ScipyKrylov()

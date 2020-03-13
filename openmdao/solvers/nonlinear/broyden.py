@@ -3,17 +3,15 @@ Define the BroydenSolver class.
 
 Based on implementation in Scipy via OpenMDAO 0.8x with improvements based on NPSS solver.
 """
-from __future__ import print_function
-from six.moves import range
-
 import numpy as np
 
 from openmdao.recorders.recording_iteration_stack import Recording
+from openmdao.solvers.linesearch.backtracking import BoundsEnforceLS
 from openmdao.solvers.solver import NonlinearSolver
 from openmdao.utils.class_util import overrides_method
-from openmdao.utils.general_utils import simple_warning, warn_deprecation
+from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.mpi import MPI
-from openmdao.vectors.vector import INT_DTYPE
+
 
 CITATION = """@ARTICLE{
               Broyden1965ACo,
@@ -78,7 +76,7 @@ class BroydenSolver(NonlinearSolver):
         self.linear_solver = None
 
         # Slot for linesearch
-        self.linesearch = None
+        self.linesearch = BoundsEnforceLS()
 
         self.cite = CITATION
 
@@ -132,6 +130,10 @@ class BroydenSolver(NonlinearSolver):
                              desc="Flag controls whether to perform Broyden update to the "
                                   "Jacobian. There are some applications where it may be useful "
                                   "to turn this off.")
+        self.options.declare('reraise_child_analysiserror', types=bool, default=False,
+                             desc='When the option is true, a solver will reraise any '
+                             'AnalysisError that arises during subsolve; when false, it will '
+                             'continue solving.')
 
         self.supports['gradients'] = True
         self.supports['implicit_components'] = True
@@ -152,6 +154,7 @@ class BroydenSolver(NonlinearSolver):
         self._computed_jacobians = 0
         iproc = system.comm.rank
 
+        rank = MPI.COMM_WORLD.rank if MPI is not None else 0
         self._disallow_discrete_outputs()
 
         if self.linear_solver is not None:
@@ -162,16 +165,6 @@ class BroydenSolver(NonlinearSolver):
         if self.linesearch is not None:
             self.linesearch._setup_solvers(system, self._depth + 1)
             self.linesearch._do_subsolve = True
-
-        else:
-            # In OpenMDAO 3.x, we will be making BoundsEnforceLS the default line search.
-            # This deprecation warning is to prepare users for the change.
-            pathname = system.pathname
-            if pathname:
-                pathname += ': '
-            msg = 'Deprecation warning: In V 3.0, the default Broyden solver setup will change ' + \
-                  'to use the BoundsEnforceLS line search.'
-            warn_deprecation(pathname + msg)
 
         self._disallow_distrib_solve()
 

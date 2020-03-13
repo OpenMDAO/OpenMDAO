@@ -4,8 +4,7 @@ import sys
 import unittest
 import itertools
 
-from six import assertRaisesRegex, StringIO, assertRegex
-
+from io import StringIO
 import numpy as np
 
 import openmdao.api as om
@@ -342,7 +341,7 @@ class TestProblem(unittest.TestCase):
         # check bad scalar value
         bad_val = -10*np.ones((10))
         prob['indep.num'] = bad_val
-        with assertRaisesRegex(self, ValueError, msg):
+        with self.assertRaisesRegex(ValueError, msg):
             prob.final_setup()
         prob._initial_condition_cache = {}
 
@@ -359,7 +358,7 @@ class TestProblem(unittest.TestCase):
 
         # check bad array value
         bad_val = -10*np.ones((10))
-        with assertRaisesRegex(self, ValueError, msg):
+        with self.assertRaisesRegex(ValueError, msg):
             prob['indep.arr'] = bad_val
 
         # check valid list value
@@ -369,7 +368,7 @@ class TestProblem(unittest.TestCase):
 
         # check bad list value
         bad_val = bad_val.tolist()
-        with assertRaisesRegex(self, ValueError, msg):
+        with self.assertRaisesRegex(ValueError, msg):
             prob['indep.arr'] = bad_val
 
     def test_compute_totals_basic(self):
@@ -1039,19 +1038,19 @@ class TestProblem(unittest.TestCase):
         prob.run_model()
 
         msg = "Can't express variable 'comp.x' with units of 'cm' in units of 'degK'."
-        with assertRaisesRegex(self, TypeError, msg):
+        with self.assertRaisesRegex(TypeError, msg):
             prob.get_val('comp.x', 'degK')
 
         msg = "Can't set variable 'comp.x' with units 'cm' to value with units 'degK'."
-        with assertRaisesRegex(self, TypeError, msg):
+        with self.assertRaisesRegex(TypeError, msg):
             prob.set_val('comp.x', 55.0, 'degK')
 
         msg = "Can't express variable 'no_unit.x' with units of 'None' in units of 'degK'."
-        with assertRaisesRegex(self, TypeError, msg):
+        with self.assertRaisesRegex(TypeError, msg):
             prob.get_val('no_unit.x', 'degK')
 
         msg = "Can't set variable 'no_unit.x' with units 'None' to value with units 'degK'."
-        with assertRaisesRegex(self, TypeError, msg):
+        with self.assertRaisesRegex(TypeError, msg):
             prob.set_val('no_unit.x', 55.0, 'degK')
 
     def test_feature_get_set_with_units(self):
@@ -1266,34 +1265,6 @@ class TestProblem(unittest.TestCase):
         else:
             self.fail('Expecting TypeError')
 
-    def test_root_deprecated(self):
-        # testing the root property
-        msg = "The 'root' property provides backwards compatibility " \
-              "with OpenMDAO <= 1.x ; use 'model' instead."
-
-        prob = om.Problem()
-
-        # check deprecation on setter & getter
-        with assert_warning(DeprecationWarning, msg):
-            prob.root = om.Group()
-
-        with assert_warning(DeprecationWarning, msg):
-            prob.root
-
-        # testing the root kwarg
-        with self.assertRaises(ValueError) as cm:
-            prob = om.Problem(root=om.Group(), model=om.Group())
-
-        self.assertEqual(str(cm.exception),
-                         "Problem: Cannot specify both 'root' and 'model'. "
-                         "'root' has been deprecated, please use 'model'.")
-
-        msg = "The 'root' argument provides backwards " \
-              "compatibility with OpenMDAO <= 1.x ; use 'model' instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            prob = om.Problem(root=om.Group())
-
     def test_args(self):
         # defaults
         prob = om.Problem()
@@ -1422,7 +1393,7 @@ class TestProblem(unittest.TestCase):
         p_opt.model = SellarOneComp(solve_y1=SOLVE_Y1, solve_y2=SOLVE_Y2)
 
         if SOLVE_Y1 or SOLVE_Y2:
-            newton = p_opt.model.nonlinear_solver = om.NewtonSolver()
+            newton = p_opt.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
             newton.options['iprint'] = 0
 
         # NOTE: need to have this direct solver attached to the sellar comp until I define a solve_linear for it
@@ -1493,7 +1464,7 @@ class TestProblem(unittest.TestCase):
 
             def configure(self):
                 # This will solve it.
-                self.sub.nonlinear_solver = om.NewtonSolver()
+                self.sub.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
                 self.sub.linear_solver = om.ScipyKrylov()
 
         top = om.Problem(model=Super())
@@ -1543,7 +1514,7 @@ class TestProblem(unittest.TestCase):
         top.setup()
 
         # These solvers override the ones set in the setup method of the 'sub' groups
-        top.model.sub.nonlinear_solver = om.NewtonSolver()
+        top.model.sub.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         top.model.sub.linear_solver = om.ScipyKrylov()
 
         self.assertTrue(isinstance(top.model.sub.nonlinear_solver, om.NewtonSolver))
@@ -1773,7 +1744,7 @@ class TestProblem(unittest.TestCase):
 
             def configure(self):
                 # This will solve it.
-                self.sub.nonlinear_solver = om.NewtonSolver()
+                self.sub.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
                 self.sub.linear_solver = om.ScipyKrylov()
 
         top = om.Problem(model=Super())
@@ -1823,7 +1794,7 @@ class TestProblem(unittest.TestCase):
         top.setup()
 
         # This will solve it.
-        top.model.sub.nonlinear_solver = om.NewtonSolver()
+        top.model.sub.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         top.model.sub.linear_solver = om.ScipyKrylov()
 
         self.assertTrue(isinstance(top.model.sub.nonlinear_solver, om.NewtonSolver))
@@ -1883,11 +1854,11 @@ class TestProblem(unittest.TestCase):
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
         self.assertEquals(output[1], r'Design Variables')
-        assertRegex(self, output[5], r'^pz.z +\|[0-9. e+-]+\| +2')
+        self.assertRegex(output[5], r'^pz.z +\|[0-9. e+-]+\| +2')
         self.assertEquals(output[9], r'Constraints')
-        assertRegex(self, output[14], r'^con_cmp2.con2 +\[[0-9. e+-]+\] +1')
+        self.assertRegex(output[14], r'^con_cmp2.con2 +\[[0-9. e+-]+\] +1')
         self.assertEquals(output[17], r'Objectives')
-        assertRegex(self, output[21], r'^obj_cmp.obj +\[[0-9. e+-]+\] +1')
+        self.assertRegex(output[21], r'^obj_cmp.obj +\[[0-9. e+-]+\] +1')
 
         # With show_promoted_name=False
         stdout = sys.stdout
@@ -1898,9 +1869,9 @@ class TestProblem(unittest.TestCase):
         finally:
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
-        assertRegex(self, output[5], r'^z +\|[0-9. e+-]+\| +2')
-        assertRegex(self, output[14], r'^con2 +\[[0-9. e+-]+\] +1')
-        assertRegex(self, output[21], r'^obj +\[[0-9. e+-]+\] +1')
+        self.assertRegex(output[5], r'^z +\|[0-9. e+-]+\| +2')
+        self.assertRegex(output[14], r'^con2 +\[[0-9. e+-]+\] +1')
+        self.assertRegex(output[21], r'^obj +\[[0-9. e+-]+\] +1')
 
         # With all the optional columns
         stdout = sys.stdout
@@ -1927,11 +1898,11 @@ class TestProblem(unittest.TestCase):
         finally:
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
-        assertRegex(self, output[3],
+        self.assertRegex(output[3],
                     r'^name\s+value\s+size\s+lower\s+upper\s+ref\s+ref0\s+'
                     r'indices\s+adder\s+scaler\s+parallel_deriv_color\s+'
                     r'vectorize_derivs\s+cache_linear_solution')
-        assertRegex(self, output[5],
+        self.assertRegex(output[5],
                     r'^pz.z\s+\|[0-9.e+-]+\|\s+2\s+\|10.0\|\s+\|[0-9.e+-]+\|\s+None\s+'
                     r'None\s+None\s+None\s+None\s+None\s+False\s+False')
 
@@ -1960,12 +1931,12 @@ class TestProblem(unittest.TestCase):
         finally:
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
-        assertRegex(self, output[6], r'^\s+value:')
-        assertRegex(self, output[7], r'^\s+array+\(+\[[0-9., e+-]+\]+\)')
-        assertRegex(self, output[9], r'^\s+lower:')
-        assertRegex(self, output[10], r'^\s+array+\(+\[[0-9., e+-]+\]+\)')
-        assertRegex(self, output[12], r'^\s+upper:')
-        assertRegex(self, output[13], r'^\s+array+\(+\[[0-9., e+-]+\]+\)')
+        self.assertRegex(output[6], r'^\s+value:')
+        self.assertRegex(output[7], r'^\s+array+\(+\[[0-9., e+-]+\]+\)')
+        self.assertRegex(output[9], r'^\s+lower:')
+        self.assertRegex(output[10], r'^\s+array+\(+\[[0-9., e+-]+\]+\)')
+        self.assertRegex(output[12], r'^\s+upper:')
+        self.assertRegex(output[13], r'^\s+array+\(+\[[0-9., e+-]+\]+\)')
 
     def test_feature_list_problem_vars(self):
         import numpy as np

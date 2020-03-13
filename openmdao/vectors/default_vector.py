@@ -1,11 +1,6 @@
 """Define the default Vector class."""
-from __future__ import division
-
 from copy import deepcopy
 import numbers
-
-from six import iteritems, itervalues
-from six.moves import zip
 
 import numpy as np
 

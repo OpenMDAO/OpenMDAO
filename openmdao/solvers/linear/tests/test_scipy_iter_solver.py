@@ -1,8 +1,5 @@
 """Test the ScipyKrylov linear solver class."""
 
-from __future__ import division, print_function
-
-from six import iteritems
 import unittest
 
 import numpy as np
@@ -38,13 +35,7 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
 
     def test_solve_linear_scipy(self):
         """Solve implicit system with ScipyKrylov."""
-
-        # use ScipyIterativeSolver here to check for deprecation warning and verify that the deprecated
-        # class still gets the right answer without duplicating this test.
-        msg = "ScipyIterativeSolver is deprecated.  Use ScipyKrylov instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            group = TestImplicitGroup(lnSolverClass=lambda : om.ScipyIterativeSolver(solver=self.linear_solver_name))
+        group = TestImplicitGroup(lnSolverClass=lambda : om.ScipyKrylov(solver=self.linear_solver_name))
 
         p = om.Problem(group)
         p.setup()
@@ -138,20 +129,6 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         output = d_residuals._data
         assert_rel_error(self, output, g1.expected_solution, 3e-15)
 
-    def test_preconditioner_deprecation(self):
-
-        group = TestImplicitGroup(lnSolverClass=self.linear_solver_class)
-
-        msg = "The 'preconditioner' property provides backwards compatibility " \
-            + "with OpenMDAO <= 1.x ; use 'precon' instead."
-
-        # check deprecation on setter & getter
-        with assert_warning(DeprecationWarning, msg):
-            group.linear_solver.preconditioner = om.LinearBlockGS()
-
-        with assert_warning(DeprecationWarning, msg):
-            group.linear_solver.preconditioner
-
     def test_linear_solution_cache(self):
         # Test derivatives across a converged Sellar model. When caching
         # is performed, the second solve takes less iterations than the
@@ -175,9 +152,9 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        J = prob.driver._compute_totals(of=['y'], wrt=['x'], global_names=False, return_format='flat_dict')
+        J = prob.driver._compute_totals(of=['y'], wrt=['x'], use_abs_names=False, return_format='flat_dict')
         icount1 = prob.model.linear_solver._iter_count
-        J = prob.driver._compute_totals(of=['y'], wrt=['x'], global_names=False, return_format='flat_dict')
+        J = prob.driver._compute_totals(of=['y'], wrt=['x'], use_abs_names=False, return_format='flat_dict')
         icount2 = prob.model.linear_solver._iter_count
 
         # Should take less iterations when starting from previous solution.
@@ -201,9 +178,9 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        J = prob.driver._compute_totals(of=['y'], wrt=['x'], global_names=False, return_format='flat_dict')
+        J = prob.driver._compute_totals(of=['y'], wrt=['x'], use_abs_names=False, return_format='flat_dict')
         icount1 = prob.model.linear_solver._iter_count
-        J = prob.driver._compute_totals(of=['y'], wrt=['x'], global_names=False, return_format='flat_dict')
+        J = prob.driver._compute_totals(of=['y'], wrt=['x'], use_abs_names=False, return_format='flat_dict')
         icount2 = prob.model.linear_solver._iter_count
 
         # Should take less iterations when starting from previous solution.
@@ -371,7 +348,7 @@ class TestScipyKrylovFeature(unittest.TestCase):
         model.connect('sub2.q2.x', 'sub2.z2.x')
         model.connect('sub2.z2.y', 'sub1.q1.c')
 
-        model.nonlinear_solver = om.NewtonSolver()
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         model.linear_solver = om.ScipyKrylov()
 
         prob.setup()

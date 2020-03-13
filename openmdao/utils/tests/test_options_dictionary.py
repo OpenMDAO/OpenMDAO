@@ -2,9 +2,7 @@ from openmdao.api import OptionsDictionary
 
 import unittest
 
-from openmdao.utils.assert_utils import assert_warning
-
-from six import assertRegex
+from openmdao.utils.assert_utils import assert_warning, assert_no_warning
 
 from openmdao.core.explicitcomponent import ExplicitComponent
 
@@ -142,22 +140,6 @@ class TestOptionsDict(unittest.TestCase):
         expected_msg = "Option 'even_test' with value 3 is not an even number."
         self.assertEqual(expected_msg, str(context.exception))
 
-    def test_isvalid_deprecated_type(self):
-
-        msg = "In declaration of option 'even_test' the '_type' arg is deprecated.  Use 'types' instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            self.dict.declare('even_test', type_=int, check_valid=check_even)
-
-        self.dict['even_test'] = 2
-        self.dict['even_test'] = 4
-
-        with self.assertRaises(ValueError) as context:
-            self.dict['even_test'] = 3
-
-        expected_msg = "Option 'even_test' with value 3 is not an even number."
-        self.assertEqual(expected_msg, str(context.exception))
-
     def test_unnamed_args(self):
         with self.assertRaises(KeyError) as context:
             self.dict['test'] = 1
@@ -221,7 +203,7 @@ class TestOptionsDict(unittest.TestCase):
 
         expected_msg = ("Value \(<object object at 0x[0-9A-Fa-f]+>\) of option 'test' is not one of \[<object object at 0x[0-9A-Fa-f]+>,"
                         " <object object at 0x[0-9A-Fa-f]+>\].")
-        assertRegex(self, str(context.exception), expected_msg)
+        self.assertRegex(str(context.exception), expected_msg)
 
     def test_read_only(self):
         opt = OptionsDictionary(read_only=True)
@@ -231,7 +213,7 @@ class TestOptionsDict(unittest.TestCase):
             opt['permanent'] = 4.0
 
         expected_msg = ("Tried to set read-only option 'permanent'.")
-        assertRegex(self, str(context.exception), expected_msg)
+        self.assertRegex(str(context.exception), expected_msg)
 
     def test_bounds(self):
         self.dict.declare('x', default=1.0, lower=0.0, upper=2.0)
@@ -266,6 +248,26 @@ class TestOptionsDict(unittest.TestCase):
         expected_msg = "\"Option 'test' cannot be found\""
         self.assertEqual(expected_msg, str(context.exception))
 
+    def test_deprecated_option(self):
+        msg = 'Option "test1" is deprecated.'
+        self.dict.declare('test1', deprecation=msg)
+
+        # test double set
+        with assert_warning(DeprecationWarning, msg):
+            self.dict['test1'] = None
+        # Should only generate warning first time
+        with assert_no_warning(DeprecationWarning, msg):
+            self.dict['test1'] = None
+
+        # Also test set and then get
+        msg = 'Option "test2" is deprecated.'
+        self.dict.declare('test2', deprecation=msg)
+
+        with assert_warning(DeprecationWarning, msg):
+            self.dict['test2'] = None
+        # Should only generate warning first time
+        with assert_no_warning(DeprecationWarning, msg):
+            option = self.dict['test2']
 
 if __name__ == "__main__":
     unittest.main()

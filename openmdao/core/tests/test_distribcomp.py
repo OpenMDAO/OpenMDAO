@@ -1,4 +1,3 @@
-from __future__ import print_function
 
 import unittest
 import time
@@ -177,8 +176,8 @@ class DistribInputDistribOutputComp(om.ExplicitComponent):
         start = offsets[rank]
         end = start + sizes[rank]
 
-        self.add_input('invec', np.ones(sizes[rank], float),
-                       src_indices=np.arange(start, end, dtype=int))
+        # don't set src_indices on the input and just use default behavior
+        self.add_input('invec', np.ones(sizes[rank], float))
         self.add_output('outvec', np.ones(sizes[rank], float))
 
 
@@ -607,82 +606,6 @@ class MPITests(unittest.TestCase):
 
         if MPI and self.comm.rank == 0:
             self.assertTrue(all(C3._outputs['outvec'] == np.array(range(size, 0, -1), float)*4))
-
-
-@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-class DeprecatedMPITests(unittest.TestCase):
-
-    N_PROCS = 2
-
-    def test_distrib_idx_in_full_out_deprecated(self):
-
-        class DeprecatedDistribInputComp(om.ExplicitComponent):
-            """Deprecated version of DistribInputComp, uses attribute instead of option."""
-
-            def __init__(self, arr_size=11):
-                super(DeprecatedDistribInputComp, self).__init__()
-                self.arr_size = arr_size
-                self.distributed = True
-
-            def compute(self, inputs, outputs):
-                if MPI:
-                    self.comm.Allgatherv(inputs['invec']*2.0,
-                                         [outputs['outvec'], self.sizes,
-                                          self.offsets, MPI.DOUBLE])
-                else:
-                    outputs['outvec'] = inputs['invec'] * 2.0
-
-            def setup(self):
-                comm = self.comm
-                rank = comm.rank
-
-                self.sizes, self.offsets = evenly_distrib_idxs(comm.size, self.arr_size)
-                start = self.offsets[rank]
-                end = start + self.sizes[rank]
-
-                self.add_input('invec', np.ones(self.sizes[rank], float),
-                               src_indices=np.arange(start, end, dtype=int))
-                self.add_output('outvec', np.ones(self.arr_size, float),
-                                shape=np.int32(self.arr_size))
-
-        size = 11
-
-        p = om.Problem()
-        top = p.model
-
-        C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
-
-        # check deprecation on setter & getter
-        msg = "The 'distributed' property provides backwards compatibility " \
-              "with OpenMDAO <= 2.4.0 ; use the 'distributed' option instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            C2 = top.add_subsystem("C2", DeprecatedDistribInputComp(arr_size=size))
-
-        with assert_warning(DeprecationWarning, msg):
-            C2.distributed
-
-        # continue to make sure everything still works with the deprecation
-        top.connect('C1.outvec', 'C2.invec')
-
-        # Conclude setup but don't run model.
-        msg = "The 'distributed' option is set to True for Component C2, " \
-              "but there is no distributed vector implementation (MPI/PETSc) " \
-              "available. The default non-distributed vectors will be used."
-
-        if PETScVector is None:
-            with assert_warning(UserWarning, msg):
-                p.setup()
-        else:
-            p.setup()
-
-        p.final_setup()
-
-        C1._inputs['invec'] = np.array(range(size, 0, -1), float)
-
-        p.run_model()
-
-        self.assertTrue(all(C2._outputs['outvec'] == np.array(range(size, 0, -1), float)*4))
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")

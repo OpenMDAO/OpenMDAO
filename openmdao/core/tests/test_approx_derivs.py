@@ -1,8 +1,6 @@
 """ Testing for group finite differencing."""
 import itertools
 import unittest
-from six import iterkeys
-from six.moves import range
 
 try:
     from parameterized import parameterized
@@ -152,7 +150,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        prob.driver._compute_totals(of=['parab.f_xy'], wrt=['px.x'], global_names=True)
+        prob.driver._compute_totals(of=['parab.f_xy'], wrt=['px.x'], use_abs_names=True)
 
         # 1. run_model; 2. step x
         self.assertEqual(model.parab.count, 2)
@@ -334,7 +332,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         model.add_subsystem('comp', TestImplCompArrayDenseNoSolve())
         model.connect('p_rhs.rhs', 'comp.rhs')
 
-        model.nonlinear_solver = om.NewtonSolver()
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         model.linear_solver = om.ScipyKrylov()
         model.approx_totals()
 
@@ -636,7 +634,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        sub.nonlinear_solver = om.NewtonSolver()
+        sub.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         sub.linear_solver = om.ScipyKrylov(assemble_jac=True)
 
         model.approx_totals(method='fd', step=1e-5)
@@ -675,7 +673,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        sub.nonlinear_solver = om.NewtonSolver()
+        sub.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         sub.linear_solver = om.ScipyKrylov(assemble_jac=True)
 
         model.approx_totals(method='fd', step=1e-5)
@@ -1282,7 +1280,7 @@ class TestGroupComplexStep(unittest.TestCase):
         model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        sub.nonlinear_solver = om.NewtonSolver()
+        sub.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         sub.linear_solver = om.DirectSolver(assemble_jac=False)
         sub.nonlinear_solver.options['atol'] = 1e-10
         sub.nonlinear_solver.options['rtol'] = 1e-10
@@ -1333,7 +1331,7 @@ class TestGroupComplexStep(unittest.TestCase):
         model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        sub.nonlinear_solver = om.NewtonSolver()
+        sub.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         sub.linear_solver = om.DirectSolver()
         sub.options['assembled_jac_type'] = 'dense'
 
@@ -1386,7 +1384,7 @@ class TestGroupComplexStep(unittest.TestCase):
         model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        sub.nonlinear_solver = om.NewtonSolver()
+        sub.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         sub.linear_solver = om.DirectSolver()
         sub.options['assembled_jac_type'] = 'csc'
 
@@ -1444,7 +1442,7 @@ class TestGroupComplexStep(unittest.TestCase):
                 sub.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0', con2=0.0, y2=0.0),
                                   promotes=['con2', 'y2'])
 
-                self.nonlinear_solver = om.NewtonSolver()
+                self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
                 self.linear_solver = om.LinearBlockGS()
                 self.linear_solver.options['maxiter'] = 25
                 self.linear_solver.options['atol'] = 1e-16
@@ -1500,7 +1498,7 @@ class TestGroupComplexStep(unittest.TestCase):
                 sub.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0', con2=0.0, y2=0.0),
                                   promotes=['con2', 'y2'])
 
-                self.nonlinear_solver = om.NewtonSolver()
+                self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
                 self.linear_solver = om.LinearBlockGS()
                 self.linear_solver.options['maxiter'] = 25
                 self.linear_solver.options['atol'] = 1e-16
@@ -1556,7 +1554,7 @@ class TestGroupComplexStep(unittest.TestCase):
                 sub.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0', con2=0.0, y2=0.0),
                                   promotes=['con2', 'y2'])
 
-                self.nonlinear_solver = om.NewtonSolver()
+                self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
                 self.linear_solver = om.LinearBlockGS()
                 self.linear_solver.options['maxiter'] = 25
                 self.linear_solver.options['atol'] = 1e-16
@@ -1607,7 +1605,7 @@ class TestGroupComplexStep(unittest.TestCase):
         model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        sub.nonlinear_solver = om.NewtonSolver()
+        sub.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         sub.linear_solver = om.ScipyKrylov()
         sub.nonlinear_solver.options['atol'] = 1e-10
         sub.nonlinear_solver.options['rtol'] = 1e-10
@@ -1653,7 +1651,7 @@ class TestGroupComplexStep(unittest.TestCase):
         model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        sub.nonlinear_solver = om.NewtonSolver()
+        sub.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         sub.linear_solver = om.ScipyKrylov(assemble_jac=True)
         sub.nonlinear_solver.options['atol'] = 1e-20
         sub.nonlinear_solver.options['rtol'] = 1e-20
@@ -1702,7 +1700,7 @@ class TestGroupComplexStep(unittest.TestCase):
         # Finite difference for the Newton linear solve only
         subfd.approx_totals(method='fd')
 
-        sub.nonlinear_solver = om.NewtonSolver()
+        sub.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         sub.nonlinear_solver.options['maxiter'] = 12
         sub.linear_solver = om.DirectSolver(assemble_jac=False)
         sub.nonlinear_solver.options['atol'] = 1e-20
@@ -1748,7 +1746,7 @@ class TestGroupComplexStep(unittest.TestCase):
         model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        prob.model.nonlinear_solver = om.NewtonSolver()
+        prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         prob.model.linear_solver = om.DirectSolver(assemble_jac=False)
 
         prob.model.approx_totals(method='cs')
@@ -2232,7 +2230,7 @@ class ParallelFDParametricTestCase(unittest.TestCase):
 
         expected_values = model.expected_values
         if expected_values:
-            actual = {key: problem[key] for key in iterkeys(expected_values)}
+            actual = {key: problem[key] for key in expected_values}
             assert_rel_error(self, actual, expected_values, 1e-4)
 
         expected_totals = model.expected_totals

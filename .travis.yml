@@ -15,13 +15,10 @@ language: generic
 
 env:
   matrix:
-    # test with the latest version of Python 3.x; due to issues with PETSc 3.12, stay with 3.11 and
-    # install from maint-3.11 to get this fix: https://bitbucket.org/petsc/petsc4py/commits/a013d13
-    - PY=3   NUMPY=1.18 SCIPY=1.4 PETSc=git+https://bitbucket.org/petsc/petsc4py.git@maint-3.11 UPLOAD_DOCS=1
+    # test with the latest version of Python 3.x
+    - PY=3   NUMPY=1.18 SCIPY=1.4 PETSc=3.12 UPLOAD_DOCS=1
     - PY=3.7 NUMPY=1.17 SCIPY=1.3
     - PY=3.6 NUMPY=1.16 SCIPY=1.2 PETSc=3.10.1
-    - PY=2.7 NUMPY=1.15 SCIPY=1.2 PETSc=3.9
-    - PY=2.7 NUMPY=1.14 SCIPY=1.1
 
 git:
   depth: 99999
@@ -113,6 +110,7 @@ install:
     echo "  > Cloning pyOptSparse from mdolab";
     git clone https://github.com/mdolab/pyoptsparse.git;
     cd pyoptsparse;
+    git checkout tags/v1.2;
 
     if [ "$SNOPT_LOCATION" ] && [ "${PY:0:1}" = "3" ]; then
       cd pyoptsparse/pySNOPT;
@@ -122,8 +120,12 @@ install:
     fi
 
     echo "  > Install pyOptSparse";
+    pip install -r requirements.txt;
     pip install .;
     cd ..;
+
+    echo " >> Installing optional packages for test coverage";
+    pip install psutil objgraph git+https://github.com/mdolab/pyxdsm;
 
     if [ "$PETSc" ]; then
       echo " >> Installing parallel processing dependencies";
@@ -157,18 +159,20 @@ script:
   fi
 
 # run the tests from down here to see if it can work without being at top level
-# only do coverage on the upload machine.
+# only do coverage on the upload machine (and show skipped tests).
 - if [ "$UPLOAD_DOCS" ]; then
-    testflo -n 1 openmdao --coverage  --coverpkg openmdao --cover-omit \*tests/\*  --cover-omit \*devtools/\* --cover-omit \*test_suite/\* --cover-omit \*docs/\* --cover-omit \*code_review/\*;
+    testflo -n 1 openmdao --show_skipped --coverage  --coverpkg openmdao --cover-omit \*tests/\*  --cover-omit \*devtools/\* --cover-omit \*test_suite/\* --cover-omit \*docs/\* --cover-omit \*code_review/\*;
   else
-    testflo -n 1 --timeout=120 openmdao;
+    testflo -n 1 openmdao --timeout=120;
   fi
 
 after_success:
 # again, only run coverage operations on the upload machine after success.
+# strip the site-package path so that links works on coveralls.io
 - if [ "$UPLOAD_DOCS" ]; then
     coveralls --rcfile=../../.coveragerc --output=coveralls.json;
-    sed 's/\/home\/travis\/miniconda\/envs\/PY$PY\/lib\/python'"$PY"'\/site-packages\///g' < coveralls.json > coveralls-upd.json;
+    SITE=`python -c 'import site; print(site.getsitepackages()[0])'`;
+    sed "s/${SITE//\//\\/}\///g" < coveralls.json > coveralls-upd.json;
     coveralls --upload=coveralls-upd.json;
   fi
 

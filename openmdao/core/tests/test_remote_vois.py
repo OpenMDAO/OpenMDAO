@@ -1,4 +1,3 @@
-from __future__ import print_function
 
 import unittest
 import numpy as np
@@ -42,7 +41,7 @@ class RemoteVOITestCase(unittest.TestCase):
     def test_remote_voi(self):
         prob = Problem()
 
-        prob.model.add_subsystem('par', ParallelGroup())
+        par = prob.model.add_subsystem('par', ParallelGroup())
 
         prob.model.par.add_subsystem('G1', Mygroup())
         prob.model.par.add_subsystem('G2', Mygroup())
@@ -57,6 +56,9 @@ class RemoteVOITestCase(unittest.TestCase):
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.setup()
+
+        self.assertEqual('par.G1', par.G1.pathname)
+        self.assertEqual('par.G2', par.G2.pathname)
 
         prob.run_driver()
 

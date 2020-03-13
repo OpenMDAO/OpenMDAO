@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 import unittest
 import os
 from fnmatch import fnmatch, filter as fnfilter

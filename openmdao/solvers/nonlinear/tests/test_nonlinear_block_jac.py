@@ -74,8 +74,8 @@ class TestNLBlockJacobi(unittest.TestCase):
 
         model.linear_solver = om.LinearBlockGS()
 
-        nlgbs = model.nonlinear_solver = om.NonlinearBlockJac()
-        nlgbs.options['maxiter'] = 4
+        nlbgs = model.nonlinear_solver = om.NonlinearBlockJac()
+        nlbgs.options['maxiter'] = 4
 
         prob.setup()
 
@@ -108,8 +108,8 @@ class TestNLBlockJacobi(unittest.TestCase):
 
         model.linear_solver = om.LinearBlockGS()
 
-        nlgbs = model.nonlinear_solver = om.NonlinearBlockJac()
-        nlgbs.options['rtol'] = 1e-3
+        nlbgs = model.nonlinear_solver = om.NonlinearBlockJac()
+        nlbgs.options['rtol'] = 1e-3
 
         prob.setup()
 
@@ -142,8 +142,8 @@ class TestNLBlockJacobi(unittest.TestCase):
 
         model.linear_solver = om.LinearBlockGS()
 
-        nlgbs = model.nonlinear_solver = om.NonlinearBlockJac()
-        nlgbs.options['atol'] = 1e-2
+        nlbgs = model.nonlinear_solver = om.NonlinearBlockJac()
+        nlbgs.options['atol'] = 1e-2
 
         prob.setup()
 

@@ -1,8 +1,6 @@
 """Definition of the Matrix Vector Product Component."""
 
 
-from six import string_types
-
 import numpy as np
 import scipy.linalg as spla
 
@@ -38,19 +36,19 @@ class MatrixVectorProductComp(ExplicitComponent):
         self.options.declare('vec_size', types=int, default=1,
                              desc='The number of points at which the matrix'
                                   '-vector product is to be computed')
-        self.options.declare('A_name', types=string_types, default='A',
+        self.options.declare('A_name', types=str, default='A',
                              desc='The variable name for the matrix.')
         self.options.declare('A_shape', types=tuple, default=(3, 3),
                              desc='The shape of the input matrix at a single point.')
-        self.options.declare('A_units', types=string_types, allow_none=True, default=None,
+        self.options.declare('A_units', types=str, allow_none=True, default=None,
                              desc='The units of the input matrix.')
-        self.options.declare('x_name', types=string_types, default='x',
+        self.options.declare('x_name', types=str, default='x',
                              desc='The name of the input vector.')
-        self.options.declare('x_units', types=string_types, default=None, allow_none=True,
+        self.options.declare('x_units', types=str, default=None, allow_none=True,
                              desc='The units of the input vector.')
-        self.options.declare('b_name', types=string_types, default='b',
+        self.options.declare('b_name', types=str, default='b',
                              desc='The variable name of the output vector.')
-        self.options.declare('b_units', types=string_types, allow_none=True, default=None,
+        self.options.declare('b_units', types=str, allow_none=True, default=None,
                              desc='The units of the output vector.')
 
     def setup(self):

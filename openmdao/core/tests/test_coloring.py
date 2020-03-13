@@ -1,4 +1,3 @@
-from __future__ import print_function
 
 import os
 import sys
@@ -10,7 +9,7 @@ import unittest
 import numpy as np
 import math
 
-from six import StringIO
+from io import StringIO
 
 from distutils.version import LooseVersion
 from numpy.testing import assert_array_almost_equal, assert_almost_equal
@@ -23,7 +22,7 @@ except ImportError:
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.utils.general_utils import set_pyoptsparse_opt
-from openmdao.utils.coloring import Coloring, _compute_coloring, array_viz
+from openmdao.utils.coloring import Coloring, _compute_coloring, array_viz, compute_total_coloring
 from openmdao.utils.mpi import MPI
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.test_suite.tot_jac_builder import TotJacBuilder
@@ -95,7 +94,7 @@ class DynPartialsComp(om.ExplicitComponent):
 
 def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True,
             recorder=None, has_lin_constraint=True, has_diag_partials=True, partial_coloring=False,
-            **options):
+            use_vois=True, **options):
 
     p = om.Problem(model=CounterGroup())
 
@@ -159,23 +158,24 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True
     p.driver.options['debug_print'] = ['totals']
     p.driver.options.update(options)
 
-    p.model.add_design_var('x')
-    p.model.add_design_var('y')
-    p.model.add_design_var('r', lower=.5, upper=10)
+    if use_vois:
+        p.model.add_design_var('x')
+        p.model.add_design_var('y')
+        p.model.add_design_var('r', lower=.5, upper=10)
 
-    # nonlinear constraints
-    p.model.add_constraint('r_con.g', equals=0)
+        # nonlinear constraints
+        p.model.add_constraint('r_con.g', equals=0)
 
-    p.model.add_constraint('theta_con.g', lower=-1e-5, upper=1e-5, indices=EVEN_IND)
-    p.model.add_constraint('delta_theta_con.g', lower=-1e-5, upper=1e-5)
+        p.model.add_constraint('theta_con.g', lower=-1e-5, upper=1e-5, indices=EVEN_IND)
+        p.model.add_constraint('delta_theta_con.g', lower=-1e-5, upper=1e-5)
 
-    # this constrains x[0] to be 1 (see definition of l_conx)
-    p.model.add_constraint('l_conx.g', equals=0, linear=False, indices=[0,])
+        # this constrains x[0] to be 1 (see definition of l_conx)
+        p.model.add_constraint('l_conx.g', equals=0, linear=False, indices=[0,])
 
-    # linear constraint (if has_lin_constraint is set)
-    p.model.add_constraint('y', equals=0, indices=[0,], linear=has_lin_constraint)
+        # linear constraint (if has_lin_constraint is set)
+        p.model.add_constraint('y', equals=0, indices=[0,], linear=has_lin_constraint)
 
-    p.model.add_objective('circle.area', ref=-1)
+        p.model.add_objective('circle.area', ref=-1)
 
     # # setup coloring
     if color_info is not None:
@@ -185,7 +185,10 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True
         p.driver.add_recorder(recorder)
 
     p.setup(mode=mode, derivatives=derivs)
-    p.run_driver()
+    if use_vois:
+        p.run_driver()
+    else:
+        p.run_model()
 
     return p
 
@@ -358,7 +361,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
 
         self.assertFalse(failed, "Optimization failed.")
 
-        self.assertTrue('In mode: fwd, Solving variable(s):' in output)
+        self.assertTrue('In mode: fwd, Solving variable(s) using simul coloring:' in output)
         self.assertTrue("('indeps.y', [1, 3, 5, 7, 9])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
@@ -373,7 +376,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
 
         self.assertFalse(failed, "Optimization failed.")
 
-        self.assertTrue('In mode: rev, Solving variable(s):' in output)
+        self.assertTrue('In mode: rev, Solving variable(s) using simul coloring:' in output)
         self.assertTrue("('r_con.g', [0])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
@@ -482,6 +485,25 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         # - where N is 21 for the uncolored case and 21 * 4 for the dynamic colored case.
         self.assertEqual((p.model._solve_count - 21) / 21,
                          (p_color.model._solve_count - 21 * 4) / 5)
+
+    def test_problem_total_coloring_auto(self):
+
+        p = run_opt(om.ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False, use_vois=False)
+        coloring = compute_total_coloring(p,
+                                          of=['r_con.g', 'theta_con.g', 'delta_theta_con.g',
+                                              'l_conx.g', 'y', 'circle.area'],
+                                          wrt=['x', 'y', 'r'])
+        self.assertEqual(coloring.total_solves(), 5)
+
+    def test_problem_total_coloring_auto_mixed_vois(self):
+
+        p = run_opt(om.ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False,)
+        coloring = compute_total_coloring(p,
+                                          of=['r_con.g', 'theta_con.g', 'delta_theta_con.g',
+                                              'l_conx.g', 'y', 'circle.area'],
+                                          wrt=['x', 'y', 'r'])
+        self.assertEqual(coloring.total_solves(), 5)
+        coloring.display_txt()  # leave this in because at one point it caused an exception
 
     def test_simul_coloring_example(self):
 
@@ -851,11 +873,11 @@ class MatMultMultipointTestCase(unittest.TestCase):
         p.driver = pyOptSparseDriver()
         p.driver.options['optimizer'] = OPTIMIZER
         p.driver.declare_coloring()
-        if OPTIMIZER == 'SLSQP':
+        if OPTIMIZER == 'SNOPT':
             p.driver.opt_settings['Major iterations limit'] = 100
             p.driver.opt_settings['Major feasibility tolerance'] = 1.0E-6
             p.driver.opt_settings['Major optimality tolerance'] = 1.0E-6
-            p.driver.opt_settings['iSumm'] = 6
+            # p.driver.opt_settings['iSumm'] = 6
 
         model = p.model
         for i in range(num_pts):
@@ -885,25 +907,35 @@ class MatMultMultipointTestCase(unittest.TestCase):
 
         model.add_objective('obj.y')
 
-        try:
-            p.setup()
+        p.setup()
 
-            p.run_driver()
+        p.run_driver()
 
-            J = p.compute_totals()
+        J = p.compute_totals()
 
-            for i in range(num_pts):
-                vname = 'par2.comp%d.A' % i
-                if vname in model._var_abs_names['input']:
-                    norm = np.linalg.norm(J['par2.comp%d.y'%i,'indep%d.x'%i] -
-                                          getattr(par2, 'comp%d'%i)._inputs['A'].dot(getattr(par1, 'comp%d'%i)._inputs['A']))
-                    self.assertLess(norm, 1.e-7)
-                elif vname not in model._var_allprocs_abs_names['input']:
-                    self.fail("Can't find variable par2.comp%d.A" % i)
+        for i in range(num_pts):
+            cname = 'par2.comp%d' % i
+            vname = cname + '.A'
+            if vname in model._var_abs_names['input']:
+                A1 = p.get_val('par1.comp%d.A'%i)
+                A2 = p.get_val('par2.comp%d.A'%i)
+                norm = np.linalg.norm(J['par2.comp%d.y'%i,'indep%d.x'%i] - A2.dot(A1))
+                self.assertLess(norm, 1.e-7)
 
-            print("final obj:", p['obj.y'])
-        except Exception as err:
-            print(str(err))
+        print("final obj:", p['obj.y'])
+
+
+# use_tempdirs is inherited
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class MatMultMultipointMPI2TestCase(MatMultMultipointTestCase):
+    N_PROCS = 2
+
+
+# use_tempdirs is inherited
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class MatMultMultipointMPI4TestCase(MatMultMultipointTestCase):
+    N_PROCS = 4
+
 
 class SimulColoringVarOutputTestClass(unittest.TestCase):
     def test_multi_variable_coloring_debug_print_totals(self):
@@ -917,10 +949,10 @@ class SimulColoringVarOutputTestClass(unittest.TestCase):
         p.driver.options['optimizer'] = 'SLSQP'
         p.driver.declare_coloring()
         p.driver.options['debug_print'] = ['totals']
-        # if OPTIMIZER == 'SLSQP':
-        #     p.driver.opt_settings['Major iterations limit'] = 100
-        #     p.driver.opt_settings['Major feasibility tolerance'] = 1.0E-6
-        #     p.driver.opt_settings['Major optimality tolerance'] = 1.0E-6
+        if OPTIMIZER == 'SNOPT':
+            p.driver.opt_settings['Major iterations limit'] = 100
+            p.driver.opt_settings['Major feasibility tolerance'] = 1.0E-6
+            p.driver.opt_settings['Major optimality tolerance'] = 1.0E-6
         #     p.driver.opt_settings['iSumm'] = 6
 
         model = p.model
@@ -957,7 +989,7 @@ class SimulColoringVarOutputTestClass(unittest.TestCase):
 
         self.assertFalse(failed, "Optimization failed.")
 
-        self.assertTrue('In mode: fwd, Solving variable(s):' in output)
+        self.assertTrue('In mode: fwd, Solving variable(s) using simul coloring:' in output)
         self.assertTrue("('indep0.x', [7])" in output)
         self.assertTrue("('indep1.x', [7])" in output)
         self.assertTrue("('indep2.x', [7])" in output)
@@ -1009,6 +1041,8 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
         if color == 'total':
             p.driver.declare_coloring()
             if fixed:
+                # NOTE: This call line is embedded in the 2.x->3.x api conversion guide. Do not
+                # modify without carefully checking the guide.
                 p.driver.use_fixed_coloring()
 
         indeps = model.add_subsystem('indeps', om.IndepVarComp())
@@ -1071,7 +1105,6 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
                               sizes=[3, 4, 5], color='partial', fixed=False)
         p.run_driver()
 
-        print('++++++++++++')
         p = self._build_model(ofnames=['w', 'x', 'y', 'z'], wrtnames=['a', 'b', 'c', 'd'],
                                 sizes=[3, 4, 5, 6], color='partial', fixed=True)
 
@@ -1154,4 +1187,3 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-

@@ -1,10 +1,8 @@
 """
 Unit and feature doc tests for partial derivative specifiation.
 """
-from __future__ import print_function, division
 import itertools
 import unittest
-from six import iteritems
 
 import numpy as np
 import scipy as sp
@@ -397,7 +395,7 @@ class TestJacobianFeatures(unittest.TestCase):
         }
 
         jac = units._subjacs_info
-        for deriv, val in iteritems(expected_subjacs):
+        for deriv, val in expected_subjacs.items():
             assert_rel_error(self, jac[deriv]['value'], val, 1e-6)
 
     def test_reference(self):

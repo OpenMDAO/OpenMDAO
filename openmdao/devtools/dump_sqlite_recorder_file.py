@@ -1,15 +1,10 @@
-from __future__ import print_function
 import pprint
 import sqlite3
 import sys
-from six import PY2, PY3, iteritems
 
 from openmdao.recorders.sqlite_recorder import blob_to_array
 
-if PY2:
-    import cPickle as pickle
-if PY3:
-    import pickle
+import pickle
 
 indent = 4 * ' '
 
@@ -46,14 +41,8 @@ if __name__ == '__main__':
     con = sqlite3.connect(filename)
     cur = con.cursor()
 
-    from six import PY2, PY3
-
-    if PY2:
-        def pickle_load(pickled_item):
-            return pickle.loads(str(pickled_item))
-    if PY3:
-        def pickle_load(pickled_item):
-            return pickle.loads(pickled_item)
+    def pickle_load(pickled_item):
+        return pickle.loads(pickled_item)
 
     # Driver metadata
     print_header('Driver Metadata', '=')
@@ -72,7 +61,7 @@ if __name__ == '__main__':
             vector = scaling_factors[in_out][linear_type]
             print(indent, in_out, linear_type)
             if vector:
-                for abs_name, view in iteritems(vector._views):
+                for abs_name, view in vector._views.items():
                     print(2 * indent, abs_name, view)
             else:
                 print(2 * indent, 'None')

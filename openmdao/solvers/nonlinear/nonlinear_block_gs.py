@@ -3,6 +3,7 @@
 import numpy as np
 
 from openmdao.solvers.solver import NonlinearSolver
+from openmdao.utils.mpi import MPI
 
 
 class NonlinearBlockGS(NonlinearSolver):
@@ -48,6 +49,8 @@ class NonlinearBlockGS(NonlinearSolver):
         """
         super(NonlinearBlockGS, self)._setup_solvers(system, depth)
 
+        rank = MPI.COMM_WORLD.rank if MPI is not None else 0
+
         if len(system._subsystems_allprocs) != len(system._subsystems_myproc):
             raise RuntimeError('{}: Nonlinear Gauss-Seidel cannot be used on a '
                                'parallel group.'.format(self.msginfo))
@@ -70,6 +73,10 @@ class NonlinearBlockGS(NonlinearSolver):
         self.options.declare('use_apply_nonlinear', types=bool, default=False,
                              desc="Set to True to always call apply_nonlinear on the solver's "
                              "system after solve_nonlinear has been called.")
+        self.options.declare('reraise_child_analysiserror', types=bool, default=False,
+                             desc='When the option is true, a solver will reraise any '
+                             'AnalysisError that arises during subsolve; when false, it will '
+                             'continue solving.')
 
     def _iter_initialize(self):
         """

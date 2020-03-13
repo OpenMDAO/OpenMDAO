@@ -1,13 +1,9 @@
 """
 Unit tests for Group.
 """
-from __future__ import print_function
 
 import itertools
 import unittest
-
-from six import assertRaisesRegex, iteritems
-from six.moves import range
 
 import numpy as np
 
@@ -90,6 +86,218 @@ class TestSubsystemConfigError(unittest.TestCase):
 
 class TestGroup(unittest.TestCase):
 
+    def test_promotes_outputs_in_config(self):
+
+        class SimpleGroup(om.Group):
+
+            def setup(self):
+
+                self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
+                self.add_subsystem('comp2', om.ExecComp('b=2*a'))
+
+            def configure(self):
+                self.promotes('comp2', outputs=['b'])
+
+        top = om.Problem(model=SimpleGroup())
+        top.setup()
+
+        self.assertEqual(top['b'], 1)
+        with self.assertRaises(KeyError) as cm:
+            top['a']
+
+        self.assertEqual(str(cm.exception),
+                         "'Problem: Variable name \"a\" not found.'")
+
+    def test_promotes_inputs_in_config(self):
+
+        class SimpleGroup(om.Group):
+
+            def setup(self):
+
+                self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
+                self.add_subsystem('comp2', om.ExecComp('b=2*a'))
+
+            def configure(self):
+                self.promotes('comp2', inputs=['a'])
+
+        top = om.Problem(model=SimpleGroup())
+        top.setup()
+
+        self.assertEqual(top['a'], 1)
+        with self.assertRaises(KeyError) as cm:
+            top['b']
+
+        self.assertEqual(str(cm.exception),
+                         "'Problem: Variable name \"b\" not found.'")
+
+    def test_promotes_in_config(self):
+
+        class SimpleGroup(om.Group):
+
+            def setup(self):
+
+                self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
+                self.add_subsystem('comp2', om.ExecComp('b=2*a'))
+
+            def configure(self):
+                self.promotes('comp1', any=['*'])
+
+        top = om.Problem(model=SimpleGroup())
+        top.setup()
+
+        self.assertEqual(top['x'], 5)
+        with self.assertRaises(KeyError) as cm:
+            top['a']
+
+        self.assertEqual(str(cm.exception),
+                         "'Problem: Variable name \"a\" not found.'")
+
+    def test_promotes_alias(self):
+        class SubGroup(om.Group):
+
+            def setup(self):
+                self.add_subsystem('comp1', om.ExecComp('x=2.0*a+3.0*b', a=3.0, b=4.0))
+
+            def configure(self):
+                self.promotes('comp1', inputs=['a'])
+
+        class TopGroup(om.Group):
+
+            def setup(self):
+                self.add_subsystem('sub', SubGroup())
+
+            def configure(self):
+                self.sub.promotes('comp1', inputs=['b'])
+                self.promotes('sub', inputs=[('b', 'bb')])
+
+        top = om.Problem(model=TopGroup())
+        top.setup()
+
+        self.assertEqual(top['bb'], 4.0)
+
+    def test_promotes_alias_from_parent(self):
+        class SubGroup(om.Group):
+
+            def setup(self):
+                self.add_subsystem('comp1', om.ExecComp('x=2.0*a+3.0*b+c', a=3.0, b=4.0))
+
+            def configure(self):
+                self.promotes('comp1', inputs=[('b', 'bb')])
+
+        class TopGroup(om.Group):
+
+            def setup(self):
+                self.add_subsystem('sub', SubGroup())
+
+            def configure(self):
+                self.sub.promotes('comp1', inputs=['b'])
+
+        top = om.Problem(model=TopGroup())
+
+        with self.assertRaises(RuntimeError) as context:
+            top.setup()
+
+        self.assertEqual(str(context.exception),
+                         "SubGroup (sub): Trying to promote 'b' when it has been aliased to 'bb'.")
+
+    def test_promotes_wildcard_rename(self):
+        class SubGroup(om.Group):
+
+            def setup(self):
+                self.add_subsystem('comp1', om.ExecComp('x=2.0+bb', bb=4.0))
+
+            def configure(self):
+                self.promotes('comp1', inputs=["b*"])
+
+        class TopGroup(om.Group):
+
+            def setup(self):
+                self.add_subsystem('sub', SubGroup())
+
+            def configure(self):
+                self.sub.promotes('comp1', inputs=[('bb', 'xx')])
+
+        top = om.Problem(model=TopGroup())
+
+        with self.assertRaises(RuntimeError) as context:
+            top.setup()
+
+        self.assertEqual(str(context.exception),
+                         "ExecComp (sub.comp1): promotes_inputs 'b*' matched 'bb' but 'bb' has been "
+                         "aliased to 'xx'.")
+
+    def test_promotes_wildcard_name(self):
+        class SubGroup(om.Group):
+
+            def setup(self):
+                self.add_subsystem('comp1', om.ExecComp('x=2.0+bb', bb=4.0))
+
+            def configure(self):
+                self.promotes('comp1', inputs=["b*"])
+
+        class TopGroup(om.Group):
+
+            def setup(self):
+                self.add_subsystem('sub', SubGroup())
+
+            def configure(self):
+                self.sub.promotes('comp1', inputs=['bb'])
+
+        top = om.Problem(model=TopGroup())
+
+        top.setup()
+
+    def test_multiple_promotes(self):
+
+        class BranchGroup(om.Group):
+
+            def setup(self):
+
+                b1 = self.add_subsystem('Branch1', om.Group())
+                g1 = b1.add_subsystem('G1', om.Group())
+                g2 = g1.add_subsystem('G2', om.Group())
+                g2.add_subsystem('comp1', om.ExecComp('b=2.0*a', a=3.0, b=6.0))
+
+            def configure(self):
+                self.Branch1.G1.G2.promotes('comp1', inputs=['a'])
+                self.Branch1.G1.promotes('G2', any=['*'])
+
+        top = om.Problem(model=BranchGroup())
+        top.setup()
+
+        self.assertEqual(top['Branch1.G1.a'], 3)
+        self.assertEqual(top['Branch1.G1.comp1.b'], 6)
+        with self.assertRaises(KeyError) as cm:
+            top['Branch1.G1.comp1.a']
+
+        self.assertEqual(str(cm.exception),
+                         "'Problem: Variable name \"Branch1.G1.comp1.a\" not found.'")
+
+    def test_multiple_promotes_collision(self):
+
+        class SubGroup(om.Group):
+
+            def setup(self):
+                self.add_subsystem('comp1', om.ExecComp('x=2.0*a+3.0*b', a=3.0, b=4.0))
+
+            def configure(self):
+                self.promotes('comp1', inputs=['a'])
+
+        class TopGroup(om.Group):
+
+            def setup(self):
+                self.add_subsystem('sub', SubGroup())
+
+            def configure(self):
+                self.sub.promotes('comp1', inputs=['b'])
+                self.promotes('sub', inputs=['b'])
+
+        top = om.Problem(model=TopGroup())
+        top.setup()
+
+        self.assertEqual(top['sub.a'], 3)
+        self.assertEqual(top['b'], 4)
+
     def test_add_subsystem_class(self):
         p = om.Problem()
         try:
@@ -113,16 +321,6 @@ class TestGroup(unittest.TestCase):
         else:
             self.fail('Exception expected.')
 
-    def test_deprecated_runonce(self):
-        p = om.Problem()
-        p.model.add_subsystem('indep', om.IndepVarComp('x', 5.0))
-        p.model.add_subsystem('comp', om.ExecComp('b=2*a'))
-
-        msg = "NonLinearRunOnce is deprecated.  Use NonlinearRunOnce instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            p.model.nonlinear_solver = om.NonLinearRunOnce()
-
     def test_group_simple(self):
         import openmdao.api as om
 
@@ -133,18 +331,6 @@ class TestGroup(unittest.TestCase):
 
         self.assertEqual(p['comp1.a'], 3.0)
         self.assertEqual(p['comp1.b'], 6.0)
-
-    def test_group_add(self):
-        model = om.Group()
-        ecomp = om.ExecComp('b=2.0*a', a=3.0, b=6.0)
-
-        msg = "The 'add' method provides backwards compatibility with OpenMDAO <= 1.x ; " \
-              "use 'add_subsystem' instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            comp1 = model.add('comp1', ecomp)
-
-        self.assertTrue(ecomp is comp1)
 
     def test_group_simple_promoted(self):
         import openmdao.api as om
@@ -219,6 +405,44 @@ class TestGroup(unittest.TestCase):
 
         self.assertEqual(p['comp1.b'], 6.0)
         self.assertEqual(p['comp2.b'], 9.0)
+
+    def test_promotes_any(self):
+        import openmdao.api as om
+
+        class SimpleGroup(om.Group):
+
+            def setup(self):
+
+                self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
+                self.add_subsystem('comp2', om.ExecComp('b=2*a'))
+
+            def configure(self):
+                self.promotes('comp1', any=['*'])
+
+        top = om.Problem(model=SimpleGroup())
+        top.setup()
+
+        self.assertEqual(top['x'], 5)
+
+    def test_promotes_inputs_and_outputs(self):
+
+        import openmdao.api as om
+
+        class SimpleGroup(om.Group):
+
+            def setup(self):
+
+                self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
+                self.add_subsystem('comp2', om.ExecComp('b=2*a'))
+
+            def configure(self):
+                self.promotes('comp2', inputs=['a'], outputs=['b'])
+
+        top = om.Problem(model=SimpleGroup())
+        top.setup()
+
+        self.assertEqual(top['a'], 1)
+        self.assertEqual(top['b'], 1)
 
     def test_double_promote_conns(self):
         p = om.Problem()
@@ -385,8 +609,12 @@ class TestGroup(unittest.TestCase):
     def test_group_promotes(self):
         """Promoting a single variable."""
         p = om.Problem()
-        p.model.add_subsystem('comp1', om.IndepVarComp([('a', 2.0), ('x', 5.0)]),
-                              promotes_outputs=['x'])
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('a', 2.0)
+        ivc.add_output('x', 5.0)
+
+        p.model.add_subsystem('comp1', ivc, promotes_outputs=['x'])
         p.model.add_subsystem('comp2', om.ExecComp('y=2*x'), promotes_inputs=['x'])
         p.setup()
 
@@ -445,8 +673,12 @@ class TestGroup(unittest.TestCase):
     def test_group_promotes_multiple(self):
         """Promoting multiple variables."""
         p = om.Problem()
-        p.model.add_subsystem('comp1', om.IndepVarComp([('a', 2.0), ('x', 5.0)]),
-                              promotes_outputs=['a', 'x'])
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('a', 2.0)
+        ivc.add_output('x', 5.0)
+
+        p.model.add_subsystem('comp1', ivc, promotes_outputs=['a', 'x'])
         p.model.add_subsystem('comp2', om.ExecComp('y=2*x'),
                               promotes_inputs=['x'])
         p.setup()
@@ -461,8 +693,12 @@ class TestGroup(unittest.TestCase):
     def test_group_promotes_all(self):
         """Promoting all variables with asterisk."""
         p = om.Problem()
-        p.model.add_subsystem('comp1', om.IndepVarComp([('a', 2.0), ('x', 5.0)]),
-                              promotes_outputs=['*'])
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('a', 2.0)
+        ivc.add_output('x', 5.0)
+
+        p.model.add_subsystem('comp1', ivc, promotes_outputs=['*'])
         p.model.add_subsystem('comp2', om.ExecComp('y=2*x'),
                               promotes_inputs=['x'])
         p.setup()
@@ -550,7 +786,7 @@ class TestGroup(unittest.TestCase):
         G1.add_subsystem("C1", om.ExecComp("y=2.0*x"), promotes=['y'])
         G1.add_subsystem("C2", om.ExecComp("y=2.0*x"), promotes=['y'])
         msg = r"Output name 'y' refers to multiple outputs: \['G1.C1.y', 'G1.C2.y'\]."
-        with assertRaisesRegex(self, Exception, msg):
+        with self.assertRaisesRegex(Exception, msg):
             prob.setup()
 
     def test_basic_connect_units(self):
@@ -724,8 +960,8 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.setup()
         self.assertEqual(str(context.exception),
-                         "ExecComp (C2): 'promotes_outputs' failed to find any matches for "
-                         "the following names or patterns: ['x*'].")
+                         "ExecComp (C2): 'promotes_outputs' failed to find any matches for the "
+                         "following pattern: 'x*'.")
 
     def test_promote_not_found2(self):
         p = om.Problem()
@@ -760,9 +996,8 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.setup()
         self.assertEqual(str(context.exception),
-                         "Group (G1): 'promotes' failed to find any matches for "
-                         "the following names or patterns: ['*']. "
-                         "Group contains no variables.")
+                         "Group (G1): 'promotes' failed to find any matches for the following "
+                         "pattern: '*'. Group contains no variables.")
 
     def test_missing_promote_var(self):
         p = om.Problem()
@@ -1175,7 +1410,7 @@ class TestGroup(unittest.TestCase):
 
         totals = p.check_totals(of=['discipline.comp1.z'], wrt=['parameters.input_value'], method='cs', out_stream=None)
 
-        for key, val in iteritems(totals):
+        for key, val in totals.items():
             assert_rel_error(self, val['rel error'][0], 0.0, 1e-15)
 
 
@@ -1239,56 +1474,71 @@ class TestConnect(unittest.TestCase):
         msg = "src_indices must contain integers, but src_indices for " + \
               "connection from 'src.x' to 'tgt.x' is <.* 'numpy.float64'>."
 
-        with assertRaisesRegex(self, TypeError, msg):
+        with self.assertRaisesRegex(TypeError, msg):
             self.sub.connect('src.x', 'tgt.x', src_indices=[1.0])
 
     def test_src_indices_as_float_array(self):
         msg = "src_indices must contain integers, but src_indices for " + \
               "connection from 'src.x' to 'tgt.x' is <.* 'numpy.float64'>."
 
-        with assertRaisesRegex(self, TypeError, msg):
+        with self.assertRaisesRegex(TypeError, msg):
             self.sub.connect('src.x', 'tgt.x', src_indices=np.zeros(1))
 
     def test_src_indices_as_str(self):
         msg = "src_indices must be an index array, " + \
               "did you mean connect('src.x', [tgt.x, cmp.x])?"
 
-        with assertRaisesRegex(self, TypeError, msg):
+        with self.assertRaisesRegex(TypeError, msg):
             self.sub.connect('src.x', 'tgt.x', 'cmp.x')
 
     def test_already_connected(self):
         msg = "Input 'tgt.x' is already connected to 'src.x'."
 
         self.sub.connect('src.x', 'tgt.x', src_indices=[1])
-        with assertRaisesRegex(self, RuntimeError, msg):
+        with self.assertRaisesRegex(RuntimeError, msg):
             self.sub.connect('cmp.x', 'tgt.x', src_indices=[1])
 
     def test_invalid_source(self):
-        msg = "Output 'src.z' does not exist for connection " + \
-              "in 'sub' from 'src.z' to 'tgt.x'."
+        msg = "Attempted to connect from 'src.z' to 'tgt.x', but 'src.z' doesn't exist."
 
         # source and target names can't be checked until setup
         # because setup is not called until then
         self.sub.connect('src.z', 'tgt.x', src_indices=[1])
-        with assertRaisesRegex(self, NameError, msg):
+        with self.assertRaisesRegex(NameError, msg):
+            self.prob.setup()
+
+    def test_connect_to_output(self):
+        msg = "Attempted to connect from 'tgt.y' to 'cmp.z', but 'cmp.z' is an output. All connections must be from an output to an input."
+
+        # source and target names can't be checked until setup
+        # because setup is not called until then
+        self.sub.connect('tgt.y', 'cmp.z')
+        with self.assertRaisesRegex(NameError, msg):
+            self.prob.setup()
+
+    def test_connect_from_input(self):
+        msg = "Attempted to connect from 'tgt.x' to 'cmp.x', but 'tgt.x' is an input. All connections must be from an output to an input."
+
+        # source and target names can't be checked until setup
+        # because setup is not called until then
+        self.sub.connect('tgt.x', 'cmp.x')
+        with self.assertRaisesRegex(NameError, msg):
             self.prob.setup()
 
     def test_invalid_target(self):
-        msg = "Group (sub): Input 'tgt.z' does not exist for connection from 'src.x' to 'tgt.z'."
+        msg = "Attempted to connect from 'src.x' to 'tgt.z', but 'tgt.z' doesn't exist."
 
         # source and target names can't be checked until setup
         # because setup is not called until then
         self.sub.connect('src.x', 'tgt.z', src_indices=[1])
-        with self.assertRaises(NameError) as ctx:
+        with self.assertRaisesRegex(NameError, msg):
             self.prob.setup()
-
-        self.assertEqual(str(ctx.exception), msg)
 
     def test_connect_within_system(self):
         msg = "Output and input are in the same System for connection " + \
               "from 'tgt.y' to 'tgt.x'."
 
-        with assertRaisesRegex(self, RuntimeError, msg):
+        with self.assertRaisesRegex(RuntimeError, msg):
             self.sub.connect('tgt.y', 'tgt.x', src_indices=[1])
 
     def test_connect_within_system_with_promotes(self):
@@ -1309,7 +1559,7 @@ class TestConnect(unittest.TestCase):
         prob = om.Problem()
         prob.model.add_subsystem('px1', om.IndepVarComp('x1', 100.0))
         prob.model.add_subsystem('src', om.ExecComp('x2 = 2 * x1', x2={'units': 'degC'}))
-        prob.model.add_subsystem('tgt', om.ExecComp('y = 3 * x', x={'units': 'unitless'}))
+        prob.model.add_subsystem('tgt', om.ExecComp('y = 3 * x', x={'units': None}))
 
         prob.model.connect('px1.x1', 'src.x1')
         prob.model.connect('src.x2', 'tgt.x')
@@ -1332,7 +1582,7 @@ class TestConnect(unittest.TestCase):
         prob.model.connect('px1.x1', 'src.x1')
         prob.model.connect('src.x2', 'tgt.x')
 
-        with assertRaisesRegex(self, RuntimeError, msg):
+        with self.assertRaisesRegex(RuntimeError, msg):
             prob.setup()
 
     def test_connect_units_with_nounits(self):
@@ -1426,7 +1676,7 @@ class TestConnect(unittest.TestCase):
         msg = ("The source and target shapes do not match or are ambiguous for the connection "
                "'sub.src.s' to 'sub.arr.x'.")
 
-        with assertRaisesRegex(self, ValueError, msg):
+        with self.assertRaisesRegex(ValueError, msg):
             self.prob.setup()
 
     def test_bad_indices_shape(self):
@@ -1440,7 +1690,7 @@ class TestConnect(unittest.TestCase):
                r"the connection 'IV.x' to 'C1.x'. The target "
                r"shape is \(2.*, 2.*\) but indices are \(1.*, 2.*\).")
 
-        with assertRaisesRegex(self, ValueError, msg):
+        with self.assertRaisesRegex(ValueError, msg):
             p.setup()
 
     def test_bad_indices_dimensions(self):

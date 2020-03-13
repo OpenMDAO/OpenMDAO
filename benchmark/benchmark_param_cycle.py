@@ -12,8 +12,12 @@ def _build(solver_class=om.NewtonSolver, linear_solver_class=om.ScipyKrylov,
     suite.solver_class = solver_class
     if solver_options is not None:
         suite.solver_options = solver_options
+    if solver_class == om.NewtonSolver:
+        if 'solve_subsystems' not in suite.solver_options:
+            suite.solver_options['solve_subsystems'] = False
     if linear_solver_options is not None:
         suite.linear_solver_options = linear_solver_options
+
     suite.linear_solver_class = linear_solver_class
     suite.setup()
     return suite
@@ -44,6 +48,7 @@ class BM(unittest.TestCase):
     def benchmark_comp200_var5_nlbs_lbgs(self):
         suite = _build(
             solver_class=om.NonlinearBlockGS, linear_solver_class=om.LinearBlockGS,
+            solver_options={'maxiter': 100},
             assembled_jac=False,
             jacobian_type='dense',
             connection_type='explicit',
