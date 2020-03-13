@@ -1292,7 +1292,7 @@ class Problem(object):
             data[''][key] = {}
             data[''][key]['J_fwd'] = val
             data[''][key]['J_fd'] = Jfd[key]
-        fd_args['method'] = 'fd'
+        fd_args['method'] = method
 
         if out_stream == _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
