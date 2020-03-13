@@ -1723,6 +1723,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                 pad_name('a(fwd-chk)'),
                                 pad_name('r(fwd-chk)'),
                             )
+
                 if out_stream:
                     out_buffer.write(header + '\n')
                     out_buffer.write('-' * len(header) + '\n' + '\n')
@@ -1797,7 +1798,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                 if compact_print:
                     if totals:
                         if out_stream:
-                            out_stream.write(deriv_line.format(
+                            out_buffer.write(deriv_line.format(
                                 pad_name(of, 30, quotes=True),
                                 pad_name(wrt, 30, quotes=True),
                                 magnitude.forward,
