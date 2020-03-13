@@ -1,10 +1,7 @@
 """Runs a parametric test over several of the linear solvers."""
 
-from __future__ import division, print_function
-
 import numpy as np
 import unittest
-from six import iterkeys
 
 from openmdao.core.group import Group
 from openmdao.core.problem import Problem
@@ -123,7 +120,7 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
 
         expected_values = model.expected_values
         if expected_values:
-            actual = {key: problem[key] for key in iterkeys(expected_values)}
+            actual = {key: problem[key] for key in expected_values}
             assert_rel_error(self, actual, expected_values, 1e-8)
 
         expected_totals = model.expected_totals

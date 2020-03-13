@@ -1,8 +1,6 @@
 """ Testing for group finite differencing."""
 import itertools
 import unittest
-from six import iterkeys
-from six.moves import range
 
 try:
     from parameterized import parameterized
@@ -152,7 +150,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        prob.driver._compute_totals(of=['parab.f_xy'], wrt=['px.x'], global_names=True)
+        prob.driver._compute_totals(of=['parab.f_xy'], wrt=['px.x'], use_abs_names=True)
 
         # 1. run_model; 2. step x
         self.assertEqual(model.parab.count, 2)
@@ -2232,7 +2230,7 @@ class ParallelFDParametricTestCase(unittest.TestCase):
 
         expected_values = model.expected_values
         if expected_values:
-            actual = {key: problem[key] for key in iterkeys(expected_values)}
+            actual = {key: problem[key] for key in expected_values}
             assert_rel_error(self, actual, expected_values, 1e-4)
 
         expected_totals = model.expected_totals

@@ -1,10 +1,12 @@
 """
 Utilities for working with files.
 """
-from __future__ import print_function
 
 import sys
 import os
+import importlib
+import unittest
+from inspect import getmembers, isclass, ismethod, isfunction
 from fnmatch import fnmatch
 from os.path import join, basename, dirname, isfile, split, splitext, abspath, expanduser
 
@@ -137,6 +139,33 @@ def files_iter(start_dir='.', dir_includes=None, dir_excludes=(),
                     yield join(root, f)
 
 
+def _to_filename(spec):
+    """
+    Return the filename part of the given testspec or the full string if the string is a filename.
+
+    Parameters
+    ----------
+    spec : str
+        The filename or testspec.
+
+    Returns
+    -------
+    str
+        The filename.
+    """
+    if ':' in spec and not os.path.isfile(spec):
+        fname, rest = spec.rsplit(':', 1)
+        if not fname.endswith('.py'):
+            try:
+                mod = importlib.import_module(fname)
+                return mod.__file__
+            except ImportError:
+                return spec
+        return fname
+
+    return spec
+
+
 def _load_and_exec(script_name, user_args):
     """
     Load and exec the given script as __main__.
@@ -148,6 +177,9 @@ def _load_and_exec(script_name, user_args):
     user_args : list of str
         Args to be passed to the user script.
     """
+    if ':' in script_name and not os.path.isfile(script_name):
+        return _load_and_run_test(script_name)
+
     sys.path.insert(0, os.path.dirname(script_name))
 
     sys.argv[:] = [script_name] + user_args
@@ -163,3 +195,60 @@ def _load_and_exec(script_name, user_args):
     }
 
     exec(code, globals_dict)
+
+
+def _load_and_run_test(testspec):
+    """
+    Load and run an individual test function.
+
+    Parameters
+    ----------
+    testspec : str
+        <fpath_or_modpath>:<testcase>.<method> OR <fpath_or_modpath>:<function>
+    """
+    syspath_save = sys.path[:]
+
+    modpath, funcpath = testspec.rsplit(':', 1)
+
+    if modpath.endswith('.py'):
+        modpath = get_module_path(modpath)
+
+    sys.path.append('.')
+    mod = importlib.import_module(modpath)
+
+    try:
+        return _run_test_func(mod, funcpath)
+    finally:
+        sys.path = syspath_save
+
+
+def _run_test_func(mod, funcpath):
+    """
+    Run the given TestCase method or test function in the given module.
+
+    Parameters
+    ----------
+    mod : module
+        The module where the test resides.
+    funcpath : str
+        Either <testcase>.<method_name> or <func_name>.
+
+    Returns
+    -------
+    object
+        In the case of a module level function call, returns whatever the function returns.
+    """
+    parts = funcpath.split('.', 1)
+    if len(parts) == 2:
+        tcase_name, method_name = parts
+        testcase = getattr(mod, tcase_name)(methodName=method_name)
+        setup = getattr(testcase, 'setUp', None)
+        if setup is not None:
+            setup()
+        getattr(testcase, method_name)()
+        teardown = getattr(testcase, 'tearDown', None)
+        if teardown:
+            teardown()
+    else:
+        funcname = parts[0]
+        return getattr(mod, funcname)()

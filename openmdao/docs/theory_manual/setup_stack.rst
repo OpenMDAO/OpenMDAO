@@ -111,7 +111,7 @@ Add a case recorder to the group or to a solver in a subsystem                  
 Problem setup and final_setup
 -----------------------------
 
-OpenMDAO 2.0 introduces a new change to the setup process in which the original monolithic process
+OpenMDAO 2.0 introduced a new change to the setup process in which the original monolithic process
 is split into two separate phases triggered by the methods: `setup` and `final_setup`. The `final_setup` method is
 however something you will probably never have to call, as it is called automatically the first time that
 you call `run_model` or `run_driver` after running `setup`. The reason that the `setup` process was split into two

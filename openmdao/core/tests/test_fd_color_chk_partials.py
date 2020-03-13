@@ -1,6 +1,6 @@
 import unittest
 
-from six import StringIO
+from io import StringIO
 
 import openmdao.api as om
 import numpy as np

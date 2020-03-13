@@ -1,8 +1,5 @@
 """Complex Step derivative approximations."""
-from __future__ import division, print_function
 
-from six import iteritems, itervalues
-from six.moves import range
 from collections import defaultdict
 
 import numpy as np
@@ -115,7 +112,7 @@ class ComplexStep(ApproximationScheme):
 
                 fd = self._fd = FiniteDifference()
                 empty = {}
-                for lst in itervalues(self._exec_dict):
+                for lst in self._exec_dict.values():
                     for apprx in lst:
                         fd.add_approximation(apprx[0], system, empty)
 

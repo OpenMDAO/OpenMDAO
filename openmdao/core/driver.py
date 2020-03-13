@@ -1,13 +1,9 @@
 """Define a base class for all Drivers in OpenMDAO."""
-from __future__ import print_function
-
 from collections import OrderedDict
 import pprint
 import sys
 import os
 import weakref
-
-from six import iteritems, itervalues, string_types
 
 import numpy as np
 
@@ -166,10 +162,7 @@ class Driver(object):
         self.iter_count = 0
         self.cite = ""
 
-        self._coloring_info = coloring_mod._DEF_COMP_SPARSITY_ARGS.copy()
-        self._coloring_info['coloring'] = None
-        self._coloring_info['dynamic'] = False
-        self._coloring_info['static'] = None
+        self._coloring_info = coloring_mod._get_coloring_meta()
 
         self._total_jac_sparsity = None
         self._res_jacs = {}
@@ -252,8 +245,8 @@ class Driver(object):
         self._total_jac = None
 
         self._has_scaling = (
-            np.any([r['scaler'] is not None for r in itervalues(self._responses)]) or
-            np.any([dv['scaler'] is not None for dv in itervalues(self._designvars)])
+            np.any([r['scaler'] is not None for r in self._responses.values()]) or
+            np.any([dv['scaler'] is not None for dv in self._designvars.values()])
         )
 
         # Determine if any design variables are discrete.
@@ -614,7 +607,7 @@ class Driver(object):
             The nonlinear response names in order.
         """
         order = list(self._objs)
-        order.extend(n for n, meta in iteritems(self._cons)
+        order.extend(n for n, meta in self._cons.items()
                      if not ('linear' in meta and meta['linear']))
         return order
 
@@ -638,7 +631,7 @@ class Driver(object):
         self._cons = cons = OrderedDict()
 
         self._responses = resps = model.get_responses(recurse=True)
-        for name, data in iteritems(resps):
+        for name, data in resps.items():
             if data['type'] == 'con':
                 cons[name] = data
             else:
@@ -648,7 +641,7 @@ class Driver(object):
 
         # Gather up the information for design vars.
         self._designvars = designvars = model.get_design_vars(recurse=True)
-        desvar_size = sum(data['size'] for data in itervalues(designvars))
+        desvar_size = sum(data['size'] for data in designvars.values())
 
         return response_size, desvar_size
 
@@ -670,7 +663,8 @@ class Driver(object):
         self.iter_count += 1
         return False
 
-    def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', global_names=True):
+    def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', global_names=None,
+                        use_abs_names=True):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -689,7 +683,9 @@ class Driver(object):
             returns them in a dictionary whose keys are tuples of form (of, wrt). For
             the scipy optimizer, 'array' is also supported.
         global_names : bool
-            Set to True when passing in global names to skip some translation steps.
+            Deprecated.  Use 'use_abs_names' instead.
+        use_abs_names : bool
+            Set to True when passing in absolute names to skip some translation steps.
 
         Returns
         -------
@@ -706,12 +702,17 @@ class Driver(object):
             print(header)
             print(len(header) * '-' + '\n')
 
+        if global_names is not None:
+            warn_deprecation("'global_names' is deprecated in calls to _compute_totals. "
+                             "Use 'use_abs_names' instead.")
+            use_abs_names = global_names
+
         if problem.model._owns_approx_jac:
             self._recording_iter.push(('_compute_totals_approx', 0))
 
             try:
                 if total_jac is None:
-                    total_jac = _TotalJacInfo(problem, of, wrt, global_names,
+                    total_jac = _TotalJacInfo(problem, of, wrt, use_abs_names,
                                               return_format, approx=True, debug_print=debug_print)
 
                     # Don't cache linear constraint jacobian
@@ -726,7 +727,7 @@ class Driver(object):
 
         else:
             if total_jac is None:
-                total_jac = _TotalJacInfo(problem, of, wrt, global_names, return_format,
+                total_jac = _TotalJacInfo(problem, of, wrt, use_abs_names, return_format,
                                           debug_print=debug_print)
 
                 # don't cache linear constraint jacobian
@@ -845,27 +846,16 @@ class Driver(object):
             raise RuntimeError("Driver '%s' does not support simultaneous derivatives." %
                                self._get_name())
 
-    def set_simul_deriv_color(self, coloring):
-        """
-        See use_fixed_coloring. This method is deprecated.
-
-        Parameters
-        ----------
-        coloring : str or Coloring
-            Information about simultaneous coloring for design vars and responses.  If a
-            string, then coloring is assumed to be the name of a file that contains the
-            coloring information in pickle format. Otherwise it must be a Coloring object.
-            See the docstring for Coloring for details.
-
-        """
-        warn_deprecation("set_simul_deriv_color is deprecated.  Use use_fixed_coloring instead.")
-        self.use_fixed_coloring(coloring)
-
-    def _setup_tot_jac_sparsity(self):
+    def _setup_tot_jac_sparsity(self, coloring=None):
         """
         Set up total jacobian subjac sparsity.
 
         Drivers that can use subjac sparsity should override this.
+
+        Parameters
+        ----------
+        coloring : Coloring or None
+            Current coloring.
         """
         pass
 
@@ -892,7 +882,7 @@ class Driver(object):
         if coloring is not None:
             return coloring
 
-        if static is coloring_mod._STD_COLORING_FNAME or isinstance(static, string_types):
+        if static is coloring_mod._STD_COLORING_FNAME or isinstance(static, str):
             if static is coloring_mod._STD_COLORING_FNAME:
                 fname = self._get_total_coloring_fname()
             else:

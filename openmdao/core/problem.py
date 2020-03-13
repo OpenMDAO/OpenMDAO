@@ -1,7 +1,5 @@
 """Define the Problem class and a FakeComm class for non-MPI users."""
 
-from __future__ import division, print_function
-
 import sys
 import pprint
 import os
@@ -11,8 +9,7 @@ from collections import defaultdict, namedtuple
 from fnmatch import fnmatchcase
 from itertools import product
 
-from six import iteritems, iterkeys, itervalues
-from six.moves import range, cStringIO
+from io import StringIO
 
 import numpy as np
 import scipy.sparse as sparse
@@ -30,7 +27,7 @@ from openmdao.error_checking.check_config import _default_checks, _all_checks
 from openmdao.recorders.recording_iteration_stack import _RecIteration
 from openmdao.recorders.recording_manager import RecordingManager, record_viewer_data
 from openmdao.utils.record_util import create_local_meta
-from openmdao.utils.general_utils import warn_deprecation, ContainsAll, pad_name, simple_warning
+from openmdao.utils.general_utils import ContainsAll, pad_name, simple_warning
 from openmdao.utils.mpi import FakeComm
 from openmdao.utils.mpi import MPI
 from openmdao.utils.name_maps import prom_name2abs_name
@@ -130,7 +127,7 @@ class Problem(object):
         Problem name.
     """
 
-    def __init__(self, model=None, driver=None, comm=None, root=None, name=None, **options):
+    def __init__(self, model=None, driver=None, comm=None, name=None, **options):
         """
         Initialize attributes.
 
@@ -142,8 +139,6 @@ class Problem(object):
             The driver for the problem. If not specified, a simple "Run Once" driver will be used.
         comm : MPI.Comm or <FakeComm> or None
             The global communicator.
-        root : <System> or None
-            Deprecated kwarg for `model`.
         name : str
             Problem name. Can be used to specify a Problem instance when multiple Problems
             exist.
@@ -159,16 +154,6 @@ class Problem(object):
                 comm = MPI.COMM_WORLD
             except ImportError:
                 comm = FakeComm()
-
-        if root is not None:
-            if model is not None:
-                raise ValueError(self.msginfo + ": Cannot specify both 'root' and 'model'. "
-                                 "'root' has been deprecated, please use 'model'.")
-
-            warn_deprecation("The 'root' argument provides backwards compatibility "
-                             "with OpenMDAO <= 1.x ; use 'model' instead.")
-
-            model = root
 
         if model is None:
             self.model = Group()
@@ -490,39 +475,11 @@ class Problem(object):
         """
         Set all initial conditions that have been saved in cache after setup.
         """
-        for name, value in iteritems(self._initial_condition_cache):
+        for name, value in self._initial_condition_cache.items():
             self[name] = value
 
         # Clean up cache
         self._initial_condition_cache = {}
-
-    @property
-    def root(self):
-        """
-        Provide 'root' property for backwards compatibility.
-
-        Returns
-        -------
-        <Group>
-            reference to the 'model' property.
-        """
-        warn_deprecation("The 'root' property provides backwards compatibility "
-                         "with OpenMDAO <= 1.x ; use 'model' instead.")
-        return self.model
-
-    @root.setter
-    def root(self, model):
-        """
-        Provide for setting the 'root' property for backwards compatibility.
-
-        Parameters
-        ----------
-        model : <Group>
-            reference to a <Group> to be assigned to the 'model' property.
-        """
-        warn_deprecation("The 'root' property provides backwards compatibility "
-                         "with OpenMDAO <= 1.x ; use 'model' instead.")
-        self.model = model
 
     def run_model(self, case_prefix=None, reset_iter_counts=True):
         """
@@ -649,29 +606,6 @@ class Problem(object):
 
         return {n: lvec[n].copy() for n in lnames}
 
-    def run_once(self):
-        """
-        Backward compatible call for run_model.
-        """
-        warn_deprecation("The 'run_once' method provides backwards compatibility with "
-                         "OpenMDAO <= 1.x ; use 'run_model' instead.")
-
-        self.run_model()
-
-    def run(self):
-        """
-        Backward compatible call for run_driver.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        """
-        warn_deprecation("The 'run' method provides backwards compatibility with "
-                         "OpenMDAO <= 1.x ; use 'run_driver' instead.")
-
-        return self.run_driver()
-
     def _setup_recording(self):
         """
         Set up case recording.
@@ -729,9 +663,9 @@ class Problem(object):
         """
         return create_local_meta(case_name)
 
-    def setup(self, vector_class=None, check=False, logger=None, mode='auto',
-              force_alloc_complex=False, distributed_vector_class=PETScVector,
-              local_vector_class=DefaultVector, derivatives=True):
+    def setup(self, check=False, logger=None, mode='auto', force_alloc_complex=False,
+              distributed_vector_class=PETScVector, local_vector_class=DefaultVector,
+              derivatives=True):
         """
         Set up the model hierarchy.
 
@@ -742,9 +676,6 @@ class Problem(object):
 
         Parameters
         ----------
-        vector_class : type
-            Reference to an actual <Vector> class; not an instance. This is deprecated. Use
-            distributed_vector_class instead.
         check : boolean
             whether to run config check after setup is complete.
         logger : object
@@ -775,11 +706,6 @@ class Problem(object):
         model = self.model
         model.force_alloc_complex = force_alloc_complex
         comm = self.comm
-
-        if vector_class is not None:
-            warn_deprecation("'vector_class' has been deprecated. Use "
-                             "'distributed_vector_class' and/or 'local_vector_class' instead.")
-            distributed_vector_class = vector_class
 
         # PETScVector is required for MPI
         if comm.size > 1:
@@ -1024,8 +950,6 @@ class Problem(object):
                 c_name = comp.pathname
                 indep_key[c_name] = set()
 
-                # TODO: Check deprecated deriv_options.
-
                 with comp._unscaled_context():
 
                     of_list, wrt_list = \
@@ -1224,11 +1148,11 @@ class Problem(object):
                                                                        fd_options)
 
             approx_jac = {}
-            for approximation in itervalues(approximations):
+            for approximation in approximations.values():
                 # Perform the FD here.
                 approximation.compute_approximations(comp, jac=approx_jac)
 
-            for abs_key, partial in iteritems(approx_jac):
+            for abs_key, partial in approx_jac.items():
                 rel_key = abs_key2rel_key(comp, abs_key)
                 partials_data[c_name][rel_key][jac_key] = partial
 
@@ -1240,7 +1164,7 @@ class Problem(object):
                         deriv[key] = np.atleast_2d(np.sum(deriv[key], axis=1)).T
 
         # Conversion of defaultdict to dicts
-        partials_data = {comp_name: dict(outer) for comp_name, outer in iteritems(partials_data)}
+        partials_data = {comp_name: dict(outer) for comp_name, outer in partials_data.items()}
 
         if out_stream == _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
@@ -1364,7 +1288,7 @@ class Problem(object):
         # Assemble and Return all metrics.
         data = {}
         data[''] = {}
-        for key, val in iteritems(Jcalc):
+        for key, val in Jcalc.items():
             data[''][key] = {}
             data[''][key]['J_fwd'] = val
             data[''][key]['J_fd'] = Jfd[key]
@@ -1378,7 +1302,7 @@ class Problem(object):
         return data['']
 
     def compute_totals(self, of=None, wrt=None, return_format='flat_dict', debug_print=False,
-                       driver_scaling=False):
+                       driver_scaling=False, use_abs_names=False):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -1400,6 +1324,8 @@ class Problem(object):
             When True, return derivatives that are scaled according to either the adder and scaler
             or the ref and ref0 values that were specified when add_design_var, add_objective, and
             add_constraint were called on the model. Default is False, which is unscaled.
+        use_abs_names : bool
+            Set to True when passing in absolute names to skip some translation steps.
 
         Returns
         -------
@@ -1410,11 +1336,11 @@ class Problem(object):
             self.final_setup()
 
         if self.model._owns_approx_jac:
-            total_info = _TotalJacInfo(self, of, wrt, False, return_format,
+            total_info = _TotalJacInfo(self, of, wrt, use_abs_names, return_format,
                                        approx=True, driver_scaling=driver_scaling)
             return total_info.compute_totals_approx(initialize=True)
         else:
-            total_info = _TotalJacInfo(self, of, wrt, False, return_format,
+            total_info = _TotalJacInfo(self, of, wrt, use_abs_names, return_format,
                                        debug_print=debug_print, driver_scaling=driver_scaling)
             return total_info.compute_totals()
 
@@ -1532,7 +1458,7 @@ class Problem(object):
 
         # Get the values for all the elements in the tables
         rows = []
-        for name, meta in iteritems(vars):
+        for name, meta in vars.items():
             row = {}
             for col_name in col_names:
                 if col_name == 'name':
@@ -1738,13 +1664,13 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             sys_name = 'Full Model'
 
         # Sorted keys ensures deterministic ordering
-        sorted_keys = sorted(iterkeys(derivatives))
+        sorted_keys = sorted(derivatives.keys())
 
         if not suppress_output:
             # Need to capture the output of a component's derivative
             # info so that it can be used if that component is the
             # worst subjac. That info is printed at the bottom of all the output
-            out_buffer = cStringIO()
+            out_buffer = StringIO()
             num_bad_jacs = 0  # Keep track of number of bad derivative values for each component
             if out_stream:
                 header_str = '-' * (len(sys_name) + len(sys_type) + len(sys_class_name) + 5) + '\n'

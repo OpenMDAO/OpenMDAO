@@ -1,10 +1,9 @@
 """Test for a feature doc showing how to use cache_linear_solution"""
-from __future__ import division
-
 from distutils.version import LooseVersion
 import unittest
 from copy import deepcopy
-from six.moves import cStringIO
+from io import StringIO
+
 
 import numpy as np
 import scipy

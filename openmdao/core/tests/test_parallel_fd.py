@@ -1,13 +1,10 @@
 
-from __future__ import print_function
 
 import time
 import itertools
 import numpy as np
 import unittest
 TestCase = unittest.TestCase
-
-from six import iterkeys
 
 import openmdao.api as om
 from openmdao.utils.mpi import MPI

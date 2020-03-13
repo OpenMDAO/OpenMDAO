@@ -1,6 +1,4 @@
 """IndepVarComp tests used in the IndepVarComp feature doc."""
-from __future__ import division
-
 import unittest
 
 import openmdao.api as om
@@ -54,34 +52,6 @@ class TestIndepVarComp(unittest.TestCase):
         prob = om.Problem(comp).setup()
 
         assert_rel_error(self, prob['indep_var'], array)
-
-    def test_multiple_default(self):
-        """Define two independent variables at once."""
-        import openmdao.api as om
-
-        comp = om.IndepVarComp((
-            ('indep_var_1', 1.0),
-            ('indep_var_2', 2.0),
-        ))
-
-        prob = om.Problem(comp).setup()
-
-        assert_rel_error(self, prob['indep_var_1'], 1.0)
-        assert_rel_error(self, prob['indep_var_2'], 2.0)
-
-    def test_multiple_kwargs(self):
-        """Define two independent variables at once and additional options."""
-        import openmdao.api as om
-
-        comp = om.IndepVarComp((
-            ('indep_var_1', 1.0, {'lower': 0, 'upper': 10}),
-            ('indep_var_2', 2.0, {'lower': 1., 'upper': 20}),
-        ))
-
-        prob = om.Problem(comp).setup()
-
-        assert_rel_error(self, prob['indep_var_1'], 1.0)
-        assert_rel_error(self, prob['indep_var_2'], 2.0)
 
     def test_add_output(self):
         """Define two independent variables using the add_output method."""
@@ -183,20 +153,6 @@ class TestIndepVarComp(unittest.TestCase):
             self.assertEqual(str(err),
                 "IndepVarComp (<model>): No outputs (independent variables) have been declared. They must either be declared during "
                 "instantiation or by calling add_output or add_discrete_output afterwards.")
-        else:
-            self.fail('Exception expected.')
-
-    def test_error_badtup(self):
-        try:
-            comp = om.IndepVarComp((
-                ('indep_var_1', 1.0, {'lower': 0, 'upper': 10}),
-                'indep_var_2',
-            ))
-            prob = om.Problem(comp).setup()
-        except Exception as err:
-            self.assertEqual(str(err),
-                "IndepVarComp init: arg indep_var_2 must be a tuple of the "
-                "form (name, value) or (name, value, keyword_dict).")
         else:
             self.fail('Exception expected.')
 

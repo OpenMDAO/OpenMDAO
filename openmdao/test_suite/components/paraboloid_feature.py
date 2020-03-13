@@ -1,8 +1,6 @@
 """
 Demonstration of a model using the Paraboloid component.
 """
-from __future__ import division, print_function
-
 import openmdao.api as om
 
 

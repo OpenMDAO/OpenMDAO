@@ -3,7 +3,6 @@
 import numpy as np
 
 from openmdao.surrogate_models.nn_interpolators.nn_base import NNBase
-from six.moves import range
 from scipy.sparse import csc_matrix
 from scipy.sparse.linalg import spsolve
 

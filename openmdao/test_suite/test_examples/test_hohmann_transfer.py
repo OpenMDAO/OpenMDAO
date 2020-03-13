@@ -2,7 +2,6 @@
 Find the minimum delta-V for an impulsive Hohmann Transer from
 Low Earth Orbit (LEO) to Geostationary Orbit (GEO)
 """
-from __future__ import print_function, division, absolute_import
 import unittest
 
 import numpy as np

@@ -49,7 +49,7 @@ Creating Your Own OpenMDAO Plugins
 Documentation Style Guide
 -------------------------
 
-This document exists to help OpenMDAO 2.x.y documentation writers follow appropriate guidelines,
+This document exists to help OpenMDAO documentation writers follow appropriate guidelines,
 in terms of formatting and embedding code.
 
 .. toctree::
