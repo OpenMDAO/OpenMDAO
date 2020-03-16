@@ -240,7 +240,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         model.recording_options['record_inputs'] = True
         model.recording_options['record_outputs'] = True
         model.recording_options['record_residuals'] = True
-        model.recording_options['record_metadata'] = False
 
         model.add_recorder(self.recorder)
 
@@ -2287,7 +2286,6 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # root solver
         nl = prob.model.nonlinear_solver
-        nl.recording_options['record_metadata'] = True
         nl.recording_options['record_abs_error'] = True
         nl.recording_options['record_rel_error'] = True
         nl.recording_options['record_solver_residuals'] = True
@@ -2295,7 +2293,6 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # system
         pz = prob.model.pz  # IndepVarComp which is an ExplicitComponent
-        pz.recording_options['record_metadata'] = True
         pz.recording_options['record_inputs'] = True
         pz.recording_options['record_outputs'] = True
         pz.recording_options['record_residuals'] = True
@@ -2303,7 +2300,6 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # mda solver
         nl = prob.model.mda.nonlinear_solver = om.NonlinearBlockGS()
-        nl.recording_options['record_metadata'] = True
         nl.recording_options['record_abs_error'] = True
         nl.recording_options['record_rel_error'] = True
         nl.recording_options['record_solver_residuals'] = True

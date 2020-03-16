@@ -342,15 +342,17 @@ class System(object):
         self.recording_options.declare('record_residuals', types=bool, default=True,
                                        desc='Set to True to record residuals at the system level')
         self.recording_options.declare('record_metadata', types=bool,
-                                       desc='Record metadata for this system', default=True,
-                                       deprecation="The recording option 'record_metadata' \
-                                       on System is \
-                                       deprecated. Recording of metadata will always be done")
+                                       desc='Deprecated. Recording of metadata will always be done',
+                                       default=True,
+                                       deprecation="The recording option, record_metadata, "
+                                       "on System is "
+                                       "deprecated. Recording of metadata will always be done")
         self.recording_options.declare('record_model_metadata', types=bool,
-                                       desc='Record metadata for all sub systems in the model',
-                                       deprecation="The recording option 'record_model_metadata' \
-                                       on System is deprecated. Recording of metadata will always \
-                                       be done",
+                                       desc='Deprecated. Recording of model metadata will always '
+                                       'be done',
+                                       deprecation="The recording option, record_model_metadata, "
+                                       "on System is deprecated. Recording of model metadata will "
+                                       "always be done",
                                        default=True)
         self.recording_options.declare('includes', types=list, default=['*'],
                                        desc='Patterns for variables to include in recording. \
@@ -908,17 +910,13 @@ class System(object):
         if setup_mode in ('full', 'reconf'):
             self.set_initial_values()
 
-        rec_model_meta = self.recording_options['record_model_metadata']
-
         # Tell all subsystems to record their metadata if they have recorders attached
         for sub in self.system_iter(recurse=True, include_self=True):
-            if sub.recording_options['record_metadata']:
-                sub._rec_mgr.record_metadata(sub)
+            sub._rec_mgr.record_metadata(sub)
 
-            # Also, optionally, record to the recorders attached to this System,
+            # Also, record to the recorders attached to this System,
             #   the system metadata for all the subsystems
-            if rec_model_meta:
-                self._rec_mgr.record_metadata(sub)
+            self._rec_mgr.record_metadata(sub)
 
     def use_fixed_coloring(self, coloring=_STD_COLORING_FNAME, recurse=True):
         """

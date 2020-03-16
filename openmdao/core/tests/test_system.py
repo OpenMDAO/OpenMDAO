@@ -257,6 +257,18 @@ class TestSystem(unittest.TestCase):
         outputs = model.list_outputs(excludes=['circuit*'], implicit=False, out_stream=None)
         self.assertEqual(len(outputs), 2)
 
+    def test_recording_options_deprecated(self):
+        prob = Problem()
+        msg = "The recording option, record_model_metadata, on System is deprecated. " \
+              "Recording of model metadata will always be done"
+        with assert_warning(DeprecationWarning, msg):
+            prob.model.recording_options['record_model_metadata'] = True
+
+        msg = "The recording option, record_metadata, on System is deprecated. " \
+              "Recording of metadata will always be done"
+        with assert_warning(DeprecationWarning, msg):
+            prob.model.recording_options['record_metadata'] = True
+
 
 if __name__ == "__main__":
     unittest.main()
