@@ -25,7 +25,7 @@ def index_to_varname(system, loc):
     Returns
     -------
     str
-        Sting containing variable absolute name (and promoted name if there is one) and index.
+        String containing variable absolute name (and promoted name if there is one) and index.
     """
     start = end = 0
     varsizes = np.sum(system._owned_sizes, axis=0)
