@@ -9,7 +9,7 @@ import openmdao.api as om
 from openmdao.components.spline_comp import SPLINE_METHODS
 from openmdao.utils.assert_utils import assert_check_partials, assert_rel_error
 from openmdao.utils.general_utils import printoptions
-from openmdao.utils.spline_distributions import sine_distribution
+from openmdao.utils.spline_distributions import cell_centered
 from openmdao.components.interp_util.interp import InterpND
 
 
@@ -57,6 +57,31 @@ class SplineCompTestCase(unittest.TestCase):
 
         self.prob.setup(force_alloc_complex=True)
         self.prob.run_model()
+
+    def test_small_akima_spline_bug(self):
+        # Fixes a bug that only occure for a 4 point spline.
+        prob = om.Problem()
+
+        num_cp = 4
+        num_radial = 11
+        comp = om.IndepVarComp()
+        comp.add_output("chord_cp", units="m", val=np.array([0.1, 0.2, 0.3, 0.15]))
+        comp.add_output("theta_cp", units="rad", val=np.array([1.0, 0.8, 0.6, 0.4]))
+        prob.model.add_subsystem("inputs_comp", comp, promotes=["*"])
+
+        x_cp = np.linspace(0.0, 1.0, num_cp)
+        x_interp = cell_centered(num_radial, start=0.0, end=1.0)
+        akima_options = {'delta_x': 0.1}
+        comp = om.SplineComp(method='akima', interp_options=akima_options, x_cp_val=x_cp, x_interp_val=x_interp)
+        comp.add_spline(y_cp_name='chord_cp', y_interp_name='chord_interp', y_units='m')
+        comp.add_spline(y_cp_name='theta_cp', y_interp_name='theta_interp', y_units='rad')
+        prob.model.add_subsystem('akima_comp', comp,
+                                 promotes_inputs=['chord_cp', 'theta_cp'],
+                                 promotes_outputs=['chord_interp', 'theta_interp'])
+        prob.setup()
+
+        # Make sure we don't get an exception
+        prob.run_model()
 
     def test_akima_backward_compatibility(self):
 
