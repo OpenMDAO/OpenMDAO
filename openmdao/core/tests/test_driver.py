@@ -8,8 +8,7 @@ import unittest
 
 import numpy as np
 
-import openmdao
-from openmdao.api import Problem, IndepVarComp, Group, ExecComp, ScipyOptimizeDriver
+import openmdao.api as om
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.utils.general_utils import printoptions
 from openmdao.test_suite.components.sellar import SellarDerivatives
@@ -20,7 +19,7 @@ class TestDriver(unittest.TestCase):
 
     def test_basic_get(self):
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = model = SellarDerivatives()
 
         model.add_design_var('z')
@@ -42,7 +41,7 @@ class TestDriver(unittest.TestCase):
 
     def test_scaled_design_vars(self):
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = model = SellarDerivatives()
 
         model.add_design_var('z', ref=5.0, ref0=3.0)
@@ -65,7 +64,7 @@ class TestDriver(unittest.TestCase):
 
     def test_scaled_constraints(self):
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = model = SellarDerivatives()
 
         model.add_design_var('z')
@@ -82,7 +81,7 @@ class TestDriver(unittest.TestCase):
 
     def test_scaled_objectves(self):
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = model = SellarDerivatives()
 
         model.add_design_var('z')
@@ -99,7 +98,7 @@ class TestDriver(unittest.TestCase):
 
     def test_scaled_derivs(self):
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = model = SellarDerivatives()
 
         model.add_design_var('z')
@@ -112,7 +111,7 @@ class TestDriver(unittest.TestCase):
 
         base = prob.compute_totals(of=['obj', 'con1'], wrt=['z'])
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = model = SellarDerivatives()
 
         model.add_design_var('z', ref=2.0, ref0=0.0)
@@ -130,10 +129,10 @@ class TestDriver(unittest.TestCase):
 
     def test_vector_scaled_derivs(self):
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('px', IndepVarComp(name="x", val=np.ones((2, ))))
+        model.add_subsystem('px', om.IndepVarComp(name="x", val=np.ones((2, ))))
         comp = model.add_subsystem('comp', DoubleArrayComp())
         model.connect('px.x', 'comp.x1')
 
@@ -170,10 +169,10 @@ class TestDriver(unittest.TestCase):
     def test_vector_bounds_inf(self):
 
         # make sure no overflow when there is no specified upper/lower bound and significatn scaling
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('px', IndepVarComp(name="x", val=np.ones((2, ))))
+        model.add_subsystem('px', om.IndepVarComp(name="x", val=np.ones((2, ))))
         comp = model.add_subsystem('comp', DoubleArrayComp())
         model.connect('px.x', 'comp.x1')
 
@@ -194,10 +193,10 @@ class TestDriver(unittest.TestCase):
 
     def test_vector_scaled_derivs_diff_sizes(self):
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('px', IndepVarComp(name="x", val=np.ones((2, ))))
+        model.add_subsystem('px', om.IndepVarComp(name="x", val=np.ones((2, ))))
         comp = model.add_subsystem('comp', NonSquareArrayComp())
         model.connect('px.x', 'comp.x1')
 
@@ -234,7 +233,7 @@ class TestDriver(unittest.TestCase):
 
     def test_debug_print_option(self):
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = model = SellarDerivatives()
 
         model.add_design_var('z')
@@ -279,18 +278,18 @@ class TestDriver(unittest.TestCase):
                          "Option 'debug_print' contains value 'bad_option' which is not one of ['desvars', 'nl_cons', 'ln_cons', 'objs', 'totals'].")
 
     def test_debug_print_desvar_physical_with_indices(self):
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
         size = 3
-        model.add_subsystem('p1', IndepVarComp('x', np.array([50.0] * size)))
-        model.add_subsystem('p2', IndepVarComp('y', np.array([50.0] * size)))
-        model.add_subsystem('comp', ExecComp('f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0',
-                                             x=np.zeros(size), y=np.zeros(size),
-                                             f_xy=np.zeros(size)))
-        model.add_subsystem('con', ExecComp('c = - x + y',
-                                            c=np.zeros(size), x=np.zeros(size),
-                                            y=np.zeros(size)))
+        model.add_subsystem('p1', om.IndepVarComp('x', np.array([50.0] * size)))
+        model.add_subsystem('p2', om.IndepVarComp('y', np.array([50.0] * size)))
+        model.add_subsystem('comp', om.ExecComp('f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0',
+                                                x=np.zeros(size), y=np.zeros(size),
+                                                f_xy=np.zeros(size)))
+        model.add_subsystem('con', om.ExecComp('c = - x + y',
+                                               c=np.zeros(size), x=np.zeros(size),
+                                               y=np.zeros(size)))
 
         model.connect('p1.x', 'comp.x')
         model.connect('p2.y', 'comp.y')
@@ -299,7 +298,7 @@ class TestDriver(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizeDriver()
+        prob.driver = om.ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -331,18 +330,18 @@ class TestDriver(unittest.TestCase):
         self.assertEqual(output[3], "{'p1.x': array([ 50.,  50.,  50.]), 'p2.y': array([ 50.,  50.,  50.])}")
 
     def test_debug_print_response_physical(self):
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
         size = 3
-        model.add_subsystem('p1', IndepVarComp('x', np.array([50.0] * size)))
-        model.add_subsystem('p2', IndepVarComp('y', np.array([50.0] * size)))
-        model.add_subsystem('comp', ExecComp('f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0',
-                                             x=np.zeros(size), y=np.zeros(size),
-                                             f_xy=np.zeros(size)))
-        model.add_subsystem('con', ExecComp('c = - x + y + 1',
-                                            c=np.zeros(size), x=np.zeros(size),
-                                            y=np.zeros(size)))
+        model.add_subsystem('p1', om.IndepVarComp('x', np.array([50.0] * size)))
+        model.add_subsystem('p2', om.IndepVarComp('y', np.array([50.0] * size)))
+        model.add_subsystem('comp', om.ExecComp('f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0',
+                                                x=np.zeros(size), y=np.zeros(size),
+                                                f_xy=np.zeros(size)))
+        model.add_subsystem('con', om.ExecComp('c = - x + y + 1',
+                                               c=np.zeros(size), x=np.zeros(size),
+                                               y=np.zeros(size)))
 
         model.connect('p1.x', 'comp.x')
         model.connect('p2.y', 'comp.y')
@@ -351,7 +350,7 @@ class TestDriver(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizeDriver()
+        prob.driver = om.ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -386,10 +385,10 @@ class TestDriver(unittest.TestCase):
     def test_debug_desvar_shape(self):
         # Desvar should always be printed un-flattened.
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p', IndepVarComp('x', val=np.array([[1.0, 3, 4], [7, 2, 5]])))
+        model.add_subsystem('p', om.IndepVarComp('x', val=np.array([[1.0, 3, 4], [7, 2, 5]])))
 
         model.add_design_var('p.x', np.array([[1.0, 3, 4], [7, 2, 5]]))
         prob.driver.options['debug_print'] = ['desvars']
@@ -417,15 +416,15 @@ class TestDriver(unittest.TestCase):
         self.assertEqual(output[4], '       [ 7.,  2.,  5.]])}')
 
     def test_unsupported_discrete_desvar(self):
-        prob = Problem()
+        prob = om.Problem()
 
-        indep = IndepVarComp()
+        indep = om.IndepVarComp()
         indep.add_discrete_output('xI', val=0)
         prob.model.add_subsystem('p', indep)
 
         prob.model.add_design_var('p.xI')
 
-        prob.driver = ScipyOptimizeDriver()
+        prob.driver = om.ScipyOptimizeDriver()
 
         prob.setup()
 
@@ -435,6 +434,32 @@ class TestDriver(unittest.TestCase):
         msg = "Discrete design variables are not supported by this driver: p.xI"
         self.assertEqual(str(context.exception), msg)
 
+    def test_units_basic(self):
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', 3.0, units='degF', lower=32.0, upper=212.0)
+
+        model.add_subsystem('p', ivc)
+        model.add_subsystem('comp1', om.ExecComp('y1 = 4.0*x',
+                                                 x={'value': 2.0, 'units': 'degF'},
+                                                 y1={'value': 2.0, 'units': 'degF'}),
+                            promotes=['x', 'y1'])
+
+        model.add_subsystem('comp2', om.ExecComp('y2 = 7.0*x',
+                                                 x={'value': 2.0, 'units': 'degF'},
+                                                 y2={'value': 2.0, 'units': 'degF'}),
+                            promotes=['x', 'y2'])
+
+        model.add_design_var('x', units='degC', lower=0.0, upper=100.0)
+        model.add_constraint('y1', units='degC', lower=0.0, upper=100.0)
+        model.add_objective('y2', units='degC', lower=0.0, upper=100.0)
+
+        prob.setup()
+        prob.run_driver()
+
+        print('done')
 
 if __name__ == "__main__":
     unittest.main()
