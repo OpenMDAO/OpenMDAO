@@ -182,9 +182,9 @@ class Jacobian(object):
                 else:
                     # Sparse subjac
                     if subjac.shape != (1,) and subjac.shape != rows.shape:
-                        raise ValueError("{}: Sub-jacobian for key %s has "
-                                         "the wrong shape (%s), expected (%s)." %
-                                         (self.msginfo, abs_key, subjac.shape, rows.shape))
+                        msg = '{}: Sub-jacobian for key {} has the wrong shape ({}), expected ({}).'
+                        raise ValueError(msg.format(self.msginfo, abs_key,
+                                                    subjac.shape, rows.shape))
 
                 subjacs_info['value'][:] = subjac
 
