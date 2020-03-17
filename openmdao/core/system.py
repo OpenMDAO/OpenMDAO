@@ -2440,8 +2440,8 @@ class System(object):
         for isub, subsys in enumerate(self._subsystems_allprocs):
             yield subsys, subsys.name in self._loc_subsys_map
 
-    def add_design_var(self, name, lower=None, upper=None, ref=None,
-                       ref0=None, indices=None, adder=None, scaler=None,
+    def add_design_var(self, name, lower=None, upper=None, ref=None, ref0=None, indices=None,
+                       adder=None, scaler=None, units=None,
                        parallel_deriv_color=None, vectorize_derivs=False,
                        cache_linear_solution=False):
         r"""
@@ -2463,6 +2463,8 @@ class System(object):
             If a param is an array, these indicate which entries are of
             interest for this particular design variable.  These may be
             positive or negative integers.
+        units : str, optional
+            Units to
         adder : float or ndarray, optional
             Value to add to the model value to get the scaled value for the driver. adder
             is first in precedence.  adder and scaler are an alterantive to using ref
@@ -2570,7 +2572,7 @@ class System(object):
         design_vars[name] = dvs
 
     def add_response(self, name, type_, lower=None, upper=None, equals=None,
-                     ref=None, ref0=None, indices=None, index=None,
+                     ref=None, ref0=None, indices=None, index=None, units=None,
                      adder=None, scaler=None, linear=False, parallel_deriv_color=None,
                      vectorize_derivs=False, cache_linear_solution=False):
         r"""
@@ -2761,7 +2763,7 @@ class System(object):
         responses[name] = resp
 
     def add_constraint(self, name, lower=None, upper=None, equals=None,
-                       ref=None, ref0=None, adder=None, scaler=None,
+                       ref=None, ref0=None, adder=None, scaler=None, units=None,
                        indices=None, linear=False, parallel_deriv_color=None,
                        vectorize_derivs=False, cache_linear_solution=False):
         r"""
@@ -2820,7 +2822,7 @@ class System(object):
                           vectorize_derivs=vectorize_derivs,
                           cache_linear_solution=cache_linear_solution)
 
-    def add_objective(self, name, ref=None, ref0=None, index=None,
+    def add_objective(self, name, ref=None, ref0=None, index=None, units=None,
                       adder=None, scaler=None, parallel_deriv_color=None,
                       vectorize_derivs=False, cache_linear_solution=False):
         r"""
