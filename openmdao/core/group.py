@@ -881,7 +881,7 @@ class Group(System):
                 if (prom_out in allprocs_prom2abs_list_in or
                         prom_out in self._var_allprocs_discrete['input']):
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
-                          f"'{prom_in}',"" but '{prom_out}' is an input. " + \
+                          f"'{prom_in}', but '{prom_out}' is an input. " + \
                           "All connections must be from an output to an input."
                     if self._raise_connection_error:
                         raise NameError(msg)
@@ -991,8 +991,9 @@ class Group(System):
                         dup_info[tgt].add(src)
             dup_info = [(n, srcs) for n, srcs in dup_info.items() if len(srcs) > 1]
             if dup_info:
-                msg = ["%s from %s" % (tgt, sorted(srcs)) for tgt, srcs in dup_info]
-                msg = f"{self.msginfo}: The following inputs have multiple connections: {', '.join(msg)}"
+                dup = ["%s from %s" % (tgt, sorted(srcs)) for tgt, srcs in dup_info]
+                msg = f"{self.msginfo}: The following inputs have multiple connections: " + \
+                      f"{', '.join(dup)}"
                 if self._raise_connection_error:
                     raise RuntimeError(msg)
                 else:
@@ -1211,9 +1212,10 @@ class Group(System):
                     if len(src_indices.shape) > len(in_shape):
                         source_dimensions = src_indices.shape[len(in_shape)]
                         if source_dimensions != len(out_shape):
+                            str_indices = str(src_indices).replace('\n', '')
                             msg = f"{self.msginfo}: The source indices " + \
-                                  f"{src_indices} do not specify a " + \
-                                  f"valid shape for the connection '{abs_out}' to '{abs_in}' " + \
+                                  f"{str_indices} do not specify a " + \
+                                  f"valid shape for the connection '{abs_out}' to '{abs_in}'. " + \
                                   f"The source has {len(out_shape)} dimensions but the " + \
                                   f"indices expect {source_dimensions}."
                             raise ValueError(msg)
