@@ -16,7 +16,7 @@ except ImportError:
 
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 
-from openmdao.utils.assert_utils import assert_rel_error, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 
 
 @unittest.skipUnless(PETScVector is not None, "PETSc is required.")
@@ -50,7 +50,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.run_solve_linear(['linear'], 'fwd')
 
         output = d_outputs._data
-        assert_rel_error(self, output, group.expected_solution, 1e-15)
+        assert_near_equal(output, group.expected_solution, 1e-15)
 
         # reverse
         d_outputs.set_const(1.0)
@@ -58,7 +58,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.run_solve_linear(['linear'], 'rev')
 
         output = d_residuals._data
-        assert_rel_error(self, output, group.expected_solution, 1e-15)
+        assert_near_equal(output, group.expected_solution, 1e-15)
 
     def test_solve_linear_ksp_gmres(self):
         """Solve implicit system with PETScKrylov using 'gmres' method."""
@@ -81,7 +81,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.run_solve_linear(['linear'], 'fwd')
 
         output = d_outputs._data
-        assert_rel_error(self, output, group.expected_solution, 1e-15)
+        assert_near_equal(output, group.expected_solution, 1e-15)
 
         # reverse
         d_outputs.set_const(1.0)
@@ -89,7 +89,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.run_solve_linear(['linear'], 'rev')
 
         output = d_residuals._data
-        assert_rel_error(self, output, group.expected_solution, 1e-15)
+        assert_near_equal(output, group.expected_solution, 1e-15)
 
     def test_solve_linear_ksp_maxiter(self):
         """Verify that PETScKrylov abides by the 'maxiter' option."""
@@ -141,7 +141,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.run_solve_linear(['linear'], 'fwd')
 
         output = d_outputs._data
-        assert_rel_error(self, output, group.expected_solution, 1e-15)
+        assert_near_equal(output, group.expected_solution, 1e-15)
 
         self.assertTrue(precon._iter_count > 0)
 
@@ -151,7 +151,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.run_solve_linear(['linear'], 'rev')
 
         output = d_residuals._data
-        assert_rel_error(self, output, group.expected_solution, 3e-15)
+        assert_near_equal(output, group.expected_solution, 3e-15)
 
         self.assertTrue(precon._iter_count > 0)
 
@@ -171,7 +171,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.run_solve_linear(['linear'], 'fwd')
 
         output = d_outputs._data
-        assert_rel_error(self, output, group.expected_solution, 1e-15)
+        assert_near_equal(output, group.expected_solution, 1e-15)
 
         # reverse
         d_outputs.set_const(1.0)
@@ -180,7 +180,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.run_solve_linear(['linear'], 'rev')
 
         output = d_residuals._data
-        assert_rel_error(self, output, group.expected_solution, 3e-15)
+        assert_near_equal(output, group.expected_solution, 3e-15)
 
     def test_solve_linear_ksp_precon_left(self):
         """Solve implicit system with PETScKrylov using a preconditioner."""
@@ -206,7 +206,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.run_solve_linear(['linear'], 'fwd')
 
         output = d_outputs._data
-        assert_rel_error(self, output, group.expected_solution, 1e-15)
+        assert_near_equal(output, group.expected_solution, 1e-15)
 
         # reverse
         d_outputs.set_const(1.0)
@@ -215,7 +215,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.run_solve_linear(['linear'], 'rev')
 
         output = d_residuals._data
-        assert_rel_error(self, output, group.expected_solution, 3e-15)
+        assert_near_equal(output, group.expected_solution, 3e-15)
 
         # test the direct solver and make sure KSP correctly recurses for _linearize
         precon = group.linear_solver.precon = om.DirectSolver(assemble_jac=False)
@@ -236,7 +236,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.run_solve_linear(['linear'], 'fwd')
 
         output = d_outputs._data
-        assert_rel_error(self, output, group.expected_solution, 1e-15)
+        assert_near_equal(output, group.expected_solution, 1e-15)
 
         # reverse
         d_outputs.set_const(1.0)
@@ -245,7 +245,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.run_solve_linear(['linear'], 'rev')
 
         output = d_residuals._data
-        assert_rel_error(self, output, group.expected_solution, 3e-15)
+        assert_near_equal(output, group.expected_solution, 3e-15)
 
     def test_solve_on_subsystem(self):
         """solve an implicit system with KSP attached anywhere but the root"""
@@ -273,7 +273,7 @@ class TestPETScKrylov(unittest.TestCase):
         g1.run_solve_linear(['linear'], 'fwd')
 
         output = d_outputs._data
-        assert_rel_error(self, output, g1.expected_solution, 1e-15)
+        assert_near_equal(output, g1.expected_solution, 1e-15)
 
         # reverse
         d_inputs, d_outputs, d_residuals = g1.get_linear_vectors()
@@ -284,7 +284,7 @@ class TestPETScKrylov(unittest.TestCase):
         g1.run_solve_linear(['linear'], 'rev')
 
         output = d_residuals._data
-        assert_rel_error(self, output, g1.expected_solution, 3e-15)
+        assert_near_equal(output, g1.expected_solution, 3e-15)
 
     def test_linear_solution_cache(self):
         # Test derivatives across a converged Sellar model. When caching
@@ -417,8 +417,8 @@ class TestPETScKrylovSolverFeature(unittest.TestCase):
         of = ['obj']
 
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-        assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, .00001)
-        assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
+        assert_near_equal(J['obj', 'z'][0][0], 9.61001056, .00001)
+        assert_near_equal(J['obj', 'z'][0][1], 1.78448534, .00001)
 
     def test_specify_ksp_type(self):
         import numpy as np
@@ -455,8 +455,8 @@ class TestPETScKrylovSolverFeature(unittest.TestCase):
         of = ['obj']
 
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-        assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, .00001)
-        assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
+        assert_near_equal(J['obj', 'z'][0][0], 9.61001056, .00001)
+        assert_near_equal(J['obj', 'z'][0][1], 1.78448534, .00001)
 
     def test_feature_maxiter(self):
         import numpy as np
@@ -492,8 +492,8 @@ class TestPETScKrylovSolverFeature(unittest.TestCase):
         of = ['obj']
 
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-        assert_rel_error(self, J['obj', 'z'][0][0], 4.93218027, .00001)
-        assert_rel_error(self, J['obj', 'z'][0][1], 1.73406455, .00001)
+        assert_near_equal(J['obj', 'z'][0][0], 4.93218027, .00001)
+        assert_near_equal(J['obj', 'z'][0][1], 1.73406455, .00001)
 
     def test_feature_atol(self):
         import numpy as np
@@ -529,8 +529,8 @@ class TestPETScKrylovSolverFeature(unittest.TestCase):
         of = ['obj']
 
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-        assert_rel_error(self, J['obj', 'z'][0][0], 9.61001055699, .00001)
-        assert_rel_error(self, J['obj', 'z'][0][1], 1.78448533563, .00001)
+        assert_near_equal(J['obj', 'z'][0][0], 9.61001055699, .00001)
+        assert_near_equal(J['obj', 'z'][0][1], 1.78448533563, .00001)
 
     def test_feature_rtol(self):
         import numpy as np
@@ -566,8 +566,8 @@ class TestPETScKrylovSolverFeature(unittest.TestCase):
         of = ['obj']
 
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-        assert_rel_error(self, J['obj', 'z'][0][0], 9.61001055699, .00001)
-        assert_rel_error(self, J['obj', 'z'][0][1], 1.78448533563, .00001)
+        assert_near_equal(J['obj', 'z'][0][0], 9.61001055699, .00001)
+        assert_near_equal(J['obj', 'z'][0][1], 1.78448533563, .00001)
 
     def test_specify_precon(self):
         import numpy as np
@@ -601,8 +601,8 @@ class TestPETScKrylovSolverFeature(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob['y2'], 12.05848819, .00001)
 
     def test_specify_precon_left(self):
         import numpy as np
@@ -637,8 +637,8 @@ class TestPETScKrylovSolverFeature(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob['y2'], 12.05848819, .00001)
 
 if __name__ == "__main__":
     unittest.main()

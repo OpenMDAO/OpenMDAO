@@ -8,7 +8,7 @@ import numpy as np
 
 from openmdao.api import Problem, IndepVarComp, NonlinearBlockGS, ScipyOptimizeDriver, \
     ExecComp, Group, NewtonSolver, ImplicitComponent, ScipyKrylov, ExplicitComponent, ParallelGroup
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives
 
@@ -44,12 +44,12 @@ class DiscreteMPITestCase(unittest.TestCase):
         prob.run_model()
 
         if prob.comm.rank == 0:
-            assert_rel_error(self, prob['par.comp1.y'], 1)
+            assert_near_equal(prob['par.comp1.y'], 1)
         else:
-            assert_rel_error(self, prob['par.comp2.y'], 2)
+            assert_near_equal(prob['par.comp2.y'], 2)
 
-        assert_rel_error(self, prob.get_val('par.comp1.y', get_remote=True), 1)
-        assert_rel_error(self, prob.get_val('par.comp2.y', get_remote=True), 2)
+        assert_near_equal(prob.get_val('par.comp1.y', get_remote=True), 1)
+        assert_near_equal(prob.get_val('par.comp2.y', get_remote=True), 2)
 
 
     def test_simple_run_once_discrete_implicit(self):
@@ -69,12 +69,12 @@ class DiscreteMPITestCase(unittest.TestCase):
         prob.run_model()
 
         if prob.comm.rank == 0:
-            assert_rel_error(self, prob['par.comp1.y'], 1)
+            assert_near_equal(prob['par.comp1.y'], 1)
         else:
-            assert_rel_error(self, prob['par.comp2.y'], 2)
+            assert_near_equal(prob['par.comp2.y'], 2)
 
-        assert_rel_error(self, prob.get_val('par.comp1.y', get_remote=True), 1)
-        assert_rel_error(self, prob.get_val('par.comp2.y', get_remote=True), 2)
+        assert_near_equal(prob.get_val('par.comp1.y', get_remote=True), 1)
+        assert_near_equal(prob.get_val('par.comp2.y', get_remote=True), 2)
 
 
 # This re-runs all of the DiscretePromTestCase tests under MPI

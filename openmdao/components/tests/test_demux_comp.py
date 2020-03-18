@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 
 
 class TestDemuxCompOptions(unittest.TestCase):
@@ -91,10 +91,10 @@ class TestDemuxComp1D(unittest.TestCase):
         for i in range(self.nn):
             in_i = self.p['a'][i]
             out_i = self.p['demux_comp.a_{0}'.format(i)]
-            assert_rel_error(self, in_i, out_i)
+            assert_near_equal(in_i, out_i)
             in_i = self.p['b'][i]
             out_i = self.p['demux_comp.b_{0}'.format(i)]
-            assert_rel_error(self, in_i, out_i)
+            assert_near_equal(in_i, out_i)
 
     def test_partials(self):
         np.set_printoptions(linewidth=1024)
@@ -138,11 +138,11 @@ class TestDemuxComp2D(unittest.TestCase):
         for i in range(self.nn):
             in_i = np.take(self.p['a'], indices=i, axis=0)
             out_i = self.p['demux_comp.a_{0}'.format(i)]
-            assert_rel_error(self, in_i, out_i)
+            assert_near_equal(in_i, out_i)
 
             in_i = np.take(self.p['b'], indices=i, axis=1)
             out_i = self.p['demux_comp.b_{0}'.format(i)]
-            assert_rel_error(self, in_i, out_i)
+            assert_near_equal(in_i, out_i)
 
     def test_partials(self):
         np.set_printoptions(linewidth=1024)
@@ -159,7 +159,7 @@ class TestFeature(unittest.TestCase):
         import numpy as np
 
         import openmdao.api as om
-        from openmdao.utils.assert_utils import assert_rel_error
+        from openmdao.utils.assert_utils import assert_near_equal
 
         # The number of elements to be demuxed
         n = 3
@@ -200,7 +200,7 @@ class TestFeature(unittest.TestCase):
         p.run_model()
 
         expected = np.arctan(p['pos_ecef'][:, 1] / p['pos_ecef'][:, 0])
-        assert_rel_error(self, p.get_val('longitude_comp.long'), expected)
+        assert_near_equal(p.get_val('longitude_comp.long'), expected)
 
 
 if __name__ == '__main__':

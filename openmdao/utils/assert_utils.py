@@ -14,6 +14,7 @@ from openmdao.core.component import Component
 from openmdao.core.group import Group
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.utils.general_utils import pad_name, reset_warning_registry
+from openmdao.utils.general_utils import warn_deprecation
 
 
 @contextmanager
@@ -273,6 +274,9 @@ def assert_rel_error(test_case, actual, desired, tolerance=1e-15):
     float
         The error.
     """
+    warn_deprecation("'assert_rel_error' has been deprecated. Use "
+                     "'assert_near_equal' instead.")
+
     if isinstance(actual, dict) and isinstance(desired, dict):
 
         actual_keys = set(actual.keys())
@@ -332,6 +336,94 @@ def assert_rel_error(test_case, actual, desired, tolerance=1e-15):
             else:
                 test_case.fail('arrays do not match, rel error %.3e > tol (%.3e)' %
                                (error, tolerance))
+
+    return error
+
+
+def assert_near_equal(actual, desired, tolerance=1e-15):
+    """
+    Check relative error.
+
+    Determine that the relative error between `actual` and `desired`
+    is within `tolerance`. If `desired` is zero, then use absolute error.
+
+    Parameters
+    ----------
+    actual : float, array-like, dict
+        The value from the test.
+    desired : float, array-like, dict
+        The value expected.
+    tolerance : float
+        Maximum relative error ``(actual - desired) / desired``.
+
+    Returns
+    -------
+    float
+        The error.
+    """
+    if isinstance(actual, dict) and isinstance(desired, dict):
+
+        actual_keys = set(actual.keys())
+        desired_keys = set(desired.keys())
+
+        if actual_keys.symmetric_difference(desired_keys):
+            msg = 'Actual and desired keys differ. Actual extra keys: {}, Desired extra keys: {}'
+            actual_extra = actual_keys.difference(desired_keys)
+            desired_extra = desired_keys.difference(actual_keys)
+            raise KeyError(msg.format(actual_extra, desired_extra))
+
+        error = 0.
+
+        for key in actual_keys:
+            try:
+                new_error = assert_near_equal(
+                    actual[key], desired[key], tolerance)
+                error = max(error, new_error)
+            except ValueError as exception:
+                msg = '{}: '.format(key) + str(exception)
+                raise ValueError(msg) from None
+            except KeyError as exception:
+                msg = '{}: '.format(key) + str(exception)
+                raise KeyError(msg) from None
+
+    elif isinstance(actual, float) and isinstance(desired, float):
+        if isnan(actual) and not isnan(desired):
+            raise ValueError('actual nan, desired %s' % desired)
+        if desired != 0:
+            error = (actual - desired) / desired
+        else:
+            error = actual
+        if abs(error) > tolerance:
+            raise ValueError('actual %s, desired %s, rel error %s, tolerance %s'
+                             % (actual, desired, error, tolerance))
+
+    # array values
+    else:
+        actual = np.atleast_1d(actual)
+        desired = np.atleast_1d(desired)
+        if actual.shape != desired.shape:
+            raise ValueError(
+                'actual and desired have differing shapes.'
+                ' actual {}, desired {}'.format(actual.shape, desired.shape))
+        if not np.all(np.isnan(actual) == np.isnan(desired)):
+            if actual.size == 1 and desired.size == 1:
+                raise ValueError('actual %s, desired %s' % (actual, desired))
+            else:
+                raise ValueError('actual and desired values have non-matching nan'
+                                 ' values')
+
+        if np.linalg.norm(desired) == 0:
+            error = np.linalg.norm(actual)
+        else:
+            error = np.linalg.norm(actual - desired) / np.linalg.norm(desired)
+
+        if abs(error) > tolerance:
+            if actual.size < 10 and desired.size < 10:
+                raise ValueError('actual %s, desired %s, rel error %s, tolerance %s'
+                                 % (actual, desired, error, tolerance))
+            else:
+                raise ValueError('arrays do not match, rel error %.3e > tol (%.3e)' %
+                                 (error, tolerance))
 
     return error
 

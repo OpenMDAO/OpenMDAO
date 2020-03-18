@@ -1,7 +1,7 @@
 import unittest
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class TestSellarOpt(unittest.TestCase):
@@ -33,11 +33,11 @@ class TestSellarOpt(unittest.TestCase):
         prob.run_driver()
 
         print('minimum found at')
-        assert_rel_error(self, prob['x'][0], 0., 1e-5)
-        assert_rel_error(self, prob['z'], [1.977639, 0.], 1e-5)
+        assert_near_equal(prob['x'][0], 0., 1e-5)
+        assert_near_equal(prob['z'], [1.977639, 0.], 1e-5)
 
         print('minumum objective')
-        assert_rel_error(self, prob['obj'][0], 3.18339395045, 1e-5)
+        assert_near_equal(prob['obj'][0], 3.18339395045, 1e-5)
 
 
 if __name__ == "__main__":

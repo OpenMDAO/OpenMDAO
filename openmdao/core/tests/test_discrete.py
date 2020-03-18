@@ -13,7 +13,7 @@ from openmdao.visualization.n2_viewer.n2_viewer import _get_viewer_data
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import StateConnection, \
      SellarDis1withDerivatives, SellarDis2withDerivatives
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.general_utils import remove_whitespace
 from openmdao.utils.logger_utils import TestLogger
 
@@ -194,7 +194,7 @@ class DiscreteTestCase(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['comp.y'], 2)
+        assert_near_equal(prob['comp.y'], 2)
 
     def test_simple_run_once_promoted(self):
         prob = om.Problem()
@@ -207,7 +207,7 @@ class DiscreteTestCase(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['y'], 2)
+        assert_near_equal(prob['y'], 2)
 
     def test_simple_run_once_implicit(self):
         prob = om.Problem()
@@ -222,7 +222,7 @@ class DiscreteTestCase(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['comp.y'], 2)
+        assert_near_equal(prob['comp.y'], 2)
 
     def test_list_inputs_outputs(self):
         prob = om.Problem()
@@ -872,7 +872,7 @@ class DiscreteFeatureTestCase(unittest.TestCase):
         prob.run_model()
 
         # minimum value
-        assert_rel_error(self, prob['SolidityComp.blade_solidity'], 0.02984155, 1e-4)
+        assert_near_equal(prob['SolidityComp.blade_solidity'], 0.02984155, 1e-4)
 
     def test_feature_discrete_implicit(self):
         import openmdao.api as om
@@ -922,7 +922,7 @@ class DiscreteFeatureTestCase(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['comp.x'], 3., 1e-4)
+        assert_near_equal(prob['comp.x'], 3., 1e-4)
 
 
 if __name__ == "__main__":

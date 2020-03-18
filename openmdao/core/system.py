@@ -1657,8 +1657,95 @@ class System(object):
         relevant : dict or None
             Dictionary mapping VOI name to all variables necessary for computing
             derivatives between the VOI and all other VOIs.
-
         """
+        # Update driver quantities to apply unit conversions.
+        abs2meta = self._var_abs2meta
+        pro2abs = self._var_allprocs_prom2abs_list['output']
+        dv = self._design_vars
+        for name, meta in dv.items():
+            units = meta['units']
+            if units is not None:
+                abs_name = pro2abs[name][0]
+                var_units = abs2meta[abs_name]['units']
+                if var_units is None:
+                    msg = "{}: Target for design variable {} has no units, but a unit " + \
+                          "conversion was specified."
+                    raise RuntimeError(msg.format(self.msginfo, name))
+
+                if not is_compatible(var_units, units):
+                    msg = "{}: Target for design variable {} has '{} 'units, but '{}' units " + \
+                          "were specified."
+                    raise RuntimeError(msg.format(self.msginfo, name, var_units, units))
+
+                factor, offset = get_conversion(var_units, units)
+                base_adder, base_scaler = determine_adder_scaler(None, None,
+                                                                 dv[name]['adder'],
+                                                                 dv[name]['scaler'])
+
+                # Apply unit conversion as initial scale factor.
+                scaler = base_scaler * factor
+                adder = offset + base_adder / factor
+
+                # Re-adjust upper and lower
+                for item in ['upper', 'lower']:
+                    old_val = dv[name][item]
+                    if old_val is not None:
+                        unscaled = old_val / base_scaler - base_adder
+                        scaled = ((unscaled + offset) * factor + base_adder) * base_scaler
+                        dv[name][item] = scaled
+
+                dv[name]['total_adder'] = adder
+                dv[name]['total_scaler'] = scaler
+
+            else:
+                dv[name]['total_adder'] = dv[name]['adder']
+                dv[name]['total_scaler'] = dv[name]['scaler']
+
+        resp = self._responses
+        type_dict = {'con': 'constraint', 'obj': 'objective'}
+        for name, meta in resp.items():
+            units = meta['units']
+            if units is not None:
+                abs_name = pro2abs[name][0]
+                var_units = abs2meta[abs_name]['units']
+                if var_units is None:
+                    msg = "{}: Target for {} {} has no units, but a unit " + \
+                          "conversion was specified."
+                    raise RuntimeError(msg.format(self.msginfo, type_dict[meta['type']], name))
+
+                if not is_compatible(var_units, units):
+                    msg = "{}: Target for {} {} has '{} 'units, but '{}' units " + \
+                          "were specified."
+                    raise RuntimeError(msg.format(self.msginfo, type_dict[meta['type']],
+                                                  name, var_units, units))
+
+                factor, offset = get_conversion(var_units, units)
+                base_adder, base_scaler = determine_adder_scaler(None, None,
+                                                                 resp[name]['adder'],
+                                                                 resp[name]['scaler'])
+
+                # Apply unit conversion as initial scale factor.
+                scaler = base_scaler * factor
+                adder = offset + base_adder / factor
+
+                # Re-adjust upper and lower
+                if meta['type'] == 'con':
+                    for item in ['upper', 'lower', 'equals']:
+                        old_val = resp[name][item]
+                        if old_val is not None:
+                            unscaled = old_val / base_scaler - base_adder
+                            scaled = ((unscaled + offset) * factor + base_adder) * base_scaler
+                            resp[name][item] = scaled
+
+                resp[name]['total_adder'] = adder
+                resp[name]['total_scaler'] = scaler
+
+            else:
+                resp[name]['total_adder'] = resp[name]['adder']
+                resp[name]['total_scaler'] = resp[name]['scaler']
+
+        # Relevance setup
+
         if relevant is None:  # should only occur at top level on full setup
             self._relevant = relevant = self._init_relevance(mode)
         else:
@@ -2822,7 +2909,7 @@ class System(object):
         """
         self.add_response(name=name, type_='con', lower=lower, upper=upper,
                           equals=equals, scaler=scaler, adder=adder, ref=ref,
-                          ref0=ref0, indices=indices, linear=linear,
+                          ref0=ref0, indices=indices, linear=linear, units=units,
                           parallel_deriv_color=parallel_deriv_color,
                           vectorize_derivs=vectorize_derivs,
                           cache_linear_solution=cache_linear_solution)
@@ -2894,7 +2981,7 @@ class System(object):
             raise TypeError('{}: If specified, objective index must be '
                             'an int.'.format(self.msginfo))
         self.add_response(name, type_='obj', scaler=scaler, adder=adder,
-                          ref=ref, ref0=ref0, index=index,
+                          ref=ref, ref0=ref0, index=index, units=units,
                           parallel_deriv_color=parallel_deriv_color,
                           vectorize_derivs=vectorize_derivs,
                           cache_linear_solution=cache_linear_solution)
@@ -2930,42 +3017,6 @@ class System(object):
         except KeyError as err:
             msg = "{}: Output not found for design variable {}."
             raise RuntimeError(msg.format(self.msginfo, str(err)))
-
-        # Process unit conversions.
-        abs2meta = self._var_abs2meta
-        for name, meta in out.items():
-            units = meta['units']
-            if units is not None:
-                var_units = abs2meta[name]['units']
-                if var_units is None:
-                    msg = "{}: Target for design variable {} has no units, but a unit " + \
-                          "conversion was specified."
-                    raise RuntimeError(msg.format(self.msginfo, name))
-
-                if not is_compatible(var_units, units):
-                    msg = "{}: Target for design variable {} has '{} 'units, but '{}' units " + \
-                          "were specified."
-                    raise RuntimeError(msg.format(self.msginfo, name, var_units, units))
-
-                factor, offset = get_conversion(var_units, units)
-                base_adder, base_scaler = determine_adder_scaler(None, None,
-                                                                 out[name]['adder'],
-                                                                 out[name]['scaler'])
-
-                # Apply unit conversion as initial scale factor.
-                scaler = base_scaler * factor
-                adder = base_adder * base_scaler * factor + offset * factor
-
-                # Re-adjust upper and lower
-                for item in ['upper', 'lower']:
-                    old_val = out[name][item]
-                    if old_val is not None:
-                        unscaled = old_val / base_scaler - base_adder
-                        scaled = ((unscaled + offset) * factor + base_adder) * base_scaler
-                        out[name][item] = scaled
-
-                out[name]['adder'] = adder
-                out[name]['scaler'] = scaler
 
         if get_sizes:
             # Size them all
@@ -3021,42 +3072,6 @@ class System(object):
         except KeyError as err:
             msg = "{}: Output not found for response {}."
             raise RuntimeError(msg.format(self.msginfo, str(err)))
-
-        # Process unit conversions.
-        abs2meta = self._var_abs2meta
-        for name, meta in out.items():
-            units = meta['units']
-            if units is not None:
-                var_units = abs2meta[name]['units']
-                if var_units is None:
-                    msg = "{}: Target for design variable {} has no units, but a unit " + \
-                          "conversion was specified."
-                    raise RuntimeError(msg.format(self.msginfo, name))
-
-                if not is_compatible(var_units, units):
-                    msg = "{}: Target for design variable {} has '{} 'units, but '{}' units " + \
-                          "were specified."
-                    raise RuntimeError(msg.format(self.msginfo, name, var_units, units))
-
-                factor, offset = get_conversion(units, var_units)
-                base_adder, base_scaler = determine_adder_scaler(None, None,
-                                                                 out[name]['adder'],
-                                                                 out[name]['scaler'])
-
-                # Apply unit conversion as initial scale factor.
-                scaler = base_scaler * factor
-                adder = base_adder * base_scaler * factor + offset * factor
-
-                # Re-adjust upper and lower
-                for item in ['upper', 'lower', 'equal']:
-                    old_val = out[name][item]
-                    if old_val is not None:
-                        unscaled = old_val / base_scaler - base_adder
-                        scaled = ((unscaled + offset) * factor + base_adder) * base_scaler
-                        out[name][item] = scaled
-
-                out[name]['adder'] = adder
-                out[name]['scaler'] = scaler
 
         if get_sizes:
             # Size them all

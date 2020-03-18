@@ -9,7 +9,7 @@ import openmdao.api as om
 from openmdao.test_suite.components.double_sellar import SubSellar
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimple, \
     TestExplCompSimpleDense
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.general_utils import printoptions, remove_whitespace
 
 
@@ -125,18 +125,18 @@ class ExplCompTestCase(unittest.TestCase):
         prob['comp1.length'] = 3.
         prob['comp1.width'] = 2.
         prob.run_model()
-        assert_rel_error(self, prob['comp2.area'], 6.)
-        assert_rel_error(self, prob['comp3.area'], 6.)
+        assert_near_equal(prob['comp2.area'], 6.)
+        assert_near_equal(prob['comp3.area'], 6.)
 
         # total derivs
         total_derivs = prob.compute_totals(
             wrt=['comp1.length', 'comp1.width'],
             of=['comp2.area', 'comp3.area']
         )
-        assert_rel_error(self, total_derivs['comp2.area', 'comp1.length'], [[2.]])
-        assert_rel_error(self, total_derivs['comp3.area', 'comp1.length'], [[2.]])
-        assert_rel_error(self, total_derivs['comp2.area', 'comp1.width'], [[3.]])
-        assert_rel_error(self, total_derivs['comp3.area', 'comp1.width'], [[3.]])
+        assert_near_equal(total_derivs['comp2.area', 'comp1.length'], [[2.]])
+        assert_near_equal(total_derivs['comp3.area', 'comp1.length'], [[2.]])
+        assert_near_equal(total_derivs['comp2.area', 'comp1.width'], [[3.]])
+        assert_near_equal(total_derivs['comp3.area', 'comp1.width'], [[3.]])
 
         # list inputs
         inputs = prob.model.list_inputs(out_stream=None)
@@ -280,7 +280,7 @@ class ExplCompTestCase(unittest.TestCase):
             self.assertEqual(expected[0], actual[0])
             self.assertEqual(expected[1]['units'], actual[1]['units'])
             self.assertEqual(expected[1]['shape'], actual[1]['shape'])
-            assert_rel_error(self, expected[1]['value'], actual[1]['value'], tol)
+            assert_near_equal(expected[1]['value'], actual[1]['value'], tol)
 
         text = stream.getvalue().split('\n')
         expected_text = [

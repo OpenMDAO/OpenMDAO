@@ -4,7 +4,7 @@ import numpy as np
 
 import openmdao.api as om
 from openmdao.test_suite.components.sellar import SellarDis1, SellarDis2
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class TestSellarMDAPromoteConnect(unittest.TestCase):
@@ -54,7 +54,7 @@ class TestSellarMDAPromoteConnect(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, (prob['y1'][0], prob['y2'][0], prob['obj'][0], prob['con1'][0], prob['con2'][0]),
+        assert_near_equal((prob['y1'][0], prob['y2'][0], prob['obj'][0], prob['con1'][0], prob['con2'][0]),
                          (2.10951651, -0.54758253,  6.8385845,  1.05048349, -24.54758253), 1e-5)
 
 
@@ -104,7 +104,7 @@ class TestSellarMDAPromoteConnect(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, (prob['cycle.d1.y1'][0], prob['cycle.d2.y2'][0], prob['obj_cmp.obj'][0], prob['con_cmp1.con1'][0], prob['con_cmp2.con2'][0]),
+        assert_near_equal((prob['cycle.d1.y1'][0], prob['cycle.d2.y2'][0], prob['obj_cmp.obj'][0], prob['con_cmp1.con1'][0], prob['con_cmp2.con2'][0]),
                          (2.10951651, -0.54758253, 6.8385845, 1.05048349, -24.54758253), 1e-5)
 
 
@@ -155,7 +155,7 @@ class TestSellarMDAPromoteConnect(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, (prob['d1.y1'][0], prob['d2.y2'][0], prob['obj_cmp.obj'][0], prob['con_cmp1.con1'][0], prob['con_cmp2.con2'][0]),
+        assert_near_equal((prob['d1.y1'][0], prob['d2.y2'][0], prob['obj_cmp.obj'][0], prob['con_cmp1.con1'][0], prob['con_cmp2.con2'][0]),
                          (2.10951651, -0.54758253, 6.8385845, 1.05048349, -24.54758253), 1e-5)
 
 

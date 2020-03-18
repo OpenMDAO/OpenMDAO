@@ -304,6 +304,10 @@ class InterpAkima(InterpAlgorithm):
         if compute_local_train:
             dm3_dv = (deriv_dv[..., idx_val4, :] - deriv_dv[..., idx_val3, :]) / \
                 (grid[idx + 1] - grid[idx])
+            dm1_dv = 0
+            dm2_dv = 0
+            dm4_dv = 0
+            dm5_dv = 0
 
         if idx >= 2:
             m1 = (val2 - val1) / (grid[idx - 1] - grid[idx - 2])

@@ -25,7 +25,10 @@ class N2Matrix {
      */
     constructor(model, layout, n2Groups, lastClickWasLeft,
         findRootOfChangeFunction,
-        prevNodeSize = { 'width': 0, 'height': 0 }) {
+        prevNodeSize = {
+            'width': 0,
+            'height': 0
+        }) {
 
         this.layout = layout;
         this.diagNodes = layout.visibleNodes;
@@ -55,8 +58,12 @@ class N2Matrix {
         stopTimer('N2Matrix._setupComponentBoxesAndGridLines');
     }
 
-    get cellDims() { return N2CellRenderer.dims; }
-    get prevCellDims() { return N2CellRenderer.prevDims; }
+    get cellDims() {
+        return N2CellRenderer.dims;
+    }
+    get prevCellDims() {
+        return N2CellRenderer.prevDims;
+    }
 
     /**
      * Determine if a node exists at the specified location.
@@ -75,7 +82,7 @@ class N2Matrix {
      * @param {N2MatrixCell} cell The cell to test.
      * @returns {Boolean} True if this.diagNodes has an object in the
      *   same row and column, and it matches the provided cell.
-    */
+     */
     cellExists(cell) {
         return (this.exists(cell.row, cell.col) &&
             this.cell(cell.row, cell.col) === cell);
@@ -92,8 +99,7 @@ class N2Matrix {
     cell(row, col, doThrow = false) {
         if (this.exists(row, col)) {
             return this.grid[row][col];
-        }
-        else if (doThrow) {
+        } else if (doThrow) {
             throw "No node in matrix at (" + row + ", " + col + ").";
         }
 
@@ -200,8 +206,7 @@ class N2Matrix {
                 if (tgtIdx != -1) {
                     let newCell = new N2MatrixCell(srcIdx, tgtIdx, diagNode, tgt, model);
                     this._addCell(srcIdx, tgtIdx, newCell);
-                }
-                else if (tgt.isConnectable()) {
+                } else if (tgt.isConnectable()) {
                     newDiagCell.addOffScreenConn(diagNode, tgt);
                 }
             }
@@ -229,13 +234,17 @@ class N2Matrix {
                 }
             }
         }
+
     }
 
     /**
      * Determine the size of the boxes that will border the parameters of each component.
      */
     _setupComponentBoxesAndGridLines() {
-        let currentBox = { "startI": 0, "stopI": 0 };
+        let currentBox = {
+            "startI": 0,
+            "stopI": 0
+        };
 
         this.boxInfo = [currentBox];
 
@@ -249,9 +258,11 @@ class N2Matrix {
                 curNode.parentComponent &&
                 startINode.parentComponent === curNode.parentComponent) {
                 ++currentBox.stopI;
-            }
-            else {
-                currentBox = { "startI": ri, "stopI": ri };
+            } else {
+                currentBox = {
+                    "startI": ri,
+                    "stopI": ri
+                };
             }
             this.boxInfo.push(currentBox);
         }
@@ -276,7 +287,10 @@ class N2Matrix {
         if (!this.tooMuchDetail()) {
             for (let i = 0; i < this.diagNodes.length; ++i) {
                 let obj = this.diagNodes[i];
-                let gl = { "i": i, "obj": obj };
+                let gl = {
+                    "i": i,
+                    "obj": obj
+                };
                 this.gridLines.push(gl);
             }
         }
@@ -317,7 +331,7 @@ class N2Matrix {
         // Use D3 to join N2MatrixCells to SVG groups, and render shapes in them.
         let gEnter = selection.enter().append('g')
             .attr('class', 'n2cell')
-            .attr('transform', function (d) {
+            .attr('transform', function(d) {
                 if (self.lastClickWasLeft) {
                     return 'translate(' +
                         (self.prevCellDims.size.width *
@@ -335,13 +349,13 @@ class N2Matrix {
                     let prevIdx = roc.prevRootIndex -
                         self.layout.zoomedElement.prevRootIndex;
                     return 'translate(' + (self.prevCellDims.size.width * prevIdx +
-                        self.prevCellDims.bottomRight.x) + ',' +
+                            self.prevCellDims.bottomRight.x) + ',' +
                         (self.prevCellDims.size.height * prevIdx +
                             self.prevCellDims.bottomRight.y) + ')';
                 }
                 throw ('Enter transform not found');
             })
-            .each(function (d) {
+            .each(function(d) {
                 // "this" refers to the element here, so leave it alone:
                 d.renderer.renderPrevious(this)
                     .on('mouseover', d.mouseover())
@@ -351,21 +365,23 @@ class N2Matrix {
 
         gEnter.merge(selection)
             .transition(sharedTransition)
-            .attr('transform', function (d) {
+            .attr('transform', function(d) {
                 return 'translate(' + (self.cellDims.size.width * d.col +
-                    self.cellDims.bottomRight.x) + ',' +
+                        self.cellDims.bottomRight.x) + ',' +
                     (self.cellDims.size.height * d.row +
                         self.cellDims.bottomRight.y) + ')';
             })
             // "this" refers to the element here, so leave it alone:
-            .each(function (d) { d.renderer.updateCurrent(this) });
+            .each(function(d) {
+                d.renderer.updateCurrent(this)
+            });
 
         selection.exit()
             .transition(sharedTransition)
-            .attr('transform', function (d) {
+            .attr('transform', function(d) {
                 if (self.lastClickWasLeft)
                     return 'translate(' + (self.cellDims.size.width *
-                        (d.col - exitIndex) + self.cellDims.bottomRight.x) + ',' +
+                            (d.col - exitIndex) + self.cellDims.bottomRight.x) + ',' +
                         (self.cellDims.size.height * (d.row - exitIndex) +
                             self.cellDims.bottomRight.y) + ')';
 
@@ -375,13 +391,15 @@ class N2Matrix {
                 if (roc) {
                     let index = roc.rootIndex - self.layout.zoomedElement.rootIndex;
                     return 'translate(' + (self.cellDims.size.width * index +
-                        self.cellDims.bottomRight.x) + ',' +
+                            self.cellDims.bottomRight.x) + ',' +
                         (self.cellDims.size.height * index + self.cellDims.bottomRight.y) + ')';
                 }
                 throw ('Exit transform not found');
             })
             // "this" refers to the element here, so leave it alone:
-            .each(function (d) { d.renderer.updateCurrent(this) })
+            .each(function(d) {
+                d.renderer.updateCurrent(this)
+            })
             .remove();
     }
 
@@ -390,13 +408,13 @@ class N2Matrix {
         let self = this; // For callbacks that change "this". Alternative to using .bind().
 
         let selection = self.n2Groups.gridlines.selectAll('.horiz_line')
-            .data(self.gridLines, function (d) {
+            .data(self.gridLines, function(d) {
                 return d.obj.id;
             });
 
         let gEnter = selection.enter().append('g')
             .attr('class', 'horiz_line')
-            .attr('transform', function (d) {
+            .attr('transform', function(d) {
                 if (self.lastClickWasLeft) return 'translate(0,' +
                     (self.prevCellDims.size.height * (d.i - enterIndex)) + ')';
                 let roc = (self.findRootOfChangeFunction) ?
@@ -411,14 +429,14 @@ class N2Matrix {
             .attr('x2', self.layout.size.n2matrix.width);
 
         let gUpdate = gEnter.merge(selection).transition(sharedTransition)
-            .attr('transform', function (d) {
+            .attr('transform', function(d) {
                 return 'translate(0,' + (self.cellDims.size.height * d.i) + ')';
             });
         gUpdate.select('line')
             .attr('x2', self.layout.size.n2matrix.width);
 
         selection.exit().transition(sharedTransition)
-            .attr('transform', function (d) {
+            .attr('transform', function(d) {
                 if (self.lastClickWasLeft) return 'translate(0,' +
                     (self.cellDims.size.height * (d.i - exitIndex)) + ')';
                 let roc = (self.findRootOfChangeFunction) ?
@@ -437,12 +455,12 @@ class N2Matrix {
         let self = this; // For callbacks that change "this". Alternative to using .bind().
 
         let selection = self.n2Groups.gridlines.selectAll(".vert_line")
-            .data(self.gridLines, function (d) {
+            .data(self.gridLines, function(d) {
                 return d.obj.id;
             });
         let gEnter = selection.enter().append("g")
             .attr("class", "vert_line")
-            .attr("transform", function (d) {
+            .attr("transform", function(d) {
                 if (self.lastClickWasLeft) return "translate(" +
                     (self.prevCellDims.size.width * (d.i - enterIndex)) + ")rotate(-90)";
                 let roc = (self.findRootOfChangeFunction) ? self.findRootOfChangeFunction(d.obj) : null;
@@ -456,14 +474,14 @@ class N2Matrix {
             .attr("x1", -self.layout.size.n2matrix.height);
 
         let gUpdate = gEnter.merge(selection).transition(sharedTransition)
-            .attr("transform", function (d) {
+            .attr("transform", function(d) {
                 return "translate(" + (self.cellDims.size.width * d.i) + ")rotate(-90)";
             });
         gUpdate.select("line")
             .attr("x1", -self.layout.size.n2matrix.height);
 
         selection.exit().transition(sharedTransition)
-            .attr("transform", function (d) {
+            .attr("transform", function(d) {
                 if (self.lastClickWasLeft) return "translate(" +
                     (self.cellDims.size.width * (d.i - exitIndex)) + ")rotate(-90)";
                 let roc = (self.findRootOfChangeFunction) ? self.findRootOfChangeFunction(d.obj) : null;
@@ -481,12 +499,12 @@ class N2Matrix {
         let self = this; // For callbacks that change "this". Alternative to using .bind().
 
         let selection = self.n2Groups.componentBoxes.selectAll(".component_box")
-            .data(self.componentBoxInfo, function (d) {
+            .data(self.componentBoxInfo, function(d) {
                 return d.obj.id;
             });
         let gEnter = selection.enter().append("g")
             .attr("class", "component_box")
-            .attr("transform", function (d) {
+            .attr("transform", function(d) {
                 if (self.lastClickWasLeft) return "translate(" +
                     (self.prevCellDims.size.width * (d.startI - enterIndex)) + "," +
                     (self.prevCellDims.size.height * (d.startI - enterIndex)) + ")";
@@ -497,34 +515,34 @@ class N2Matrix {
                         (self.prevCellDims.size.height * index0) + ")";
                 }
                 throw ("enter transform not found");
-            });
+            })
 
         gEnter.append("rect")
-            .attr("width", function (d) {
+            .attr("width", function(d) {
                 if (self.lastClickWasLeft) return self.prevCellDims.size.width * (1 + d.stopI - d.startI);
                 return self.prevCellDims.size.width;
             })
-            .attr("height", function (d) {
+            .attr("height", function(d) {
                 if (self.lastClickWasLeft) return self.prevCellDims.size.height * (1 + d.stopI - d.startI);
                 return self.prevCellDims.size.height;
             });
 
         let gUpdate = gEnter.merge(selection).transition(sharedTransition)
-            .attr("transform", function (d) {
+            .attr("transform", function(d) {
                 return "translate(" + (self.cellDims.size.width * d.startI) + "," +
                     (self.cellDims.size.height * d.startI) + ")";
             });
 
         gUpdate.select("rect")
-            .attr("width", function (d) {
+            .attr("width", function(d) {
                 return self.cellDims.size.width * (1 + d.stopI - d.startI);
             })
-            .attr("height", function (d) {
+            .attr("height", function(d) {
                 return self.cellDims.size.height * (1 + d.stopI - d.startI);
             });
 
         let nodeExit = selection.exit().transition(sharedTransition)
-            .attr("transform", function (d) {
+            .attr("transform", function(d) {
                 if (self.lastClickWasLeft) return "translate(" +
                     (self.cellDims.size.width * (d.startI - exitIndex)) + "," +
                     (self.cellDims.size.height * (d.startI - exitIndex)) + ")";
@@ -540,11 +558,11 @@ class N2Matrix {
             .remove();
 
         nodeExit.select("rect")
-            .attr("width", function (d) {
+            .attr("width", function(d) {
                 if (self.lastClickWasLeft) return self.cellDims.size.width * (1 + d.stopI - d.startI);
                 return self.cellDims.size.width;
             })
-            .attr("height", function (d) {
+            .attr("height", function(d) {
                 if (self.lastClickWasLeft) return self.cellDims.size.height * (1 + d.stopI - d.startI);
                 return self.cellDims.size.height;
             });
@@ -568,8 +586,7 @@ class N2Matrix {
             debugInfo("Drawing gridlines.")
             this._drawHorizontalLines();
             this._drawVerticalLines();
-        }
-        else {
+        } else {
             debugInfo("Erasing gridlines.")
             this.n2Groups.gridlines.selectAll('.horiz_line').remove();
             this.n2Groups.gridlines.selectAll(".vert_line").remove();
@@ -590,8 +607,11 @@ class N2Matrix {
         for (let side in cell.offScreen) {
             for (let dir in cell.offScreen[side]) {
                 for (let offscreenNode of cell.offScreen[side][dir]) {
-                    new (N2OffGridArrow.arrowDir[side][dir])({
-                        'cell': { 'col': cell.row, 'row': cell.row },
+                    new(N2OffGridArrow.arrowDir[side][dir])({
+                        'cell': {
+                            'col': cell.row,
+                            'row': cell.row
+                        },
                         'width': lineWidth,
                         'matrixSize': this.diagNodes.length,
                         'label': offscreenNode.absPathName
@@ -629,8 +649,14 @@ class N2Matrix {
                 if (col != cell.row) {
 
                     new N2BentArrow({
-                        'end': { 'col': col, 'row': col },
-                        'start': { 'col': cell.row, 'row': cell.row },
+                        'end': {
+                            'col': col,
+                            'row': col
+                        },
+                        'start': {
+                            'col': cell.row,
+                            'row': cell.row
+                        },
                         'color': N2Style.color.greenArrow,
                         'width': lineWidth
                     }, this.n2Groups, this.nodeSize);
@@ -648,8 +674,14 @@ class N2Matrix {
                 if (col != cell.row) {
 
                     new N2BentArrow({
-                        'start': { 'col': col, 'row': col },
-                        'end': { 'col': cell.row, 'row': cell.row },
+                        'start': {
+                            'col': col,
+                            'row': col
+                        },
+                        'end': {
+                            'col': cell.row,
+                            'row': cell.row
+                        },
                         'color': N2Style.color.redArrow,
                         'width': lineWidth
                     }, this.n2Groups, this.nodeSize);
@@ -675,7 +707,10 @@ class N2Matrix {
         for (let startsI = boxStart.startI; startsI <= boxStart.stopI; ++startsI) {
             for (let endsI = boxEnd.startI; endsI <= boxEnd.stopI; ++endsI) {
                 if (this.exists(startsI, endsI)) {
-                    arrows.push({ 'start': startsI, 'end': endsI });
+                    arrows.push({
+                        'start': startsI,
+                        'end': endsI
+                    });
                 }
                 /*
                 else {
@@ -686,8 +721,14 @@ class N2Matrix {
 
         for (let arrow of arrows) {
             new N2BentArrow({
-                'start': { 'col': arrow.start, 'row': arrow.start },
-                'end': { 'col': arrow.end, 'row': arrow.end },
+                'start': {
+                    'col': arrow.start,
+                    'row': arrow.start
+                },
+                'end': {
+                    'col': arrow.end,
+                    'row': arrow.end
+                },
                 'color': (startIndex < endIndex) ?
                     N2Style.color.greenArrow : N2Style.color.redArrow,
                 'width': lineWidth
@@ -709,8 +750,14 @@ class N2Matrix {
         let tgt = this.diagNodes[cell.col];
 
         new N2BentArrow({
-            'start': { 'col': cell.row, 'row': cell.row },
-            'end': { 'col': cell.col, 'row': cell.col },
+            'start': {
+                'col': cell.row,
+                'row': cell.row
+            },
+            'end': {
+                'col': cell.col,
+                'row': cell.col
+            },
             'color': N2Style.color.redArrow,
             'width': lineWidth
         }, this.n2Groups, this.nodeSize);
@@ -722,7 +769,8 @@ class N2Matrix {
                 for (let ai of twca.cycleArrows) {
                     if (src.hasNode(ai.src)) {
                         for (let arrow of ai.arrows) {
-                            let firstBeginIndex = -1, firstEndIndex = -1;
+                            let firstBeginIndex = -1,
+                                firstEndIndex = -1;
 
                             // find first begin index
                             for (let mi in this.diagNodes) {

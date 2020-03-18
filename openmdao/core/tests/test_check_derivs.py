@@ -18,7 +18,7 @@ from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1w
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.components.array_comp import ArrayComp
 from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC
-from openmdao.utils.assert_utils import assert_rel_error, assert_warning, assert_check_partials
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_partials
 from openmdao.utils.mpi import MPI
 
 try:
@@ -222,9 +222,9 @@ class TestProblemCheckPartials(unittest.TestCase):
         # but we still get good derivative data for 'comp1'
         self.assertTrue('comp1' in data)
 
-        assert_rel_error(self, data['comp1'][('y', 'x')]['J_fd'][0][0], 2., 1e-9)
-        assert_rel_error(self, data['comp1'][('y', 'x')]['J_fwd'][0][0], 2., 1e-15)
-        assert_rel_error(self, data['comp1'][('y', 'x')]['J_rev'][0][0], 2., 1e-15)
+        assert_near_equal(data['comp1'][('y', 'x')]['J_fd'][0][0], 2., 1e-9)
+        assert_near_equal(data['comp1'][('y', 'x')]['J_fwd'][0][0], 2., 1e-15)
+        assert_near_equal(data['comp1'][('y', 'x')]['J_rev'][0][0], 2., 1e-15)
 
     def test_missing_entry(self):
         class MyComp(om.ExplicitComponent):
@@ -423,13 +423,13 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         data = p.check_partials(out_stream=None)
         identity = np.eye(4)
-        assert_rel_error(self, data['pt'][('bar', 'foo')]['J_fwd'], identity, 1e-15)
-        assert_rel_error(self, data['pt'][('bar', 'foo')]['J_rev'], identity, 1e-15)
-        assert_rel_error(self, data['pt'][('bar', 'foo')]['J_fd'], identity, 1e-9)
+        assert_near_equal(data['pt'][('bar', 'foo')]['J_fwd'], identity, 1e-15)
+        assert_near_equal(data['pt'][('bar', 'foo')]['J_rev'], identity, 1e-15)
+        assert_near_equal(data['pt'][('bar', 'foo')]['J_fd'], identity, 1e-9)
 
-        assert_rel_error(self, data['pt2'][('bar2', 'foo2')]['J_fwd'], identity, 1e-15)
-        assert_rel_error(self, data['pt2'][('bar2', 'foo2')]['J_rev'], identity, 1e-15)
-        assert_rel_error(self, data['pt2'][('bar2', 'foo2')]['J_fd'], identity, 1e-9)
+        assert_near_equal(data['pt2'][('bar2', 'foo2')]['J_fwd'], identity, 1e-15)
+        assert_near_equal(data['pt2'][('bar2', 'foo2')]['J_rev'], identity, 1e-15)
+        assert_near_equal(data['pt2'][('bar2', 'foo2')]['J_fd'], identity, 1e-9)
 
     def test_matrix_free_explicit(self):
         prob = om.Problem()
@@ -452,17 +452,17 @@ class TestProblemCheckPartials(unittest.TestCase):
             for partial_name, partial in comp.items():
                 abs_error = partial['abs error']
                 rel_error = partial['rel error']
-                assert_rel_error(self, abs_error.forward, 0., 1e-5)
-                assert_rel_error(self, abs_error.reverse, 0., 1e-5)
-                assert_rel_error(self, abs_error.forward_reverse, 0., 1e-5)
-                assert_rel_error(self, rel_error.forward, 0., 1e-5)
-                assert_rel_error(self, rel_error.reverse, 0., 1e-5)
-                assert_rel_error(self, rel_error.forward_reverse, 0., 1e-5)
+                assert_near_equal(abs_error.forward, 0., 1e-5)
+                assert_near_equal(abs_error.reverse, 0., 1e-5)
+                assert_near_equal(abs_error.forward_reverse, 0., 1e-5)
+                assert_near_equal(rel_error.forward, 0., 1e-5)
+                assert_near_equal(rel_error.reverse, 0., 1e-5)
+                assert_near_equal(rel_error.forward_reverse, 0., 1e-5)
 
-        assert_rel_error(self, data['comp'][('f_xy', 'x')]['J_fwd'][0][0], 5.0, 1e-6)
-        assert_rel_error(self, data['comp'][('f_xy', 'x')]['J_rev'][0][0], 5.0, 1e-6)
-        assert_rel_error(self, data['comp'][('f_xy', 'y')]['J_fwd'][0][0], 21.0, 1e-6)
-        assert_rel_error(self, data['comp'][('f_xy', 'y')]['J_rev'][0][0], 21.0, 1e-6)
+        assert_near_equal(data['comp'][('f_xy', 'x')]['J_fwd'][0][0], 5.0, 1e-6)
+        assert_near_equal(data['comp'][('f_xy', 'x')]['J_rev'][0][0], 5.0, 1e-6)
+        assert_near_equal(data['comp'][('f_xy', 'y')]['J_fwd'][0][0], 21.0, 1e-6)
+        assert_near_equal(data['comp'][('f_xy', 'y')]['J_rev'][0][0], 21.0, 1e-6)
 
     def test_matrix_free_implicit(self):
         prob = om.Problem()
@@ -483,12 +483,12 @@ class TestProblemCheckPartials(unittest.TestCase):
             for partial_name, partial in comp.items():
                 abs_error = partial['abs error']
                 rel_error = partial['rel error']
-                assert_rel_error(self, abs_error.forward, 0., 1e-5)
-                assert_rel_error(self, abs_error.reverse, 0., 1e-5)
-                assert_rel_error(self, abs_error.forward_reverse, 0., 1e-5)
-                assert_rel_error(self, rel_error.forward, 0., 1e-5)
-                assert_rel_error(self, rel_error.reverse, 0., 1e-5)
-                assert_rel_error(self, rel_error.forward_reverse, 0., 1e-5)
+                assert_near_equal(abs_error.forward, 0., 1e-5)
+                assert_near_equal(abs_error.reverse, 0., 1e-5)
+                assert_near_equal(abs_error.forward_reverse, 0., 1e-5)
+                assert_near_equal(rel_error.forward, 0., 1e-5)
+                assert_near_equal(rel_error.reverse, 0., 1e-5)
+                assert_near_equal(rel_error.forward_reverse, 0., 1e-5)
 
     def test_implicit_undeclared(self):
         # Test to see that check_partials works when state_wrt_input and state_wrt_state
@@ -531,10 +531,10 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         data = prob.check_partials(out_stream=None)
 
-        assert_rel_error(self, data['comp']['y', 'extra']['J_fwd'], np.zeros((2, 2)))
-        assert_rel_error(self, data['comp']['y', 'extra']['J_rev'], np.zeros((2, 2)))
-        assert_rel_error(self, data['comp']['y', 'dummy']['J_fwd'], np.zeros((2, 2)))
-        assert_rel_error(self, data['comp']['y', 'dummy']['J_rev'], np.zeros((2, 2)))
+        assert_near_equal(data['comp']['y', 'extra']['J_fwd'], np.zeros((2, 2)))
+        assert_near_equal(data['comp']['y', 'extra']['J_rev'], np.zeros((2, 2)))
+        assert_near_equal(data['comp']['y', 'dummy']['J_fwd'], np.zeros((2, 2)))
+        assert_near_equal(data['comp']['y', 'dummy']['J_rev'], np.zeros((2, 2)))
 
     def test_dependent_false_hide(self):
         # Test that we omit derivs declared with dependent=False
@@ -910,9 +910,9 @@ class TestProblemCheckPartials(unittest.TestCase):
         data = prob.check_partials(out_stream=None)
 
         # Note 'aba' gets the better value from the second options call with the *a wildcard.
-        assert_rel_error(self, data['comp']['y', 'ab']['J_fd'][0][0], 507.3901, 1e-4)
-        assert_rel_error(self, data['comp']['y', 'aba']['J_fd'][0][0], 507.0039, 1e-4)
-        assert_rel_error(self, data['comp']['y', 'ba']['J_fd'][0][0], 507.0039, 1e-4)
+        assert_near_equal(data['comp']['y', 'ab']['J_fd'][0][0], 507.3901, 1e-4)
+        assert_near_equal(data['comp']['y', 'aba']['J_fd'][0][0], 507.0039, 1e-4)
+        assert_near_equal(data['comp']['y', 'ba']['J_fd'][0][0], 507.0039, 1e-4)
 
     def test_option_printing(self):
         # Make sure we print the approximation type for each variable.
@@ -1451,11 +1451,11 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         # Comp1 and Comp3 are complex step, so have tighter tolerances.
         for key, val in data['comp1'].items():
-            assert_rel_error(self, val['rel error'][0], 0.0, 1e-15)
+            assert_near_equal(val['rel error'][0], 0.0, 1e-15)
         for key, val in data['comp2'].items():
-            assert_rel_error(self, val['rel error'][0], 0.0, 1e-6)
+            assert_near_equal(val['rel error'][0], 0.0, 1e-6)
         for key, val in data['comp3'].items():
-            assert_rel_error(self, val['rel error'][0], 0.0, 1e-15)
+            assert_near_equal(val['rel error'][0], 0.0, 1e-15)
 
     def test_rel_error_fd_zero(self):
         # When the fd turns out to be zero, test that we switch the definition of relative
@@ -1533,13 +1533,13 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         x1_error = data['comp']['y', 'x1']['abs error']
 
-        assert_rel_error(self, x1_error.forward, 1., 1e-8)
-        assert_rel_error(self, x1_error.reverse, 1., 1e-8)
+        assert_near_equal(x1_error.forward, 1., 1e-8)
+        assert_near_equal(x1_error.reverse, 1., 1e-8)
 
         x2_error = data['comp']['y', 'x2']['rel error']
 
-        assert_rel_error(self, x2_error.forward, 9., 1e-8)
-        assert_rel_error(self, x2_error.reverse, 9., 1e-8)
+        assert_near_equal(x2_error.forward, 9., 1e-8)
+        assert_near_equal(x2_error.reverse, 9., 1e-8)
 
     def test_feature_check_partials_suppress(self):
         import numpy as np
@@ -1873,8 +1873,8 @@ class TestProblemCheckTotals(unittest.TestCase):
         self.assertTrue('9.80614' in lines[5], "'9.80614' not found in '%s'" % lines[5])
         self.assertTrue('cs:None' in lines[5], "'cs:None not found in '%s'" % lines[5])
 
-        assert_rel_error(self, totals['con_cmp2.con2', 'px.x']['J_fwd'], [[0.09692762]], 1e-5)
-        assert_rel_error(self, totals['con_cmp2.con2', 'px.x']['J_fd'], [[0.09692762]], 1e-5)
+        assert_near_equal(totals['con_cmp2.con2', 'px.x']['J_fwd'], [[0.09692762]], 1e-5)
+        assert_near_equal(totals['con_cmp2.con2', 'px.x']['J_fd'], [[0.09692762]], 1e-5)
 
         # Test compact_print output
         compact_stream = StringIO()
@@ -1915,8 +1915,8 @@ class TestProblemCheckTotals(unittest.TestCase):
         self.assertTrue('0.000' in lines[6])
         self.assertTrue('0.000' in lines[8])
 
-        assert_rel_error(self, totals['px.x', 'px.x']['J_fwd'], [[1.0]], 1e-5)
-        assert_rel_error(self, totals['px.x', 'px.x']['J_fd'], [[1.0]], 1e-5)
+        assert_near_equal(totals['px.x', 'px.x']['J_fwd'], [[1.0]], 1e-5)
+        assert_near_equal(totals['px.x', 'px.x']['J_fd'], [[1.0]], 1e-5)
 
     def test_desvar_and_response_with_indices(self):
 
@@ -1971,17 +1971,17 @@ class TestProblemCheckTotals(unittest.TestCase):
         wrt = ['x1']
 
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-        assert_rel_error(self, J['y1', 'x1'][0][0], Jbase[0, 1], 1e-8)
-        assert_rel_error(self, J['y1', 'x1'][0][1], Jbase[0, 3], 1e-8)
-        assert_rel_error(self, J['y1', 'x1'][1][0], Jbase[2, 1], 1e-8)
-        assert_rel_error(self, J['y1', 'x1'][1][1], Jbase[2, 3], 1e-8)
+        assert_near_equal(J['y1', 'x1'][0][0], Jbase[0, 1], 1e-8)
+        assert_near_equal(J['y1', 'x1'][0][1], Jbase[0, 3], 1e-8)
+        assert_near_equal(J['y1', 'x1'][1][0], Jbase[2, 1], 1e-8)
+        assert_near_equal(J['y1', 'x1'][1][1], Jbase[2, 3], 1e-8)
 
         totals = prob.check_totals()
         jac = totals[('mycomp.y1', 'x_param1.x1')]['J_fd']
-        assert_rel_error(self, jac[0][0], Jbase[0, 1], 1e-8)
-        assert_rel_error(self, jac[0][1], Jbase[0, 3], 1e-8)
-        assert_rel_error(self, jac[1][0], Jbase[2, 1], 1e-8)
-        assert_rel_error(self, jac[1][1], Jbase[2, 3], 1e-8)
+        assert_near_equal(jac[0][0], Jbase[0, 1], 1e-8)
+        assert_near_equal(jac[0][1], Jbase[0, 3], 1e-8)
+        assert_near_equal(jac[1][0], Jbase[2, 1], 1e-8)
+        assert_near_equal(jac[1][1], Jbase[2, 3], 1e-8)
 
         # Objective instead
 
@@ -2004,13 +2004,13 @@ class TestProblemCheckTotals(unittest.TestCase):
         wrt = ['x1']
 
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-        assert_rel_error(self, J['y1', 'x1'][0][0], Jbase[1, 1], 1e-8)
-        assert_rel_error(self, J['y1', 'x1'][0][1], Jbase[1, 3], 1e-8)
+        assert_near_equal(J['y1', 'x1'][0][0], Jbase[1, 1], 1e-8)
+        assert_near_equal(J['y1', 'x1'][0][1], Jbase[1, 3], 1e-8)
 
         totals = prob.check_totals()
         jac = totals[('mycomp.y1', 'x_param1.x1')]['J_fd']
-        assert_rel_error(self, jac[0][0], Jbase[1, 1], 1e-8)
-        assert_rel_error(self, jac[0][1], Jbase[1, 3], 1e-8)
+        assert_near_equal(jac[0][0], Jbase[1, 1], 1e-8)
+        assert_near_equal(jac[0][1], Jbase[1, 3], 1e-8)
 
     def test_cs_suppress(self):
         prob = om.Problem()
@@ -2060,14 +2060,14 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         totals = prob.check_totals(method='fd', step=1.0e-1, out_stream=None)
 
-        assert_rel_error(self, totals['px.x', 'px.x']['J_fwd'], [[1.0]], 1e-5)
-        assert_rel_error(self, totals['px.x', 'px.x']['J_fd'], [[1.0]], 1e-5)
-        assert_rel_error(self, totals['pz.z', 'pz.z']['J_fwd'], np.eye(2), 1e-5)
-        assert_rel_error(self, totals['pz.z', 'pz.z']['J_fd'], np.eye(2), 1e-5)
-        assert_rel_error(self, totals['px.x', 'pz.z']['J_fwd'], [[0.0, 0.0]], 1e-5)
-        assert_rel_error(self, totals['px.x', 'pz.z']['J_fd'], [[0.0, 0.0]], 1e-5)
-        assert_rel_error(self, totals['pz.z', 'px.x']['J_fwd'], [[0.0], [0.0]], 1e-5)
-        assert_rel_error(self, totals['pz.z', 'px.x']['J_fd'], [[0.0], [0.0]], 1e-5)
+        assert_near_equal(totals['px.x', 'px.x']['J_fwd'], [[1.0]], 1e-5)
+        assert_near_equal(totals['px.x', 'px.x']['J_fd'], [[1.0]], 1e-5)
+        assert_near_equal(totals['pz.z', 'pz.z']['J_fwd'], np.eye(2), 1e-5)
+        assert_near_equal(totals['pz.z', 'pz.z']['J_fd'], np.eye(2), 1e-5)
+        assert_near_equal(totals['px.x', 'pz.z']['J_fwd'], [[0.0, 0.0]], 1e-5)
+        assert_near_equal(totals['px.x', 'pz.z']['J_fd'], [[0.0, 0.0]], 1e-5)
+        assert_near_equal(totals['pz.z', 'px.x']['J_fwd'], [[0.0], [0.0]], 1e-5)
+        assert_near_equal(totals['pz.z', 'px.x']['J_fd'], [[0.0], [0.0]], 1e-5)
 
     def test_full_con_with_index_desvar(self):
         prob = om.Problem()
@@ -2087,8 +2087,8 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         totals = prob.check_totals(method='fd', step=1.0e-1, out_stream=None)
 
-        assert_rel_error(self, totals['pz.z', 'pz.z']['J_fwd'], [[0.0], [1.0]], 1e-5)
-        assert_rel_error(self, totals['pz.z', 'pz.z']['J_fd'], [[0.0], [1.0]], 1e-5)
+        assert_near_equal(totals['pz.z', 'pz.z']['J_fwd'], [[0.0], [1.0]], 1e-5)
+        assert_near_equal(totals['pz.z', 'pz.z']['J_fd'], [[0.0], [1.0]], 1e-5)
 
     def test_full_desvar_with_index_con(self):
         prob = om.Problem()
@@ -2108,8 +2108,8 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         totals = prob.check_totals(method='fd', step=1.0e-1, out_stream=None)
 
-        assert_rel_error(self, totals['pz.z', 'pz.z']['J_fwd'], [[0.0, 1.0]], 1e-5)
-        assert_rel_error(self, totals['pz.z', 'pz.z']['J_fd'], [[0.0, 1.0]], 1e-5)
+        assert_near_equal(totals['pz.z', 'pz.z']['J_fwd'], [[0.0, 1.0]], 1e-5)
+        assert_near_equal(totals['pz.z', 'pz.z']['J_fd'], [[0.0, 1.0]], 1e-5)
 
     def test_full_desvar_with_index_obj(self):
         prob = om.Problem()
@@ -2129,8 +2129,8 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         totals = prob.check_totals(method='fd', step=1.0e-1, out_stream=None)
 
-        assert_rel_error(self, totals['pz.z', 'pz.z']['J_fwd'], [[0.0, 1.0]], 1e-5)
-        assert_rel_error(self, totals['pz.z', 'pz.z']['J_fd'], [[0.0, 1.0]], 1e-5)
+        assert_near_equal(totals['pz.z', 'pz.z']['J_fwd'], [[0.0, 1.0]], 1e-5)
+        assert_near_equal(totals['pz.z', 'pz.z']['J_fd'], [[0.0, 1.0]], 1e-5)
 
     def test_bug_fd_with_sparse(self):
         # This bug was found via the x57 model in pointer.
@@ -2218,8 +2218,8 @@ class TestProblemCheckTotals(unittest.TestCase):
         # Make sure we don't bomb out with an error.
         J = p.check_totals(out_stream=None)
 
-        assert_rel_error(self, J[('time.time', 'time_extents.t_duration')]['J_fwd'][0], 17.0, 1e-5)
-        assert_rel_error(self, J[('time.time', 'time_extents.t_duration')]['J_fd'][0], 17.0, 1e-5)
+        assert_near_equal(J[('time.time', 'time_extents.t_duration')]['J_fwd'][0], 17.0, 1e-5)
+        assert_near_equal(J[('time.time', 'time_extents.t_duration')]['J_fd'][0], 17.0, 1e-5)
 
         # Try again with a direct solver and sparse assembled hierarchy.
 
@@ -2237,14 +2237,14 @@ class TestProblemCheckTotals(unittest.TestCase):
         # Make sure we don't bomb out with an error.
         J = p.check_totals(out_stream=None)
 
-        assert_rel_error(self, J[('sub.time.time', 'sub.time_extents.t_duration')]['J_fwd'][0], 17.0, 1e-5)
-        assert_rel_error(self, J[('sub.time.time', 'sub.time_extents.t_duration')]['J_fd'][0], 17.0, 1e-5)
+        assert_near_equal(J[('sub.time.time', 'sub.time_extents.t_duration')]['J_fwd'][0], 17.0, 1e-5)
+        assert_near_equal(J[('sub.time.time', 'sub.time_extents.t_duration')]['J_fd'][0], 17.0, 1e-5)
 
         # Make sure check_totals cleans up after itself by running it a second time.
         J = p.check_totals(out_stream=None)
 
-        assert_rel_error(self, J[('sub.time.time', 'sub.time_extents.t_duration')]['J_fwd'][0], 17.0, 1e-5)
-        assert_rel_error(self, J[('sub.time.time', 'sub.time_extents.t_duration')]['J_fd'][0], 17.0, 1e-5)
+        assert_near_equal(J[('sub.time.time', 'sub.time_extents.t_duration')]['J_fwd'][0], 17.0, 1e-5)
+        assert_near_equal(J[('sub.time.time', 'sub.time_extents.t_duration')]['J_fd'][0], 17.0, 1e-5)
 
     def test_vector_scaled_derivs(self):
 
@@ -2279,10 +2279,10 @@ class TestProblemCheckTotals(unittest.TestCase):
         J[0, 1] *= oscale[0]*iscale[1]
         J[1, 0] *= oscale[1]*iscale[0]
         J[1, 1] *= oscale[1]*iscale[1]
-        assert_rel_error(self, J, derivs['comp.y1']['px.x'], 1.0e-3)
+        assert_near_equal(J, derivs['comp.y1']['px.x'], 1.0e-3)
 
         cderiv = prob.check_totals(driver_scaling=True, out_stream=None)
-        assert_rel_error(self, cderiv['comp.y1', 'px.x']['J_fwd'], J, 1.0e-3)
+        assert_near_equal(cderiv['comp.y1', 'px.x']['J_fwd'], J, 1.0e-3)
 
         # cleanup after FD
         prob.run_model()
@@ -2292,10 +2292,10 @@ class TestProblemCheckTotals(unittest.TestCase):
         derivs = prob.compute_totals(of=['comp.y1'], wrt=['px.x'], return_format='dict')
 
         J = comp.JJ[0:2, 0:2]
-        assert_rel_error(self, J, derivs['comp.y1']['px.x'], 1.0e-3)
+        assert_near_equal(J, derivs['comp.y1']['px.x'], 1.0e-3)
 
         cderiv = prob.check_totals(out_stream=None)
-        assert_rel_error(self, cderiv['comp.y1', 'px.x']['J_fwd'], J, 1.0e-3)
+        assert_near_equal(cderiv['comp.y1', 'px.x']['J_fwd'], J, 1.0e-3)
 
     def test_cs_around_newton(self):
         # Basic sellar test.
@@ -2337,7 +2337,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         totals = prob.check_totals(method='cs', out_stream=None)
 
         for key, val in totals.items():
-            assert_rel_error(self, val['rel error'][0], 0.0, 1e-10)
+            assert_near_equal(val['rel error'][0], 0.0, 1e-10)
 
     def test_cs_around_broyden(self):
         # Basic sellar test.
@@ -2379,7 +2379,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         totals = prob.check_totals(method='cs', out_stream=None)
 
         for key, val in totals.items():
-            assert_rel_error(self, val['rel error'][0], 0.0, 1e-6)
+            assert_near_equal(val['rel error'][0], 0.0, 1e-6)
 
     def test_cs_error_allocate(self):
         prob = om.Problem()
@@ -2427,8 +2427,8 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         # This test verifies fix of a TypeError (division by None)
         J = prob.check_totals(out_stream=None)
-        assert_rel_error(self, J['comp.y', 'p.x']['J_fwd'], [[14.0]], 1e-6)
-        assert_rel_error(self, J['comp.y', 'p.x']['J_fd'], [[0.0]], 1e-6)
+        assert_near_equal(J['comp.y', 'p.x']['J_fwd'], [[14.0]], 1e-6)
+        assert_near_equal(J['comp.y', 'p.x']['J_fd'], [[0.0]], 1e-6)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -2446,10 +2446,10 @@ class TestProblemCheckTotalsMPI(unittest.TestCase):
         prob.run_model()
 
         J = prob.check_totals(out_stream=None)
-        assert_rel_error(self, J['sum.y', 'sub.sub1.p1.x']['J_fwd'], [[2.0]], 1.0e-6)
-        assert_rel_error(self, J['sum.y', 'sub.sub2.p2.x']['J_fwd'], [[4.0]], 1.0e-6)
-        assert_rel_error(self, J['sum.y', 'sub.sub1.p1.x']['J_fd'], [[2.0]], 1.0e-6)
-        assert_rel_error(self, J['sum.y', 'sub.sub2.p2.x']['J_fd'], [[4.0]], 1.0e-6)
+        assert_near_equal(J['sum.y', 'sub.sub1.p1.x']['J_fwd'], [[2.0]], 1.0e-6)
+        assert_near_equal(J['sum.y', 'sub.sub2.p2.x']['J_fwd'], [[4.0]], 1.0e-6)
+        assert_near_equal(J['sum.y', 'sub.sub1.p1.x']['J_fd'], [[2.0]], 1.0e-6)
+        assert_near_equal(J['sum.y', 'sub.sub2.p2.x']['J_fd'], [[4.0]], 1.0e-6)
 
 
 if __name__ == "__main__":

@@ -10,7 +10,7 @@ from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDe
 from openmdao.test_suite.components.misc_components import Comp4LinearCacheTest
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
-from openmdao.utils.assert_utils import assert_rel_error, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 
 
 # use this to fake out the TestImplicitGroup so it'll use the solver we want.
@@ -51,14 +51,14 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         d_outputs.set_const(0.0)
         group.run_solve_linear(['linear'], 'fwd')
         output = d_outputs._data
-        assert_rel_error(self, output, group.expected_solution, 1e-15)
+        assert_near_equal(output, group.expected_solution, 1e-15)
 
         # reverse
         d_outputs.set_const(1.0)
         d_residuals.set_const(0.0)
         group.run_solve_linear(['linear'], 'rev')
         output = d_residuals._data
-        assert_rel_error(self, output, group.expected_solution, 1e-15)
+        assert_near_equal(output, group.expected_solution, 1e-15)
 
     def test_solve_linear_scipy_maxiter(self):
         """Verify that ScipyKrylov abides by the 'maxiter' option."""
@@ -116,7 +116,7 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         g1.run_solve_linear(['linear'], 'fwd')
 
         output = d_outputs._data
-        assert_rel_error(self, output, g1.expected_solution, 1e-15)
+        assert_near_equal(output, g1.expected_solution, 1e-15)
 
         # reverse
         d_inputs, d_outputs, d_residuals = g1.get_linear_vectors()
@@ -127,7 +127,7 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         g1.run_solve_linear(['linear'], 'rev')
 
         output = d_residuals._data
-        assert_rel_error(self, output, g1.expected_solution, 3e-15)
+        assert_near_equal(output, g1.expected_solution, 3e-15)
 
     def test_linear_solution_cache(self):
         # Test derivatives across a converged Sellar model. When caching
@@ -214,7 +214,7 @@ class TestScipyKrylovFeature(unittest.TestCase):
         wrt = ['length']
 
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-        assert_rel_error(self, J['area', 'length'][0][0], 2.0, 1e-6)
+        assert_near_equal(J['area', 'length'][0][0], 2.0, 1e-6)
 
     def test_specify_solver(self):
         import numpy as np
@@ -250,8 +250,8 @@ class TestScipyKrylovFeature(unittest.TestCase):
         of = ['obj']
 
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-        assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, .00001)
-        assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
+        assert_near_equal(J['obj', 'z'][0][0], 9.61001056, .00001)
+        assert_near_equal(J['obj', 'z'][0][1], 1.78448534, .00001)
 
     def test_feature_maxiter(self):
         import numpy as np
@@ -287,8 +287,8 @@ class TestScipyKrylovFeature(unittest.TestCase):
         of = ['obj']
 
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-        assert_rel_error(self, J['obj', 'z'][0][0], 0.0, .00001)
-        assert_rel_error(self, J['obj', 'z'][0][1], 0.0, .00001)
+        assert_near_equal(J['obj', 'z'][0][0], 0.0, .00001)
+        assert_near_equal(J['obj', 'z'][0][1], 0.0, .00001)
 
     def test_feature_atol(self):
         import numpy as np
@@ -324,8 +324,8 @@ class TestScipyKrylovFeature(unittest.TestCase):
         of = ['obj']
 
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-        assert_rel_error(self, J['obj', 'z'][0][0], 9.61001055699, .00001)
-        assert_rel_error(self, J['obj', 'z'][0][1], 1.78448533563, .00001)
+        assert_near_equal(J['obj', 'z'][0][0], 9.61001055699, .00001)
+        assert_near_equal(J['obj', 'z'][0][1], 1.78448533563, .00001)
 
     def test_specify_precon(self):
         import numpy as np
@@ -361,8 +361,8 @@ class TestScipyKrylovFeature(unittest.TestCase):
         prob.set_solver_print(level=2)
         prob.run_model()
 
-        assert_rel_error(self, prob['sub1.q1.x'], 1.996, .0001)
-        assert_rel_error(self, prob['sub2.q2.x'], 1.996, .0001)
+        assert_near_equal(prob['sub1.q1.x'], 1.996, .0001)
+        assert_near_equal(prob['sub2.q2.x'], 1.996, .0001)
 
 
 if __name__ == "__main__":

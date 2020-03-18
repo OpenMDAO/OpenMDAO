@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 
 
 class TestMuxCompOptions(unittest.TestCase):
@@ -101,11 +101,11 @@ class TestMuxCompScalar(unittest.TestCase):
         for i in range(self.nn):
             out_i = self.p['mux_comp.a'][i]
             in_i = self.p['a_{0}'.format(i)]
-            assert_rel_error(self, in_i, out_i)
+            assert_near_equal(in_i, out_i)
 
             out_i = self.p['mux_comp.b'][0, i]
             in_i = self.p['b_{0}'.format(i)]
-            assert_rel_error(self, in_i, out_i)
+            assert_near_equal(in_i, out_i)
 
     def test_partials(self):
         np.set_printoptions(linewidth=1024)
@@ -154,11 +154,11 @@ class TestMuxComp1D(unittest.TestCase):
         for i in range(self.nn):
             out_i = self.p['mux_comp.a'][i, ...]
             in_i = self.p['a_{0}'.format(i)]
-            assert_rel_error(self, in_i, out_i)
+            assert_near_equal(in_i, out_i)
 
             out_i = self.p['mux_comp.b'][:, i]
             in_i = self.p['b_{0}'.format(i)]
-            assert_rel_error(self, in_i, out_i)
+            assert_near_equal(in_i, out_i)
 
     def test_partials(self):
         np.set_printoptions(linewidth=1024)
@@ -210,15 +210,15 @@ class TestMuxComp2D(unittest.TestCase):
         for i in range(self.nn):
             out_i = self.p['mux_comp.a'][i, ...]
             in_i = self.p['a_{0}'.format(i)]
-            assert_rel_error(self, in_i, out_i)
+            assert_near_equal(in_i, out_i)
 
             out_i = self.p['mux_comp.b'][:, i, :]
             in_i = self.p['b_{0}'.format(i)]
-            assert_rel_error(self, in_i, out_i)
+            assert_near_equal(in_i, out_i)
 
             out_i = self.p['mux_comp.c'][:, :, i]
             in_i = self.p['c_{0}'.format(i)]
-            assert_rel_error(self, in_i, out_i)
+            assert_near_equal(in_i, out_i)
 
     def test_partials(self):
         np.set_printoptions(linewidth=1024)
@@ -235,7 +235,7 @@ class TestFeature(unittest.TestCase):
         import numpy as np
 
         import openmdao.api as om
-        from openmdao.utils.assert_utils import assert_rel_error
+        from openmdao.utils.assert_utils import assert_near_equal
 
         # The number of elements to be muxed
         n = 3
@@ -279,7 +279,7 @@ class TestFeature(unittest.TestCase):
         for i in range(n):
             r_i = [p['x'][i], p['y'][i], p['z'][i]]
             expected_i = np.sqrt(np.dot(r_i, r_i))
-            assert_rel_error(self, p.get_val('vec_mag_comp.r_mag')[i], expected_i)
+            assert_near_equal(p.get_val('vec_mag_comp.r_mag')[i], expected_i)
 
 
 if __name__ == '__main__':

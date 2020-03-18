@@ -11,7 +11,7 @@ from openmdao.api import IndepVarComp, Group, Problem, \
                          ExplicitComponent, ImplicitComponent, ExecComp, \
                          NewtonSolver, ScipyKrylov, \
                          LinearBlockGS, DirectSolver
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.api import ScipyOptimizeDriver
 
@@ -361,7 +361,7 @@ class TestJacobian(unittest.TestCase):
         self.assertEqual(len(jac_out.shape), 2)
         expected_dtype = np.promote_types(dtype, float)
         self.assertEqual(jac_out.dtype, expected_dtype)
-        assert_rel_error(self, jac_out, np.atleast_2d(expected).reshape(expected_shape), 1e-15)
+        assert_near_equal(jac_out, np.atleast_2d(expected).reshape(expected_shape), 1e-15)
 
     def test_group_assembled_jac_with_ext_mat(self):
 
@@ -484,7 +484,7 @@ class TestJacobian(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.setup()
         prob.run_model()
-        assert_rel_error(self, prob['C3.ee'], 8.0, 0000.1)
+        assert_near_equal(prob['C3.ee'], 8.0, 0000.1)
 
     def test_assembled_jacobian_submat_indexing_dense(self):
         prob = Problem(model=Group(assembled_jac_type='dense'))
@@ -511,8 +511,8 @@ class TestJacobian(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['G1.C1.y'], 50.0)
-        assert_rel_error(self, prob['G1.C2.y'], 243.0)
+        assert_near_equal(prob['G1.C1.y'], 50.0)
+        assert_near_equal(prob['G1.C2.y'], 243.0)
 
     def test_assembled_jacobian_submat_indexing_csc(self):
         prob = Problem(model=Group(assembled_jac_type='dense'))
@@ -542,8 +542,8 @@ class TestJacobian(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['G1.C1.y'], 50.0)
-        assert_rel_error(self, prob['G1.C2.y'], 243.0)
+        assert_near_equal(prob['G1.C1.y'], 50.0)
+        assert_near_equal(prob['G1.C2.y'], 243.0)
 
     def test_declare_partial_reference(self):
         # Test for a bug where declare_partials is given an array reference
@@ -569,7 +569,7 @@ class TestJacobian(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['y'], 2 * np.ones(2))
+        assert_near_equal(prob['y'], 2 * np.ones(2))
 
     def test_declare_partials_row_col_size_mismatch(self):
         # Make sure we have clear error messages.
@@ -790,7 +790,7 @@ class TestJacobian(unittest.TestCase):
         prob.run_model()
 
         J = prob.compute_totals(of=['G1.C1.z'], wrt=['indeps.x'])
-        assert_rel_error(self, J['G1.C1.z', 'indeps.x'], np.array([[ 3.,  0.,  2.,  0.],
+        assert_near_equal(J['G1.C1.z', 'indeps.x'], np.array([[ 3.,  0.,  2.,  0.],
                                                                    [-0.,  3.,  0.,  2.]]), .0001)
 
     def test_one_src_2_tgts_csc_error(self):
@@ -814,7 +814,7 @@ class TestJacobian(unittest.TestCase):
         prob.run_model()
 
         J = prob.compute_totals(of=['G1.C1.z'], wrt=['indeps.x'])
-        assert_rel_error(self, J['G1.C1.z', 'indeps.x'], np.eye(10)*5.0, .0001)
+        assert_near_equal(J['G1.C1.z', 'indeps.x'], np.eye(10)*5.0, .0001)
 
     def test_dict_properties(self):
         # Make sure you can use the partials variable passed to compute_partials as a dict
@@ -849,7 +849,7 @@ class TestJacobian(unittest.TestCase):
                 [e[1] for e in sorted(comp.partials_values)],
                 [e[1] for e in sorted(expected)],
                 ):
-            assert_rel_error(self,act,exp, 1e-5)
+            assert_near_equal(act,exp, 1e-5)
 
 class MySparseComp(ExplicitComponent):
     def setup(self):
