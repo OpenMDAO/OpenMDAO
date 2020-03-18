@@ -14,6 +14,7 @@ from openmdao.visualization.n2_viewer.n2_viewer import _get_viewer_data, n2
 from openmdao.recorders.sqlite_recorder import SqliteRecorder
 from openmdao.test_suite.test_examples.test_betz_limit import ActuatorDisc
 from openmdao.utils.shell_proc import check_call
+from openmdao.utils.assert_utils import assert_warning
 
 
 # set DEBUG to True if you want to view the generated HTML file(s)
@@ -700,6 +701,44 @@ class TestViewModelData(unittest.TestCase):
         self.assertTrue(os.path.isfile(self.problem_html_filename),
                         (self.problem_html_filename + " is not a valid file."))
         self.assertTrue('OpenMDAO Model Hierarchy and N2 diagram: Sellar State Connection'
+                        in open(self.problem_html_filename).read())
+
+    def test_n2_connection_error(self):
+        """
+        Test that an n2 html file is generated from a Problem even if it has connection errors.
+        """
+        import openmdao.api as om
+        from openmdao.core.tests.test_units import SpeedComp
+
+        indep = om.IndepVarComp()
+        indep.add_output('distance', val=1., units='m')
+        indep.add_output('time', val=1., units='m')  # invalid units
+
+        prob = om.Problem()
+        prob.model.add_subsystem('indep', indep)
+        prob.model.add_subsystem('speed', om.ExecComp('speed=distance/time', 
+                                                      distance={'units': 'm'}, 
+                                                      time={'units': 's'}))
+
+        prob.model.connect('indep.distance', 'speed.distance')
+        prob.model.connect('indep.time', 'speed.time')
+
+        # this flag would be set by the command line hook
+        prob.model._raise_connection_error = False
+
+        expected = "Group (<model>): Output units of 'm' for 'indep.time' " + \
+                   "are incompatible with input units of 's' for 'speed.time'."
+
+        with assert_warning(UserWarning, expected):
+            prob.setup()
+
+        n2(prob, outfile=self.problem_html_filename, show_browser=DEBUG,
+           title="Bad Connection")
+
+        # Check that the html file has been created and has something in it.
+        self.assertTrue(os.path.isfile(self.problem_html_filename),
+                        (self.problem_html_filename + " is not a valid file."))
+        self.assertTrue('OpenMDAO Model Hierarchy and N2 diagram: Bad Connection'
                         in open(self.problem_html_filename).read())
 
 
