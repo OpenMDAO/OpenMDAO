@@ -15,23 +15,22 @@ import sys
 import os
 import time
 from numbers import Integral
-import itertools
 
 import numpy as np
 import networkx as nx
 
 import openmdao
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
-from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.vectors.vector import INT_DTYPE
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
+from openmdao.utils.units import is_compatible, get_conversion
 from openmdao.utils.variable_table import write_var_table
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.graph_utils import all_connected_nodes
-from openmdao.utils.name_maps import rel_name2abs_name, name2abs_name
+from openmdao.utils.name_maps import name2abs_name
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
     _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS
 import openmdao.utils.coloring as coloring_mod
@@ -2464,7 +2463,7 @@ class System(object):
             interest for this particular design variable.  These may be
             positive or negative integers.
         units : str, optional
-            Units to
+            Units to convert to before applying scaling.
         adder : float or ndarray, optional
             Value to add to the model value to get the scaled value for the driver. adder
             is first in precedence.  adder and scaler are an alterantive to using ref
@@ -2543,6 +2542,7 @@ class System(object):
         dvs['lower'] = lower
         dvs['ref'] = ref
         dvs['ref0'] = ref0
+        dvs['units'] = units
         dvs['cache_linear_solution'] = cache_linear_solution
 
         if indices is not None:
@@ -2604,6 +2604,8 @@ class System(object):
         index : int, optional
             If variable is an array, this indicates which entry is of
             interest for this particular response.
+        units : str, optional
+            Units to convert to before applying scaling.
         adder : float or ndarray, optional
             Value to add to the model value to get the scaled value for the driver. adder
             is first in precedence.  adder and scaler are an alterantive to using ref
@@ -2755,6 +2757,7 @@ class System(object):
         resp['ref'] = ref
         resp['ref0'] = ref0
         resp['type'] = type_
+        resp['units'] = units
         resp['cache_linear_solution'] = cache_linear_solution
 
         resp['parallel_deriv_color'] = parallel_deriv_color
@@ -2791,6 +2794,8 @@ class System(object):
             value to multiply the model value to get the scaled value for the driver. scaler
             is second in precedence. adder and scaler are an alterantive to using ref
             and ref0.
+        units : str, optional
+            Units to convert to before applying scaling.
         indices : sequence of int, optional
             If variable is an array, these indicate which entries are of
             interest for this particular response.  These may be positive or
@@ -2840,6 +2845,8 @@ class System(object):
             If variable is an array, this indicates which entry is of
             interest for this particular response. This may be a positive
             or negative integer.
+        units : str, optional
+            Units to convert to before applying scaling.
         adder : float or ndarray, optional
             Value to add to the model value to get the scaled value for the driver. adder
             is first in precedence.  adder and scaler are an alterantive to using ref
@@ -2924,6 +2931,42 @@ class System(object):
             msg = "{}: Output not found for design variable {}."
             raise RuntimeError(msg.format(self.msginfo, str(err)))
 
+        # Process unit conversions.
+        abs2meta = self._var_abs2meta
+        for name, meta in out.items():
+            units = meta['units']
+            if units is not None:
+                var_units = abs2meta[name]['units']
+                if var_units is None:
+                    msg = "{}: Target for design variable {} has no units, but a unit " + \
+                          "conversion was specified."
+                    raise RuntimeError(msg.format(self.msginfo, name))
+
+                if not is_compatible(var_units, units):
+                    msg = "{}: Target for design variable {} has '{} 'units, but '{}' units " + \
+                          "were specified."
+                    raise RuntimeError(msg.format(self.msginfo, name, var_units, units))
+
+                factor, offset = get_conversion(var_units, units)
+                base_adder, base_scaler = determine_adder_scaler(None, None,
+                                                                 out[name]['adder'],
+                                                                 out[name]['scaler'])
+
+                # Apply unit conversion as initial scale factor.
+                scaler = base_scaler * factor
+                adder = base_adder * base_scaler * factor + offset * factor
+
+                # Re-adjust upper and lower
+                for item in ['upper', 'lower']:
+                    old_val = out[name][item]
+                    if old_val is not None:
+                        unscaled = old_val / base_scaler - base_adder
+                        scaled = ((unscaled + offset) * factor + base_adder) * base_scaler
+                        out[name][item] = scaled
+
+                out[name]['adder'] = adder
+                out[name]['scaler'] = scaler
+
         if get_sizes:
             # Size them all
             sizes = self._var_sizes['nonlinear']['output']
@@ -2978,6 +3021,42 @@ class System(object):
         except KeyError as err:
             msg = "{}: Output not found for response {}."
             raise RuntimeError(msg.format(self.msginfo, str(err)))
+
+        # Process unit conversions.
+        abs2meta = self._var_abs2meta
+        for name, meta in out.items():
+            units = meta['units']
+            if units is not None:
+                var_units = abs2meta[name]['units']
+                if var_units is None:
+                    msg = "{}: Target for design variable {} has no units, but a unit " + \
+                          "conversion was specified."
+                    raise RuntimeError(msg.format(self.msginfo, name))
+
+                if not is_compatible(var_units, units):
+                    msg = "{}: Target for design variable {} has '{} 'units, but '{}' units " + \
+                          "were specified."
+                    raise RuntimeError(msg.format(self.msginfo, name, var_units, units))
+
+                factor, offset = get_conversion(units, var_units)
+                base_adder, base_scaler = determine_adder_scaler(None, None,
+                                                                 out[name]['adder'],
+                                                                 out[name]['scaler'])
+
+                # Apply unit conversion as initial scale factor.
+                scaler = base_scaler * factor
+                adder = base_adder * base_scaler * factor + offset * factor
+
+                # Re-adjust upper and lower
+                for item in ['upper', 'lower', 'equal']:
+                    old_val = out[name][item]
+                    if old_val is not None:
+                        unscaled = old_val / base_scaler - base_adder
+                        scaled = ((unscaled + offset) * factor + base_adder) * base_scaler
+                        out[name][item] = scaled
+
+                out[name]['adder'] = adder
+                out[name]['scaler'] = scaler
 
         if get_sizes:
             # Size them all
