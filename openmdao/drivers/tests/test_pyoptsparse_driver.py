@@ -12,7 +12,7 @@ import openmdao.api as om
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.general_utils import set_pyoptsparse_opt, run_driver
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.mpi import MPI
@@ -210,8 +210,8 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'], 7.16667, 1e-6)
-        assert_rel_error(self, prob['y'], -7.833334, 1e-6)
+        assert_near_equal(prob['x'], 7.16667, 1e-6)
+        assert_near_equal(prob['y'], -7.833334, 1e-6)
 
     def test_simple_paraboloid_upper_indices(self):
 
@@ -254,8 +254,8 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['p1.x'], np.array([50., 7.16667, 50.]), 1e-6)
-        assert_rel_error(self, prob['p2.y'], np.array([50., -7.833334, 50.]), 1e-6)
+        assert_near_equal(prob['p1.x'], np.array([50., 7.16667, 50.]), 1e-6)
+        assert_near_equal(prob['p2.y'], np.array([50., -7.833334, 50.]), 1e-6)
 
     def test_simple_paraboloid_lower(self):
 
@@ -289,8 +289,8 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'], 7.16667, 1e-6)
-        assert_rel_error(self, prob['y'], -7.833334, 1e-6)
+        assert_near_equal(prob['x'], 7.16667, 1e-6)
+        assert_near_equal(prob['y'], -7.833334, 1e-6)
 
     def test_simple_paraboloid_lower_linear(self):
 
@@ -323,8 +323,8 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'], 7.16667, 1e-6)
-        assert_rel_error(self, prob['y'], -7.833334, 1e-6)
+        assert_near_equal(prob['x'], 7.16667, 1e-6)
+        assert_near_equal(prob['y'], -7.833334, 1e-6)
 
         self.assertEqual(prob.driver._quantities, ['comp.f_xy'])
 
@@ -365,8 +365,8 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'], 7.16667, 1e-6)
-        assert_rel_error(self, prob['y'], -7.833334, 1e-6)
+        assert_near_equal(prob['x'], 7.16667, 1e-6)
+        assert_near_equal(prob['y'], -7.833334, 1e-6)
 
     def test_simple_paraboloid_equality_linear(self):
 
@@ -399,8 +399,8 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'], 7.16667, 1e-6)
-        assert_rel_error(self, prob['y'], -7.833334, 1e-6)
+        assert_near_equal(prob['x'], 7.16667, 1e-6)
+        assert_near_equal(prob['y'], -7.833334, 1e-6)
 
     def test_simple_paraboloid_double_sided_low(self):
 
@@ -431,7 +431,7 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['y'] - prob['x'], -11.0, 1e-6)
+        assert_near_equal(prob['y'] - prob['x'], -11.0, 1e-6)
 
     def test_simple_paraboloid_double_sided_high(self):
 
@@ -462,7 +462,7 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+        assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_array_comp2D(self):
 
@@ -494,7 +494,7 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         obj = prob['o']
-        assert_rel_error(self, obj, 20.0, 1e-6)
+        assert_near_equal(obj, 20.0, 1e-6)
 
     def test_simple_array_comp2D_array_lo_hi(self):
 
@@ -526,7 +526,7 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         obj = prob['o']
-        assert_rel_error(self, obj, 20.0, 1e-6)
+        assert_near_equal(obj, 20.0, 1e-6)
 
     def test_fan_out(self):
         # This tests sparse-response specification.
@@ -573,7 +573,7 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         obj = prob['obj.o']
-        assert_rel_error(self, obj, 30.0, 1e-6)
+        assert_near_equal(obj, 30.0, 1e-6)
 
         # Verify that pyOpt has the correct wrt names
         con1 = prob.driver.pyopt_solution.constraints['con1.c']
@@ -615,8 +615,8 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'], 7.16667, 1e-6)
-        assert_rel_error(self, prob['y'], -7.833334, 1e-6)
+        assert_near_equal(prob['x'], 7.16667, 1e-6)
+        assert_near_equal(prob['y'], -7.833334, 1e-6)
 
     def test_pyopt_fd_solution(self):
 
@@ -650,8 +650,8 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'], 7.16667, 1e-4)
-        assert_rel_error(self, prob['y'], -7.833334, 1e-4)
+        assert_near_equal(prob['x'], 7.16667, 1e-4)
+        assert_near_equal(prob['y'], -7.833334, 1e-4)
 
     def test_pyopt_fd_is_called(self):
 
@@ -690,8 +690,8 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'], 7.16667, 1e-4)
-        assert_rel_error(self, prob['y'], -7.833334, 1e-4)
+        assert_near_equal(prob['x'], 7.16667, 1e-4)
+        assert_near_equal(prob['y'], -7.833334, 1e-4)
 
     def test_snopt_fd_option_error(self):
 
@@ -795,7 +795,7 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+        assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_paraboloid_scaled_desvars_fd(self):
         prob = om.Problem()
@@ -829,7 +829,7 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+        assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_paraboloid_scaled_desvars_cs(self):
         prob = om.Problem()
@@ -863,7 +863,7 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+        assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_paraboloid_scaled_desvars_rev(self):
 
@@ -896,7 +896,7 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+        assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_paraboloid_scaled_constraint_fwd(self):
 
@@ -929,7 +929,7 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+        assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_paraboloid_scaled_constraint_fd(self):
         prob = om.Problem()
@@ -963,7 +963,7 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+        assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_paraboloid_scaled_constraint_cs(self):
         prob = om.Problem()
@@ -997,7 +997,7 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+        assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_paraboloid_scaled_constraint_rev(self):
 
@@ -1030,7 +1030,7 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+        assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_paraboloid_scaled_objective_fwd(self):
 
@@ -1063,7 +1063,7 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+        assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_paraboloid_scaled_objective_rev(self):
 
@@ -1096,7 +1096,7 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+        assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_sellar_mdf(self):
 
@@ -1124,9 +1124,9 @@ class TestPyoptSparse(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
 
-        assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
-        assert_rel_error(self, prob['z'][1], 0.0, 1e-3)
-        assert_rel_error(self, prob['x'], 0.0, 4e-3)
+        assert_near_equal(prob['z'][0], 1.9776, 1e-3)
+        assert_near_equal(prob['z'][1], 0.0, 1e-3)
+        assert_near_equal(prob['x'], 0.0, 4e-3)
 
     def test_sellar_mdf_linear_con_directsolver(self):
         # This test makes sure that we call solve_nonlinear first if we have any linear constraints
@@ -1230,9 +1230,9 @@ class TestPyoptSparse(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
 
-        assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
-        assert_rel_error(self, prob['z'][1], 0.0, 1e-3)
-        assert_rel_error(self, prob['x'], 0.0, 4e-3)
+        assert_near_equal(prob['z'][0], 1.9776, 1e-3)
+        assert_near_equal(prob['z'][1], 0.0, 1e-3)
+        assert_near_equal(prob['x'], 0.0, 4e-3)
 
         # Piggyback test: make sure we can run the driver again as a subdriver without a keyerror.
         prob.driver.run()
@@ -1272,8 +1272,8 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'], 7.16667, 1e-6)
-        assert_rel_error(self, prob['y'], -7.833334, 1e-6)
+        assert_near_equal(prob['x'], 7.16667, 1e-6)
+        assert_near_equal(prob['y'], -7.833334, 1e-6)
 
         # Normally it takes 9 iterations, but takes 13 here because of the
         # analysis failures. (note SLSQP takes 5 instead of 4)
@@ -1365,8 +1365,8 @@ class TestPyoptSparse(unittest.TestCase):
             tol = 1e-6
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'], 7.16667, tol)
-        assert_rel_error(self, prob['y'], -7.833334, tol)
+        assert_near_equal(prob['x'], 7.16667, tol)
+        assert_near_equal(prob['y'], -7.833334, tol)
 
         # Normally it takes 9 iterations, but takes 13 here because of the
         # gradfunc failures. (note SLSQP just doesn't do well)
@@ -1841,7 +1841,7 @@ class TestPyoptSparse(unittest.TestCase):
         prob.setup(check=False, mode='rev')
         prob.run_driver()
 
-        assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
+        assert_near_equal(prob['z'][0], 1.9776, 1e-3)
 
 
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
@@ -1879,7 +1879,7 @@ class TestPyoptSparseFeature(unittest.TestCase):
         prob.setup(check=False, mode='rev')
         prob.run_driver()
 
-        assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
+        assert_near_equal(prob['z'][0], 1.9776, 1e-3)
 
     def test_settings_print(self):
         import numpy as np
@@ -1905,7 +1905,7 @@ class TestPyoptSparseFeature(unittest.TestCase):
         prob.setup(check=False, mode='rev')
         prob.run_driver()
 
-        assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
+        assert_near_equal(prob['z'][0], 1.9776, 1e-3)
 
     def test_slsqp_atol(self):
         import numpy as np
@@ -1932,7 +1932,7 @@ class TestPyoptSparseFeature(unittest.TestCase):
         prob.setup(check=False, mode='rev')
         prob.run_driver()
 
-        assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
+        assert_near_equal(prob['z'][0], 1.9776, 1e-3)
 
     def test_slsqp_maxit(self):
         import numpy as np
@@ -1959,7 +1959,7 @@ class TestPyoptSparseFeature(unittest.TestCase):
         prob.setup(check=False, mode='rev')
         prob.run_driver()
 
-        assert_rel_error(self, prob['z'][0], 1.98337708, 1e-3)
+        assert_near_equal(prob['z'][0], 1.98337708, 1e-3)
 
 
 class TestPyoptSparseSnoptFeature(unittest.TestCase):
@@ -1995,7 +1995,7 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
         prob.setup(check=False, mode='rev')
         prob.run_driver()
 
-        assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
+        assert_near_equal(prob['z'][0], 1.9776, 1e-3)
 
     def test_snopt_maxit(self):
         import numpy as np
@@ -2024,7 +2024,7 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
 
         prob.run_driver()
 
-        assert_rel_error(self, prob['z'][0], 1.9780247, 2e-3)
+        assert_near_equal(prob['z'][0], 1.9780247, 2e-3)
 
     def test_snopt_fd_solution(self):
 
@@ -2058,8 +2058,8 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'], 7.16667, 1e-6)
-        assert_rel_error(self, prob['y'], -7.833334, 1e-6)
+        assert_near_equal(prob['x'], 7.16667, 1e-6)
+        assert_near_equal(prob['y'], -7.833334, 1e-6)
 
     def test_snopt_fd_is_called(self):
 
@@ -2098,8 +2098,8 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'], 7.16667, 1e-6)
-        assert_rel_error(self, prob['y'], -7.833334, 1e-6)
+        assert_near_equal(prob['x'], 7.16667, 1e-6)
+        assert_near_equal(prob['y'], -7.833334, 1e-6)
 
     def test_sellar_analysis_error(self):
         # One discipline of Sellar will something raise analysis error. This is to test that
@@ -2216,9 +2216,9 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
 
-        assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
-        assert_rel_error(self, prob['z'][1], 0.0, 1e-3)
-        assert_rel_error(self, prob['x'], 0.0, 1e-3)
+        assert_near_equal(prob['z'][0], 1.9776, 1e-3)
+        assert_near_equal(prob['z'][1], 0.0, 1e-3)
+        assert_near_equal(prob['x'], 0.0, 1e-3)
 
         self.assertEqual(model.cycle.d1.failed, 2)
 

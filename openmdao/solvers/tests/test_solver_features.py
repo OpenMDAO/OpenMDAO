@@ -4,7 +4,7 @@ import unittest
 
 import openmdao.api as om
 
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.components.double_sellar import DoubleSellar
 
@@ -29,8 +29,8 @@ class TestSolverFeatures(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob['y2'], 12.05848819, .00001)
 
     def test_specify_subgroup_solvers(self):
         import openmdao.api as om
@@ -56,10 +56,10 @@ class TestSolverFeatures(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['g1.y1'], 0.64, .00001)
-        assert_rel_error(self, prob['g1.y2'], 0.80, .00001)
-        assert_rel_error(self, prob['g2.y1'], 0.64, .00001)
-        assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
+        assert_near_equal(prob['g1.y1'], 0.64, .00001)
+        assert_near_equal(prob['g1.y2'], 0.80, .00001)
+        assert_near_equal(prob['g2.y1'], 0.64, .00001)
+        assert_near_equal(prob['g2.y2'], 0.80, .00001)
 
 
 if __name__ == "__main__":

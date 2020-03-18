@@ -3,7 +3,7 @@ import unittest
 
 import openmdao.api as om
 from openmdao.test_suite.parametric_suite import ParameterizedInstance
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 def _build(solver_class=om.NewtonSolver, linear_solver_class=om.ScipyKrylov,
@@ -30,17 +30,17 @@ def _check_results(testcase, test, error_bound):
     expected_values = root.expected_values
     if expected_values:
         actual = {key: problem[key] for key in expected_values}
-        assert_rel_error(testcase, actual, expected_values, 1e-8)
+        assert_near_equal(actual, expected_values, 1e-8)
 
     expected_totals = root.expected_totals
     if expected_totals:
         # Forward Derivatives Check
         totals = test.compute_totals('fwd')
-        assert_rel_error(testcase, totals, expected_totals, error_bound)
+        assert_near_equal(totals, expected_totals, error_bound)
 
         # Reverse Derivatives Check
         totals = test.compute_totals('rev')
-        assert_rel_error(testcase, totals, expected_totals, error_bound)
+        assert_near_equal(totals, expected_totals, error_bound)
 
 
 class BM(unittest.TestCase):

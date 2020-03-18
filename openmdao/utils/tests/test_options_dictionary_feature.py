@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class TestOptionsDictionaryFeature(unittest.TestCase):
@@ -22,7 +22,7 @@ class TestOptionsDictionaryFeature(unittest.TestCase):
         prob['inputs.x'] = [1., 2., 3.]
 
         prob.run_model()
-        assert_rel_error(self, prob['double.y'], [2., 4., 6.])
+        assert_near_equal(prob['double.y'], [2., 4., 6.])
 
     def test_simple_fail(self):
         import openmdao.api as om
@@ -71,7 +71,7 @@ class TestOptionsDictionaryFeature(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, prob['a_comp.y'], [5., 10., 15.])
+        assert_near_equal(prob['a_comp.y'], [5., 10., 15.])
 
     def test_simple_function(self):
         import openmdao.api as om
@@ -91,7 +91,7 @@ class TestOptionsDictionaryFeature(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, prob['f_comp.y'], 10.)
+        assert_near_equal(prob['f_comp.y'], 10.)
 
 
 if __name__ == "__main__":

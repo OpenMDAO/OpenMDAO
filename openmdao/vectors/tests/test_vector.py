@@ -4,7 +4,7 @@ import numpy as np
 
 import openmdao.api as om
 from openmdao.utils.array_utils import evenly_distrib_idxs
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.mpi import MPI
 
 try:
@@ -152,13 +152,13 @@ class TestPETScVector2Proc(unittest.TestCase):
         vec = prob.model._vectors['output']['nonlinear']
         norm_val = vec.get_norm()
 
-        assert_rel_error(self, norm_val, 0.22595230821097395, 1e-10)
+        assert_near_equal(norm_val, 0.22595230821097395, 1e-10)
 
         # test petsc dot while we're at it
         vec.set_const(3.)
         vec2 = prob.model._vectors['residual']['linear']
         vec2.set_const(4.)
-        assert_rel_error(self, vec.dot(vec2), 12.*6, 1e-10)
+        assert_near_equal(vec.dot(vec2), 12.*6, 1e-10)
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestPETScVector3Proc(unittest.TestCase):
@@ -184,13 +184,13 @@ class TestPETScVector3Proc(unittest.TestCase):
         vec = prob.model._vectors['output']['nonlinear']
         norm_val = vec.get_norm()
 
-        assert_rel_error(self, norm_val, 0.22595230821097395, 1e-10)
+        assert_near_equal(norm_val, 0.22595230821097395, 1e-10)
 
         # test petsc dot while we're at it
         vec.set_const(3.)
         vec2 = prob.model._vectors['residual']['linear']
         vec2.set_const(4.)
-        assert_rel_error(self, vec.dot(vec2), 12.*6, 1e-10)
+        assert_near_equal(vec.dot(vec2), 12.*6, 1e-10)
 
     def test_distributed_norm_parallel_group(self):
         prob = om.Problem()
@@ -218,19 +218,19 @@ class TestPETScVector3Proc(unittest.TestCase):
 
         vec = prob.model._vectors['output']['nonlinear']
         norm_val = vec.get_norm()
-        assert_rel_error(self, norm_val, 89.61584681293817, 1e-10)
+        assert_near_equal(norm_val, 89.61584681293817, 1e-10)
 
         J = prob.compute_totals(of=['pp.calc1.y', 'pp.calc2.y', 'pp.calc3.y'], wrt=['des_vars.v1'])
 
         vec = prob.model._vectors['output']['linear']
         norm_val = vec.get_norm()
-        assert_rel_error(self, norm_val, 8.888194417315589, 1e-10)
+        assert_near_equal(norm_val, 8.888194417315589, 1e-10)
 
         # test petsc dot while we're at it
         vec.set_const(3.)
         vec2 = prob.model._vectors['residual']['linear']
         vec2.set_const(4.)
-        assert_rel_error(self, vec.dot(vec2), 12.*13, 1e-10)
+        assert_near_equal(vec.dot(vec2), 12.*13, 1e-10)
 
 
 if __name__ == '__main__':

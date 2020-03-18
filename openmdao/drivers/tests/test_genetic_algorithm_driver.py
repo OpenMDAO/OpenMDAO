@@ -11,7 +11,7 @@ from openmdao.test_suite.components.branin import Branin, BraninDiscrete
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar_feature import SellarMDA
 from openmdao.test_suite.components.three_bar_truss import ThreeBarTruss
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.mpi import MPI
 
 try:
@@ -78,9 +78,9 @@ class TestSimpleGA(unittest.TestCase):
 
         # TODO: Satadru listed this solution, but I get a way better one.
         # Solution: xopt = [0.2857, -0.8571], fopt = 23.2933
-        assert_rel_error(self, prob['obj.f'], 12.37306086, 1e-4)
-        assert_rel_error(self, prob['px.x'][0], 0.2, 1e-4)
-        assert_rel_error(self, prob['px.x'][1], -0.88653391, 1e-4)
+        assert_near_equal(prob['obj.f'], 12.37306086, 1e-4)
+        assert_near_equal(prob['px.x'][0], 0.2, 1e-4)
+        assert_near_equal(prob['px.x'][1], -0.88653391, 1e-4)
 
     def test_mixed_integer_branin(self):
         prob = om.Problem()
@@ -109,7 +109,7 @@ class TestSimpleGA(unittest.TestCase):
             print('comp.f', prob['comp.f'])
 
         # Optimal solution
-        assert_rel_error(self, prob['comp.f'], 0.49399549, 1e-4)
+        assert_near_equal(prob['comp.f'], 0.49399549, 1e-4)
         self.assertTrue(int(prob['p2.xI']) in [3, -3])
 
     def test_mixed_integer_branin_discrete(self):
@@ -143,7 +143,7 @@ class TestSimpleGA(unittest.TestCase):
             print('p.xI', prob['p.xI'])
 
         # Optimal solution
-        assert_rel_error(self, prob['comp.f'], 0.49399549, 1e-4)
+        assert_near_equal(prob['comp.f'], 0.49399549, 1e-4)
         self.assertTrue(prob['p.xI'] in [3, -3])
         self.assertTrue(isinstance(prob['p.xI'], int))
 
@@ -208,8 +208,8 @@ class TestSimpleGA(unittest.TestCase):
         # as much as we can. Objective is still rather random, but it is close. GA does a great job
         # of picking the correct values for the integer desvars though.
         self.assertLess(prob['mass'], 6.0)
-        assert_rel_error(self, prob['mat1'], 3, 1e-5)
-        assert_rel_error(self, prob['mat2'], 3, 1e-5)
+        assert_near_equal(prob['mat1'], 3, 1e-5)
+        assert_near_equal(prob['mat2'], 3, 1e-5)
         # Material 3 can be anything
 
     def test_mixed_integer_3bar_default_bits(self):
@@ -276,8 +276,8 @@ class TestSimpleGA(unittest.TestCase):
         # as much as we can. Objective is still rather random, but it is close. GA does a great job
         # of picking the correct values for the integer desvars though.
         self.assertLess(prob['mass'], 6.0)
-        assert_rel_error(self, prob['mat1'], 3, 1e-5)
-        assert_rel_error(self, prob['mat2'], 3, 1e-5)
+        assert_near_equal(prob['mat1'], 3, 1e-5)
+        assert_near_equal(prob['mat2'], 3, 1e-5)
         # Material 3 can be anything
 
     def test_analysis_error(self):
@@ -789,7 +789,7 @@ class MPITestSimpleGA(unittest.TestCase):
             print('p2.xI', prob['p2.xI'])
 
         # Optimal solution
-        assert_rel_error(self, prob['comp.f'], 0.49399549, 1e-4)
+        assert_near_equal(prob['comp.f'], 0.49399549, 1e-4)
         self.assertTrue(int(prob['p2.xI']) in [3, -3])
 
     def test_two_branin_parallel_model(self):
@@ -833,7 +833,7 @@ class MPITestSimpleGA(unittest.TestCase):
             print('p2.xI', prob['p2.xI'])
 
         # Optimal solution
-        assert_rel_error(self, prob['comp.f'], 0.98799098, 1e-4)
+        assert_near_equal(prob['comp.f'], 0.98799098, 1e-4)
         self.assertTrue(int(prob['p2.xI']) in [3, -3])
 
     def test_mixed_integer_3bar_default_bits(self):
@@ -901,8 +901,8 @@ class MPITestSimpleGA(unittest.TestCase):
         # as much as we can. Objective is still rather random, but it is close. GA does a great job
         # of picking the correct values for the integer desvars though.
         self.assertLess(prob['mass'], 6.0)
-        assert_rel_error(self, prob['mat1'], 3, 1e-5)
-        assert_rel_error(self, prob['mat2'], 3, 1e-5)
+        assert_near_equal(prob['mat1'], 3, 1e-5)
+        assert_near_equal(prob['mat2'], 3, 1e-5)
         # Material 3 can be anything
 
     def test_mpi_bug_solver(self):
@@ -1068,7 +1068,7 @@ class MPITestSimpleGA4Procs(unittest.TestCase):
             print('p2.xI', prob['p2.xI'])
 
         # Optimal solution
-        assert_rel_error(self, prob['comp.f'], 0.98799098, 1e-4)
+        assert_near_equal(prob['comp.f'], 0.98799098, 1e-4)
         self.assertTrue(int(prob['p2.xI']) in [3, -3])
 
     def test_indivisible_error(self):
@@ -1210,7 +1210,7 @@ class TestFeatureSimpleGA(unittest.TestCase):
         prob.run_driver()
 
         # Optimal solution
-        assert_rel_error(self, prob['comp.f'], 0.49399549, 1e-4)
+        assert_near_equal(prob['comp.f'], 0.49399549, 1e-4)
 
     def test_option_max_gen(self):
         import openmdao.api as om

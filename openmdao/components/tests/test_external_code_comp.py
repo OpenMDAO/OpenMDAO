@@ -10,7 +10,7 @@ from scipy.optimize import fsolve
 import openmdao.api as om
 from openmdao.components.external_code_comp import STDOUT
 
-from openmdao.utils.assert_utils import assert_rel_error, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 
 DIRECTORY = os.path.dirname((os.path.abspath(__file__)))
 
@@ -472,8 +472,8 @@ class TestExternalCodeCompFeature(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        assert_rel_error(self, prob['p1.x'], 6.66666667, 1e-6)
-        assert_rel_error(self, prob['p2.y'], -7.3333333, 1e-6)
+        assert_near_equal(prob['p1.x'], 6.66666667, 1e-6)
+        assert_near_equal(prob['p2.y'], -7.3333333, 1e-6)
 
     def test_optimize_derivs(self):
         import openmdao.api as om
@@ -506,8 +506,8 @@ class TestExternalCodeCompFeature(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        assert_rel_error(self, prob['p1.x'], 6.66666667, 1e-6)
-        assert_rel_error(self, prob['p2.y'], -7.3333333, 1e-6)
+        assert_near_equal(prob['p1.x'], 6.66666667, 1e-6)
+        assert_near_equal(prob['p2.y'], -7.3333333, 1e-6)
 
 
 class TestExternalCodeImplicitCompFeature(unittest.TestCase):
@@ -617,14 +617,14 @@ class TestExternalCodeImplicitCompFeature(unittest.TestCase):
         prob['area_ratio'] = area_ratio
         mach_comp.options['super_sonic'] = super_sonic
         prob.run_model()
-        assert_rel_error(self, prob['mach'], mach_solve(area_ratio, super_sonic=super_sonic), 1e-8)
+        assert_near_equal(prob['mach'], mach_solve(area_ratio, super_sonic=super_sonic), 1e-8)
 
         area_ratio = 1.3
         super_sonic = True
         prob['area_ratio'] = area_ratio
         mach_comp.options['super_sonic'] = super_sonic
         prob.run_model()
-        assert_rel_error(self, prob['mach'], mach_solve(area_ratio, super_sonic=super_sonic), 1e-8)
+        assert_near_equal(prob['mach'], mach_solve(area_ratio, super_sonic=super_sonic), 1e-8)
 
 if __name__ == "__main__":
     unittest.main()

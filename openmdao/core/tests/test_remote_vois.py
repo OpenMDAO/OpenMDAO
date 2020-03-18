@@ -7,7 +7,7 @@ import random
 from openmdao.api import Group, ParallelGroup, Problem, IndepVarComp, \
     ExecComp, PETScVector
 from openmdao.utils.mpi import MPI
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 
 if MPI:
     from openmdao.api import PETScVector
@@ -65,12 +65,12 @@ class RemoteVOITestCase(unittest.TestCase):
         J = prob.compute_totals(of=['Obj.obj', 'par.G1.c', 'par.G2.c'],
                                 wrt=['par.G1.x', 'par.G2.x'])
 
-        assert_rel_error(self, J['Obj.obj', 'par.G1.x'], np.array([[2.0]]), 1e-6)
-        assert_rel_error(self, J['Obj.obj', 'par.G2.x'], np.array([[2.0]]), 1e-6)
-        assert_rel_error(self, J['par.G1.c', 'par.G1.x'], np.array([[1.0]]), 1e-6)
-        assert_rel_error(self, J['par.G1.c', 'par.G2.x'], np.array([[0.0]]), 1e-6)
-        assert_rel_error(self, J['par.G2.c', 'par.G1.x'], np.array([[0.0]]), 1e-6)
-        assert_rel_error(self, J['par.G2.c', 'par.G2.x'], np.array([[1.0]]), 1e-6)
+        assert_near_equal(J['Obj.obj', 'par.G1.x'], np.array([[2.0]]), 1e-6)
+        assert_near_equal(J['Obj.obj', 'par.G2.x'], np.array([[2.0]]), 1e-6)
+        assert_near_equal(J['par.G1.c', 'par.G1.x'], np.array([[1.0]]), 1e-6)
+        assert_near_equal(J['par.G1.c', 'par.G2.x'], np.array([[0.0]]), 1e-6)
+        assert_near_equal(J['par.G2.c', 'par.G1.x'], np.array([[0.0]]), 1e-6)
+        assert_near_equal(J['par.G2.c', 'par.G2.x'], np.array([[1.0]]), 1e-6)
 
 
 if __name__ == "__main__":

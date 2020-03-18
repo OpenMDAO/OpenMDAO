@@ -6,7 +6,7 @@ import numpy as np
 import openmdao.api as om
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_stress import MultipointBeamGroup
-from openmdao.utils.assert_utils import assert_rel_error, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 
 
 class TestKSFunction(unittest.TestCase):
@@ -28,7 +28,7 @@ class TestKSFunction(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        assert_rel_error(self, max(prob['comp.y2']), prob['ks.KS'][0])
+        assert_near_equal(max(prob['comp.y2']), prob['ks.KS'][0])
 
     def test_vectorized(self):
         prob = om.Problem()
@@ -49,14 +49,14 @@ class TestKSFunction(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        assert_rel_error(self, prob['ks.KS'][0], 17.0)
-        assert_rel_error(self, prob['ks.KS'][1], 34.0)
-        assert_rel_error(self, prob['ks.KS'][2], 51.0)
+        assert_near_equal(prob['ks.KS'][0], 17.0)
+        assert_near_equal(prob['ks.KS'][1], 34.0)
+        assert_near_equal(prob['ks.KS'][2], 51.0)
 
         partials = prob.check_partials(includes=['ks'], out_stream=None)
 
         for (of, wrt) in partials['ks']:
-            assert_rel_error(self, partials['ks'][of, wrt]['abs error'][0], 0.0, 1e-6)
+            assert_near_equal(partials['ks'][of, wrt]['abs error'][0], 0.0, 1e-6)
 
     def test_partials_no_compute(self):
         prob = om.Problem()
@@ -77,14 +77,14 @@ class TestKSFunction(unittest.TestCase):
         partials = {}
 
         ks_comp.compute_partials(inputs, partials)
-        assert_rel_error(self, partials[('KS', 'g')], np.array([1., 0.]), 1e-6)
+        assert_near_equal(partials[('KS', 'g')], np.array([1., 0.]), 1e-6)
 
         # swap inputs and call compute partials again, without calling compute
         inputs['g'][0][0] = 4
         inputs['g'][0][1] = 5
 
         ks_comp.compute_partials(inputs, partials)
-        assert_rel_error(self, partials[('KS', 'g')], np.array([0., 1.]), 1e-6)
+        assert_near_equal(partials[('KS', 'g')], np.array([0., 1.]), 1e-6)
 
     def test_beam_stress(self):
         E = 1.
@@ -114,8 +114,8 @@ class TestKSFunction(unittest.TestCase):
         stress1 = prob['parallel.sub_0.stress_comp.stress_1']
 
         # Test that the the maximum constraint prior to aggregation is close to "active".
-        assert_rel_error(self, max(stress0), 100.0, tolerance=5e-2)
-        assert_rel_error(self, max(stress1), 100.0, tolerance=5e-2)
+        assert_near_equal(max(stress0), 100.0, tolerance=5e-2)
+        assert_near_equal(max(stress1), 100.0, tolerance=5e-2)
 
         # Test that no original constraint is violated.
         self.assertTrue(np.all(stress0 < 100.0))
@@ -137,7 +137,7 @@ class TestKSFunction(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['ks.KS'][0], -1.0)
+        assert_near_equal(prob['ks.KS'][0], -1.0)
 
     def test_lower_flag(self):
 
@@ -155,7 +155,7 @@ class TestKSFunction(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['ks.KS'][0], -12.0)
+        assert_near_equal(prob['ks.KS'][0], -12.0)
 
 
 class TestKSFunctionFeatures(unittest.TestCase):
@@ -179,7 +179,7 @@ class TestKSFunctionFeatures(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['ks.KS'][0], 15.0)
+        assert_near_equal(prob['ks.KS'][0], 15.0)
 
     def test_vectorized(self):
         import numpy as np
@@ -200,8 +200,8 @@ class TestKSFunctionFeatures(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['ks.KS'][0], 15.0)
-        assert_rel_error(self, prob['ks.KS'][1], 30.0)
+        assert_near_equal(prob['ks.KS'][0], 15.0)
+        assert_near_equal(prob['ks.KS'][1], 30.0)
 
     def test_upper(self):
         import numpy as np
@@ -223,7 +223,7 @@ class TestKSFunctionFeatures(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['ks.KS'][0], -1.0)
+        assert_near_equal(prob['ks.KS'][0], -1.0)
 
     def test_lower_flag(self):
         import numpy as np
@@ -245,7 +245,7 @@ class TestKSFunctionFeatures(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['ks.KS'][0], -12.0)
+        assert_near_equal(prob['ks.KS'][0], -12.0)
 
 
 if __name__ == "__main__":

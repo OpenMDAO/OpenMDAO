@@ -7,7 +7,7 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.proc_allocators.default_allocator import DefaultAllocator
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 if MPI:
@@ -171,4 +171,4 @@ class ProbRemote4TestCase(unittest.TestCase):
 
         objs = comm.allgather(prob['obj.o'])
         for i, obj in enumerate(objs):
-            assert_rel_error(self, obj, 2.0, 1e-6)
+            assert_near_equal(obj, 2.0, 1e-6)

@@ -3,7 +3,7 @@ import unittest
 import openmdao.api as om
 from openmdao.test_suite.test_examples.beam_optimization.beam_group import BeamGroup
 from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group import MultipointBeamGroup
-from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 from openmdao.utils.mpi import MPI
 
 try:
@@ -38,7 +38,7 @@ class TestCase(unittest.TestCase):
 
         prob.run_driver()
 
-        assert_rel_error(self, prob['inputs_comp.h'],
+        assert_near_equal(prob['inputs_comp.h'],
                          [0.14915754,  0.14764328,  0.14611321,  0.14456715,  0.14300421,  0.14142417,
                           0.13982611,  0.13820976,  0.13657406,  0.13491866,  0.13324268,  0.13154528,
                           0.12982575,  0.12808305,  0.12631658,  0.12452477,  0.12270701,  0.12086183,
@@ -79,7 +79,7 @@ class TestCase(unittest.TestCase):
 
         prob.run_driver()
 
-        assert_rel_error(self, prob['interp.h'][0],
+        assert_near_equal(prob['interp.h'][0],
                          [ 0.14122705,  0.14130706,  0.14154096,  0.1419107,   0.14238706,  0.14293095,
                            0.14349514,  0.14402636,  0.1444677,   0.14476123,  0.14485062,  0.14468388,
                            0.14421589,  0.1434107,   0.14224356,  0.14070252,  0.13878952,  0.13652104,
@@ -121,7 +121,7 @@ class TestCase(unittest.TestCase):
 
         prob.run_driver()
 
-        assert_rel_error(self, prob['interp.h'][0],
+        assert_near_equal(prob['interp.h'][0],
                          [ 0.45632323,  0.45612552,  0.45543324,  0.45397058,  0.45134629,  0.44714397,
                            0.4410258,   0.43283139,  0.42265378,  0.41087801,  0.3981731,   0.3854358,
                            0.37369202,  0.36342186,  0.35289066,  0.34008777,  0.32362887,  0.30300358,
@@ -148,9 +148,9 @@ class TestCase(unittest.TestCase):
         prob.run_model()
 
         derivs = prob.check_totals(method='cs', out_stream=None)
-        assert_rel_error(self, derivs[('compliance_comp.compliance', 'inputs_comp.h')]['rel error'][0],
+        assert_near_equal(derivs[('compliance_comp.compliance', 'inputs_comp.h')]['rel error'][0],
                          0.0, 1e-8)
-        assert_rel_error(self, derivs[('volume_comp.volume', 'inputs_comp.h')]['rel error'][0],
+        assert_near_equal(derivs[('volume_comp.volume', 'inputs_comp.h')]['rel error'][0],
                          0.0, 1e-8)
 
         derivs = prob.check_partials(method='cs', out_stream=None)
@@ -182,9 +182,9 @@ class TestCase(unittest.TestCase):
         prob.run_model()
 
         derivs = prob.check_totals(method='cs', out_stream=None)
-        assert_rel_error(self, derivs[('obj_sum.obj', 'inputs_comp.h_cp')]['rel error'][0],
+        assert_near_equal(derivs[('obj_sum.obj', 'inputs_comp.h_cp')]['rel error'][0],
                          0.0, 1e-8)
-        assert_rel_error(self, derivs[('volume_comp.volume', 'inputs_comp.h_cp')]['rel error'][0],
+        assert_near_equal(derivs[('volume_comp.volume', 'inputs_comp.h_cp')]['rel error'][0],
                          0.0, 1e-8)
 
         derivs = prob.check_partials(method='cs', out_stream=None)
@@ -226,7 +226,7 @@ class TestParallelGroups(unittest.TestCase):
 
         prob.run_driver()
 
-        assert_rel_error(self, prob['interp.h'][0],
+        assert_near_equal(prob['interp.h'][0],
                          [ 0.14122705,  0.14130706,  0.14154096,  0.1419107,   0.14238706,  0.14293095,
                            0.14349514,  0.14402636,  0.1444677,   0.14476123,  0.14485062,  0.14468388,
                            0.14421589,  0.1434107,   0.14224356,  0.14070252,  0.13878952,  0.13652104,
