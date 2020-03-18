@@ -3,7 +3,7 @@
 import unittest
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_rel_error, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.test_suite.components.unit_conv import UnitConvGroup, SrcComp, TgtCompC, TgtCompF, \
     TgtCompK, SrcCompFD, TgtCompCFD, TgtCompFFD, TgtCompKFD, TgtCompFMulti
 
@@ -33,28 +33,28 @@ class TestUnitConversion(unittest.TestCase):
         prob.setup(check=False, mode='fwd')
         prob.run_model()
 
-        assert_rel_error(self, prob['src.x2'], 100.0, 1e-6)
-        assert_rel_error(self, prob['tgtF.x3'], 212.0, 1e-6)
-        assert_rel_error(self, prob['tgtC.x3'], 100.0, 1e-6)
-        assert_rel_error(self, prob['tgtK.x3'], 373.15, 1e-6)
+        assert_near_equal(prob['src.x2'], 100.0, 1e-6)
+        assert_near_equal(prob['tgtF.x3'], 212.0, 1e-6)
+        assert_near_equal(prob['tgtC.x3'], 100.0, 1e-6)
+        assert_near_equal(prob['tgtK.x3'], 373.15, 1e-6)
 
         # Check the total derivatives in forward mode
         wrt = ['px1.x1']
         of = ['tgtF.x3', 'tgtC.x3', 'tgtK.x3']
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
 
-        assert_rel_error(self, J['tgtF.x3', 'px1.x1'][0][0], 1.8, 1e-6)
-        assert_rel_error(self, J['tgtC.x3', 'px1.x1'][0][0], 1.0, 1e-6)
-        assert_rel_error(self, J['tgtK.x3', 'px1.x1'][0][0], 1.0, 1e-6)
+        assert_near_equal(J['tgtF.x3', 'px1.x1'][0][0], 1.8, 1e-6)
+        assert_near_equal(J['tgtC.x3', 'px1.x1'][0][0], 1.0, 1e-6)
+        assert_near_equal(J['tgtK.x3', 'px1.x1'][0][0], 1.0, 1e-6)
 
         # Check the total derivatives in reverse mode
         prob.setup(check=False, mode='rev')
         prob.run_model()
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
 
-        assert_rel_error(self, J['tgtF.x3', 'px1.x1'][0][0], 1.8, 1e-6)
-        assert_rel_error(self, J['tgtC.x3', 'px1.x1'][0][0], 1.0, 1e-6)
-        assert_rel_error(self, J['tgtK.x3', 'px1.x1'][0][0], 1.0, 1e-6)
+        assert_near_equal(J['tgtF.x3', 'px1.x1'][0][0], 1.8, 1e-6)
+        assert_near_equal(J['tgtC.x3', 'px1.x1'][0][0], 1.0, 1e-6)
+        assert_near_equal(J['tgtK.x3', 'px1.x1'][0][0], 1.0, 1e-6)
 
     def test_dangling_input_w_units(self):
         prob = om.Problem()
@@ -82,14 +82,14 @@ class TestUnitConversion(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['c1.distance'], 1.)  # units: m
-        assert_rel_error(self, prob['c2.distance'], 1.e-3)  # units: km
+        assert_near_equal(prob['c1.distance'], 1.)  # units: m
+        assert_near_equal(prob['c2.distance'], 1.e-3)  # units: km
 
-        assert_rel_error(self, prob['c1.time'], 1.)  # units: s
-        assert_rel_error(self, prob['c2.time'], 1./3600.)  # units: h
+        assert_near_equal(prob['c1.time'], 1.)  # units: s
+        assert_near_equal(prob['c2.time'], 1./3600.)  # units: h
 
-        assert_rel_error(self, prob['c2.speed'], 3.6)  # units: km/h
-        assert_rel_error(self, prob['c3.f'], 1.0)  # units: km/h
+        assert_near_equal(prob['c2.speed'], 3.6)  # units: km/h
+        assert_near_equal(prob['c3.f'], 1.0)  # units: km/h
 
     def test_basic(self):
         """Test that output values and total derivatives are correct."""
@@ -99,40 +99,40 @@ class TestUnitConversion(unittest.TestCase):
         prob.setup(check=False, mode='fwd')
         prob.run_model()
 
-        assert_rel_error(self, prob['src.x2'], 100.0, 1e-6)
-        assert_rel_error(self, prob['tgtF.x3'], 212.0, 1e-6)
-        assert_rel_error(self, prob['tgtC.x3'], 100.0, 1e-6)
-        assert_rel_error(self, prob['tgtK.x3'], 373.15, 1e-6)
+        assert_near_equal(prob['src.x2'], 100.0, 1e-6)
+        assert_near_equal(prob['tgtF.x3'], 212.0, 1e-6)
+        assert_near_equal(prob['tgtC.x3'], 100.0, 1e-6)
+        assert_near_equal(prob['tgtK.x3'], 373.15, 1e-6)
 
         # Check the total derivatives in forward mode
         wrt = ['px1.x1']
         of = ['tgtF.x3', 'tgtC.x3', 'tgtK.x3']
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
 
-        assert_rel_error(self, J['tgtF.x3', 'px1.x1'][0][0], 1.8, 1e-6)
-        assert_rel_error(self, J['tgtC.x3', 'px1.x1'][0][0], 1.0, 1e-6)
-        assert_rel_error(self, J['tgtK.x3', 'px1.x1'][0][0], 1.0, 1e-6)
+        assert_near_equal(J['tgtF.x3', 'px1.x1'][0][0], 1.8, 1e-6)
+        assert_near_equal(J['tgtC.x3', 'px1.x1'][0][0], 1.0, 1e-6)
+        assert_near_equal(J['tgtK.x3', 'px1.x1'][0][0], 1.0, 1e-6)
 
         # Check the total derivatives in reverse mode
         prob.setup(check=False, mode='rev')
         prob.run_model()
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
 
-        assert_rel_error(self, J['tgtF.x3', 'px1.x1'][0][0], 1.8, 1e-6)
-        assert_rel_error(self, J['tgtC.x3', 'px1.x1'][0][0], 1.0, 1e-6)
-        assert_rel_error(self, J['tgtK.x3', 'px1.x1'][0][0], 1.0, 1e-6)
+        assert_near_equal(J['tgtF.x3', 'px1.x1'][0][0], 1.8, 1e-6)
+        assert_near_equal(J['tgtC.x3', 'px1.x1'][0][0], 1.0, 1e-6)
+        assert_near_equal(J['tgtK.x3', 'px1.x1'][0][0], 1.0, 1e-6)
 
         # Make sure check partials handles conversion
         data = prob.check_partials()
 
         for key1, val1 in data.items():
             for key2, val2 in val1.items():
-                assert_rel_error(self, val2['abs error'][0], 0.0, 1e-6)
-                assert_rel_error(self, val2['abs error'][1], 0.0, 1e-6)
-                assert_rel_error(self, val2['abs error'][2], 0.0, 1e-6)
-                assert_rel_error(self, val2['rel error'][0], 0.0, 1e-6)
-                assert_rel_error(self, val2['rel error'][1], 0.0, 1e-6)
-                assert_rel_error(self, val2['rel error'][2], 0.0, 1e-6)
+                assert_near_equal(val2['abs error'][0], 0.0, 1e-6)
+                assert_near_equal(val2['abs error'][1], 0.0, 1e-6)
+                assert_near_equal(val2['abs error'][2], 0.0, 1e-6)
+                assert_near_equal(val2['rel error'][0], 0.0, 1e-6)
+                assert_near_equal(val2['rel error'][1], 0.0, 1e-6)
+                assert_near_equal(val2['rel error'][2], 0.0, 1e-6)
 
     def test_basic_apply(self):
         """Test that output values and total derivatives are correct."""
@@ -189,22 +189,22 @@ class TestUnitConversion(unittest.TestCase):
         prob.setup(check=False, mode='fwd')
         prob.run_model()
 
-        assert_rel_error(self, prob['src.x2'], 100.0, 1e-6)
-        assert_rel_error(self, prob['tgtF.x3'], 212.0, 1e-6)
+        assert_near_equal(prob['src.x2'], 100.0, 1e-6)
+        assert_near_equal(prob['tgtF.x3'], 212.0, 1e-6)
 
         # Check the total derivatives in forward mode
         wrt = ['px1.x1']
         of = ['tgtF.x3']
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
 
-        assert_rel_error(self, J['tgtF.x3', 'px1.x1'][0][0], 1.8, 1e-6)
+        assert_near_equal(J['tgtF.x3', 'px1.x1'][0][0], 1.8, 1e-6)
 
         # Check the total derivatives in reverse mode
         prob.setup(check=False, mode='rev')
         prob.run_model()
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
 
-        assert_rel_error(self, J['tgtF.x3', 'px1.x1'][0][0], 1.8, 1e-6)
+        assert_near_equal(J['tgtF.x3', 'px1.x1'][0][0], 1.8, 1e-6)
 
     def test_basic_fd_comps(self):
 
@@ -222,47 +222,47 @@ class TestUnitConversion(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['src.x2'], 100.0, 1e-6)
-        assert_rel_error(self, prob['tgtF.x3'], 212.0, 1e-6)
-        assert_rel_error(self, prob['tgtC.x3'], 100.0, 1e-6)
-        assert_rel_error(self, prob['tgtK.x3'], 373.15, 1e-6)
+        assert_near_equal(prob['src.x2'], 100.0, 1e-6)
+        assert_near_equal(prob['tgtF.x3'], 212.0, 1e-6)
+        assert_near_equal(prob['tgtC.x3'], 100.0, 1e-6)
+        assert_near_equal(prob['tgtK.x3'], 373.15, 1e-6)
 
         indep_list = ['x1']
         unknown_list = ['tgtF.x3', 'tgtC.x3', 'tgtK.x3']
         J = prob.compute_totals(of=unknown_list, wrt=indep_list, return_format='dict')
 
-        assert_rel_error(self, J['tgtF.x3']['x1'][0][0], 1.8, 1e-6)
-        assert_rel_error(self, J['tgtC.x3']['x1'][0][0], 1.0, 1e-6)
-        assert_rel_error(self, J['tgtK.x3']['x1'][0][0], 1.0, 1e-6)
+        assert_near_equal(J['tgtF.x3']['x1'][0][0], 1.8, 1e-6)
+        assert_near_equal(J['tgtC.x3']['x1'][0][0], 1.0, 1e-6)
+        assert_near_equal(J['tgtK.x3']['x1'][0][0], 1.0, 1e-6)
 
         prob.setup(check=False, mode='rev')
         prob.run_model()
         J = prob.compute_totals(of=unknown_list, wrt=indep_list, return_format='dict')
 
-        assert_rel_error(self, J['tgtF.x3']['x1'][0][0], 1.8, 1e-6)
-        assert_rel_error(self, J['tgtC.x3']['x1'][0][0], 1.0, 1e-6)
-        assert_rel_error(self, J['tgtK.x3']['x1'][0][0], 1.0, 1e-6)
+        assert_near_equal(J['tgtF.x3']['x1'][0][0], 1.8, 1e-6)
+        assert_near_equal(J['tgtC.x3']['x1'][0][0], 1.0, 1e-6)
+        assert_near_equal(J['tgtK.x3']['x1'][0][0], 1.0, 1e-6)
 
         prob.model.approx_totals(method='fd')
         prob.setup(check=False, mode='rev')
         prob.run_model()
         J = prob.compute_totals(of=unknown_list, wrt=indep_list, return_format='dict')
 
-        assert_rel_error(self, J['tgtF.x3']['x1'][0][0], 1.8, 1e-6)
-        assert_rel_error(self, J['tgtC.x3']['x1'][0][0], 1.0, 1e-6)
-        assert_rel_error(self, J['tgtK.x3']['x1'][0][0], 1.0, 1e-6)
+        assert_near_equal(J['tgtF.x3']['x1'][0][0], 1.8, 1e-6)
+        assert_near_equal(J['tgtC.x3']['x1'][0][0], 1.0, 1e-6)
+        assert_near_equal(J['tgtK.x3']['x1'][0][0], 1.0, 1e-6)
 
         # Make sure check partials handles conversion
         data = prob.check_partials()
 
         for key1, val1 in data.items():
             for key2, val2 in val1.items():
-                assert_rel_error(self, val2['abs error'][0], 0.0, 1e-6)
-                assert_rel_error(self, val2['abs error'][1], 0.0, 1e-6)
-                assert_rel_error(self, val2['abs error'][2], 0.0, 1e-6)
-                assert_rel_error(self, val2['rel error'][0], 0.0, 1e-6)
-                assert_rel_error(self, val2['rel error'][1], 0.0, 1e-6)
-                assert_rel_error(self, val2['rel error'][2], 0.0, 1e-6)
+                assert_near_equal(val2['abs error'][0], 0.0, 1e-6)
+                assert_near_equal(val2['abs error'][1], 0.0, 1e-6)
+                assert_near_equal(val2['abs error'][2], 0.0, 1e-6)
+                assert_near_equal(val2['rel error'][0], 0.0, 1e-6)
+                assert_near_equal(val2['rel error'][1], 0.0, 1e-6)
+                assert_near_equal(val2['rel error'][2], 0.0, 1e-6)
 
     def test_bad_units(self):
         """Test error handling when invalid units are declared."""
@@ -312,28 +312,28 @@ class TestUnitConversion(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['x2'], 100.0, 1e-6)
-        assert_rel_error(self, prob['tgtF.x3'], 212.0, 1e-6)
-        assert_rel_error(self, prob['tgtC.x3'], 100.0, 1e-6)
-        assert_rel_error(self, prob['tgtK.x3'], 373.15, 1e-6)
+        assert_near_equal(prob['x2'], 100.0, 1e-6)
+        assert_near_equal(prob['tgtF.x3'], 212.0, 1e-6)
+        assert_near_equal(prob['tgtC.x3'], 100.0, 1e-6)
+        assert_near_equal(prob['tgtK.x3'], 373.15, 1e-6)
 
         # Check the total derivatives in forward mode
         wrt = ['x1']
         of = ['tgtF.x3', 'tgtC.x3', 'tgtK.x3']
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
 
-        assert_rel_error(self, J['tgtF.x3', 'x1'][0][0], 1.8, 1e-6)
-        assert_rel_error(self, J['tgtC.x3', 'x1'][0][0], 1.0, 1e-6)
-        assert_rel_error(self, J['tgtK.x3', 'x1'][0][0], 1.0, 1e-6)
+        assert_near_equal(J['tgtF.x3', 'x1'][0][0], 1.8, 1e-6)
+        assert_near_equal(J['tgtC.x3', 'x1'][0][0], 1.0, 1e-6)
+        assert_near_equal(J['tgtK.x3', 'x1'][0][0], 1.0, 1e-6)
 
         # Check the total derivatives in reverse mode
         prob.setup(check=False, mode='rev')
         prob.run_model()
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
 
-        assert_rel_error(self, J['tgtF.x3', 'x1'][0][0], 1.8, 1e-6)
-        assert_rel_error(self, J['tgtC.x3', 'x1'][0][0], 1.0, 1e-6)
-        assert_rel_error(self, J['tgtK.x3', 'x1'][0][0], 1.0, 1e-6)
+        assert_near_equal(J['tgtF.x3', 'x1'][0][0], 1.8, 1e-6)
+        assert_near_equal(J['tgtC.x3', 'x1'][0][0], 1.0, 1e-6)
+        assert_near_equal(J['tgtK.x3', 'x1'][0][0], 1.0, 1e-6)
 
     def test_basic_grouped(self):
 
@@ -355,27 +355,27 @@ class TestUnitConversion(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['sub1.src.x2'], 100.0, 1e-6)
-        assert_rel_error(self, prob['sub2.tgtF.x3'], 212.0, 1e-6)
-        assert_rel_error(self, prob['sub2.tgtC.x3'], 100.0, 1e-6)
-        assert_rel_error(self, prob['sub2.tgtK.x3'], 373.15, 1e-6)
+        assert_near_equal(prob['sub1.src.x2'], 100.0, 1e-6)
+        assert_near_equal(prob['sub2.tgtF.x3'], 212.0, 1e-6)
+        assert_near_equal(prob['sub2.tgtC.x3'], 100.0, 1e-6)
+        assert_near_equal(prob['sub2.tgtK.x3'], 373.15, 1e-6)
 
         wrt = ['x1']
         of = ['sub2.tgtF.x3', 'sub2.tgtC.x3', 'sub2.tgtK.x3']
         J = prob.compute_totals(of=of, wrt=wrt, return_format='dict')
 
-        assert_rel_error(self, J['sub2.tgtF.x3']['x1'][0][0], 1.8, 1e-6)
-        assert_rel_error(self, J['sub2.tgtC.x3']['x1'][0][0], 1.0, 1e-6)
-        assert_rel_error(self, J['sub2.tgtK.x3']['x1'][0][0], 1.0, 1e-6)
+        assert_near_equal(J['sub2.tgtF.x3']['x1'][0][0], 1.8, 1e-6)
+        assert_near_equal(J['sub2.tgtC.x3']['x1'][0][0], 1.0, 1e-6)
+        assert_near_equal(J['sub2.tgtK.x3']['x1'][0][0], 1.0, 1e-6)
 
         # Check the total derivatives in reverse mode
         prob.setup(check=False, mode='rev')
         prob.run_model()
         J = prob.compute_totals(of=of, wrt=wrt, return_format='dict')
 
-        assert_rel_error(self, J['sub2.tgtF.x3']['x1'][0][0], 1.8, 1e-6)
-        assert_rel_error(self, J['sub2.tgtC.x3']['x1'][0][0], 1.0, 1e-6)
-        assert_rel_error(self, J['sub2.tgtK.x3']['x1'][0][0], 1.0, 1e-6)
+        assert_near_equal(J['sub2.tgtF.x3']['x1'][0][0], 1.8, 1e-6)
+        assert_near_equal(J['sub2.tgtC.x3']['x1'][0][0], 1.0, 1e-6)
+        assert_near_equal(J['sub2.tgtK.x3']['x1'][0][0], 1.0, 1e-6)
 
     def test_basic_grouped_bug_from_pycycle(self):
 
@@ -397,27 +397,27 @@ class TestUnitConversion(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['x2'], 100.0, 1e-6)
-        assert_rel_error(self, prob['tgtF.x3'], 212.0, 1e-6)
-        assert_rel_error(self, prob['tgtC.x3'], 100.0, 1e-6)
-        assert_rel_error(self, prob['tgtK.x3'], 373.15, 1e-6)
+        assert_near_equal(prob['x2'], 100.0, 1e-6)
+        assert_near_equal(prob['tgtF.x3'], 212.0, 1e-6)
+        assert_near_equal(prob['tgtC.x3'], 100.0, 1e-6)
+        assert_near_equal(prob['tgtK.x3'], 373.15, 1e-6)
 
         wrt = ['x1']
         of = ['tgtF.x3', 'tgtC.x3', 'tgtK.x3']
         J = prob.compute_totals(of=of, wrt=wrt, return_format='dict')
 
-        assert_rel_error(self, J['tgtF.x3']['x1'][0][0], 1.8, 1e-6)
-        assert_rel_error(self, J['tgtC.x3']['x1'][0][0], 1.0, 1e-6)
-        assert_rel_error(self, J['tgtK.x3']['x1'][0][0], 1.0, 1e-6)
+        assert_near_equal(J['tgtF.x3']['x1'][0][0], 1.8, 1e-6)
+        assert_near_equal(J['tgtC.x3']['x1'][0][0], 1.0, 1e-6)
+        assert_near_equal(J['tgtK.x3']['x1'][0][0], 1.0, 1e-6)
 
         # Check the total derivatives in reverse mode
         prob.setup(check=False, mode='rev')
         prob.run_model()
         J = prob.compute_totals(of=of, wrt=wrt, return_format='dict')
 
-        assert_rel_error(self, J['tgtF.x3']['x1'][0][0], 1.8, 1e-6)
-        assert_rel_error(self, J['tgtC.x3']['x1'][0][0], 1.0, 1e-6)
-        assert_rel_error(self, J['tgtK.x3']['x1'][0][0], 1.0, 1e-6)
+        assert_near_equal(J['tgtF.x3']['x1'][0][0], 1.8, 1e-6)
+        assert_near_equal(J['tgtC.x3']['x1'][0][0], 1.0, 1e-6)
+        assert_near_equal(J['tgtK.x3']['x1'][0][0], 1.0, 1e-6)
 
     #def test_basic_grouped_grouped_implicit(self):
 
@@ -435,33 +435,33 @@ class TestUnitConversion(unittest.TestCase):
         #prob.setup()
         #prob.run_model()
 
-        #assert_rel_error(self, prob['x2'], 100.0, 1e-6)
-        #assert_rel_error(self, prob['sub2.tgtF.x3'], 212.0, 1e-6)
-        #assert_rel_error(self, prob['sub2.tgtC.x3'], 100.0, 1e-6)
-        #assert_rel_error(self, prob['sub2.tgtK.x3'], 373.15, 1e-6)
+        #assert_near_equal(prob['x2'], 100.0, 1e-6)
+        #assert_near_equal(prob['sub2.tgtF.x3'], 212.0, 1e-6)
+        #assert_near_equal(prob['sub2.tgtC.x3'], 100.0, 1e-6)
+        #assert_near_equal(prob['sub2.tgtK.x3'], 373.15, 1e-6)
 
         #indep_list = ['x1']
         #unknown_list = ['sub2.tgtF.x3', 'sub2.tgtC.x3', 'sub2.tgtK.x3']
         #J = prob.calc_gradient(indep_list, unknown_list, mode='fwd',
                                #return_format='dict')
 
-        #assert_rel_error(self, J['sub2.tgtF.x3']['x1'][0][0], 1.8, 1e-6)
-        #assert_rel_error(self, J['sub2.tgtC.x3']['x1'][0][0], 1.0, 1e-6)
-        #assert_rel_error(self, J['sub2.tgtK.x3']['x1'][0][0], 1.0, 1e-6)
+        #assert_near_equal(J['sub2.tgtF.x3']['x1'][0][0], 1.8, 1e-6)
+        #assert_near_equal(J['sub2.tgtC.x3']['x1'][0][0], 1.0, 1e-6)
+        #assert_near_equal(J['sub2.tgtK.x3']['x1'][0][0], 1.0, 1e-6)
 
         #J = prob.calc_gradient(indep_list, unknown_list, mode='rev',
                                #return_format='dict')
 
-        #assert_rel_error(self, J['sub2.tgtF.x3']['x1'][0][0], 1.8, 1e-6)
-        #assert_rel_error(self, J['sub2.tgtC.x3']['x1'][0][0], 1.0, 1e-6)
-        #assert_rel_error(self, J['sub2.tgtK.x3']['x1'][0][0], 1.0, 1e-6)
+        #assert_near_equal(J['sub2.tgtF.x3']['x1'][0][0], 1.8, 1e-6)
+        #assert_near_equal(J['sub2.tgtC.x3']['x1'][0][0], 1.0, 1e-6)
+        #assert_near_equal(J['sub2.tgtK.x3']['x1'][0][0], 1.0, 1e-6)
 
         #J = prob.calc_gradient(indep_list, unknown_list, mode='fd',
                                #return_format='dict')
 
-        #assert_rel_error(self, J['sub2.tgtF.x3']['x1'][0][0], 1.8, 1e-6)
-        #assert_rel_error(self, J['sub2.tgtC.x3']['x1'][0][0], 1.0, 1e-6)
-        #assert_rel_error(self, J['sub2.tgtK.x3']['x1'][0][0], 1.0, 1e-6)
+        #assert_near_equal(J['sub2.tgtF.x3']['x1'][0][0], 1.8, 1e-6)
+        #assert_near_equal(J['sub2.tgtC.x3']['x1'][0][0], 1.0, 1e-6)
+        #assert_near_equal(J['sub2.tgtK.x3']['x1'][0][0], 1.0, 1e-6)
 
     #def test_apply_linear_adjoint(self):
         ## Make sure we can index into dinputs
@@ -571,7 +571,7 @@ class TestUnitConversion(unittest.TestCase):
         #for key, val in Jr.items():
             #for key2 in val:
                 #diff = abs(Jf[key][key2] - Jr[key][key2])
-                #assert_rel_error(self, diff, 0.0, 1e-10)
+                #assert_near_equal(diff, 0.0, 1e-10)
 
     def test_incompatible_connections(self):
 
@@ -646,8 +646,8 @@ class TestUnitConversion(unittest.TestCase):
         #sub.linear_solver.rel_inputs = ['sub.cc2.x', 'sub.cc1.x2']
         #rhs_buf = {None : np.array([3.5, 1.7])}
         #sol_buf = sub.linear_solver.solve(rhs_buf, sub, mode='fwd')[None]
-        #assert_rel_error(self, sol_buf[0], -3.52052052, 1e-3)
-        #assert_rel_error(self, sol_buf[1], -2.05205205, 1e-3)
+        #assert_near_equal(sol_buf[0], -3.52052052, 1e-3)
+        #assert_near_equal(sol_buf[1], -2.05205205, 1e-3)
 
     #def test_nested_relevancy(self):
 

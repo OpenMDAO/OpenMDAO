@@ -5,7 +5,7 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.array_utils import evenly_distrib_idxs
 
 try:
@@ -132,7 +132,7 @@ class TestUserDefinedSolver(unittest.TestCase):
         p.run_model()
         jac = p.compute_totals(of=['out_var'], wrt=['a'], return_format='dict')
 
-        assert_rel_error(self, 15.0, jac['out_var']['a'][0][0])
+        assert_near_equal(15.0, jac['out_var']['a'][0][0])
 
     def test_scaling(self):
         # Make sure values are unscaled/dimensional.
@@ -184,7 +184,7 @@ class TestUserDefinedSolver(unittest.TestCase):
         p.run_model()
         jac = p.compute_totals(of=['out_var'], wrt=['a'], return_format='dict')
 
-        assert_rel_error(self, 15.0, jac['out_var']['a'][0][0])
+        assert_near_equal(15.0, jac['out_var']['a'][0][0])
 
     def test_feature(self):
         import numpy as np
@@ -300,7 +300,7 @@ class TestUserDefinedSolver(unittest.TestCase):
         prob.run_model()
         jac = prob.compute_totals(of=['out_var'], wrt=['a'], return_format='dict')
 
-        assert_rel_error(self, 15.0, jac['out_var']['a'][0][0])
+        assert_near_equal(15.0, jac['out_var']['a'][0][0])
 
 if __name__ == "__main__":
     unittest.main()

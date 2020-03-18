@@ -5,7 +5,7 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDense
 from openmdao.solvers.linear.tests.linear_test_base import LinearSolverTests
@@ -66,8 +66,8 @@ class TestBJacSolverFeature(unittest.TestCase):
         of = ['obj']
 
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-        assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, .00001)
-        assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
+        assert_near_equal(J['obj', 'z'][0][0], 9.61001056, .00001)
+        assert_near_equal(J['obj', 'z'][0][1], 1.78448534, .00001)
 
     def test_feature_maxiter(self):
         import numpy as np
@@ -103,8 +103,8 @@ class TestBJacSolverFeature(unittest.TestCase):
         of = ['obj']
 
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-        assert_rel_error(self, J['obj', 'z'][0][0], 9.60230118004, .00001)
-        assert_rel_error(self, J['obj', 'z'][0][1], 1.78022500547, .00001)
+        assert_near_equal(J['obj', 'z'][0][0], 9.60230118004, .00001)
+        assert_near_equal(J['obj', 'z'][0][1], 1.78022500547, .00001)
 
     def test_feature_atol(self):
         import numpy as np
@@ -140,8 +140,8 @@ class TestBJacSolverFeature(unittest.TestCase):
         of = ['obj']
 
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-        assert_rel_error(self, J['obj', 'z'][0][0], 9.61016296175, .00001)
-        assert_rel_error(self, J['obj', 'z'][0][1], 1.78456955704, .00001)
+        assert_near_equal(J['obj', 'z'][0][0], 9.61016296175, .00001)
+        assert_near_equal(J['obj', 'z'][0][1], 1.78456955704, .00001)
 
     def test_feature_rtol(self):
         import numpy as np
@@ -177,8 +177,8 @@ class TestBJacSolverFeature(unittest.TestCase):
         of = ['obj']
 
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-        assert_rel_error(self, J['obj', 'z'][0][0], 9.61016296175, .00001)
-        assert_rel_error(self, J['obj', 'z'][0][1], 1.78456955704, .00001)
+        assert_near_equal(J['obj', 'z'][0][0], 9.61016296175, .00001)
+        assert_near_equal(J['obj', 'z'][0][1], 1.78456955704, .00001)
 
 if __name__ == "__main__":
     unittest.main()

@@ -165,7 +165,7 @@ class TestFeature(unittest.TestCase):
         import numpy as np
 
         import openmdao.api as om
-        from openmdao.utils.assert_utils import assert_rel_error
+        from openmdao.utils.assert_utils import assert_near_equal
 
         n = 100
 
@@ -201,7 +201,7 @@ class TestFeature(unittest.TestCase):
             a_i = p['force'][i, :]
             b_i = p['vel'][i, :]
             expected_i = np.dot(a_i, b_i) / 1000.0
-            assert_rel_error(self, p.get_val('dot_prod_comp.P', units='kW')[i], expected_i)
+            assert_near_equal(p.get_val('dot_prod_comp.P', units='kW')[i], expected_i)
 
 
 if __name__ == '__main__':

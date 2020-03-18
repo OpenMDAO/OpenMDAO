@@ -1,5 +1,5 @@
 from openmdao.api import Group, Problem, MetaModelUnStructuredComp, NearestNeighbor
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 
 import numpy as np
 import unittest
@@ -52,18 +52,18 @@ class TestMap(unittest.TestCase):
         p.run_model()
 
         tol = 1e-1
-        assert_rel_error(self, p['compmap.PR'], p['compmap.Nc']*p['compmap.Rline']+p['compmap.alpha'], tol)
-        assert_rel_error(self, p['compmap.eff'], p['compmap.Nc']*p['compmap.Rline']**2+p['compmap.alpha'], tol)
-        assert_rel_error(self, p['compmap.Wc'], p['compmap.Nc']**2*p['compmap.Rline']**2+p['compmap.alpha'], tol)
+        assert_near_equal(p['compmap.PR'], p['compmap.Nc']*p['compmap.Rline']+p['compmap.alpha'], tol)
+        assert_near_equal(p['compmap.eff'], p['compmap.Nc']*p['compmap.Rline']**2+p['compmap.alpha'], tol)
+        assert_near_equal(p['compmap.Wc'], p['compmap.Nc']**2*p['compmap.Rline']**2+p['compmap.alpha'], tol)
 
         p['compmap.Nc'] = 0.95
         p['compmap.Rline'] = 2.1
         p['compmap.alpha'] = 0.0
         p.run_model()
 
-        assert_rel_error(self, p['compmap.PR'], p['compmap.Nc']*p['compmap.Rline']+p['compmap.alpha'], tol)
-        assert_rel_error(self, p['compmap.eff'], p['compmap.Nc']*p['compmap.Rline']**2+p['compmap.alpha'], tol)
-        assert_rel_error(self, p['compmap.Wc'], p['compmap.Nc']**2*p['compmap.Rline']**2+p['compmap.alpha'], tol)
+        assert_near_equal(p['compmap.PR'], p['compmap.Nc']*p['compmap.Rline']+p['compmap.alpha'], tol)
+        assert_near_equal(p['compmap.eff'], p['compmap.Nc']*p['compmap.Rline']**2+p['compmap.alpha'], tol)
+        assert_near_equal(p['compmap.Wc'], p['compmap.Nc']**2*p['compmap.Rline']**2+p['compmap.alpha'], tol)
 
 
 if __name__ == "__main__":

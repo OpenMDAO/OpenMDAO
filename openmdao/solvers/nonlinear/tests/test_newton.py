@@ -14,7 +14,7 @@ from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTw
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
      SellarNoDerivatives, SellarDerivatives, SellarStateConnection, StateConnection, \
      SellarDis1withDerivatives, SellarDis2withDerivatives
-from openmdao.utils.assert_utils import assert_rel_error, assert_warning, assert_no_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_no_warning
 from openmdao.utils.mpi import MPI
 
 try:
@@ -38,8 +38,8 @@ class TestNewton(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob['y2'], 12.05848819, .00001)
 
     def test_feature_newton_basic(self):
         """ Feature test for slotting a Newton solver and using it to solve
@@ -53,8 +53,8 @@ class TestNewton(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob['y2'], 12.05848819, .00001)
 
     def test_sellar_grouped(self):
         # Tests basic Newton solution on Sellar in a subgroup
@@ -65,8 +65,8 @@ class TestNewton(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob['y2'], 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
         self.assertLess(prob.model.nonlinear_solver._iter_count, 8)
@@ -79,8 +79,8 @@ class TestNewton(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob['y2'], 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
         self.assertLess(prob.model.nonlinear_solver._iter_count, 8)
@@ -98,8 +98,8 @@ class TestNewton(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob['y2'], 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
         self.assertLess(prob.model.nonlinear_solver._iter_count, 8)
@@ -120,8 +120,8 @@ class TestNewton(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob['y2'], 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
         self.assertLess(prob.model.nonlinear_solver._iter_count, 8)
@@ -135,8 +135,8 @@ class TestNewton(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob['state_eq.y2_command'], 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
         self.assertLess(prob.model.nonlinear_solver._iter_count, 8)
@@ -152,8 +152,8 @@ class TestNewton(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob['state_eq.y2_command'], 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
         self.assertLess(prob.model.nonlinear_solver._iter_count, 6)
@@ -204,8 +204,8 @@ class TestNewton(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob['state_eq.y2_command'], 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
         self.assertLess(model.nonlinear_solver._iter_count, 8)
@@ -258,8 +258,8 @@ class TestNewton(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob['state_eq.y2_command'], 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
         self.assertLess(model.nonlinear_solver._iter_count, 8)
@@ -290,10 +290,10 @@ class TestNewton(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['g1.y1'], 0.64, .00001)
-        assert_rel_error(self, prob['g1.y2'], 0.80, .00001)
-        assert_rel_error(self, prob['g2.y1'], 0.64, .00001)
-        assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
+        assert_near_equal(prob['g1.y1'], 0.64, .00001)
+        assert_near_equal(prob['g1.y2'], 0.80, .00001)
+        assert_near_equal(prob['g2.y1'], 0.64, .00001)
+        assert_near_equal(prob['g2.y2'], 0.80, .00001)
 
     def test_solve_subsystems_basic_csc(self):
         prob = om.Problem(model=DoubleSellar())
@@ -315,10 +315,10 @@ class TestNewton(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['g1.y1'], 0.64, .00001)
-        assert_rel_error(self, prob['g1.y2'], 0.80, .00001)
-        assert_rel_error(self, prob['g2.y1'], 0.64, .00001)
-        assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
+        assert_near_equal(prob['g1.y1'], 0.64, .00001)
+        assert_near_equal(prob['g1.y2'], 0.80, .00001)
+        assert_near_equal(prob['g2.y1'], 0.64, .00001)
+        assert_near_equal(prob['g2.y2'], 0.80, .00001)
 
     def test_solve_subsystems_basic_dense_jac(self):
         prob = om.Problem(model=DoubleSellar())
@@ -339,10 +339,10 @@ class TestNewton(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['g1.y1'], 0.64, .00001)
-        assert_rel_error(self, prob['g1.y2'], 0.80, .00001)
-        assert_rel_error(self, prob['g2.y1'], 0.64, .00001)
-        assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
+        assert_near_equal(prob['g1.y1'], 0.64, .00001)
+        assert_near_equal(prob['g1.y2'], 0.80, .00001)
+        assert_near_equal(prob['g2.y1'], 0.64, .00001)
+        assert_near_equal(prob['g2.y2'], 0.80, .00001)
 
     def test_solve_subsystems_basic_dense_jac_scaling(self):
         prob = om.Problem(model=DoubleSellar(units=None, scaling=True))
@@ -363,10 +363,10 @@ class TestNewton(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['g1.y1'], 0.64, .00001)
-        assert_rel_error(self, prob['g1.y2'], 0.80, .00001)
-        assert_rel_error(self, prob['g2.y1'], 0.64, .00001)
-        assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
+        assert_near_equal(prob['g1.y1'], 0.64, .00001)
+        assert_near_equal(prob['g1.y2'], 0.80, .00001)
+        assert_near_equal(prob['g2.y1'], 0.64, .00001)
+        assert_near_equal(prob['g2.y2'], 0.80, .00001)
 
     def test_solve_subsystems_basic_dense_jac_units_scaling(self):
         prob = om.Problem(model=DoubleSellar(units=True, scaling=True))
@@ -390,10 +390,10 @@ class TestNewton(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['g1.y1'], 0.0533333333, .00001)
-        assert_rel_error(self, prob['g1.y2'], 0.80, .00001)
-        assert_rel_error(self, prob['g2.y1'], 0.0533333333, .00001)
-        assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
+        assert_near_equal(prob['g1.y1'], 0.0533333333, .00001)
+        assert_near_equal(prob['g1.y2'], 0.80, .00001)
+        assert_near_equal(prob['g2.y1'], 0.0533333333, .00001)
+        assert_near_equal(prob['g2.y2'], 0.80, .00001)
 
     def test_solve_subsystems_assembled_jac_top(self):
         prob = om.Problem(model=DoubleSellar())
@@ -414,10 +414,10 @@ class TestNewton(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['g1.y1'], 0.64, .00001)
-        assert_rel_error(self, prob['g1.y2'], 0.80, .00001)
-        assert_rel_error(self, prob['g2.y1'], 0.64, .00001)
-        assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
+        assert_near_equal(prob['g1.y1'], 0.64, .00001)
+        assert_near_equal(prob['g1.y2'], 0.80, .00001)
+        assert_near_equal(prob['g2.y1'], 0.64, .00001)
+        assert_near_equal(prob['g2.y2'], 0.80, .00001)
 
     def test_solve_subsystems_assembled_jac_top_csc(self):
         prob = om.Problem(model=DoubleSellar())
@@ -437,10 +437,10 @@ class TestNewton(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['g1.y1'], 0.64, .00001)
-        assert_rel_error(self, prob['g1.y2'], 0.80, .00001)
-        assert_rel_error(self, prob['g2.y1'], 0.64, .00001)
-        assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
+        assert_near_equal(prob['g1.y1'], 0.64, .00001)
+        assert_near_equal(prob['g1.y2'], 0.80, .00001)
+        assert_near_equal(prob['g2.y1'], 0.64, .00001)
+        assert_near_equal(prob['g2.y2'], 0.80, .00001)
 
     def test_solve_subsystems_assembled_jac_top_implicit(self):
         prob = om.Problem(model=DoubleSellarImplicit())
@@ -461,10 +461,10 @@ class TestNewton(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['g1.y1'], 0.64, .00001)
-        assert_rel_error(self, prob['g1.y2'], 0.80, .00001)
-        assert_rel_error(self, prob['g2.y1'], 0.64, .00001)
-        assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
+        assert_near_equal(prob['g1.y1'], 0.64, .00001)
+        assert_near_equal(prob['g1.y2'], 0.80, .00001)
+        assert_near_equal(prob['g2.y1'], 0.64, .00001)
+        assert_near_equal(prob['g2.y2'], 0.80, .00001)
 
     def test_solve_subsystems_assembled_jac_top_implicit_scaling(self):
         prob = om.Problem(model=DoubleSellarImplicit(scaling=True))
@@ -485,10 +485,10 @@ class TestNewton(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['g1.y1'], 0.64, .00001)
-        assert_rel_error(self, prob['g1.y2'], 0.80, .00001)
-        assert_rel_error(self, prob['g2.y1'], 0.64, .00001)
-        assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
+        assert_near_equal(prob['g1.y1'], 0.64, .00001)
+        assert_near_equal(prob['g1.y2'], 0.80, .00001)
+        assert_near_equal(prob['g2.y1'], 0.64, .00001)
+        assert_near_equal(prob['g2.y2'], 0.80, .00001)
 
     def test_solve_subsystems_assembled_jac_top_implicit_scaling_units(self):
         prob = om.Problem(model=DoubleSellarImplicit(units=True, scaling=True))
@@ -512,10 +512,10 @@ class TestNewton(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['g1.y1'], 0.053333333, .00001)
-        assert_rel_error(self, prob['g1.y2'], 0.80, .00001)
-        assert_rel_error(self, prob['g2.y1'], 0.053333333, .00001)
-        assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
+        assert_near_equal(prob['g1.y1'], 0.053333333, .00001)
+        assert_near_equal(prob['g1.y2'], 0.80, .00001)
+        assert_near_equal(prob['g2.y1'], 0.053333333, .00001)
+        assert_near_equal(prob['g2.y2'], 0.80, .00001)
 
     def test_solve_subsystems_assembled_jac_subgroup(self):
         prob = om.Problem(model=DoubleSellar())
@@ -536,10 +536,10 @@ class TestNewton(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['g1.y1'], 0.64, .00001)
-        assert_rel_error(self, prob['g1.y2'], 0.80, .00001)
-        assert_rel_error(self, prob['g2.y1'], 0.64, .00001)
-        assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
+        assert_near_equal(prob['g1.y1'], 0.64, .00001)
+        assert_near_equal(prob['g1.y2'], 0.80, .00001)
+        assert_near_equal(prob['g2.y1'], 0.64, .00001)
+        assert_near_equal(prob['g2.y2'], 0.80, .00001)
 
     def test_solve_subsystems_internals(self):
         # Here we test that this feature is doing what it should do by counting the
@@ -825,7 +825,7 @@ class TestNewton(unittest.TestCase):
         prob.run_model()
 
         J = prob.compute_totals()
-        assert_rel_error(self, J['ecomp.y', 'p1.x'][0][0], -0.703467422498, 1e-6)
+        assert_near_equal(J['ecomp.y', 'p1.x'][0][0], -0.703467422498, 1e-6)
 
     def test_error_specify_solve_subsystems(self):
         # Raise AnalysisError when it fails to converge
@@ -877,8 +877,8 @@ class TestNewtonFeatures(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob['y2'], 12.05848819, .00001)
 
     def test_feature_maxiter(self):
         import numpy as np
@@ -911,8 +911,8 @@ class TestNewtonFeatures(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.5878516779, .00001)
-        assert_rel_error(self, prob['y2'], 12.0607416105, .00001)
+        assert_near_equal(prob['y1'], 25.5878516779, .00001)
+        assert_near_equal(prob['y2'], 12.0607416105, .00001)
 
     def test_feature_rtol(self):
         import numpy as np
@@ -945,8 +945,8 @@ class TestNewtonFeatures(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.5878516779, .00001)
-        assert_rel_error(self, prob['y2'], 12.0607416105, .00001)
+        assert_near_equal(prob['y1'], 25.5878516779, .00001)
+        assert_near_equal(prob['y2'], 12.0607416105, .00001)
 
     def test_feature_atol(self):
         import numpy as np
@@ -979,8 +979,8 @@ class TestNewtonFeatures(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.5882856302, .00001)
-        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.5882856302, .00001)
+        assert_near_equal(prob['y2'], 12.05848819, .00001)
 
     def test_feature_linear_solver(self):
         import numpy as np
@@ -1015,8 +1015,8 @@ class TestNewtonFeatures(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob['y2'], 12.05848819, .00001)
 
     def test_feature_max_sub_solves(self):
         import numpy as np
@@ -1116,10 +1116,10 @@ class TestNewtonFeatures(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['g1.y1'], 0.64, .00001)
-        assert_rel_error(self, prob['g1.y2'], 0.80, .00001)
-        assert_rel_error(self, prob['g2.y1'], 0.64, .00001)
-        assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
+        assert_near_equal(prob['g1.y1'], 0.64, .00001)
+        assert_near_equal(prob['g1.y2'], 0.80, .00001)
+        assert_near_equal(prob['g2.y1'], 0.64, .00001)
+        assert_near_equal(prob['g2.y2'], 0.80, .00001)
 
 
 if __name__ == "__main__":

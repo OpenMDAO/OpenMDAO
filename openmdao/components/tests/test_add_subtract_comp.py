@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 
 
 class TestAddSubtractCompScalars(unittest.TestCase):
@@ -38,7 +38,7 @@ class TestAddSubtractCompScalars(unittest.TestCase):
         b = self.p['b']
         out = self.p['add_subtract_comp.adder_output']
         expected = a + b
-        assert_rel_error(self, out, expected,1e-16)
+        assert_near_equal(out, expected,1e-16)
 
     def test_partials(self):
         partials = self.p.check_partials(method='fd', out_stream=None)
@@ -79,7 +79,7 @@ class TestAddSubtractCompNx1(unittest.TestCase):
         b = self.p['b']
         out = self.p['add_subtract_comp.adder_output']
         expected = a + b
-        assert_rel_error(self, out, expected,1e-16)
+        assert_near_equal(out, expected,1e-16)
 
     def test_partials(self):
         partials = self.p.check_partials(method='fd', out_stream=None)
@@ -120,7 +120,7 @@ class TestAddSubtractCompNx3(unittest.TestCase):
         b = self.p['b']
         out = self.p['add_subtract_comp.adder_output']
         expected = a + b
-        assert_rel_error(self, out, expected,1e-16)
+        assert_near_equal(out, expected,1e-16)
 
     def test_partials(self):
         partials = self.p.check_partials(method='fd', out_stream=None)
@@ -165,7 +165,7 @@ class TestAddSubtractMultipleInputs(unittest.TestCase):
         c = self.p['c']
         out = self.p['add_subtract_comp.adder_output']
         expected = a + b + c
-        assert_rel_error(self, out, expected,1e-16)
+        assert_near_equal(out, expected,1e-16)
 
     def test_partials(self):
         partials = self.p.check_partials(method='fd', out_stream=None)
@@ -210,7 +210,7 @@ class TestAddSubtractScalingFactors(unittest.TestCase):
         c = self.p['c']
         out = self.p['add_subtract_comp.adder_output']
         expected = 2*a + b - c
-        assert_rel_error(self, out, expected,1e-16)
+        assert_near_equal(out, expected,1e-16)
 
     def test_partials(self):
         partials = self.p.check_partials(method='fd', out_stream=None)
@@ -256,7 +256,7 @@ class TestAddSubtractUnits(unittest.TestCase):
         out = self.p['add_subtract_comp.adder_output']
         m_to_ft = 3.280839895
         expected = a + b*m_to_ft + c*m_to_ft
-        assert_rel_error(self, out, expected,1e-8)
+        assert_near_equal(out, expected,1e-8)
 
     def test_partials(self):
         partials = self.p.check_partials(method='fd', out_stream=None)
@@ -342,7 +342,7 @@ class TestFeature(unittest.TestCase):
 
         # Verify the results
         expected_i = np.array([[100, 200, 300], [0, -1, -2]]).T
-        assert_rel_error(self, p.get_val('totalforcecomp.total_force', units='kN'), expected_i)
+        assert_near_equal(p.get_val('totalforcecomp.total_force', units='kN'), expected_i)
 
 
 if __name__ == '__main__':

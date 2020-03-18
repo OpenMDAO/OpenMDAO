@@ -4,7 +4,7 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class CompAddWithDefault(om.ExplicitComponent):
@@ -101,16 +101,16 @@ class TestAddVar(unittest.TestCase):
         p = om.Problem(model=CompAddWithDefault())
         p.setup()
 
-        assert_rel_error(self, p['x_a'], 1.)
-        assert_rel_error(self, p['x_b'], 3.)
-        assert_rel_error(self, p['x_c'], 3. * np.ones(2))
-        assert_rel_error(self, p['x_d'], 3. * np.ones(2))
-        assert_rel_error(self, p['x_e'], 3. * np.ones((2, 2)))
-        assert_rel_error(self, p['y_a'], 1.)
-        assert_rel_error(self, p['y_b'], 6.)
-        assert_rel_error(self, p['y_c'], 6. * np.ones(3))
-        assert_rel_error(self, p['y_d'], 6. * np.ones(3))
-        assert_rel_error(self, p['y_e'], 6. * np.ones((3, 2)))
+        assert_near_equal(p['x_a'], 1.)
+        assert_near_equal(p['x_b'], 3.)
+        assert_near_equal(p['x_c'], 3. * np.ones(2))
+        assert_near_equal(p['x_d'], 3. * np.ones(2))
+        assert_near_equal(p['x_e'], 3. * np.ones((2, 2)))
+        assert_near_equal(p['y_a'], 1.)
+        assert_near_equal(p['y_b'], 6.)
+        assert_near_equal(p['y_c'], 6. * np.ones(3))
+        assert_near_equal(p['y_d'], 6. * np.ones(3))
+        assert_near_equal(p['y_e'], 6. * np.ones((3, 2)))
 
     def test_shape(self):
         """Test declaring only shape."""
@@ -120,12 +120,12 @@ class TestAddVar(unittest.TestCase):
         p = om.Problem(model=CompAddWithShape())
         p.setup()
 
-        assert_rel_error(self, p['x_a'], np.ones(2))
-        assert_rel_error(self, p['x_b'], np.ones((2, 2)))
-        assert_rel_error(self, p['x_c'], np.ones((2, 2)))
-        assert_rel_error(self, p['y_a'], np.ones(3))
-        assert_rel_error(self, p['y_b'], np.ones((3, 3)))
-        assert_rel_error(self, p['y_c'], np.ones((3, 3)))
+        assert_near_equal(p['x_a'], np.ones(2))
+        assert_near_equal(p['x_b'], np.ones((2, 2)))
+        assert_near_equal(p['x_c'], np.ones((2, 2)))
+        assert_near_equal(p['y_a'], np.ones(3))
+        assert_near_equal(p['y_b'], np.ones((3, 3)))
+        assert_near_equal(p['y_c'], np.ones((3, 3)))
 
     def test_indices(self):
         """Test declaring only indices."""
@@ -135,21 +135,21 @@ class TestAddVar(unittest.TestCase):
         p = om.Problem(model=CompAddWithIndices())
         p.setup()
 
-        assert_rel_error(self, p['x_a'], 1.)
-        assert_rel_error(self, p['x_b'], np.ones(2))
-        assert_rel_error(self, p['x_c'], np.ones(2))
-        assert_rel_error(self, p['x_d'], np.ones(6))
-        assert_rel_error(self, p['x_e'], np.ones((3,2)))
+        assert_near_equal(p['x_a'], 1.)
+        assert_near_equal(p['x_b'], np.ones(2))
+        assert_near_equal(p['x_c'], np.ones(2))
+        assert_near_equal(p['x_d'], np.ones(6))
+        assert_near_equal(p['x_e'], np.ones((3,2)))
 
     def test_shape_and_indices(self):
         """Test declaring shape and indices."""
         p = om.Problem(model=CompAddWithShapeAndIndices())
         p.setup()
 
-        assert_rel_error(self, p['x_a'], np.ones(2))
-        assert_rel_error(self, p['x_b'], np.ones(2))
-        assert_rel_error(self, p['x_c'], np.ones((2,2)))
-        assert_rel_error(self, p['x_d'], np.ones((2,2)))
+        assert_near_equal(p['x_a'], np.ones(2))
+        assert_near_equal(p['x_b'], np.ones(2))
+        assert_near_equal(p['x_c'], np.ones((2,2)))
+        assert_near_equal(p['x_d'], np.ones((2,2)))
 
     def test_scalar_array(self):
         """Test declaring a scalar val with an array variable."""
@@ -159,12 +159,12 @@ class TestAddVar(unittest.TestCase):
         p = om.Problem(model=CompAddArrayWithScalar())
         p.setup()
 
-        assert_rel_error(self, p['x_a'], 2. * np.ones(6))
-        assert_rel_error(self, p['x_b'], 2. * np.ones((3, 2)))
-        assert_rel_error(self, p['x_c'], 2. * np.ones(6))
-        assert_rel_error(self, p['x_d'], 2. * np.ones((3, 2)))
-        assert_rel_error(self, p['y_a'], 3. * np.ones(6))
-        assert_rel_error(self, p['y_b'], 3. * np.ones((3, 2)))
+        assert_near_equal(p['x_a'], 2. * np.ones(6))
+        assert_near_equal(p['x_b'], 2. * np.ones((3, 2)))
+        assert_near_equal(p['x_c'], 2. * np.ones(6))
+        assert_near_equal(p['x_d'], 2. * np.ones((3, 2)))
+        assert_near_equal(p['y_a'], 3. * np.ones(6))
+        assert_near_equal(p['y_b'], 3. * np.ones((3, 2)))
 
     def test_array_indices(self):
         """Test declaring with array val and array indices."""
@@ -174,8 +174,8 @@ class TestAddVar(unittest.TestCase):
         p = om.Problem(model=CompAddWithArrayIndices())
         p.setup()
 
-        assert_rel_error(self, p['x_a'], 2. * np.ones(6))
-        assert_rel_error(self, p['x_b'], 2. * np.ones((3, 2)))
+        assert_near_equal(p['x_a'], 2. * np.ones(6))
+        assert_near_equal(p['x_b'], 2. * np.ones((3, 2)))
 
     def test_bounds(self):
         """Test declaring bounds."""
@@ -185,11 +185,11 @@ class TestAddVar(unittest.TestCase):
         p = om.Problem(model=CompAddWithBounds())
         p.setup()
 
-        assert_rel_error(self, p['y_a'], 2.)
-        assert_rel_error(self, p['y_b'], 2.)
-        assert_rel_error(self, p['y_c'], 2. * np.ones(6))
-        assert_rel_error(self, p['y_d'], 2. * np.ones(6))
-        assert_rel_error(self, p['y_e'], 2. * np.ones((3, 2)))
+        assert_near_equal(p['y_a'], 2.)
+        assert_near_equal(p['y_b'], 2.)
+        assert_near_equal(p['y_c'], 2. * np.ones(6))
+        assert_near_equal(p['y_d'], 2. * np.ones(6))
+        assert_near_equal(p['y_e'], 2. * np.ones((3, 2)))
 
 if __name__ == '__main__':
     unittest.main()

@@ -7,7 +7,7 @@ import numpy as np
 
 import openmdao.api as om
 from openmdao.components.spline_comp import SPLINE_METHODS
-from openmdao.utils.assert_utils import assert_check_partials, assert_rel_error
+from openmdao.utils.assert_utils import assert_check_partials, assert_near_equal
 from openmdao.utils.general_utils import printoptions
 from openmdao.utils.spline_distributions import cell_centered
 from openmdao.components.interp_util.interp import InterpND
@@ -106,7 +106,7 @@ class SplineCompTestCase(unittest.TestCase):
                             20.96983509, 21.37579297, 21.94811407, 22.66809748, 23.51629844,
                             24.47327219, 25.51957398, 26.63575905, 27.80238264, 29.        ]])
 
-        assert_rel_error(self, akima_y.flatten(), self.prob['akima1.y_val'].flatten(), tolerance=1e-8)
+        assert_near_equal(akima_y.flatten(), self.prob['akima1.y_val'].flatten(), tolerance=1e-8)
 
         derivs = self.prob.check_partials(out_stream=None, method='cs')
         assert_check_partials(derivs, atol=1e-14, rtol=1e-14)
@@ -145,7 +145,7 @@ class SplineCompTestCase(unittest.TestCase):
                         6.        ,  6.73660714,  8.46428571, 10.45982143, 12.        ,
                         13.08035714, 14.        ]])
 
-        assert_rel_error(self, y.flatten(), self.prob['akima1.y_val'].flatten(), tolerance=1e-8)
+        assert_near_equal(y.flatten(), self.prob['akima1.y_val'].flatten(), tolerance=1e-8)
 
         derivs = self.prob.check_partials(out_stream=None, method='cs')
         assert_check_partials(derivs, atol=1e-14, rtol=1e-14)
@@ -257,18 +257,18 @@ class SplineCompTestCase(unittest.TestCase):
         xx = prob['interp.h']
 
         with printoptions(precision=3, floatmode='fixed'):
-            assert_rel_error(self, x[0, :], np.array([
+            assert_near_equal(x[0, :], np.array([
                 0., 0.38268343, 0.70710678, 0.92387953, 1.
             ]), 1e-5)
-            assert_rel_error(self, x[1, :], 2.0*np.array([
+            assert_near_equal(x[1, :], 2.0*np.array([
                 0., 0.38268343, 0.70710678, 0.92387953, 1.
             ]), 1e-5)
 
-            assert_rel_error(self, xx[0, :], np.array([
+            assert_near_equal(xx[0, :], np.array([
                 0., 0.06687281, 0.23486869, 0.43286622, 0.6062628,
                 0.74821484, 0.86228902, 0.94134389, 0.98587725, 1.
             ]), 1e-5)
-            assert_rel_error(self, xx[1, :], 2.0*np.array([
+            assert_near_equal(xx[1, :], 2.0*np.array([
                 0., 0.06687281, 0.23486869, 0.43286622, 0.6062628,
                 0.74821484, 0.86228902, 0.94134389, 0.98587725, 1.
             ]), 1e-5)
@@ -390,7 +390,7 @@ class SplineCompFeatureTestCase(unittest.TestCase):
                             20.96983509, 21.37579297, 21.94811407, 22.66809748, 23.51629844,
                             24.47327219, 25.51957398, 26.63575905, 27.80238264, 29.        ]])
 
-        assert_rel_error(self, akima_y.flatten(), prob['akima1.y_val'].flatten(), tolerance=1e-8)
+        assert_near_equal(akima_y.flatten(), prob['akima1.y_val'].flatten(), tolerance=1e-8)
 
     def test_multi_splines(self):
 
@@ -442,7 +442,7 @@ class SplineCompFeatureTestCase(unittest.TestCase):
                              17.96032258, 20.14140712, 22.31181718, 24.40891577, 26.27368825, 27.74068235,
                              28.67782484, 29.        ]])
 
-        assert_rel_error(self, akima_y.flatten(), prob['akima1.y_val'].flatten(), tolerance=1e-8)
+        assert_near_equal(akima_y.flatten(), prob['akima1.y_val'].flatten(), tolerance=1e-8)
 
     def test_akima_options(self):
         import numpy as np
@@ -525,7 +525,7 @@ class SplineCompFeatureTestCase(unittest.TestCase):
                         14.99875415, 16.        , 17.93874585, 21.        , 24.625    ,
                         29.        ]])
 
-        assert_rel_error(self, prob['comp1.chord'], y, 1e-6)
+        assert_near_equal(prob['comp1.chord'], y, 1e-6)
 
     def test_bsplines_2to3doc(self):
         from openmdao.utils.spline_distributions import sine_distribution
@@ -561,18 +561,18 @@ class SplineCompFeatureTestCase(unittest.TestCase):
         xx = prob['interp.h']
 
         with printoptions(precision=3, floatmode='fixed'):
-            assert_rel_error(self, x[0, :], np.array([
+            assert_near_equal(x[0, :], np.array([
                 0., 0.38268343, 0.70710678, 0.92387953, 1.
             ]), 1e-5)
-            assert_rel_error(self, x[1, :], 2.0*np.array([
+            assert_near_equal(x[1, :], 2.0*np.array([
                 0., 0.38268343, 0.70710678, 0.92387953, 1.
             ]), 1e-5)
 
-            assert_rel_error(self, xx[0, :], np.array([
+            assert_near_equal(xx[0, :], np.array([
                 0., 0.06687281, 0.23486869, 0.43286622, 0.6062628,
                 0.74821484, 0.86228902, 0.94134389, 0.98587725, 1.
             ]), 1e-5)
-            assert_rel_error(self, xx[1, :], 2.0*np.array([
+            assert_near_equal(xx[1, :], 2.0*np.array([
                 0., 0.06687281, 0.23486869, 0.43286622, 0.6062628,
                 0.74821484, 0.86228902, 0.94134389, 0.98587725, 1.
             ]), 1e-5)

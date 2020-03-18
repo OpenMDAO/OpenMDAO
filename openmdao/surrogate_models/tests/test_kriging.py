@@ -6,7 +6,7 @@ import itertools
 import numpy as np
 
 from openmdao.api import KrigingSurrogate
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 def branin(x):
@@ -30,8 +30,8 @@ class TestKrigingSurrogate(unittest.TestCase):
 
         for x0, y0 in zip(x, y):
             mu, sigma = surrogate.predict(x0)
-            assert_rel_error(self, mu, [y0], 1e-9)
-            assert_rel_error(self, sigma, [[0]], 1e-5)
+            assert_near_equal(mu, [y0], 1e-9)
+            assert_near_equal(sigma, [[0]], 1e-5)
 
     def test_1d_predictor(self):
         x = np.array([[0.0], [2.0], [3.0], [4.0], [6.0]])
@@ -43,8 +43,8 @@ class TestKrigingSurrogate(unittest.TestCase):
         new_x = np.array([3.5])
         mu, sigma = surrogate.predict(new_x)
 
-        assert_rel_error(self, mu, [[branin_1d(new_x)]], 1e-1)
-        assert_rel_error(self, sigma, [[0.07101449]], 1e-2)
+        assert_near_equal(mu, [[branin_1d(new_x)]], 1e-1)
+        assert_near_equal(sigma, [[0.07101449]], 1e-2)
 
     def test_1d_ill_conditioned(self):
         # Test for least squares solver utilization when ill-conditioned
@@ -55,7 +55,7 @@ class TestKrigingSurrogate(unittest.TestCase):
         new_x = np.array([0.5])
         mu, sigma = surrogate.predict(new_x)
         self.assertTrue(sigma < 1.e-5)
-        assert_rel_error(self, mu, [[np.sin(0.5)]], 1e-5)
+        assert_near_equal(mu, [[np.sin(0.5)]], 1e-5)
 
     def test_2d(self):
 
@@ -69,13 +69,13 @@ class TestKrigingSurrogate(unittest.TestCase):
 
         for x0, y0 in zip(x, y):
             mu, sigma = surrogate.predict(x0)
-            assert_rel_error(self, mu, [y0], 1e-9)
-            assert_rel_error(self, sigma, [[0]], 1e-4)
+            assert_near_equal(mu, [y0], 1e-9)
+            assert_near_equal(sigma, [[0]], 1e-4)
 
         mu, sigma = surrogate.predict([5., 5.])
 
-        assert_rel_error(self, mu, [[16.72]], 1e-1)
-        assert_rel_error(self, sigma, [[15.27]], 1e-2)
+        assert_near_equal(mu, [[16.72]], 1e-1)
+        assert_near_equal(sigma, [[15.27]], 1e-2)
 
     def test_no_training_data(self):
         surrogate = KrigingSurrogate()
@@ -110,8 +110,8 @@ class TestKrigingSurrogate(unittest.TestCase):
 
         for x0, y0 in zip(x, y):
             mu, sigma = surrogate.predict(x0)
-            assert_rel_error(self, mu, [y0], 1e-9)
-            assert_rel_error(self, sigma, [[0]], 1e-6)
+            assert_near_equal(mu, [y0], 1e-9)
+            assert_near_equal(sigma, [[0]], 1e-6)
 
     def test_vector_output(self):
         surrogate = KrigingSurrogate(nugget=0., eval_rmse=True)
@@ -123,8 +123,8 @@ class TestKrigingSurrogate(unittest.TestCase):
 
         for x0, y0 in zip(x, y):
             mu, sigma = surrogate.predict(x0)
-            assert_rel_error(self, mu, [y0], 1e-9)
-            assert_rel_error(self, sigma, [[0, 0]], 1e-6)
+            assert_near_equal(mu, [y0], 1e-9)
+            assert_near_equal(sigma, [[0, 0]], 1e-6)
 
     def test_scalar_derivs(self):
         surrogate = KrigingSurrogate(nugget=0.)
@@ -135,7 +135,7 @@ class TestKrigingSurrogate(unittest.TestCase):
         surrogate.train(x, y)
         jac = surrogate.linearize(np.array([[0.]]))
 
-        assert_rel_error(self, jac[0][0], 1., 5e-3)
+        assert_near_equal(jac[0][0], 1., 5e-3)
 
     def test_vector_derivs(self):
         surrogate = KrigingSurrogate()
@@ -146,7 +146,7 @@ class TestKrigingSurrogate(unittest.TestCase):
 
         surrogate.train(x, y)
         jac = surrogate.linearize(np.array([[0.5, 0.5]]))
-        assert_rel_error(self, jac, np.array([[1, 1], [1, -1], [1, 2]]), 5e-4)
+        assert_near_equal(jac, np.array([[1, 1], [1, -1], [1, 2]]), 5e-4)
 
 if __name__ == "__main__":
     unittest.main()

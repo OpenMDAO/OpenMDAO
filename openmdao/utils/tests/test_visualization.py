@@ -8,7 +8,7 @@ except ImportError:
     matplotlib = None
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 
 @unittest.skipUnless(matplotlib, "Matplotlib is required.")
 class TestVisualization(unittest.TestCase):
@@ -65,19 +65,19 @@ class TestVisualization(unittest.TestCase):
                                    [1., 0., 1., 0.],
                                    [0., 1., 0., 1.]])
         actual_array = ax[0].images[0]._A.data
-        assert_rel_error(self, expected_array, actual_array, 1e-8)
+        assert_near_equal(expected_array, actual_array, 1e-8)
         expected_array = np.array([[ 1.,  0.,  0.,  1.],
                                    [ 0.,  1.,  1.,  0.],
                                    [ 1.,  0.,  1.,  0.],
                                    [ 0.,  1.,  0.,  1.]])
         actual_array = ax[1].images[0]._A.data
-        assert_rel_error(self, expected_array, actual_array, 1e-8)
+        assert_near_equal(expected_array, actual_array, 1e-8)
         expected_array = np.array([[  9.31322575e-10,   0.0,   0.0, 1.0e-07],
                                    [  0.0,   0.0,  -2.0e-07, 0.0],
                                    [  0.0,   0.0,   9.31322575e-10, 0.0],
                                    [  0.0,   0.0,   0.0, 1.86264515e-09]])
         actual_array = ax[2].images[0]._A.data
-        assert_rel_error(self, expected_array, actual_array, 1e-8)
+        assert_near_equal(expected_array, actual_array, 1e-8)
 
         # plot with specified jac_method
         fig, ax = om.partial_deriv_plot('y1', 'x1', check_partials_data, jac_method = "J_rev",
@@ -87,19 +87,19 @@ class TestVisualization(unittest.TestCase):
                                    [1., 0., 1., 0.],
                                    [0., 1., 0., 1.]])
         actual_array = ax[0].images[0]._A.data
-        assert_rel_error(self, expected_array, actual_array, 1e-8)
+        assert_near_equal(expected_array, actual_array, 1e-8)
         expected_array = np.array([[ 1.,  0.,  0.,  1.],
                                    [ 0.,  1.,  1.,  0.],
                                    [ 1.,  0.,  1.,  0.],
                                    [ 0.,  1.,  0.,  1.]])
         actual_array = ax[1].images[0]._A.data
-        assert_rel_error(self, expected_array, actual_array, 1e-8)
+        assert_near_equal(expected_array, actual_array, 1e-8)
         expected_array = np.array([[  9.31322575e-10,   0.0,   0.0, 1.0e-07],
                                    [  0.0,   0.0,  -2.0e-07, 0.0],
                                    [  0.0,   0.0,   9.31322575e-10, 0.0],
                                    [  0.0,   0.0,   0.0, 1.86264515e-09]])
         actual_array = ax[2].images[0]._A.data
-        assert_rel_error(self, expected_array, actual_array, 1e-8)
+        assert_near_equal(expected_array, actual_array, 1e-8)
 
         # plot in non-binary mode
         fig, ax = om.partial_deriv_plot('y1', 'x1', check_partials_data, binary = False,
@@ -109,19 +109,19 @@ class TestVisualization(unittest.TestCase):
                                    [-1. ,  0. ,  8. ,  0. ],
                                    [ 0. ,  4. ,  0. ,  6. ]])
         actual_array = ax[0].images[0]._A.data
-        assert_rel_error(self, expected_array, actual_array, 1e-8)
+        assert_near_equal(expected_array, actual_array, 1e-8)
         expected_array = np.array([[  1.0e+00,   0.0,   0.0, 7.00000010e+00],
                                    [  0.0,   2.5e+00,  -2.0e-07, 0.0],
                                    [ -1.0e+00,   0.0,   8.0e+00, 0.0],
                                    [  0.0,   4.0e+00,   0.0, 6.0e+00]])
         actual_array = ax[1].images[0]._A.data
-        assert_rel_error(self, expected_array, actual_array, 1e-8)
+        assert_near_equal(expected_array, actual_array, 1e-8)
         expected_array = np.array([[  9.31322575e-10,   0.0,   0.0, 1.0e-07],
                                    [  0.0,   0.0,  -2.0e-07, 0.0],
                                    [  0.0,   0.0,   9.31322575e-10, 0.0],
                                    [  0.0,   0.0,   0.0, 1.86264515e-09]])
         actual_array = ax[2].images[0]._A.data
-        assert_rel_error(self, expected_array, actual_array, 1e-8)
+        assert_near_equal(expected_array, actual_array, 1e-8)
 
         # plot with different tol values
         # Not obvious how to test this other than image matching

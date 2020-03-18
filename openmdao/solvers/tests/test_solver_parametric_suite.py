@@ -6,7 +6,7 @@ import unittest
 from openmdao.core.group import Group
 from openmdao.core.problem import Problem
 from openmdao.core.implicitcomponent import ImplicitComponent
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.solvers.nonlinear.newton import NewtonSolver
 from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
@@ -55,7 +55,7 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
             prob.setup()
 
             prob.run_model()
-            assert_rel_error(self, prob['y'], [-1., 1.])
+            assert_near_equal(prob['y'], [-1., 1.])
 
             d_inputs, d_outputs, d_residuals = prob.model.get_linear_vectors()
 
@@ -63,13 +63,13 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
             d_outputs.set_const(0.0)
             prob.model.run_solve_linear(['linear'], 'fwd')
             result = d_outputs._data
-            assert_rel_error(self, result, [-2., 2.])
+            assert_near_equal(result, [-2., 2.])
 
             d_outputs.set_const(2.0)
             d_residuals.set_const(0.0)
             prob.model.run_solve_linear(['linear'], 'rev')
             result = d_residuals._data
-            assert_rel_error(self, result, [2., -2.])
+            assert_near_equal(result, [2., -2.])
 
     def test_direct_solver_group(self):
         """
@@ -93,13 +93,13 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
         d_outputs.set_const(0.0)
         prob.model.run_solve_linear(['linear'], 'fwd')
         result = d_outputs._data
-        assert_rel_error(self, result, prob.model.expected_solution, 1e-15)
+        assert_near_equal(result, prob.model.expected_solution, 1e-15)
 
         d_outputs.set_const(1.0)
         d_residuals.set_const(0.0)
         prob.model.run_solve_linear(['linear'], 'rev')
         result = d_residuals._data
-        assert_rel_error(self, result, prob.model.expected_solution, 1e-15)
+        assert_near_equal(result, prob.model.expected_solution, 1e-15)
 
     @parametric_suite(
         assembled_jac=[False, True],
@@ -121,17 +121,17 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
         expected_values = model.expected_values
         if expected_values:
             actual = {key: problem[key] for key in expected_values}
-            assert_rel_error(self, actual, expected_values, 1e-8)
+            assert_near_equal(actual, expected_values, 1e-8)
 
         expected_totals = model.expected_totals
         if expected_totals:
             # Forward Derivatives Check
             totals = param_instance.compute_totals('fwd')
-            assert_rel_error(self, totals, expected_totals, 1e-8)
+            assert_near_equal(totals, expected_totals, 1e-8)
 
             # Reverse Derivatives Check
             totals = param_instance.compute_totals('rev')
-            assert_rel_error(self, totals, expected_totals, 1e-8)
+            assert_near_equal(totals, expected_totals, 1e-8)
 
 if __name__ == "__main__":
     unittest.main()

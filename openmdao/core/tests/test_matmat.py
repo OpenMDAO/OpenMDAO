@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class QuadraticCompVectorized(om.ImplicitComponent):
@@ -589,8 +589,8 @@ class MatMatTestCase(unittest.TestCase):
         p.driver = om.ScipyOptimizeDriver()
         p.run_driver()
 
-        assert_rel_error(self, p['x'], [0.10000691, 0.1, 0.1, 0.1, 0.1], 1e-5)
-        assert_rel_error(self, p['y'], [0, 1.41421, 2.0, 2.44948, 2.82842], 1e-5)
+        assert_near_equal(p['x'], [0.10000691, 0.1, 0.1, 0.1, 0.1], 1e-5)
+        assert_near_equal(p['y'], [0, 1.41421, 2.0, 2.44948, 2.82842], 1e-5)
 
     def test_simple_multi_fwd(self):
         p, expected = simple_model(order=20, vectorize=True)
@@ -606,7 +606,7 @@ class MatMatTestCase(unittest.TestCase):
         # plt.show()
 
         y_lgl = p['y_lgl']
-        assert_rel_error(self, expected, y_lgl, 1.e-5)
+        assert_near_equal(expected, y_lgl, 1.e-5)
 
     def test_simple_multi_rev(self):
         p, expected = simple_model(order=20, vectorize=True)
@@ -616,7 +616,7 @@ class MatMatTestCase(unittest.TestCase):
         p.run_driver()
 
         y_lgl = p['y_lgl']
-        assert_rel_error(self, expected, y_lgl, 1.e-5)
+        assert_near_equal(expected, y_lgl, 1.e-5)
 
     def test_phases_multi_fwd(self):
         N_PHASES = 4
@@ -636,7 +636,7 @@ class MatMatTestCase(unittest.TestCase):
         # plt.show()
 
         for i in range(N_PHASES):
-            assert_rel_error(self, expected, p['p%d.y_lgl' % i], 1.e-5)
+            assert_near_equal(expected, p['p%d.y_lgl' % i], 1.e-5)
 
     def test_phases_multi_rev(self):
         N_PHASES = 4
@@ -647,7 +647,7 @@ class MatMatTestCase(unittest.TestCase):
         p.run_driver()
 
         for i in range(N_PHASES):
-            assert_rel_error(self, expected, p['p%d.y_lgl' % i], 1.e-5)
+            assert_near_equal(expected, p['p%d.y_lgl' % i], 1.e-5)
 
     def test_feature_declaration(self):
         # Tests the code that shows the signature for compute_multi_jacvec
@@ -671,8 +671,8 @@ class MatMatTestCase(unittest.TestCase):
         prob.run_model()
 
         J = prob.compute_totals(of=['comp.area'], wrt=['p.length', 'p.width'])
-        assert_rel_error(self, J['comp.area', 'p.length'], np.diag(np.array([1.0, 2.0, 3.0])))
-        assert_rel_error(self, J['comp.area', 'p.width'], np.diag(np.array([3.0, 4.0, 5.0])))
+        assert_near_equal(J['comp.area', 'p.length'], np.diag(np.array([1.0, 2.0, 3.0])))
+        assert_near_equal(J['comp.area', 'p.width'], np.diag(np.array([3.0, 4.0, 5.0])))
 
     def test_implicit(self):
         prob = QCVProblem()
@@ -682,9 +682,9 @@ class MatMatTestCase(unittest.TestCase):
         prob.run_model()
 
         J = prob.compute_totals(of=['comp.x'], wrt=['p.a', 'p.b', 'p.c'])
-        assert_rel_error(self, J['comp.x', 'p.a'], np.diag(np.array([-0.06066017, -0.05, -0.03971954])), 1e-4)
-        assert_rel_error(self, J['comp.x', 'p.b'], np.diag(np.array([-0.14644661, -0.1, -0.07421663])), 1e-4)
-        assert_rel_error(self, J['comp.x', 'p.c'], np.diag(np.array([-0.35355339, -0.2, -0.13867505])), 1e-4)
+        assert_near_equal(J['comp.x', 'p.a'], np.diag(np.array([-0.06066017, -0.05, -0.03971954])), 1e-4)
+        assert_near_equal(J['comp.x', 'p.b'], np.diag(np.array([-0.14644661, -0.1, -0.07421663])), 1e-4)
+        assert_near_equal(J['comp.x', 'p.c'], np.diag(np.array([-0.35355339, -0.2, -0.13867505])), 1e-4)
 
     def test_apply_multi_linear_inputs_read_only(self):
         class BadComp(QuadraticCompVectorized):
@@ -841,64 +841,64 @@ class ComputeMultiJacVecTestCase(unittest.TestCase):
 
         J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
-        assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
-        assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
+        assert_near_equal(J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
+        assert_near_equal(J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
 
     def test_compute_multi_jacvec_prod_rev(self):
         p = self.setup_model(size=5, comp_class=JacVec, vectorize=False, mode='rev')
 
         J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
-        assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
-        assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
+        assert_near_equal(J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
+        assert_near_equal(J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
 
     def test_compute_multi_jacvec_prod_fwd_vectorize(self):
         p = self.setup_model(size=5, comp_class=JacVec, vectorize=True, mode='fwd')
 
         J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
-        assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
-        assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
+        assert_near_equal(J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
+        assert_near_equal(J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
 
     def test_compute_multi_jacvec_prod_rev_vectorize(self):
         p = self.setup_model(size=5, comp_class=JacVec, vectorize=True, mode='rev')
 
         J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
-        assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
-        assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
+        assert_near_equal(J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
+        assert_near_equal(J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
 
     def test_compute_multi_jacvec_prod_fwd_multi(self):
         p = self.setup_model(size=5, comp_class=MultiJacVec, vectorize=False, mode='fwd')
 
         J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
-        assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
-        assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
+        assert_near_equal(J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
+        assert_near_equal(J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
 
     def test_compute_multi_jacvec_prod_rev_multi(self):
         p = self.setup_model(size=5, comp_class=MultiJacVec, vectorize=False, mode='rev')
 
         J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
-        assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
-        assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
+        assert_near_equal(J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
+        assert_near_equal(J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
 
     def test_compute_multi_jacvec_prod_fwd_vectorize_multi(self):
         p = self.setup_model(size=5, comp_class=MultiJacVec, vectorize=True, mode='fwd')
 
         J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
-        assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
-        assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
+        assert_near_equal(J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
+        assert_near_equal(J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
 
     def test_compute_multi_jacvec_prod_rev_vectorize_multi(self):
         p = self.setup_model(size=5, comp_class=MultiJacVec, vectorize=True, mode='rev')
 
         J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
-        assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
-        assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
+        assert_near_equal(J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
+        assert_near_equal(J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
 
     def test_compute_jacvec_product_mode_read_only(self):
         class BadComp(JacVec):

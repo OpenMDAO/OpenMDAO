@@ -5,7 +5,7 @@ import unittest
 import openmdao.api as om
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.groups.parallel_groups import ConvergeDivergeGroups
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class TestLinearRunOnceSolver(unittest.TestCase):
@@ -28,16 +28,16 @@ class TestLinearRunOnceSolver(unittest.TestCase):
         of = ['c7.y1']
 
         # Make sure value is fine.
-        assert_rel_error(self, prob['c7.y1'], -102.7, 1e-6)
+        assert_near_equal(prob['c7.y1'], -102.7, 1e-6)
 
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-        assert_rel_error(self, J['c7.y1', 'iv.x'][0][0], -40.75, 1e-6)
+        assert_near_equal(J['c7.y1', 'iv.x'][0][0], -40.75, 1e-6)
 
         prob.setup(check=False, mode='rev')
         prob.run_model()
 
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-        assert_rel_error(self, J['c7.y1', 'iv.x'][0][0], -40.75, 1e-6)
+        assert_near_equal(J['c7.y1', 'iv.x'][0][0], -40.75, 1e-6)
 
     def test_undeclared_options(self):
         # Test that using options that should not exist in class cause an error
@@ -72,8 +72,8 @@ class TestLinearRunOnceSolver(unittest.TestCase):
         wrt = ['x', 'y']
         derivs = prob.compute_totals(of=of, wrt=wrt, return_format='dict')
 
-        assert_rel_error(self, derivs['f_xy']['x'], [[-6.0]], 1e-6)
-        assert_rel_error(self, derivs['f_xy']['y'], [[8.0]], 1e-6)
+        assert_near_equal(derivs['f_xy']['x'], [[-6.0]], 1e-6)
+        assert_near_equal(derivs['f_xy']['y'], [[8.0]], 1e-6)
 
 
 if __name__ == "__main__":

@@ -10,7 +10,7 @@ import numpy as np
 
 import openmdao
 from openmdao.api import Problem, IndepVarComp, Group, ExecComp, ScipyOptimizeDriver
-from openmdao.utils.assert_utils import assert_rel_error, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.general_utils import printoptions
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp, NonSquareArrayComp
@@ -125,8 +125,8 @@ class TestDriver(unittest.TestCase):
 
         derivs = prob.driver._compute_totals(of=['obj_cmp.obj', 'con_cmp1.con1'], wrt=['pz.z'],
                                              return_format='dict')
-        assert_rel_error(self, base[('con1', 'z')][0], derivs['con_cmp1.con1']['pz.z'][0], 1e-5)
-        assert_rel_error(self, base[('obj', 'z')][0]*2.0, derivs['obj_cmp.obj']['pz.z'][0], 1e-5)
+        assert_near_equal(base[('con1', 'z')][0], derivs['con_cmp1.con1']['pz.z'][0], 1e-5)
+        assert_near_equal(base[('obj', 'z')][0]*2.0, derivs['obj_cmp.obj']['pz.z'][0], 1e-5)
 
     def test_vector_scaled_derivs(self):
 
@@ -157,15 +157,15 @@ class TestDriver(unittest.TestCase):
         J[0, 1] *= oscale[0]*iscale[1]
         J[1, 0] *= oscale[1]*iscale[0]
         J[1, 1] *= oscale[1]*iscale[1]
-        assert_rel_error(self, J, derivs['comp.y1']['px.x'], 1.0e-3)
+        assert_near_equal(J, derivs['comp.y1']['px.x'], 1.0e-3)
 
         obj = prob.driver.get_objective_values()
         obj_base = np.array([ (prob['comp.y1'][0]-5.2)/(7.0-5.2), (prob['comp.y1'][1]-6.3)/(11.0-6.3) ])
-        assert_rel_error(self, obj['comp.y1'], obj_base, 1.0e-3)
+        assert_near_equal(obj['comp.y1'], obj_base, 1.0e-3)
 
         con = prob.driver.get_constraint_values()
         con_base = np.array([ (prob['comp.y2'][0]-1.2)/(2.0-1.2), (prob['comp.y2'][1]-2.3)/(4.0-2.3) ])
-        assert_rel_error(self, con['comp.y2'], con_base, 1.0e-3)
+        assert_near_equal(con['comp.y2'], con_base, 1.0e-3)
 
     def test_vector_bounds_inf(self):
 
@@ -222,15 +222,15 @@ class TestDriver(unittest.TestCase):
         J[1, 1] *= oscale[1]*iscale[1]
         J[2, 0] *= oscale[2]*iscale[0]
         J[2, 1] *= oscale[2]*iscale[1]
-        assert_rel_error(self, J, derivs['comp.y1']['px.x'], 1.0e-3)
+        assert_near_equal(J, derivs['comp.y1']['px.x'], 1.0e-3)
 
         obj = prob.driver.get_objective_values()
         obj_base = np.array([ (prob['comp.y1'][0]-5.2)/(7.0-5.2), (prob['comp.y1'][1]-6.3)/(11.0-6.3), (prob['comp.y1'][2]-1.2)/(2.0-1.2) ])
-        assert_rel_error(self, obj['comp.y1'], obj_base, 1.0e-3)
+        assert_near_equal(obj['comp.y1'], obj_base, 1.0e-3)
 
         con = prob.driver.get_constraint_values()
         con_base = np.array([ (prob['comp.y2'][0]-1.2)/(2.0-1.2)])
-        assert_rel_error(self, con['comp.y2'], con_base, 1.0e-3)
+        assert_near_equal(con['comp.y2'], con_base, 1.0e-3)
 
     def test_debug_print_option(self):
 

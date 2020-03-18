@@ -6,7 +6,7 @@ from numpy.testing import assert_almost_equal
 
 import openmdao.api as om
 from openmdao.test_suite.components.sellar_feature import SellarIDF
-from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 
 
 class TestEQConstraintComp(unittest.TestCase):
@@ -32,10 +32,10 @@ class TestEQConstraintComp(unittest.TestCase):
         # check results
         prob.run_driver()
 
-        assert_rel_error(self, prob['dv.x'], 0., 1e-5)
-        assert_rel_error(self, prob['dv.z'], [1.977639, 0.], 1e-5)
+        assert_near_equal(prob['dv.x'], 0., 1e-5)
+        assert_near_equal(prob['dv.z'], [1.977639, 0.], 1e-5)
 
-        assert_rel_error(self, prob['obj_cmp.obj'], 3.18339395045, 1e-5)
+        assert_near_equal(prob['obj_cmp.obj'], 3.18339395045, 1e-5)
 
         assert_almost_equal(prob['dv.y1'], 3.16)
         assert_almost_equal(prob['d1.y1'], 3.16)
@@ -163,7 +163,7 @@ class TestEQConstraintComp(unittest.TestCase):
         lhs = prob['f.y']
         rhs = prob['g.y']
         diff = lhs - rhs
-        assert_rel_error(self, prob['equal.y'], diff)
+        assert_near_equal(prob['equal.y'], diff)
 
         prob.driver = om.ScipyOptimizeDriver(disp=False)
 
@@ -293,7 +293,7 @@ class TestEQConstraintComp(unittest.TestCase):
         lhs = prob['f.y']
         rhs = prob['g.y']
         diff = lhs - rhs
-        assert_rel_error(self, prob['equal.y'], diff)
+        assert_near_equal(prob['equal.y'], diff)
 
         prob.run_driver()
 
@@ -333,9 +333,9 @@ class TestEQConstraintComp(unittest.TestCase):
         prob.driver = om.ScipyOptimizeDriver(disp=False)
         prob.run_driver()
 
-        assert_rel_error(self, prob['equal.y'], 0., 1e-6)
-        assert_rel_error(self, prob['indep.x'], 2., 1e-6)
-        assert_rel_error(self, prob['f.y'], 4., 1e-6)
+        assert_near_equal(prob['equal.y'], 0., 1e-6)
+        assert_near_equal(prob['indep.x'], 2., 1e-6)
+        assert_near_equal(prob['f.y'], 4., 1e-6)
 
         cpd = prob.check_partials(out_stream=None)
         for (of, wrt) in cpd['equal']:
@@ -401,9 +401,9 @@ class TestEQConstraintComp(unittest.TestCase):
         prob.driver = om.ScipyOptimizeDriver(disp=False)
         prob.run_driver()
 
-        assert_rel_error(self, prob['equal.y'], np.zeros(n), 1e-6)
-        assert_rel_error(self, prob['indep.x'], np.ones(n)*2., 1e-6)
-        assert_rel_error(self, prob['f.y'], np.ones(n)*4., 1e-6)
+        assert_near_equal(prob['equal.y'], np.zeros(n), 1e-6)
+        assert_near_equal(prob['indep.x'], np.ones(n)*2., 1e-6)
+        assert_near_equal(prob['f.y'], np.ones(n)*4., 1e-6)
 
         cpd = prob.check_partials(out_stream=None)
         for (of, wrt) in cpd['equal']:
@@ -437,9 +437,9 @@ class TestEQConstraintComp(unittest.TestCase):
         prob.driver = om.ScipyOptimizeDriver(disp=False)
         prob.run_driver()
 
-        assert_rel_error(self, prob['equal.y'], np.zeros(n), 1e-6)
-        assert_rel_error(self, prob['indep.x'], np.ones(n)*2., 1e-6)
-        assert_rel_error(self, prob['f.y'], np.ones(n)*4., 1e-6)
+        assert_near_equal(prob['equal.y'], np.zeros(n), 1e-6)
+        assert_near_equal(prob['indep.x'], np.ones(n)*2., 1e-6)
+        assert_near_equal(prob['f.y'], np.ones(n)*4., 1e-6)
 
         cpd = prob.check_partials(out_stream=None)
         for (of, wrt) in cpd['equal']:
@@ -467,9 +467,9 @@ class TestEQConstraintComp(unittest.TestCase):
         prob.driver = om.ScipyOptimizeDriver(disp=False)
         prob.run_driver()
 
-        assert_rel_error(self, prob['equal.y'], 0., 1e-6)
-        assert_rel_error(self, prob['indep.x'], 2., 1e-6)
-        assert_rel_error(self, prob['f.y'], 4., 1e-6)
+        assert_near_equal(prob['equal.y'], 0., 1e-6)
+        assert_near_equal(prob['indep.x'], 2., 1e-6)
+        assert_near_equal(prob['f.y'], 4., 1e-6)
 
         cpd = prob.check_partials(out_stream=None)
 
@@ -504,9 +504,9 @@ class TestEQConstraintComp(unittest.TestCase):
         prob.driver = om.ScipyOptimizeDriver(disp=False)
         prob.run_driver()
 
-        assert_rel_error(self, prob['equal.y'], np.zeros(n), 1e-6)
-        assert_rel_error(self, prob['indep.x'], np.ones(n)*2., 1e-6)
-        assert_rel_error(self, prob['f.y'], np.ones(n)*4., 1e-6)
+        assert_near_equal(prob['equal.y'], np.zeros(n), 1e-6)
+        assert_near_equal(prob['indep.x'], np.ones(n)*2., 1e-6)
+        assert_near_equal(prob['f.y'], np.ones(n)*4., 1e-6)
 
         cpd = prob.check_partials(out_stream=None)
         for (of, wrt) in cpd['equal']:
@@ -529,7 +529,7 @@ class TestEQConstraintComp(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['equal.y'], np.ones(shape) - rhs, 1e-6)
+        assert_near_equal(prob['equal.y'], np.ones(shape) - rhs, 1e-6)
 
         cpd = prob.check_partials(out_stream=None)
         for (of, wrt) in cpd['equal']:
@@ -585,14 +585,14 @@ class TestFeatureEQConstraintComp(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        assert_rel_error(self, prob['dv.x'], 0., 1e-5)
+        assert_near_equal(prob['dv.x'], 0., 1e-5)
 
-        assert_rel_error(self, [prob['dv.y1'], prob['d1.y1']], [[3.16], [3.16]], 1e-5)
-        assert_rel_error(self, [prob['dv.y2'], prob['d2.y2']], [[3.7552778], [3.7552778]], 1e-5)
+        assert_near_equal([prob['dv.y1'], prob['d1.y1']], [[3.16], [3.16]], 1e-5)
+        assert_near_equal([prob['dv.y2'], prob['d2.y2']], [[3.7552778], [3.7552778]], 1e-5)
 
-        assert_rel_error(self, prob['dv.z'], [1.977639, 0.], 1e-5)
+        assert_near_equal(prob['dv.z'], [1.977639, 0.], 1e-5)
 
-        assert_rel_error(self, prob['obj_cmp.obj'], 3.18339395045, 1e-5)
+        assert_near_equal(prob['obj_cmp.obj'], 3.18339395045, 1e-5)
 
 
 if __name__ == '__main__':  # pragma: no cover

@@ -7,7 +7,7 @@ import numpy as np
 from numpy.testing import assert_almost_equal
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_rel_error, assert_warning, assert_check_partials
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_partials
 
 scipy_gte_019 = True
 try:
@@ -424,8 +424,8 @@ class TestMetaModelStructuredScipy(unittest.TestCase):
         f, g = self.prob['comp.f'], self.prob['comp.g']
 
         tol = 1e-6
-        assert_rel_error(self, f, -0.05624571, tol)
-        assert_rel_error(self, g, 1.02068754, tol)
+        assert_near_equal(f, -0.05624571, tol)
+        assert_near_equal(g, 1.02068754, tol)
 
     def test_deriv1_swap(self):
         # Bugfix test that we can add outputs before inputs.
@@ -562,8 +562,8 @@ class TestMetaModelStructuredScipy(unittest.TestCase):
         val1 = np.array([-32.62094041, -31.67449135, -27.46959668])
 
         tol = 1e-5
-        assert_rel_error(self, prob['f'], val0, tol)
-        assert_rel_error(self, prob['g'], val1, tol)
+        assert_near_equal(prob['f'], val0, tol)
+        assert_near_equal(prob['g'], val1, tol)
         self.run_and_check_derivs(prob)
 
     def test_training_gradient_setup_called_twice(self):
@@ -604,8 +604,8 @@ class TestMetaModelStructuredScipy(unittest.TestCase):
         val1 = np.array([-32.62094041, -31.67449135, -27.46959668])
 
         tol = 1e-5
-        assert_rel_error(self, prob['f'], val0, tol)
-        assert_rel_error(self, prob['g'], val1, tol)
+        assert_near_equal(prob['f'], val0, tol)
+        assert_near_equal(prob['g'], val1, tol)
         self.run_and_check_derivs(prob)
 
         # Setup and run again
@@ -616,8 +616,8 @@ class TestMetaModelStructuredScipy(unittest.TestCase):
         val1 = np.array([-32.62094041, -31.67449135, -27.46959668])
 
         tol = 1e-5
-        assert_rel_error(self, prob['f'], val0, tol)
-        assert_rel_error(self, prob['g'], val1, tol)
+        assert_near_equal(prob['f'], val0, tol)
+        assert_near_equal(prob['g'], val1, tol)
         self.run_and_check_derivs(prob)
 
     def run_and_check_derivs(self, prob, tol=1e-5, verbose=False):
@@ -724,8 +724,8 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         f, g = self.prob['comp.f'], self.prob['comp.g']
 
         tol = 1e-6
-        assert_rel_error(self, f, -0.05624571, tol)
-        assert_rel_error(self, g, 1.02068754, tol)
+        assert_near_equal(f, -0.05624571, tol)
+        assert_near_equal(g, 1.02068754, tol)
 
     def test_deriv1_swap(self):
         # Bugfix test that we can add outputs before inputs.

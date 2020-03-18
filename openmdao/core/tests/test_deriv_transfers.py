@@ -23,7 +23,7 @@ try:
 except ImportError:
     PETScVector = None
 
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.logger_utils import TestLogger
 from openmdao.error_checking.check_config import _default_checks
 from openmdao.core.tests.test_distrib_derivs import DistribExecComp
@@ -72,8 +72,8 @@ class TestParallelGroups(unittest.TestCase):
         J = prob.compute_totals(of=of, wrt=wrt)
 
         print(model.comm.rank, "val:", J['C1.y', 'indep.x'][0][0])
-        assert_rel_error(self, J['C1.y', 'indep.x'][0][0], 2.5, 1e-6)
-        assert_rel_error(self, prob['C1.y'], 2.5, 1e-6)
+        assert_near_equal(J['C1.y', 'indep.x'][0][0], 2.5, 1e-6)
+        assert_near_equal(prob['C1.y'], 2.5, 1e-6)
 
     @parameterized.expand(itertools.product(['fwd', 'rev']),
                           name_func=_test_func_name)
@@ -98,15 +98,15 @@ class TestParallelGroups(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        assert_rel_error(self, prob.get_val('par.C1.y', get_remote=True), 2.5, 1e-6)
-        assert_rel_error(self, prob.get_val('par.C2.y', get_remote=True), 7., 1e-6)
+        assert_near_equal(prob.get_val('par.C1.y', get_remote=True), 2.5, 1e-6)
+        assert_near_equal(prob.get_val('par.C2.y', get_remote=True), 7., 1e-6)
 
         J = prob.compute_totals(of=of, wrt=wrt)
 
-        assert_rel_error(self, J['par.C1.y', 'indep.x'][0][0], 2.5, 1e-6)
-        assert_rel_error(self, prob.get_val('par.C1.y', get_remote=True), 2.5, 1e-6)
-        assert_rel_error(self, J['par.C2.y', 'indep.x'][0][0], 7., 1e-6)
-        assert_rel_error(self, prob.get_val('par.C2.y', get_remote=True), 7., 1e-6)
+        assert_near_equal(J['par.C1.y', 'indep.x'][0][0], 2.5, 1e-6)
+        assert_near_equal(prob.get_val('par.C1.y', get_remote=True), 2.5, 1e-6)
+        assert_near_equal(J['par.C2.y', 'indep.x'][0][0], 7., 1e-6)
+        assert_near_equal(prob.get_val('par.C2.y', get_remote=True), 7., 1e-6)
 
     @parameterized.expand(itertools.product(['fwd', 'rev']),
                           name_func=_test_func_name)
@@ -133,18 +133,18 @@ class TestParallelGroups(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        assert_rel_error(self, prob.get_val('par.C1.y', get_remote=True), 2.5, 1e-6)
-        assert_rel_error(self, prob.get_val('par.C2.y', get_remote=True), 7., 1e-6)
-        assert_rel_error(self, prob.get_val('dup.y', get_remote=True), 1.5, 1e-6)
+        assert_near_equal(prob.get_val('par.C1.y', get_remote=True), 2.5, 1e-6)
+        assert_near_equal(prob.get_val('par.C2.y', get_remote=True), 7., 1e-6)
+        assert_near_equal(prob.get_val('dup.y', get_remote=True), 1.5, 1e-6)
 
         J = prob.compute_totals(of=of, wrt=wrt)
 
-        assert_rel_error(self, J['par.C1.y', 'indep.x'][0][0], 2.5, 1e-6)
-        assert_rel_error(self, prob.get_val('par.C1.y', get_remote=True), 2.5, 1e-6)
-        assert_rel_error(self, J['par.C2.y', 'indep.x'][0][0], 7., 1e-6)
-        assert_rel_error(self, prob.get_val('par.C2.y', get_remote=True), 7., 1e-6)
-        assert_rel_error(self, J['dup.y', 'indep.x'][0][0], 1.5, 1e-6)
-        assert_rel_error(self, prob.get_val('dup.y', get_remote=True), 1.5, 1e-6)
+        assert_near_equal(J['par.C1.y', 'indep.x'][0][0], 2.5, 1e-6)
+        assert_near_equal(prob.get_val('par.C1.y', get_remote=True), 2.5, 1e-6)
+        assert_near_equal(J['par.C2.y', 'indep.x'][0][0], 7., 1e-6)
+        assert_near_equal(prob.get_val('par.C2.y', get_remote=True), 7., 1e-6)
+        assert_near_equal(J['dup.y', 'indep.x'][0][0], 1.5, 1e-6)
+        assert_near_equal(prob.get_val('dup.y', get_remote=True), 1.5, 1e-6)
 
     def test_dup_par_par_derivs(self):
         # duplicated output, parallel input
@@ -173,15 +173,15 @@ class TestParallelGroups(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        assert_rel_error(self, prob.get_val('par.C1.y', get_remote=True), 2.5, 1e-6)
-        assert_rel_error(self, prob.get_val('par.C2.y', get_remote=True), 7., 1e-6)
+        assert_near_equal(prob.get_val('par.C1.y', get_remote=True), 2.5, 1e-6)
+        assert_near_equal(prob.get_val('par.C2.y', get_remote=True), 7., 1e-6)
 
         J = prob.driver._compute_totals()
 
-        assert_rel_error(self, J['par.C1.y', 'indep.x'][0][0], 2.5, 1e-6)
-        assert_rel_error(self, prob.get_val('par.C1.y', get_remote=True), 2.5, 1e-6)
-        assert_rel_error(self, J['par.C2.y', 'indep.x'][0][0], 7., 1e-6)
-        assert_rel_error(self, prob.get_val('par.C2.y', get_remote=True), 7., 1e-6)
+        assert_near_equal(J['par.C1.y', 'indep.x'][0][0], 2.5, 1e-6)
+        assert_near_equal(prob.get_val('par.C1.y', get_remote=True), 2.5, 1e-6)
+        assert_near_equal(J['par.C2.y', 'indep.x'][0][0], 7., 1e-6)
+        assert_near_equal(prob.get_val('par.C2.y', get_remote=True), 7., 1e-6)
 
     @parameterized.expand(itertools.product(['fwd', 'rev']),
                           name_func=_test_func_name)
@@ -208,15 +208,15 @@ class TestParallelGroups(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        assert_rel_error(self, prob.get_val('C1.y', get_remote=True),
+        assert_near_equal(prob.get_val('C1.y', get_remote=True),
                          np.array([2.5,2.5,3.5], dtype=float), 1e-6)
 
         J = prob.compute_totals(of=of, wrt=wrt)
 
         expected = np.array([[2.5, 0, 0], [0, 2.5, 0], [0,0,3.5]], dtype=float)
 
-        assert_rel_error(self, J['C1.y', 'indep.x'], expected, 1e-6)
-        assert_rel_error(self, prob.get_val('C1.y', get_remote=True),
+        assert_near_equal(J['C1.y', 'indep.x'], expected, 1e-6)
+        assert_near_equal(prob.get_val('C1.y', get_remote=True),
                          np.array([2.5,2.5,3.5], dtype=float), 1e-6)
 
     @parameterized.expand(itertools.product(['fwd', 'rev']),
@@ -244,13 +244,13 @@ class TestParallelGroups(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        assert_rel_error(self, prob['C1.y'], 6., 1e-6)
+        assert_near_equal(prob['C1.y'], 6., 1e-6)
 
         J = prob.compute_totals(of=of, wrt=wrt)
 
-        assert_rel_error(self, J['C1.y', 'par.indep1.x'][0][0], 2.5, 1e-6)
-        assert_rel_error(self, J['C1.y', 'par.indep2.x'][0][0], 3.5, 1e-6)
-        assert_rel_error(self, prob['C1.y'], 6., 1e-6)
+        assert_near_equal(J['C1.y', 'par.indep1.x'][0][0], 2.5, 1e-6)
+        assert_near_equal(J['C1.y', 'par.indep2.x'][0][0], 3.5, 1e-6)
+        assert_near_equal(prob['C1.y'], 6., 1e-6)
 
     @parameterized.expand(itertools.product(['fwd', 'rev']),
                           name_func=_test_func_name)
@@ -279,15 +279,15 @@ class TestParallelGroups(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        assert_rel_error(self, prob.get_val('sink.y', get_remote=True),
+        assert_near_equal(prob.get_val('sink.y', get_remote=True),
                          np.array([-3.75,-3.75,-5.25], dtype=float), 1e-6)
 
         J = prob.compute_totals(of=of, wrt=wrt)
 
         expected = np.array([[-3.75, 0, 0], [0, -3.75, 0], [0,0,-5.25]], dtype=float)
 
-        assert_rel_error(self, J['sink.y', 'indep.x'], expected, 1e-6)
-        assert_rel_error(self, prob.get_val('sink.y', get_remote=True),
+        assert_near_equal(J['sink.y', 'indep.x'], expected, 1e-6)
+        assert_near_equal(prob.get_val('sink.y', get_remote=True),
                          np.array([-3.75,-3.75,-5.25], dtype=float), 1e-6)
 
     @parameterized.expand(itertools.product(['fwd', 'rev']),
@@ -320,15 +320,15 @@ class TestParallelGroups(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        assert_rel_error(self, prob.get_val('C3.y', get_remote=True),
+        assert_near_equal(prob.get_val('C3.y', get_remote=True),
                          np.array([17,17,5], dtype=float), 1e-6)
 
         J = prob.compute_totals(of=of, wrt=wrt)
 
         expected = np.array([[17, 0, 0], [0, 17, 0], [0,0,5]], dtype=float)
 
-        assert_rel_error(self, J['C3.y', 'indep.x'], expected, 1e-6)
-        assert_rel_error(self, prob.get_val('C3.y', get_remote=True),
+        assert_near_equal(J['C3.y', 'indep.x'], expected, 1e-6)
+        assert_near_equal(prob.get_val('C3.y', get_remote=True),
                          np.array([17,17,5], dtype=float), 1e-6)
 
     @parameterized.expand(itertools.product(['fwd', 'rev']),

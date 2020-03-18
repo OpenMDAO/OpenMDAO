@@ -13,7 +13,7 @@ from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.test_suite.components.implicit_newton_linesearch \
     import ImplCompTwoStates, ImplCompTwoStatesArrays
 from openmdao.test_suite.components.sellar import SellarDis1, SellarDis2withDerivatives
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class TestArmejoGoldsteinBounds(unittest.TestCase):
@@ -39,14 +39,14 @@ class TestArmejoGoldsteinBounds(unittest.TestCase):
         # Run without a line search at x=2.0
         top['px.x'] = 2.0
         top.run_model()
-        assert_rel_error(self, top['comp.y'], 4.666666, 1e-4)
-        assert_rel_error(self, top['comp.z'], 1.333333, 1e-4)
+        assert_near_equal(top['comp.y'], 4.666666, 1e-4)
+        assert_near_equal(top['comp.z'], 1.333333, 1e-4)
 
         # Run without a line search at x=0.5
         top['px.x'] = 0.5
         top.run_model()
-        assert_rel_error(self, top['comp.y'], 5.833333, 1e-4)
-        assert_rel_error(self, top['comp.z'], 2.666666, 1e-4)
+        assert_near_equal(top['comp.y'], 5.833333, 1e-4)
+        assert_near_equal(top['comp.z'], 2.666666, 1e-4)
 
     def test_linesearch_bounds_vector(self):
         top = self.top
@@ -63,14 +63,14 @@ class TestArmejoGoldsteinBounds(unittest.TestCase):
         top['comp.y'] = 0.0
         top['comp.z'] = 1.6
         top.run_model()
-        assert_rel_error(self, top['comp.z'], 1.5, 1e-8)
+        assert_near_equal(top['comp.z'], 1.5, 1e-8)
 
         # Test upper bound: should go to the upper bound and stall
         top['px.x'] = 0.5
         top['comp.y'] = 0.0
         top['comp.z'] = 2.4
         top.run_model()
-        assert_rel_error(self, top['comp.z'], 2.5, 1e-8)
+        assert_near_equal(top['comp.z'], 2.5, 1e-8)
 
     def test_linesearch_bounds_wall(self):
         top = self.top
@@ -87,14 +87,14 @@ class TestArmejoGoldsteinBounds(unittest.TestCase):
         top['comp.y'] = 0.0
         top['comp.z'] = 1.6
         top.run_model()
-        assert_rel_error(self, top['comp.z'], 1.5, 1e-8)
+        assert_near_equal(top['comp.z'], 1.5, 1e-8)
 
         # Test upper bound: should go to the upper bound and stall
         top['px.x'] = 0.5
         top['comp.y'] = 0.0
         top['comp.z'] = 2.4
         top.run_model()
-        assert_rel_error(self, top['comp.z'], 2.5, 1e-8)
+        assert_near_equal(top['comp.z'], 2.5, 1e-8)
 
     def test_linesearch_bounds_scalar(self):
         top = self.top
@@ -191,7 +191,7 @@ class TestAnalysisErrorExplicit(unittest.TestCase):
         top['comp.y'] = 0.0
         top['comp.z'] = 2.1
         top.run_model()
-        assert_rel_error(self, top['comp.z'], 1.8, 1e-8)
+        assert_near_equal(top['comp.z'], 1.8, 1e-8)
 
     def test_no_retry(self):
         # Test the behavior with the switch turned off.
@@ -397,7 +397,7 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
         top['comp.z'] = 1.6
         top.run_model()
         for ind in range(3):
-            assert_rel_error(self, top['comp.z'][ind], [1.5], 1e-8)
+            assert_near_equal(top['comp.z'][ind], [1.5], 1e-8)
 
         # Test upper bounds: should go to the minimum upper bound and stall
         top['px.x'] = 0.5
@@ -418,7 +418,7 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
         self.assertTrue("'comp.z' exceeds upper bound" in txt)
 
         for ind in range(3):
-            assert_rel_error(self, top['comp.z'][ind], [2.5], 1e-8)
+            assert_near_equal(top['comp.z'][ind], [2.5], 1e-8)
 
     def test_linesearch_wall_bound_enforcement_wall(self):
         top = self.top
@@ -434,7 +434,7 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
         top['comp.z'] = 1.6
         top.run_model()
         for ind in range(3):
-            assert_rel_error(self, top['comp.z'][ind], [1.5], 1e-8)
+            assert_near_equal(top['comp.z'][ind], [1.5], 1e-8)
 
         # Test upper bounds: should go to the upper bound and stall
         top['px.x'] = 0.5
@@ -442,7 +442,7 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
         top['comp.z'] = 2.4
         top.run_model()
         for ind in range(3):
-            assert_rel_error(self, top['comp.z'][ind], [self.ub[ind]], 1e-8)
+            assert_near_equal(top['comp.z'][ind], [self.ub[ind]], 1e-8)
 
     def test_linesearch_wall_bound_enforcement_scalar(self):
         top = self.top
@@ -621,7 +621,7 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
         top['comp.z'] = 1.6
         top.run_model()
         for ind in range(3):
-            assert_rel_error(self, top['comp.z'][ind], [1.5], 1e-8)
+            assert_near_equal(top['comp.z'][ind], [1.5], 1e-8)
 
         # Test upper bounds: should go to the minimum upper bound and stall
         top['px.x'] = 0.5
@@ -629,7 +629,7 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
         top['comp.z'] = 2.4
         top.run_model()
         for ind in range(3):
-            assert_rel_error(self, top['comp.z'][ind], [2.5], 1e-8)
+            assert_near_equal(top['comp.z'][ind], [2.5], 1e-8)
 
     def test_linesearch_wall_bound_enforcement_wall(self):
         top = self.top
@@ -645,7 +645,7 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
         top['comp.z'] = 1.6
         top.run_model()
         for ind in range(3):
-            assert_rel_error(self, top['comp.z'][ind], [1.5], 1e-8)
+            assert_near_equal(top['comp.z'][ind], [1.5], 1e-8)
 
         # Test upper bounds: should go to the upper bound and stall
         top['px.x'] = 0.5
@@ -653,7 +653,7 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
         top['comp.z'] = 2.4
         top.run_model()
         for ind in range(3):
-            assert_rel_error(self, top['comp.z'][ind], [self.ub[ind]], 1e-8)
+            assert_near_equal(top['comp.z'][ind], [self.ub[ind]], 1e-8)
 
     def test_linesearch_wall_bound_enforcement_scalar(self):
         top = self.top
@@ -706,10 +706,10 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['g1.y1'], 0.64, .00001)
-        assert_rel_error(self, prob['g1.y2'], 0.80, .00001)
-        assert_rel_error(self, prob['g2.y1'], 0.64, .00001)
-        assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
+        assert_near_equal(prob['g1.y1'], 0.64, .00001)
+        assert_near_equal(prob['g1.y2'], 0.80, .00001)
+        assert_near_equal(prob['g2.y1'], 0.64, .00001)
+        assert_near_equal(prob['g2.y2'], 0.80, .00001)
 
 
 class CompAtan(om.ImplicitComponent):
@@ -779,7 +779,7 @@ class TestFeatureLineSearch(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, prob['comp.y'], 19.68734033, 1e-6)
+        assert_near_equal(prob['comp.y'], 19.68734033, 1e-6)
 
     def test_feature_boundsenforcels_basic(self):
         import numpy as np
@@ -807,7 +807,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.run_model()
 
         for ind in range(3):
-            assert_rel_error(self, top['comp.z'][ind], [1.5], 1e-8)
+            assert_near_equal(top['comp.z'][ind], [1.5], 1e-8)
 
     def test_feature_armijogoldsteinls_basic(self):
         import numpy as np
@@ -835,7 +835,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.run_model()
 
         for ind in range(3):
-            assert_rel_error(self, top['comp.z'][ind], [1.5], 1e-8)
+            assert_near_equal(top['comp.z'][ind], [1.5], 1e-8)
 
     def test_feature_boundscheck_basic(self):
         import numpy as np
@@ -863,7 +863,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.run_model()
 
         for ind in range(3):
-            assert_rel_error(self, top['comp.z'][ind], [1.5], 1e-8)
+            assert_near_equal(top['comp.z'][ind], [1.5], 1e-8)
 
     def test_feature_boundscheck_vector(self):
         import numpy as np
@@ -891,7 +891,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.run_model()
 
         for ind in range(3):
-            assert_rel_error(self, top['comp.z'][ind], [1.5], 1e-8)
+            assert_near_equal(top['comp.z'][ind], [1.5], 1e-8)
 
     def test_feature_boundscheck_wall(self):
         import numpy as np
@@ -918,9 +918,9 @@ class TestFeatureLineSearch(unittest.TestCase):
         top['comp.z'] = 2.4
         top.run_model()
 
-        assert_rel_error(self, top['comp.z'][0], [2.6], 1e-8)
-        assert_rel_error(self, top['comp.z'][1], [2.5], 1e-8)
-        assert_rel_error(self, top['comp.z'][2], [2.65], 1e-8)
+        assert_near_equal(top['comp.z'][0], [2.6], 1e-8)
+        assert_near_equal(top['comp.z'][1], [2.5], 1e-8)
+        assert_near_equal(top['comp.z'][2], [2.65], 1e-8)
 
     def test_feature_boundscheck_scalar(self):
         import numpy as np
@@ -976,7 +976,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.run_model()
 
         for ind in range(3):
-            assert_rel_error(self, top['comp.z'][ind], [1.5], 1e-8)
+            assert_near_equal(top['comp.z'][ind], [1.5], 1e-8)
 
     def test_feature_armijo_boundscheck_vector(self):
         import numpy as np
@@ -1004,7 +1004,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.run_model()
 
         for ind in range(3):
-            assert_rel_error(self, top['comp.z'][ind], [1.5], 1e-8)
+            assert_near_equal(top['comp.z'][ind], [1.5], 1e-8)
 
     def test_feature_armijo_boundscheck_wall(self):
         import numpy as np
@@ -1031,9 +1031,9 @@ class TestFeatureLineSearch(unittest.TestCase):
         top['comp.z'] = 2.4
         top.run_model()
 
-        assert_rel_error(self, top['comp.z'][0], [2.6], 1e-8)
-        assert_rel_error(self, top['comp.z'][1], [2.5], 1e-8)
-        assert_rel_error(self, top['comp.z'][2], [2.65], 1e-8)
+        assert_near_equal(top['comp.z'][0], [2.6], 1e-8)
+        assert_near_equal(top['comp.z'][1], [2.5], 1e-8)
+        assert_near_equal(top['comp.z'][2], [2.65], 1e-8)
 
     def test_feature_armijo_boundscheck_scalar(self):
         import numpy as np
@@ -1089,7 +1089,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.run_model()
 
         for ind in range(3):
-            assert_rel_error(self, top['comp.z'][ind], [1.5], 1e-8)
+            assert_near_equal(top['comp.z'][ind], [1.5], 1e-8)
 
     def test_feature_goldstein(self):
         import numpy as np
@@ -1118,7 +1118,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.run_model()
 
         for ind in range(3):
-            assert_rel_error(self, top['comp.z'][ind], [1.5], 1e-8)
+            assert_near_equal(top['comp.z'][ind], [1.5], 1e-8)
 
 
 if __name__ == "__main__":

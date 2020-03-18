@@ -147,7 +147,7 @@ class TestFeature(unittest.TestCase):
         """
         import numpy as np
         import openmdao.api as om
-        from openmdao.utils.assert_utils import assert_rel_error
+        from openmdao.utils.assert_utils import assert_near_equal
 
         n = 100
 
@@ -177,7 +177,7 @@ class TestFeature(unittest.TestCase):
         for i in range(n):
             a_i = p['pos'][i, :]
             expected_i = np.sqrt(np.dot(a_i, a_i)) / 1000.0
-            assert_rel_error(self, p.get_val('vec_mag_comp.r_mag')[i], expected_i)
+            assert_near_equal(p.get_val('vec_mag_comp.r_mag')[i], expected_i)
 
 
 if __name__ == '__main__':

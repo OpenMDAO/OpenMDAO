@@ -223,6 +223,17 @@ def replace_asserts_with_prints(src):
             #
             assert_node.value[0].replace("print")
 
+    if 'assert_near_equal' in src:
+        assert_nodes = rb.findAll("NameNode", value='assert_near_equal')
+        for assert_node in assert_nodes:
+            assert_node = assert_node.parent
+            # If relative error tolerance is specified, there are 3 arguments
+            if len(assert_node.value[1]) == 3:
+                # remove the relative error tolerance
+                remove_redbaron_node(assert_node.value[1], -1)
+            remove_redbaron_node(assert_node.value[1], -1)  # remove the expected value
+            assert_node.value[0].replace("print")
+
     if 'assert_almost_equal' in src:
         assert_nodes = rb.findAll("NameNode", value='assert_almost_equal')
         for assert_node in assert_nodes:
