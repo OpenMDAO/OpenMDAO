@@ -43,8 +43,7 @@ def assert_warning(category, msg):
         if (issubclass(warn.category, category) and str(warn.message) == msg):
             break
     else:
-        raise AssertionError("Did not see expected %s: %s" %
-                             (category.__name__, msg))
+        raise AssertionError("Did not see expected %s: %s" % (category.__name__, msg))
 
 
 @contextmanager
@@ -120,8 +119,7 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6):
                             wrt_string = '{0} wrt {1}'.format(var, wrt)
                             norm_string = '{}'.format(norm)
                             len_wrt_width = max(len_wrt_width, len(wrt_string))
-                            len_norm_width = max(
-                                len_norm_width, len(norm_string))
+                            len_norm_width = max(len_norm_width, len(norm_string))
 
                     elif error_type == 'abs error' and norm_type == 'fwd-fd':
                         # Capturing case where computed partials or output are NaN.
@@ -143,8 +141,7 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6):
                                 norm_string = '{}'.format(norm)
                                 err_msg = '{0} | {1} | {2} | {3}'.format(
                                     pad_name(wrt_string, len_wrt_width),
-                                    pad_name(error_type.split()[
-                                             0], len_absrel_width),
+                                    pad_name(error_type.split()[0], len_absrel_width),
                                     pad_name(norm_type, len_norm_type_width),
                                     pad_name(norm_string, len_norm_width)) + '\n'
                                 comp_error_string += err_msg
@@ -155,8 +152,7 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6):
                             norm_string = '{}'.format(norm)
                             err_msg = '{0} | {1} | {2} | {3}'.format(
                                 pad_name(wrt_string, len_wrt_width),
-                                pad_name(error_type.split()[
-                                         0], len_absrel_width),
+                                pad_name(error_type.split()[0], len_absrel_width),
                                 pad_name(norm_type, len_norm_type_width),
                                 pad_name(norm_string, len_norm_width)) + '\n'
                             comp_error_string += err_msg
@@ -184,8 +180,7 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6):
     # if error string then raise error with that string
     if error_string:
         header_line1 = 'Assert Check Partials failed for the following Components'
-        header_line2 = 'with absolute tolerance = {} and relative tolerance = {}'.format(
-            atol, rtol)
+        header_line2 = 'with absolute tolerance = {} and relative tolerance = {}'.format(atol, rtol)
         header_width = max(len(header_line1), len(header_line2))
         header = '\n' + header_width * '=' + '\n'
         header += header_line1 + '\n'
@@ -297,8 +292,7 @@ def assert_rel_error(test_case, actual, desired, tolerance=1e-15):
 
         for key in actual_keys:
             try:
-                new_error = assert_rel_error(
-                    test_case, actual[key], desired[key], tolerance)
+                new_error = assert_rel_error(test_case, actual[key], desired[key], tolerance)
                 error = max(error, new_error)
             except test_case.failureException as exception:
                 msg = '{}: '.format(key) + str(exception)
