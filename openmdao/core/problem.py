@@ -1390,17 +1390,17 @@ class Problem(object):
             List of optional columns to be displayed in the desvars table.
             Allowed values are:
             ['lower', 'upper', 'ref', 'ref0', 'indices', 'adder', 'scaler', 'parallel_deriv_color',
-            'vectorize_derivs', 'cache_linear_solution']
+            'vectorize_derivs', 'cache_linear_solution', 'units']
         cons_opts : list of str
             List of optional columns to be displayed in the cons table.
             Allowed values are:
             ['lower', 'upper', 'equals', 'ref', 'ref0', 'indices', 'index', 'adder', 'scaler',
             'linear', 'parallel_deriv_color', 'vectorize_derivs',
-            'cache_linear_solution']
+            'cache_linear_solution', 'units']
         objs_opts : list of str
             List of optional columns to be displayed in the objs table.
             Allowed values are:
-            ['ref', 'ref0', 'indices', 'adder', 'scaler',
+            ['ref', 'ref0', 'indices', 'adder', 'scaler', 'units',
             'parallel_deriv_color', 'vectorize_derivs', 'cache_linear_solution']
 
         """
@@ -1408,32 +1408,37 @@ class Problem(object):
 
         # Design vars
         desvars = self.model.get_design_vars()
+        vals = self.driver.get_design_var_values()
         header = "Design Variables"
         col_names = default_col_names + desvar_opts
-        self._write_var_info_table(header, col_names, desvars,
+        self._write_var_info_table(header, col_names, desvars, vals,
                                    show_promoted_name=show_promoted_name,
                                    print_arrays=print_arrays,
                                    col_spacing=2)
 
         # Constraints
         cons = self.model.get_constraints()
+        vals = self.driver.get_constraint_values()
         header = "Constraints"
         col_names = default_col_names + cons_opts
-        self._write_var_info_table(header, col_names, cons, show_promoted_name=show_promoted_name,
+        self._write_var_info_table(header, col_names, cons, vals,
+                                   show_promoted_name=show_promoted_name,
                                    print_arrays=print_arrays,
                                    col_spacing=2)
 
         objs = self.model.get_objectives()
+        vals = self.driver.get_objective_values()
         header = "Objectives"
         col_names = default_col_names + objs_opts
-        self._write_var_info_table(header, col_names, objs, show_promoted_name=show_promoted_name,
+        self._write_var_info_table(header, col_names, objs, vals,
+                                   show_promoted_name=show_promoted_name,
                                    print_arrays=print_arrays,
                                    col_spacing=2)
 
-    def _write_var_info_table(self, header, col_names, vars, print_arrays=False,
+    def _write_var_info_table(self, header, col_names, meta, vals, print_arrays=False,
                               show_promoted_name=True, col_spacing=1):
         """
-        Write a table of information for the data in vars.
+        Write a table of information for the problem variable in meta and vals.
 
         Parameters
         ----------
@@ -1441,8 +1446,10 @@ class Problem(object):
             The header line for the table.
         col_names : list of str
             List of column labels.
-        vars : OrderedDict
-            Keys are variable names and values are metadata for the variables.
+        meta : OrderedDict
+            Dictionary of metadata for each problem variable.
+        vals : OrderedDict
+            Dictionary of values for each problem variable.
         print_arrays : bool, optional
             When False, in the columnar display, just display norm of any ndarrays with size > 1.
             The norm is surrounded by vertical bars to indicate that it is a norm.
@@ -1458,7 +1465,7 @@ class Problem(object):
 
         # Get the values for all the elements in the tables
         rows = []
-        for name, meta in vars.items():
+        for name, meta in meta.items():
             row = {}
             for col_name in col_names:
                 if col_name == 'name':
@@ -1470,7 +1477,7 @@ class Problem(object):
                         else:
                             row[col_name] = abs2prom['output'][name]
                 elif col_name == 'value':
-                    row[col_name] = self[name]
+                    row[col_name] = vals[name]
                 else:
                     row[col_name] = meta[col_name]
             rows.append(row)

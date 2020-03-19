@@ -9,12 +9,14 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_partials
 from openmdao.utils.general_utils import printoptions
+from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp, NonSquareArrayComp
 
 
+@use_tempdirs
 class TestDriver(unittest.TestCase):
 
     def test_basic_get(self):
@@ -469,9 +471,241 @@ class TestDriver(unittest.TestCase):
         con = prob.driver.get_constraint_values(driver_scaling=True)
         assert_near_equal(con['comp1.y1'][0], 38.0 * 5 / 9, 1e-8)
 
-        prob.list_problem_vars()
+        meta = model.get_design_vars()
+        assert_near_equal(meta['p.x']['lower'], 0.0, 1e-7)
+        assert_near_equal(meta['p.x']['upper'], 100.0, 1e-7)
 
-        print('done')
+        meta = model.get_constraints()
+        assert_near_equal(meta['comp1.y1']['lower'], 0.0, 1e-7)
+        assert_near_equal(meta['comp1.y1']['upper'], 100.0, 1e-7)
+
+        stdout = sys.stdout
+        strout = StringIO()
+        sys.stdout = strout
+        try:
+            prob.list_problem_vars(desvar_opts=['units'], objs_opts=['units'], cons_opts=['units'])
+        finally:
+            sys.stdout = stdout
+        output = strout.getvalue().split('\n')
+
+        self.assertTrue('1.666' in output[5])
+        self.assertTrue('21.111' in output[12])
+        self.assertTrue('40.555' in output[19])
+        self.assertTrue('degC' in output[5])
+        self.assertTrue('degC' in output[12])
+        self.assertTrue('degC' in output[19])
+
+    def test_units_with_scaling(self):
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', 35.0, units='degF', lower=32.0, upper=212.0)
+
+        model.add_subsystem('p', ivc, promotes=['x'])
+        model.add_subsystem('comp1', om.ExecComp('y1 = 2.0*x',
+                                                 x={'value': 2.0, 'units': 'degF'},
+                                                 y1={'value': 2.0, 'units': 'degF'}),
+                            promotes=['x', 'y1'])
+
+        model.add_subsystem('comp2', om.ExecComp('y2 = 3.0*x',
+                                                 x={'value': 2.0, 'units': 'degF'},
+                                                 y2={'value': 2.0, 'units': 'degF'}),
+                            promotes=['x', 'y2'])
+
+        model.add_design_var('x', units='degC', lower=0.0, upper=100.0, scaler=3.5, adder=77.0)
+        model.add_constraint('y1', units='degC', lower=0.0, upper=100.0, scaler=3.5, adder=77.0)
+        model.add_objective('y2', units='degC', scaler=3.5, adder=77.0)
+
+        recorder = om.SqliteRecorder('cases.sql')
+        prob.driver.add_recorder(recorder)
+
+        prob.driver.recording_options['record_objectives'] = True
+        prob.driver.recording_options['record_constraints'] = True
+        prob.driver.recording_options['record_desvars'] = True
+
+        prob.setup()
+
+        prob.run_driver()
+
+        dv = prob.driver.get_design_var_values()
+        assert_near_equal(dv['p.x'][0], ((3.0 * 5 / 9) + 77.0) * 3.5, 1e-8)
+
+        obj = prob.driver.get_objective_values(driver_scaling=True)
+        assert_near_equal(obj['comp2.y2'][0], ((73.0 * 5 / 9) + 77.0) * 3.5, 1e-8)
+
+        con = prob.driver.get_constraint_values(driver_scaling=True)
+        assert_near_equal(con['comp1.y1'][0], ((38.0 * 5 / 9) + 77.0) * 3.5, 1e-8)
+
+        meta = model.get_design_vars()
+        assert_near_equal(meta['p.x']['lower'], ((0.0) + 77.0) * 3.5, 1e-7)
+        assert_near_equal(meta['p.x']['upper'], ((100.0) + 77.0) * 3.5, 1e-7)
+
+        meta = model.get_constraints()
+        assert_near_equal(meta['comp1.y1']['lower'], ((0.0) + 77.0) * 3.5, 1e-7)
+        assert_near_equal(meta['comp1.y1']['upper'], ((100.0) + 77.0) * 3.5, 1e-7)
+
+        stdout = sys.stdout
+        strout = StringIO()
+        sys.stdout = strout
+        try:
+            prob.list_problem_vars(desvar_opts=['units'], objs_opts=['units'], cons_opts=['units'])
+        finally:
+            sys.stdout = stdout
+        output = strout.getvalue().split('\n')
+
+        self.assertTrue('275.33' in output[5])
+        self.assertTrue('343.3888' in output[12])
+        self.assertTrue('411.444' in output[19])
+        self.assertTrue('degC' in output[5])
+        self.assertTrue('degC' in output[12])
+        self.assertTrue('degC' in output[19])
+
+        totals = prob.check_totals(out_stream=None, driver_scaling=True)
+
+        for key, val in totals.items():
+            assert_near_equal(val['rel error'][0], 0.0, 1e-6)
+
+        cr = om.CaseReader("cases.sql")
+        cases = cr.list_cases('driver')
+        case = cr.get_case(cases[0])
+
+        dv = case.get_design_vars()
+        assert_near_equal(dv['p.x'][0], ((3.0 * 5 / 9) + 77.0) * 3.5, 1e-8)
+
+        obj = case.get_objectives()
+        assert_near_equal(obj['comp2.y2'][0], ((73.0 * 5 / 9) + 77.0) * 3.5, 1e-8)
+
+        con = case.get_constraints()
+        assert_near_equal(con['comp1.y1'][0], ((38.0 * 5 / 9) + 77.0) * 3.5, 1e-8)
+
+    def test_units_error_messages(self):
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', 35.0, units='degF', lower=32.0, upper=212.0)
+
+        model.add_subsystem('p', ivc, promotes=['x'])
+        model.add_subsystem('comp1', om.ExecComp('y1 = 2.0*x',
+                                                 x={'value': 2.0, 'units': 'degF'},
+                                                 y1={'value': 2.0, 'units': 'degF'}),
+                            promotes=['x', 'y1'])
+
+        model.add_design_var('x', units='ft', lower=0.0, upper=100.0, scaler=3.5, adder=77.0)
+
+        with self.assertRaises(RuntimeError) as context:
+            prob.setup()
+
+        msg = "Group (<model>): Target for design variable x has 'degF' units, but 'ft' units were specified."
+        self.assertEqual(str(context.exception), msg)
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', 35.0, units='degF', lower=32.0, upper=212.0)
+
+        model.add_subsystem('p', ivc, promotes=['x'])
+        model.add_subsystem('comp1', om.ExecComp('y1 = 2.0*x',
+                                                 x={'value': 2.0, 'units': 'degF'},
+                                                 y1={'value': 2.0, 'units': 'degF'}),
+                            promotes=['x', 'y1'])
+
+        model.add_constraint('x', units='ft', lower=0.0, upper=100.0)
+
+        with self.assertRaises(RuntimeError) as context:
+            prob.setup()
+
+        msg = "Group (<model>): Target for constraint x has 'degF' units, but 'ft' units were specified."
+        self.assertEqual(str(context.exception), msg)
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', 35.0, units=None, lower=32.0, upper=212.0)
+
+        model.add_subsystem('p', ivc, promotes=['x'])
+        model.add_subsystem('comp1', om.ExecComp('y1 = 2.0*x',
+                                                 x={'value': 2.0, 'units': 'degF'},
+                                                 y1={'value': 2.0, 'units': 'degF'}),
+                            promotes=['x', 'y1'])
+
+        model.add_design_var('x', units='ft', lower=0.0, upper=100.0, scaler=3.5, adder=77.0)
+
+        with self.assertRaises(RuntimeError) as context:
+            prob.setup()
+
+        msg = "Group (<model>): Target for design variable x has no units, but 'ft' units were specified."
+        self.assertEqual(str(context.exception), msg)
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', 35.0, units=None, lower=32.0, upper=212.0)
+
+        model.add_subsystem('p', ivc, promotes=['x'])
+        model.add_subsystem('comp1', om.ExecComp('y1 = 2.0*x',
+                                                 x={'value': 2.0, 'units': 'degF'},
+                                                 y1={'value': 2.0, 'units': 'degF'}),
+                            promotes=['x', 'y1'])
+
+        model.add_constraint('x', units='ft', lower=0.0, upper=100.0)
+
+        with self.assertRaises(RuntimeError) as context:
+            prob.setup()
+
+        msg = "Group (<model>): Target for constraint x has no units, but 'ft' units were specified."
+        self.assertEqual(str(context.exception), msg)
+
+
+class TestDriverFeature(unittest.TestCase):
+
+    def test_specify_units(self):
+        import openmdao.api as om
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', 35.0, units='degF', lower=32.0, upper=212.0)
+
+        model.add_subsystem('p', ivc, promotes=['x'])
+        model.add_subsystem('comp1', om.ExecComp('y1 = 2.0*x',
+                                                 x={'value': 2.0, 'units': 'degF'},
+                                                 y1={'value': 2.0, 'units': 'degF'}),
+                            promotes=['x', 'y1'])
+
+        model.add_subsystem('comp2', om.ExecComp('y2 = 3.0*x',
+                                                 x={'value': 2.0, 'units': 'degF'},
+                                                 y2={'value': 2.0, 'units': 'degF'}),
+                            promotes=['x', 'y2'])
+
+        model.add_design_var('x', units='degC', lower=0.0, upper=100.0)
+        model.add_constraint('y1', units='degC', lower=0.0, upper=100.0)
+        model.add_objective('y2', units='degC')
+
+        prob.setup()
+        prob.run_driver()
+
+        print('Model variables')
+        assert_near_equal(prob['p.x'][0], 35.0, 1e-8)
+        assert_near_equal(prob['comp2.y2'][0], 105.0, 1e-8)
+        assert_near_equal(prob['comp1.y1'][0], 70.0, 1e-8)
+
+        print('')
+        print('Driver variables')
+        dv = prob.driver.get_design_var_values()
+        assert_near_equal(dv['p.x'][0], 3.0 * 5 / 9, 1e-8)
+
+        obj = prob.driver.get_objective_values(driver_scaling=True)
+        assert_near_equal(obj['comp2.y2'][0], 73.0 * 5 / 9, 1e-8)
+
+        con = prob.driver.get_constraint_values(driver_scaling=True)
+        assert_near_equal(con['comp1.y1'][0], 38.0 * 5 / 9, 1e-8)
+
 
 if __name__ == "__main__":
     unittest.main()

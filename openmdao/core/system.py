@@ -1668,12 +1668,12 @@ class System(object):
                 abs_name = pro2abs[name][0]
                 var_units = abs2meta[abs_name]['units']
                 if var_units is None:
-                    msg = "{}: Target for design variable {} has no units, but a unit " + \
-                          "conversion was specified."
-                    raise RuntimeError(msg.format(self.msginfo, name))
+                    msg = "{}: Target for design variable {} has no units, but '{}' units " + \
+                          "were specified."
+                    raise RuntimeError(msg.format(self.msginfo, name, units))
 
                 if not is_compatible(var_units, units):
-                    msg = "{}: Target for design variable {} has '{} 'units, but '{}' units " + \
+                    msg = "{}: Target for design variable {} has '{}' units, but '{}' units " + \
                           "were specified."
                     raise RuntimeError(msg.format(self.msginfo, name, var_units, units))
 
@@ -1682,20 +1682,8 @@ class System(object):
                                                                  dv[name]['adder'],
                                                                  dv[name]['scaler'])
 
-                # Apply unit conversion as initial scale factor.
-                scaler = base_scaler * factor
-                adder = offset + base_adder / factor
-
-                # Re-adjust upper and lower
-                for item in ['upper', 'lower']:
-                    old_val = dv[name][item]
-                    if old_val is not None:
-                        unscaled = old_val / base_scaler - base_adder
-                        scaled = ((unscaled + offset) * factor + base_adder) * base_scaler
-                        dv[name][item] = scaled
-
-                dv[name]['total_adder'] = adder
-                dv[name]['total_scaler'] = scaler
+                dv[name]['total_adder'] = offset + base_adder / factor
+                dv[name]['total_scaler'] = base_scaler * factor
 
             else:
                 dv[name]['total_adder'] = dv[name]['adder']
@@ -1709,12 +1697,13 @@ class System(object):
                 abs_name = pro2abs[name][0]
                 var_units = abs2meta[abs_name]['units']
                 if var_units is None:
-                    msg = "{}: Target for {} {} has no units, but a unit " + \
-                          "conversion was specified."
-                    raise RuntimeError(msg.format(self.msginfo, type_dict[meta['type']], name))
+                    msg = "{}: Target for {} {} has no units, but '{}' units " + \
+                          "were specified."
+                    raise RuntimeError(msg.format(self.msginfo, type_dict[meta['type']],
+                                                  name, units))
 
                 if not is_compatible(var_units, units):
-                    msg = "{}: Target for {} {} has '{} 'units, but '{}' units " + \
+                    msg = "{}: Target for {} {} has '{}' units, but '{}' units " + \
                           "were specified."
                     raise RuntimeError(msg.format(self.msginfo, type_dict[meta['type']],
                                                   name, var_units, units))
@@ -1724,25 +1713,12 @@ class System(object):
                                                                  resp[name]['adder'],
                                                                  resp[name]['scaler'])
 
-                # Apply unit conversion as initial scale factor.
-                scaler = base_scaler * factor
-                adder = offset + base_adder / factor
-
-                # Re-adjust upper and lower
-                if meta['type'] == 'con':
-                    for item in ['upper', 'lower', 'equals']:
-                        old_val = resp[name][item]
-                        if old_val is not None:
-                            unscaled = old_val / base_scaler - base_adder
-                            scaled = ((unscaled + offset) * factor + base_adder) * base_scaler
-                            resp[name][item] = scaled
-
-                resp[name]['total_adder'] = adder
-                resp[name]['total_scaler'] = scaler
+                resp[name]['total_scaler'] = base_scaler * factor
+                resp[name]['total_adder'] = offset + base_adder / factor
 
             else:
-                resp[name]['total_adder'] = resp[name]['adder']
                 resp[name]['total_scaler'] = resp[name]['scaler']
+                resp[name]['total_adder'] = resp[name]['adder']
 
         # Relevance setup
 
