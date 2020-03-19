@@ -1664,9 +1664,16 @@ class System(object):
         dv = self._design_vars
         for name, meta in dv.items():
             units = meta['units']
+            dv[name]['total_adder'] = dv[name]['adder']
+            dv[name]['total_scaler'] = dv[name]['scaler']
+
             if units is not None:
                 abs_name = pro2abs[name][0]
                 var_units = abs2meta[abs_name]['units']
+
+                if var_units == units:
+                    continue
+
                 if var_units is None:
                     msg = "{}: Target for design variable {} has no units, but '{}' units " + \
                           "were specified."
@@ -1685,17 +1692,20 @@ class System(object):
                 dv[name]['total_adder'] = offset + base_adder / factor
                 dv[name]['total_scaler'] = base_scaler * factor
 
-            else:
-                dv[name]['total_adder'] = dv[name]['adder']
-                dv[name]['total_scaler'] = dv[name]['scaler']
-
         resp = self._responses
         type_dict = {'con': 'constraint', 'obj': 'objective'}
         for name, meta in resp.items():
             units = meta['units']
+            resp[name]['total_scaler'] = resp[name]['scaler']
+            resp[name]['total_adder'] = resp[name]['adder']
+
             if units is not None:
                 abs_name = pro2abs[name][0]
                 var_units = abs2meta[abs_name]['units']
+
+                if var_units == units:
+                    continue
+
                 if var_units is None:
                     msg = "{}: Target for {} {} has no units, but '{}' units " + \
                           "were specified."
@@ -1715,10 +1725,6 @@ class System(object):
 
                 resp[name]['total_scaler'] = base_scaler * factor
                 resp[name]['total_adder'] = offset + base_adder / factor
-
-            else:
-                resp[name]['total_scaler'] = resp[name]['scaler']
-                resp[name]['total_adder'] = resp[name]['adder']
 
         # Relevance setup
 

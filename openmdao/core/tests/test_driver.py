@@ -495,6 +495,49 @@ class TestDriver(unittest.TestCase):
         self.assertTrue('degC' in output[12])
         self.assertTrue('degC' in output[19])
 
+    def test_units_equal(self):
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', 35.0, units='degF', lower=32.0, upper=212.0)
+
+        model.add_subsystem('p', ivc, promotes=['x'])
+        model.add_subsystem('comp1', om.ExecComp('y1 = 2.0*x',
+                                                 x={'value': 2.0, 'units': 'degF'},
+                                                 y1={'value': 2.0, 'units': 'degF'}),
+                            promotes=['x', 'y1'])
+
+        model.add_subsystem('comp2', om.ExecComp('y2 = 3.0*x',
+                                                 x={'value': 2.0, 'units': 'degF'},
+                                                 y2={'value': 2.0, 'units': 'degF'}),
+                            promotes=['x', 'y2'])
+
+        model.add_design_var('x', units='degF', lower=32.0, upper=212.0)
+        model.add_constraint('y1', units='degF', lower=32.0, upper=212.0)
+        model.add_objective('y2', units='degF')
+
+        prob.setup()
+
+        prob.run_driver()
+
+        dv = prob.driver.get_design_var_values()
+        assert_near_equal(dv['p.x'][0], 35.0, 1e-8)
+
+        obj = prob.driver.get_objective_values(driver_scaling=True)
+        assert_near_equal(obj['comp2.y2'][0], 105.0, 1e-8)
+
+        con = prob.driver.get_constraint_values(driver_scaling=True)
+        assert_near_equal(con['comp1.y1'][0], 70.0, 1e-8)
+
+        meta = model.get_design_vars()
+        self.assertEqual(meta['p.x']['scaler'], None)
+        self.assertEqual(meta['p.x']['adder'], None)
+
+        meta = model.get_constraints()
+        self.assertEqual(meta['comp1.y1']['scaler'], None)
+        self.assertEqual(meta['comp1.y1']['adder'], None)
+
     def test_units_with_scaling(self):
         prob = om.Problem()
         model = prob.model
