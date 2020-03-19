@@ -8,7 +8,7 @@
  * @property {Object} prevSolverDims The previous value of solverDims.
  * @property {Object} isMinimized Whether this node or a parent has been collapsed.
  * @property {number} depth
-*/
+ */
 class N2TreeNode {
 
     /**
@@ -28,10 +28,32 @@ class N2TreeNode {
         if (this.nonlinear_solver == "") this.nonlinear_solver = "None";
 
         this.rootIndex = -1;
-        this.dims = { 'x': 0, 'y': 0, 'width': 1, 'height': 1 };
-        this.prevDims = { 'x': 1e-6, 'y': 1e-6, 'width': 1e-6, 'height': 1e-6 };
-        this.solverDims = { 'x': 0, 'y': 0, 'width': 1, 'height': 1 };
-        this.prevSolverDims = { 'x': 1e-6, 'y': 1e-6, 'width': 1e-6, 'height': 1e-6 };
+        this.dims = {
+            'x': 0,
+            'y': 0,
+            'width': 1,
+            'height': 1,
+            'rx': 12,
+            'ry': 12
+        };
+        this.prevDims = {
+            'x': 1e-6,
+            'y': 1e-6,
+            'width': 1e-6,
+            'height': 1e-6
+        };
+        this.solverDims = {
+            'x': 0,
+            'y': 0,
+            'width': 1,
+            'height': 1
+        };
+        this.prevSolverDims = {
+            'x': 1e-6,
+            'y': 1e-6,
+            'width': 1e-6,
+            'height': 1e-6
+        };
         this.isMinimized = false;
     }
 
@@ -61,7 +83,7 @@ class N2TreeNode {
      * @param {string} [childrenPropName = 'children'] Usually children, but
      *   sometimes 'subsystem_children'
      * @return {boolean} True if the children property is an Array and length > 0.
-    */
+     */
     hasChildren(childrenPropName = 'children') {
         return (Array.isPopulatedArray(this[childrenPropName]));
     }
@@ -101,8 +123,8 @@ class N2TreeNode {
      */
     isConnectable() {
         if (this.isParamOrUnknown() && !(this.hasChildren() ||
-            this.parent.isMinimized || this.parentComponent.isMinimized)) return true;
-    
+                this.parent.isMinimized || this.parentComponent.isMinimized)) return true;
+
         return (this.isMinimized && !this.splitByColon);
     }
 
@@ -131,7 +153,7 @@ class N2TreeNode {
      * @param {N2TreeNode} compareNode The node to look for.
      * @param {N2TreeNode} [parentLimit = null] Stop searching at this common parent.
      * @returns {Boolean} True if the node is found, otherwise false.
-    */
+     */
     hasNode(compareNode, parentLimit = null) {
         // Check parents first.
         for (let obj = this; obj != null && obj !== parentLimit; obj = obj.parent) {
@@ -149,7 +171,9 @@ class N2TreeNode {
      * @param {Array} arr The array to add to.
      */
     _getNodesInChildrenWithCycleArrows(arr) {
-        if (this.cycleArrows) { arr.push(this); }
+        if (this.cycleArrows) {
+            arr.push(this);
+        }
 
         if (this.hasChildren()) {
             for (let child of this.children) {
@@ -167,7 +191,9 @@ class N2TreeNode {
 
         // Check parents first.
         for (let obj = this.parent; obj != null; obj = obj.parent) {
-            if (obj.cycleArrows) { arr.push(obj); }
+            if (obj.cycleArrows) {
+                arr.push(obj);
+            }
         }
 
         // Check all descendants as well.
@@ -182,7 +208,7 @@ class N2TreeNode {
      * @returns {N2TreeNode} The first common parent found.
      */
     nearestCommonParent(other) {
-        for (let myParent = this.parent; myParent != null; myParent = myParent.parent )
+        for (let myParent = this.parent; myParent != null; myParent = myParent.parent)
             for (let otherParent = other.parent; otherParent != null; otherParent = otherParent.parent)
                 if (myParent === otherParent) return myParent;
 

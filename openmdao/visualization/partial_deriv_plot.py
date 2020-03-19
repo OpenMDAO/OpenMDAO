@@ -95,7 +95,8 @@ def partial_deriv_plot(of, wrt, check_partials_data, title=None, jac_method='J_f
 
     # plot Jacobians
     if binary:
-        ax[0].imshow(fd_binary.real, interpolation='none', cmap=BINARY_CMP, aspect='auto')
+        ax[0].imshow(fd_binary.real, interpolation='none',
+                     cmap=BINARY_CMP, aspect='auto')
         im_computed = ax[1].imshow(computed_binary.real, interpolation='none', cmap=BINARY_CMP,
                                    aspect='auto')
     else:
@@ -106,7 +107,8 @@ def partial_deriv_plot(of, wrt, check_partials_data, title=None, jac_method='J_f
     ax[0].set_title('Approximated Jacobian')
     ax[1].set_title('User-Defined Jacobian')
     # Legend
-    fig.colorbar(im_computed, orientation='horizontal', ax=ax[0:2].ravel().tolist())
+    fig.colorbar(im_computed, orientation='horizontal',
+                 ax=ax[0:2].ravel().tolist())
 
     # plot difference between computed and finite differenced
     diff = computed_full.real - fd_full.real

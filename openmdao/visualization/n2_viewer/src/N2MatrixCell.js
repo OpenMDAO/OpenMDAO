@@ -14,12 +14,20 @@ class N2CellRenderer {
     static updateDims(baseWidth, baseHeight) {
         if (!N2CellRenderer.dims) {
             N2CellRenderer.prevDims = {
-                "size": { "width": 0, "height": 0 },
-                "bottomRight": { "x": 0, "y": 0 },
-                "topLeft": { "x": 0, "y": 0 }
+                "size": {
+                    "width": 0,
+                    "height": 0
+                },
+                "bottomRight": {
+                    "x": 0,
+                    "y": 0
+                },
+                "topLeft": {
+                    "x": 0,
+                    "y": 0
+                }
             }
-        }
-        else {
+        } else {
             for (let prop of ["size", "bottomRight", "topLeft"]) {
                 Object.assign(N2CellRenderer.prevDims[prop],
                     N2CellRenderer.dims[prop]);
@@ -361,7 +369,7 @@ class N2GroupGroupCell extends N2GroupBase {
  * @property {N2TreeNode} tgtObj The model tree node that this outputs to.
  * @property {string} id The srcObj id appended with the tgtObj id.
  * @property {SymbolType} symbolType Info about the type of symbol represented by the node.
-*/
+ */
 class N2MatrixCell {
     /**
      * Initialize the cell.
@@ -371,7 +379,7 @@ class N2MatrixCell {
      * @param {N2TreeNode} tgtObj The model tree node that this outputs to.
      * @param {ModelData} model Reference to the model to get some info from it.
      * @param {N2CellRenderer} renderer The object that draws the cell.
-    */
+     */
     constructor(row, col, srcObj, tgtObj, model) {
         this.row = row;
         this.col = col;
@@ -383,8 +391,14 @@ class N2MatrixCell {
         this.renderer = this._newRenderer();
 
         this.offScreen = {
-            "top": { "incoming": new Set(), "outgoing": new Set() },
-            "bottom": { "incoming": new Set(), "outgoing": new Set() },
+            "top": {
+                "incoming": new Set(),
+                "outgoing": new Set()
+            },
+            "bottom": {
+                "incoming": new Set(),
+                "outgoing": new Set()
+            },
             "total": 0
         }
     }
@@ -392,7 +406,7 @@ class N2MatrixCell {
     /**
      * Determine if this node is on the main diagonal of the matrix.
      * @return {Boolean} True if row equals column.
-    */
+     */
     onDiagonal() {
         return (this.row == this.col);
     }
@@ -440,21 +454,18 @@ class N2MatrixCell {
                 // Top
                 debugInfo("New offscreen outgoing connection on top" + debugStr);
                 this.offScreen.top.outgoing.add(tgtNode);
-            }
-            else {
+            } else {
                 // Bottom
                 debugInfo("New offscreen outgoing connection on bottom" + debugStr);
                 this.offScreen.bottom.outgoing.add(tgtNode);
             }
-        }
-        else {
+        } else {
             // Incoming
             if (srcNode.rootIndex < tgtNode.rootIndex) {
                 // Top
                 debugInfo("New offscreen incoming connection on top" + debugStr);
                 this.offScreen.top.incoming.add(srcNode);
-            }
-            else {
+            } else {
                 // Bottom
                 debugInfo("New offscreen incoming connection on bottom" + debugStr);
                 this.offScreen.bottom.incoming.add(srcNode);
@@ -471,18 +482,30 @@ class N2MatrixCell {
      */
     _newRenderer() {
         switch (this.symbolType.name) {
-            case "scalar": return new N2ScalarCell(this.color(), this.id);
-            case "vector": return new N2VectorCell(this.color(), this.id);
-            case "group": return new N2GroupCell(this.color(), this.id);
-            case "scalarScalar": return new N2ScalarScalarCell(this.color(), this.id);
-            case "scalarVector": return new N2ScalarVectorCell(this.color(), this.id);
-            case "vectorScalar": return new N2VectorScalarCell(this.color(), this.id);
-            case "vectorVector": return new N2VectorVectorCell(this.color(), this.id);
-            case "scalarGroup": return new N2ScalarGroupCell(this.color(), this.id);
-            case "groupScalar": return new N2GroupScalarCell(this.color(), this.id);
-            case "vectorGroup": return new N2VectorGroupCell(this.color(), this.id);
-            case "groupVector": return new N2GroupVectorCell(this.color(), this.id);
-            case "groupGroup": return new N2GroupGroupCell(this.color(), this.id);
+            case "scalar":
+                return new N2ScalarCell(this.color(), this.id);
+            case "vector":
+                return new N2VectorCell(this.color(), this.id);
+            case "group":
+                return new N2GroupCell(this.color(), this.id);
+            case "scalarScalar":
+                return new N2ScalarScalarCell(this.color(), this.id);
+            case "scalarVector":
+                return new N2ScalarVectorCell(this.color(), this.id);
+            case "vectorScalar":
+                return new N2VectorScalarCell(this.color(), this.id);
+            case "vectorVector":
+                return new N2VectorVectorCell(this.color(), this.id);
+            case "scalarGroup":
+                return new N2ScalarGroupCell(this.color(), this.id);
+            case "groupScalar":
+                return new N2GroupScalarCell(this.color(), this.id);
+            case "vectorGroup":
+                return new N2VectorGroupCell(this.color(), this.id);
+            case "groupVector":
+                return new N2GroupVectorCell(this.color(), this.id);
+            case "groupGroup":
+                return new N2GroupGroupCell(this.color(), this.id);
         }
     }
 }
