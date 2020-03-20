@@ -1646,19 +1646,10 @@ class System(object):
                                               ContainsAll())}
             return relevant
 
-    def _setup_relevance(self, mode, relevant=None):
+    def _setup_driver_units(self):
         """
-        Set up the relevance dictionary.
-
-        Parameters
-        ----------
-        mode : str
-            Derivative direction, either 'fwd' or 'rev'.
-        relevant : dict or None
-            Dictionary mapping VOI name to all variables necessary for computing
-            derivatives between the VOI and all other VOIs.
+        Compute unit conversions for driver variables.
         """
-        # Update driver quantities to apply unit conversions.
         abs2meta = self._var_abs2meta
         pro2abs = self._var_allprocs_prom2abs_list['output']
         dv = self._design_vars
@@ -1726,8 +1717,21 @@ class System(object):
                 resp[name]['total_scaler'] = base_scaler * factor
                 resp[name]['total_adder'] = offset + base_adder / factor
 
-        # Relevance setup
+        for s in self._subsystems_myproc:
+            s._setup_driver_units()
 
+    def _setup_relevance(self, mode, relevant=None):
+        """
+        Set up the relevance dictionary.
+
+        Parameters
+        ----------
+        mode : str
+            Derivative direction, either 'fwd' or 'rev'.
+        relevant : dict or None
+            Dictionary mapping VOI name to all variables necessary for computing
+            derivatives between the VOI and all other VOIs.
+        """
         if relevant is None:  # should only occur at top level on full setup
             self._relevant = relevant = self._init_relevance(mode)
         else:

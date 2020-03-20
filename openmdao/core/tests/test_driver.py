@@ -636,9 +636,10 @@ class TestDriver(unittest.TestCase):
                             promotes=['x', 'y1'])
 
         model.add_design_var('x', units='ft', lower=0.0, upper=100.0, scaler=3.5, adder=77.0)
+        prob.setup()
 
         with self.assertRaises(RuntimeError) as context:
-            prob.setup()
+            prob.final_setup()
 
         msg = "Group (<model>): Target for design variable x has 'degF' units, but 'ft' units were specified."
         self.assertEqual(str(context.exception), msg)
@@ -656,9 +657,10 @@ class TestDriver(unittest.TestCase):
                             promotes=['x', 'y1'])
 
         model.add_constraint('x', units='ft', lower=0.0, upper=100.0)
+        prob.setup()
 
         with self.assertRaises(RuntimeError) as context:
-            prob.setup()
+            prob.final_setup()
 
         msg = "Group (<model>): Target for constraint x has 'degF' units, but 'ft' units were specified."
         self.assertEqual(str(context.exception), msg)
@@ -671,14 +673,15 @@ class TestDriver(unittest.TestCase):
 
         model.add_subsystem('p', ivc, promotes=['x'])
         model.add_subsystem('comp1', om.ExecComp('y1 = 2.0*x',
-                                                 x={'value': 2.0, 'units': 'degF'},
+                                                 x={'value': 2.0},
                                                  y1={'value': 2.0, 'units': 'degF'}),
                             promotes=['x', 'y1'])
 
         model.add_design_var('x', units='ft', lower=0.0, upper=100.0, scaler=3.5, adder=77.0)
+        prob.setup()
 
         with self.assertRaises(RuntimeError) as context:
-            prob.setup()
+            prob.final_setup()
 
         msg = "Group (<model>): Target for design variable x has no units, but 'ft' units were specified."
         self.assertEqual(str(context.exception), msg)
@@ -691,14 +694,15 @@ class TestDriver(unittest.TestCase):
 
         model.add_subsystem('p', ivc, promotes=['x'])
         model.add_subsystem('comp1', om.ExecComp('y1 = 2.0*x',
-                                                 x={'value': 2.0, 'units': 'degF'},
+                                                 x={'value': 2.0},
                                                  y1={'value': 2.0, 'units': 'degF'}),
                             promotes=['x', 'y1'])
 
         model.add_constraint('x', units='ft', lower=0.0, upper=100.0)
+        prob.setup()
 
         with self.assertRaises(RuntimeError) as context:
-            prob.setup()
+            prob.final_setup()
 
         msg = "Group (<model>): Target for constraint x has no units, but 'ft' units were specified."
         self.assertEqual(str(context.exception), msg)

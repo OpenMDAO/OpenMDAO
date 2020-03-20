@@ -755,6 +755,7 @@ class Problem(object):
         """
         driver = self.driver
 
+        self.model._setup_driver_units()
         response_size, desvar_size = driver._update_voi_meta(self.model)
 
         # update mode if it's been set to 'auto'
@@ -1407,7 +1408,7 @@ class Problem(object):
         default_col_names = ['name', 'value', 'size']
 
         # Design vars
-        desvars = self.model.get_design_vars()
+        desvars = self.driver._designvars
         vals = self.driver.get_design_var_values()
         header = "Design Variables"
         col_names = default_col_names + desvar_opts
@@ -1417,7 +1418,7 @@ class Problem(object):
                                    col_spacing=2)
 
         # Constraints
-        cons = self.model.get_constraints()
+        cons = self.driver._cons
         vals = self.driver.get_constraint_values()
         header = "Constraints"
         col_names = default_col_names + cons_opts
@@ -1426,7 +1427,7 @@ class Problem(object):
                                    print_arrays=print_arrays,
                                    col_spacing=2)
 
-        objs = self.model.get_objectives()
+        objs = self.driver._objs
         vals = self.driver.get_objective_values()
         header = "Objectives"
         col_names = default_col_names + objs_opts
