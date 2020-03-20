@@ -22,7 +22,7 @@ from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTw
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
     SellarDis1withDerivatives, SellarDis2withDerivatives, SellarProblem
-from openmdao.utils.assert_utils import assert_rel_error, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.general_utils import set_pyoptsparse_opt, determine_adder_scaler, printoptions
 from openmdao.utils.general_utils import remove_whitespace
 from openmdao.utils.testing_utils import use_tempdirs
@@ -1520,29 +1520,29 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         case = cr.get_case(0)
 
-        assert_rel_error(self, case.get_val('comp.x'), 77.0, 1e-6)
-        assert_rel_error(self, case.get_val('comp.x', 'degC'), 25.0, 1e-6)
-        assert_rel_error(self, case.get_val('comp.y'), 52., 1e-6)
-        assert_rel_error(self, case.get_val('comp.y', 'degF'), 125.6, 1e-6)
+        assert_near_equal(case.get_val('comp.x'), 77.0, 1e-6)
+        assert_near_equal(case.get_val('comp.x', 'degC'), 25.0, 1e-6)
+        assert_near_equal(case.get_val('comp.y'), 52., 1e-6)
+        assert_near_equal(case.get_val('comp.y', 'degF'), 125.6, 1e-6)
 
-        assert_rel_error(self, case.get_val('xx'), 77.0, 1e-6)
-        assert_rel_error(self, case.get_val('xx', 'degC'), 25.0, 1e-6)
-        assert_rel_error(self, case.get_val('yy'), 52., 1e-6)
-        assert_rel_error(self, case.get_val('yy', 'degF'), 125.6, 1e-6)
+        assert_near_equal(case.get_val('xx'), 77.0, 1e-6)
+        assert_near_equal(case.get_val('xx', 'degC'), 25.0, 1e-6)
+        assert_near_equal(case.get_val('yy'), 52., 1e-6)
+        assert_near_equal(case.get_val('yy', 'degF'), 125.6, 1e-6)
 
-        assert_rel_error(self, case.get_val('acomp.x', indices=0), 77.0, 1e-6)
-        assert_rel_error(self, case.get_val('acomp.x', indices=[1]), 95.0, 1e-6)
-        assert_rel_error(self, case.get_val('acomp.x', 'degC', indices=[0]), 25.0, 1e-6)
-        assert_rel_error(self, case.get_val('acomp.x', 'degC', indices=1), 35.0, 1e-6)
-        assert_rel_error(self, case.get_val('acomp.y', indices=0), 52., 1e-6)
-        assert_rel_error(self, case.get_val('acomp.y', 'degF', indices=0), 125.6, 1e-6)
+        assert_near_equal(case.get_val('acomp.x', indices=0), 77.0, 1e-6)
+        assert_near_equal(case.get_val('acomp.x', indices=[1]), 95.0, 1e-6)
+        assert_near_equal(case.get_val('acomp.x', 'degC', indices=[0]), 25.0, 1e-6)
+        assert_near_equal(case.get_val('acomp.x', 'degC', indices=1), 35.0, 1e-6)
+        assert_near_equal(case.get_val('acomp.y', indices=0), 52., 1e-6)
+        assert_near_equal(case.get_val('acomp.y', 'degF', indices=0), 125.6, 1e-6)
 
-        assert_rel_error(self, case.get_val('axx', indices=0), 77.0, 1e-6)
-        assert_rel_error(self, case.get_val('axx', indices=1), 95.0, 1e-6)
-        assert_rel_error(self, case.get_val('axx', 'degC', indices=0), 25.0, 1e-6)
-        assert_rel_error(self, case.get_val('axx', 'degC', indices=np.array([1])), 35.0, 1e-6)
-        assert_rel_error(self, case.get_val('ayy', indices=0), 52., 1e-6)
-        assert_rel_error(self, case.get_val('ayy', 'degF', indices=0), 125.6, 1e-6)
+        assert_near_equal(case.get_val('axx', indices=0), 77.0, 1e-6)
+        assert_near_equal(case.get_val('axx', indices=1), 95.0, 1e-6)
+        assert_near_equal(case.get_val('axx', 'degC', indices=0), 25.0, 1e-6)
+        assert_near_equal(case.get_val('axx', 'degC', indices=np.array([1])), 35.0, 1e-6)
+        assert_near_equal(case.get_val('ayy', indices=0), 52., 1e-6)
+        assert_near_equal(case.get_val('ayy', 'degF', indices=0), 125.6, 1e-6)
 
     def test_get_ambiguous_input(self):
         model = om.Group()
@@ -1565,14 +1565,14 @@ class TestSqliteCaseReader(unittest.TestCase):
         cr = om.CaseReader(self.filename)
         case = cr.get_case(0)
 
-        assert_rel_error(self, case.get_val('x'), 1., 1e-6)
-        assert_rel_error(self, case.get_val('x', units='ft'), 3.280839895, 1e-6)
+        assert_near_equal(case.get_val('x'), 1., 1e-6)
+        assert_near_equal(case.get_val('x', units='ft'), 3.280839895, 1e-6)
 
-        assert_rel_error(self, case.get_val('G1.C0.x'), 1., 1e-6)
-        assert_rel_error(self, case.get_val('G1.C0.x', units='ft'), 3.280839895, 1e-6)
+        assert_near_equal(case.get_val('G1.C0.x'), 1., 1e-6)
+        assert_near_equal(case.get_val('G1.C0.x', units='ft'), 3.280839895, 1e-6)
 
-        assert_rel_error(self, case.get_val('G2.C1.m'), 1., 1e-6)
-        assert_rel_error(self, case.get_val('G2.C2.f'), 3.280839895, 1e-6)
+        assert_near_equal(case.get_val('G2.C1.m'), 1., 1e-6)
+        assert_near_equal(case.get_val('G2.C2.f'), 3.280839895, 1e-6)
 
         # 'a' is ambiguous.. which input do you want when accessing 'a'?
         msg = "The promoted name 'a' is invalid because it refers to multiple inputs:" + \
@@ -2155,10 +2155,10 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # check 'use_indices' option, default is to use indices
         dvs = case.get_design_vars()
-        assert_rel_error(self, dvs['x'], x_vals[[0, 3]], 1e-12)
+        assert_near_equal(dvs['x'], x_vals[[0, 3]], 1e-12)
 
         dvs = case.get_design_vars(use_indices=False)
-        assert_rel_error(self, dvs['x'], x_vals, 1e-12)
+        assert_near_equal(dvs['x'], x_vals, 1e-12)
 
         cons = case.get_constraints()
         self.assertEqual(len(cons['theta_con.g']), len(EVEN_IND))
@@ -2993,7 +2993,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         ]))
 
         # Get specific derivative.
-        assert_rel_error(self, derivs['obj', 'z'], derivs['obj', 'z'])
+        assert_near_equal(derivs['obj', 'z'], derivs['obj', 'z'])
 
     def test_feature_recording_option_precedence(self):
         import openmdao.api as om
@@ -3163,13 +3163,13 @@ class TestFeatureSqliteReader(unittest.TestCase):
 
         case_inputs = sorted(case.list_inputs())
 
-        assert_rel_error(self, case_inputs[0][1]['value'], [1.], tolerance=1e-10) # d1.x
-        assert_rel_error(self, case_inputs[1][1]['value'], [12.27257053], tolerance=1e-10) # d1.y2
-        assert_rel_error(self, case_inputs[2][1]['value'], [5., 2.], tolerance=1e-10) # d1.z
+        assert_near_equal(case_inputs[0][1]['value'], [1.], tolerance=1e-10) # d1.x
+        assert_near_equal(case_inputs[1][1]['value'], [12.27257053], tolerance=1e-10) # d1.y2
+        assert_near_equal(case_inputs[2][1]['value'], [5., 2.], tolerance=1e-10) # d1.z
 
         case_outputs = case.list_outputs(prom_name=True)
 
-        assert_rel_error(self, case_outputs[0][1]['value'], [25.545485893882876], tolerance=1e-10) # d1.y1
+        assert_near_equal(case_outputs[0][1]['value'], [25.545485893882876], tolerance=1e-10) # d1.y1
 
     def test_feature_list_inputs_and_outputs_with_tags(self):
         import openmdao.api as om
@@ -3286,11 +3286,11 @@ class TestFeatureSqliteReader(unittest.TestCase):
         cr = om.CaseReader('cases.sql')
         case = cr.get_case(0)
 
-        assert_rel_error(self, case['x'], 100., 1e-6)
-        assert_rel_error(self, case.get_val('x', units='ft'), 328.0839895, 1e-6)
+        assert_near_equal(case['x'], 100., 1e-6)
+        assert_near_equal(case.get_val('x', units='ft'), 328.0839895, 1e-6)
 
-        assert_rel_error(self, case['v'], 100./60., 1e-6)
-        assert_rel_error(self, case.get_val('v', units='ft/s'), 5.46807, 1e-6)
+        assert_near_equal(case['v'], 100./60., 1e-6)
+        assert_near_equal(case.get_val('v', units='ft/s'), 5.46807, 1e-6)
 
 
 @use_tempdirs

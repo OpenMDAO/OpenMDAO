@@ -4,7 +4,7 @@ A contrived example for issuing connections during configure rather than setup.
 import itertools
 import unittest
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class Squarer(om.ExplicitComponent):
@@ -189,14 +189,14 @@ class TestConnectionsInSetup(unittest.TestCase):
 
         p.run_model()
 
-        assert_rel_error(self, p['h.squarer.a_squared'], p['h.a'] ** 2)
-        assert_rel_error(self, p['h.squarer.b_squared'], p['h.b'] ** 2)
-        assert_rel_error(self, p['h.squarer.c_squared'], p['h.c'] ** 2)
+        assert_near_equal(p['h.squarer.a_squared'], p['h.a'] ** 2)
+        assert_near_equal(p['h.squarer.b_squared'], p['h.b'] ** 2)
+        assert_near_equal(p['h.squarer.c_squared'], p['h.c'] ** 2)
 
-        assert_rel_error(self, p['h.cuber.a_cubed'], p['h.a'] ** 3)
-        assert_rel_error(self, p['h.cuber.b_cubed'], p['h.b'] ** 3)
-        assert_rel_error(self, p['h.cuber.x_cubed'], p['h.x'] ** 3)
-        assert_rel_error(self, p['h.cuber.y_cubed'], p['h.y'] ** 3)
+        assert_near_equal(p['h.cuber.a_cubed'], p['h.a'] ** 3)
+        assert_near_equal(p['h.cuber.b_cubed'], p['h.b'] ** 3)
+        assert_near_equal(p['h.cuber.x_cubed'], p['h.x'] ** 3)
+        assert_near_equal(p['h.cuber.y_cubed'], p['h.y'] ** 3)
 
     def test_connect_in_configure(self):
 
@@ -219,14 +219,14 @@ class TestConnectionsInSetup(unittest.TestCase):
 
         p.run_model()
 
-        assert_rel_error(self, p['h.squarer.a_squared'], p['h.a'] ** 2)
-        assert_rel_error(self, p['h.squarer.b_squared'], p['h.b'] ** 2)
-        assert_rel_error(self, p['h.squarer.c_squared'], p['h.c'] ** 2)
+        assert_near_equal(p['h.squarer.a_squared'], p['h.a'] ** 2)
+        assert_near_equal(p['h.squarer.b_squared'], p['h.b'] ** 2)
+        assert_near_equal(p['h.squarer.c_squared'], p['h.c'] ** 2)
 
-        assert_rel_error(self, p['h.cuber.a_cubed'], p['h.a'] ** 3)
-        assert_rel_error(self, p['h.cuber.b_cubed'], p['h.b'] ** 3)
-        assert_rel_error(self, p['h.cuber.x_cubed'], p['h.x'] ** 3)
-        assert_rel_error(self, p['h.cuber.y_cubed'], p['h.y'] ** 3)
+        assert_near_equal(p['h.cuber.a_cubed'], p['h.a'] ** 3)
+        assert_near_equal(p['h.cuber.b_cubed'], p['h.b'] ** 3)
+        assert_near_equal(p['h.cuber.x_cubed'], p['h.x'] ** 3)
+        assert_near_equal(p['h.cuber.y_cubed'], p['h.y'] ** 3)
 
 
 class TestAddSubcomponentIOInConfigure(unittest.TestCase):
@@ -270,7 +270,7 @@ class TestAddSubcomponentIOInConfigure(unittest.TestCase):
 
         p.run_model()
 
-        assert_rel_error(self, p.get_val('g.foo_cubed'), p.get_val('g.foo')**3)
+        assert_near_equal(p.get_val('g.foo_cubed'), p.get_val('g.foo')**3)
 
 
 if __name__ == '__main__':

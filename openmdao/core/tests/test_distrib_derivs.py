@@ -7,7 +7,7 @@ import itertools
 import openmdao.api as om
 from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import evenly_distrib_idxs
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 
 try:
     from parameterized import parameterized
@@ -164,7 +164,7 @@ class MPITests2(unittest.TestCase):
         final[0:5] *= 2.0
         final[5:9] *= 3.0
 
-        assert_rel_error(self, prob['total.y'], final)
+        assert_near_equal(prob['total.y'], final)
 
     def test_two_simple(self):
         size = 3
@@ -189,13 +189,13 @@ class MPITests2(unittest.TestCase):
         prob.run_model()
 
         J = prob.compute_totals(['C2.z'], ['P.x'])
-        assert_rel_error(self, J['C2.z', 'P.x'], numpy.diag([6.0, 6.0, 9.0]), 1e-6)
+        assert_near_equal(J['C2.z', 'P.x'], numpy.diag([6.0, 6.0, 9.0]), 1e-6)
 
         prob.setup(check=False, mode='rev')
         prob.run_model()
 
         J = prob.compute_totals(['C2.z'], ['P.x'])
-        assert_rel_error(self, J['C2.z', 'P.x'], numpy.diag([6.0, 6.0, 9.0]), 1e-6)
+        assert_near_equal(J['C2.z', 'P.x'], numpy.diag([6.0, 6.0, 9.0]), 1e-6)
 
     @parameterized.expand(itertools.product([om.NonlinearRunOnce, om.NonlinearBlockGS]),
                           name_func=_test_func_name)
@@ -236,22 +236,22 @@ class MPITests2(unittest.TestCase):
         diag1 = [4.5, 4.5, 3.0]
         diag2 = [15.0, 15.0, 10.0]
 
-        assert_rel_error(self, prob['C2.y'], diag1)
-        assert_rel_error(self, prob['C3.y'], diag2)
+        assert_near_equal(prob['C2.y'], diag1)
+        assert_near_equal(prob['C3.y'], diag2)
 
         diag1 = numpy.diag(diag1)
         diag2 = numpy.diag(diag2)
 
         J = prob.compute_totals(of=['C2.y', "C3.y"], wrt=['P.x'])
-        assert_rel_error(self, J['C2.y', 'P.x'], diag1, 1e-6)
-        assert_rel_error(self, J['C3.y', 'P.x'], diag2, 1e-6)
+        assert_near_equal(J['C2.y', 'P.x'], diag1, 1e-6)
+        assert_near_equal(J['C3.y', 'P.x'], diag2, 1e-6)
 
         prob.setup(check=False, mode='rev')
         prob.run_model()
 
         J = prob.compute_totals(of=['C2.y', "C3.y"], wrt=['P.x'])
-        assert_rel_error(self, J['C2.y', 'P.x'], diag1, 1e-6)
-        assert_rel_error(self, J['C3.y', 'P.x'], diag2, 1e-6)
+        assert_near_equal(J['C2.y', 'P.x'], diag1, 1e-6)
+        assert_near_equal(J['C3.y', 'P.x'], diag2, 1e-6)
 
     @parameterized.expand(itertools.product([om.NonlinearRunOnce, om.NonlinearBlockGS]),
                           name_func=_test_func_name)
@@ -296,16 +296,16 @@ class MPITests2(unittest.TestCase):
         diag2 = numpy.diag([35.0, 35.0, 17.5])
 
         J = prob.compute_totals(of=['C4.y'], wrt=['P1.x', 'P2.x'])
-        assert_rel_error(self, J['C4.y', 'P1.x'], diag1, 1e-6)
-        assert_rel_error(self, J['C4.y', 'P2.x'], diag2, 1e-6)
+        assert_near_equal(J['C4.y', 'P1.x'], diag1, 1e-6)
+        assert_near_equal(J['C4.y', 'P2.x'], diag2, 1e-6)
 
         prob.setup(check=False, mode='rev')
 
         prob.run_driver()
 
         J = prob.compute_totals(of=['C4.y'], wrt=['P1.x', 'P2.x'])
-        assert_rel_error(self, J['C4.y', 'P1.x'], diag1, 1e-6)
-        assert_rel_error(self, J['C4.y', 'P2.x'], diag2, 1e-6)
+        assert_near_equal(J['C4.y', 'P1.x'], diag1, 1e-6)
+        assert_near_equal(J['C4.y', 'P2.x'], diag2, 1e-6)
 
     def test_distrib_voi(self):
         raise unittest.SkipTest("distrib vois no supported yet")
@@ -407,12 +407,12 @@ class MPITests3(unittest.TestCase):
         p.setup(mode='fwd')
         p.run_model()
         jac = p.compute_totals(of=['out_var'], wrt=['a'], return_format='dict')
-        assert_rel_error(self, jac['out_var']['a'][0], expected, 1e-6)
+        assert_near_equal(jac['out_var']['a'][0], expected, 1e-6)
 
         p.setup(mode='rev')
         p.run_model()
         jac = p.compute_totals(of=['out_var'], wrt=['a'], return_format='dict')
-        assert_rel_error(self, jac['out_var']['a'][0], expected, 1e-6)
+        assert_near_equal(jac['out_var']['a'][0], expected, 1e-6)
 
 
 if __name__ == "__main__":

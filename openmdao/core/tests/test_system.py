@@ -6,7 +6,7 @@ import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp
 from openmdao.test_suite.components.options_feature_vector import VectorDoublingComp
-from openmdao.utils.assert_utils import assert_rel_error, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 
 
 class TestSystem(unittest.TestCase):
@@ -131,11 +131,11 @@ class TestSystem(unittest.TestCase):
 
         # assign scalar to array
         inputs['C2.x'] = num_val
-        assert_rel_error(self, inputs['C2.x'], arr_val, 1e-10)
+        assert_near_equal(inputs['C2.x'], arr_val, 1e-10)
 
         # assign array to array
         inputs['C2.x'] = arr_val
-        assert_rel_error(self, inputs['C2.x'], arr_val, 1e-10)
+        assert_near_equal(inputs['C2.x'], arr_val, 1e-10)
 
         # assign bad array shape to array
         with self.assertRaisesRegex(ValueError, msg):
@@ -143,7 +143,7 @@ class TestSystem(unittest.TestCase):
 
         # assign list to array
         inputs['C2.x'] = arr_val.tolist()
-        assert_rel_error(self, inputs['C2.x'], arr_val, 1e-10)
+        assert_near_equal(inputs['C2.x'], arr_val, 1e-10)
 
         # assign bad list shape to array
         with self.assertRaisesRegex(ValueError, msg):
@@ -159,11 +159,11 @@ class TestSystem(unittest.TestCase):
 
         # assign scalar to array
         outputs['C2.y'] = num_val
-        assert_rel_error(self, outputs['C2.y'], arr_val, 1e-10)
+        assert_near_equal(outputs['C2.y'], arr_val, 1e-10)
 
         # assign array to array
         outputs['C2.y'] = arr_val
-        assert_rel_error(self, outputs['C2.y'], arr_val, 1e-10)
+        assert_near_equal(outputs['C2.y'], arr_val, 1e-10)
 
         # assign bad array shape to array
         with self.assertRaisesRegex(ValueError, msg):
@@ -171,7 +171,7 @@ class TestSystem(unittest.TestCase):
 
         # assign list to array
         outputs['C2.y'] = arr_val.tolist()
-        assert_rel_error(self, outputs['C2.y'], arr_val, 1e-10)
+        assert_near_equal(outputs['C2.y'], arr_val, 1e-10)
 
         # assign bad list shape to array
         with self.assertRaisesRegex(ValueError, msg):
@@ -187,11 +187,11 @@ class TestSystem(unittest.TestCase):
 
         # assign scalar to array
         residuals['C2.y'] = num_val
-        assert_rel_error(self, residuals['C2.y'], arr_val, 1e-10)
+        assert_near_equal(residuals['C2.y'], arr_val, 1e-10)
 
         # assign array to array
         residuals['C2.y'] = arr_val
-        assert_rel_error(self, residuals['C2.y'], arr_val, 1e-10)
+        assert_near_equal(residuals['C2.y'], arr_val, 1e-10)
 
         # assign bad array shape to array
         with self.assertRaisesRegex(ValueError, msg):
@@ -199,7 +199,7 @@ class TestSystem(unittest.TestCase):
 
         # assign list to array
         residuals['C2.y'] = arr_val.tolist()
-        assert_rel_error(self, residuals['C2.y'], arr_val, 1e-10)
+        assert_near_equal(residuals['C2.y'], arr_val, 1e-10)
 
         # assign bad list shape to array
         with self.assertRaisesRegex(ValueError, msg):

@@ -21,69 +21,69 @@ current_test = 1
 """ A set of toolbar tests that runs on each model. """
 toolbar_script = [
     {
-        "desc": "Collapse All Outputs button",
-        "id": "collapseAllButtonId",
-        "waitForTransition": True
-    },
-    {
         "desc": "Uncollapse All button",
-        "id": "uncollapseAllButtonId",
+        "id": "expand-all",
         "waitForTransition": True
     },
     {
         "desc": "Collapse Outputs in View Only button",
-        "id": "collapseInViewButtonId",
+        "id": "collapse-element",
         "waitForTransition": True
     },
     {
         "desc": "Uncollapse In View Only button",
-        "id": "uncollapseInViewButtonId",
+        "id": "expand-element",
+        "waitForTransition": True
+    },
+    {
+        "desc": "Show Legend (off) button",
+        "id": "legend-button",
         "waitForTransition": True
     },
     {
         "desc": "Show Legend (on) button",
-        "id": "showLegendButtonId",
-        "waitForTransition": False
-    },
-    {
-        "desc": "Show Legend (off) button",
-        "id": "showLegendButtonId",
+        "id": "legend-button",
         "waitForTransition": False
     },
     {
         "desc": "Show Path (on) button",
-        "id": "showCurrentPathButtonId",
+        "id": "info-button",
         "waitForTransition": False
     },
     {
         "desc": "Show Path (off) button",
-        "id": "showCurrentPathButtonId",
+        "id": "info-button",
         "waitForTransition": False
     },
     {
         "desc": "Toggle Solver Names (on) button",
-        "id": "toggleSolverNamesButtonId",
-        "waitForTransition": True
+        "id": "linear-solver-button",
+        "waitForTransition": False
     },
     {
         "desc": "Toggle Solver Names (off) button",
-        "id": "toggleSolverNamesButtonId",
+        "id": "linear-solver-button",
         "waitForTransition": True
     },
     {
         "desc": "Clear Arrows and Connection button",
-        "id": "clearArrowsAndConnectsButtonId",
+        "id": "hide-connections",
         "waitForTransition": False
     },
     {
         "desc": "Help (on) button",
-        "id": "helpButtonId",
+        "id": "question-button",
         "waitForTransition": False
     },
     {
         "desc": "Help (off) button",
-        "id": "helpButtonId",
+        "id": "question-button",
         "waitForTransition": False
+    },
+    {
+        "desc": "Collapse All Outputs button",
+        "id": "collapse-all",
+        "waitForTransition": True
     }
 ]
 
@@ -161,11 +161,6 @@ n2_gui_test_scripts = {
             "test": "click",
             "selector": "g#solver_tree rect#circuit_n1",
             "button": "right"
-        },
-        {
-            "test": "search",
-            "searchString": "R1.I",
-            "n2ElementCount": 16
         }
     ],
     "bug_arrow": [
@@ -240,11 +235,6 @@ n2_gui_test_scripts = {
             "test": "click",
             "selector": "g#solver_tree rect#design_fan_map_scalars",
             "button": "right"
-        },
-        {
-            "test": "search",
-            "searchString": "s_Nc",
-            "n2ElementCount": 4
         }
     ],
     "double_sellar": [
@@ -319,19 +309,14 @@ n2_gui_test_scripts = {
             "test": "click",
             "selector": "g#solver_tree rect#g1_d1",
             "button": "right"
-        },
-        {
-            "test": "search",
-            "searchString": "d2.y2",
-            "n2ElementCount": 8
         }
     ],
     "udpi_circuit": [
         {
-            "desc": "Check the number of cells in the N2 Matrix",
-            "test": "count",
-            "selector": "g#n2elements > g.n2cell",
-            "count": 29
+        "desc": "Check the number of cells in the N2 Matrix",
+        "test": "count",
+        "selector": "g#n2elements > g.n2cell",
+        "count": 29
         }
     ],
     "parabaloid": [
@@ -344,7 +329,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Hit back button to uncollapse the indeps view",
             "test": "click",
-            "selector": "#backButtonId",
+            "selector": "#undo-graph",
             "button": "left"
         },
         {
@@ -397,13 +382,16 @@ class n2_gui_test_case(unittest.TestCase):
         self.browser = await launch({
             'defaultViewport': {
                 'width': 1600,
-                'height': 1200
-            }
+                'height': 900
+            },
+            'args': ['--start-fullscreen'],
+            'headless': True
         })
         userAgentStr = await self.browser.userAgent()
         print("Browser: " + userAgentStr + "\n")
 
         self.page = await self.browser.newPage()
+        await self.page.bringToFront()
         await self.setup_error_handlers()
 
     def log_test(self, msg):
@@ -535,7 +523,7 @@ class n2_gui_test_case(unittest.TestCase):
         """
 
         self.log_test("Return to root")
-        hndl = await self.get_handle("button#returnToRootButtonId.myButton")
+        hndl = await self.get_handle("#reset-graph")
         await hndl.click()
         await self.page.waitFor(self.transition_wait)
 
@@ -544,16 +532,24 @@ class n2_gui_test_case(unittest.TestCase):
         Enter a string in the search textbox and check that the expected
         number of elements are shown in the N2 matrix.
         """
+        searchString = options['searchString']
         self.log_test(options['desc'] if 'desc' in options else
                       "Searching for '" + options['searchString'] +
                       "' and checking for " +
                       str(options['n2ElementCount']) + " N2 elements after.")
 
-        hndl = await self.get_handle("div#toolbarLoc input#awesompleteId")
-        await hndl.type(options['searchString'])
-        await hndl.press('Enter')
-        await self.page.waitFor(self.transition_wait + 500)
+        await self.page.hover(".searchbar-container")
+        await self.page.click(".searchbar")
+        await self.page.waitFor(500)
 
+        searchbar = await self.page.querySelector('#awesompleteId')
+        await self.page.evaluate('(element, searchString, page) => element.value = searchString + " "', searchbar, searchString, page)
+
+        await self.page.waitFor(500)
+
+        await self.page.keyboard.press('Backspace')
+        await self.page.keyboard.press("Enter")
+        await self.page.waitFor(self.transition_wait + 500)
         await self.assert_element_count("g#n2elements > g.n2cell",
                                         options['n2ElementCount'])
 

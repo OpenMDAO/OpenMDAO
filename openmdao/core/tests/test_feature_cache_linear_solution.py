@@ -10,7 +10,7 @@ import scipy
 from scipy.sparse.linalg import gmres
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class CacheLinearTestCase(unittest.TestCase):
@@ -109,7 +109,7 @@ class CacheLinearTestCase(unittest.TestCase):
 
         print(p['a'], p['b'], p['c'])
         print(p['states'])
-        assert_rel_error(self, p['obj.y'], 0.25029766, 1e-3)
+        assert_near_equal(p['obj.y'], 0.25029766, 1e-3)
 
 
 if __name__ == "__main__":

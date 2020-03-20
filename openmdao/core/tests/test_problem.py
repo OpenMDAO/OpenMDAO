@@ -10,7 +10,7 @@ import numpy as np
 import openmdao.api as om
 from openmdao.core.system import get_relevant_vars
 from openmdao.core.driver import Driver
-from openmdao.utils.assert_utils import assert_rel_error, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 import openmdao.utils.hooks as hooks
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives
@@ -134,7 +134,7 @@ class TestProblem(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['comp.f_xy'], -15.0)
+        assert_near_equal(prob['comp.f_xy'], -15.0)
 
     def test_feature_simple_run_once_input_input(self):
         import openmdao.api as om
@@ -155,8 +155,8 @@ class TestProblem(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['comp1.f_xy'], 13.0)
-        assert_rel_error(self, prob['comp2.f_xy'], 13.0)
+        assert_near_equal(prob['comp1.f_xy'], 13.0)
+        assert_near_equal(prob['comp2.f_xy'], 13.0)
 
     def test_feature_simple_run_once_compute_totals(self):
         import openmdao.api as om
@@ -176,12 +176,12 @@ class TestProblem(unittest.TestCase):
         prob.run_model()
 
         totals = prob.compute_totals(of=['comp.f_xy'], wrt=['p1.x', 'p2.y'])
-        assert_rel_error(self, totals[('comp.f_xy', 'p1.x')][0][0], -4.0)
-        assert_rel_error(self, totals[('comp.f_xy', 'p2.y')][0][0], 3.0)
+        assert_near_equal(totals[('comp.f_xy', 'p1.x')][0][0], -4.0)
+        assert_near_equal(totals[('comp.f_xy', 'p2.y')][0][0], 3.0)
 
         totals = prob.compute_totals(of=['comp.f_xy'], wrt=['p1.x', 'p2.y'], return_format='dict')
-        assert_rel_error(self, totals['comp.f_xy']['p1.x'][0][0], -4.0)
-        assert_rel_error(self, totals['comp.f_xy']['p2.y'][0][0], 3.0)
+        assert_near_equal(totals['comp.f_xy']['p1.x'][0][0], -4.0)
+        assert_near_equal(totals['comp.f_xy']['p2.y'][0][0], 3.0)
 
     def test_feature_simple_run_once_compute_totals_scaled(self):
         import openmdao.api as om
@@ -205,8 +205,8 @@ class TestProblem(unittest.TestCase):
         prob.run_model()
 
         totals = prob.compute_totals(of=['comp.f_xy'], wrt=['p1.x', 'p2.y'], driver_scaling=True)
-        assert_rel_error(self, totals[('comp.f_xy', 'p1.x')][0][0], 196.0)
-        assert_rel_error(self, totals[('comp.f_xy', 'p2.y')][0][0], 3.0)
+        assert_near_equal(totals[('comp.f_xy', 'p1.x')][0][0], 196.0)
+        assert_near_equal(totals[('comp.f_xy', 'p2.y')][0][0], 3.0)
 
     def test_feature_simple_run_once_set_deriv_mode(self):
         import openmdao.api as om
@@ -226,7 +226,7 @@ class TestProblem(unittest.TestCase):
         # prob.setup(mode='fwd')
         prob.run_model()
 
-        assert_rel_error(self, prob['comp.f_xy'], -15.0)
+        assert_near_equal(prob['comp.f_xy'], -15.0)
 
         prob.compute_totals(of=['comp.f_xy'], wrt=['p1.x', 'p2.y'])
 
@@ -246,7 +246,7 @@ class TestProblem(unittest.TestCase):
         prob.run_model()
 
         totals = prob.compute_totals(of='comp.f_xy', wrt='p1.x')
-        assert_rel_error(self, totals[('comp.f_xy', 'p1.x')][0][0], -4.0)
+        assert_near_equal(totals[('comp.f_xy', 'p1.x')][0][0], -4.0)
 
     def test_two_var_single_string_error(self):
 
@@ -289,12 +289,12 @@ class TestProblem(unittest.TestCase):
         p.run_model()
 
         J = p.compute_totals()
-        assert_rel_error(self, J[('MP1.y', 'indeps1.x')], np.eye(5)*7., 1e-10)
-        assert_rel_error(self, J[('MP2.y', 'indeps2.x')], np.eye(3)*-3., 1e-10)
+        assert_near_equal(J[('MP1.y', 'indeps1.x')], np.eye(5)*7., 1e-10)
+        assert_near_equal(J[('MP2.y', 'indeps2.x')], np.eye(3)*-3., 1e-10)
         # before the bug fix, the following two derivs contained nonzero values even
         # though the variables involved were not dependent on each other.
-        assert_rel_error(self, J[('MP2.y', 'indeps1.x')], np.zeros((3, 5)), 1e-10)
-        assert_rel_error(self, J[('MP1.y', 'indeps2.x')], np.zeros((5, 3)), 1e-10)
+        assert_near_equal(J[('MP2.y', 'indeps1.x')], np.zeros((3, 5)), 1e-10)
+        assert_near_equal(J[('MP1.y', 'indeps2.x')], np.zeros((5, 3)), 1e-10)
 
     def test_set_2d_array(self):
         import numpy as np
@@ -311,14 +311,14 @@ class TestProblem(unittest.TestCase):
         prob['indeps.X_c'] = new_val
         prob.final_setup()
 
-        assert_rel_error(self, prob['indeps.X_c'], new_val, 1e-10)
+        assert_near_equal(prob['indeps.X_c'], new_val, 1e-10)
 
         new_val = 2.5*np.ones(3)
         prob['indeps.X_c'][:, 0] = new_val
         prob.final_setup()
 
-        assert_rel_error(self, prob['indeps.X_c'], new_val.reshape((3, 1)), 1e-10)
-        assert_rel_error(self, prob['indeps.X_c'][:, 0], new_val, 1e-10)
+        assert_near_equal(prob['indeps.X_c'], new_val.reshape((3, 1)), 1e-10)
+        assert_near_equal(prob['indeps.X_c'][:, 0], new_val, 1e-10)
 
     def test_set_checks_shape(self):
 
@@ -336,7 +336,7 @@ class TestProblem(unittest.TestCase):
         # check valid scalar value
         new_val = -10.
         prob['indep.num'] = new_val
-        assert_rel_error(self, prob['indep.num'], new_val, 1e-10)
+        assert_near_equal(prob['indep.num'], new_val, 1e-10)
 
         # check bad scalar value
         bad_val = -10*np.ones((10))
@@ -349,12 +349,12 @@ class TestProblem(unittest.TestCase):
         arr_val = new_val*np.ones((10, 1))
         prob['indep.arr'] = new_val
         prob.final_setup()
-        assert_rel_error(self, prob['indep.arr'], arr_val, 1e-10)
+        assert_near_equal(prob['indep.arr'], arr_val, 1e-10)
 
         # check valid array value
         new_val = -10*np.ones((10, 1))
         prob['indep.arr'] = new_val
-        assert_rel_error(self, prob['indep.arr'], new_val, 1e-10)
+        assert_near_equal(prob['indep.arr'], new_val, 1e-10)
 
         # check bad array value
         bad_val = -10*np.ones((10))
@@ -364,7 +364,7 @@ class TestProblem(unittest.TestCase):
         # check valid list value
         new_val = new_val.tolist()
         prob['indep.arr'] = new_val
-        assert_rel_error(self, prob['indep.arr'], new_val, 1e-10)
+        assert_near_equal(prob['indep.arr'], new_val, 1e-10)
 
         # check bad list value
         bad_val = bad_val.tolist()
@@ -388,8 +388,8 @@ class TestProblem(unittest.TestCase):
         wrt = ['x', 'y']
         derivs = prob.compute_totals(of=of, wrt=wrt)
 
-        assert_rel_error(self, derivs['f_xy', 'x'], [[-6.0]], 1e-6)
-        assert_rel_error(self, derivs['f_xy', 'y'], [[8.0]], 1e-6)
+        assert_near_equal(derivs['f_xy', 'x'], [[-6.0]], 1e-6)
+        assert_near_equal(derivs['f_xy', 'y'], [[8.0]], 1e-6)
 
         prob.setup(check=False, mode='rev')
         prob.run_model()
@@ -398,8 +398,8 @@ class TestProblem(unittest.TestCase):
         wrt = ['x', 'y']
         derivs = prob.compute_totals(of=of, wrt=wrt)
 
-        assert_rel_error(self, derivs['f_xy', 'x'], [[-6.0]], 1e-6)
-        assert_rel_error(self, derivs['f_xy', 'y'], [[8.0]], 1e-6)
+        assert_near_equal(derivs['f_xy', 'x'], [[-6.0]], 1e-6)
+        assert_near_equal(derivs['f_xy', 'y'], [[8.0]], 1e-6)
 
     def test_compute_totals_basic_return_dict(self):
         # Make sure 'dict' return_format works.
@@ -418,8 +418,8 @@ class TestProblem(unittest.TestCase):
         wrt = ['x', 'y']
         derivs = prob.compute_totals(of=of, wrt=wrt, return_format='dict')
 
-        assert_rel_error(self, derivs['f_xy']['x'], [[-6.0]], 1e-6)
-        assert_rel_error(self, derivs['f_xy']['y'], [[8.0]], 1e-6)
+        assert_near_equal(derivs['f_xy']['x'], [[-6.0]], 1e-6)
+        assert_near_equal(derivs['f_xy']['y'], [[8.0]], 1e-6)
 
         prob.setup(check=False, mode='rev')
         prob.run_model()
@@ -428,8 +428,8 @@ class TestProblem(unittest.TestCase):
         wrt = ['x', 'y']
         derivs = prob.compute_totals(of=of, wrt=wrt, return_format='dict')
 
-        assert_rel_error(self, derivs['f_xy']['x'], [[-6.0]], 1e-6)
-        assert_rel_error(self, derivs['f_xy']['y'], [[8.0]], 1e-6)
+        assert_near_equal(derivs['f_xy']['x'], [[-6.0]], 1e-6)
+        assert_near_equal(derivs['f_xy']['y'], [[8.0]], 1e-6)
 
     def test_compute_totals_no_args_no_desvar(self):
         p = om.Problem()
@@ -491,7 +491,7 @@ class TestProblem(unittest.TestCase):
 
         derivs = p.compute_totals()
 
-        assert_rel_error(self, derivs['calc.y', 'des_vars.x'], [[2.0]], 1e-6)
+        assert_near_equal(derivs['calc.y', 'des_vars.x'], [[2.0]], 1e-6)
 
     def test_compute_totals_no_args_promoted(self):
         p = om.Problem()
@@ -509,7 +509,7 @@ class TestProblem(unittest.TestCase):
 
         derivs = p.compute_totals()
 
-        assert_rel_error(self, derivs['calc.y', 'des_vars.x'], [[2.0]], 1e-6)
+        assert_near_equal(derivs['calc.y', 'des_vars.x'], [[2.0]], 1e-6)
 
     @parameterized.expand(itertools.product(['fwd', 'rev']))
     def test_compute_jacvec_product(self, mode):
@@ -572,7 +572,7 @@ class TestProblem(unittest.TestCase):
         prob['x'] = 2.
         prob['y'] = 10.
         prob.run_model()
-        assert_rel_error(self, prob['f_xy'], 214.0, 1e-6)
+        assert_near_equal(prob['f_xy'], 214.0, 1e-6)
 
     def test_feature_basic_setup(self):
         import openmdao.api as om
@@ -589,19 +589,19 @@ class TestProblem(unittest.TestCase):
         prob['x'] = 2.
         prob['y'] = 10.
         prob.run_model()
-        assert_rel_error(self, prob['f_xy'], 214.0, 1e-6)
+        assert_near_equal(prob['f_xy'], 214.0, 1e-6)
 
         prob['x'] = 0.
         prob['y'] = 0.
         prob.run_model()
-        assert_rel_error(self, prob['f_xy'], 22.0, 1e-6)
+        assert_near_equal(prob['f_xy'], 22.0, 1e-6)
 
         prob.setup()
         prob['x'] = 4
         prob['y'] = 8.
 
         prob.run_model()
-        assert_rel_error(self, prob['f_xy'], 174.0, 1e-6)
+        assert_near_equal(prob['f_xy'], 174.0, 1e-6)
 
     def test_feature_petsc_setup(self):
         import openmdao.api as om
@@ -619,7 +619,7 @@ class TestProblem(unittest.TestCase):
         prob['y'] = 10.
 
         prob.run_model()
-        assert_rel_error(self, prob['f_xy'], 214.0, 1e-6)
+        assert_near_equal(prob['f_xy'], 214.0, 1e-6)
 
     def test_feature_check_totals_manual(self):
         import openmdao.api as om
@@ -850,11 +850,11 @@ class TestProblem(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        assert_rel_error(self, prob['x'], 0.0, 1e-5)
-        assert_rel_error(self, prob['y1'], 3.160000, 1e-2)
-        assert_rel_error(self, prob['y2'], 3.755278, 1e-2)
-        assert_rel_error(self, prob['z'], [1.977639, 0.000000], 1e-2)
-        assert_rel_error(self, prob['obj'], 3.18339395, 1e-2)
+        assert_near_equal(prob['x'], 0.0, 1e-5)
+        assert_near_equal(prob['y1'], 3.160000, 1e-2)
+        assert_near_equal(prob['y2'], 3.755278, 1e-2)
+        assert_near_equal(prob['z'], [1.977639, 0.000000], 1e-2)
+        assert_near_equal(prob['obj'], 3.18339395, 1e-2)
 
     def test_feature_promoted_sellar_set_get_outputs(self):
         import openmdao.api as om
@@ -869,9 +869,9 @@ class TestProblem(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, prob['x'], 2.75, 1e-6)
+        assert_near_equal(prob['x'], 2.75, 1e-6)
 
-        assert_rel_error(self, prob['y1'], 27.3049178437, 1e-6)
+        assert_near_equal(prob['y1'], 27.3049178437, 1e-6)
 
     def test_feature_not_promoted_sellar_set_get_outputs(self):
         import openmdao.api as om
@@ -886,9 +886,9 @@ class TestProblem(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, prob['px.x'], 2.75, 1e-6)
+        assert_near_equal(prob['px.x'], 2.75, 1e-6)
 
-        assert_rel_error(self, prob['d1.y1'], 27.3049178437, 1e-6)
+        assert_near_equal(prob['d1.y1'], 27.3049178437, 1e-6)
 
     def test_feature_promoted_sellar_set_get_inputs(self):
         import openmdao.api as om
@@ -903,12 +903,12 @@ class TestProblem(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, prob['x'], 2.75, 1e-6)
+        assert_near_equal(prob['x'], 2.75, 1e-6)
 
         # the output variable, referenced by the promoted name
-        assert_rel_error(self, prob['y1'], 27.3049178437, 1e-6)
+        assert_near_equal(prob['y1'], 27.3049178437, 1e-6)
         # the connected input variable, referenced by the absolute path
-        assert_rel_error(self, prob['d2.y1'], 27.3049178437, 1e-6)
+        assert_near_equal(prob['d2.y1'], 27.3049178437, 1e-6)
 
     def test_get_set_with_units_exhaustive(self):
         import openmdao.api as om
@@ -935,47 +935,47 @@ class TestProblem(unittest.TestCase):
 
         # Gets
 
-        assert_rel_error(self, prob.get_val('comp.x'), 77.0, 1e-6)
-        assert_rel_error(self, prob.get_val('comp.x', 'degC'), 25.0, 1e-6)
-        assert_rel_error(self, prob.get_val('comp.y'), 0.0, 1e-6)
-        assert_rel_error(self, prob.get_val('comp.y', 'degF'), 32.0, 1e-6)
+        assert_near_equal(prob.get_val('comp.x'), 77.0, 1e-6)
+        assert_near_equal(prob.get_val('comp.x', 'degC'), 25.0, 1e-6)
+        assert_near_equal(prob.get_val('comp.y'), 0.0, 1e-6)
+        assert_near_equal(prob.get_val('comp.y', 'degF'), 32.0, 1e-6)
 
-        assert_rel_error(self, prob.get_val('xx'), 77.0, 1e-6)
-        assert_rel_error(self, prob.get_val('xx', 'degC'), 25.0, 1e-6)
-        assert_rel_error(self, prob.get_val('yy'), 0.0, 1e-6)
-        assert_rel_error(self, prob.get_val('yy', 'degF'), 32.0, 1e-6)
+        assert_near_equal(prob.get_val('xx'), 77.0, 1e-6)
+        assert_near_equal(prob.get_val('xx', 'degC'), 25.0, 1e-6)
+        assert_near_equal(prob.get_val('yy'), 0.0, 1e-6)
+        assert_near_equal(prob.get_val('yy', 'degF'), 32.0, 1e-6)
 
-        assert_rel_error(self, prob.get_val('acomp.x', indices=0), 77.0, 1e-6)
-        assert_rel_error(self, prob.get_val('acomp.x', indices=[1]), 95.0, 1e-6)
-        assert_rel_error(self, prob.get_val('acomp.x', 'degC', indices=[0]), 25.0, 1e-6)
-        assert_rel_error(self, prob.get_val('acomp.x', 'degC', indices=1), 35.0, 1e-6)
-        assert_rel_error(self, prob.get_val('acomp.y', indices=0), 0.0, 1e-6)
-        assert_rel_error(self, prob.get_val('acomp.y', 'degF', indices=0), 32.0, 1e-6)
+        assert_near_equal(prob.get_val('acomp.x', indices=0), 77.0, 1e-6)
+        assert_near_equal(prob.get_val('acomp.x', indices=[1]), 95.0, 1e-6)
+        assert_near_equal(prob.get_val('acomp.x', 'degC', indices=[0]), 25.0, 1e-6)
+        assert_near_equal(prob.get_val('acomp.x', 'degC', indices=1), 35.0, 1e-6)
+        assert_near_equal(prob.get_val('acomp.y', indices=0), 0.0, 1e-6)
+        assert_near_equal(prob.get_val('acomp.y', 'degF', indices=0), 32.0, 1e-6)
 
-        assert_rel_error(self, prob.get_val('axx', indices=0), 77.0, 1e-6)
-        assert_rel_error(self, prob.get_val('axx', indices=1), 95.0, 1e-6)
-        assert_rel_error(self, prob.get_val('axx', 'degC', indices=0), 25.0, 1e-6)
-        assert_rel_error(self, prob.get_val('axx', 'degC', indices=np.array([1])), 35.0, 1e-6)
-        assert_rel_error(self, prob.get_val('ayy', indices=0), 0.0, 1e-6)
-        assert_rel_error(self, prob.get_val('ayy', 'degF', indices=0), 32.0, 1e-6)
+        assert_near_equal(prob.get_val('axx', indices=0), 77.0, 1e-6)
+        assert_near_equal(prob.get_val('axx', indices=1), 95.0, 1e-6)
+        assert_near_equal(prob.get_val('axx', 'degC', indices=0), 25.0, 1e-6)
+        assert_near_equal(prob.get_val('axx', 'degC', indices=np.array([1])), 35.0, 1e-6)
+        assert_near_equal(prob.get_val('ayy', indices=0), 0.0, 1e-6)
+        assert_near_equal(prob.get_val('ayy', 'degF', indices=0), 32.0, 1e-6)
 
         # Sets
 
         prob.set_val('comp.x', 30.0, 'degC')
-        assert_rel_error(self, prob['comp.x'], 86.0, 1e-6)
-        assert_rel_error(self, prob.get_val('comp.x', 'degC'), 30.0, 1e-6)
+        assert_near_equal(prob['comp.x'], 86.0, 1e-6)
+        assert_near_equal(prob.get_val('comp.x', 'degC'), 30.0, 1e-6)
 
         prob.set_val('xx', 30.0, 'degC')
-        assert_rel_error(self, prob['xx'], 86.0, 1e-6)
-        assert_rel_error(self, prob.get_val('xx', 'degC'), 30.0, 1e-6)
+        assert_near_equal(prob['xx'], 86.0, 1e-6)
+        assert_near_equal(prob.get_val('xx', 'degC'), 30.0, 1e-6)
 
         prob.set_val('acomp.x', 30.0, 'degC', indices=[0])
-        assert_rel_error(self, prob['acomp.x'][0], 86.0, 1e-6)
-        assert_rel_error(self, prob.get_val('acomp.x', 'degC', indices=0), 30.0, 1e-6)
+        assert_near_equal(prob['acomp.x'][0], 86.0, 1e-6)
+        assert_near_equal(prob.get_val('acomp.x', 'degC', indices=0), 30.0, 1e-6)
 
         prob.set_val('axx', 30.0, 'degC', indices=0)
-        assert_rel_error(self, prob['axx'][0], 86.0, 1e-6)
-        assert_rel_error(self, prob.get_val('axx', 'degC', indices=np.array([0])), 30.0, 1e-6)
+        assert_near_equal(prob['axx'][0], 86.0, 1e-6)
+        assert_near_equal(prob.get_val('axx', 'degC', indices=np.array([0])), 30.0, 1e-6)
 
         prob.final_setup()
 
@@ -983,47 +983,47 @@ class TestProblem(unittest.TestCase):
 
         # Gets
 
-        assert_rel_error(self, prob.get_val('comp.x'), 86.0, 1e-6)
-        assert_rel_error(self, prob.get_val('comp.x', 'degC'), 30.0, 1e-6)
-        assert_rel_error(self, prob.get_val('comp.y'), 0.0, 1e-6)
-        assert_rel_error(self, prob.get_val('comp.y', 'degF'), 32.0, 1e-6)
+        assert_near_equal(prob.get_val('comp.x'), 86.0, 1e-6)
+        assert_near_equal(prob.get_val('comp.x', 'degC'), 30.0, 1e-6)
+        assert_near_equal(prob.get_val('comp.y'), 0.0, 1e-6)
+        assert_near_equal(prob.get_val('comp.y', 'degF'), 32.0, 1e-6)
 
-        assert_rel_error(self, prob.get_val('xx'), 86.0, 1e-6)
-        assert_rel_error(self, prob.get_val('xx', 'degC'), 30.0, 1e-6)
-        assert_rel_error(self, prob.get_val('yy'), 0.0, 1e-6)
-        assert_rel_error(self, prob.get_val('yy', 'degF'), 32.0, 1e-6)
+        assert_near_equal(prob.get_val('xx'), 86.0, 1e-6)
+        assert_near_equal(prob.get_val('xx', 'degC'), 30.0, 1e-6)
+        assert_near_equal(prob.get_val('yy'), 0.0, 1e-6)
+        assert_near_equal(prob.get_val('yy', 'degF'), 32.0, 1e-6)
 
-        assert_rel_error(self, prob.get_val('acomp.x', indices=0), 86.0, 1e-6)
-        assert_rel_error(self, prob.get_val('acomp.x', indices=[1]), 95.0, 1e-6)
-        assert_rel_error(self, prob.get_val('acomp.x', 'degC', indices=[0]), 30.0, 1e-6)
-        assert_rel_error(self, prob.get_val('acomp.x', 'degC', indices=1), 35.0, 1e-6)
-        assert_rel_error(self, prob.get_val('acomp.y', indices=0), 0.0, 1e-6)
-        assert_rel_error(self, prob.get_val('acomp.y', 'degF', indices=0), 32.0, 1e-6)
+        assert_near_equal(prob.get_val('acomp.x', indices=0), 86.0, 1e-6)
+        assert_near_equal(prob.get_val('acomp.x', indices=[1]), 95.0, 1e-6)
+        assert_near_equal(prob.get_val('acomp.x', 'degC', indices=[0]), 30.0, 1e-6)
+        assert_near_equal(prob.get_val('acomp.x', 'degC', indices=1), 35.0, 1e-6)
+        assert_near_equal(prob.get_val('acomp.y', indices=0), 0.0, 1e-6)
+        assert_near_equal(prob.get_val('acomp.y', 'degF', indices=0), 32.0, 1e-6)
 
-        assert_rel_error(self, prob.get_val('axx', indices=0), 86.0, 1e-6)
-        assert_rel_error(self, prob.get_val('axx', indices=1), 95.0, 1e-6)
-        assert_rel_error(self, prob.get_val('axx', 'degC', indices=0), 30.0, 1e-6)
-        assert_rel_error(self, prob.get_val('axx', 'degC', indices=np.array([1])), 35.0, 1e-6)
-        assert_rel_error(self, prob.get_val('ayy', indices=0), 0.0, 1e-6)
-        assert_rel_error(self, prob.get_val('ayy', 'degF', indices=0), 32.0, 1e-6)
+        assert_near_equal(prob.get_val('axx', indices=0), 86.0, 1e-6)
+        assert_near_equal(prob.get_val('axx', indices=1), 95.0, 1e-6)
+        assert_near_equal(prob.get_val('axx', 'degC', indices=0), 30.0, 1e-6)
+        assert_near_equal(prob.get_val('axx', 'degC', indices=np.array([1])), 35.0, 1e-6)
+        assert_near_equal(prob.get_val('ayy', indices=0), 0.0, 1e-6)
+        assert_near_equal(prob.get_val('ayy', 'degF', indices=0), 32.0, 1e-6)
 
         # Sets
 
         prob.set_val('comp.x', 35.0, 'degC')
-        assert_rel_error(self, prob['comp.x'], 95.0, 1e-6)
-        assert_rel_error(self, prob.get_val('comp.x', 'degC'), 35.0, 1e-6)
+        assert_near_equal(prob['comp.x'], 95.0, 1e-6)
+        assert_near_equal(prob.get_val('comp.x', 'degC'), 35.0, 1e-6)
 
         prob.set_val('xx', 35.0, 'degC')
-        assert_rel_error(self, prob['xx'], 95.0, 1e-6)
-        assert_rel_error(self, prob.get_val('xx', 'degC'), 35.0, 1e-6)
+        assert_near_equal(prob['xx'], 95.0, 1e-6)
+        assert_near_equal(prob.get_val('xx', 'degC'), 35.0, 1e-6)
 
         prob.set_val('acomp.x', 35.0, 'degC', indices=[0])
-        assert_rel_error(self, prob['acomp.x'][0], 95.0, 1e-6)
-        assert_rel_error(self, prob.get_val('acomp.x', 'degC', indices=0), 35.0, 1e-6)
+        assert_near_equal(prob['acomp.x'][0], 95.0, 1e-6)
+        assert_near_equal(prob.get_val('acomp.x', 'degC', indices=0), 35.0, 1e-6)
 
         prob.set_val('axx', 35.0, 'degC', indices=0)
-        assert_rel_error(self, prob['axx'][0], 95.0, 1e-6)
-        assert_rel_error(self, prob.get_val('axx', 'degC', indices=np.array([0])), 35.0, 1e-6)
+        assert_near_equal(prob['axx'][0], 95.0, 1e-6)
+        assert_near_equal(prob.get_val('axx', 'degC', indices=np.array([0])), 35.0, 1e-6)
 
     def test_get_set_with_units_error_messages(self):
         import openmdao.api as om
@@ -1064,11 +1064,11 @@ class TestProblem(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob.get_val('comp.x'), 100, 1e-6)
-        assert_rel_error(self, prob.get_val('comp.x', 'm'), 1.0, 1e-6)
+        assert_near_equal(prob.get_val('comp.x'), 100, 1e-6)
+        assert_near_equal(prob.get_val('comp.x', 'm'), 1.0, 1e-6)
         prob.set_val('comp.x', 10.0, 'mm')
-        assert_rel_error(self, prob.get_val('comp.x'), 1.0, 1e-6)
-        assert_rel_error(self, prob.get_val('comp.x', 'm'), 1.0e-2, 1e-6)
+        assert_near_equal(prob.get_val('comp.x'), 1.0, 1e-6)
+        assert_near_equal(prob.get_val('comp.x', 'm'), 1.0e-2, 1e-6)
 
     def test_feature_get_set_array_with_units(self):
         import numpy as np
@@ -1082,17 +1082,17 @@ class TestProblem(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob.get_val('comp.x'), np.array([100, 33.3]), 1e-6)
-        assert_rel_error(self, prob.get_val('comp.x', 'm'), np.array([1.0, 0.333]), 1e-6)
-        assert_rel_error(self, prob.get_val('comp.x', 'km', indices=[0]), 0.001, 1e-6)
+        assert_near_equal(prob.get_val('comp.x'), np.array([100, 33.3]), 1e-6)
+        assert_near_equal(prob.get_val('comp.x', 'm'), np.array([1.0, 0.333]), 1e-6)
+        assert_near_equal(prob.get_val('comp.x', 'km', indices=[0]), 0.001, 1e-6)
 
         prob.set_val('comp.x', 10.0, 'mm')
-        assert_rel_error(self, prob.get_val('comp.x'), np.array([1.0, 1.0]), 1e-6)
-        assert_rel_error(self, prob.get_val('comp.x', 'm', indices=0), 1.0e-2, 1e-6)
+        assert_near_equal(prob.get_val('comp.x'), np.array([1.0, 1.0]), 1e-6)
+        assert_near_equal(prob.get_val('comp.x', 'm', indices=0), 1.0e-2, 1e-6)
 
         prob.set_val('comp.x', 50.0, 'mm', indices=[1])
-        assert_rel_error(self, prob.get_val('comp.x'), np.array([1.0, 5.0]), 1e-6)
-        assert_rel_error(self, prob.get_val('comp.x', 'm', indices=1), 5.0e-2, 1e-6)
+        assert_near_equal(prob.get_val('comp.x'), np.array([1.0, 5.0]), 1e-6)
+        assert_near_equal(prob.get_val('comp.x', 'm', indices=1), 5.0e-2, 1e-6)
 
     def test_feature_get_set_array_with_slicer(self):
         import numpy as np
@@ -1106,14 +1106,14 @@ class TestProblem(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob.get_val('comp.x', indices=om.slicer[:, 0]), [1., 3.], 1e-6)
-        assert_rel_error(self, prob.get_val('comp.x', indices=om.slicer[0, 1]), 2., 1e-6)
-        assert_rel_error(self, prob.get_val('comp.x', indices=om.slicer[1, -1]), 4., 1e-6)
+        assert_near_equal(prob.get_val('comp.x', indices=om.slicer[:, 0]), [1., 3.], 1e-6)
+        assert_near_equal(prob.get_val('comp.x', indices=om.slicer[0, 1]), 2., 1e-6)
+        assert_near_equal(prob.get_val('comp.x', indices=om.slicer[1, -1]), 4., 1e-6)
 
         prob.set_val('comp.x', [5., 6.], indices=om.slicer[:,0])
-        assert_rel_error(self, prob.get_val('comp.x', indices=om.slicer[:, 0]), [5., 6.], 1e-6)
+        assert_near_equal(prob.get_val('comp.x', indices=om.slicer[:, 0]), [5., 6.], 1e-6)
         prob.run_model()
-        assert_rel_error(self, prob.get_val('comp.y', indices=om.slicer[:, 0]), [6., 7.], 1e-6)
+        assert_near_equal(prob.get_val('comp.y', indices=om.slicer[:, 0]), [6., 7.], 1e-6)
 
     def test_feature_set_get_array(self):
         import numpy as np
@@ -1127,27 +1127,27 @@ class TestProblem(unittest.TestCase):
         prob.setup()
 
         # default value from the class definition
-        assert_rel_error(self, prob['x'], 1.0, 1e-6)
+        assert_near_equal(prob['x'], 1.0, 1e-6)
 
         prob['x'] = 2.75
-        assert_rel_error(self, prob['x'], 2.75, 1e-6)
+        assert_near_equal(prob['x'], 2.75, 1e-6)
 
         # default value from the class definition
-        assert_rel_error(self, prob['z'], [5.0, 2.0], 1e-6)
+        assert_near_equal(prob['z'], [5.0, 2.0], 1e-6)
 
         prob['z'] = [1.5, 1.5]  # for convenience we convert the list to an array.
-        assert_rel_error(self, prob['z'], [1.5, 1.5], 1e-6)
+        assert_near_equal(prob['z'], [1.5, 1.5], 1e-6)
 
         prob.run_model()
-        assert_rel_error(self, prob['y1'], 5.43379016853, 1e-6)
-        assert_rel_error(self, prob['y2'], 5.33104915618, 1e-6)
+        assert_near_equal(prob['y1'], 5.43379016853, 1e-6)
+        assert_near_equal(prob['y2'], 5.33104915618, 1e-6)
 
         prob['z'] = np.array([2.5, 2.5])
-        assert_rel_error(self, prob['z'], [2.5, 2.5], 1e-6)
+        assert_near_equal(prob['z'], [2.5, 2.5], 1e-6)
 
         prob.run_model()
-        assert_rel_error(self, prob['y1'], 9.87161739688, 1e-6)
-        assert_rel_error(self, prob['y2'], 8.14191301549, 1e-6)
+        assert_near_equal(prob['y1'], 9.87161739688, 1e-6)
+        assert_near_equal(prob['y2'], 8.14191301549, 1e-6)
 
     def test_feature_residuals(self):
         import openmdao.api as om
@@ -1708,7 +1708,7 @@ class TestProblem(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_rel_error(self, p.get_val('totalforcecomp.total_force', units='kN'),
+        assert_near_equal(p.get_val('totalforcecomp.total_force', units='kN'),
                          np.array([[100, 200, 300], [0, -1, -2]]).T)
 
     def test_feature_system_configure(self):
@@ -1820,8 +1820,8 @@ class TestProblem(unittest.TestCase):
             prob.setup()
             prob.run_model()
 
-            assert_rel_error(self, prob['p2.y'], 5.0)
-            assert_rel_error(self, prob['comp.f_xy'], 21.0)
+            assert_near_equal(prob['p2.y'], 5.0)
+            assert_near_equal(prob['comp.f_xy'], 21.0)
         finally:
             hooks._unregister_hook('final_setup', class_name='Problem')
             hooks.use_hooks = False

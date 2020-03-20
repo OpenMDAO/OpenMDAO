@@ -4,7 +4,7 @@ import numpy as np
 
 import openmdao.api as om
 import openmdao.utils.coloring as coloring_mod
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 
 
@@ -508,4 +508,4 @@ class TestMPIColoringBug(unittest.TestCase):
         J = p.driver._compute_totals(of=of, wrt=wrt, return_format='dict')
         dd = J['phases.burn1.collocation_constraint.defects:deltav']['phases.burn1.indep_states.states:deltav']
 
-        assert_rel_error(self, np.array([[-0.75, 0.75]]), dd, 1e-6)
+        assert_near_equal(np.array([[-0.75, 0.75]]), dd, 1e-6)

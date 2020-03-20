@@ -10,7 +10,7 @@ import openmdao.api as om
 
 from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import evenly_distrib_idxs
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.general_utils import printoptions, remove_whitespace
 
 from openmdao.test_suite.groups.parallel_groups import FanOutGrouped
@@ -588,7 +588,7 @@ class DistributedListVarsTest(unittest.TestCase):
                 self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line),
                                  '\nExpected: %s\nReceived: %s\n' % (line, text[i]))
 
-        assert_rel_error(self, prob['C3.out'], -5.)
+        assert_near_equal(prob['C3.out'], -5.)
 
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")
@@ -632,7 +632,7 @@ class MPIFeatureTests(unittest.TestCase):
         # is different on each processor, use the all_procs argument to display on all processors
         model.C3.list_inputs(hierarchical=False, shape=True, global_shape=True, print_arrays=True, all_procs=True)
 
-        assert_rel_error(self, prob['C3.out'], -5.)
+        assert_near_equal(prob['C3.out'], -5.)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 // Just to make things easier to find:
 const _DEFAULT_N2_DIAGRAM_UNIT = 'px';
-const _DEFAULT_N2_DIAGRAM_HEIGHT = 600;
+const _DEFAULT_N2_DIAGRAM_HEIGHT = window.innerHeight * .95;
 const _DEFAULT_FONT_SIZE = 11;
 const _DEFAULT_GAP_SIZE = _DEFAULT_FONT_SIZE + 4;
 
@@ -21,9 +21,9 @@ defaultDims = {
             'height': _DEFAULT_N2_DIAGRAM_HEIGHT,
         },
         'font': _DEFAULT_FONT_SIZE,
-        'minColumnWidth': 5,
+        'minColumnWidth': 2,
         'rightTextMargin': 8,
-        'parentNodeWidth': 40,
+        'parentNodeWidth': 30,
         'partitionTreeGap': _DEFAULT_GAP_SIZE, // Pixels between partition tree and N2 matrix
         'svgMargin': 1,
     }
@@ -46,8 +46,8 @@ let DebugFlags = {
 }
 
 let colonVarNameAppend = ' '; // Used internally. Appended to vars split by colon vars
-                              // Allows user to have inputs like f_approx:f, f_approx:r
-                              // and outputs on the same comp as f_approx
+// Allows user to have inputs like f_approx:f, f_approx:r
+// and outputs on the same comp as f_approx
 
 
 // Object.freeze(N2TransitionDefaults);

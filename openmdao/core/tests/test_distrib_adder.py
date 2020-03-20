@@ -13,7 +13,7 @@ try:
 except ImportError:
     PETScVector = None
 
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class DistributedAdder(ExplicitComponent):
@@ -104,7 +104,7 @@ class DistributedAdderTest(unittest.TestCase):
                 raise RuntimeError("Summer input y[%d] is %f but should be 11.0" %
                                    (i, inp[i]))
 
-        assert_rel_error(self, prob['sum'], 11.0 * size, 1.e-6)
+        assert_near_equal(prob['sum'], 11.0 * size, 1.e-6)
 
 
 if __name__ == "__main__":

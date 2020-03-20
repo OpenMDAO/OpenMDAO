@@ -14,7 +14,7 @@ from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, SellarDerivatives
 from openmdao.test_suite.components.simple_comps import NonSquareArrayComp
 from openmdao.test_suite.groups.sin_fitter import SineFitter
-from openmdao.utils.assert_utils import assert_rel_error, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.general_utils import run_driver
 from openmdao.utils.mpi import MPI
 
@@ -138,8 +138,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         wrt = ['x', 'y']
         derivs = prob.compute_totals(of=of, wrt=wrt, return_format='array')
 
-        assert_rel_error(self, derivs[0, 0], -6.0, 1e-6)
-        assert_rel_error(self, derivs[0, 1], 8.0, 1e-6)
+        assert_near_equal(derivs[0, 0], -6.0, 1e-6)
+        assert_near_equal(derivs[0, 1], 8.0, 1e-6)
 
         prob.setup(check=False, mode='rev')
 
@@ -149,8 +149,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         wrt = ['x', 'y']
         derivs = prob.compute_totals(of=of, wrt=wrt, return_format='array')
 
-        assert_rel_error(self, derivs[0, 0], -6.0, 1e-6)
-        assert_rel_error(self, derivs[0, 1], 8.0, 1e-6)
+        assert_near_equal(derivs[0, 0], -6.0, 1e-6)
+        assert_near_equal(derivs[0, 1], 8.0, 1e-6)
 
     def test_compute_totals_return_array_non_square(self):
 
@@ -175,7 +175,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         derivs = prob.compute_totals(of=['comp.y1'], wrt=['px.x'], return_format='array')
 
         J = comp.JJ[0:3, 0:2]
-        assert_rel_error(self, J, derivs, 1.0e-3)
+        assert_near_equal(J, derivs, 1.0e-3)
 
         # Support for a name to be in 'of' and 'wrt'
 
@@ -183,9 +183,9 @@ class TestScipyOptimizeDriver(unittest.TestCase):
                                      wrt=['px.x'],
                                      return_format='array')
 
-        assert_rel_error(self, J, derivs[3:, :], 1.0e-3)
-        assert_rel_error(self, comp.JJ[3:4, 0:2], derivs[0:1, :], 1.0e-3)
-        assert_rel_error(self, np.eye(2), derivs[1:3, :], 1.0e-3)
+        assert_near_equal(J, derivs[3:, :], 1.0e-3)
+        assert_near_equal(comp.JJ[3:4, 0:2], derivs[0:1, :], 1.0e-3)
+        assert_near_equal(np.eye(2), derivs[1:3, :], 1.0e-3)
 
     def test_deriv_wrt_self(self):
 
@@ -208,7 +208,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         J = prob.driver._compute_totals(of=['px.x'], wrt=['px.x'],
                                         return_format='array')
 
-        assert_rel_error(self, J, np.eye(2), 1.0e-3)
+        assert_near_equal(J, np.eye(2), 1.0e-3)
 
     def test_scipy_optimizer_simple_paraboloid_unconstrained(self):
 
@@ -234,8 +234,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed, result =\n" +
                                  str(prob.driver.result))
 
-        assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
-        assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
+        assert_near_equal(prob['x'], 6.66666667, 1e-6)
+        assert_near_equal(prob['y'], -7.3333333, 1e-6)
 
     def test_simple_paraboloid_unconstrained(self):
 
@@ -264,8 +264,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed, result =\n" +
                                  str(prob.driver.result))
 
-        assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
-        assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
+        assert_near_equal(prob['x'], 6.66666667, 1e-6)
+        assert_near_equal(prob['y'], -7.3333333, 1e-6)
 
     def test_simple_paraboloid_unconstrained_COBYLA(self):
         prob = om.Problem()
@@ -293,8 +293,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed, result =\n" +
                                  str(prob.driver.result))
 
-        assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
-        assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
+        assert_near_equal(prob['x'], 6.66666667, 1e-6)
+        assert_near_equal(prob['y'], -7.3333333, 1e-6)
 
     def test_simple_paraboloid_upper(self):
 
@@ -326,8 +326,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
                                  str(prob.driver.result))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'], 7.16667, 1e-6)
-        assert_rel_error(self, prob['y'], -7.833334, 1e-6)
+        assert_near_equal(prob['x'], 7.16667, 1e-6)
+        assert_near_equal(prob['y'], -7.833334, 1e-6)
 
     def test_simple_paraboloid_lower(self):
 
@@ -360,8 +360,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
                                  str(prob.driver.result))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'], 7.16667, 1e-6)
-        assert_rel_error(self, prob['y'], -7.833334, 1e-6)
+        assert_near_equal(prob['x'], 7.16667, 1e-6)
+        assert_near_equal(prob['y'], -7.833334, 1e-6)
 
     def test_simple_paraboloid_equality(self):
 
@@ -394,8 +394,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         # Minimum should be at (7.166667, -7.833334)
         # (Note, loose tol because of appveyor py3.4 machine.)
-        assert_rel_error(self, prob['x'], 7.16667, 1e-4)
-        assert_rel_error(self, prob['y'], -7.833334, 1e-4)
+        assert_near_equal(prob['x'], 7.16667, 1e-4)
+        assert_near_equal(prob['y'], -7.833334, 1e-4)
 
     def test_unsupported_equality(self):
 
@@ -484,7 +484,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed, result =\n" +
                                  str(prob.driver.result))
 
-        assert_rel_error(self, prob['y'] - prob['x'], -11.0, 1e-6)
+        assert_near_equal(prob['y'] - prob['x'], -11.0, 1e-6)
 
     def test_simple_paraboloid_double_sided_high(self):
 
@@ -515,7 +515,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed, result =\n" +
                                  str(prob.driver.result))
 
-        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+        assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_array_comp2D(self):
 
@@ -549,7 +549,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
                                  str(prob.driver.result))
 
         obj = prob['o']
-        assert_rel_error(self, obj, 20.0, 1e-6)
+        assert_near_equal(obj, 20.0, 1e-6)
 
     def test_simple_array_comp2D_eq_con(self):
 
@@ -580,7 +580,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
                                  str(prob.driver.result))
 
         obj = prob['o']
-        assert_rel_error(self, obj, 41.5, 1e-6)
+        assert_near_equal(obj, 41.5, 1e-6)
 
     def test_simple_array_comp2D_dbl_sided_con(self):
 
@@ -611,7 +611,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
                                  str(prob.driver.result))
 
         con = prob['areas']
-        assert_rel_error(self, con, np.array([[24.0, 21.0], [3.5, 17.5]]), 1e-6)
+        assert_near_equal(con, np.array([[24.0, 21.0], [3.5, 17.5]]), 1e-6)
 
     def test_simple_array_comp2D_dbl_sided_con_array(self):
 
@@ -642,7 +642,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
                                  str(prob.driver.result))
 
         obj = prob['o']
-        assert_rel_error(self, obj, 20.0, 1e-6)
+        assert_near_equal(obj, 20.0, 1e-6)
 
     def test_simple_array_comp2D_array_lo_hi(self):
 
@@ -675,7 +675,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
                                  str(prob.driver.result))
 
         obj = prob['o']
-        assert_rel_error(self, obj, 20.0, 1e-6)
+        assert_near_equal(obj, 20.0, 1e-6)
 
     def test_simple_paraboloid_scaled_desvars_fwd(self):
 
@@ -706,7 +706,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed, result =\n" +
                                  str(prob.driver.result))
 
-        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+        assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_paraboloid_scaled_desvars_rev(self):
 
@@ -737,7 +737,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed, result =\n" +
                                  str(prob.driver.result))
 
-        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+        assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_paraboloid_scaled_constraint_fwd(self):
 
@@ -768,7 +768,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed, result =\n" +
                                  str(prob.driver.result))
 
-        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+        assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_paraboloid_scaled_objective_fwd(self):
 
@@ -799,7 +799,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed, result =\n" +
                                  str(prob.driver.result))
 
-        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+        assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_paraboloid_scaled_objective_rev(self):
 
@@ -830,7 +830,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed, result =\n" +
                                  str(prob.driver.result))
 
-        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+        assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_sellar_mdf(self):
 
@@ -855,9 +855,9 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed, result =\n" +
                                  str(prob.driver.result))
 
-        assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
-        assert_rel_error(self, prob['z'][1], 0.0, 1e-3)
-        assert_rel_error(self, prob['x'], 0.0, 1e-3)
+        assert_near_equal(prob['z'][0], 1.9776, 1e-3)
+        assert_near_equal(prob['z'][1], 0.0, 1e-3)
+        assert_near_equal(prob['x'], 0.0, 1e-3)
 
     def test_bug_in_eq_constraints(self):
         # We were getting extra constraints created because lower and upper are maxfloat instead of
@@ -869,7 +869,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         p.run_driver()
 
         max_defect = np.max(np.abs(p['defect.defect']))
-        assert_rel_error(self, max_defect, 0.0, 1e-10)
+        assert_near_equal(max_defect, 0.0, 1e-10)
 
     def test_reraise_exception_from_callbacks(self):
         class ReducedActuatorDisc(om.ExplicitComponent):
@@ -949,8 +949,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
                                  str(prob.driver.result))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'], 7.16667, 1e-6)
-        assert_rel_error(self, prob['y'], -7.833334, 1e-6)
+        assert_near_equal(prob['x'], 7.16667, 1e-6)
+        assert_near_equal(prob['y'], -7.833334, 1e-6)
 
     def test_sellar_mdf_COBYLA(self):
 
@@ -975,9 +975,9 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed, result =\n" +
                                  str(prob.driver.result))
 
-        assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
-        assert_rel_error(self, prob['z'][1], 0.0, 1e-3)
-        assert_rel_error(self, prob['x'], 0.0, 1e-3)
+        assert_near_equal(prob['z'][0], 1.9776, 1e-3)
+        assert_near_equal(prob['z'][1], 0.0, 1e-3)
+        assert_near_equal(prob['x'], 0.0, 1e-3)
 
     @unittest.skipUnless(LooseVersion(scipy_version) >= LooseVersion("1.1"),
                          "scipy >= 1.1 is required.")
@@ -1016,8 +1016,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        assert_rel_error(self, prob['x'], np.ones(3), 2e-2)
-        assert_rel_error(self, prob['f'], 0., 1e-2)
+        assert_near_equal(prob['x'], np.ones(3), 2e-2)
+        assert_near_equal(prob['f'], 0., 1e-2)
         self.assertTrue(prob['c'] < 10)
         self.assertTrue(prob['c'] > 0)
 
@@ -1059,8 +1059,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        assert_rel_error(self, prob['x'], np.ones(3), 2e-2)
-        assert_rel_error(self, prob['f'], 0., 1e-2)
+        assert_near_equal(prob['x'], np.ones(3), 2e-2)
+        assert_near_equal(prob['f'], 0., 1e-2)
         self.assertTrue(prob['c'] < 10)
         self.assertTrue(prob['c'] > 0)
 
@@ -1103,7 +1103,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        assert_rel_error(self, prob['con.c'], 1., 1e-3)
+        assert_near_equal(prob['con.c'], 1., 1e-3)
 
     @unittest.skipUnless(LooseVersion(scipy_version) >= LooseVersion("1.2"),
                          "scipy >= 1.2 is required.")
@@ -1141,7 +1141,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        assert_rel_error(self, prob['c'], 1.0, 1e-2)
+        assert_near_equal(prob['c'], 1.0, 1e-2)
 
     @unittest.skipUnless(LooseVersion(scipy_version) >= LooseVersion("1.2"),
                          "scipy >= 1.2 is required.")
@@ -1176,8 +1176,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        assert_rel_error(self, prob['x'][0], -1., 1e-2)
-        assert_rel_error(self, prob['x'][1], -1.2, 1e-2)
+        assert_near_equal(prob['x'][0], -1., 1e-2)
+        assert_near_equal(prob['x'][1], -1.2, 1e-2)
 
     def test_simple_paraboloid_lower_linear(self):
 
@@ -1209,8 +1209,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
                                  str(prob.driver.result))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'], 7.16667, 1e-6)
-        assert_rel_error(self, prob['y'], -7.833334, 1e-6)
+        assert_near_equal(prob['x'], 7.16667, 1e-6)
+        assert_near_equal(prob['y'], -7.833334, 1e-6)
 
         self.assertEqual(prob.driver._obj_and_nlcons, ['comp.f_xy'])
 
@@ -1244,8 +1244,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
                                  str(prob.driver.result))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'], 7.16667, 1e-6)
-        assert_rel_error(self, prob['y'], -7.833334, 1e-6)
+        assert_near_equal(prob['x'], 7.16667, 1e-6)
+        assert_near_equal(prob['y'], -7.833334, 1e-6)
 
     def test_debug_print_option_totals(self):
 
@@ -1385,9 +1385,9 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         failed = prob.run_driver()
 
-        assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
-        assert_rel_error(self, prob['z'][1], 0.0, 1e-3)
-        assert_rel_error(self, prob['x'], 0.0, 4e-3)
+        assert_near_equal(prob['z'][0], 1.9776, 1e-3)
+        assert_near_equal(prob['z'][1], 0.0, 1e-3)
+        assert_near_equal(prob['x'], 0.0, 4e-3)
 
         self.assertEqual(len(prob.driver._lincongrad_cache), 1)
         # Piggyback test: make sure we can run the driver again as a subdriver without a keyerror.
@@ -1453,7 +1453,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         prob.run_driver()
 
         # minimum value
-        assert_rel_error(self, prob['parab.f_xy'], -27, 1e-6)
+        assert_near_equal(prob['parab.f_xy'], -27, 1e-6)
 
     def test_multiple_objectives_error(self):
 
@@ -1528,8 +1528,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         model.add_objective('f')
         prob.setup()
         prob.run_driver()
-        assert_rel_error(self, prob['x'], np.array([-0.1951, -0.1000]), 1e-3)
-        assert_rel_error(self, prob['f'], -1.0109, 1e-3)
+        assert_near_equal(prob['x'], np.array([-0.1951, -0.1000]), 1e-3)
+        assert_near_equal(prob['f'], -1.0109, 1e-3)
 
     def test_basinhopping_bounded(self):
         # It should find the local minimum, which is inside the bounds
@@ -1570,8 +1570,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         model.add_objective('f')
         prob.setup()
         prob.run_driver()
-        assert_rel_error(self, prob['x'], np.array([0.234171, -0.1000]), 1e-3)
-        assert_rel_error(self, prob['f'], -0.907267, 1e-3)
+        assert_near_equal(prob['x'], np.array([0.234171, -0.1000]), 1e-3)
+        assert_near_equal(prob['f'], -0.907267, 1e-3)
     @unittest.skipUnless(LooseVersion(scipy_version) >= LooseVersion("1.2"),
                          "scipy >= 1.2 is required.")
     def test_dual_annealing(self):
@@ -1596,8 +1596,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         model.add_objective('f')
         prob.setup()
         prob.run_driver()
-        assert_rel_error(self, prob['x'], np.ones(rosenbrock_size), 1e-2)
-        assert_rel_error(self, prob['f'], 0.0, 1e-2)
+        assert_near_equal(prob['x'], np.ones(rosenbrock_size), 1e-2)
+        assert_near_equal(prob['f'], 0.0, 1e-2)
 
     @unittest.skipUnless(LooseVersion(scipy_version) >= LooseVersion("1.2"),
                          "scipy >= 1.2 is required.")
@@ -1635,8 +1635,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         model.add_objective('f')
         prob.setup()
         prob.run_driver()
-        assert_rel_error(self, prob['x'], np.zeros(size), 1e-2)
-        assert_rel_error(self, prob['f'], 0.0, 1e-2)
+        assert_near_equal(prob['x'], np.zeros(size), 1e-2)
+        assert_near_equal(prob['f'], 0.0, 1e-2)
 
     def test_differential_evolution(self):
         # Source of example:
@@ -1672,8 +1672,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         model.add_objective('f')
         prob.setup()
         prob.run_driver()
-        assert_rel_error(self, prob['x'], np.zeros(size), 1e-6)
-        assert_rel_error(self, prob['f'], 0.0, 1e-6)
+        assert_near_equal(prob['x'], np.zeros(size), 1e-6)
+        assert_near_equal(prob['f'], 0.0, 1e-6)
 
     def test_differential_evolution_bounded(self):
         # Source of example:
@@ -1709,8 +1709,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         model.add_objective('f')
         prob.setup()
         prob.run_driver()
-        assert_rel_error(self, prob['x'], -np.ones(size), 1e-2)
-        assert_rel_error(self, prob['f'], 3.0, 1e-2)
+        assert_near_equal(prob['x'], -np.ones(size), 1e-2)
+        assert_near_equal(prob['f'], 3.0, 1e-2)
 
     @unittest.skipUnless(LooseVersion(scipy_version) >= LooseVersion("1.2"),
                          "scipy >= 1.2 is required.")
@@ -1734,8 +1734,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         model.add_objective('f')
         prob.setup()
         prob.run_driver()
-        assert_rel_error(self, prob['x'], np.ones(rosenbrock_size), 1e-2)
-        assert_rel_error(self, prob['f'], 0.0, 1e-2)
+        assert_near_equal(prob['x'], np.ones(rosenbrock_size), 1e-2)
+        assert_near_equal(prob['f'], 0.0, 1e-2)
 
 class TestScipyOptimizeDriverFeatures(unittest.TestCase):
 
@@ -1763,8 +1763,8 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
 
         prob.run_driver()
 
-        assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
-        assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
+        assert_near_equal(prob['x'], 6.66666667, 1e-6)
+        assert_near_equal(prob['y'], -7.3333333, 1e-6)
 
     def test_feature_optimizer(self):
         import openmdao.api as om
@@ -1787,8 +1787,8 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
 
         prob.run_driver()
 
-        assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
-        assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
+        assert_near_equal(prob['x'], 6.66666667, 1e-6)
+        assert_near_equal(prob['y'], -7.3333333, 1e-6)
 
     def test_feature_maxiter(self):
         import openmdao.api as om
@@ -1812,8 +1812,8 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
 
         prob.run_driver()
 
-        assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
-        assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
+        assert_near_equal(prob['x'], 6.66666667, 1e-6)
+        assert_near_equal(prob['y'], -7.3333333, 1e-6)
 
     def test_feature_tol(self):
         import openmdao.api as om
@@ -1837,8 +1837,8 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
 
         prob.run_driver()
 
-        assert_rel_error(self, prob['x'], 6.66666667, 1e-6)
-        assert_rel_error(self, prob['y'], -7.3333333, 1e-6)
+        assert_near_equal(prob['x'], 6.66666667, 1e-6)
+        assert_near_equal(prob['y'], -7.3333333, 1e-6)
 
     def test_feature_debug_print_option(self):
 
@@ -1944,8 +1944,8 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        assert_rel_error(self, prob['x'], np.zeros(size), 1e-6)
-        assert_rel_error(self, prob['f'], 0.0, 1e-6)
+        assert_near_equal(prob['x'], np.zeros(size), 1e-6)
+        assert_near_equal(prob['f'], 0.0, 1e-6)
 
 
 if __name__ == "__main__":

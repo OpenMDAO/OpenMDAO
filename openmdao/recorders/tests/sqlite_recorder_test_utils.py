@@ -5,7 +5,7 @@ import json
 from contextlib import contextmanager
 
 from openmdao.utils.record_util import format_iteration_coordinate, deserialize
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.recorders.sqlite_recorder import blob_to_array, format_version
 
 import pickle
@@ -91,7 +91,7 @@ def assertProblemDataRecorded(test, expected, tolerance):
                                         '{} variable not found in actual data'
                                         ' from recorder'.format(key))
                         # Check to see if the values in actual and expected match
-                        assert_rel_error(test, actual[key], expected[key], tolerance)
+                        assert_near_equal(actual[key], expected[key], tolerance)
 
 
 def assertDriverIterDataRecorded(test, expected, tolerance, prefix=None):
@@ -150,7 +150,7 @@ def assertDriverIterDataRecorded(test, expected, tolerance, prefix=None):
                                         '{} variable not found in actual data'
                                         ' from recorder'.format(key))
                         # Check to see if the values in actual and expected match
-                        assert_rel_error(test, actual[key], expected[key], tolerance)
+                        assert_near_equal(actual[key], expected[key], tolerance)
 
 
 def assertDriverDerivDataRecorded(test, expected, tolerance, prefix=None):
@@ -202,7 +202,7 @@ def assertDriverDerivDataRecorded(test, expected, tolerance, prefix=None):
                                     '{} variable not found in actual data'
                                     ' from recorder'.format(key))
                     # Check to see if the values in actual and expected match
-                    assert_rel_error(test, actual[key], totals_expected[key], tolerance)
+                    assert_near_equal(actual[key], totals_expected[key], tolerance)
 
 
 def assertSystemIterDataRecorded(test, expected, tolerance, prefix=None):
@@ -262,7 +262,7 @@ def assertSystemIterDataRecorded(test, expected, tolerance, prefix=None):
                                         '{} variable not found in actual data '
                                         'from recorder'.format(key))
                         # Check to see if the values in actual and expected match
-                        assert_rel_error(test, actual[0][key], expected[key], tolerance)
+                        assert_near_equal(actual[0][key], expected[key], tolerance)
 
 
 def assertSolverIterDataRecorded(test, expected, tolerance, prefix=None):
@@ -304,10 +304,10 @@ def assertSolverIterDataRecorded(test, expected, tolerance, prefix=None):
             test.assertEqual(msg, '')
             if expected_abs_error:
                 test.assertTrue(abs_err, 'Expected absolute error but none recorded')
-                assert_rel_error(test, abs_err, expected_abs_error, tolerance)
+                assert_near_equal(abs_err, expected_abs_error, tolerance)
             if expected_rel_error:
                 test.assertTrue(rel_err, 'Expected relative error but none recorded')
-                assert_rel_error(test, rel_err, expected_rel_error, tolerance)
+                assert_near_equal(rel_err, expected_rel_error, tolerance)
 
             for vartype, actual, expected in (
                     ('outputs', output_actual, expected_output),
@@ -328,7 +328,7 @@ def assertSolverIterDataRecorded(test, expected, tolerance, prefix=None):
                                         '{} variable not found in actual data '
                                         'from recorder'.format(key))
                         # Check to see if the values in actual and expected match
-                        assert_rel_error(test, actual[0][key], expected[key], tolerance)
+                        assert_near_equal(actual[0][key], expected[key], tolerance)
 
 
 def assertMetadataRecorded(test, expected_prom2abs, expected_abs2prom):

@@ -16,7 +16,7 @@ import openmdao.api as om
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.groups.parallel_groups import FanInGrouped
 
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.general_utils import run_driver, printoptions
 
 from openmdao.utils.mpi import MPI
@@ -469,7 +469,7 @@ class TestDOEDriver(unittest.TestCase):
         for case, expected_case in zip(cases, expected):
             outputs = cr.get_case(case).outputs
             for name in ('x', 'y'):
-                assert_rel_error(self, outputs[name], expected_case[name], 1e-4)
+                assert_near_equal(outputs[name], expected_case[name], 1e-4)
 
     def test_full_factorial(self):
         prob = om.Problem()
@@ -751,8 +751,8 @@ class TestDOEDriver(unittest.TestCase):
             bucket = int((y + y_offset) / (y_bucket_size / samples))
             y_buckets_filled.add(bucket)
 
-            assert_rel_error(self, x, expected_case['x'], 1e-4)
-            assert_rel_error(self, y, expected_case['y'], 1e-4)
+            assert_near_equal(x, expected_case['x'], 1e-4)
+            assert_near_equal(y, expected_case['y'], 1e-4)
 
         self.assertEqual(x_buckets_filled, all_buckets)
         self.assertEqual(y_buckets_filled, all_buckets)
@@ -819,8 +819,8 @@ class TestDOEDriver(unittest.TestCase):
             bucket = int((y + y_offset) / (y_bucket_size / samples))
             y_buckets_filled.add(bucket)
 
-            assert_rel_error(self, x, expected_case['xy'][0], 1e-4)
-            assert_rel_error(self, y, expected_case['xy'][1], 1e-4)
+            assert_near_equal(x, expected_case['xy'][0], 1e-4)
+            assert_near_equal(y, expected_case['xy'][1], 1e-4)
 
         self.assertEqual(x_buckets_filled, all_buckets)
         self.assertEqual(y_buckets_filled, all_buckets)
@@ -912,9 +912,9 @@ class TestDOEDriver(unittest.TestCase):
         final_case = cr.list_cases('driver')[-1]
         outputs = cr.get_case(final_case).outputs
 
-        assert_rel_error(self, outputs['x'], 10.0, 1e-7)
-        assert_rel_error(self, outputs['y'], 20.0, 1e-7)
-        assert_rel_error(self, outputs['z'], 30.0, 1e-7)
+        assert_near_equal(outputs['x'], 10.0, 1e-7)
+        assert_near_equal(outputs['y'], 20.0, 1e-7)
+        assert_near_equal(outputs['z'], 30.0, 1e-7)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")

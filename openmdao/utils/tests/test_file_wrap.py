@@ -8,7 +8,7 @@ import shutil
 
 import unittest
 
-from openmdao.utils.assert_utils import assert_rel_error, assert_equal_arrays
+from openmdao.utils.assert_utils import assert_near_equal, assert_equal_arrays
 
 import numpy
 from numpy import array, isnan, isinf
@@ -794,7 +794,7 @@ class FileParserFeature(unittest.TestCase):
         parser.mark_anchor("LOAD CASE")
         var = parser.transfer_array(2, 2, 2, 5)
 
-        assert_rel_error(self, var, numpy.array([2.1, 4.6, 3.1, 2.22234]))
+        assert_near_equal(var, numpy.array([2.1, 4.6, 3.1, 2.22234]))
 
     def test_parse_array_multiline(self):
         parser.reset_anchor()
@@ -920,7 +920,7 @@ class FileParserArrayColumnsFeature(unittest.TestCase):
 
         parser.set_delimiters(" \t")
 
-        assert_rel_error(self, var,
+        assert_near_equal(var,
                          numpy.array([11., 22., 33., 44., 55., 66.]))
 
 

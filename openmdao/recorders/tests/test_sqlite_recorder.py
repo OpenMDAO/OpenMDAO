@@ -24,8 +24,7 @@ from openmdao.recorders.tests.sqlite_recorder_test_utils import assertMetadataRe
     assertDriverDerivDataRecorded
 
 from openmdao.recorders.tests.recorder_test_utils import run_driver
-from openmdao.utils.assert_utils import assert_rel_error, assert_warning
-
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.general_utils import determine_adder_scaler
 from openmdao.utils.testing_utils import use_tempdirs
 
@@ -1868,8 +1867,8 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         cr = om.CaseReader(case_recorder_filename)
         case = cr.get_case('rank0:ScipyOptimize_SLSQP|4')
 
-        assert_rel_error(self, case.outputs['x'], 7.16666667, 1e-6)
-        assert_rel_error(self, case.outputs['y'], -7.83333333, 1e-6)
+        assert_near_equal(case.outputs['x'], 7.16666667, 1e-6)
+        assert_near_equal(case.outputs['y'], -7.83333333, 1e-6)
 
     def test_feature_problem_metadata(self):
         import openmdao.api as om
@@ -2093,10 +2092,10 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         design_vars = case.get_design_vars()
         constraints = case.get_constraints()
 
-        assert_rel_error(self, objectives['obj'], 28.58, 1e-1)
+        assert_near_equal(objectives['obj'], 28.58, 1e-1)
 
-        assert_rel_error(self, design_vars, case.get_design_vars(), 1e-1)
-        assert_rel_error(self, constraints, case.get_constraints(), 1e-1)
+        assert_near_equal(design_vars, case.get_design_vars(), 1e-1)
+        assert_near_equal(constraints, case.get_constraints(), 1e-1)
 
     def test_feature_solver_options(self):
         import openmdao.api as om
@@ -2346,10 +2345,10 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         design_vars = case.get_design_vars()
         constraints = case.get_constraints()
 
-        assert_rel_error(self, objectives['obj'], 3.18, 1e-1)
+        assert_near_equal(objectives['obj'], 3.18, 1e-1)
 
-        assert_rel_error(self, design_vars, case.get_design_vars(), 1e-1)
-        assert_rel_error(self, constraints, case.get_constraints(), 1e-1)
+        assert_near_equal(design_vars, case.get_design_vars(), 1e-1)
+        assert_near_equal(constraints, case.get_constraints(), 1e-1)
 
     def test_scaling_multiple_calls(self):
         import openmdao.api as om
@@ -2401,9 +2400,9 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         constraints = case.get_constraints()
 
         # Methods are called a second time
-        assert_rel_error(self, objectives['obj'], case.get_objectives()['obj'], 1e-1)
-        assert_rel_error(self, design_vars, case.get_design_vars(), 1e-1)
-        assert_rel_error(self, constraints, case.get_constraints(), 1e-1)
+        assert_near_equal(objectives['obj'], case.get_objectives()['obj'], 1e-1)
+        assert_near_equal(design_vars, case.get_design_vars(), 1e-1)
+        assert_near_equal(constraints, case.get_constraints(), 1e-1)
 
     def test_recorder_resetup(self):
         vec_size = 7
@@ -2468,7 +2467,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         y_recorded = case.get_val('test_sys.y')
 
-        assert_rel_error(self, y_recorded, y1)
+        assert_near_equal(y_recorded, y1)
 
 
 @use_tempdirs
@@ -2534,10 +2533,10 @@ class TestFeatureBasicRecording(unittest.TestCase):
         design_vars = case.get_design_vars()
         constraints = case.get_constraints()
 
-        assert_rel_error(self, objectives['obj'], 28.58, 1e-1)
+        assert_near_equal(objectives['obj'], 28.58, 1e-1)
 
-        assert_rel_error(self, design_vars, case.get_design_vars(), 1e-1)
-        assert_rel_error(self, constraints, case.get_constraints(), 1e-1)
+        assert_near_equal(design_vars, case.get_design_vars(), 1e-1)
+        assert_near_equal(constraints, case.get_constraints(), 1e-1)
 
         # get a list of cases that we manually recorded
         self.assertEqual(cr.list_cases('problem'), ['final'])
@@ -2549,10 +2548,10 @@ class TestFeatureBasicRecording(unittest.TestCase):
         design_vars = case.get_design_vars()
         constraints = case.get_constraints()
 
-        assert_rel_error(self, objectives['obj'], 3.18, 1e-1)
+        assert_near_equal(objectives['obj'], 3.18, 1e-1)
 
-        assert_rel_error(self, design_vars, case.get_design_vars(), 1e-1)
-        assert_rel_error(self, constraints, case.get_constraints(), 1e-1)
+        assert_near_equal(design_vars, case.get_design_vars(), 1e-1)
+        assert_near_equal(constraints, case.get_constraints(), 1e-1)
 
 
 if __name__ == "__main__":

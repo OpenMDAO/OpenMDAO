@@ -5,7 +5,7 @@ import numpy as np
 
 from openmdao.api import Problem, NonlinearBlockGS, Group, IndepVarComp, ExecComp, ScipyKrylov,  \
     IndepVarComp, ScipyOptimizeDriver
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.mpi import MPI
 
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1withDerivatives, \

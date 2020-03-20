@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 
 from openmdao.api import MultiFiCoKrigingSurrogate
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class CoKrigingSurrogateTest(unittest.TestCase):
@@ -19,24 +19,24 @@ class CoKrigingSurrogateTest(unittest.TestCase):
         new_x = np.array([0.5])
 
         mu, sigma = krig1.predict(x[0])
-        assert_rel_error(self, mu, [[y[0]]], 1e-4)
-        assert_rel_error(self, sigma, [[0.]], 1e-4)
+        assert_near_equal(mu, [[y[0]]], 1e-4)
+        assert_near_equal(sigma, [[0.]], 1e-4)
 
         mu, sigma = krig1.predict(new_x)
-        assert_rel_error(self, mu, [[-2.0279]], 1e-3)
-        assert_rel_error(self, sigma, [[1.3408]], 1e-3)
+        assert_near_equal(mu, [[-2.0279]], 1e-3)
+        assert_near_equal(sigma, [[1.3408]], 1e-3)
 
         # Test with theta setting instead of estimation
         krig2 = MultiFiCoKrigingSurrogate(theta=0.1, normalize=False)
         krig2.train(x, y)
 
         mu, sigma = krig2.predict(x[0])
-        assert_rel_error(self , mu, [[y[0]]], 1e-4)
-        assert_rel_error(self, sigma, [[.0]], 1e-4)
+        assert_near_equal(mu, [[y[0]]], 1e-4)
+        assert_near_equal(sigma, [[.0]], 1e-4)
 
         mu, sigma = krig2.predict(new_x)
-        assert_rel_error(self, mu, [[-1.2719]], 1e-3)
-        assert_rel_error(self, sigma, [[0.0439]], 1e-3)
+        assert_near_equal(mu, [[-1.2719]], 1e-3)
+        assert_near_equal(sigma, [[0.0439]], 1e-3)
 
     def test_1d_2fi_cokriging(self):
         # Example from Forrester: Engineering design via surrogate modelling
@@ -57,8 +57,8 @@ class CoKrigingSurrogateTest(unittest.TestCase):
 
         new_x = np.array([0.75])
         mu, sigma = cokrig.predict(new_x)
-        assert_rel_error(self, mu,  [[f_expensive(new_x[0])]], 0.05)
-        assert_rel_error(self, sigma, [[0.]], 0.02)
+        assert_near_equal(mu,  [[f_expensive(new_x[0])]], 0.05)
+        assert_near_equal(sigma, [[0.]], 0.02)
 
     def test_2d_1fi_cokriging(self):
         # CoKrigingSurrogate with one fidelity could be used as a KrigingSurrogate
@@ -76,24 +76,24 @@ class CoKrigingSurrogateTest(unittest.TestCase):
         krig1.train(x, y)
 
         mu, sigma = krig1.predict([-2., 0.])
-        assert_rel_error(self, mu, [[branin(x[0])]], 1e-5)
-        assert_rel_error(self, sigma, [[0.]], 1e-5)
+        assert_near_equal(mu, [[branin(x[0])]], 1e-5)
+        assert_near_equal(sigma, [[0.]], 1e-5)
 
         mu, sigma = krig1.predict([5., 5.])
-        assert_rel_error(self, mu, [[22]], 1)
-        assert_rel_error(self, sigma, [[13]], 1)
+        assert_near_equal(mu, [[22]], 1)
+        assert_near_equal(sigma, [[13]], 1)
 
         # Test with theta setting instead of estimation
         krig2 = MultiFiCoKrigingSurrogate(theta=[0.1])
         krig1.train(x, y)
 
         mu, sigma = krig1.predict([-2., 0.])
-        assert_rel_error(self, mu, [[branin(x[0])]], 1e-5)
-        assert_rel_error(self, sigma, [[0.]], 1e-5)
+        assert_near_equal(mu, [[branin(x[0])]], 1e-5)
+        assert_near_equal(sigma, [[0.]], 1e-5)
 
         mu, sigma = krig1.predict([5., 5.])
-        assert_rel_error(self, mu, [[22]], 1)
-        assert_rel_error(self, sigma, [[13]], 1)
+        assert_near_equal(mu, [[22]], 1)
+        assert_near_equal(sigma, [[13]], 1)
 
     def test_2d_2fi_cokriging(self):
 
@@ -144,24 +144,24 @@ class CoKrigingSurrogateTest(unittest.TestCase):
         cokrig.train_multifi(x, y)
 
         mu, sigma = cokrig.predict([2./3., 1/3.])
-        assert_rel_error(self, mu, [[26]], 0.2)
-        assert_rel_error(self, sigma, [[0.3]], 0.2)
+        assert_near_equal(mu, [[26]], 0.2)
+        assert_near_equal(sigma, [[0.3]], 0.2)
 
         # Test with theta setting instead of theta estimation
         cokrig2 = MultiFiCoKrigingSurrogate(theta=0.1, normalize=False)
         cokrig2.train_multifi(x, y)
 
         mu, sigma = cokrig2.predict([2./3., 1/3.])
-        assert_rel_error(self, mu, [[21.7]], 0.1)
-        assert_rel_error(self, sigma, [[2.29]], 0.1)
+        assert_near_equal(mu, [[21.7]], 0.1)
+        assert_near_equal(sigma, [[2.29]], 0.1)
 
         # Test with theta setting instead of theta estimation
         cokrig2 = MultiFiCoKrigingSurrogate(theta=[0.1, 10], normalize=False)
         cokrig2.train_multifi(x, y)
 
         mu, sigma = cokrig2.predict([2./3., 1/3.])
-        assert_rel_error(self, mu, [[21.01]], 0.2)
-        assert_rel_error(self, sigma, [[2.29]], 0.2)
+        assert_near_equal(mu, [[21.01]], 0.2)
+        assert_near_equal(sigma, [[2.29]], 0.2)
 
         # Test bad theta setting
         cokrig3 = MultiFiCoKrigingSurrogate(theta=[0.1])

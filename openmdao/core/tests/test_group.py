@@ -14,7 +14,7 @@ except ImportError:
 
 import openmdao.api as om
 from openmdao.test_suite.components.sellar import SellarDis2
-from openmdao.utils.assert_utils import assert_rel_error, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.logger_utils import TestLogger
 from openmdao.error_checking.check_config import _check_hanging_inputs
 
@@ -810,9 +810,9 @@ class TestGroup(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_rel_error(self, p['indep.x'], np.ones(5))
-        assert_rel_error(self, p['comp1.x'], np.ones(5)*12.)
-        assert_rel_error(self, p['comp1.y'], 60.)
+        assert_near_equal(p['indep.x'], np.ones(5))
+        assert_near_equal(p['comp1.x'], np.ones(5)*12.)
+        assert_near_equal(p['comp1.y'], 60.)
 
     def test_unconnected_input_units_no_mismatch(self):
         p = om.Problem()
@@ -877,9 +877,9 @@ class TestGroup(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_rel_error(self, p['C1.y'], 10.)
-        assert_rel_error(self, p['C2.y'], 20.)
-        assert_rel_error(self, p['C3.y'], 30.)
+        assert_near_equal(p['C1.y'], 10.)
+        assert_near_equal(p['C2.y'], 20.)
+        assert_near_equal(p['C3.y'], 30.)
 
     def test_double_src_indices(self):
         class MyComp1(om.ExplicitComponent):
@@ -923,10 +923,10 @@ class TestGroup(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_rel_error(self, p['C1.x'], np.ones(3))
-        assert_rel_error(self, p['C1.y'], 6.)
-        assert_rel_error(self, p['C2.x'], np.ones(2))
-        assert_rel_error(self, p['C2.y'], 8.)
+        assert_near_equal(p['C1.x'], np.ones(3))
+        assert_near_equal(p['C1.y'], 6.)
+        assert_near_equal(p['C2.x'], np.ones(2))
+        assert_near_equal(p['C2.y'], 8.)
 
     def test_connect_src_indices_noflat(self):
         import numpy as np
@@ -946,9 +946,9 @@ class TestGroup(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_rel_error(self, p['C1.x'], np.array([[0., 10.],
+        assert_near_equal(p['C1.x'], np.array([[0., 10.],
                                                     [7., 4.]]))
-        assert_rel_error(self, p['C1.y'], 42.)
+        assert_near_equal(p['C1.y'], 42.)
 
     def test_promote_not_found1(self):
         p = om.Problem()
@@ -1064,10 +1064,10 @@ class TestGroup(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_rel_error(self, p['C1.x'], np.ones(3))
-        assert_rel_error(self, p['C1.y'], 6.)
-        assert_rel_error(self, p['C2.x'], np.ones(2))
-        assert_rel_error(self, p['C2.y'], 8.)
+        assert_near_equal(p['C1.x'], np.ones(3))
+        assert_near_equal(p['C1.y'], 6.)
+        assert_near_equal(p['C2.x'], np.ones(2))
+        assert_near_equal(p['C2.y'], 8.)
 
     def test_promote_src_indices_nonflat(self):
         import numpy as np
@@ -1105,10 +1105,10 @@ class TestGroup(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_rel_error(self, p['C1.x'],
+        assert_near_equal(p['C1.x'],
                          np.array([[0., 10.],
                                    [7., 4.]]))
-        assert_rel_error(self, p['C1.y'], 21.)
+        assert_near_equal(p['C1.y'], 21.)
 
     def test_promote_src_indices_nonflat_to_scalars(self):
         class MyComp(om.ExplicitComponent):
@@ -1129,8 +1129,8 @@ class TestGroup(unittest.TestCase):
         p.set_solver_print(level=0)
         p.setup()
         p.run_model()
-        assert_rel_error(self, p['C1.x'], 10.)
-        assert_rel_error(self, p['C1.y'], 20.)
+        assert_near_equal(p['C1.x'], 10.)
+        assert_near_equal(p['C1.y'], 20.)
 
     def test_promote_src_indices_nonflat_error(self):
         class MyComp(om.ExplicitComponent):
@@ -1198,9 +1198,9 @@ class TestGroup(unittest.TestCase):
         p.set_solver_print(level=0)
         p.setup()
         p.run_model()
-        assert_rel_error(self, p['C1.x'],
+        assert_near_equal(p['C1.x'],
                          np.array([0., 10., 7., 4.]).reshape(tgt_shape))
-        assert_rel_error(self, p['C1.y'], 21.)
+        assert_near_equal(p['C1.y'], 21.)
 
     def test_set_order_feature(self):
         import openmdao.api as om
@@ -1358,7 +1358,7 @@ class TestGroup(unittest.TestCase):
 
         self.assertEqual(p.model.nonlinear_solver._iter_count, 0)
 
-        assert_rel_error(self, p['discipline.x'], 1.41421356, 1e-6)
+        assert_near_equal(p['discipline.x'], 1.41421356, 1e-6)
 
     def test_guess_nonlinear_complex_step(self):
 
@@ -1406,12 +1406,12 @@ class TestGroup(unittest.TestCase):
 
         self.assertEqual(p.model.nonlinear_solver._iter_count, 0)
 
-        assert_rel_error(self, p['discipline.x'], 1.41421356, 1e-6)
+        assert_near_equal(p['discipline.x'], 1.41421356, 1e-6)
 
         totals = p.check_totals(of=['discipline.comp1.z'], wrt=['parameters.input_value'], method='cs', out_stream=None)
 
         for key, val in totals.items():
-            assert_rel_error(self, val['rel error'][0], 0.0, 1e-15)
+            assert_near_equal(val['rel error'][0], 0.0, 1e-15)
 
 
 class MyComp(om.ExplicitComponent):
@@ -1604,7 +1604,7 @@ class TestConnect(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, prob['tgt.y'], 600.)
+        assert_near_equal(prob['tgt.y'], 600.)
 
     def test_connect_units_with_nounits_prom(self):
         prob = om.Problem()
@@ -1622,7 +1622,7 @@ class TestConnect(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, prob['tgt.z'], 600.)
+        assert_near_equal(prob['tgt.z'], 600.)
 
     def test_mix_promotes_types(self):
         prob = om.Problem()
@@ -1668,7 +1668,7 @@ class TestConnect(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        assert_rel_error(self, prob['G1.par1.c4.y'], 8.0)
+        assert_near_equal(prob['G1.par1.c4.y'], 8.0)
 
     def test_bad_shapes(self):
         self.sub.connect('src.s', 'arr.x')

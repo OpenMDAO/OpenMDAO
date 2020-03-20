@@ -3,7 +3,7 @@
 import unittest
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.test_suite.components.paraboloid_feature import Paraboloid
 
 
@@ -24,7 +24,7 @@ class TestSellarFeature(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['comp.f_xy'], -15.0)
+        assert_near_equal(prob['comp.f_xy'], -15.0)
 
 if __name__ == "__main__":
     unittest.main()

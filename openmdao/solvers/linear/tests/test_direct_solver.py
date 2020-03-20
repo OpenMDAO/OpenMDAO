@@ -9,7 +9,7 @@ from openmdao.solvers.linear.tests.linear_test_base import LinearSolverTests
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleJacVec
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.mpi import MPI
 from openmdao.core.tests.test_distrib_derivs import DistribExecComp
 try:
@@ -129,7 +129,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         g1.run_solve_linear(['linear'], 'fwd')
 
         output = d_outputs._data
-        assert_rel_error(self, output, g1.expected_solution, 1e-15)
+        assert_near_equal(output, g1.expected_solution, 1e-15)
 
         # reverse
         d_inputs, d_outputs, d_residuals = g1.get_linear_vectors()
@@ -140,7 +140,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         g1.run_solve_linear(['linear'], 'rev')
 
         output = d_residuals._data
-        assert_rel_error(self, output, g1.expected_solution, 3e-15)
+        assert_near_equal(output, g1.expected_solution, 3e-15)
 
     def test_rev_mode_bug(self):
 
@@ -152,8 +152,8 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob['y2'], 12.05848819, .00001)
 
         wrt = ['x', 'z']
         of = ['obj', 'con1', 'con2']
@@ -168,14 +168,14 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         for key, val in Jbase.items():
-            assert_rel_error(self, J[key], val, .00001)
+            assert_near_equal(J[key], val, .00001)
 
         # In the bug, the solver mode got switched from fwd to rev when it shouldn't
         # have been, causing a singular matrix and NaNs in the output.
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob['y2'], 12.05848819, .00001)
 
     def test_multi_dim_src_indices(self):
         prob = om.Problem()
@@ -539,11 +539,11 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.compute_totals(of=['c5.y'], wrt=['p.x'])
 
-        expected_msg = "Singular entry found in Group (<model>) for row/col associated with state/residual 'c5.y' index 0."
+        expected_msg = "Singular entry found in Group (<model>) for row associated with state/residual 'c5.y' index 0."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
-    def test_raise_error_on_underdetermined_csc(self):
+    def test_error_msg_underdetermined_1(self):
 
         class DCgenerator(om.ImplicitComponent):
 
@@ -606,9 +606,209 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        expected_msg = "Identical rows or columns found in jacobian in 'sub'. Problem is underdetermined."
+        expected = "Jacobian in 'sub' is not full rank. The following set of states/residuals contains one or more equations that is a linear combination of the others: \n"
+        expected += " 'gen.I_out' ('sub.gen.I_out') index 0.\n"
+        expected += " 'Vm_dc' ('sub.calcs.V_out') index 0.\n"
 
-        self.assertEqual(expected_msg, str(cm.exception))
+        self.assertEqual(expected, str(cm.exception))
+
+    def test_error_msg_underdetermined_2(self):
+
+        class E1(om.ImplicitComponent):
+
+            def setup(self):
+                self.add_input('a', 1.0)
+                self.add_input('aa', 1.0)
+                self.add_input('y', 1.0)
+                self.add_input('z', 1.0)
+                self.add_output('x', 1.0)
+
+                self.declare_partials('x', 'x', val=1.0)
+                self.declare_partials('x', 'y', val=1.0)
+                self.declare_partials('x', 'z', val=1.0)
+                self.declare_partials('x', 'a', val=-1.0)
+                self.declare_partials('x', 'aa', val=-1.0)
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                residuals['x'] = outputs['x'] + inputs['y'] + inputs['z'] - inputs['a'] - inputs['aa']
+
+
+        class E2(om.ImplicitComponent):
+
+            def setup(self):
+                self.add_input('x', 1.0)
+                self.add_output('y', 1.0)
+
+                self.declare_partials('y', 'x', val=2.063e-4)
+                self.declare_partials('y', 'y')
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                residuals['y'] = 2.063e-4 * inputs['x'] - outputs['y'] ** 2
+
+            def linearize(self, inputs, outputs, jacobian):
+                jacobian['y', 'y'] = -2.0 * outputs['y']
+
+
+        class E3(om.ImplicitComponent):
+
+            def setup(self):
+                self.add_input('a', 1.0)
+                self.add_input('aa', 1.0)
+                self.add_input('x', 1.0)
+                self.add_input('y', 1.0)
+                self.add_output('z', 1.0)
+
+                self.declare_partials('z', 'x', val=2.0)
+                self.declare_partials('z', 'y', val=1.0)
+                self.declare_partials('z', 'z', val=-4.0)
+                self.declare_partials('z', 'a', val=-1.0)
+                self.declare_partials('z', 'aa', val=-1.0)
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                residuals['z'] = 2.0 * inputs['x'] + inputs['y'] - 4.0 * outputs['z'] - inputs['a'] - inputs['aa']
+
+
+        class E3bad(om.ImplicitComponent):
+
+            def setup(self):
+                self.add_input('a', 1.0)
+                self.add_input('aa', 1.0)
+                self.add_input('x', 1.0)
+                self.add_input('y', 1.0)
+                self.add_output('z', 1.0)
+
+                self.declare_partials('z', 'x', val=1.0)
+                self.declare_partials('z', 'y', val=1.0)
+                self.declare_partials('z', 'z', val=1.0)
+                self.declare_partials('z', 'a', val=-1.0)
+                self.declare_partials('z', 'aa', val=-1.0)
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                residuals['z'] = 2.0 * inputs['x'] + inputs['y'] - 4.0 * outputs['z'] - inputs['a'] - inputs['aa']
+
+        # Configuration 1
+        p = om.Problem()
+        model = p.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('aa', 1.0)
+        model.add_subsystem('p', ivc, promotes=['aa'])
+
+        sub1 = model.add_subsystem('sub1', om.Group())
+        sub2 = model.add_subsystem('sub2', om.Group())
+        sub3 = model.add_subsystem('sub3', om.Group())
+
+        sub1.add_subsystem('e1', E1(), promotes=['*'])
+        sub1.add_subsystem('e2', E2(), promotes=['*'])
+        sub1.add_subsystem('e3', E3(), promotes=['*'])
+
+        sub2.add_subsystem('e1', E1(), promotes=['*'])
+        sub2.add_subsystem('e2', E2(), promotes=['*'])
+        sub2.add_subsystem('e3', E3bad(), promotes=['*'])
+
+        sub3.add_subsystem('e1', E1(), promotes=['*'])
+        sub3.add_subsystem('e2', E2(), promotes=['*'])
+        sub3.add_subsystem('e3', E3(), promotes=['*'])
+
+        model.connect('sub1.z', 'sub2.a')
+        model.connect('sub2.z', 'sub3.a')
+        model.connect('sub3.z', 'sub1.a')
+        model.linear_solver = om.DirectSolver()
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+
+        p.setup()
+        with self.assertRaises(RuntimeError) as cm:
+            p.run_model()
+
+        expected = "Jacobian in '' is not full rank. The following set of states/residuals contains one or more equations that is a linear combination of the others: \n"
+        expected += " 'sub2.x' ('sub2.e1.x') index 0.\n"
+        expected += " 'sub2.z' ('sub2.e3.z') index 0.\n"
+
+        self.assertEqual(expected, str(cm.exception))
+
+        # Configuration 1 Dense
+        p = om.Problem()
+        model = p.model
+        model.options['assembled_jac_type'] = 'dense'
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('aa', 1.0)
+        model.add_subsystem('p', ivc, promotes=['aa'])
+
+        sub1 = model.add_subsystem('sub1', om.Group())
+        sub2 = model.add_subsystem('sub2', om.Group())
+        sub3 = model.add_subsystem('sub3', om.Group())
+
+        sub1.add_subsystem('e1', E1(), promotes=['*'])
+        sub1.add_subsystem('e2', E2(), promotes=['*'])
+        sub1.add_subsystem('e3', E3(), promotes=['*'])
+
+        sub2.add_subsystem('e1', E1(), promotes=['*'])
+        sub2.add_subsystem('e2', E2(), promotes=['*'])
+        sub2.add_subsystem('e3', E3bad(), promotes=['*'])
+
+        sub3.add_subsystem('e1', E1(), promotes=['*'])
+        sub3.add_subsystem('e2', E2(), promotes=['*'])
+        sub3.add_subsystem('e3', E3(), promotes=['*'])
+
+        model.connect('sub1.z', 'sub2.a')
+        model.connect('sub2.z', 'sub3.a')
+        model.connect('sub3.z', 'sub1.a')
+        model.linear_solver = om.DirectSolver()
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+
+        p.setup()
+        with self.assertRaises(RuntimeError) as cm:
+            p.run_model()
+
+        expected = "Jacobian in '' is not full rank. The following set of states/residuals contains one or more equations that is a linear combination of the others: \n"
+        expected += " 'sub2.x' ('sub2.e1.x') index 0.\n"
+        expected += " 'sub2.z' ('sub2.e3.z') index 0.\n"
+
+        self.assertEqual(expected, str(cm.exception))
+
+        # Configuration 2
+        p = om.Problem()
+        model = p.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('aa', 1.0)
+        model.add_subsystem('p', ivc, promotes=['aa'])
+
+        sub1 = model.add_subsystem('sub1', om.Group())
+        sub2 = model.add_subsystem('sub2', om.Group())
+        sub3 = model.add_subsystem('sub3', om.Group())
+
+        sub1.add_subsystem('e1', E1(), promotes=['*'])
+        sub1.add_subsystem('e2', E2(), promotes=['*'])
+        sub1.add_subsystem('e3', E3(), promotes=['aa', 'x', 'y', 'z'])
+
+        sub2.add_subsystem('e1', E1(), promotes=['*'])
+        sub2.add_subsystem('e2', E2(), promotes=['*'])
+        sub2.add_subsystem('e3', E3bad(), promotes=['aa', 'x', 'y', 'z'])
+
+        sub3.add_subsystem('e1', E1(), promotes=['*'])
+        sub3.add_subsystem('e2', E2(), promotes=['*'])
+        sub3.add_subsystem('e3', E3(), promotes=['aa', 'x', 'y', 'z'])
+
+        model.connect('sub1.z', 'sub2.a')
+        model.connect('sub2.z', 'sub3.a')
+        model.linear_solver = om.DirectSolver()
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+
+        p.setup()
+        with self.assertRaises(RuntimeError) as cm:
+            p.run_model()
+
+        expected = "Jacobian in '' is not full rank. The following set of states/residuals contains one or more equations that is a linear combination of the others: \n"
+        expected += " 'sub1.x' ('sub1.e1.x') index 0.\n"
+        expected += " 'sub1.y' ('sub1.e2.y') index 0.\n"
+        expected += " 'sub1.z' ('sub1.e3.z') index 0.\n"
+        expected += " 'sub2.x' ('sub2.e1.x') index 0.\n"
+        expected += " 'sub2.z' ('sub2.e3.z') index 0.\n"
+        expected += "Note that the problem may be in a single Component."
+
+        self.assertEqual(expected, str(cm.exception))
 
     def test_matvec_error_raised(self):
         prob = om.Problem()
@@ -702,8 +902,8 @@ class TestDirectSolverFeature(unittest.TestCase):
         of = ['obj']
 
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-        assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, .00001)
-        assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
+        assert_near_equal(J['obj', 'z'][0][0], 9.61001056, .00001)
+        assert_near_equal(J['obj', 'z'][0][1], 1.78448534, .00001)
 
 
 if __name__ == "__main__":
