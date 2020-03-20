@@ -259,7 +259,9 @@ class TestPhysicalUnit(unittest.TestCase):
     def test_get_conversion(self):
         msg = "'get_conversion' has been deprecated. Use 'unit_conversion' instead."
         with assert_warning(DeprecationWarning, msg):
-            self.assertEqual(get_conversion('km', 'm'), (1000., 0.))
+            get_conversion('km', 'm'), (1000., 0.)
+
+        self.assertEqual(get_conversion('km', 'm'), (1000., 0.))
 
         try:
             get_conversion('km', 1.0)
