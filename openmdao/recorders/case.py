@@ -14,7 +14,7 @@ from openmdao.recorders.sqlite_recorder import blob_to_array
 from openmdao.utils.record_util import deserialize, get_source_system
 from openmdao.utils.variable_table import write_var_table
 from openmdao.utils.general_utils import make_set, match_includes_excludes
-from openmdao.utils.units import get_conversion
+from openmdao.utils.units import unit_conversion
 
 _DEFAULT_OUT_STREAM = object()
 _AMBIGOUS_PROM_NAME = object()
@@ -250,7 +250,7 @@ class Case(object):
                 raise TypeError(msg.format(name, units))
 
             try:
-                scale, offset = get_conversion(base_units, units)
+                scale, offset = unit_conversion(base_units, units)
             except TypeError:
                 msg = "Can't express variable '{}' with units of '{}' in units of '{}'."
                 raise TypeError(msg.format(name, base_units, units))

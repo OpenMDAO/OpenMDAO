@@ -32,7 +32,7 @@ from openmdao.utils.mpi import FakeComm
 from openmdao.utils.mpi import MPI
 from openmdao.utils.name_maps import prom_name2abs_name
 from openmdao.utils.options_dictionary import OptionsDictionary
-from openmdao.utils.units import get_conversion
+from openmdao.utils.units import unit_conversion
 from openmdao.utils import coloring as coloring_mod
 from openmdao.utils.name_maps import abs_key2rel_key
 from openmdao.vectors.vector import INT_DTYPE
@@ -459,7 +459,7 @@ class Problem(object):
                 raise TypeError(msg.format(self.msginfo, name, units))
 
             try:
-                scale, offset = get_conversion(units, base_units)
+                scale, offset = unit_conversion(units, base_units)
             except TypeError:
                 msg = "{}: Can't set variable '{}' with units '{}' to value with units '{}'."
                 raise TypeError(msg.format(self.msginfo, name, base_units, units))
