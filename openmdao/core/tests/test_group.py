@@ -460,7 +460,7 @@ class TestGroup(unittest.TestCase):
 
         self.assertEqual(str(cm.exception), expected)
 
-        p.model._raise_connection_errors(False)
+        p.model._raise_connection_error = False
 
         with assert_warning(UserWarning, expected):
             p.setup()
@@ -1451,7 +1451,7 @@ def src_indices_model(src_shape, tgt_shape, src_indices=None, flat_src_indices=F
                            flat_src_indices=flat_src_indices)
 
     if not raise_connection_errors:
-        prob.model._raise_connection_errors(False)
+        prob.model._raise_connection_error = False
 
     prob.setup()
     return prob
@@ -1521,7 +1521,7 @@ class TestConnect(unittest.TestCase):
 
         self.assertEqual(str(context.exception), msg)
 
-        self.prob.model._raise_connection_errors(False)
+        self.prob.model._raise_connection_error = False
 
         with assert_warning(UserWarning, msg):
             self.prob.setup()
@@ -1540,7 +1540,7 @@ class TestConnect(unittest.TestCase):
 
         self.assertEqual(str(context.exception), msg)
 
-        self.prob.model._raise_connection_errors(False)
+        self.prob.model._raise_connection_error = False
 
         with assert_warning(UserWarning, msg):
             self.prob.setup()
@@ -1559,7 +1559,7 @@ class TestConnect(unittest.TestCase):
 
         self.assertEqual(str(context.exception), msg)
 
-        self.prob.model._raise_connection_errors(False)
+        self.prob.model._raise_connection_error = False
 
         with assert_warning(UserWarning, msg):
             self.prob.setup()
@@ -1576,7 +1576,7 @@ class TestConnect(unittest.TestCase):
 
         self.assertEqual(str(context.exception), msg)
 
-        self.prob.model._raise_connection_errors(False)
+        self.prob.model._raise_connection_error = False
 
         with assert_warning(UserWarning, msg):
             self.prob.setup()
@@ -1603,7 +1603,7 @@ class TestConnect(unittest.TestCase):
 
         self.assertEqual(str(ctx.exception), msg)
 
-        prob.model._raise_connection_errors(False)
+        prob.model._raise_connection_error = False
         
         with assert_warning(UserWarning, msg):
             prob.setup()
@@ -1623,7 +1623,7 @@ class TestConnect(unittest.TestCase):
         with assert_warning(UserWarning, msg):
             prob.setup()
 
-        self.prob.model._raise_connection_errors(False)
+        self.prob.model._raise_connection_error = False
         
         with assert_warning(UserWarning, msg):
             prob.setup()
@@ -1645,7 +1645,7 @@ class TestConnect(unittest.TestCase):
 
         self.assertEqual(str(context.exception), msg)
 
-        prob.model._raise_connection_errors(False)
+        prob.model._raise_connection_error = False
         
         with assert_warning(UserWarning, msg):
             prob.setup()
@@ -1747,7 +1747,7 @@ class TestConnect(unittest.TestCase):
 
         self.assertEqual(str(context.exception), msg)
 
-        self.prob.model._raise_connection_errors(False)
+        self.prob.model._raise_connection_error = False
         
         with assert_warning(UserWarning, msg):
             self.prob.setup()
@@ -1768,7 +1768,7 @@ class TestConnect(unittest.TestCase):
 
         self.assertEqual(str(context.exception), msg)
 
-        p.model._raise_connection_errors(False)
+        p.model._raise_connection_error = False
         
         with assert_warning(UserWarning, msg):
             p.setup()
@@ -1788,7 +1788,7 @@ class TestConnect(unittest.TestCase):
         else:
             self.fail('Exception expected.')
 
-        self.prob.model._raise_connection_errors(False)
+        self.prob.model._raise_connection_error = False
         
         with assert_warning(UserWarning, msg):
             self.prob.setup()
@@ -1809,7 +1809,7 @@ class TestConnect(unittest.TestCase):
         else:
             self.fail('Exception expected.')
 
-        self.prob.model._raise_connection_errors(False)
+        self.prob.model._raise_connection_error = False
         
         with assert_warning(UserWarning, msg):
             self.prob.setup()

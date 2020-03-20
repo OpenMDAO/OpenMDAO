@@ -83,7 +83,7 @@ def _n2_cmd(options, user_args):
     if filename.endswith('.py'):
         # the file is a python script, run as a post_setup hook
         def _noraise(prob):
-            prob.model._raise_connection_errors(False)
+            prob.model._raise_connection_error = False
 
         def _viewmod(prob):
             n2(prob, outfile=options.outfile, show_browser=not options.no_browser,

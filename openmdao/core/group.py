@@ -829,6 +829,9 @@ class Group(System):
         conns : dict
             Dictionary of connections passed down from parent group.
         """
+        if self._raise_connection_error is False:
+            self._set_subsys_connection_error(False)
+
         global_abs_in2out = self._conn_global_abs_in2out = {}
 
         allprocs_prom2abs_list_in = self._var_allprocs_prom2abs_list['input']
@@ -1276,9 +1279,9 @@ class Group(System):
                                             else:
                                                 simple_warning(msg)
 
-    def _raise_connection_errors(self, val=True):
+    def _set_subsys_connection_error(self, val=True):
         """
-        Set flag indicating whether connection errors raise an Exception or just a Warning.
+        Set flag in all subgroups indicating whether connection errors just issue a Warning.
 
         Parameters
         ----------
@@ -1286,8 +1289,10 @@ class Group(System):
             If True, connection errors will raise an Exception. If False, connection errors
             will issue a warning and the offending connection will be ignored.
         """
-        for s in self.system_iter(recurse=True, include_self=True, typ=Group):
-            s._raise_connection_error = val
+        for sub in self._subsystems_allprocs:
+            if isinstance(sub, Group):
+                sub._raise_connection_error = val
+                sub._set_subsys_connection_error(val)
 
     def _transfer(self, vec_name, mode, isub=None):
         """
