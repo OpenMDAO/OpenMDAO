@@ -2,22 +2,22 @@
 import openmdao.api as om
 import numpy as np
 
-class BadConnection(om.Group):
+class BadConnectionModel(om.Group):
 
     def setup(self):
-        indeps = self.add_subsystem('indeps', om.IndepVarComp())
-        indeps.add_output('x', 10*np.ones(4))
+        sub = self.add_subsystem('sub', om.Group())
 
-        # c2.y is implicitly connected to c1.y
-        self.add_subsystem('c1', om.ExecComp('y = 2*x', x=np.ones(4), y=2*np.ones(4)),
-                           promotes=['y'])
-        self.add_subsystem('c2', om.ExecComp('z = 2*y', y=np.ones(4), z=2*np.ones(4)),
-                           promotes=['y'])
+        idv = sub.add_subsystem('src', om.IndepVarComp())
+        idv.add_output('x', np.arange(15).reshape((5, 3)))  # array
+        idv.add_output('s', 3.)                             # scalar
 
-        # make a second, explicit, connection to y (which is c2.y promoted)
-        self.connect('indeps.x', 'y')
+        sub.add_subsystem('tgt', om.ExecComp('y = x'))
+        sub.add_subsystem('cmp', om.ExecComp('z = x'))
+        sub.add_subsystem('arr', om.ExecComp('a = x', x=np.zeros(2)))
+
+        self.sub.connect('tgt.x', 'cmp.x')
 
 if __name__ == '__main__':
-    p = om.Problem(model=BadConnection())
+    p = om.Problem(model=BadConnectionModel())
     p.setup()
     p.run_model()

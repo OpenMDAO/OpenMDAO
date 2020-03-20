@@ -80,7 +80,7 @@ class Group(System):
     _has_distrib_vars : bool
         If True, this Group contains distributed variables.
     _raise_connection_error : bool
-        Flag indicating whether connection errors or raised as an Exception.
+        Flag indicating whether connection errors are raised as an Exception.
     """
 
     def __init__(self, **kwargs):
@@ -887,6 +887,7 @@ class Group(System):
                         raise NameError(msg)
                     else:
                         simple_warning(msg)
+                        continue
                 else:
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
                           f"'{prom_in}', but '{prom_out}' doesn't exist."
@@ -894,6 +895,7 @@ class Group(System):
                         raise NameError(msg)
                     else:
                         simple_warning(msg)
+                        continue
 
             if (prom_in not in allprocs_prom2abs_list_in and
                     prom_in not in self._var_allprocs_discrete['input']):
@@ -906,6 +908,7 @@ class Group(System):
                         raise NameError(msg)
                     else:
                         simple_warning(msg)
+                        continue
                 else:
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
                           f"'{prom_in}', but '{prom_in}' doesn't exist."
@@ -913,6 +916,7 @@ class Group(System):
                         raise NameError(msg)
                     else:
                         simple_warning(msg)
+                        continue
 
             # Throw an exception if output and input are in the same system
             # (not traceable to a connect statement, so provide context)
@@ -931,6 +935,7 @@ class Group(System):
                         raise RuntimeError(msg)
                     else:
                         simple_warning(msg)
+                        continue
 
                 if src_indices is not None and abs_in in abs2meta:
                     meta = abs2meta[abs_in]
@@ -942,6 +947,7 @@ class Group(System):
                             raise RuntimeError(msg)
                         else:
                             simple_warning(msg)
+                            continue
                     meta['src_indices'] = np.atleast_1d(src_indices)
                     meta['flat_src_indices'] = flat_src_indices
 
@@ -952,6 +958,7 @@ class Group(System):
                         raise RuntimeError(msg)
                     else:
                         simple_warning(msg)
+                        continue
 
                 abs_in2out[abs_in] = abs_out
 
@@ -1207,6 +1214,7 @@ class Group(System):
                                 raise ValueError(msg)
                             else:
                                 simple_warning(msg)
+                                continue
 
                     # any remaining dimension of indices must match shape of source
                     if len(src_indices.shape) > len(in_shape):
@@ -1218,7 +1226,11 @@ class Group(System):
                                   f"valid shape for the connection '{abs_out}' to '{abs_in}'. " + \
                                   f"The source has {len(out_shape)} dimensions but the " + \
                                   f"indices expect {source_dimensions}."
-                            raise ValueError(msg)
+                            if self._raise_connection_error:
+                                raise ValueError(msg)
+                            else:
+                                simple_warning(msg)
+                                continue
                     else:
                         source_dimensions = 1
 
@@ -1263,6 +1275,19 @@ class Group(System):
                                                 raise ValueError(msg)
                                             else:
                                                 simple_warning(msg)
+
+    def _raise_connection_errors(self, val=True):
+        """
+        Set flag indicating whether connection errors raise an Exception or just a Warning.
+
+        Parameters
+        ----------
+        val : bool
+            If True, connection errors will raise an Exception. If False, connection errors
+            will issue a warning and the offending connection will be ignored.
+        """
+        for s in self.system_iter(recurse=True, include_self=True, typ=Group):
+            s._raise_connection_error = val
 
     def _transfer(self, vec_name, mode, isub=None):
         """

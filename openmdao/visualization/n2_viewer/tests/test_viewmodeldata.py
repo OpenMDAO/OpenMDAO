@@ -707,32 +707,19 @@ class TestViewModelData(unittest.TestCase):
         """
         Test that an n2 html file is generated from a Problem even if it has connection errors.
         """
-        import openmdao.api as om
-        from openmdao.core.tests.test_units import SpeedComp
+        from openmdao.test_suite.scripts.bad_connection import BadConnectionModel 
 
-        indep = om.IndepVarComp()
-        indep.add_output('distance', val=1., units='m')
-        indep.add_output('time', val=1., units='m')  # invalid units
+        p = Problem(BadConnectionModel())
 
-        prob = om.Problem()
-        prob.model.add_subsystem('indep', indep)
-        prob.model.add_subsystem('speed', om.ExecComp('speed=distance/time', 
-                                                      distance={'units': 'm'}, 
-                                                      time={'units': 's'}))
+        p.model._raise_connection_errors(False)
 
-        prob.model.connect('indep.distance', 'speed.distance')
-        prob.model.connect('indep.time', 'speed.time')
-
-        # this flag would be set by the command line hook
-        prob.model._raise_connection_error = False
-
-        expected = "Group (<model>): Output units of 'm' for 'indep.time' " + \
-                   "are incompatible with input units of 's' for 'speed.time'."
+        expected = "Group (sub): Attempted to connect from 'tgt.x' to 'cmp.x', but " + \
+                   "'tgt.x' is an input. All connections must be from an output to an input."
 
         with assert_warning(UserWarning, expected):
-            prob.setup()
+            p.setup()
 
-        n2(prob, outfile=self.problem_html_filename, show_browser=DEBUG,
+        n2(p, outfile=self.problem_html_filename, show_browser=DEBUG,
            title="Bad Connection")
 
         # Check that the html file has been created and has something in it.
