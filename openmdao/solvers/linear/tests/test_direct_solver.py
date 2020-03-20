@@ -9,7 +9,7 @@ from openmdao.solvers.linear.tests.linear_test_base import LinearSolverTests
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleJacVec
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.mpi import MPI
 from openmdao.core.tests.test_distrib_derivs import DistribExecComp
 try:
@@ -129,7 +129,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         g1.run_solve_linear(['linear'], 'fwd')
 
         output = d_outputs._data
-        assert_rel_error(self, output, g1.expected_solution, 1e-15)
+        assert_near_equal(output, g1.expected_solution, 1e-15)
 
         # reverse
         d_inputs, d_outputs, d_residuals = g1.get_linear_vectors()
@@ -140,7 +140,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         g1.run_solve_linear(['linear'], 'rev')
 
         output = d_residuals._data
-        assert_rel_error(self, output, g1.expected_solution, 3e-15)
+        assert_near_equal(output, g1.expected_solution, 3e-15)
 
     def test_rev_mode_bug(self):
 
@@ -152,8 +152,8 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob['y2'], 12.05848819, .00001)
 
         wrt = ['x', 'z']
         of = ['obj', 'con1', 'con2']
@@ -168,14 +168,14 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         for key, val in Jbase.items():
-            assert_rel_error(self, J[key], val, .00001)
+            assert_near_equal(J[key], val, .00001)
 
         # In the bug, the solver mode got switched from fwd to rev when it shouldn't
         # have been, causing a singular matrix and NaNs in the output.
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob['y2'], 12.05848819, .00001)
 
     def test_multi_dim_src_indices(self):
         prob = om.Problem()
@@ -902,8 +902,8 @@ class TestDirectSolverFeature(unittest.TestCase):
         of = ['obj']
 
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-        assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, .00001)
-        assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
+        assert_near_equal(J['obj', 'z'][0][0], 9.61001056, .00001)
+        assert_near_equal(J['obj', 'z'][0][1], 1.78448534, .00001)
 
 
 if __name__ == "__main__":

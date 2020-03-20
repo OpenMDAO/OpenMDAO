@@ -10,7 +10,7 @@ from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.test_suite.components.sellar import SellarDerivatives, \
     SellarDis1withDerivatives, SellarDis2withDerivatives, \
     SellarDis1, SellarDis2
-from openmdao.utils.assert_utils import assert_rel_error, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 
 from openmdao.utils.mpi import MPI
 try:
@@ -83,8 +83,8 @@ class TestNLBGaussSeidel(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob['y2'], 12.05848819, .00001)
 
     def test_feature_basic(self):
         import numpy as np
@@ -114,8 +114,8 @@ class TestNLBGaussSeidel(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob['y2'], 12.05848819, .00001)
 
     def test_feature_maxiter(self):
         import numpy as np
@@ -146,8 +146,8 @@ class TestNLBGaussSeidel(unittest.TestCase):
         prob.set_solver_print()
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58914915, .00001)
-        assert_rel_error(self, prob['y2'], 12.05857185, .00001)
+        assert_near_equal(prob['y1'], 25.58914915, .00001)
+        assert_near_equal(prob['y2'], 12.05857185, .00001)
 
     def test_feature_rtol(self):
         import numpy as np
@@ -178,8 +178,8 @@ class TestNLBGaussSeidel(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.5883027, .00001)
-        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.5883027, .00001)
+        assert_near_equal(prob['y2'], 12.05848819, .00001)
 
     def test_feature_atol(self):
         import numpy as np
@@ -210,8 +210,8 @@ class TestNLBGaussSeidel(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.5882856302, .00001)
-        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.5882856302, .00001)
+        assert_near_equal(prob['y2'], 12.05848819, .00001)
 
     def test_sellar(self):
         # Basic sellar test.
@@ -238,8 +238,8 @@ class TestNLBGaussSeidel(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob['y2'], 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
         self.assertEqual(model.nonlinear_solver._iter_count, 7)
@@ -272,8 +272,8 @@ class TestNLBGaussSeidel(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob['y2'], 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
         self.assertEqual(model.nonlinear_solver._iter_count, 7)
@@ -347,10 +347,10 @@ class TestNLBGaussSeidel(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, prob['g1.y1'], 0.64, .00001)
-        assert_rel_error(self, prob['g1.y2'], 0.80, .00001)
-        assert_rel_error(self, prob['g2.y1'], 0.64, .00001)
-        assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
+        assert_near_equal(prob['g1.y1'], 0.64, .00001)
+        assert_near_equal(prob['g1.y2'], 0.80, .00001)
+        assert_near_equal(prob['g2.y1'], 0.64, .00001)
+        assert_near_equal(prob['g2.y2'], 0.80, .00001)
 
     def test_NLBGS_Aitken(self):
 
@@ -362,8 +362,8 @@ class TestNLBGaussSeidel(unittest.TestCase):
         model.nonlinear_solver.options['use_aitken'] = True
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob['y2'], 12.05848819, .00001)
         self.assertTrue(model.nonlinear_solver._iter_count == 5)
 
     def test_NLBGS_Aitken_cs(self):
@@ -381,11 +381,11 @@ class TestNLBGaussSeidel(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob['y2'], 12.05848819, .00001)
 
         J = prob.compute_totals(of=['y1'], wrt=['x'])
-        assert_rel_error(self, J['y1', 'x'][0][0], 0.98061448, 1e-6)
+        assert_near_equal(J['y1', 'x'][0][0], 0.98061448, 1e-6)
 
     def test_NLBGS_cs(self):
 
@@ -401,11 +401,11 @@ class TestNLBGaussSeidel(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob['y2'], 12.05848819, .00001)
 
         J = prob.compute_totals(of=['y1'], wrt=['x'])
-        assert_rel_error(self, J['y1', 'x'][0][0], 0.98061448, 1e-6)
+        assert_near_equal(J['y1', 'x'][0][0], 0.98061448, 1e-6)
 
     def test_res_ref(self):
 
@@ -481,10 +481,10 @@ class ProcTestCase1(unittest.TestCase):
         print(prob.get_val('d1b.y2', get_remote=True))
         print(prob.get_val('d2b.y2', get_remote=True))
 
-        assert_rel_error(self, prob.get_val('d1a.y1', get_remote=True), 25.58830273, .00001)
-        assert_rel_error(self, prob.get_val('d1b.y1', get_remote=True), 25.58830273, .00001)
-        assert_rel_error(self, prob.get_val('d2a.y2', get_remote=True), 12.05848819, .00001)
-        assert_rel_error(self, prob.get_val('d2b.y2', get_remote=True), 12.05848819, .00001)
+        assert_near_equal(prob.get_val('d1a.y1', get_remote=True), 25.58830273, .00001)
+        assert_near_equal(prob.get_val('d1b.y1', get_remote=True), 25.58830273, .00001)
+        assert_near_equal(prob.get_val('d2a.y2', get_remote=True), 12.05848819, .00001)
+        assert_near_equal(prob.get_val('d2b.y2', get_remote=True), 12.05848819, .00001)
 
         # Test that Aitken accelerated the convergence, normally takes 7.
         self.assertTrue(model.nonlinear_solver._iter_count == 5)

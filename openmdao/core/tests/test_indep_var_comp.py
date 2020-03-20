@@ -2,7 +2,7 @@
 import unittest
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class TestIndepVarComp(unittest.TestCase):
@@ -14,10 +14,10 @@ class TestIndepVarComp(unittest.TestCase):
         comp = om.IndepVarComp('indep_var')
         prob = om.Problem(comp).setup()
 
-        assert_rel_error(self, prob['indep_var'], 1.0)
+        assert_near_equal(prob['indep_var'], 1.0)
 
         prob['indep_var'] = 2.0
-        assert_rel_error(self, prob['indep_var'], 2.0)
+        assert_near_equal(prob['indep_var'], 2.0)
 
     def test_simple_default(self):
         """Define one independent variable with a default value."""
@@ -26,7 +26,7 @@ class TestIndepVarComp(unittest.TestCase):
         comp = om.IndepVarComp('indep_var', val=2.0)
         prob = om.Problem(comp).setup()
 
-        assert_rel_error(self, prob['indep_var'], 2.0)
+        assert_near_equal(prob['indep_var'], 2.0)
 
     def test_simple_kwargs(self):
         """Define one independent variable with a default value and additional options."""
@@ -35,7 +35,7 @@ class TestIndepVarComp(unittest.TestCase):
         comp = om.IndepVarComp('indep_var', val=2.0, units='m', lower=0, upper=10)
         prob = om.Problem(comp).setup()
 
-        assert_rel_error(self, prob['indep_var'], 2.0)
+        assert_near_equal(prob['indep_var'], 2.0)
 
     def test_simple_array(self):
         """Define one independent array variable."""
@@ -51,7 +51,7 @@ class TestIndepVarComp(unittest.TestCase):
         comp = om.IndepVarComp('indep_var', val=array)
         prob = om.Problem(comp).setup()
 
-        assert_rel_error(self, prob['indep_var'], array)
+        assert_near_equal(prob['indep_var'], array)
 
     def test_add_output(self):
         """Define two independent variables using the add_output method."""
@@ -63,8 +63,8 @@ class TestIndepVarComp(unittest.TestCase):
 
         prob = om.Problem(comp).setup()
 
-        assert_rel_error(self, prob['indep_var_1'], 1.0)
-        assert_rel_error(self, prob['indep_var_2'], 2.0)
+        assert_near_equal(prob['indep_var_1'], 1.0)
+        assert_near_equal(prob['indep_var_2'], 2.0)
 
     def test_invalid_tags(self):
         with self.assertRaises(TypeError) as cm:
@@ -182,7 +182,7 @@ class TestIndepVarComp(unittest.TestCase):
         prob['p.x1'][0] = 0.5
         prob.run_model()
 
-        assert_rel_error(self, prob['p.x1'][0], 0.5)
+        assert_near_equal(prob['p.x1'][0], 0.5)
 
 
 if __name__ == '__main__':

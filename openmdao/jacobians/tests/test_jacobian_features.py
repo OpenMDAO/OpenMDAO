@@ -15,7 +15,7 @@ except ImportError:
 
 import openmdao.api as om
 
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class SimpleComp(om.ExplicitComponent):
@@ -292,7 +292,7 @@ class TestJacobianFeatures(unittest.TestCase):
         jacobian['g', 'x'] = [[1], [0], [0], [1]]
         jacobian['g', 'z'] = np.zeros((4, 4))
 
-        assert_rel_error(self, totals, jacobian)
+        assert_near_equal(totals, jacobian)
 
     @parameterized.expand(
         itertools.product([1e-6, 1e-8],  # Step size
@@ -324,7 +324,7 @@ class TestJacobianFeatures(unittest.TestCase):
         jacobian['g', 'x'] = [[1], [0], [0], [1]]
         jacobian['g', 'z'] = np.zeros((4, 4))
 
-        assert_rel_error(self, totals, jacobian, 1e-6)
+        assert_near_equal(totals, jacobian, 1e-6)
 
     def test_mixed_fd(self):
         comp = SimpleCompMixedFD()
@@ -350,7 +350,7 @@ class TestJacobianFeatures(unittest.TestCase):
         jacobian['g', 'x'] = [[1], [0], [0], [1]]
         jacobian['g', 'z'] = np.zeros((4, 4))
 
-        assert_rel_error(self, totals, jacobian, 1e-6)
+        assert_near_equal(totals, jacobian, 1e-6)
 
     def test_units_fd(self):
         class UnitCompBase(om.ExplicitComponent):
@@ -385,7 +385,7 @@ class TestJacobianFeatures(unittest.TestCase):
             ('flow:T', 'P'): [[0.]],
             ('flow:P', 'P'): [[14.50377]],
         }
-        assert_rel_error(self, totals, expected_totals, 1e-6)
+        assert_near_equal(totals, expected_totals, 1e-6)
 
         expected_subjacs = {
             ('units.flow:T', 'units.T'): [[1.]],
@@ -396,7 +396,7 @@ class TestJacobianFeatures(unittest.TestCase):
 
         jac = units._subjacs_info
         for deriv, val in expected_subjacs.items():
-            assert_rel_error(self, jac[deriv]['value'], val, 1e-6)
+            assert_near_equal(jac[deriv]['value'], val, 1e-6)
 
     def test_reference(self):
         class TmpComp(om.ExplicitComponent):
@@ -430,7 +430,7 @@ class TestJacobianFeatures(unittest.TestCase):
             ('y', 'x'): 9/5 * np.ones((3, 3)),
             ('z', 'x'): 9/5 * np.ones((3, 3)),
         }
-        assert_rel_error(self, totals, expected_totals, 1e-6)
+        assert_near_equal(totals, expected_totals, 1e-6)
 
 
 class TestJacobianForDocs(unittest.TestCase):
@@ -458,16 +458,16 @@ class TestJacobianForDocs(unittest.TestCase):
         totals = problem.compute_totals(['f', 'g'],
                                               ['x', 'y1', 'y2', 'y3', 'z'])
 
-        assert_rel_error(self, totals['f', 'x'], [[1.]])
-        assert_rel_error(self, totals['f', 'z'], np.ones((1, 4)))
-        assert_rel_error(self, totals['f', 'y1'], np.zeros((1, 2)))
-        assert_rel_error(self, totals['f', 'y2'], np.zeros((1, 2)))
-        assert_rel_error(self, totals['f', 'y3'], np.zeros((1, 2)))
-        assert_rel_error(self, totals['g', 'z'], np.zeros((4, 4)))
-        assert_rel_error(self, totals['g', 'y1'], [[1, 0], [1, 0], [0, 1], [0, 1]])
-        assert_rel_error(self, totals['g', 'y2'], [[1, 0], [0, 1], [1, 0], [0, 1]])
-        assert_rel_error(self, totals['g', 'y3'], [[1, 0], [1, 0], [0, 1], [0, 1]])
-        assert_rel_error(self, totals['g', 'x'], [[1], [0], [0], [1]])
+        assert_near_equal(totals['f', 'x'], [[1.]])
+        assert_near_equal(totals['f', 'z'], np.ones((1, 4)))
+        assert_near_equal(totals['f', 'y1'], np.zeros((1, 2)))
+        assert_near_equal(totals['f', 'y2'], np.zeros((1, 2)))
+        assert_near_equal(totals['f', 'y3'], np.zeros((1, 2)))
+        assert_near_equal(totals['g', 'z'], np.zeros((4, 4)))
+        assert_near_equal(totals['g', 'y1'], [[1, 0], [1, 0], [0, 1], [0, 1]])
+        assert_near_equal(totals['g', 'y2'], [[1, 0], [0, 1], [1, 0], [0, 1]])
+        assert_near_equal(totals['g', 'y3'], [[1, 0], [1, 0], [0, 1], [0, 1]])
+        assert_near_equal(totals['g', 'x'], [[1], [0], [0], [1]])
 
     def test_sparse_jacobian_in_place(self):
         import numpy as np
@@ -513,7 +513,7 @@ class TestJacobianForDocs(unittest.TestCase):
         problem.run_model()
         totals = problem.compute_totals(['example.f'], ['input.x'])
 
-        assert_rel_error(self, totals['example.f', 'input.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]])
+        assert_near_equal(totals['example.f', 'input.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]])
 
     def test_sparse_jacobian(self):
         import numpy as np
@@ -547,7 +547,7 @@ class TestJacobianForDocs(unittest.TestCase):
         problem.run_model()
         totals = problem.compute_totals(['example.f'], ['input.x'])
 
-        assert_rel_error(self, totals['example.f', 'input.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]])
+        assert_near_equal(totals['example.f', 'input.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]])
 
     def test_sparse_jacobian_const(self):
         import numpy as np
@@ -586,8 +586,8 @@ class TestJacobianForDocs(unittest.TestCase):
         problem.run_model()
         totals = problem.compute_totals(['example.f'], ['input.x', 'input.y'])
 
-        assert_rel_error(self, totals['example.f', 'input.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]])
-        assert_rel_error(self, totals['example.f', 'input.y'], [[1., 0.], [0., 1.]])
+        assert_near_equal(totals['example.f', 'input.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]])
+        assert_near_equal(totals['example.f', 'input.y'], [[1., 0.], [0., 1.]])
 
     def test_fd_glob(self):
         import numpy as np
@@ -629,9 +629,9 @@ class TestJacobianForDocs(unittest.TestCase):
         problem.run_model()
         totals = problem.compute_totals(['example.f'], ['input.x', 'input.y'])
 
-        assert_rel_error(self, totals['example.f', 'input.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]],
+        assert_near_equal(totals['example.f', 'input.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]],
                          tolerance=1e-8)
-        assert_rel_error(self, totals['example.f', 'input.y'], [[1., 0.], [0., 1.]], tolerance=1e-8)
+        assert_near_equal(totals['example.f', 'input.y'], [[1., 0.], [0., 1.]], tolerance=1e-8)
 
     def test_fd_options(self):
         import numpy as np
@@ -674,9 +674,9 @@ class TestJacobianForDocs(unittest.TestCase):
         problem.run_model()
         totals = problem.compute_totals(['example.f'], ['input.x', 'input.y'])
 
-        assert_rel_error(self, totals['example.f', 'input.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]],
+        assert_near_equal(totals['example.f', 'input.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]],
                          tolerance=1e-8)
-        assert_rel_error(self, totals['example.f', 'input.y'], [[1., 0.], [0., 1.]], tolerance=1e-8)
+        assert_near_equal(totals['example.f', 'input.y'], [[1., 0.], [0., 1.]], tolerance=1e-8)
 
 
 if __name__ == '__main__':

@@ -8,7 +8,7 @@ TestCase = unittest.TestCase
 
 import openmdao.api as om
 from openmdao.utils.mpi import MPI
-from openmdao.utils.assert_utils import assert_rel_error, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.test_suite.parametric_suite import parametric_suite
 from openmdao.test_suite.components.matmultcomp import MatMultComp
 
@@ -113,7 +113,7 @@ class SerialSimpleFDTestCase(TestCase):
         prob = setup_1comp_model(1, size, mult, add, 'fd')
 
         J = prob.compute_totals(['C1.y'], ['P1.x'], return_format='dict')
-        assert_rel_error(self, J['C1.y']['P1.x'], np.eye(size)*mult, 1e-6)
+        assert_near_equal(J['C1.y']['P1.x'], np.eye(size)*mult, 1e-6)
 
     def test_serial_cs(self):
         size = 15
@@ -122,7 +122,7 @@ class SerialSimpleFDTestCase(TestCase):
         prob = setup_1comp_model(1, size, mult, add, 'cs')
 
         J = prob.compute_totals(['C1.y'], ['P1.x'], return_format='dict')
-        assert_rel_error(self, J['C1.y']['P1.x'], np.eye(size)*mult, 1e-6)
+        assert_near_equal(J['C1.y']['P1.x'], np.eye(size)*mult, 1e-6)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -138,7 +138,7 @@ class ParallelSimpleFDTestCase2(TestCase):
         prob = setup_1comp_model(2, size, mult, add, 'fd')
 
         J = prob.compute_totals(['C1.y'], ['P1.x'], return_format='dict')
-        assert_rel_error(self, J['C1.y']['P1.x'], np.eye(size)*mult, 1e-6)
+        assert_near_equal(J['C1.y']['P1.x'], np.eye(size)*mult, 1e-6)
 
     def test_parallel_cs2(self):
         size = 15
@@ -148,7 +148,7 @@ class ParallelSimpleFDTestCase2(TestCase):
         prob = setup_1comp_model(2, size, mult, add, 'cs')
 
         J = prob.compute_totals(['C1.y'], ['P1.x'], return_format='dict')
-        assert_rel_error(self, J['C1.y']['P1.x'], np.eye(size)*mult, 1e-6)
+        assert_near_equal(J['C1.y']['P1.x'], np.eye(size)*mult, 1e-6)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -163,7 +163,7 @@ class ParallelFDTestCase5(TestCase):
         prob = setup_1comp_model(5, size, mult, add, 'fd')
 
         J = prob.compute_totals(['C1.y'], ['P1.x'], return_format='dict')
-        assert_rel_error(self, J['C1.y']['P1.x'], np.eye(size)*mult, 1e-6)
+        assert_near_equal(J['C1.y']['P1.x'], np.eye(size)*mult, 1e-6)
 
     def test_parallel_cs5(self):
         size = 15
@@ -172,7 +172,7 @@ class ParallelFDTestCase5(TestCase):
         prob = setup_1comp_model(5, size, mult, add, 'cs')
 
         J = prob.compute_totals(['C1.y'], ['P1.x'], return_format='dict')
-        assert_rel_error(self, J['C1.y']['P1.x'], np.eye(size)*mult, 1e-6)
+        assert_near_equal(J['C1.y']['P1.x'], np.eye(size)*mult, 1e-6)
 
 
 class SerialDiamondFDTestCase(TestCase):
@@ -180,18 +180,18 @@ class SerialDiamondFDTestCase(TestCase):
     def test_diamond_fd_totals(self):
         size = 15
         prob = setup_diamond_model(1, size, 'fd', 'model')
-        assert_rel_error(self, prob['C3.y'], np.ones(size)*24.0, 1e-6)
+        assert_near_equal(prob['C3.y'], np.ones(size)*24.0, 1e-6)
 
         J = prob.compute_totals(['C3.y'], ['P1.x'], return_format='dict')
-        assert_rel_error(self, J['C3.y']['P1.x'], np.eye(size)*6.0, 1e-6)
+        assert_near_equal(J['C3.y']['P1.x'], np.eye(size)*6.0, 1e-6)
 
     def test_diamond_cs_totals(self):
         size = 15
         prob = setup_diamond_model(1, size, 'cs', 'model')
-        assert_rel_error(self, prob['C3.y'], np.ones(size)*24.0, 1e-6)
+        assert_near_equal(prob['C3.y'], np.ones(size)*24.0, 1e-6)
 
         J = prob.compute_totals(['C3.y'], ['P1.x'], return_format='dict')
-        assert_rel_error(self, J['C3.y']['P1.x'], np.eye(size)*6.0, 1e-6)
+        assert_near_equal(J['C3.y']['P1.x'], np.eye(size)*6.0, 1e-6)
 
     def test_bad_num_par_fds(self):
         try:
@@ -208,50 +208,50 @@ class ParallelDiamondFDTestCase(TestCase):
     def test_diamond_fd_totals(self):
         size = 15
         prob = setup_diamond_model(2, size, 'fd', 'model')
-        assert_rel_error(self, prob['C3.y'], np.ones(size)*24.0, 1e-6)
+        assert_near_equal(prob['C3.y'], np.ones(size)*24.0, 1e-6)
 
         J = prob.compute_totals(['C3.y'], ['P1.x'], return_format='dict')
-        assert_rel_error(self, J['C3.y']['P1.x'], np.eye(size)*6.0, 1e-6)
+        assert_near_equal(J['C3.y']['P1.x'], np.eye(size)*6.0, 1e-6)
 
     def test_diamond_fd_nested_par_fd_totals(self):
         size = 15
         prob = setup_diamond_model(4, size, 'fd', 'par')
-        assert_rel_error(self, prob['C3.y'], np.ones(size)*24.0, 1e-6)
+        assert_near_equal(prob['C3.y'], np.ones(size)*24.0, 1e-6)
 
         J = prob.compute_totals(['C3.y'], ['P1.x'], return_format='dict')
-        assert_rel_error(self, J['C3.y']['P1.x'], np.eye(size)*6.0, 1e-6)
+        assert_near_equal(J['C3.y']['P1.x'], np.eye(size)*6.0, 1e-6)
 
     def test_diamond_fd_totals_num_fd_bigger_than_psize(self):
         size = 1
         prob = setup_diamond_model(2, size, 'fd', 'model')
-        assert_rel_error(self, prob['C3.y'], np.ones(size)*24.0, 1e-6)
+        assert_near_equal(prob['C3.y'], np.ones(size)*24.0, 1e-6)
 
         J = prob.compute_totals(['C3.y'], ['P1.x'], return_format='dict')
-        assert_rel_error(self, J['C3.y']['P1.x'], np.eye(size)*6.0, 1e-6)
+        assert_near_equal(J['C3.y']['P1.x'], np.eye(size)*6.0, 1e-6)
 
     def test_diamond_cs_totals(self):
         size = 15
         prob = setup_diamond_model(2, size, 'cs', 'model')
-        assert_rel_error(self, prob['C3.y'], np.ones(size)*24.0, 1e-6)
+        assert_near_equal(prob['C3.y'], np.ones(size)*24.0, 1e-6)
 
         J = prob.compute_totals(['C3.y'], ['P1.x'], return_format='dict')
-        assert_rel_error(self, J['C3.y']['P1.x'], np.eye(size)*6.0, 1e-6)
+        assert_near_equal(J['C3.y']['P1.x'], np.eye(size)*6.0, 1e-6)
 
     def test_diamond_cs_totals_nested_par_cs(self):
         size = 15
         prob = setup_diamond_model(4, size, 'cs', 'par')
-        assert_rel_error(self, prob['C3.y'], np.ones(size)*24.0, 1e-6)
+        assert_near_equal(prob['C3.y'], np.ones(size)*24.0, 1e-6)
 
         J = prob.compute_totals(['C3.y'], ['P1.x'], return_format='dict')
-        assert_rel_error(self, J['C3.y']['P1.x'], np.eye(size)*6.0, 1e-6)
+        assert_near_equal(J['C3.y']['P1.x'], np.eye(size)*6.0, 1e-6)
 
     def test_diamond_cs_totals_num_fd_bigger_than_psize(self):
         size = 1
         prob = setup_diamond_model(2, size, 'cs', 'model')
-        assert_rel_error(self, prob['C3.y'], np.ones(size)*24.0, 1e-6)
+        assert_near_equal(prob['C3.y'], np.ones(size)*24.0, 1e-6)
 
         J = prob.compute_totals(['C3.y'], ['P1.x'], return_format='dict')
-        assert_rel_error(self, J['C3.y']['P1.x'], np.eye(size)*6.0, 1e-6)
+        assert_near_equal(J['C3.y']['P1.x'], np.eye(size)*6.0, 1e-6)
 
 
 def _test_func_name(func, num, param):

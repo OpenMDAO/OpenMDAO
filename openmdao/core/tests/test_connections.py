@@ -6,7 +6,7 @@ import numpy as np
 from io import StringIO
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent
-from openmdao.utils.assert_utils import assert_rel_error, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 
 
 class TestConnections(unittest.TestCase):
@@ -504,7 +504,7 @@ class TestShapes(unittest.TestCase):
         p.model.connect('indep.x', 'C1.x')
         p.setup()
         p.run_model()
-        assert_rel_error(self, p['C1.y'], np.arange(10)[np.newaxis, :])
+        assert_near_equal(p['C1.y'], np.arange(10)[np.newaxis, :])
 
     def test_connect_flat_array_to_col_vector(self):
         p = Problem()
@@ -517,7 +517,7 @@ class TestShapes(unittest.TestCase):
         p.model.connect('indep.x', 'C1.x')
         p.setup()
         p.run_model()
-        assert_rel_error(self, p['C1.y'], np.arange(10)[:, np.newaxis])
+        assert_near_equal(p['C1.y'], np.arange(10)[:, np.newaxis])
 
     def test_connect_row_vector_to_flat_array(self):
         p = Problem()
@@ -528,7 +528,7 @@ class TestShapes(unittest.TestCase):
         p.model.connect('indep.x', 'C1.x')
         p.setup()
         p.run_model()
-        assert_rel_error(self, p['C1.y'], 5 * np.arange(10))
+        assert_near_equal(p['C1.y'], 5 * np.arange(10))
 
     def test_connect_col_vector_to_flat_array(self):
         p = Problem()
@@ -539,7 +539,7 @@ class TestShapes(unittest.TestCase):
         p.model.connect('indep.x', 'C1.x')
         p.setup()
         p.run_model()
-        assert_rel_error(self, p['C1.y'], 5 * np.arange(10))
+        assert_near_equal(p['C1.y'], 5 * np.arange(10))
 
     def test_connect_flat_to_3d_array(self):
         p = Problem()
@@ -550,7 +550,7 @@ class TestShapes(unittest.TestCase):
         p.model.connect('indep.x', 'C1.x')
         p.setup()
         p.run_model()
-        assert_rel_error(self, p['C1.y'], 5 * np.arange(10)[np.newaxis, :, np.newaxis])
+        assert_near_equal(p['C1.y'], 5 * np.arange(10)[np.newaxis, :, np.newaxis])
 
     def test_connect_flat_nd_to_flat_nd(self):
         p = Problem()
@@ -563,7 +563,7 @@ class TestShapes(unittest.TestCase):
         p.model.connect('indep.x', 'C1.x')
         p.setup()
         p.run_model()
-        assert_rel_error(self, p['C1.y'],
+        assert_near_equal(p['C1.y'],
                          5 * np.arange(10)[np.newaxis, np.newaxis, np.newaxis, :])
 
     def test_connect_incompatible_shapes(self):

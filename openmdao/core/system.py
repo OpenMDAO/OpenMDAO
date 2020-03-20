@@ -15,23 +15,22 @@ import sys
 import os
 import time
 from numbers import Integral
-import itertools
 
 import numpy as np
 import networkx as nx
 
 import openmdao
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
-from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.vectors.vector import INT_DTYPE
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
+from openmdao.utils.units import is_compatible, get_conversion
 from openmdao.utils.variable_table import write_var_table
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.graph_utils import all_connected_nodes
-from openmdao.utils.name_maps import rel_name2abs_name, name2abs_name
+from openmdao.utils.name_maps import name2abs_name
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
     _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS
 import openmdao.utils.coloring as coloring_mod
@@ -40,7 +39,7 @@ from openmdao.utils.general_utils import determine_adder_scaler, find_matches, \
     simple_warning, make_set, match_includes_excludes
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
-from openmdao.utils.units import get_conversion
+from openmdao.utils.units import unit_conversion
 
 # Use this as a special value to be able to tell if the caller set a value for the optional
 #   out_stream argument. We run into problems running testflo if we use a default of sys.stdout.
@@ -1647,6 +1646,80 @@ class System(object):
                                               ContainsAll())}
             return relevant
 
+    def _setup_driver_units(self):
+        """
+        Compute unit conversions for driver variables.
+        """
+        abs2meta = self._var_abs2meta
+        pro2abs = self._var_allprocs_prom2abs_list['output']
+        dv = self._design_vars
+        for name, meta in dv.items():
+            units = meta['units']
+            dv[name]['total_adder'] = dv[name]['adder']
+            dv[name]['total_scaler'] = dv[name]['scaler']
+
+            if units is not None:
+                abs_name = pro2abs[name][0]
+                var_units = abs2meta[abs_name]['units']
+
+                if var_units == units:
+                    continue
+
+                if var_units is None:
+                    msg = "{}: Target for design variable {} has no units, but '{}' units " + \
+                          "were specified."
+                    raise RuntimeError(msg.format(self.msginfo, name, units))
+
+                if not is_compatible(var_units, units):
+                    msg = "{}: Target for design variable {} has '{}' units, but '{}' units " + \
+                          "were specified."
+                    raise RuntimeError(msg.format(self.msginfo, name, var_units, units))
+
+                factor, offset = get_conversion(var_units, units)
+                base_adder, base_scaler = determine_adder_scaler(None, None,
+                                                                 dv[name]['adder'],
+                                                                 dv[name]['scaler'])
+
+                dv[name]['total_adder'] = offset + base_adder / factor
+                dv[name]['total_scaler'] = base_scaler * factor
+
+        resp = self._responses
+        type_dict = {'con': 'constraint', 'obj': 'objective'}
+        for name, meta in resp.items():
+            units = meta['units']
+            resp[name]['total_scaler'] = resp[name]['scaler']
+            resp[name]['total_adder'] = resp[name]['adder']
+
+            if units is not None:
+                abs_name = pro2abs[name][0]
+                var_units = abs2meta[abs_name]['units']
+
+                if var_units == units:
+                    continue
+
+                if var_units is None:
+                    msg = "{}: Target for {} {} has no units, but '{}' units " + \
+                          "were specified."
+                    raise RuntimeError(msg.format(self.msginfo, type_dict[meta['type']],
+                                                  name, units))
+
+                if not is_compatible(var_units, units):
+                    msg = "{}: Target for {} {} has '{}' units, but '{}' units " + \
+                          "were specified."
+                    raise RuntimeError(msg.format(self.msginfo, type_dict[meta['type']],
+                                                  name, var_units, units))
+
+                factor, offset = get_conversion(var_units, units)
+                base_adder, base_scaler = determine_adder_scaler(None, None,
+                                                                 resp[name]['adder'],
+                                                                 resp[name]['scaler'])
+
+                resp[name]['total_scaler'] = base_scaler * factor
+                resp[name]['total_adder'] = offset + base_adder / factor
+
+        for s in self._subsystems_myproc:
+            s._setup_driver_units()
+
     def _setup_relevance(self, mode, relevant=None):
         """
         Set up the relevance dictionary.
@@ -1658,7 +1731,6 @@ class System(object):
         relevant : dict or None
             Dictionary mapping VOI name to all variables necessary for computing
             derivatives between the VOI and all other VOIs.
-
         """
         if relevant is None:  # should only occur at top level on full setup
             self._relevant = relevant = self._init_relevance(mode)
@@ -2440,8 +2512,8 @@ class System(object):
         for isub, subsys in enumerate(self._subsystems_allprocs):
             yield subsys, subsys.name in self._loc_subsys_map
 
-    def add_design_var(self, name, lower=None, upper=None, ref=None,
-                       ref0=None, indices=None, adder=None, scaler=None,
+    def add_design_var(self, name, lower=None, upper=None, ref=None, ref0=None, indices=None,
+                       adder=None, scaler=None, units=None,
                        parallel_deriv_color=None, vectorize_derivs=False,
                        cache_linear_solution=False):
         r"""
@@ -2463,6 +2535,8 @@ class System(object):
             If a param is an array, these indicate which entries are of
             interest for this particular design variable.  These may be
             positive or negative integers.
+        units : str, optional
+            Units to convert to before applying scaling.
         adder : float or ndarray, optional
             Value to add to the model value to get the scaled value for the driver. adder
             is first in precedence.  adder and scaler are an alterantive to using ref
@@ -2541,6 +2615,7 @@ class System(object):
         dvs['lower'] = lower
         dvs['ref'] = ref
         dvs['ref0'] = ref0
+        dvs['units'] = units
         dvs['cache_linear_solution'] = cache_linear_solution
 
         if indices is not None:
@@ -2570,7 +2645,7 @@ class System(object):
         design_vars[name] = dvs
 
     def add_response(self, name, type_, lower=None, upper=None, equals=None,
-                     ref=None, ref0=None, indices=None, index=None,
+                     ref=None, ref0=None, indices=None, index=None, units=None,
                      adder=None, scaler=None, linear=False, parallel_deriv_color=None,
                      vectorize_derivs=False, cache_linear_solution=False):
         r"""
@@ -2602,6 +2677,8 @@ class System(object):
         index : int, optional
             If variable is an array, this indicates which entry is of
             interest for this particular response.
+        units : str, optional
+            Units to convert to before applying scaling.
         adder : float or ndarray, optional
             Value to add to the model value to get the scaled value for the driver. adder
             is first in precedence.  adder and scaler are an alterantive to using ref
@@ -2753,6 +2830,7 @@ class System(object):
         resp['ref'] = ref
         resp['ref0'] = ref0
         resp['type'] = type_
+        resp['units'] = units
         resp['cache_linear_solution'] = cache_linear_solution
 
         resp['parallel_deriv_color'] = parallel_deriv_color
@@ -2761,7 +2839,7 @@ class System(object):
         responses[name] = resp
 
     def add_constraint(self, name, lower=None, upper=None, equals=None,
-                       ref=None, ref0=None, adder=None, scaler=None,
+                       ref=None, ref0=None, adder=None, scaler=None, units=None,
                        indices=None, linear=False, parallel_deriv_color=None,
                        vectorize_derivs=False, cache_linear_solution=False):
         r"""
@@ -2789,6 +2867,8 @@ class System(object):
             value to multiply the model value to get the scaled value for the driver. scaler
             is second in precedence. adder and scaler are an alterantive to using ref
             and ref0.
+        units : str, optional
+            Units to convert to before applying scaling.
         indices : sequence of int, optional
             If variable is an array, these indicate which entries are of
             interest for this particular response.  These may be positive or
@@ -2815,12 +2895,12 @@ class System(object):
         """
         self.add_response(name=name, type_='con', lower=lower, upper=upper,
                           equals=equals, scaler=scaler, adder=adder, ref=ref,
-                          ref0=ref0, indices=indices, linear=linear,
+                          ref0=ref0, indices=indices, linear=linear, units=units,
                           parallel_deriv_color=parallel_deriv_color,
                           vectorize_derivs=vectorize_derivs,
                           cache_linear_solution=cache_linear_solution)
 
-    def add_objective(self, name, ref=None, ref0=None, index=None,
+    def add_objective(self, name, ref=None, ref0=None, index=None, units=None,
                       adder=None, scaler=None, parallel_deriv_color=None,
                       vectorize_derivs=False, cache_linear_solution=False):
         r"""
@@ -2838,6 +2918,8 @@ class System(object):
             If variable is an array, this indicates which entry is of
             interest for this particular response. This may be a positive
             or negative integer.
+        units : str, optional
+            Units to convert to before applying scaling.
         adder : float or ndarray, optional
             Value to add to the model value to get the scaled value for the driver. adder
             is first in precedence.  adder and scaler are an alterantive to using ref
@@ -2885,7 +2967,7 @@ class System(object):
             raise TypeError('{}: If specified, objective index must be '
                             'an int.'.format(self.msginfo))
         self.add_response(name, type_='obj', scaler=scaler, adder=adder,
-                          ref=ref, ref0=ref0, index=index,
+                          ref=ref, ref0=ref0, index=index, units=units,
                           parallel_deriv_color=parallel_deriv_color,
                           vectorize_derivs=vectorize_derivs,
                           cache_linear_solution=cache_linear_solution)
@@ -4218,7 +4300,7 @@ class System(object):
             raise TypeError(msg.format(self.msginfo, name, units))
 
         try:
-            scale, offset = get_conversion(base_units, units)
+            scale, offset = unit_conversion(base_units, units)
         except Exception:
             msg = "{}: Can't express variable '{}' with units of '{}' in units of '{}'."
             raise TypeError(msg.format(self.msginfo, name, base_units, units))

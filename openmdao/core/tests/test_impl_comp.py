@@ -6,7 +6,7 @@ from io import StringIO
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 # Note: The following class definitions are used in feature docs
@@ -137,19 +137,19 @@ class ImplicitCompTestCase(unittest.TestCase):
         prob = self.prob
         prob.run_model()
 
-        assert_rel_error(self, prob['comp2.x'], 3.)
-        assert_rel_error(self, prob['comp2.x'], 3.)
+        assert_near_equal(prob['comp2.x'], 3.)
+        assert_near_equal(prob['comp2.x'], 3.)
 
         total_derivs = prob.compute_totals(
             wrt=['comp1.a', 'comp1.b', 'comp1.c'],
             of=['comp2.x', 'comp3.x']
         )
-        assert_rel_error(self, total_derivs['comp2.x', 'comp1.a'], [[-4.5]])
-        assert_rel_error(self, total_derivs['comp2.x', 'comp1.b'], [[-1.5]])
-        assert_rel_error(self, total_derivs['comp2.x', 'comp1.c'], [[-0.5]])
-        assert_rel_error(self, total_derivs['comp3.x', 'comp1.a'], [[-4.5]])
-        assert_rel_error(self, total_derivs['comp3.x', 'comp1.b'], [[-1.5]])
-        assert_rel_error(self, total_derivs['comp3.x', 'comp1.c'], [[-0.5]])
+        assert_near_equal(total_derivs['comp2.x', 'comp1.a'], [[-4.5]])
+        assert_near_equal(total_derivs['comp2.x', 'comp1.b'], [[-1.5]])
+        assert_near_equal(total_derivs['comp2.x', 'comp1.c'], [[-0.5]])
+        assert_near_equal(total_derivs['comp3.x', 'comp1.a'], [[-4.5]])
+        assert_near_equal(total_derivs['comp3.x', 'comp1.b'], [[-1.5]])
+        assert_near_equal(total_derivs['comp3.x', 'comp1.c'], [[-0.5]])
 
     def test_list_inputs_before_run(self):
         # cannot list_inputs on a Group before running
@@ -422,7 +422,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
         prob['comp2.x'] = np.NaN
 
         prob.run_model()
-        assert_rel_error(self, prob['comp2.x'], 3.)
+        assert_near_equal(prob['comp2.x'], 3.)
 
     def test_guess_nonlinear_complex_step(self):
 
@@ -493,12 +493,12 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
         prob.setup(force_alloc_complex=True)
         prob.run_model()
 
-        assert_rel_error(self, prob['comp.x'], 3.)
+        assert_near_equal(prob['comp.x'], 3.)
 
         totals = prob.check_totals(of=['fn.y'], wrt=['p.a'], method='cs', out_stream=None)
 
         for key, val in totals.items():
-            assert_rel_error(self, val['rel error'][0], 0.0, 1e-9)
+            assert_near_equal(val['rel error'][0], 0.0, 1e-9)
 
     def test_guess_nonlinear_transfer(self):
         # Test that data is transfered to a component before calling guess_nonlinear.
@@ -537,7 +537,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
         prob.setup()
 
         prob.run_model()
-        assert_rel_error(self, prob['comp2.y'], 77., 1e-5)
+        assert_near_equal(prob['comp2.y'], 77., 1e-5)
 
     def test_guess_nonlinear_transfer_subbed(self):
         # Test that data is transfered to a component before calling guess_nonlinear.
@@ -580,7 +580,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
         prob.setup()
 
         prob.run_model()
-        assert_rel_error(self, prob['sub.comp2.y'], 77., 1e-5)
+        assert_near_equal(prob['sub.comp2.y'], 77., 1e-5)
 
     def test_guess_nonlinear_transfer_subbed2(self):
         # Test that data is transfered to a component before calling guess_nonlinear.
@@ -623,7 +623,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
         prob.setup()
 
         prob.run_model()
-        assert_rel_error(self, prob['sub.comp2.y'], 77., 1e-5)
+        assert_near_equal(prob['sub.comp2.y'], 77., 1e-5)
 
     def test_guess_nonlinear_feature(self):
         import openmdao.api as om
@@ -676,7 +676,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['comp.x'], 3.)
+        assert_near_equal(prob['comp.x'], 3.)
 
     def test_guess_nonlinear_inputs_read_only(self):
         class ImpWithInitial(om.ImplicitComponent):

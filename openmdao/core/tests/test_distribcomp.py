@@ -7,7 +7,7 @@ import numpy as np
 import openmdao.api as om
 from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import evenly_distrib_idxs, take_nth
-from openmdao.utils.assert_utils import assert_rel_error, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -777,11 +777,11 @@ class MPIFeatureTests(unittest.TestCase):
         prob['indep.x'] = np.ones(size)
         prob.run_model()
 
-        assert_rel_error(self, prob['C2.invec'],
+        assert_near_equal(prob['C2.invec'],
                          np.ones((8,)) if model.comm.rank == 0 else np.ones((7,)))
-        assert_rel_error(self, prob['C2.outvec'],
+        assert_near_equal(prob['C2.outvec'],
                          2*np.ones((8,)) if model.comm.rank == 0 else -3*np.ones((7,)))
-        assert_rel_error(self, prob['C3.out'], -5.)
+        assert_near_equal(prob['C3.out'], -5.)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -821,12 +821,12 @@ class TestGroupMPI(unittest.TestCase):
         p.run_model()
 
         # each rank holds the assigned portion of the input array
-        assert_rel_error(self, p['C1.x'],
+        assert_near_equal(p['C1.x'],
                          np.arange(3, dtype=float) if p.model.C1.comm.rank == 0 else
                          np.arange(3, 5, dtype=float))
 
         # the output in each rank is based on the local inputs
-        assert_rel_error(self, p['C1.y'], 6. if p.model.C1.comm.rank == 0 else 14.)
+        assert_near_equal(p['C1.y'], 6. if p.model.C1.comm.rank == 0 else 14.)
 
 
 if __name__ == '__main__':

@@ -30,7 +30,7 @@ from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import convert_neg, array_connection_compatible, \
     _flatten_src_indices
 from openmdao.utils.general_utils import ContainsAll, all_ancestors, simple_warning
-from openmdao.utils.units import is_compatible, get_conversion
+from openmdao.utils.units import is_compatible, unit_conversion
 from openmdao.utils.mpi import MPI
 from openmdao.utils.coloring import Coloring, _STD_COLORING_FNAME
 import openmdao.utils.coloring as coloring_mod
@@ -269,7 +269,7 @@ class Group(System):
                     a0 = ref0
                     a1 = ref - ref0
                 else:
-                    factor, offset = get_conversion(units_out, units_in)
+                    factor, offset = unit_conversion(units_out, units_in)
                     a0 = (ref0 + offset) * factor
                     a1 = (ref - ref0) * factor
 

@@ -15,7 +15,7 @@ class N2Search {
             'value': "",
             'containsDot': false,
             'baseName': ""
-            
+
         }
         this.filterSet = {};
 
@@ -43,7 +43,7 @@ class N2Search {
             "minChars": 1,
             "maxItems": 15,
             "list": [],
-            "filter": function (text, input) {
+            "filter": function(text, input) {
                 if (self.inDataFunction) {
                     self.inDataFunction = false;
                     self.filterSet = {};
@@ -62,10 +62,10 @@ class N2Search {
                 return Awesomplete.FILTER_CONTAINS(text,
                     self.filteredWord.value);
             },
-            "item": function (text, input) {
+            "item": function(text, input) {
                 return Awesomplete.ITEM(text, self.filteredWord.value);
             },
-            "replace": function (text) {
+            "replace": function(text) {
                 let newVal = "";
                 let cursorPos = 0;
                 for (let i = 0; i < self.searchVals0.length; ++i) {
@@ -75,7 +75,7 @@ class N2Search {
                 this.input.value = newVal;
                 self.searchInputDiv.setSelectionRange(cursorPos, cursorPos);
             },
-            "data": function (item/*, input*/) {
+            "data": function(item /*, input*/ ) {
                 self.inDataFunction = true;
                 if (self.filteredWord.containsDot) {
                     let baseIndex = item.toLowerCase().indexOf("." +
@@ -94,7 +94,7 @@ class N2Search {
     _addEventListeners() {
         let self = this;
 
-        window.addEventListener("awesomplete-selectcomplete", function (e) {
+        window.addEventListener("awesomplete-selectcomplete", function(e) {
             // User made a selection from dropdown.
             // This is fired after the selection is applied
             self.searchInputEventListener(e);
@@ -130,8 +130,7 @@ class N2Search {
             if (didMatch) {
                 // only params and unknowns can count as matches
                 ++this.numMatches;
-            }
-            else if (undoList) {
+            } else if (undoList) {
                 // did not match and undo list is not null
                 node.varIsHidden = true;
                 undoList.push(node);
@@ -185,7 +184,9 @@ class N2Search {
         return new RegExp(regexStr, "i"); // case insensitive
     }
 
-    _isValid(value) { return value.length > 0; }
+    _isValid(value) {
+        return value.length > 0;
+    }
 
     /**
      * React to each value entered into the search input box.

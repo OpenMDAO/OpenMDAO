@@ -14,7 +14,7 @@ import openmdao.api as om
 from openmdao.test_suite.components.sellar import SellarDerivatives, \
     SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.groups.parallel_groups import FanOutGrouped, FanInGrouped
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.mpi import MPI
 
 
@@ -48,8 +48,8 @@ class ParDerivTestCase(unittest.TestCase):
         unknown_list = ['c3.y']
 
         J = prob.compute_totals(unknown_list, indep_list, return_format='dict')
-        assert_rel_error(self, J['c3.y']['iv.x1'][0][0], -6.0, 1e-6)
-        assert_rel_error(self, J['c3.y']['iv.x2'][0][0], 35.0, 1e-6)
+        assert_near_equal(J['c3.y']['iv.x1'][0][0], -6.0, 1e-6)
+        assert_near_equal(J['c3.y']['iv.x2'][0][0], 35.0, 1e-6)
 
     def test_fan_in_serial_sets_fwd(self):
 
@@ -69,8 +69,8 @@ class ParDerivTestCase(unittest.TestCase):
         unknown_list = ['c3.y']
 
         J = prob.compute_totals(unknown_list, indep_list, return_format='flat_dict')
-        assert_rel_error(self, J['c3.y', 'iv.x1'][0][0], -6.0, 1e-6)
-        assert_rel_error(self, J['c3.y', 'iv.x2'][0][0], 35.0, 1e-6)
+        assert_near_equal(J['c3.y', 'iv.x1'][0][0], -6.0, 1e-6)
+        assert_near_equal(J['c3.y', 'iv.x2'][0][0], 35.0, 1e-6)
 
     def test_fan_out_serial_sets_fwd(self):
 
@@ -90,8 +90,8 @@ class ParDerivTestCase(unittest.TestCase):
         indep_list = ['iv.x']
 
         J = prob.compute_totals(unknown_list, indep_list, return_format='flat_dict')
-        assert_rel_error(self, J['c2.y', 'iv.x'][0][0], -6.0, 1e-6)
-        assert_rel_error(self, J['c3.y', 'iv.x'][0][0], 15.0, 1e-6)
+        assert_near_equal(J['c2.y', 'iv.x'][0][0], -6.0, 1e-6)
+        assert_near_equal(J['c3.y', 'iv.x'][0][0], 15.0, 1e-6)
 
     def test_fan_out_serial_sets_rev(self):
 
@@ -111,8 +111,8 @@ class ParDerivTestCase(unittest.TestCase):
         indep_list = ['iv.x']
 
         J = prob.compute_totals(unknown_list, indep_list, return_format='flat_dict')
-        assert_rel_error(self, J['c2.y', 'iv.x'][0][0], -6.0, 1e-6)
-        assert_rel_error(self, J['c3.y', 'iv.x'][0][0], 15.0, 1e-6)
+        assert_near_equal(J['c2.y', 'iv.x'][0][0], -6.0, 1e-6)
+        assert_near_equal(J['c3.y', 'iv.x'][0][0], 15.0, 1e-6)
 
     def test_fan_in_parallel_sets_fwd(self):
 
@@ -133,8 +133,8 @@ class ParDerivTestCase(unittest.TestCase):
         unknown_list = ['c3.y']
 
         J = prob.compute_totals(unknown_list, indep_list, return_format='flat_dict')
-        assert_rel_error(self, J['c3.y', 'iv.x1'][0][0], -6.0, 1e-6)
-        assert_rel_error(self, J['c3.y', 'iv.x2'][0][0], 35.0, 1e-6)
+        assert_near_equal(J['c3.y', 'iv.x1'][0][0], -6.0, 1e-6)
+        assert_near_equal(J['c3.y', 'iv.x2'][0][0], 35.0, 1e-6)
 
     def test_debug_print_option_totals_color(self):
 
@@ -191,15 +191,15 @@ class ParDerivTestCase(unittest.TestCase):
         indep_list = ['iv.x']
 
         J = prob.compute_totals(unknown_list, indep_list, return_format='flat_dict')
-        assert_rel_error(self, J['c2.y', 'iv.x'][0][0], -6.0, 1e-6)
-        assert_rel_error(self, J['c3.y', 'iv.x'][0][0], 15.0, 1e-6)
+        assert_near_equal(J['c2.y', 'iv.x'][0][0], -6.0, 1e-6)
+        assert_near_equal(J['c3.y', 'iv.x'][0][0], 15.0, 1e-6)
 
         # Piggyback to make sure the distributed norm calculation is correct.
         vec = prob.model._vectors['residual']['c2.y']
         norm_val = vec.get_norm()
         # NOTE: BAN updated the norm value for the PR that added seed splitting, i.e.
         # the seed, c2.y in this case, is half what it was before (-.5 vs. -1).
-        assert_rel_error(self, norm_val, 6.422616289332565, 1e-6)
+        assert_near_equal(norm_val, 6.422616289332565, 1e-6)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -249,10 +249,10 @@ class DecoupledTestCase(unittest.TestCase):
         J = prob.compute_totals(['Con1.y', 'Con2.y'], ['Indep1.x', 'Indep2.x'],
                                 return_format='flat_dict')
 
-        assert_rel_error(self, J['Con1.y', 'Indep1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
+        assert_near_equal(J['Con1.y', 'Indep1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
         expected = np.zeros((asize, asize+2))
         expected[:,:asize] = np.eye(asize)*8.0
-        assert_rel_error(self, J['Con2.y', 'Indep2.x'], expected, 1e-6)
+        assert_near_equal(J['Con2.y', 'Indep2.x'], expected, 1e-6)
 
     def test_parallel_fwd(self):
         asize = self.asize
@@ -269,10 +269,10 @@ class DecoupledTestCase(unittest.TestCase):
         J = prob.compute_totals(['Con1.y', 'Con2.y'], ['Indep1.x', 'Indep2.x'],
                                 return_format='flat_dict')
 
-        assert_rel_error(self, J['Con1.y', 'Indep1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
+        assert_near_equal(J['Con1.y', 'Indep1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
         expected = np.zeros((asize, asize+2))
         expected[:,:asize] = np.eye(asize)*8.0
-        assert_rel_error(self, J['Con2.y', 'Indep2.x'], expected, 1e-6)
+        assert_near_equal(J['Con2.y', 'Indep2.x'], expected, 1e-6)
 
     def test_parallel_fwd_multi(self):
         asize = self.asize
@@ -289,10 +289,10 @@ class DecoupledTestCase(unittest.TestCase):
         J = prob.compute_totals(['Con1.y', 'Con2.y'], ['Indep1.x', 'Indep2.x'],
                                 return_format='flat_dict')
 
-        assert_rel_error(self, J['Con1.y', 'Indep1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
+        assert_near_equal(J['Con1.y', 'Indep1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
         expected = np.zeros((asize, asize+2))
         expected[:,:asize] = np.eye(asize)*8.0
-        assert_rel_error(self, J['Con2.y', 'Indep2.x'], expected, 1e-6)
+        assert_near_equal(J['Con2.y', 'Indep2.x'], expected, 1e-6)
 
     def test_serial_rev(self):
         asize = self.asize
@@ -309,10 +309,10 @@ class DecoupledTestCase(unittest.TestCase):
         J = prob.compute_totals(['Con1.y', 'Con2.y'], ['Indep1.x', 'Indep2.x'],
                                 return_format='flat_dict')
 
-        assert_rel_error(self, J['Con1.y', 'Indep1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
+        assert_near_equal(J['Con1.y', 'Indep1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
         expected = np.zeros((asize, asize+2))
         expected[:,:asize] = np.eye(asize)*8.0
-        assert_rel_error(self, J['Con2.y', 'Indep2.x'], expected, 1e-6)
+        assert_near_equal(J['Con2.y', 'Indep2.x'], expected, 1e-6)
 
     def test_parallel_rev(self):
         asize = self.asize
@@ -330,10 +330,10 @@ class DecoupledTestCase(unittest.TestCase):
         J = prob.compute_totals(['Con1.y', 'Con2.y'], ['Indep1.x', 'Indep2.x'],
                                 return_format='flat_dict')
 
-        assert_rel_error(self, J['Con1.y', 'Indep1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
+        assert_near_equal(J['Con1.y', 'Indep1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
         expected = np.zeros((asize, asize+2))
         expected[:,:asize] = np.eye(asize)*8.0
-        assert_rel_error(self, J['Con2.y', 'Indep2.x'], expected, 1e-6)
+        assert_near_equal(J['Con2.y', 'Indep2.x'], expected, 1e-6)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -380,16 +380,16 @@ class IndicesTestCase(unittest.TestCase):
         J = prob.compute_totals(['c4.y', 'c5.y'], ['p.x'],
                                 return_format='flat_dict')
 
-        assert_rel_error(self, J['c5.y', 'p.x'][0], np.array([20., 25.]), 1e-6)
-        assert_rel_error(self, J['c4.y', 'p.x'][0], np.array([8., 0.]), 1e-6)
+        assert_near_equal(J['c5.y', 'p.x'][0], np.array([20., 25.]), 1e-6)
+        assert_near_equal(J['c4.y', 'p.x'][0], np.array([8., 0.]), 1e-6)
 
     def test_indices_rev(self):
         prob = self.setup_model('rev')
         J = prob.compute_totals(['c4.y', 'c5.y'], ['p.x'],
                                 return_format='flat_dict')
 
-        assert_rel_error(self, J['c5.y', 'p.x'][0], np.array([20., 25.]), 1e-6)
-        assert_rel_error(self, J['c4.y', 'p.x'][0], np.array([8., 0.]), 1e-6)
+        assert_near_equal(J['c5.y', 'p.x'][0], np.array([20., 25.]), 1e-6)
+        assert_near_equal(J['c4.y', 'p.x'][0], np.array([8., 0.]), 1e-6)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -452,8 +452,8 @@ class IndicesTestCase2(unittest.TestCase):
                                 wrt=['G1.par1.p.x', 'G1.par2.p.x'],
                                 return_format='flat_dict')
 
-        assert_rel_error(self, J['G1.par2.c5.y', 'G1.par2.p.x'][0], np.array([20., 25.]), 1e-6)
-        assert_rel_error(self, J['G1.par1.c4.y', 'G1.par1.p.x'][0], np.array([8., 0.]), 1e-6)
+        assert_near_equal(J['G1.par2.c5.y', 'G1.par2.p.x'][0], np.array([20., 25.]), 1e-6)
+        assert_near_equal(J['G1.par1.c4.y', 'G1.par1.p.x'][0], np.array([8., 0.]), 1e-6)
 
     def test_indices_rev(self):
         prob = self.setup_model('rev')
@@ -461,8 +461,8 @@ class IndicesTestCase2(unittest.TestCase):
                                 ['G1.par1.p.x', 'G1.par2.p.x'],
                                 return_format='flat_dict')
 
-        assert_rel_error(self, J['G1.par2.c5.y', 'G1.par2.p.x'][0], np.array([20., 25.]), 1e-6)
-        assert_rel_error(self, J['G1.par1.c4.y', 'G1.par1.p.x'][0], np.array([8., 0.]), 1e-6)
+        assert_near_equal(J['G1.par2.c5.y', 'G1.par2.p.x'][0], np.array([20., 25.]), 1e-6)
+        assert_near_equal(J['G1.par1.c4.y', 'G1.par1.p.x'][0], np.array([8., 0.]), 1e-6)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -512,9 +512,9 @@ class MatMatTestCase(unittest.TestCase):
         J = prob.compute_totals(['c3.y', 'c4.y'], ['p1.x', 'p2.x'],
                                 return_format='flat_dict')
 
-        assert_rel_error(self, J['c3.y', 'p1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
+        assert_near_equal(J['c3.y', 'p1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
         expected = np.eye(asize)*8.0
-        assert_rel_error(self, J['c4.y', 'p2.x'], expected, 1e-6)
+        assert_near_equal(J['c4.y', 'p2.x'], expected, 1e-6)
 
     def test_parallel_multi_fwd(self):
         asize = self.asize
@@ -531,9 +531,9 @@ class MatMatTestCase(unittest.TestCase):
         J = prob.compute_totals(['c3.y', 'c4.y'], ['p1.x', 'p2.x'],
                                 return_format='flat_dict')
 
-        assert_rel_error(self, J['c3.y', 'p1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
+        assert_near_equal(J['c3.y', 'p1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
         expected = np.eye(asize)*8.0
-        assert_rel_error(self, J['c4.y', 'p2.x'], expected, 1e-6)
+        assert_near_equal(J['c4.y', 'p2.x'], expected, 1e-6)
 
     def test_parallel_rev(self):
         asize = self.asize
@@ -550,9 +550,9 @@ class MatMatTestCase(unittest.TestCase):
         J = prob.compute_totals(['c3.y', 'c4.y'], ['p1.x', 'p2.x'],
                                 return_format='flat_dict')
 
-        assert_rel_error(self, J['c3.y', 'p1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
+        assert_near_equal(J['c3.y', 'p1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
         expected = np.eye(asize)*8.0
-        assert_rel_error(self, J['c4.y', 'p2.x'], expected, 1e-6)
+        assert_near_equal(J['c4.y', 'p2.x'], expected, 1e-6)
 
     def test_parallel_multi_rev(self):
         asize = self.asize
@@ -569,9 +569,9 @@ class MatMatTestCase(unittest.TestCase):
         J = prob.compute_totals(['c3.y', 'c4.y'], ['p1.x', 'p2.x'],
                                 return_format='flat_dict')
 
-        assert_rel_error(self, J['c3.y', 'p1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
+        assert_near_equal(J['c3.y', 'p1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
         expected = np.eye(asize)*8.0
-        assert_rel_error(self, J['c4.y', 'p2.x'], expected, 1e-6)
+        assert_near_equal(J['c4.y', 'p2.x'], expected, 1e-6)
 
 
 class SumComp(om.ExplicitComponent):
@@ -674,8 +674,8 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
 
         J = p.compute_totals(of, wrt, return_format='dict')
 
-        assert_rel_error(self, J['ParallelGroup1.Con1.y']['Indep1.x'][0], np.ones(size)*2., 1e-6)
-        assert_rel_error(self, J['ParallelGroup1.Con2.y']['Indep1.x'][0], np.ones(size)*-3., 1e-6)
+        assert_near_equal(J['ParallelGroup1.Con1.y']['Indep1.x'][0], np.ones(size)*2., 1e-6)
+        assert_near_equal(J['ParallelGroup1.Con2.y']['Indep1.x'][0], np.ones(size)*-3., 1e-6)
 
     def test_fwd_vs_rev(self):
         import time
@@ -699,8 +699,8 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
         J = p.compute_totals(of, wrt, return_format='dict')
         elapsed_fwd = time.time() - elapsed_fwd
 
-        assert_rel_error(self, J['ParallelGroup1.Con1.y']['Indep1.x'][0], np.ones(size)*2., 1e-6)
-        assert_rel_error(self, J['ParallelGroup1.Con2.y']['Indep1.x'][0], np.ones(size)*-3., 1e-6)
+        assert_near_equal(J['ParallelGroup1.Con1.y']['Indep1.x'][0], np.ones(size)*2., 1e-6)
+        assert_near_equal(J['ParallelGroup1.Con2.y']['Indep1.x'][0], np.ones(size)*-3., 1e-6)
 
         # now run in rev mode and compare times for deriv calculation
         p = om.Problem(model=PartialDependGroup())
@@ -712,8 +712,8 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
         J = p.compute_totals(of, wrt, return_format='dict')
         elapsed_rev = time.time() - elapsed_rev
 
-        assert_rel_error(self, J['ParallelGroup1.Con1.y']['Indep1.x'][0], np.ones(size)*2., 1e-6)
-        assert_rel_error(self, J['ParallelGroup1.Con2.y']['Indep1.x'][0], np.ones(size)*-3., 1e-6)
+        assert_near_equal(J['ParallelGroup1.Con1.y']['Indep1.x'][0], np.ones(size)*2., 1e-6)
+        assert_near_equal(J['ParallelGroup1.Con2.y']['Indep1.x'][0], np.ones(size)*-3., 1e-6)
 
         # make sure that rev mode is faster than fwd mode
         self.assertGreater(elapsed_fwd / elapsed_rev, 1.0)

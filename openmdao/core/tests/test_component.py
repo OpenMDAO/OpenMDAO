@@ -8,7 +8,7 @@ from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimple
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
 from openmdao.test_suite.components.impl_comp_simple import TestImplCompSimple
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArray
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class TestExplicitComponent(unittest.TestCase):
@@ -32,7 +32,7 @@ class TestExplicitComponent(unittest.TestCase):
         prob['length'] = 3.
         prob['width'] = 2.
         prob.run_model()
-        assert_rel_error(self, prob['area'], 6.)
+        assert_near_equal(prob['area'], 6.)
 
     def test___init___array(self):
         """Test an explicit component with array inputs/outputs."""
@@ -42,7 +42,7 @@ class TestExplicitComponent(unittest.TestCase):
         prob['lengths'] = 3.
         prob['widths'] = 2.
         prob.run_model()
-        assert_rel_error(self, prob['total_volume'], 24.)
+        assert_near_equal(prob['total_volume'], 24.)
 
     def test_error_handling(self):
         """Test error handling when adding inputs/outputs."""
@@ -298,7 +298,7 @@ class TestImplicitComponent(unittest.TestCase):
 
         prob['a'] = a
         prob.run_model()
-        assert_rel_error(self, prob['x'], x)
+        assert_near_equal(prob['x'], x)
 
     def test___init___array(self):
         """Test an implicit component with array inputs/outputs."""
@@ -307,7 +307,7 @@ class TestImplicitComponent(unittest.TestCase):
 
         prob['rhs'] = np.ones(2)
         prob.run_model()
-        assert_rel_error(self, prob['x'], np.ones(2))
+        assert_near_equal(prob['x'], np.ones(2))
 
 
 class TestRangePartials(unittest.TestCase):
@@ -355,8 +355,8 @@ class TestRangePartials(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['vSum'], np.array([2., 3., 4., 5.]), 0.00001)
-        assert_rel_error(self, prob['vProd'], np.array([0., 2., 4., 6.]), 0.00001)
+        assert_near_equal(prob['vSum'], np.array([2., 3., 4., 5.]), 0.00001)
+        assert_near_equal(prob['vProd'], np.array([0., 2., 4., 6.]), 0.00001)
 
 
 if __name__ == '__main__':

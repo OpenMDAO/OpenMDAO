@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class TestCrossProductCompNx3(unittest.TestCase):
@@ -208,7 +208,7 @@ class TestUnits(unittest.TestCase):
             c_i = self.p.get_val('cross_prod_comp.c', units='ft*lbf')[i, :]
             expected_i = np.cross(a_i, b_i)
 
-            assert_rel_error(self, c_i, expected_i, tolerance=1.0E-12)
+            assert_near_equal(c_i, expected_i, tolerance=1.0E-12)
 
     def test_partials(self):
         np.set_printoptions(linewidth=1024)
@@ -227,7 +227,7 @@ class TestFeature(unittest.TestCase):
         import numpy as np
 
         import openmdao.api as om
-        from openmdao.utils.assert_utils import assert_rel_error
+        from openmdao.utils.assert_utils import assert_near_equal
 
         n = 100
 
@@ -261,7 +261,7 @@ class TestFeature(unittest.TestCase):
             a_i = p['r'][i, :]
             b_i = p['F'][i, :]
             expected_i = np.cross(a_i, b_i) * 0.73756215
-            assert_rel_error(self,
+            assert_near_equal(
                              p.get_val('cross_prod_comp.torque', units='ft*lbf')[i, :],
                              expected_i, tolerance=1.0E-8)
 

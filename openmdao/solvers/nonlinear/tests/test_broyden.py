@@ -11,7 +11,7 @@ from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStates
 from openmdao.test_suite.components.sellar import SellarStateConnection, SellarDerivatives, \
      SellarDis1withDerivatives, SellarDis2withDerivatives
-from openmdao.utils.assert_utils import assert_rel_error, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -207,8 +207,8 @@ class TestBryoden(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob['state_eq.y2_command'], 12.05848819, .00001)
 
     def test_simple_sellar_cycle(self):
         # Test top level Sellar (i.e., not grouped).
@@ -226,8 +226,8 @@ class TestBryoden(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob['y2'], 12.05848819, .00001)
 
     def test_sellar_state_connection_fd_system(self):
         # Sellar model closes loop with state connection instead of a cycle.
@@ -244,8 +244,8 @@ class TestBryoden(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob['state_eq.y2_command'], 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
         self.assertLess(prob.model.nonlinear_solver._iter_count, 6)
@@ -270,7 +270,7 @@ class TestBryoden(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, prob['vec.x'], np.zeros((5, )), 1e-6)
+        assert_near_equal(prob['vec.x'], np.zeros((5, )), 1e-6)
 
     def test_mixed(self):
         # Testing Broyden on a 5 state case split among 3 vars.
@@ -292,9 +292,9 @@ class TestBryoden(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, prob['mixed.x12'], np.zeros((2, )), 1e-6)
-        assert_rel_error(self, prob['mixed.x3'], 0.0, 1e-6)
-        assert_rel_error(self, prob['mixed.x45'], np.zeros((2, )), 1e-6)
+        assert_near_equal(prob['mixed.x12'], np.zeros((2, )), 1e-6)
+        assert_near_equal(prob['mixed.x3'], 0.0, 1e-6)
+        assert_near_equal(prob['mixed.x45'], np.zeros((2, )), 1e-6)
 
     def test_missing_state_warning(self):
         # Testing Broyden on a 5 state case split among 3 vars.
@@ -362,9 +362,9 @@ class TestBryoden(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, prob['x12'], np.zeros((2, )), 1e-6)
-        assert_rel_error(self, prob['x3'], 0.0, 1e-6)
-        assert_rel_error(self, prob['x45'], np.zeros((2, )), 1e-6)
+        assert_near_equal(prob['x12'], np.zeros((2, )), 1e-6)
+        assert_near_equal(prob['x3'], 0.0, 1e-6)
+        assert_near_equal(prob['x45'], np.zeros((2, )), 1e-6)
 
     def test_mixed_jacobian(self):
         # Testing Broyden on a 5 state case split among 3 vars.
@@ -386,9 +386,9 @@ class TestBryoden(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, prob['mixed.x12'], np.zeros((2, )), 1e-6)
-        assert_rel_error(self, prob['mixed.x3'], 0.0, 1e-6)
-        assert_rel_error(self, prob['mixed.x45'], np.zeros((2, )), 1e-6)
+        assert_near_equal(prob['mixed.x12'], np.zeros((2, )), 1e-6)
+        assert_near_equal(prob['mixed.x3'], 0.0, 1e-6)
+        assert_near_equal(prob['mixed.x45'], np.zeros((2, )), 1e-6)
 
         # Normally takes about 13 iters, but takes around 4 if you calculate an initial
         # Jacobian.
@@ -408,8 +408,8 @@ class TestBryoden(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob['state_eq.y2_command'], 12.05848819, .00001)
 
         # Normally takes about 4 iters, but takes around 3 if you calculate an initial
         # Jacobian.
@@ -428,8 +428,8 @@ class TestBryoden(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob['state_eq.y2_command'], 12.05848819, .00001)
 
         # Normally takes about 4 iters, but takes around 3 if you calculate an initial
         # Jacobian.
@@ -449,8 +449,8 @@ class TestBryoden(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob['state_eq.y2_command'], 12.05848819, .00001)
 
         # Normally takes about 4 iters, but takes around 3 if you calculate an initial
         # Jacobian.
@@ -470,8 +470,8 @@ class TestBryoden(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob['state_eq.y2_command'], 12.05848819, .00001)
 
         # Normally takes about 5 iters, but takes around 4 if you calculate an initial
         # Jacobian.
@@ -490,8 +490,8 @@ class TestBryoden(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob['state_eq.y2_command'], 12.05848819, .00001)
 
         # Normally takes about 5 iters, but takes around 4 if you calculate an initial
         # Jacobian.
@@ -520,7 +520,7 @@ class TestBryoden(unittest.TestCase):
         prob.set_solver_print(level=2)
         prob.run_model()
 
-        assert_rel_error(self, prob['comp.y'], np.array([-36.26230985,  10.20857237, -54.17658612]), 1e-6)
+        assert_near_equal(prob['comp.y'], np.array([-36.26230985,  10.20857237, -54.17658612]), 1e-6)
 
     def test_jacobian_update_diverge_limit(self):
         # This model needs jacobian updates to converge.
@@ -544,7 +544,7 @@ class TestBryoden(unittest.TestCase):
         prob.set_solver_print(level=2)
         prob.run_model()
 
-        assert_rel_error(self, prob['comp.y'], np.array([-36.26230985,  10.20857237, -54.17658612]), 1e-6)
+        assert_near_equal(prob['comp.y'], np.array([-36.26230985,  10.20857237, -54.17658612]), 1e-6)
 
     def test_backtracking(self):
         top = om.Problem()
@@ -570,14 +570,14 @@ class TestBryoden(unittest.TestCase):
         top['comp.y'] = 0.0
         top['comp.z'] = 1.6
         top.run_model()
-        assert_rel_error(self, top['comp.z'], 1.5, 1e-8)
+        assert_near_equal(top['comp.z'], 1.5, 1e-8)
 
         # Test upper bound: should go to the upper bound and stall
         top['px.x'] = 0.5
         top['comp.y'] = 0.0
         top['comp.z'] = 2.4
         top.run_model()
-        assert_rel_error(self, top['comp.z'], 2.5, 1e-8)
+        assert_near_equal(top['comp.z'], 2.5, 1e-8)
 
     def test_cs_around_broyden(self):
         # Basic sellar test.
@@ -619,7 +619,7 @@ class TestBryoden(unittest.TestCase):
         totals = prob.check_totals(method='cs', out_stream=None)
 
         for key, val in totals.items():
-            assert_rel_error(self, val['rel error'][0], 0.0, 1e-6)
+            assert_near_equal(val['rel error'][0], 0.0, 1e-6)
 
     def test_cs_around_broyden_compute_jac(self):
         # Basic sellar test.
@@ -661,7 +661,7 @@ class TestBryoden(unittest.TestCase):
         totals = prob.check_totals(method='cs', out_stream=None)
 
         for key, val in totals.items():
-            assert_rel_error(self, val['rel error'][0], 0.0, 1e-6)
+            assert_near_equal(val['rel error'][0], 0.0, 1e-6)
 
     def test_cs_around_broyden_compute_jac_dense(self):
         # Basic sellar test.
@@ -703,7 +703,7 @@ class TestBryoden(unittest.TestCase):
         totals = prob.check_totals(method='cs', out_stream=None)
 
         for key, val in totals.items():
-            assert_rel_error(self, val['rel error'][0], 0.0, 1e-6)
+            assert_near_equal(val['rel error'][0], 0.0, 1e-6)
 
     def test_complex_step(self):
         prob = om.Problem()
@@ -743,7 +743,7 @@ class TestBryoden(unittest.TestCase):
         totals = prob.check_totals(method='cs', out_stream=None)
 
         for key, val in totals.items():
-            assert_rel_error(self, val['rel error'][0], 0.0, 1e-7)
+            assert_near_equal(val['rel error'][0], 0.0, 1e-7)
 
 
 @unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")
@@ -792,8 +792,8 @@ class TestBryodenFeature(unittest.TestCase):
         prob.set_solver_print(level=2)
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob['state_eq.y2_command'], 12.05848819, .00001)
 
     def test_circuit(self):
         import openmdao.api as om
@@ -827,11 +827,11 @@ class TestBryodenFeature(unittest.TestCase):
         p.set_solver_print(level=2)
         p.run_model()
 
-        assert_rel_error(self, p['circuit.n1.V'], 9.90804735, 1e-5)
-        assert_rel_error(self, p['circuit.n2.V'], 0.71278226, 1e-5)
+        assert_near_equal(p['circuit.n1.V'], 9.90804735, 1e-5)
+        assert_near_equal(p['circuit.n2.V'], 0.71278226, 1e-5)
 
         # sanity check: should sum to .1 Amps
-        assert_rel_error(self,  p['circuit.R1.I'] + p['circuit.D1.I'], .1, 1e-6)
+        assert_near_equal(p['circuit.R1.I'] + p['circuit.D1.I'], .1, 1e-6)
 
     def test_circuit_options(self):
         import openmdao.api as om
@@ -865,11 +865,11 @@ class TestBryodenFeature(unittest.TestCase):
         p.set_solver_print(level=2)
         p.run_model()
 
-        assert_rel_error(self, p['circuit.n1.V'], 9.90804735, 1e-5)
-        assert_rel_error(self, p['circuit.n2.V'], 0.71278226, 1e-5)
+        assert_near_equal(p['circuit.n1.V'], 9.90804735, 1e-5)
+        assert_near_equal(p['circuit.n2.V'], 0.71278226, 1e-5)
 
         # sanity check: should sum to .1 Amps
-        assert_rel_error(self,  p['circuit.R1.I'] + p['circuit.D1.I'], .1, 1e-6)
+        assert_near_equal(p['circuit.R1.I'] + p['circuit.D1.I'], .1, 1e-6)
 
     def test_circuit_full(self):
         import openmdao.api as om
@@ -899,11 +899,11 @@ class TestBryodenFeature(unittest.TestCase):
         p.set_solver_print(level=2)
         p.run_model()
 
-        assert_rel_error(self, p['circuit.n1.V'], 9.90804735, 1e-5)
-        assert_rel_error(self, p['circuit.n2.V'], 0.71278226, 1e-5)
+        assert_near_equal(p['circuit.n1.V'], 9.90804735, 1e-5)
+        assert_near_equal(p['circuit.n2.V'], 0.71278226, 1e-5)
 
         # sanity check: should sum to .1 Amps
-        assert_rel_error(self,  p['circuit.R1.I'] + p['circuit.D1.I'], .1, 1e-6)
+        assert_near_equal(p['circuit.R1.I'] + p['circuit.D1.I'], .1, 1e-6)
 
 
 if __name__ == "__main__":

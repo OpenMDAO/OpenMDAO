@@ -2,7 +2,7 @@ import numpy as np
 import unittest
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_rel_error, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 
 
 class MockSurrogate(om.MultiFiSurrogateModel):
@@ -315,12 +315,12 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         prob['mm.x'] = np.array([[2./3., 1./3.]])
         prob.run_model()
 
-        assert_rel_error(self, prob['mm.y'], 26.26, tolerance=0.02)
+        assert_near_equal(prob['mm.y'], 26.26, tolerance=0.02)
 
         prob['mm.x'] = np.array([[1./3., 2./3.]])
         prob.run_model()
 
-        assert_rel_error(self, prob['mm.y'], 36.1031735, tolerance=0.02)
+        assert_near_equal(prob['mm.y'], 36.1031735, tolerance=0.02)
 
         # Now, vectorized model with both points predicted together.
 
@@ -342,7 +342,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         prob['mm.x'] = np.array([[[2./3., 1./3.]], [[1./3., 2./3.]]])
         prob.run_model()
 
-        assert_rel_error(self, prob['mm.y'], [[26.26], [36.1031735]], tolerance=0.02)
+        assert_near_equal(prob['mm.y'], [[26.26], [36.1031735]], tolerance=0.02)
 
     def test_surrogate_message_format(self):
         mm = om.MultiFiMetaModelUnStructuredComp(nfi=2)
@@ -466,7 +466,7 @@ class MultiFiMetaModelFeatureTestCase(unittest.TestCase):
         prob['mm.x'] = np.array([[2./3., 1./3.]])
         prob.run_model()
 
-        assert_rel_error(self, prob['mm.y'], 26.26, tolerance=0.02)
+        assert_near_equal(prob['mm.y'], 26.26, tolerance=0.02)
 
 
 if __name__ == "__main__":

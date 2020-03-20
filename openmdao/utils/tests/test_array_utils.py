@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 
 from openmdao.utils.array_utils import array_connection_compatible, abs_complex, dv_abs_complex
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class TestArrayConnectionCompatible(unittest.TestCase):
@@ -63,7 +63,7 @@ class TestArrayUtils(unittest.TestCase):
 
         row = np.array([1.0 + 2j, 1.0 + 2j, 1.0 + 2j])
         dy_check = np.vstack((row, -row, -row, -row))
-        assert_rel_error(self, dy, dy_check, 1e-10)
+        assert_near_equal(dy, dy_check, 1e-10)
 
 
 if __name__ == "__main__":

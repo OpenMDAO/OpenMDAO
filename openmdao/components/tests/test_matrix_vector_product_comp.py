@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class TestMatrixVectorProductComp3x3(unittest.TestCase):
@@ -137,7 +137,7 @@ class TestMatrixVectorProductCompNonVectorized(unittest.TestCase):
         b_i = self.p['mat_vec_product_comp.b']
 
         expected = np.dot(np.reshape(A_i, (3, 3)), np.reshape(x_i, (3,)))
-        assert_rel_error(self, b_i, expected)
+        assert_near_equal(b_i, expected)
 
     def test_partials(self):
         np.set_printoptions(linewidth=1024)
@@ -145,7 +145,7 @@ class TestMatrixVectorProductCompNonVectorized(unittest.TestCase):
 
         for comp in cpd:
             for (var, wrt) in cpd[comp]:
-                assert_rel_error(self,
+                assert_near_equal(
                                  actual=cpd[comp][var, wrt]['J_fwd'],
                                  desired=cpd[comp][var, wrt]['J_fd'])
 
@@ -206,7 +206,7 @@ class TestFeature(unittest.TestCase):
     def test(self):
         import numpy as np
         import openmdao.api as om
-        from openmdao.utils.assert_utils import assert_rel_error
+        from openmdao.utils.assert_utils import assert_near_equal
 
         nn = 100
 
@@ -239,7 +239,7 @@ class TestFeature(unittest.TestCase):
             x_i = p['x'][i, :]
 
             expected_i = np.dot(A_i, x_i) * 3.2808399
-            assert_rel_error(self,
+            assert_near_equal(
                              p.get_val('mat_vec_product_comp.y', units='ft')[i, :],
                              expected_i,
                              tolerance=1.0E-8)

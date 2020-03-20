@@ -45,7 +45,7 @@ class N2Layout {
         startTimer('N2Layout._updateSolverTextWidths');
         this._updateSolverTextWidths();
         stopTimer('N2Layout._updateSolverTextWidths');
-        delete (this.textRenderer);
+        delete(this.textRenderer);
 
         startTimer('N2Layout._computeLeaves');
         this._computeLeaves();
@@ -99,8 +99,7 @@ class N2Layout {
             d3.selection.prototype.transition = returnThis;
             d3.selection.prototype.duration = returnThis;
             d3.selection.prototype.delay = returnThis;
-        }
-        else { // OK, enable transitions.
+        } else { // OK, enable transitions.
             debugInfo("Allowing transitions: ", this.visibleNodes.length,
                 " visible nodes, max allowed: ", N2TransitionDefaults.maxNodes)
 
@@ -141,8 +140,7 @@ class N2Layout {
         // Check cache first
         if (this.textRenderer.widthCache.propExists(text)) {
             width = this.textRenderer.widthCache[text];
-        }
-        else {
+        } else {
             // Not found, render and return new width.
             this.textRenderer.textSvg.text(text);
             width = this.textRenderer.workNode.getBoundingClientRect().width;
@@ -172,7 +170,7 @@ class N2Layout {
 
         if (node.splitByColon) {
             if (retVal.endsWith(colonVarNameAppend)) {
-                retVal = retVal.slice(0,-1);
+                retVal = retVal.slice(0, -1);
             }
         }
 
@@ -193,7 +191,7 @@ class N2Layout {
 
         let solver_name = this.showLinearSolverNames ? node.linear_solver : node.nonlinear_solver;
 
-        if (!this.showLinearSolverNames && node.hasOwnProperty("solve_subsystems") && node.solve_subsystems){
+        if (!this.showLinearSolverNames && node.hasOwnProperty("solve_subsystems") && node.solve_subsystems) {
             return solver_name + " (sub_solve)";
         } else {
             return solver_name;
@@ -243,15 +241,13 @@ class N2Layout {
     _computeLeaves(node = this.model.root) {
         if (node.varIsHidden) {
             node.numLeaves = 0;
-        }
-        else if (node.hasChildren() && !node.isMinimized) {
+        } else if (node.hasChildren() && !node.isMinimized) {
             node.numLeaves = 0;
             for (let child of node.children) {
                 this._computeLeaves(child);
                 node.numLeaves += child.numLeaves;
             }
-        }
-        else {
+        } else {
             node.numLeaves = 1;
         }
     }
@@ -281,8 +277,7 @@ class N2Layout {
             for (let child of node[childrenProp]) {
                 this._setColumnWidthsFromWidestText(child, childrenProp, colArr, leafArr, widthProp);
             }
-        }
-        else { //leaf
+        } else { //leaf
             leafArr[node.depth] = Math.max(leafArr[node.depth], width);
         }
     }
@@ -293,8 +288,13 @@ class N2Layout {
     _computeColumnWidths(node = this.zoomedElement) {
         this.greatestDepth = 0;
         this.leafWidthsPx = new Array(this.model.maxDepth + 1).fill(0.0);
-        this.cols = Array.from({ length: this.model.maxDepth + 1 }, () =>
-            ({ 'width': 0.0, 'location': 0.0 }));
+        this.cols = Array.from({
+                length: this.model.maxDepth + 1
+            }, () =>
+            ({
+                'width': 0.0,
+                'location': 0.0
+            }));
 
         this._setColumnWidthsFromWidestText(node, 'children', this.cols,
             this.leafWidthsPx, 'nameWidthPx');
@@ -317,8 +317,13 @@ class N2Layout {
     _computeSolverColumnWidths(node = this.zoomedElement) {
         this.greatestDepth = 0;
         this.leafSolverWidthsPx = new Array(this.model.maxDepth + 1).fill(0.0);
-        this.solverCols = Array.from({ length: this.model.maxDepth + 1 }, () =>
-            ({ 'width': 0.0, 'location': 0.0 }));
+        this.solverCols = Array.from({
+                length: this.model.maxDepth + 1
+            }, () =>
+            ({
+                'width': 0.0,
+                'location': 0.0
+            }));
 
         this._setColumnWidthsFromWidestText(node, 'subsystem_children', this.solverCols,
             this.leafSolverWidthsPx, 'nameSolverWidthPx');
@@ -477,7 +482,10 @@ class N2Layout {
         let height = (this.size.n2matrix.height +
             this.size.n2matrix.margin * 2);
 
-        return ({ 'width': width, 'height': height });
+        return ({
+            'width': width,
+            'height': height
+        });
     }
 
     /**
@@ -494,7 +502,11 @@ class N2Layout {
         let height = this.size.partitionTree.height;
         let margin = this.size.n2matrix.margin;
 
-        return ({ 'width': width, 'height': height, 'margin': margin });
+        return ({
+            'width': width,
+            'height': height,
+            'margin': margin
+        });
     }
 
     /**
@@ -526,7 +538,7 @@ class N2Layout {
             .attr("height", innerDims.height)
             .attr("width", this.size.partitionTree.width)
             .attr("transform", "translate(0 " + innerDims.margin + ")");
-           
+
         // Move n2 outer group to right of partition tree, spaced by the margin.
         dom.n2OuterGroup.transition(sharedTransition)
             .attr("height", outerDims.height)
@@ -547,9 +559,9 @@ class N2Layout {
         dom.pSolverTreeGroup.transition(sharedTransition)
             .attr("height", innerDims.height)
             .attr("transform", "translate(" + (this.size.partitionTree.width +
-                innerDims.margin +
-                innerDims.height +
-                innerDims.margin) + " " +
+                    innerDims.margin +
+                    innerDims.height +
+                    innerDims.margin) + " " +
                 innerDims.margin + ")");
     }
 }
