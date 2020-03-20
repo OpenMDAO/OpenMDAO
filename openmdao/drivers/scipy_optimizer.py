@@ -214,6 +214,8 @@ class ScipyOptimizeDriver(Driver):
                     d['indices'] = None
                     d['adder'] = None
                     d['scaler'] = None
+                    d['total_adder'] = None
+                    d['total_scaler'] = None
                     d['size'] = meta['size']
                     d['linear'] = True
                     self._cons[name] = d
