@@ -79,7 +79,7 @@ class Group(System):
         Flag to check if setup_procs is complete
     _has_distrib_vars : bool
         If True, this Group contains distributed variables.
-    _raise_connection_error : bool
+    _raise_connection_errors : bool
         Flag indicating whether connection errors are raised as an Exception.
     """
 
@@ -109,7 +109,7 @@ class Group(System):
         self._approx_subjac_keys = None
         self._setup_procs_finished = False
         self._has_distrib_vars = False
-        self._raise_connection_error = True
+        self._raise_connection_errors = True
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -829,7 +829,7 @@ class Group(System):
         conns : dict
             Dictionary of connections passed down from parent group.
         """
-        if self._raise_connection_error is False:
+        if self._raise_connection_errors is False:
             self._set_subsys_connection_error(False)
 
         global_abs_in2out = self._conn_global_abs_in2out = {}
@@ -886,7 +886,7 @@ class Group(System):
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
                           f"'{prom_in}', but '{prom_out}' is an input. " + \
                           "All connections must be from an output to an input."
-                    if self._raise_connection_error:
+                    if self._raise_connection_errors:
                         raise NameError(msg)
                     else:
                         simple_warning(msg)
@@ -894,7 +894,7 @@ class Group(System):
                 else:
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
                           f"'{prom_in}', but '{prom_out}' doesn't exist."
-                    if self._raise_connection_error:
+                    if self._raise_connection_errors:
                         raise NameError(msg)
                     else:
                         simple_warning(msg)
@@ -907,7 +907,7 @@ class Group(System):
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
                           f"'{prom_in}', but '{prom_in}' is an output. " + \
                           "All connections must be from an output to an input."
-                    if self._raise_connection_error:
+                    if self._raise_connection_errors:
                         raise NameError(msg)
                     else:
                         simple_warning(msg)
@@ -915,7 +915,7 @@ class Group(System):
                 else:
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
                           f"'{prom_in}', but '{prom_in}' doesn't exist."
-                    if self._raise_connection_error:
+                    if self._raise_connection_errors:
                         raise NameError(msg)
                     else:
                         simple_warning(msg)
@@ -934,7 +934,7 @@ class Group(System):
                 if out_subsys == in_subsys:
                     msg = f"{self.msginfo}: Output and input are in the same System for " + \
                           f"connection from '{prom_out}' to '{prom_in}'."
-                    if self._raise_connection_error:
+                    if self._raise_connection_errors:
                         raise RuntimeError(msg)
                     else:
                         simple_warning(msg)
@@ -946,7 +946,7 @@ class Group(System):
                         msg = f"{self.msginfo}: src_indices has been defined in both " + \
                               f"connect('{prom_out}', '{prom_in}') and " + \
                               f"add_input('{prom_in}', ...)."
-                        if self._raise_connection_error:
+                        if self._raise_connection_errors:
                             raise RuntimeError(msg)
                         else:
                             simple_warning(msg)
@@ -957,7 +957,7 @@ class Group(System):
                 if abs_in in abs_in2out:
                     msg = f"{self.msginfo}: Input '{abs_in}' cannot be connected to " + \
                           f"'{abs_out}' because it's already connected to '{abs_in2out[abs_in]}'"
-                    if self._raise_connection_error:
+                    if self._raise_connection_errors:
                         raise RuntimeError(msg)
                     else:
                         simple_warning(msg)
@@ -1004,7 +1004,7 @@ class Group(System):
                 dup = ["%s from %s" % (tgt, sorted(srcs)) for tgt, srcs in dup_info]
                 msg = f"{self.msginfo}: The following inputs have multiple connections: " + \
                       f"{', '.join(dup)}"
-                if self._raise_connection_error:
+                if self._raise_connection_errors:
                     raise RuntimeError(msg)
                 else:
                     simple_warning(msg)
@@ -1078,7 +1078,7 @@ class Group(System):
                     elif abs_out in allprocs_discrete_out:
                         msg = f"{self.msginfo}: Can't connect discrete output '{abs_out}' " + \
                               f"to continuous input '{abs_in}'."
-                        if self._raise_connection_error:
+                        if self._raise_connection_errors:
                             raise RuntimeError(msg)
                         else:
                             simple_warning(msg)
@@ -1139,14 +1139,14 @@ class Group(System):
             except KeyError:
                 msg = f"{self.msginfo}: Can't connect continuous output '{abs_out}' " + \
                       f"to discrete input '{abs_in}'."
-                if self._raise_connection_error:
+                if self._raise_connection_errors:
                     raise RuntimeError(msg)
                 else:
                     simple_warning(msg)
             if not issubclass(in_type, out_type):
                 msg = f"{self.msginfo}: Type '{out_type.__name__}' of output '{abs_out}' is " + \
                       f"incompatible with type '{in_type.__name__}' of input '{abs_in}'."
-                if self._raise_connection_error:
+                if self._raise_connection_errors:
                     raise RuntimeError(msg)
                 else:
                     simple_warning(msg)
@@ -1169,7 +1169,7 @@ class Group(System):
                 elif not is_compatible(in_units, out_units):
                     msg = f"{self.msginfo}: Output units of '{out_units}' for '{abs_out}' " + \
                           f"are incompatible with input units of '{in_units}' for '{abs_in}'."
-                    if self._raise_connection_error:
+                    if self._raise_connection_errors:
                         raise RuntimeError(msg)
                     else:
                         simple_warning(msg)
@@ -1197,7 +1197,7 @@ class Group(System):
                               f"are ambiguous for the connection '{abs_out}' to '{abs_in}'. " + \
                               f"The source shape is {tuple([int(s) for s in out_shape])} " + \
                               f"but the target shape is {tuple([int(s) for s in in_shape])}."
-                        if self._raise_connection_error:
+                        if self._raise_connection_errors:
                             raise ValueError(msg)
                         else:
                             simple_warning(msg)
@@ -1213,7 +1213,7 @@ class Group(System):
                                   f"valid shape for the connection '{abs_out}' to " + \
                                   f"'{abs_in}'. The target shape is " + \
                                   f"{in_shape} but indices are {src_indices.shape}."
-                            if self._raise_connection_error:
+                            if self._raise_connection_errors:
                                 raise ValueError(msg)
                             else:
                                 simple_warning(msg)
@@ -1229,7 +1229,7 @@ class Group(System):
                                   f"valid shape for the connection '{abs_out}' to '{abs_in}'. " + \
                                   f"The source has {len(out_shape)} dimensions but the " + \
                                   f"indices expect {source_dimensions}."
-                            if self._raise_connection_error:
+                            if self._raise_connection_errors:
                                 raise ValueError(msg)
                             else:
                                 simple_warning(msg)
@@ -1253,7 +1253,7 @@ class Group(System):
                                   f"a valid index for the connection '{abs_out}' to " + \
                                   f"'{abs_in}'. Index '{bad_idx}' is out of range for " + \
                                   f"a flat source of size {out_size}."
-                            if self._raise_connection_error:
+                            if self._raise_connection_errors:
                                 raise ValueError(msg)
                             else:
                                 simple_warning(msg)
@@ -1274,7 +1274,7 @@ class Group(System):
                                                   f"connection '{abs_out}' to '{abs_in}'. " + \
                                                   f"Index '{i}' is out of range for source " + \
                                                   f"dimension of size {d_size}."
-                                            if self._raise_connection_error:
+                                            if self._raise_connection_errors:
                                                 raise ValueError(msg)
                                             else:
                                                 simple_warning(msg)
@@ -1291,7 +1291,7 @@ class Group(System):
         """
         for sub in self._subsystems_allprocs:
             if isinstance(sub, Group):
-                sub._raise_connection_error = val
+                sub._raise_connection_errors = val
                 sub._set_subsys_connection_error(val)
 
     def _transfer(self, vec_name, mode, isub=None):

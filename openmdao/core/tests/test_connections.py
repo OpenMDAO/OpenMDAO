@@ -444,7 +444,7 @@ class TestConnectionsIndices(unittest.TestCase):
         else:
             self.fail('Exception expected.')
 
-        self.prob.model._raise_connection_errors(False)
+        self.prob.model._raise_connection_errors = False
         
         with assert_warning(UserWarning, expected):
             self.prob.setup()
@@ -465,7 +465,7 @@ class TestConnectionsIndices(unittest.TestCase):
         else:
             self.fail('Exception expected.')
 
-        self.prob.model._raise_connection_errors(False)
+        self.prob.model._raise_connection_errors = False
         
         with assert_warning(UserWarning, expected):
             self.prob.setup()
@@ -486,7 +486,7 @@ class TestConnectionsIndices(unittest.TestCase):
         else:
             self.fail('Exception expected.')
 
-        self.prob.model._raise_connection_errors(False)
+        self.prob.model._raise_connection_errors = False
         
         with assert_warning(UserWarning, expected):
             self.prob.setup()
@@ -584,7 +584,7 @@ class TestShapes(unittest.TestCase):
 
         self.assertEqual(str(context.exception), expected)
 
-        p.model._raise_connection_errors(False)
+        p.model._raise_connection_errors = False
 
         with assert_warning(UserWarning, expected):
             p.setup()
@@ -618,7 +618,7 @@ class TestMultiConns(unittest.TestCase):
 
         self.assertEqual(str(context.exception), expected)
 
-        prob.model._raise_connection_errors(False)
+        prob.model._raise_connection_errors = False
 
         with assert_warning(UserWarning, expected):
             prob.setup()
@@ -647,7 +647,7 @@ class TestMultiConns(unittest.TestCase):
 
         self.assertEqual(str(context.exception), expected)
 
-        prob.model._raise_connection_errors(False)
+        prob.model._raise_connection_errors = False
 
         with assert_warning(UserWarning, expected):
             prob.setup()

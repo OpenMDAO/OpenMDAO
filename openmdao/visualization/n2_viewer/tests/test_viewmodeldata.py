@@ -711,7 +711,7 @@ class TestViewModelData(unittest.TestCase):
 
         p = Problem(BadConnectionModel())
 
-        p.model._raise_connection_error = False
+        p.model._raise_connection_errors = False
 
         expected = "Group (sub): Attempted to connect from 'tgt.x' to 'cmp.x', but " + \
                    "'tgt.x' is an input. All connections must be from an output to an input."
