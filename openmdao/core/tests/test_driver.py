@@ -437,7 +437,7 @@ class TestDriver(unittest.TestCase):
         self.assertEqual(str(context.exception), msg)
 
     def test_driver_recording_options_deprecated(self):
-        prob = Problem()
+        prob = om.Problem()
         msg = "The recording option, record_model_metadata, on Driver is deprecated. " \
               "Recording of model metadata will always be done"
         with assert_warning(DeprecationWarning, msg):
