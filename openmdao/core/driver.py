@@ -630,6 +630,8 @@ class Driver(object):
         self._objs = objs = OrderedDict()
         self._cons = cons = OrderedDict()
 
+        model._setup_driver_units()
+
         self._responses = resps = model.get_responses(recurse=True)
         for name, data in resps.items():
             if data['type'] == 'con':

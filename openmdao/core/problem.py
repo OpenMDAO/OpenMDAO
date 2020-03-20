@@ -755,7 +755,6 @@ class Problem(object):
         """
         driver = self.driver
 
-        self.model._setup_driver_units()
         response_size, desvar_size = driver._update_voi_meta(self.model)
 
         # update mode if it's been set to 'auto'
