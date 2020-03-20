@@ -5,7 +5,7 @@ import unittest
 
 # from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.units import NumberDict, PhysicalUnit, _find_unit, import_library, \
-    add_unit, add_offset_unit, get_conversion
+    add_unit, add_offset_unit, unit_conversion
 
 
 class TestNumberDict(unittest.TestCase):
@@ -245,11 +245,11 @@ class TestPhysicalUnit(unittest.TestCase):
         y = x2 / (x1**2)
         self.assertEqual(y.name(), 'kg/m**2')
 
-    def test_get_conversion(self):
-        self.assertEqual(get_conversion('km', 'm'), (1000., 0.))
+    def test_unit_conversion(self):
+        self.assertEqual(unit_conversion('km', 'm'), (1000., 0.))
 
         try:
-            get_conversion('km', 1.0)
+            unit_conversion('km', 1.0)
         except RuntimeError as err:
             self.assertEqual(str(err), "Cannot convert to new units: 1.0")
         else:
