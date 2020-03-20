@@ -830,7 +830,7 @@ class Group(System):
             Dictionary of connections passed down from parent group.
         """
         if self._raise_connection_errors is False:
-            self._set_subsys_connection_error(False)
+            self._set_subsys_connection_errors(False)
 
         global_abs_in2out = self._conn_global_abs_in2out = {}
 
@@ -1279,7 +1279,7 @@ class Group(System):
                                             else:
                                                 simple_warning(msg)
 
-    def _set_subsys_connection_error(self, val=True):
+    def _set_subsys_connection_errors(self, val=True):
         """
         Set flag in all subgroups indicating whether connection errors just issue a Warning.
 
@@ -1292,7 +1292,7 @@ class Group(System):
         for sub in self._subsystems_allprocs:
             if isinstance(sub, Group):
                 sub._raise_connection_errors = val
-                sub._set_subsys_connection_error(val)
+                sub._set_subsys_connection_errors(val)
 
     def _transfer(self, vec_name, mode, isub=None):
         """

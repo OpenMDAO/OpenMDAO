@@ -711,6 +711,7 @@ class TestViewModelData(unittest.TestCase):
 
         p = Problem(BadConnectionModel())
 
+        # this would be set by the command line hook
         p.model._raise_connection_errors = False
 
         expected = "Group (sub): Attempted to connect from 'tgt.x' to 'cmp.x', but " + \

@@ -42,7 +42,6 @@ from openmdao.utils.entry_points import _list_installed_setup_parser, _list_inst
     split_ep, _compute_entry_points_setup_parser, _compute_entry_points_exec, \
         _find_plugins_setup_parser, _find_plugins_exec
 from openmdao.core.component import Component
-from openmdao.core.group import Group
 
 
 def _n2_setup_parser(parser):
