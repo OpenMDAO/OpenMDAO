@@ -257,12 +257,12 @@ class TestPhysicalUnit(unittest.TestCase):
             self.fail("Expecting RuntimeError")
 
     def test_get_conversion(self):
-        self.assertEqual(get_conversion('km', 'm'), (1000., 0.))
+        msg = "'get_conversion' has been deprecated. Use 'unit_conversion' instead."
+        with assert_warning(DeprecationWarning, msg):
+            self.assertEqual(get_conversion('km', 'm'), (1000., 0.))
 
         try:
-            msg = "'get_conversion' has been deprecated. Use 'unit_conversion' instead."
-            with assert_warning(DeprecationWarning, msg):
-                get_conversion('km', 1.0)
+            get_conversion('km', 1.0)
         except RuntimeError as err:
             self.assertEqual(str(err), "Cannot convert to new units: 1.0")
         else:
