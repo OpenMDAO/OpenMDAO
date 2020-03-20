@@ -9,7 +9,7 @@ from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.matrices.coo_matrix import COOMatrix
 from openmdao.matrices.csr_matrix import CSRMatrix
 from openmdao.matrices.csc_matrix import CSCMatrix
-from openmdao.utils.units import get_conversion
+from openmdao.utils.units import unit_conversion
 from openmdao.utils.array_utils import _flatten_src_indices
 from openmdao.utils.mpi import MPI
 from openmdao.vectors.vector import INT_DTYPE
@@ -151,7 +151,7 @@ class AssembledJacobian(Jacobian):
                     in_units = meta_in['units']
                     out_units = all_out_meta['units']
                     if in_units and out_units and in_units != out_units:
-                        factor, _ = get_conversion(out_units, in_units)
+                        factor, _ = unit_conversion(out_units, in_units)
                         if factor == 1.0:
                             factor = None
                     else:

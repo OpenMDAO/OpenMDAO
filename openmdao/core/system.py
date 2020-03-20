@@ -39,7 +39,7 @@ from openmdao.utils.general_utils import determine_adder_scaler, find_matches, \
     simple_warning, make_set, match_includes_excludes
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
-from openmdao.utils.units import get_conversion
+from openmdao.utils.units import unit_conversion
 
 # Use this as a special value to be able to tell if the caller set a value for the optional
 #   out_stream argument. We run into problems running testflo if we use a default of sys.stdout.
@@ -4300,7 +4300,7 @@ class System(object):
             raise TypeError(msg.format(self.msginfo, name, units))
 
         try:
-            scale, offset = get_conversion(base_units, units)
+            scale, offset = unit_conversion(base_units, units)
         except Exception:
             msg = "{}: Can't express variable '{}' with units of '{}' in units of '{}'."
             raise TypeError(msg.format(self.msginfo, name, base_units, units))

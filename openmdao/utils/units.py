@@ -16,6 +16,7 @@ import os.path
 from collections import OrderedDict
 
 from configparser import RawConfigParser as ConfigParser
+from openmdao.utils.general_utils import warn_deprecation
 
 # pylint: disable=E0611, F0401
 from math import floor, pi
@@ -975,7 +976,7 @@ def is_compatible(old_units, new_units):
     return old_unit.is_compatible(new_unit)
 
 
-def get_conversion(old_units, new_units):
+def unit_conversion(old_units, new_units):
     """
     Return conversion factor and offset between old and new units.
 
@@ -996,6 +997,28 @@ def get_conversion(old_units, new_units):
         raise RuntimeError("Cannot convert to new units: %s" % str(new_units))
 
     return _find_unit(old_units).conversion_tuple_to(new_physical_units)
+
+
+def get_conversion(old_units, new_units):
+    """
+    Return conversion factor and offset between old and new units (deprecated).
+
+    Parameters
+    ----------
+    old_units : str
+        original units as a string.
+    new_units : str
+        new units to return the value in.
+
+    Returns
+    -------
+    (float, float)
+        Conversion factor and offset
+    """
+    warn_deprecation("'get_conversion' has been deprecated. Use "
+                     "'unit_conversion' instead.")
+
+    return unit_conversion(old_units, new_units)
 
 
 def convert_units(val, old_units, new_units=None):
@@ -1030,8 +1053,7 @@ def convert_units(val, old_units, new_units=None):
 
 
 # Load in the default unit library
-file_path = open(os.path.join(os.path.dirname(__file__),
-                 'unit_library.ini'))
+file_path = open(os.path.join(os.path.dirname(__file__), 'unit_library.ini'))
 with file_path as default_lib:
     import_library(default_lib)
 
