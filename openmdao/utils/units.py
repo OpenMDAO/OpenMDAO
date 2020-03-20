@@ -975,6 +975,7 @@ def is_compatible(old_units, new_units):
 
     return old_unit.is_compatible(new_unit)
 
+
 def unit_conversion(old_units, new_units):
     """
     Return conversion factor and offset between old and new units.
@@ -997,10 +998,10 @@ def unit_conversion(old_units, new_units):
 
     return _find_unit(old_units).conversion_tuple_to(new_physical_units)
 
+
 def get_conversion(old_units, new_units):
     """
-    Return conversion factor and offset between old and new units.
-    Deprecated. Use unit_conversion() instead.
+    Return conversion factor and offset between old and new units (deprecated).
 
     Parameters
     ----------
@@ -1018,6 +1019,7 @@ def get_conversion(old_units, new_units):
                      "'unit_conversion' instead.")
 
     return unit_conversion(old_units, new_units)
+
 
 def convert_units(val, old_units, new_units=None):
     """
@@ -1051,8 +1053,7 @@ def convert_units(val, old_units, new_units=None):
 
 
 # Load in the default unit library
-file_path = open(os.path.join(os.path.dirname(__file__),
-                 'unit_library.ini'))
+file_path = open(os.path.join(os.path.dirname(__file__), 'unit_library.ini'))
 with file_path as default_lib:
     import_library(default_lib)
 
