@@ -1171,8 +1171,9 @@ class Problem(object):
                 wrt = rel_key[1]
                 if wrt in local_opts and local_opts[wrt]['directional']:
                     deriv = partials_data[c_name][rel_key]
-                    for key in ['J_fwd', 'J_rev']:
-                        deriv[key] = np.atleast_2d(np.sum(deriv[key], axis=1)).T
+                    deriv['J_fwd'] = np.atleast_2d(np.sum(deriv['J_fwd'], axis=1)).T
+                    axis = 0 if comp.matrix_free else 1
+                    deriv['J_rev'] = np.atleast_2d(np.sum(deriv['J_rev'], axis=axis)).T
 
         # Conversion of defaultdict to dicts
         partials_data = {comp_name: dict(outer) for comp_name, outer in partials_data.items()}

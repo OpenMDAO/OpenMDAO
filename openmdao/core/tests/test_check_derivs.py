@@ -1431,7 +1431,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         assert_check_partials(data, atol=1.0E-8, rtol=1.0E-8)
 
-    def test_directional_matrix_free(self):
+    def test_directional_vectorized_matrix_free(self):
 
         class TestDirectional(om.ExplicitComponent):
             def initialize(self):
@@ -1449,35 +1449,71 @@ class TestProblemCheckPartials(unittest.TestCase):
 
             def compute(self,inputs,outputs):
                 self.n_compute += 1
-                print("compute inputs:", inputs['in'])
-
-                outputs['out'] = 2.0 * inputs['in']
+                fac = 2.0 + np.arange(self.options['n'])
+                outputs['out'] = fac * inputs['in']
 
             def compute_jacvec_product(self,inputs,d_inputs,d_outputs, mode):
+                fac = 2.0 + np.arange(self.options['n'])
                 if mode == 'fwd':
                     if 'out' in d_outputs:
                         if 'in' in d_inputs:
-                            print("fwd mode d_inputs:", d_inputs['in'])
-                            d_outputs['out'] = 2.0 * d_inputs['in']
+                            d_outputs['out'] = fac * d_inputs['in']
                             self.n_fwd += 1
 
                 if mode == 'rev':
                     if 'out' in d_outputs:
                         if 'in' in d_inputs:
-                            d_inputs['in'] = 2.0 * d_outputs['out']
+                            d_inputs['in'] = fac * d_outputs['out']
                             self.n_rev += 1
 
         prob = om.Problem()
         model = prob.model
 
-        comp = TestDirectional(n=2)
+        comp = TestDirectional(n=5)
         model.add_subsystem('comp', comp)
 
         prob.setup(force_alloc_complex=True)
         prob.run_model()
         J = prob.check_partials(method='cs', out_stream=None)
+        assert_check_partials(J)
         self.assertEqual(comp.n_fwd, 1)
         self.assertEqual(comp.n_rev, 1)
+
+    def test_directional_vectorized(self):
+
+        class TestDirectional(om.ExplicitComponent):
+            def initialize(self):
+                self.options.declare('n',default=1, desc='vector size')
+
+                self.n_compute = 0
+                self.n_fwd = 0
+                self.n_rev = 0
+
+            def setup(self):
+                self.add_input('in',shape=self.options['n'])
+                self.add_output('out',shape=self.options['n'])
+
+                self.declare_partials('out', 'in')
+                self.set_check_partial_options(wrt='*', directional=True, method='cs')
+
+            def compute(self,inputs,outputs):
+                self.n_compute += 1
+                fac = 2.0 + np.arange(self.options['n'])
+                outputs['out'] = fac * inputs['in']
+
+            def compute_partials(self, inputs, partials):
+                partials['out', 'in'] = np.diag(2.0 + np.arange(self.options['n']))
+
+        prob = om.Problem()
+        model = prob.model
+
+        comp = TestDirectional(n=5)
+        model.add_subsystem('comp', comp)
+
+        prob.setup(force_alloc_complex=True)
+        prob.run_model()
+        J = prob.check_partials(method='cs', out_stream=None)
+        assert_check_partials(J)
 
     def test_bug_local_method(self):
         # This fixes a bug setting the check method on a component overrode the requested method for
