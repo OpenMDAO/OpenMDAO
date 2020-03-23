@@ -436,6 +436,13 @@ class TestDriver(unittest.TestCase):
         msg = "Discrete design variables are not supported by this driver: p.xI"
         self.assertEqual(str(context.exception), msg)
 
+    def test_driver_recording_options_deprecated(self):
+        prob = om.Problem()
+        msg = "The recording option, record_model_metadata, on Driver is deprecated. " \
+              "Recording of model metadata will always be done"
+        with assert_warning(DeprecationWarning, msg):
+            prob.driver.recording_options['record_model_metadata'] = True
+
     def test_units_basic(self):
         prob = om.Problem()
         model = prob.model
