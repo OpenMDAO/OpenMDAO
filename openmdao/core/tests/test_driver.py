@@ -8,19 +8,20 @@ import unittest
 
 import numpy as np
 
-import openmdao
-from openmdao.api import Problem, IndepVarComp, Group, ExecComp, ScipyOptimizeDriver
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+import openmdao.api as om
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_partials
 from openmdao.utils.general_utils import printoptions
+from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp, NonSquareArrayComp
 
 
+@use_tempdirs
 class TestDriver(unittest.TestCase):
 
     def test_basic_get(self):
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = model = SellarDerivatives()
 
         model.add_design_var('z')
@@ -42,7 +43,7 @@ class TestDriver(unittest.TestCase):
 
     def test_scaled_design_vars(self):
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = model = SellarDerivatives()
 
         model.add_design_var('z', ref=5.0, ref0=3.0)
@@ -65,7 +66,7 @@ class TestDriver(unittest.TestCase):
 
     def test_scaled_constraints(self):
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = model = SellarDerivatives()
 
         model.add_design_var('z')
@@ -82,7 +83,7 @@ class TestDriver(unittest.TestCase):
 
     def test_scaled_objectves(self):
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = model = SellarDerivatives()
 
         model.add_design_var('z')
@@ -99,7 +100,7 @@ class TestDriver(unittest.TestCase):
 
     def test_scaled_derivs(self):
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = model = SellarDerivatives()
 
         model.add_design_var('z')
@@ -112,7 +113,7 @@ class TestDriver(unittest.TestCase):
 
         base = prob.compute_totals(of=['obj', 'con1'], wrt=['z'])
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = model = SellarDerivatives()
 
         model.add_design_var('z', ref=2.0, ref0=0.0)
@@ -130,10 +131,10 @@ class TestDriver(unittest.TestCase):
 
     def test_vector_scaled_derivs(self):
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('px', IndepVarComp(name="x", val=np.ones((2, ))))
+        model.add_subsystem('px', om.IndepVarComp(name="x", val=np.ones((2, ))))
         comp = model.add_subsystem('comp', DoubleArrayComp())
         model.connect('px.x', 'comp.x1')
 
@@ -170,10 +171,10 @@ class TestDriver(unittest.TestCase):
     def test_vector_bounds_inf(self):
 
         # make sure no overflow when there is no specified upper/lower bound and significatn scaling
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('px', IndepVarComp(name="x", val=np.ones((2, ))))
+        model.add_subsystem('px', om.IndepVarComp(name="x", val=np.ones((2, ))))
         comp = model.add_subsystem('comp', DoubleArrayComp())
         model.connect('px.x', 'comp.x1')
 
@@ -194,10 +195,10 @@ class TestDriver(unittest.TestCase):
 
     def test_vector_scaled_derivs_diff_sizes(self):
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('px', IndepVarComp(name="x", val=np.ones((2, ))))
+        model.add_subsystem('px', om.IndepVarComp(name="x", val=np.ones((2, ))))
         comp = model.add_subsystem('comp', NonSquareArrayComp())
         model.connect('px.x', 'comp.x1')
 
@@ -234,7 +235,7 @@ class TestDriver(unittest.TestCase):
 
     def test_debug_print_option(self):
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = model = SellarDerivatives()
 
         model.add_design_var('z')
@@ -279,18 +280,18 @@ class TestDriver(unittest.TestCase):
                          "Option 'debug_print' contains value 'bad_option' which is not one of ['desvars', 'nl_cons', 'ln_cons', 'objs', 'totals'].")
 
     def test_debug_print_desvar_physical_with_indices(self):
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
         size = 3
-        model.add_subsystem('p1', IndepVarComp('x', np.array([50.0] * size)))
-        model.add_subsystem('p2', IndepVarComp('y', np.array([50.0] * size)))
-        model.add_subsystem('comp', ExecComp('f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0',
-                                             x=np.zeros(size), y=np.zeros(size),
-                                             f_xy=np.zeros(size)))
-        model.add_subsystem('con', ExecComp('c = - x + y',
-                                            c=np.zeros(size), x=np.zeros(size),
-                                            y=np.zeros(size)))
+        model.add_subsystem('p1', om.IndepVarComp('x', np.array([50.0] * size)))
+        model.add_subsystem('p2', om.IndepVarComp('y', np.array([50.0] * size)))
+        model.add_subsystem('comp', om.ExecComp('f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0',
+                                                x=np.zeros(size), y=np.zeros(size),
+                                                f_xy=np.zeros(size)))
+        model.add_subsystem('con', om.ExecComp('c = - x + y',
+                                               c=np.zeros(size), x=np.zeros(size),
+                                               y=np.zeros(size)))
 
         model.connect('p1.x', 'comp.x')
         model.connect('p2.y', 'comp.y')
@@ -299,7 +300,7 @@ class TestDriver(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizeDriver()
+        prob.driver = om.ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -331,18 +332,18 @@ class TestDriver(unittest.TestCase):
         self.assertEqual(output[3], "{'p1.x': array([ 50.,  50.,  50.]), 'p2.y': array([ 50.,  50.,  50.])}")
 
     def test_debug_print_response_physical(self):
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
         size = 3
-        model.add_subsystem('p1', IndepVarComp('x', np.array([50.0] * size)))
-        model.add_subsystem('p2', IndepVarComp('y', np.array([50.0] * size)))
-        model.add_subsystem('comp', ExecComp('f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0',
-                                             x=np.zeros(size), y=np.zeros(size),
-                                             f_xy=np.zeros(size)))
-        model.add_subsystem('con', ExecComp('c = - x + y + 1',
-                                            c=np.zeros(size), x=np.zeros(size),
-                                            y=np.zeros(size)))
+        model.add_subsystem('p1', om.IndepVarComp('x', np.array([50.0] * size)))
+        model.add_subsystem('p2', om.IndepVarComp('y', np.array([50.0] * size)))
+        model.add_subsystem('comp', om.ExecComp('f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0',
+                                                x=np.zeros(size), y=np.zeros(size),
+                                                f_xy=np.zeros(size)))
+        model.add_subsystem('con', om.ExecComp('c = - x + y + 1',
+                                               c=np.zeros(size), x=np.zeros(size),
+                                               y=np.zeros(size)))
 
         model.connect('p1.x', 'comp.x')
         model.connect('p2.y', 'comp.y')
@@ -351,7 +352,7 @@ class TestDriver(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizeDriver()
+        prob.driver = om.ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
@@ -386,10 +387,10 @@ class TestDriver(unittest.TestCase):
     def test_debug_desvar_shape(self):
         # Desvar should always be printed un-flattened.
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p', IndepVarComp('x', val=np.array([[1.0, 3, 4], [7, 2, 5]])))
+        model.add_subsystem('p', om.IndepVarComp('x', val=np.array([[1.0, 3, 4], [7, 2, 5]])))
 
         model.add_design_var('p.x', np.array([[1.0, 3, 4], [7, 2, 5]]))
         prob.driver.options['debug_print'] = ['desvars']
@@ -417,15 +418,15 @@ class TestDriver(unittest.TestCase):
         self.assertEqual(output[4], '       [ 7.,  2.,  5.]])}')
 
     def test_unsupported_discrete_desvar(self):
-        prob = Problem()
+        prob = om.Problem()
 
-        indep = IndepVarComp()
+        indep = om.IndepVarComp()
         indep.add_discrete_output('xI', val=0)
         prob.model.add_subsystem('p', indep)
 
         prob.model.add_design_var('p.xI')
 
-        prob.driver = ScipyOptimizeDriver()
+        prob.driver = om.ScipyOptimizeDriver()
 
         prob.setup()
 
@@ -434,6 +435,330 @@ class TestDriver(unittest.TestCase):
 
         msg = "Discrete design variables are not supported by this driver: p.xI"
         self.assertEqual(str(context.exception), msg)
+
+    def test_driver_recording_options_deprecated(self):
+        prob = om.Problem()
+        msg = "The recording option, record_model_metadata, on Driver is deprecated. " \
+              "Recording of model metadata will always be done"
+        with assert_warning(DeprecationWarning, msg):
+            prob.driver.recording_options['record_model_metadata'] = True
+
+    def test_units_basic(self):
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', 35.0, units='degF', lower=32.0, upper=212.0)
+
+        model.add_subsystem('p', ivc, promotes=['x'])
+        model.add_subsystem('comp1', om.ExecComp('y1 = 2.0*x',
+                                                 x={'value': 2.0, 'units': 'degF'},
+                                                 y1={'value': 2.0, 'units': 'degF'}),
+                            promotes=['x', 'y1'])
+
+        model.add_subsystem('comp2', om.ExecComp('y2 = 3.0*x',
+                                                 x={'value': 2.0, 'units': 'degF'},
+                                                 y2={'value': 2.0, 'units': 'degF'}),
+                            promotes=['x', 'y2'])
+
+        model.add_design_var('x', units='degC', lower=0.0, upper=100.0)
+        model.add_constraint('y1', units='degC', lower=0.0, upper=100.0)
+        model.add_objective('y2', units='degC')
+
+        prob.setup()
+
+        prob.run_driver()
+
+        dv = prob.driver.get_design_var_values()
+        assert_near_equal(dv['p.x'][0], 3.0 * 5 / 9, 1e-8)
+
+        obj = prob.driver.get_objective_values(driver_scaling=True)
+        assert_near_equal(obj['comp2.y2'][0], 73.0 * 5 / 9, 1e-8)
+
+        con = prob.driver.get_constraint_values(driver_scaling=True)
+        assert_near_equal(con['comp1.y1'][0], 38.0 * 5 / 9, 1e-8)
+
+        meta = model.get_design_vars()
+        assert_near_equal(meta['p.x']['lower'], 0.0, 1e-7)
+        assert_near_equal(meta['p.x']['upper'], 100.0, 1e-7)
+
+        meta = model.get_constraints()
+        assert_near_equal(meta['comp1.y1']['lower'], 0.0, 1e-7)
+        assert_near_equal(meta['comp1.y1']['upper'], 100.0, 1e-7)
+
+        stdout = sys.stdout
+        strout = StringIO()
+        sys.stdout = strout
+        try:
+            prob.list_problem_vars(desvar_opts=['units'], objs_opts=['units'], cons_opts=['units'])
+        finally:
+            sys.stdout = stdout
+        output = strout.getvalue().split('\n')
+
+        self.assertTrue('1.666' in output[5])
+        self.assertTrue('21.111' in output[12])
+        self.assertTrue('40.555' in output[19])
+        self.assertTrue('degC' in output[5])
+        self.assertTrue('degC' in output[12])
+        self.assertTrue('degC' in output[19])
+
+    def test_units_equal(self):
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', 35.0, units='degF', lower=32.0, upper=212.0)
+
+        model.add_subsystem('p', ivc, promotes=['x'])
+        model.add_subsystem('comp1', om.ExecComp('y1 = 2.0*x',
+                                                 x={'value': 2.0, 'units': 'degF'},
+                                                 y1={'value': 2.0, 'units': 'degF'}),
+                            promotes=['x', 'y1'])
+
+        model.add_subsystem('comp2', om.ExecComp('y2 = 3.0*x',
+                                                 x={'value': 2.0, 'units': 'degF'},
+                                                 y2={'value': 2.0, 'units': 'degF'}),
+                            promotes=['x', 'y2'])
+
+        model.add_design_var('x', units='degF', lower=32.0, upper=212.0)
+        model.add_constraint('y1', units='degF', lower=32.0, upper=212.0)
+        model.add_objective('y2', units='degF')
+
+        prob.setup()
+
+        prob.run_driver()
+
+        dv = prob.driver.get_design_var_values()
+        assert_near_equal(dv['p.x'][0], 35.0, 1e-8)
+
+        obj = prob.driver.get_objective_values(driver_scaling=True)
+        assert_near_equal(obj['comp2.y2'][0], 105.0, 1e-8)
+
+        con = prob.driver.get_constraint_values(driver_scaling=True)
+        assert_near_equal(con['comp1.y1'][0], 70.0, 1e-8)
+
+        meta = model.get_design_vars()
+        self.assertEqual(meta['p.x']['scaler'], None)
+        self.assertEqual(meta['p.x']['adder'], None)
+
+        meta = model.get_constraints()
+        self.assertEqual(meta['comp1.y1']['scaler'], None)
+        self.assertEqual(meta['comp1.y1']['adder'], None)
+
+    def test_units_with_scaling(self):
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', 35.0, units='degF', lower=32.0, upper=212.0)
+
+        model.add_subsystem('p', ivc, promotes=['x'])
+        model.add_subsystem('comp1', om.ExecComp('y1 = 2.0*x',
+                                                 x={'value': 2.0, 'units': 'degF'},
+                                                 y1={'value': 2.0, 'units': 'degF'}),
+                            promotes=['x', 'y1'])
+
+        model.add_subsystem('comp2', om.ExecComp('y2 = 3.0*x',
+                                                 x={'value': 2.0, 'units': 'degF'},
+                                                 y2={'value': 2.0, 'units': 'degF'}),
+                            promotes=['x', 'y2'])
+
+        model.add_design_var('x', units='degC', lower=0.0, upper=100.0, scaler=3.5, adder=77.0)
+        model.add_constraint('y1', units='degC', lower=0.0, upper=100.0, scaler=3.5, adder=77.0)
+        model.add_objective('y2', units='degC', scaler=3.5, adder=77.0)
+
+        recorder = om.SqliteRecorder('cases.sql')
+        prob.driver.add_recorder(recorder)
+
+        prob.driver.recording_options['record_objectives'] = True
+        prob.driver.recording_options['record_constraints'] = True
+        prob.driver.recording_options['record_desvars'] = True
+
+        prob.setup()
+
+        prob.run_driver()
+
+        dv = prob.driver.get_design_var_values()
+        assert_near_equal(dv['p.x'][0], ((3.0 * 5 / 9) + 77.0) * 3.5, 1e-8)
+
+        obj = prob.driver.get_objective_values(driver_scaling=True)
+        assert_near_equal(obj['comp2.y2'][0], ((73.0 * 5 / 9) + 77.0) * 3.5, 1e-8)
+
+        con = prob.driver.get_constraint_values(driver_scaling=True)
+        assert_near_equal(con['comp1.y1'][0], ((38.0 * 5 / 9) + 77.0) * 3.5, 1e-8)
+
+        meta = model.get_design_vars()
+        assert_near_equal(meta['p.x']['lower'], ((0.0) + 77.0) * 3.5, 1e-7)
+        assert_near_equal(meta['p.x']['upper'], ((100.0) + 77.0) * 3.5, 1e-7)
+
+        meta = model.get_constraints()
+        assert_near_equal(meta['comp1.y1']['lower'], ((0.0) + 77.0) * 3.5, 1e-7)
+        assert_near_equal(meta['comp1.y1']['upper'], ((100.0) + 77.0) * 3.5, 1e-7)
+
+        stdout = sys.stdout
+        strout = StringIO()
+        sys.stdout = strout
+        try:
+            prob.list_problem_vars(desvar_opts=['units'], objs_opts=['units'], cons_opts=['units'])
+        finally:
+            sys.stdout = stdout
+        output = strout.getvalue().split('\n')
+
+        self.assertTrue('275.33' in output[5])
+        self.assertTrue('343.3888' in output[12])
+        self.assertTrue('411.444' in output[19])
+        self.assertTrue('degC' in output[5])
+        self.assertTrue('degC' in output[12])
+        self.assertTrue('degC' in output[19])
+
+        totals = prob.check_totals(out_stream=None, driver_scaling=True)
+
+        for key, val in totals.items():
+            assert_near_equal(val['rel error'][0], 0.0, 1e-6)
+
+        cr = om.CaseReader("cases.sql")
+        cases = cr.list_cases('driver')
+        case = cr.get_case(cases[0])
+
+        dv = case.get_design_vars()
+        assert_near_equal(dv['p.x'][0], ((3.0 * 5 / 9) + 77.0) * 3.5, 1e-8)
+
+        obj = case.get_objectives()
+        assert_near_equal(obj['comp2.y2'][0], ((73.0 * 5 / 9) + 77.0) * 3.5, 1e-8)
+
+        con = case.get_constraints()
+        assert_near_equal(con['comp1.y1'][0], ((38.0 * 5 / 9) + 77.0) * 3.5, 1e-8)
+
+    def test_units_error_messages(self):
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', 35.0, units='degF', lower=32.0, upper=212.0)
+
+        model.add_subsystem('p', ivc, promotes=['x'])
+        model.add_subsystem('comp1', om.ExecComp('y1 = 2.0*x',
+                                                 x={'value': 2.0, 'units': 'degF'},
+                                                 y1={'value': 2.0, 'units': 'degF'}),
+                            promotes=['x', 'y1'])
+
+        model.add_design_var('x', units='ft', lower=0.0, upper=100.0, scaler=3.5, adder=77.0)
+        prob.setup()
+
+        with self.assertRaises(RuntimeError) as context:
+            prob.final_setup()
+
+        msg = "Group (<model>): Target for design variable x has 'degF' units, but 'ft' units were specified."
+        self.assertEqual(str(context.exception), msg)
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', 35.0, units='degF', lower=32.0, upper=212.0)
+
+        model.add_subsystem('p', ivc, promotes=['x'])
+        model.add_subsystem('comp1', om.ExecComp('y1 = 2.0*x',
+                                                 x={'value': 2.0, 'units': 'degF'},
+                                                 y1={'value': 2.0, 'units': 'degF'}),
+                            promotes=['x', 'y1'])
+
+        model.add_constraint('x', units='ft', lower=0.0, upper=100.0)
+        prob.setup()
+
+        with self.assertRaises(RuntimeError) as context:
+            prob.final_setup()
+
+        msg = "Group (<model>): Target for constraint x has 'degF' units, but 'ft' units were specified."
+        self.assertEqual(str(context.exception), msg)
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', 35.0, units=None, lower=32.0, upper=212.0)
+
+        model.add_subsystem('p', ivc, promotes=['x'])
+        model.add_subsystem('comp1', om.ExecComp('y1 = 2.0*x',
+                                                 x={'value': 2.0},
+                                                 y1={'value': 2.0, 'units': 'degF'}),
+                            promotes=['x', 'y1'])
+
+        model.add_design_var('x', units='ft', lower=0.0, upper=100.0, scaler=3.5, adder=77.0)
+        prob.setup()
+
+        with self.assertRaises(RuntimeError) as context:
+            prob.final_setup()
+
+        msg = "Group (<model>): Target for design variable x has no units, but 'ft' units were specified."
+        self.assertEqual(str(context.exception), msg)
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', 35.0, units=None, lower=32.0, upper=212.0)
+
+        model.add_subsystem('p', ivc, promotes=['x'])
+        model.add_subsystem('comp1', om.ExecComp('y1 = 2.0*x',
+                                                 x={'value': 2.0},
+                                                 y1={'value': 2.0, 'units': 'degF'}),
+                            promotes=['x', 'y1'])
+
+        model.add_constraint('x', units='ft', lower=0.0, upper=100.0)
+        prob.setup()
+
+        with self.assertRaises(RuntimeError) as context:
+            prob.final_setup()
+
+        msg = "Group (<model>): Target for constraint x has no units, but 'ft' units were specified."
+        self.assertEqual(str(context.exception), msg)
+
+
+class TestDriverFeature(unittest.TestCase):
+
+    def test_specify_units(self):
+        import openmdao.api as om
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', 35.0, units='degF', lower=32.0, upper=212.0)
+
+        model.add_subsystem('p', ivc, promotes=['x'])
+        model.add_subsystem('comp1', om.ExecComp('y1 = 2.0*x',
+                                                 x={'value': 2.0, 'units': 'degF'},
+                                                 y1={'value': 2.0, 'units': 'degF'}),
+                            promotes=['x', 'y1'])
+
+        model.add_subsystem('comp2', om.ExecComp('y2 = 3.0*x',
+                                                 x={'value': 2.0, 'units': 'degF'},
+                                                 y2={'value': 2.0, 'units': 'degF'}),
+                            promotes=['x', 'y2'])
+
+        model.add_design_var('x', units='degC', lower=0.0, upper=100.0)
+        model.add_constraint('y1', units='degC', lower=0.0, upper=100.0)
+        model.add_objective('y2', units='degC')
+
+        prob.setup()
+        prob.run_driver()
+
+        print('Model variables')
+        assert_near_equal(prob['p.x'][0], 35.0, 1e-8)
+        assert_near_equal(prob['comp2.y2'][0], 105.0, 1e-8)
+        assert_near_equal(prob['comp1.y1'][0], 70.0, 1e-8)
+
+        print('')
+        print('Driver variables')
+        dv = prob.driver.get_design_var_values()
+        assert_near_equal(dv['p.x'][0], 3.0 * 5 / 9, 1e-8)
+
+        obj = prob.driver.get_objective_values(driver_scaling=True)
+        assert_near_equal(obj['comp2.y2'][0], 73.0 * 5 / 9, 1e-8)
+
+        con = prob.driver.get_constraint_values(driver_scaling=True)
+        assert_near_equal(con['comp1.y1'][0], 38.0 * 5 / 9, 1e-8)
 
 
 if __name__ == "__main__":

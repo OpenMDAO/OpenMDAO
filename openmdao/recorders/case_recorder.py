@@ -86,11 +86,9 @@ class CaseRecorder(object):
         recording_requester : object
             The object that would like to record its metadata.
         """
-        record_metadata = recording_requester.recording_options['record_metadata']
-
-        if isinstance(recording_requester, System) and record_metadata:
+        if isinstance(recording_requester, System):
             self.record_metadata_system(recording_requester)
-        elif isinstance(recording_requester, Solver) and record_metadata:
+        elif isinstance(recording_requester, Solver):
             self.record_metadata_solver(recording_requester)
 
     def _get_metadata_system(self, recording_requester):

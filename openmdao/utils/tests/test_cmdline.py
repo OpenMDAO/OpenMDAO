@@ -30,6 +30,7 @@ cmd_tests = [
     'openmdao list_installed component command nl_solver lin_solver driver',
     'openmdao list_installed component -d',
     'openmdao n2 --no_browser {}'.format(os.path.join(scriptdir, 'circle_opt.py')),
+    'openmdao n2 --no_browser {}'.format(os.path.join(scriptdir, 'bad_connection.py')),
     'openmdao n2 --no_browser {} -- -f bar'.format(os.path.join(scriptdir, 'circle_coloring_needs_args.py')),
     'openmdao partial_coloring {}'.format(os.path.join(scriptdir, 'circle_coloring_dynpartials.py')),
     'openmdao scaffold -b ExplicitComponent -c Foo',
