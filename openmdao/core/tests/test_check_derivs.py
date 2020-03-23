@@ -1431,6 +1431,54 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         assert_check_partials(data, atol=1.0E-8, rtol=1.0E-8)
 
+    def test_directional_matrix_free(self):
+
+        class TestDirectional(om.ExplicitComponent):
+            def initialize(self):
+                self.options.declare('n',default=1, desc='vector size')
+
+                self.n_compute = 0
+                self.n_fwd = 0
+                self.n_rev = 0
+
+            def setup(self):
+                self.add_input('in',shape=self.options['n'])
+                self.add_output('out',shape=self.options['n'])
+
+                self.set_check_partial_options(wrt='*', directional=True, method='cs')
+
+            def compute(self,inputs,outputs):
+                self.n_compute += 1
+                print("compute inputs:", inputs['in'])
+
+                outputs['out'] = 2.0 * inputs['in']
+
+            def compute_jacvec_product(self,inputs,d_inputs,d_outputs, mode):
+                if mode == 'fwd':
+                    if 'out' in d_outputs:
+                        if 'in' in d_inputs:
+                            print("fwd mode d_inputs:", d_inputs['in'])
+                            d_outputs['out'] = 2.0 * d_inputs['in']
+                            self.n_fwd += 1
+
+                if mode == 'rev':
+                    if 'out' in d_outputs:
+                        if 'in' in d_inputs:
+                            d_inputs['in'] = 2.0 * d_outputs['out']
+                            self.n_rev += 1
+
+        prob = om.Problem()
+        model = prob.model
+
+        comp = TestDirectional(n=2)
+        model.add_subsystem('comp', comp)
+
+        prob.setup(force_alloc_complex=True)
+        prob.run_model()
+        J = prob.check_partials(method='cs', out_stream=None)
+        self.assertEqual(comp.n_fwd, 1)
+        self.assertEqual(comp.n_rev, 1)
+
     def test_bug_local_method(self):
         # This fixes a bug setting the check method on a component overrode the requested method for
         # subsequent components.

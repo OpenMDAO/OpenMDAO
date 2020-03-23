@@ -959,6 +959,8 @@ class Problem(object):
                     # product.
                     if matrix_free:
 
+                        local_opts = comp._get_check_partial_options()
+
                         dstate = comp._vectors['output']['linear']
                         if mode == 'fwd':
                             dinputs = comp._vectors['input']['linear']
@@ -973,6 +975,8 @@ class Problem(object):
 
                         for inp in in_list:
                             inp_abs = rel_name2abs_name(comp, inp)
+                            directional = inp in local_opts and \
+                                local_opts[inp]['directional'] is True
 
                             try:
                                 flat_view = dinputs._views_flat[inp_abs]
@@ -980,7 +984,11 @@ class Problem(object):
                                 # Implicit state
                                 flat_view = dstate._views_flat[inp_abs]
 
-                            n_in = len(flat_view)
+                            if directional:
+                                n_in = 1
+                            else:
+                                n_in = len(flat_view)
+
                             for idx in range(n_in):
 
                                 dinputs.set_const(0.0)
@@ -988,7 +996,10 @@ class Problem(object):
 
                                 # Dictionary access returns a scalar for 1d input, and we
                                 # need a vector for clean code, so use _views_flat.
-                                flat_view[idx] = 1.0
+                                if directional:
+                                    flat_view[:] = 1.0
+                                else:
+                                    flat_view[idx] = 1.0
 
                                 # Matrix Vector Product
                                 comp._apply_linear(None, ['linear'], _contains_all, mode)
