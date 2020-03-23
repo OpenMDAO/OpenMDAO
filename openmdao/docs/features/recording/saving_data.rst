@@ -75,7 +75,7 @@ System Recording Options
 System Recording Example
 ^^^^^^^^^^^^^^^^^^^^^^^^
 .. embed-code::
-    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_system_options
+    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_system_recording_options
     :layout: interleave
 
 Solver Recording Options

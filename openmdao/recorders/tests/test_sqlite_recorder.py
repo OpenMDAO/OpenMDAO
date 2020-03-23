@@ -474,7 +474,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.cleanup()
 
         cr = om.CaseReader("cases.sql")
-        self.assertEqual(len(cr.system_metadata.keys()), 0)
+        self.assertEqual(len(cr.system_options.keys()), 0)
 
     def test_system_record_model_metadata(self):
         # first check to see if recorded recursively, which is the default
@@ -491,9 +491,9 @@ class TestSqliteRecorder(unittest.TestCase):
         cr = om.CaseReader("cases.sql")
         # Quick check to see that keys and values were recorded
         for key in ['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']:
-            self.assertTrue(key in cr.system_metadata.keys())
+            self.assertTrue(key in cr.system_options.keys())
 
-        value = cr.system_metadata['root']['component_options']['assembled_jac_type']
+        value = cr.system_options['root']['component_options']['assembled_jac_type']
         self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
 
         # second check to see if not recorded recursively, when option set to False
@@ -509,8 +509,8 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.cleanup()
 
         cr = om.CaseReader("cases.sql")
-        self.assertEqual(list(cr.system_metadata.keys()), ['root'])
-        self.assertEqual(cr.system_metadata['root']['component_options']['assembled_jac_type'],
+        self.assertEqual(list(cr.system_options.keys()), ['root'])
+        self.assertEqual(cr.system_options['root']['component_options']['assembled_jac_type'],
                          'csc')
 
     def test_driver_record_model_metadata(self):
@@ -527,9 +527,9 @@ class TestSqliteRecorder(unittest.TestCase):
         cr = om.CaseReader("cases.sql")
         # Quick check to see that keys and values were recorded
         for key in ['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']:
-            self.assertTrue(key in cr.system_metadata.keys())
+            self.assertTrue(key in cr.system_options.keys())
 
-        value = cr.system_metadata['root']['component_options']['assembled_jac_type']
+        value = cr.system_options['root']['component_options']['assembled_jac_type']
         self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
 
         prob = om.Problem(model=SellarDerivatives())
@@ -544,7 +544,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.cleanup()
 
         cr = om.CaseReader("cases.sql")
-        self.assertEqual(len(cr.system_metadata.keys()), 0)
+        self.assertEqual(len(cr.system_options.keys()), 0)
 
     def test_without_n2_data(self):
         prob = SellarProblem()
@@ -2001,7 +2001,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         self.assertEqual(metadata['d1.NonlinearBlockGS']['solver_options']['maxiter'], 5)
         self.assertEqual(metadata['root.NonlinearBlockGS']['solver_options']['maxiter'], 10)
 
-    def test_feature_system_metadata(self):
+    def test_feature_recording_system_options(self):
         import openmdao.api as om
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
@@ -2027,7 +2027,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         cr = om.CaseReader("cases.sql")
 
         # metadata for all the systems in the model
-        metadata = cr.system_metadata
+        metadata = cr.system_options
 
         self.assertEqual(sorted(metadata.keys()),
                          sorted(['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']))
@@ -2036,7 +2036,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         self.assertEqual(metadata['d1']['component_options']['distributed'], False)
         self.assertEqual(metadata['d1']['component_options']['options value 1'], 1)
 
-    def test_feature_system_options(self):
+    def test_feature_system_recording_options(self):
         import openmdao.api as om
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
