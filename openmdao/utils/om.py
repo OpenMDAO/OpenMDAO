@@ -82,12 +82,16 @@ def _n2_cmd(options, user_args):
 
     if filename.endswith('.py'):
         # the file is a python script, run as a post_setup hook
+        def _noraise(prob):
+            prob.model._raise_connection_errors = False
+
         def _viewmod(prob):
             n2(prob, outfile=options.outfile, show_browser=not options.no_browser,
                title=options.title, embeddable=options.embeddable,
                use_declare_partial_info=options.use_declare_partial_info)
             exit()  # could make this command line selectable later
 
+        hooks._register_hook('setup', 'Problem', pre=_noraise)
         hooks._register_hook('final_setup', 'Problem', post=_viewmod)
 
         _load_and_exec(options.file[0], user_args)

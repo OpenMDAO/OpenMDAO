@@ -112,7 +112,6 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.recording_options['record_inputs'] = True
         prob.model.recording_options['record_outputs'] = True
         prob.model.recording_options['record_residuals'] = True
-        bal.recording_options['record_metadata'] = False
 
         prob.setup()
 
@@ -133,7 +132,6 @@ class TestBalanceComp(unittest.TestCase):
 
         prob.model.add_recorder(recorder)
 
-        bal.recording_options['record_metadata'] = True
         bal.recording_options['options_excludes'] = ['guess_func']
 
         prob.setup()

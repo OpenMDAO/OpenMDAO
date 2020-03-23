@@ -79,6 +79,8 @@ class Group(System):
         Flag to check if setup_procs is complete
     _has_distrib_vars : bool
         If True, this Group contains distributed variables.
+    _raise_connection_errors : bool
+        Flag indicating whether connection errors are raised as an Exception.
     """
 
     def __init__(self, **kwargs):
@@ -107,6 +109,7 @@ class Group(System):
         self._approx_subjac_keys = None
         self._setup_procs_finished = False
         self._has_distrib_vars = False
+        self._raise_connection_errors = True
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -826,6 +829,9 @@ class Group(System):
         conns : dict
             Dictionary of connections passed down from parent group.
         """
+        if self._raise_connection_errors is False:
+            self._set_subsys_connection_errors(False)
+
         global_abs_in2out = self._conn_global_abs_in2out = {}
 
         allprocs_prom2abs_list_in = self._var_allprocs_prom2abs_list['input']
@@ -877,27 +883,43 @@ class Group(System):
                     prom_out not in self._var_allprocs_discrete['output']):
                 if (prom_out in allprocs_prom2abs_list_in or
                         prom_out in self._var_allprocs_discrete['input']):
-                    raise NameError(
-                        "%s: Attempted to connect from '%s' to '%s', but '%s' is an input. "
-                        "All connections must be from an output to an input." %
-                        (self.msginfo, prom_out, prom_in, prom_out))
+                    msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
+                          f"'{prom_in}', but '{prom_out}' is an input. " + \
+                          "All connections must be from an output to an input."
+                    if self._raise_connection_errors:
+                        raise NameError(msg)
+                    else:
+                        simple_warning(msg)
+                        continue
                 else:
-                    raise NameError(
-                        "%s: Attempted to connect from '%s' to '%s', but '%s' doesn't exist." %
-                        (self.msginfo, prom_out, prom_in, prom_out))
+                    msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
+                          f"'{prom_in}', but '{prom_out}' doesn't exist."
+                    if self._raise_connection_errors:
+                        raise NameError(msg)
+                    else:
+                        simple_warning(msg)
+                        continue
 
             if (prom_in not in allprocs_prom2abs_list_in and
                     prom_in not in self._var_allprocs_discrete['input']):
                 if (prom_in in allprocs_prom2abs_list_out or
                         prom_in in self._var_allprocs_discrete['output']):
-                    raise NameError(
-                        "%s: Attempted to connect from '%s' to '%s', but '%s' is an output. "
-                        "All connections must be from an output to an input." %
-                        (self.msginfo, prom_out, prom_in, prom_in))
+                    msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
+                          f"'{prom_in}', but '{prom_in}' is an output. " + \
+                          "All connections must be from an output to an input."
+                    if self._raise_connection_errors:
+                        raise NameError(msg)
+                    else:
+                        simple_warning(msg)
+                        continue
                 else:
-                    raise NameError(
-                        "%s: Attempted to connect from '%s' to '%s', but '%s' doesn't exist." %
-                        (self.msginfo, prom_out, prom_in, prom_in))
+                    msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
+                          f"'{prom_in}', but '{prom_in}' doesn't exist."
+                    if self._raise_connection_errors:
+                        raise NameError(msg)
+                    else:
+                        simple_warning(msg)
+                        continue
 
             # Throw an exception if output and input are in the same system
             # (not traceable to a connect statement, so provide context)
@@ -910,26 +932,36 @@ class Group(System):
                 inparts = abs_in.split('.')
                 in_subsys = inparts[:-1]
                 if out_subsys == in_subsys:
-                    raise RuntimeError("{}: Output and input are in the same System "
-                                       "for connection from '{}' to '{}'.".format(self.msginfo,
-                                                                                  prom_out,
-                                                                                  prom_in))
+                    msg = f"{self.msginfo}: Output and input are in the same System for " + \
+                          f"connection from '{prom_out}' to '{prom_in}'."
+                    if self._raise_connection_errors:
+                        raise RuntimeError(msg)
+                    else:
+                        simple_warning(msg)
+                        continue
 
                 if src_indices is not None and abs_in in abs2meta:
                     meta = abs2meta[abs_in]
                     if meta['src_indices'] is not None:
-                        raise RuntimeError("{}: src_indices has been defined "
-                                           "in both connect('{}', '{}') "
-                                           "and add_input('{}', ...).".format(self.msginfo,
-                                                                              prom_out, prom_in,
-                                                                              prom_in))
+                        msg = f"{self.msginfo}: src_indices has been defined in both " + \
+                              f"connect('{prom_out}', '{prom_in}') and " + \
+                              f"add_input('{prom_in}', ...)."
+                        if self._raise_connection_errors:
+                            raise RuntimeError(msg)
+                        else:
+                            simple_warning(msg)
+                            continue
                     meta['src_indices'] = np.atleast_1d(src_indices)
                     meta['flat_src_indices'] = flat_src_indices
 
                 if abs_in in abs_in2out:
-                    raise RuntimeError("%s: Input '%s' cannot be connected to '%s' because it's "
-                                       "already connected to '%s'" % (self.msginfo, abs_in,
-                                                                      abs_out, abs_in2out[abs_in]))
+                    msg = f"{self.msginfo}: Input '{abs_in}' cannot be connected to " + \
+                          f"'{abs_out}' because it's already connected to '{abs_in2out[abs_in]}'"
+                    if self._raise_connection_errors:
+                        raise RuntimeError(msg)
+                    else:
+                        simple_warning(msg)
+                        continue
 
                 abs_in2out[abs_in] = abs_out
 
@@ -969,9 +1001,13 @@ class Group(System):
                         dup_info[tgt].add(src)
             dup_info = [(n, srcs) for n, srcs in dup_info.items() if len(srcs) > 1]
             if dup_info:
-                msg = ["%s from %s" % (tgt, sorted(srcs)) for tgt, srcs in dup_info]
-                raise RuntimeError("%s: The following inputs have multiple connections: %s" %
-                                   (self.msginfo, ", ".join(msg)))
+                dup = ["%s from %s" % (tgt, sorted(srcs)) for tgt, srcs in dup_info]
+                msg = f"{self.msginfo}: The following inputs have multiple connections: " + \
+                      f"{', '.join(dup)}"
+                if self._raise_connection_errors:
+                    raise RuntimeError(msg)
+                else:
+                    simple_warning(msg)
 
         # If running in parallel, allgather
         if self.comm.size > 1:
@@ -1040,8 +1076,12 @@ class Group(System):
                     if abs_in in allprocs_discrete_in:
                         self._conn_discrete_in2out[abs_in] = abs_out
                     elif abs_out in allprocs_discrete_out:
-                        raise RuntimeError("%s: Can't connect discrete output '%s' to continuous "
-                                           "input '%s'." % (self.msginfo, abs_out, abs_in))
+                        msg = f"{self.msginfo}: Can't connect discrete output '{abs_out}' " + \
+                              f"to continuous input '{abs_in}'."
+                        if self._raise_connection_errors:
+                            raise RuntimeError(msg)
+                        else:
+                            simple_warning(msg)
                     else:
                         abs_in2out[abs_in] = abs_out
 
@@ -1097,13 +1137,19 @@ class Group(System):
             try:
                 out_type = self._var_allprocs_discrete['output'][abs_out]['type']
             except KeyError:
-                raise RuntimeError("%s: Can't connect continuous output '%s' to discrete "
-                                   "input '%s'." % (self.msginfo, abs_out, abs_in))
+                msg = f"{self.msginfo}: Can't connect continuous output '{abs_out}' " + \
+                      f"to discrete input '{abs_in}'."
+                if self._raise_connection_errors:
+                    raise RuntimeError(msg)
+                else:
+                    simple_warning(msg)
             if not issubclass(in_type, out_type):
-                raise RuntimeError("%s: Type '%s' of output '%s' is"
-                                   " incompatible with type '%s' of input '%s'." %
-                                   (self.msginfo, out_type.__name__, abs_out,
-                                    in_type.__name__, abs_in))
+                msg = f"{self.msginfo}: Type '{out_type.__name__}' of output '{abs_out}' is " + \
+                      f"incompatible with type '{in_type.__name__}' of input '{abs_in}'."
+                if self._raise_connection_errors:
+                    raise RuntimeError(msg)
+                else:
+                    simple_warning(msg)
 
         # check unit/shape compatibility, but only for connections that are
         # either owned by (implicit) or declared by (explicit) this Group.
@@ -1117,18 +1163,20 @@ class Group(System):
 
             if out_units:
                 if not in_units:
-                    simple_warning("%s: Output '%s' with units of '%s' is "
-                                   "connected to input '%s' which has no"
-                                   " units." % (self.msginfo, abs_out, out_units, abs_in))
+                    msg = f"{self.msginfo}: Output '{abs_out}' with units of '{out_units}' " + \
+                          f"is connected to input '{abs_in}' which has no units."
+                    simple_warning(msg)
                 elif not is_compatible(in_units, out_units):
-                    raise RuntimeError("%s: Output units of '%s' for '%s' are"
-                                       " incompatible with input units of "
-                                       "'%s' for '%s'." %
-                                       (self.msginfo, out_units, abs_out, in_units, abs_in))
+                    msg = f"{self.msginfo}: Output units of '{out_units}' for '{abs_out}' " + \
+                          f"are incompatible with input units of '{in_units}' for '{abs_in}'."
+                    if self._raise_connection_errors:
+                        raise RuntimeError(msg)
+                    else:
+                        simple_warning(msg)
             elif in_units is not None:
-                simple_warning("%s: Input '%s' with units of '%s' is "
-                               "connected to output '%s' which has "
-                               "no units." % (self.msginfo, abs_in, in_units, abs_out))
+                msg = f"{self.msginfo}: Input '{abs_in}' with units of '{in_units}' is " + \
+                      f"connected to output '{abs_out}' which has no units."
+                simple_warning(msg)
 
             # check shape compatibility
             if abs_in in abs2meta and abs_out in abs2meta:
@@ -1145,13 +1193,14 @@ class Group(System):
                     # out_shape != in_shape is allowed if
                     # there's no ambiguity in storage order
                     if not array_connection_compatible(in_shape, out_shape):
-                        msg = ("%s: The source and target shapes do not match or are ambiguous"
-                               " for the connection '%s' to '%s'. "
-                               "The source shape is %s but the target shape is %s.")
-                        raise ValueError(msg % (self.msginfo, abs_out, abs_in,
-                                                tuple([int(s) for s in out_shape]),
-                                                tuple([int(s) for s in in_shape]),
-                                                ))
+                        msg = f"{self.msginfo}: The source and target shapes do not match or " + \
+                              f"are ambiguous for the connection '{abs_out}' to '{abs_in}'. " + \
+                              f"The source shape is {tuple([int(s) for s in out_shape])} " + \
+                              f"but the target shape is {tuple([int(s) for s in in_shape])}."
+                        if self._raise_connection_errors:
+                            raise ValueError(msg)
+                        else:
+                            simple_warning(msg)
 
                 if src_indices is not None:
                     src_indices = np.atleast_1d(src_indices)
@@ -1159,27 +1208,32 @@ class Group(System):
                     # initial dimensions of indices shape must be same shape as target
                     for idx_d, inp_d in zip(src_indices.shape, in_shape):
                         if idx_d != inp_d:
-                            msg = ("%s: The source indices %s do not specify a "
-                                   "valid shape for the connection '%s' to "
-                                   "'%s'. The target shape is "
-                                   "%s but indices are %s.")
-                            raise ValueError(msg % (self.msginfo,
-                                                    str(src_indices).replace('\n', ''),
-                                                    abs_out, abs_in,
-                                                    in_shape, src_indices.shape))
+                            msg = f"{self.msginfo}: The source indices " + \
+                                  f"{src_indices} do not specify a " + \
+                                  f"valid shape for the connection '{abs_out}' to " + \
+                                  f"'{abs_in}'. The target shape is " + \
+                                  f"{in_shape} but indices are {src_indices.shape}."
+                            if self._raise_connection_errors:
+                                raise ValueError(msg)
+                            else:
+                                simple_warning(msg)
+                                continue
 
                     # any remaining dimension of indices must match shape of source
                     if len(src_indices.shape) > len(in_shape):
                         source_dimensions = src_indices.shape[len(in_shape)]
                         if source_dimensions != len(out_shape):
-                            msg = ("%s: The source indices %s do not specify a "
-                                   "valid shape for the connection '%s' to "
-                                   "'%s'. The source has %d "
-                                   "dimensions but the indices expect %d.")
-                            raise ValueError(msg % (self.msginfo,
-                                                    str(src_indices).replace('\n', ''),
-                                                    abs_out, abs_in,
-                                                    len(out_shape), source_dimensions))
+                            str_indices = str(src_indices).replace('\n', '')
+                            msg = f"{self.msginfo}: The source indices " + \
+                                  f"{str_indices} do not specify a " + \
+                                  f"valid shape for the connection '{abs_out}' to '{abs_in}'. " + \
+                                  f"The source has {len(out_shape)} dimensions but the " + \
+                                  f"indices expect {source_dimensions}."
+                            if self._raise_connection_errors:
+                                raise ValueError(msg)
+                            else:
+                                simple_warning(msg)
+                                continue
                     else:
                         source_dimensions = 1
 
@@ -1195,13 +1249,14 @@ class Group(System):
                         else:
                             bad_idx = None
                         if bad_idx is not None:
-                            msg = ("%s: The source indices do not specify "
-                                   "a valid index for the connection "
-                                   "'%s' to '%s'. Index "
-                                   "'%d' is out of range for a flat source "
-                                   "of size %d.")
-                            raise ValueError(msg % (self.msginfo, abs_out, abs_in, bad_idx,
-                                                    out_size))
+                            msg = f"{self.msginfo}: The source indices do not specify " + \
+                                  f"a valid index for the connection '{abs_out}' to " + \
+                                  f"'{abs_in}'. Index '{bad_idx}' is out of range for " + \
+                                  f"a flat source of size {out_size}."
+                            if self._raise_connection_errors:
+                                raise ValueError(msg)
+                            else:
+                                simple_warning(msg)
                         if src_indices.ndim > 1:
                             abs2meta[abs_in]['src_indices'] = \
                                 abs2meta[abs_in]['src_indices'].flatten()
@@ -1214,13 +1269,30 @@ class Group(System):
                                 if np.any(arr >= d_size) or np.any(arr <= -d_size):
                                     for i in arr.flat:
                                         if abs(i) >= d_size:
-                                            msg = ("%s: The source indices do not specify "
-                                                   "a valid index for the connection "
-                                                   "'%s' to '%s'. Index "
-                                                   "'%d' is out of range for source "
-                                                   "dimension of size %d.")
-                                            raise ValueError(msg % (self.msginfo, abs_out, abs_in,
-                                                                    i, d_size))
+                                            msg = f"{self.msginfo}: The source indices " + \
+                                                  f"do not specify a valid index for the " + \
+                                                  f"connection '{abs_out}' to '{abs_in}'. " + \
+                                                  f"Index '{i}' is out of range for source " + \
+                                                  f"dimension of size {d_size}."
+                                            if self._raise_connection_errors:
+                                                raise ValueError(msg)
+                                            else:
+                                                simple_warning(msg)
+
+    def _set_subsys_connection_errors(self, val=True):
+        """
+        Set flag in all subgroups indicating whether connection errors just issue a Warning.
+
+        Parameters
+        ----------
+        val : bool
+            If True, connection errors will raise an Exception. If False, connection errors
+            will issue a warning and the offending connection will be ignored.
+        """
+        for sub in self._subsystems_allprocs:
+            if isinstance(sub, Group):
+                sub._raise_connection_errors = val
+                sub._set_subsys_connection_errors(val)
 
     def _transfer(self, vec_name, mode, isub=None):
         """

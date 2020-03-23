@@ -87,8 +87,6 @@ class ExperimentalDriver(object):
         self.recording_options = OptionsDictionary()
 
         ###########################
-        self.recording_options.declare('record_metadata', types=bool, desc='Record metadata',
-                                       default=True)
         self.recording_options.declare('record_desvars', types=bool, default=True,
                                        desc='Set to True to record design variables at the \
                                        driver level')

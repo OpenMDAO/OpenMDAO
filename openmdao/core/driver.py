@@ -121,7 +121,13 @@ class Driver(object):
         self.recording_options = OptionsDictionary(parent_name=type(self).__name__)
 
         self.recording_options.declare('record_model_metadata', types=bool, default=True,
-                                       desc='Record metadata for all Systems in the model')
+                                       desc='Deprecated. Recording of model metadata will always '
+                                       'be done',
+                                       deprecation="The recording option, record_model_metadata, "
+                                       "on Driver is "
+                                       "deprecated. Recording of model metadata will always "
+                                       "be done",
+                                       )
         self.recording_options.declare('record_desvars', types=bool, default=True,
                                        desc='Set to True to record design variables at the '
                                             'driver level')
@@ -135,8 +141,8 @@ class Driver(object):
                                        desc='Set to True to record constraints at the '
                                             'driver level')
         self.recording_options.declare('includes', types=list, default=[],
-                                       desc='Patterns for variables to include in recording. \
-                                       Uses fnmatch wildcards')
+                                       desc='Patterns for variables to include in recording. '
+                                       'Uses fnmatch wildcards')
         self.recording_options.declare('excludes', types=list, default=[],
                                        desc='Patterns for vars to exclude in recording '
                                             '(processed post-includes). Uses fnmatch wildcards')
@@ -396,9 +402,8 @@ class Driver(object):
         self._rec_mgr.startup(self)
 
         # record the system metadata to the recorders attached to this Driver
-        if self.recording_options['record_model_metadata']:
-            for sub in self._problem().model.system_iter(recurse=True, include_self=True):
-                self._rec_mgr.record_metadata(sub)
+        for sub in self._problem().model.system_iter(recurse=True, include_self=True):
+            self._rec_mgr.record_metadata(sub)
 
     def _get_voi_val(self, name, meta, remote_vois, driver_scaling=True, rank=None):
         """

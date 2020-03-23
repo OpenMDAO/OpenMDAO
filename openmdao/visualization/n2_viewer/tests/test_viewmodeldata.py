@@ -14,6 +14,7 @@ from openmdao.visualization.n2_viewer.n2_viewer import _get_viewer_data, n2
 from openmdao.recorders.sqlite_recorder import SqliteRecorder
 from openmdao.test_suite.test_examples.test_betz_limit import ActuatorDisc
 from openmdao.utils.shell_proc import check_call
+from openmdao.utils.assert_utils import assert_warning
 
 
 # set DEBUG to True if you want to view the generated HTML file(s)
@@ -700,6 +701,32 @@ class TestViewModelData(unittest.TestCase):
         self.assertTrue(os.path.isfile(self.problem_html_filename),
                         (self.problem_html_filename + " is not a valid file."))
         self.assertTrue('OpenMDAO Model Hierarchy and N2 diagram: Sellar State Connection'
+                        in open(self.problem_html_filename).read())
+
+    def test_n2_connection_error(self):
+        """
+        Test that an n2 html file is generated from a Problem even if it has connection errors.
+        """
+        from openmdao.test_suite.scripts.bad_connection import BadConnectionModel 
+
+        p = Problem(BadConnectionModel())
+
+        # this would be set by the command line hook
+        p.model._raise_connection_errors = False
+
+        expected = "Group (sub): Attempted to connect from 'tgt.x' to 'cmp.x', but " + \
+                   "'tgt.x' is an input. All connections must be from an output to an input."
+
+        with assert_warning(UserWarning, expected):
+            p.setup()
+
+        n2(p, outfile=self.problem_html_filename, show_browser=DEBUG,
+           title="Bad Connection")
+
+        # Check that the html file has been created and has something in it.
+        self.assertTrue(os.path.isfile(self.problem_html_filename),
+                        (self.problem_html_filename + " is not a valid file."))
+        self.assertTrue('OpenMDAO Model Hierarchy and N2 diagram: Bad Connection'
                         in open(self.problem_html_filename).read())
 
 
