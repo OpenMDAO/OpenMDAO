@@ -100,25 +100,10 @@ class ModelData {
 
         if (node.parent) { // not root node? node.parent.absPathName : "";
             if (node.parent.absPathName != "") {
-
-                if (node.parent.splitByColon) {
-                    if (node.parent.absPathName.endsWith(colonVarNameAppend)) {
-                        node.absPathName += node.parent.absPathName.slice(0, -1);
-                    } else {
-                        node.absPathName += node.parent.absPathName;
-                    }
-
-                } else {
-                    node.absPathName += node.parent.absPathName;
-                }
-                node.absPathName += (node.parent.splitByColon) ? ":" : ".";
+                node.absPathName += node.parent.absPathName + ".";
             }
 
-            if (node.name.endsWith(colonVarNameAppend)) {
-                node.absPathName += node.name.slice(0, -1);
-            } else {
-                node.absPathName += node.name;
-            }
+            node.absPathName += node.name;
 
             this.nodePaths[node.absPathName] = node;
         }
@@ -130,15 +115,9 @@ class ModelData {
             if (parentComponent.type == "subsystem" &&
                 parentComponent.subsystem_type == "component") {
                 node.parentComponent = parentComponent;
-            } else {
-                throw ("Param or unknown without a parent component!");
             }
-        }
-
-        if (node.splitByColon) {
-            node.colonName = node.name;
-            for (let obj = node.parent; obj.splitByColon; obj = obj.parent) {
-                node.colonName = obj.name + ":" + node.colonName;
+            else {
+                throw ("Param or unknown without a parent component!");
             }
         }
 
