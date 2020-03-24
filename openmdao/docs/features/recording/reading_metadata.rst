@@ -18,22 +18,19 @@ a `CaseReader`.
     openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_problem_metadata
     :layout: interleave
 
-System Metadata
-----------------
+System Options
+--------------
 
 Systems record both scaling factors and options within 'scaling_factors' and 'component_options',
-respectively, in :code:`system_metadata`.
+respectively, in :code:`system_options`.
 
 The component options include user-defined options that were defined
 through the :code:`system.options.declare` method. By default, everything in options is
 pickled and recorded. If there are options that cannot be pickled or you simply do not wish
 to record, they can be excluded using the 'options_excludes' recording option on the system.
 
-By setting the :code:`record_model_metadata` option on `Driver`, you can record the metadata
-for every system in the model.
-
 .. embed-code::
-    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_system_metadata
+    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_recording_system_options
     :layout: interleave
 
 .. note::
