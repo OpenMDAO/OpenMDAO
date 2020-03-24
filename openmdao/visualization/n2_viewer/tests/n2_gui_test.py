@@ -1,6 +1,6 @@
 """Test N2 GUI with multiple models using Pyppeteer."""
 import asyncio
-from pyppeteer_fork import launch
+from pyppeteer import launch
 import subprocess
 import unittest
 import os
