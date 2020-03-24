@@ -367,15 +367,14 @@ class n2_gui_test_case(unittest.TestCase):
     async def handle_console_err(self, msg):
         """ Invoked any time that an error or warning appears in the log. """
         if msg.type == 'warning':
-            print("Warning: " + self.current_test_desc + "\n")
-            for m in msg:
-                print(msg + "\n")
+            print("Warning: " + self.current_test_desc + "\n" + msg.text + "\n")
         elif msg.type == 'error':
-            self.fail(msg)
+            self.fail(msg.text)
 
     async def setup_error_handlers(self):
         self.page.on('console', lambda msg: self.handle_console_err(msg))
         self.page.on('pageerror', lambda msg: self.fail(msg))
+        self.page.on('requestfailed', lambda msg: self.fail(msg))
 
     async def setup_browser(self):
         """ Create a browser instance and print user agent info. """
