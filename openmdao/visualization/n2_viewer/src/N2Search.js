@@ -270,12 +270,8 @@ class N2Search {
         if (node === this.zoomedElement) return;
 
         let nodeName = node.name;
-        if (node.splitByColon && node.hasChildren()) nodeName += ":";
         if (node.isParamOrUnknown()) nodeName += ".";
         let namesToAdd = [nodeName];
-
-        if (node.splitByColon) namesToAdd.push(node.colonName +
-            ((node.hasChildren()) ? ":" : ""));
 
         for (let name of namesToAdd) {
             if (!this.autoComplete.names.set.hasOwnProperty(name)) {

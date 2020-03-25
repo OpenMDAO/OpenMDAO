@@ -24,14 +24,6 @@ class ModelData {
         this.root = this.tree = modelJSON.tree = this._convertToN2TreeNodes(modelJSON.tree);
         stopTimer('ModelData._convertToN2TreeNodes');
 
-        startTimer('ModelData._expandColonVars');
-        this._expandColonVars(this.root);
-        stopTimer('ModelData._expandColonVars');
-
-        startTimer('ModelData._flattenColonGroups');
-        this._flattenColonGroups(this.root);
-        stopTimer('ModelData._flattenColonGroups');
-
         startTimer('ModelData._setParentsAndDepth');
         this._setParentsAndDepth(this.root, null, 1);
         stopTimer('ModelData._setParentsAndDepth');
@@ -91,107 +83,6 @@ class ModelData {
         return newNode;
     }
 
-    /** Called by _expandColonVars when splitting an element into children.
-     * TODO: Document params and recursive functionality.
-     */
-    _addColonVarChildren(originalParent, parent, arrayOfNames, arrayOfNamesIndex, type) {
-        if (arrayOfNames.length == arrayOfNamesIndex) return;
-
-        let name = arrayOfNames[arrayOfNamesIndex];
-
-        if (!parent.hasChildren()) parent.children = [];
-
-        let newChildName = name + colonVarNameAppend;
-        let parentIdx = indexForMember(parent.children, 'name', newChildName);
-        if (parentIdx == -1) { // new name not found in parent, create new
-            let newChild = new N2TreeNode({
-                "name": newChildName,
-                "type": type,
-                "splitByColon": true,
-                "originalParent": originalParent
-            });
-
-            if (type.match(paramRegex)) {
-                parent.children.splice(0, 0, newChild);
-            } else {
-                parent.children.push(newChild);
-            }
-
-            this._addColonVarChildren(originalParent, newChild, arrayOfNames,
-                arrayOfNamesIndex + 1, type);
-        } else { // new name already found in parent, keep traversing
-            this._addColonVarChildren(originalParent, parent.children[parentIdx],
-                arrayOfNames, arrayOfNamesIndex + 1, type);
-        }
-    }
-
-    /**
-     * If an object has a child with colons in its name, split that child
-     * into multiple objects named from the tokens in the original name. Replace the
-     * original child object with the new children. Recurse over the array of children.
-     * @param {N2TreeNode} node The object that may have children to check.
-     */
-    _expandColonVars(node) {
-        if (!node.hasChildren()) return;
-
-        // Don't use an iterator here because we may modify the array
-        for (let i = 0; i < node.children.length; ++i) {
-
-            let splitArray = node.children[i].name.split(":");
-            if (splitArray.length > 1) {
-                if (!node.hasOwnProperty("subsystem_type") ||
-                    node.subsystem_type != "component") {
-                    throw ("There is a colon-named object whose parent is not a component.");
-                }
-
-                let type = node.children[i].type;
-                node.children.splice(i--, 1);
-                this._addColonVarChildren(node, node, splitArray, 0, type);
-            }
-        }
-
-        for (let child of node.children) {
-            this._expandColonVars(child);
-        }
-    }
-
-    /**
-     * If an node formerly had a name with colons, but was split by _expandColonVars()
-     * and only ended up with one child, recombine the node and its child. Operate
-     * recursively on all children.
-     * @param {N2TreeNode} node The object to check.
-     */
-    _flattenColonGroups(node) {
-        if (!Array.isPopulatedArray(node.children)) return;
-
-        if (node.name.endsWith(colonVarNameAppend)) {
-            node.name = node.name.slice(0, -1);
-        }
-
-        while (node.splitByColon && exists(node.children) &&
-            node.children.length == 1 &&
-            node.children[0].splitByColon) {
-            let child = node.children[0];
-
-            if (child.name.endsWith(colonVarNameAppend)) {
-                node.name += ":" + child.name.slice(0, -1);
-            } else {
-                node.name += ":" + child.name;
-            }
-            node.children = (Array.isArray(child.children) &&
-                    child.children.length >= 1) ?
-                child.children : null; //absorb childs children
-            if (node.children == null) delete node.children;
-            node.splitByColon = false;
-        }
-
-        if (!Array.isArray(node.children)) return;
-
-        for (let child of node.children) {
-            this._flattenColonGroups(child);
-        }
-    }
-
     /**
      * Sets parents and depth of all nodes, and determine max depth. Flags the
      * node as implicit if any children are implicit.
@@ -209,25 +100,10 @@ class ModelData {
 
         if (node.parent) { // not root node? node.parent.absPathName : "";
             if (node.parent.absPathName != "") {
-
-                if (node.parent.splitByColon) {
-                    if (node.parent.absPathName.endsWith(colonVarNameAppend)) {
-                        node.absPathName += node.parent.absPathName.slice(0, -1);
-                    } else {
-                        node.absPathName += node.parent.absPathName;
-                    }
-
-                } else {
-                    node.absPathName += node.parent.absPathName;
-                }
-                node.absPathName += (node.parent.splitByColon) ? ":" : ".";
+                node.absPathName += node.parent.absPathName + ".";
             }
 
-            if (node.name.endsWith(colonVarNameAppend)) {
-                node.absPathName += node.name.slice(0, -1);
-            } else {
-                node.absPathName += node.name;
-            }
+            node.absPathName += node.name;
 
             this.nodePaths[node.absPathName] = node;
         }
@@ -239,15 +115,9 @@ class ModelData {
             if (parentComponent.type == "subsystem" &&
                 parentComponent.subsystem_type == "component") {
                 node.parentComponent = parentComponent;
-            } else {
-                throw ("Param or unknown without a parent component!");
             }
-        }
-
-        if (node.splitByColon) {
-            node.colonName = node.name;
-            for (let obj = node.parent; obj.splitByColon; obj = obj.parent) {
-                node.colonName = obj.name + ":" + node.colonName;
+            else {
+                throw ("Param or unknown without a parent component!");
             }
         }
 

@@ -152,7 +152,7 @@ class N2Layout {
     }
 
     /** Determine the text associated with the node. Normally its name,
-     * but can be changed if promoted or originally contained a colon.
+     * but can be changed if promoted.
      * @param {N2TreeNode} node The item to operate on.
      * @return {string} The selected text.
      */
@@ -166,16 +166,6 @@ class N2Layout {
             this.zoomedElement.propExists('promotions') &&
             this.zoomedElement.promotions.propExists(node.absPathName)) {
             retVal = this.zoomedElement.promotions[node.absPathName];
-        }
-
-        if (node.splitByColon) {
-            if (retVal.endsWith(colonVarNameAppend)) {
-                retVal = retVal.slice(0, -1);
-            }
-        }
-
-        if (node.splitByColon && node.hasChildren()) {
-            retVal += ":";
         }
 
         return retVal;
