@@ -28,7 +28,7 @@ optional_dependencies = {
         'pycodestyle>=2.4.0',
         'pydocstyle==2.0.0',
         'testflo>=1.3.6'
-        'websockets>6',
+        'websockets>8',
         'pyppeteer2'
     ]
 }
