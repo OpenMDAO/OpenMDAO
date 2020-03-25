@@ -362,7 +362,7 @@ n2_gui_test_scripts = {
 n2_gui_test_models = n2_gui_test_scripts.keys()
 
 # Workaround for pyppeteer timeout
-import pyppeteer.connection
+# from https://github.com/pyppeteer/pyppeteer2/issues/6
 original_method = pyppeteer.connection.websockets.client.connect
 def new_method(*args, **kwargs):
     kwargs['ping_interval'] = None
