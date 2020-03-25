@@ -1,6 +1,6 @@
 """Test N2 GUI with multiple models using Pyppeteer."""
 import asyncio
-from pyppeteer_fork import launch
+import pyppeteer
 import subprocess
 import unittest
 import os
@@ -93,7 +93,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Hover on N2 matrix element and check arrow count",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_24_24.vMid",
+            "selector": "g#n2elements rect#cellShape_23_23.vMid",
             "arrowCount": 4
         },
         {
@@ -105,7 +105,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Hover on N2 matrix element and check arrow count",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_24_24.vMid",
+            "selector": "g#n2elements rect#cellShape_23_23.vMid",
             "arrowCount": 4
         },
         {
@@ -138,7 +138,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Hover over zoomed N2 cell and check arrow count",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_12_12.vMid",
+            "selector": "g#n2elements rect#cellShape_11_11.vMid",
             "arrowCount": 5
         },
         {
@@ -361,25 +361,23 @@ n2_gui_test_scripts = {
 
 n2_gui_test_models = n2_gui_test_scripts.keys()
 
-
 class n2_gui_test_case(unittest.TestCase):
 
     async def handle_console_err(self, msg):
         """ Invoked any time that an error or warning appears in the log. """
         if msg.type == 'warning':
-            print("Warning: " + self.current_test_desc + "\n")
-            for m in msg:
-                print(msg + "\n")
+            print("Warning: " + self.current_test_desc + "\n" + msg.text + "\n")
         elif msg.type == 'error':
-            self.fail(msg)
+            self.fail(msg.text)
 
     async def setup_error_handlers(self):
         self.page.on('console', lambda msg: self.handle_console_err(msg))
         self.page.on('pageerror', lambda msg: self.fail(msg))
+#        self.page.on('requestfailed', lambda msg: self.fail(msg))
 
     async def setup_browser(self):
         """ Create a browser instance and print user agent info. """
-        self.browser = await launch({
+        self.browser = await pyppeteer.launch({
             'defaultViewport': {
                 'width': 1600,
                 'height': 900

@@ -28,8 +28,8 @@ optional_dependencies = {
         'pycodestyle>=2.4.0',
         'pydocstyle==2.0.0',
         'testflo>=1.3.6'
-        'websockets>6',
-        'pyppeteer_fork'
+        'websockets>8',
+        'pyppeteer2'
     ]
 }
 
@@ -143,8 +143,6 @@ setup(
     },
     python_requires=">=3.6",
     install_requires=[
-        'urllib3<1.25',  # this is to prevent urllib version conflict between
-                         # requests, numpydoc, and pyppeteer
         'networkx>=2.0',
         'numpy',
         'pyDOE2',
