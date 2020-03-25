@@ -84,7 +84,6 @@ install:
     echo ">>> Using cached environment";
     export PATH=$HOME/miniconda/bin:$PATH;
     source $HOME/miniconda/bin/activate PY$PY;
-    pip uninstall -y pyppeteer pyppeteer-fork; 
   else
     echo ">>> Building python environment";
     echo " >> Installing conda";
