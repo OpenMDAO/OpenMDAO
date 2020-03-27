@@ -471,7 +471,7 @@ class _TotalJacInfo(object):
                     # if the var is not distributed, global_size == local size
                     irange = np.arange(in_var_meta['global_size'], dtype=INT_DTYPE)
                 else:
-                    irange = in_idxs
+                    irange = in_idxs.copy()
                     # correct for any negative indices
                     irange[in_idxs < 0] += in_var_meta['global_size']
 
