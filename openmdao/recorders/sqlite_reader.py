@@ -28,7 +28,7 @@ class SqliteCaseReader(BaseCaseReader):
         Metadata about the problem, including the system hierachy and connections.
     solver_metadata : dict
         The solver options for each solver in the recorded model.
-    system_metadata : dict
+    system_options : dict
         Metadata about each system in the recorded model, including options and scaling factors.
     _format_version : int
         The version of the format assumed when loading the file.
@@ -101,7 +101,7 @@ class SqliteCaseReader(BaseCaseReader):
 
             # collect data from the system_metadata table. this includes:
             #   component metadata and scaling factors for each system,
-            #   which is added to system_metadata
+            #   which is added to system_options
             self._collect_system_metadata(cur)
 
             # collect data from the solver_metadata table. this includes:
@@ -223,7 +223,7 @@ class SqliteCaseReader(BaseCaseReader):
         """
         Load data from the system table.
 
-        Populates the `system_metadata` attribute of this CaseReader.
+        Populates the `system_options` attribute of this CaseReader.
 
         Parameters
         ----------
@@ -233,10 +233,10 @@ class SqliteCaseReader(BaseCaseReader):
         cur.execute("SELECT id, scaling_factors, component_metadata FROM system_metadata")
         for row in cur:
             id = row[0]
-            self.system_metadata[id] = {}
+            self.system_options[id] = {}
 
-            self.system_metadata[id]['scaling_factors'] = pickle.loads(row[1])
-            self.system_metadata[id]['component_options'] = pickle.loads(row[2])
+            self.system_options[id]['scaling_factors'] = pickle.loads(row[1])
+            self.system_options[id]['component_options'] = pickle.loads(row[2])
 
     def _collect_solver_metadata(self, cur):
         """

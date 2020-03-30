@@ -974,6 +974,8 @@ class Problem(object):
                     # product.
                     if matrix_free:
 
+                        local_opts = comp._get_check_partial_options()
+
                         dstate = comp._vectors['output']['linear']
                         if mode == 'fwd':
                             dinputs = comp._vectors['input']['linear']
@@ -988,6 +990,8 @@ class Problem(object):
 
                         for inp in in_list:
                             inp_abs = rel_name2abs_name(comp, inp)
+                            directional = inp in local_opts and \
+                                local_opts[inp]['directional'] is True
 
                             try:
                                 flat_view = dinputs._views_flat[inp_abs]
@@ -995,7 +999,11 @@ class Problem(object):
                                 # Implicit state
                                 flat_view = dstate._views_flat[inp_abs]
 
-                            n_in = len(flat_view)
+                            if directional:
+                                n_in = 1
+                            else:
+                                n_in = len(flat_view)
+
                             for idx in range(n_in):
 
                                 dinputs.set_const(0.0)
@@ -1003,7 +1011,10 @@ class Problem(object):
 
                                 # Dictionary access returns a scalar for 1d input, and we
                                 # need a vector for clean code, so use _views_flat.
-                                flat_view[idx] = 1.0
+                                if directional:
+                                    flat_view[:] = 1.0
+                                else:
+                                    flat_view[idx] = 1.0
 
                                 # Matrix Vector Product
                                 comp._apply_linear(None, ['linear'], _contains_all, mode)
@@ -1175,8 +1186,9 @@ class Problem(object):
                 wrt = rel_key[1]
                 if wrt in local_opts and local_opts[wrt]['directional']:
                     deriv = partials_data[c_name][rel_key]
-                    for key in ['J_fwd', 'J_rev']:
-                        deriv[key] = np.atleast_2d(np.sum(deriv[key], axis=1)).T
+                    deriv['J_fwd'] = np.atleast_2d(np.sum(deriv['J_fwd'], axis=1)).T
+                    axis = 0 if comp.matrix_free else 1
+                    deriv['J_rev'] = np.atleast_2d(np.sum(deriv['J_rev'], axis=axis)).T
 
         # Conversion of defaultdict to dicts
         partials_data = {comp_name: dict(outer) for comp_name, outer in partials_data.items()}
