@@ -1790,8 +1790,6 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.record_state(case_name)
         prob.cleanup()
 
-        coordinate = [0, 'ScipyOptimize_SLSQP', (4, )]
-
         expected_derivs = {
             "comp.f_xy,p1.x": np.array([[0.5]]),
             "comp.f_xy,p2.y": np.array([[-0.5]]),
@@ -1801,6 +1799,69 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_data = ((case_name, (t0, t1), expected_derivs),)
         assertProblemDerivDataRecorded(self, expected_data, self.eps)
+
+
+    def test_problem_recording_derivatives_option_false(self):
+        prob = ParaboloidProblem()
+
+        prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
+        # prob.recording_options['record_derivatives'] = True
+        prob.add_recorder(self.recorder)
+
+        prob.setup()
+        prob.set_solver_print(0)
+        t0, t1 = run_driver(prob)
+        case_name = "state1"
+        prob.record_state(case_name)
+        prob.cleanup()
+
+        expected_derivs = {
+            # "comp.f_xy,p1.x": np.array([[0.5]]),
+            # "comp.f_xy,p2.y": np.array([[-0.5]]),
+            # "con.c,p1.x": np.array([[-1.0]]),
+            # "con.c,p2.y": np.array([[1.0]])
+        }
+
+        expected_derivs = None
+        expected_data = ((case_name, (t0, t1), expected_derivs),)
+        assertProblemDerivDataRecorded(self, expected_data, self.eps)
+
+    def test_problem_recording_derivatives_no_voi(self):
+
+        prob = om.Problem(model=SellarDerivatives())
+
+        prob.recording_options['record_derivatives'] = True
+        prob.add_recorder(self.recorder)
+
+        prob.setup()
+        prob.set_solver_print(0)
+        t0, t1 = run_driver(prob)
+
+        case_name = "state1"
+        prob.record_state(case_name)
+
+        prob.cleanup()
+
+        cr = om.CaseReader(self.filename)
+
+        problem_cases = cr.list_cases('problem')
+        self.assertEqual(len(problem_cases), 1)
+
+        expected_derivs = None
+
+
+        # expected_derivs = {
+        #     "comp.f_xy,p1.x": np.array([[0.5]]),
+        #     "comp.f_xy,p2.y": np.array([[-0.5]]),
+        #     "con.c,p1.x": np.array([[-1.0]]),
+        #     "con.c,p2.y": np.array([[1.0]])
+        # }
+
+
+        expected_data = ((case_name, (t0, t1), expected_derivs),)
+        assertProblemDerivDataRecorded(self, expected_data, self.eps)
+
+
 
 
 

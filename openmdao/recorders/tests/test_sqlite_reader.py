@@ -3306,6 +3306,179 @@ class TestFeatureSqliteReader(unittest.TestCase):
         assert_near_equal(case.get_val('v', units='ft/s'), 5.46807, 1e-6)
 
 
+    def test_slqlite_reader_read_problem_derivatives(self):
+
+        class ParaboloidProblem(om.Problem):
+            """
+            Paraboloid problem with Constraint.
+            """
+
+            def __init__(self):
+                super(ParaboloidProblem, self).__init__()
+
+                model = self.model
+                model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+                model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+                model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+                model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
+
+                model.add_design_var('x', lower=-50.0, upper=50.0)
+                model.add_design_var('y', lower=-50.0, upper=50.0)
+                model.add_objective('f_xy')
+                model.add_constraint('c', upper=-15.0)
+
+        prob = ParaboloidProblem()
+
+        prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
+        prob.recording_options['record_derivatives'] = True
+        recorder = om.SqliteRecorder('cases.sql')
+
+        prob.add_recorder(recorder)
+
+        prob.setup()
+        prob.set_solver_print(0)
+        from openmdao.recorders.tests.recorder_test_utils import run_driver
+
+        t0, t1 = run_driver(prob)
+        case_name = "c1"
+        prob.record_state(case_name)
+        prob.cleanup()
+
+        cr = om.CaseReader('cases.sql')
+
+        num_problem_cases = len(cr.list_cases('problem'))
+
+        self.assertEqual(num_problem_cases, 1)
+
+        c1 = cr.get_case('c1')
+        print(c1.derivatives)
+
+    def test_slqlite_reader_read_problem_derivatives2(self):
+        import openmdao.api as om
+        from openmdao.test_suite.components.eggcrate import EggCrate
+
+        prob = om.Problem()
+
+        model = prob.model
+        model.add_subsystem('px', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('py', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('egg_crate', EggCrate(), promotes=['*'])
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+
+        prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
+
+        prob.recording_options['record_derivatives'] = True
+        recorder = om.SqliteRecorder('cases.sql')
+        prob.add_recorder(recorder)
+
+        prob.setup()
+        prob.set_solver_print(0)
+
+        prob['x'] = 2.5
+        prob['y'] = 2.5
+        prob.run_driver()
+        print(prob['x'], prob['y'], prob['f_xy'])
+        case_name_1 = "c1"
+        prob.record_state(case_name_1)
+
+        prob['x'] = 0.1
+        prob['y'] = -0.1
+        prob.run_driver()
+        print(prob['x'], prob['y'], prob['f_xy'])
+        case_name_2 = "c2"
+        prob.record_state(case_name_2)
+        prob.cleanup()
+
+        cr = om.CaseReader('cases.sql')
+
+        num_problem_cases = len(cr.list_cases('problem'))
+
+        self.assertEqual(num_problem_cases, 2)
+
+        c1 = cr.get_case(case_name_1)
+        print(c1.derivatives)
+
+        c2 = cr.get_case(case_name_2)
+        print(c2.derivatives)
+
+
+    def test_slqlite_reader_read_problem_derivatives3(self):
+        import openmdao.api as om
+
+        # We'll use the component that was defined in the last tutorial
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        # build the model
+        prob = om.Problem()
+        indeps = prob.model.add_subsystem('indeps', om.IndepVarComp())
+        indeps.add_output('x', 3.0)
+        indeps.add_output('y', -4.0)
+
+        prob.model.add_subsystem('parab', Paraboloid())
+
+        # define the component whose output will be constrained
+        prob.model.add_subsystem('const', om.ExecComp('g = x + y'))
+
+        prob.model.connect('indeps.x', ['parab.x', 'const.x'])
+        prob.model.connect('indeps.y', ['parab.y', 'const.y'])
+
+        # setup the optimization
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'COBYLA'
+
+        prob.model.add_design_var('indeps.x', lower=-50, upper=50)
+        prob.model.add_design_var('indeps.y', lower=-50, upper=50)
+        prob.model.add_objective('parab.f_xy')
+
+        # to add the constraint to the model
+        prob.model.add_constraint('const.g', lower=0, upper=10.)
+        # prob.model.add_constraint('const.g', equals=0.)
+
+        prob.recording_options['record_derivatives'] = True
+        recorder = om.SqliteRecorder('cases.sql')
+        prob.add_recorder(recorder)
+
+        prob.setup()
+        prob.run_driver()
+
+        # minimum value
+        assert_near_equal(prob['parab.f_xy'], -27., 1e-6)
+
+        # location of the minimum
+        assert_near_equal(prob['indeps.x'], 7, 1e-4)
+        assert_near_equal(prob['indeps.y'], -7, 1e-4)
+
+        prob['indeps.x'] = 3
+        prob['indeps.y'] = -4
+        prob.run_driver()
+        print(prob['indeps.x'], prob['indeps.y'], prob['parab.f_xy'])
+        case_name_1 = "c1"
+        prob.record_state(case_name_1)
+
+        prob['indeps.x'] = 0.1
+        prob['indeps.y'] = -0.1
+        prob.run_driver()
+        print(prob['indeps.x'], prob['indeps.y'], prob['parab.f_xy'])
+        case_name_2 = "c2"
+        prob.record_state(case_name_2)
+        prob.cleanup()
+
+        cr = om.CaseReader('cases.sql')
+
+        num_problem_cases = len(cr.list_cases('problem'))
+
+        self.assertEqual(num_problem_cases, 2)
+
+        c1 = cr.get_case(case_name_1)
+        print(c1.derivatives)
+
+        c2 = cr.get_case(case_name_2)
+        print(c2.derivatives)
+
+
 @use_tempdirs
 class TestPromAbsDict(unittest.TestCase):
 
@@ -3437,6 +3610,63 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
             # If directory already deleted, keep going
             if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
                 raise e
+
+    def test_database_v5(self):
+        # the change from v5 to v7 was adding the derivatives to problem
+        # check to make sure reading a v6 file works when reading problem cases
+
+        filename = os.path.join(self.legacy_dir, 'case_database_v5.sql')
+
+        cr = om.CaseReader(filename)
+
+        #
+        # check sources
+        #
+
+        self.assertEqual(sorted(cr.list_sources()), [
+            'problem',
+        ])
+
+        expected = {
+            # promoted names
+            "x": 1.,
+            "y1": 25.58830237,
+            "y2": 12.05848815,
+            "z": [5., 2.],
+            "obj": 28.58830817,
+            "con1": -22.42830237,
+            "con2": -11.94151185,
+            # unpromoted output names
+            "px.x": 1.,
+            "pz.z": [5., 2.],
+            "obj_cmp.obj": 28.58830817,
+            "con_cmp1.con1": -22.42830237,
+            "con_cmp2.con2": -11.94151185,
+            # unpromoted system names
+            "d1.x": 1.,
+            "d1.y1": 25.58830237,
+            "d1.y2": 12.05848815,
+            "d1.z": [5., 2.],
+        }
+
+        case = cr.get_case('final')
+
+        q = case.outputs.keys()
+
+        self.assertEqual(sorted(q), sorted(['z', 'x', 'obj', 'con1', 'con2']))
+
+        # for name in expected:
+        #     if name in ['d1.x', 'd1.y2', 'd1.z']:
+        #         # problem does not record lower level inputs
+        #         msg = "'Variable name \"%s\" not found.'" % name
+        #         with self.assertRaises(KeyError) as cm:
+        #             case[name]
+        #         self.assertEqual(str(cm.exception), msg)
+        #     else:
+        #         np.testing.assert_almost_equal(case[name], expected[name])
+
+
+
 
     def test_database_v4(self):
         # the change between v4 and v5 was the addition of the 'source' information

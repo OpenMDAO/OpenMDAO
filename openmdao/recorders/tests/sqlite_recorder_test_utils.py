@@ -220,36 +220,24 @@ def assertProblemDerivDataRecorded(test, expected, tolerance, prefix=None):
                            {"case_name": case_name})
             row_actual = db_cur.fetchone()
 
-            # db_cur.execute("SELECT abs2meta FROM metadata")
-            # row_abs2meta = db_cur.fetchone()
-
             test.assertTrue(row_actual,
                             'Problem case table does not contain the requested '
                             'case name: "{}"'.format(case_name))
-            #
-            # counter
-            # INT, case_name
-            # TEXT, timestamp
-            # REAL, "
-            # "success INT, msg TEXT, outputs TEXT, derivatives
 
-            counter, global_counter, case_name, timestamp, success, msg, outputs, totals_blob = row_actual
-            # abs2meta = json.loads(row_abs2meta[0]) if row_abs2meta[0] is not None else None
-            # test.assertTrue(isinstance(abs2meta, dict))
+            counter, global_counter, case_name, timestamp, success, msg, outputs, totals_blob = \
+                row_actual
 
             totals_actual = blob_to_array(totals_blob)
-
-            # Does the timestamp make sense Doesn't have to !
-            #
-            # test.assertTrue(t0 <= timestamp and timestamp <= t1)
-            test.assertTrue(t0 <= timestamp)
 
             test.assertEqual(success, 1)
             test.assertEqual(msg, '')
 
             if totals_expected is None:
-                test.assertEqual(totals_actual, np.array(None, dtype=object))
+                test.assertEqual(totals_actual.shape, (),
+                                 msg="Expected empty array derivatives in case recorder")
             else:
+                test.assertNotEqual(totals_actual.shape[0], 0,
+                                    msg="Expected non-empty array derivatives in case recorder")
                 actual = totals_actual[0]
                 # Check to see if the number of values in actual and expected match
                 test.assertEqual(len(actual), len(totals_expected))
