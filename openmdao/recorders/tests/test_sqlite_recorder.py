@@ -1805,7 +1805,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob = ParaboloidProblem()
 
         prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
-        # prob.recording_options['record_derivatives'] = True
+        # By default the option record_derivatives is False
         prob.add_recorder(self.recorder)
 
         prob.setup()
@@ -1814,13 +1814,6 @@ class TestSqliteRecorder(unittest.TestCase):
         case_name = "state1"
         prob.record_state(case_name)
         prob.cleanup()
-
-        expected_derivs = {
-            # "comp.f_xy,p1.x": np.array([[0.5]]),
-            # "comp.f_xy,p2.y": np.array([[-0.5]]),
-            # "con.c,p1.x": np.array([[-1.0]]),
-            # "con.c,p2.y": np.array([[1.0]])
-        }
 
         expected_derivs = None
         expected_data = ((case_name, (t0, t1), expected_derivs),)
@@ -1847,23 +1840,11 @@ class TestSqliteRecorder(unittest.TestCase):
         problem_cases = cr.list_cases('problem')
         self.assertEqual(len(problem_cases), 1)
 
+        # No desvars or responses given so cannot compute total derivs
         expected_derivs = None
-
-
-        # expected_derivs = {
-        #     "comp.f_xy,p1.x": np.array([[0.5]]),
-        #     "comp.f_xy,p2.y": np.array([[-0.5]]),
-        #     "con.c,p1.x": np.array([[-1.0]]),
-        #     "con.c,p2.y": np.array([[1.0]])
-        # }
-
 
         expected_data = ((case_name, (t0, t1), expected_derivs),)
         assertProblemDerivDataRecorded(self, expected_data, self.eps)
-
-
-
-
 
     def test_simple_paraboloid_scaled_desvars(self):
         prob = om.Problem()

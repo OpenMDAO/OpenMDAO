@@ -15,6 +15,7 @@ from io import StringIO
 import openmdao.api as om
 from openmdao.recorders.sqlite_recorder import format_version
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
+from openmdao.recorders.tests.test_sqlite_recorder import ParaboloidProblem
 from openmdao.recorders.case import PromAbsDict
 from openmdao.core.tests.test_units import SpeedComp
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
@@ -2798,6 +2799,38 @@ class TestSqliteCaseReader(unittest.TestCase):
         with assert_warning(DeprecationWarning, msg):
             options = cr.system_metadata
 
+    def test_slqlite_reader_problem_derivatives(self):
+
+        prob = ParaboloidProblem()
+
+        prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
+        prob.recording_options['record_derivatives'] = True
+        recorder = om.SqliteRecorder('cases.sql')
+
+        prob.add_recorder(recorder)
+
+        prob.setup()
+        prob.set_solver_print(0)
+        from openmdao.recorders.tests.recorder_test_utils import run_driver
+
+        t0, t1 = run_driver(prob)
+        case_name = "c1"
+        prob.record_state(case_name)
+        prob.cleanup()
+
+        cr = om.CaseReader('cases.sql')
+
+        num_problem_cases = len(cr.list_cases('problem'))
+        self.assertEqual(num_problem_cases, 1)
+
+        c1 = cr.get_case('c1')
+        J = prob.compute_totals()
+        np.testing.assert_almost_equal(c1.derivatives[('f_xy', 'x')], J[('comp.f_xy', 'p1.x')])
+        np.testing.assert_almost_equal(c1.derivatives[('f_xy', 'y')], J[('comp.f_xy', 'p2.y')])
+        np.testing.assert_almost_equal(c1.derivatives[('c', 'x')], J[('con.c', 'p1.x')])
+        np.testing.assert_almost_equal(c1.derivatives[('c', 'y')], J[('con.c', 'p2.y')])
+
+
 @use_tempdirs
 class TestFeatureSqliteReader(unittest.TestCase):
 
@@ -2968,7 +3001,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         self.assertEqual(('inputs:', sorted(solver_vars['inputs']), 'outputs:', sorted(solver_vars['outputs'])),
                          ('inputs:', ['x', 'y1', 'y2', 'z'], 'outputs:', ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z']))
 
-    def test_feature_reading_derivatives(self):
+    def test_feature_reading_driver_derivatives(self):
         import openmdao.api as om
         from openmdao.test_suite.components.sellar_feature import SellarMDA
 
@@ -3305,69 +3338,18 @@ class TestFeatureSqliteReader(unittest.TestCase):
         assert_near_equal(case['v'], 100./60., 1e-6)
         assert_near_equal(case.get_val('v', units='ft/s'), 5.46807, 1e-6)
 
-
-    def test_slqlite_reader_read_problem_derivatives(self):
-
-        class ParaboloidProblem(om.Problem):
-            """
-            Paraboloid problem with Constraint.
-            """
-
-            def __init__(self):
-                super(ParaboloidProblem, self).__init__()
-
-                model = self.model
-                model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-                model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
-                model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-                model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
-
-                model.add_design_var('x', lower=-50.0, upper=50.0)
-                model.add_design_var('y', lower=-50.0, upper=50.0)
-                model.add_objective('f_xy')
-                model.add_constraint('c', upper=-15.0)
-
-        prob = ParaboloidProblem()
-
-        prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
-        prob.recording_options['record_derivatives'] = True
-        recorder = om.SqliteRecorder('cases.sql')
-
-        prob.add_recorder(recorder)
-
-        prob.setup()
-        prob.set_solver_print(0)
-        from openmdao.recorders.tests.recorder_test_utils import run_driver
-
-        t0, t1 = run_driver(prob)
-        case_name = "c1"
-        prob.record_state(case_name)
-        prob.cleanup()
-
-        cr = om.CaseReader('cases.sql')
-
-        num_problem_cases = len(cr.list_cases('problem'))
-
-        self.assertEqual(num_problem_cases, 1)
-
-        c1 = cr.get_case('c1')
-        print(c1.derivatives)
-
-    def test_slqlite_reader_read_problem_derivatives2(self):
+    def test_feature_slqlite_reader_read_problem_derivatives_multiple_recordings(self):
         import openmdao.api as om
         from openmdao.test_suite.components.eggcrate import EggCrate
 
         prob = om.Problem()
-
         model = prob.model
         model.add_subsystem('px', om.IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('py', om.IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('egg_crate', EggCrate(), promotes=['*'])
-
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
         model.add_objective('f_xy')
-
         prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
 
         prob.recording_options['record_derivatives'] = True
@@ -3395,88 +3377,17 @@ class TestFeatureSqliteReader(unittest.TestCase):
         cr = om.CaseReader('cases.sql')
 
         num_problem_cases = len(cr.list_cases('problem'))
-
         self.assertEqual(num_problem_cases, 2)
 
         c1 = cr.get_case(case_name_1)
-        print(c1.derivatives)
-
         c2 = cr.get_case(case_name_2)
-        print(c2.derivatives)
 
+        # check that derivatives have been recorded properly.
+        assert_near_equal(c1.derivatives[('f_xy', 'x')][0], 0.0, 1e-4)
+        assert_near_equal(c1.derivatives[('f_xy', 'y')][0], 0.0, 1e-4)
 
-    def test_slqlite_reader_read_problem_derivatives3(self):
-        import openmdao.api as om
-
-        # We'll use the component that was defined in the last tutorial
-        from openmdao.test_suite.components.paraboloid import Paraboloid
-
-        # build the model
-        prob = om.Problem()
-        indeps = prob.model.add_subsystem('indeps', om.IndepVarComp())
-        indeps.add_output('x', 3.0)
-        indeps.add_output('y', -4.0)
-
-        prob.model.add_subsystem('parab', Paraboloid())
-
-        # define the component whose output will be constrained
-        prob.model.add_subsystem('const', om.ExecComp('g = x + y'))
-
-        prob.model.connect('indeps.x', ['parab.x', 'const.x'])
-        prob.model.connect('indeps.y', ['parab.y', 'const.y'])
-
-        # setup the optimization
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'COBYLA'
-
-        prob.model.add_design_var('indeps.x', lower=-50, upper=50)
-        prob.model.add_design_var('indeps.y', lower=-50, upper=50)
-        prob.model.add_objective('parab.f_xy')
-
-        # to add the constraint to the model
-        prob.model.add_constraint('const.g', lower=0, upper=10.)
-        # prob.model.add_constraint('const.g', equals=0.)
-
-        prob.recording_options['record_derivatives'] = True
-        recorder = om.SqliteRecorder('cases.sql')
-        prob.add_recorder(recorder)
-
-        prob.setup()
-        prob.run_driver()
-
-        # minimum value
-        assert_near_equal(prob['parab.f_xy'], -27., 1e-6)
-
-        # location of the minimum
-        assert_near_equal(prob['indeps.x'], 7, 1e-4)
-        assert_near_equal(prob['indeps.y'], -7, 1e-4)
-
-        prob['indeps.x'] = 3
-        prob['indeps.y'] = -4
-        prob.run_driver()
-        print(prob['indeps.x'], prob['indeps.y'], prob['parab.f_xy'])
-        case_name_1 = "c1"
-        prob.record_state(case_name_1)
-
-        prob['indeps.x'] = 0.1
-        prob['indeps.y'] = -0.1
-        prob.run_driver()
-        print(prob['indeps.x'], prob['indeps.y'], prob['parab.f_xy'])
-        case_name_2 = "c2"
-        prob.record_state(case_name_2)
-        prob.cleanup()
-
-        cr = om.CaseReader('cases.sql')
-
-        num_problem_cases = len(cr.list_cases('problem'))
-
-        self.assertEqual(num_problem_cases, 2)
-
-        c1 = cr.get_case(case_name_1)
-        print(c1.derivatives)
-
-        c2 = cr.get_case(case_name_2)
-        print(c2.derivatives)
+        assert_near_equal(c2.derivatives[('f_xy', 'x')][0], 0.0, 1e-4)
+        assert_near_equal(c2.derivatives[('f_xy', 'y')][0], 0.0, 1e-4)
 
 
 @use_tempdirs

@@ -43,7 +43,6 @@ SQL case database version history.
      Original implementation.
 """
 format_version = 7
-# format_version = 5
 
 
 def array_to_blob(array):
@@ -70,8 +69,6 @@ def array_to_blob(array):
     np.save(out, array)
     out.seek(0)
     return sqlite3.Binary(out.read())
-    # b = sqlite3.Binary(out.read())
-    # return b
 
 
 def blob_to_array(blob):
@@ -93,8 +90,6 @@ def blob_to_array(blob):
     out = BytesIO(blob)
     out.seek(0)
     return np.load(out, allow_pickle=True)
-    # n = np.load(out, allow_pickle=True)
-    # return n
 
 
 class SqliteRecorder(CaseRecorder):
@@ -202,9 +197,7 @@ class SqliteRecorder(CaseRecorder):
 
                 c.execute("CREATE TABLE problem_cases(id INTEGER PRIMARY KEY, "
                           "counter INT, case_name TEXT, timestamp REAL, "
-                          # "success INT, msg TEXT, outputs TEXT)")
                           "success INT, msg TEXT, outputs TEXT, jacobian BLOB )")
-                          # "success INT, msg TEXT, outputs TEXT, derivatives BLOB )")
                 c.execute("CREATE INDEX prob_name_ind on problem_cases(case_name)")
 
                 c.execute("CREATE TABLE system_iterations(id INTEGER PRIMARY KEY, "
@@ -441,24 +434,10 @@ class SqliteRecorder(CaseRecorder):
             driver = recording_requester.driver
             if recording_requester.recording_options['record_derivatives'] and driver._designvars and driver._responses:
                 totals = data['totals']
-
-                totals_array = dict_to_structured_array(totals)
-                totals_blob = array_to_blob(totals_array)
             else:
-                from numpy import array
-                totals = OrderedDict(
-                    [('comp.f_xy,p1.x', array([[0.5]])), ('comp.f_xy,p2.y', array([[-0.5]])),
-                     ('con.c,p1.x', array([[-1.]])), ('con.c,p2.y', array([[1.]]))])
-                totals = OrderedDict(
-                    [('comp.f_xy,p1.x', array([[0.5]])),
-                  ])
-                totals = OrderedDict(
-                    [
-                  ])
-
-                # totals = OrderedDict([])
-                totals_array = dict_to_structured_array(totals)
-                totals_blob = array_to_blob(totals_array)
+                totals = OrderedDict([])
+            totals_array = dict_to_structured_array(totals)
+            totals_blob = array_to_blob(totals_array)
 
             # convert to list so this can be dumped as JSON
             if outputs is not None:
@@ -472,11 +451,8 @@ class SqliteRecorder(CaseRecorder):
 
                 c.execute("INSERT INTO problem_cases(counter, case_name, "
                           "timestamp, success, msg, outputs, jacobian) VALUES(?,?,?,?,?,?,?)",
-                          # "timestamp, success, msg, outputs, derivatives) VALUES(?,?,?,?,?,?,?)",
-                          # "timestamp, success, msg, outputs) VALUES(?,?,?,?,?,?)",
                           (self._counter, metadata['name'],
                            metadata['timestamp'], metadata['success'], metadata['msg'],
-                           # outputs_text))
                            outputs_text, totals_blob))
 
     def record_iteration_system(self, recording_requester, data, metadata):

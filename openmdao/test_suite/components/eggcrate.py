@@ -15,7 +15,6 @@ class EggCrate(om.ExplicitComponent):
     def setup(self):
         self.add_input('x', val=0.0)
         self.add_input('y', val=0.0)
-
         self.add_output('f_xy', val=0.0)
 
         self.declare_partials('*', '*')
@@ -29,7 +28,7 @@ class EggCrate(om.ExplicitComponent):
         x = inputs['x']
         y = inputs['y']
 
-        outputs['f_xy'] = x**2 + y**2 + 25.0 * ( sin(x)**2 + sin(y)**2)
+        outputs['f_xy'] = x**2 + y**2 + 25.0 * (sin(x)**2 + sin(y)**2)
 
     def compute_partials(self, inputs, partials):
         """
@@ -43,6 +42,7 @@ class EggCrate(om.ExplicitComponent):
 
 
 if __name__ == "__main__":
+    import numpy as np
 
     model = om.Group()
     ivc = om.IndepVarComp()
@@ -60,11 +60,7 @@ if __name__ == "__main__":
     prob.run_model()
     print(prob['eggcrate_comp.f_xy'])
 
-    prob['des_vars.x'] = 5.0
-    prob['des_vars.y'] = -2.0
     prob['des_vars.x'] = 0.1
     prob['des_vars.y'] = -0.1
     prob.run_model()
-    print(prob['des_vars.x'])
-    print(prob['des_vars.y'])
-    print(prob['eggcrate_comp.f_xy'])
+    np.testing.assert_almost_equal(prob['eggcrate_comp.f_xy'], [0.51833555] )
