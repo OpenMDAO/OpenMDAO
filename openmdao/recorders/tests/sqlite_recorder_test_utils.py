@@ -62,7 +62,8 @@ def assertProblemDataRecorded(test, expected, tolerance):
             test.assertTrue(row_actual, 'Problem table does not contain the requested '
                             'case name: "{}"'.format(case))
 
-            counter, global_counter, case_name, timestamp, success, msg, outputs_text = row_actual
+            counter, global_counter, case_name, timestamp, success, msg, outputs_text, derivatives \
+                = row_actual
 
             if f_version >= 3:
                 outputs_actual = deserialize(outputs_text, abs2meta)
