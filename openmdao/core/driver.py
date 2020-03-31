@@ -159,7 +159,7 @@ class Driver(object):
         self.supports.declare('linear_constraints', types=bool, default=False)
         self.supports.declare('two_sided_constraints', types=bool, default=False)
         self.supports.declare('multiple_objectives', types=bool, default=False)
-        self.supports.declare('integer_design_vars', types=bool, default=False)
+        self.supports.declare('integer_design_vars', types=bool, default=True)
         self.supports.declare('gradients', types=bool, default=False)
         self.supports.declare('active_set', types=bool, default=False)
         self.supports.declare('simultaneous_derivatives', types=bool, default=False)
@@ -523,7 +523,26 @@ class Driver(object):
             indices = slice(None)
 
         if name in self._designvars_discrete:
-            problem.model._discrete_outputs[name] = int(value)
+
+            # Note, drivers set values here and generally should know it is setting an integer.
+            # However, the DOEdriver may pull a non-integer value from its generator, so we
+            # convert it.
+            if isinstance(value, int):
+                pass
+            elif isinstance(value, float):
+                value = int(value)
+            elif isinstance(value, np.ndarray):
+                if isinstance(problem.model._discrete_outputs[name], int):
+                    # Setting an integer value with a 1D array - don't want to convert to array.
+                    value = int(value)
+                else:
+                    value = value.astype(np.int)
+            else:
+                # Error fully processed at a higher level.
+                msg = "Discrete des_vars should be integer scalars or arrays."
+                raise ValueError(msg)
+
+            problem.model._discrete_outputs[name] = value
 
         else:
             desvar = problem.model._outputs._views_flat[name]
