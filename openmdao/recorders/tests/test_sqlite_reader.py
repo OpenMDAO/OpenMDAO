@@ -3438,6 +3438,59 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
             if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
                 raise e
 
+    def test_driver_v5(self):
+        """ Not a big change to v6 but make sure reading of driver data from v5 works. """
+
+        # Case file created using this code
+
+        # import openmdao.api as om
+        # from openmdao.test_suite.components.paraboloid import Paraboloid
+        #
+        # prob = om.Problem()
+        #
+        # model = prob.model
+        # model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        # model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        # model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        # model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
+        #
+        # model.add_design_var('x', lower=-50.0, upper=50.0)
+        # model.add_design_var('y', lower=-50.0, upper=50.0)
+        # model.add_objective('f_xy')
+        # model.add_constraint('c', upper=-15.0)
+        #
+        # driver = prob.driver = om.ScipyOptimizeDriver()
+        # driver.options['optimizer'] = 'SLSQP'
+        # driver.options['tol'] = 1e-9
+        #
+        # driver.recording_options['record_desvars'] = True
+        # driver.recording_options['record_objectives'] = True
+        # driver.recording_options['record_constraints'] = True
+        #
+        # case_recorder_filename = 'case_driver_v5.sql'
+        #
+        # recorder = om.SqliteRecorder(case_recorder_filename)
+        # prob.driver.add_recorder(recorder)
+        #
+        # prob.setup()
+        # prob.run_driver()
+        # prob.cleanup()
+
+        filename = os.path.join(self.legacy_dir, 'case_driver_v5.sql')
+        cr = om.CaseReader(filename)
+
+        # recorded data from driver only
+        self.assertEqual(cr.list_sources(), ['driver'])
+
+        # check that we got the correct number of cases
+        driver_cases = cr.list_cases('driver')
+        self.assertEqual(len(driver_cases), 5)
+
+        case = cr.get_case('rank0:ScipyOptimize_SLSQP|4')
+
+        assert_near_equal(case.outputs['x'], 7.16666667, 1e-6)
+        assert_near_equal(case.outputs['y'], -7.83333333, 1e-6)
+
     def test_database_v4(self):
         # the change between v4 and v5 was the addition of the 'source' information
         # this tests the proper determination of the case source without that data
