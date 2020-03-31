@@ -432,7 +432,8 @@ class SqliteRecorder(CaseRecorder):
             outputs = data['output']
 
             driver = recording_requester.driver
-            if recording_requester.recording_options['record_derivatives'] and driver._designvars and driver._responses:
+            if recording_requester.recording_options['record_derivatives'] and \
+                    driver._designvars and driver._responses:
                 totals = data['totals']
             else:
                 totals = OrderedDict([])
