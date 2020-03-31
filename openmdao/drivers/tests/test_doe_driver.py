@@ -72,7 +72,7 @@ class ParaboloidDiscreteArray(om.ExplicitComponent):
         x = discrete_inputs['x']
         y = discrete_inputs['y']
         f_xy = (x - 3.0)**2 + x * y + (y + 4.0)**2 - 3.0
-        discrete_outputs['f_xy'][:] = f_xy.astype(np.int)
+        discrete_outputs['f_xy'] = f_xy.astype(np.int)
 
 
 class TestErrors(unittest.TestCase):
@@ -987,6 +987,7 @@ class TestDOEDriver(unittest.TestCase):
             outputs = cr.get_case(case).outputs
             for name in ('x', 'y', 'f_xy'):
                 self.assertEqual(outputs[name], expected_case[name])
+                self.assertTrue(isinstance(outputs[name], int))
 
     def test_discrete_desvar_bad_type(self):
         prob = om.Problem()
@@ -1066,6 +1067,7 @@ class TestDOEDriver(unittest.TestCase):
                 self.assertEqual(outputs[name][0], expected_case[name][0])
                 self.assertEqual(outputs[name][1], expected_case[name][1])
 
+
     def test_discrete_desvar_csv(self):
         prob = om.Problem()
         model = prob.model
@@ -1084,7 +1086,7 @@ class TestDOEDriver(unittest.TestCase):
         model.add_objective('f_xy')
 
         samples = '\n'.join([" x ,   y",
-                             "5,  5",
+                             "5,  1",
                              "3,  6",
                              "-1,  3",
                              ])
@@ -1109,6 +1111,12 @@ class TestDOEDriver(unittest.TestCase):
                     {'x': -1, 'y': 3, 'f_xy': 59},
         ]
         self.assertEqual(len(cases), len(expected))
+
+        for case, expected_case in zip(cases, expected):
+            outputs = cr.get_case(case).outputs
+            for name in ('x', 'y', 'f_xy'):
+                self.assertEqual(outputs[name], expected_case[name])
+                self.assertTrue(isinstance(outputs[name], int))
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
