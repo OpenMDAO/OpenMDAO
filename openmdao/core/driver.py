@@ -1054,26 +1054,17 @@ def record_iteration(requester, prob, case_name):
     ins = model._retrieve_data_of_kind(filt, 'input', 'nonlinear', parallel)
 
     from openmdao.core.problem import Problem
-    if isinstance(requester, Problem):
-        if requester.recording_options['record_derivatives'] and prob.driver._designvars and prob.driver._responses:
-            totals = requester.compute_totals(return_format='flat_dict_structured_key')
-            data = {
-                'output': outs,
-                'input': ins,
-                'totals': totals
-            }
-        else:
-            data = {
-                'output': outs,
-                'input': ins,
-            }
-    elif isinstance(requester, Driver):
-        data = {
-            'output': outs,
-            'input': ins,
-        }
-    else:
+    if not isinstance(requester, (Problem, Driver)):
         raise ValueError('Unexpected object requesting recording: {0}'.format(requester))
+
+    data = {
+        'output': outs,
+        'input': ins,
+    }
+    if isinstance(requester, Problem) and requester.recording_options['record_derivatives'] and \
+            prob.driver._designvars and prob.driver._responses:
+        totals = requester.compute_totals(return_format='flat_dict_structured_key')
+        data['totals'] = totals
 
     requester._rec_mgr.record_iteration(requester, data,
                                         requester._get_recorder_metadata(case_name))
