@@ -197,6 +197,8 @@ class SqliteCaseReader(BaseCaseReader):
                 self._prom2abs = pickle.loads(prom2abs.encode())
                 self._abs2meta = pickle.loads(abs2meta.encode())
 
+        self.problem_metadata['abs2prom'] = self._abs2prom
+
     def _collect_driver_metadata(self, cur):
         """
         Load data from the driver_metadata table.

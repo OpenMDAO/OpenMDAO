@@ -380,10 +380,16 @@ def assertViewerDataRecorded(test, expected):
         test.assertTrue(isinstance(model_viewer_data, dict))
 
         # primary keys
-        test.assertEqual(set(model_viewer_data.keys()), {
-            'tree', 'sys_pathnames_list', 'connections_list', 'abs2prom',
+        if f_version >= 6:
+            test.assertEqual(set(model_viewer_data.keys()), {
+            'tree', 'sys_pathnames_list', 'connections_list',
             'driver', 'design_vars', 'responses', 'declare_partials_list'
-        })
+            })
+        else:
+            test.assertEqual(set(model_viewer_data.keys()), {
+                'tree', 'sys_pathnames_list', 'connections_list', 'abs2prom',
+                'driver', 'design_vars', 'responses', 'declare_partials_list'
+            })
 
         # system pathnames
         test.assertTrue(isinstance(model_viewer_data['sys_pathnames_list'], list))
@@ -409,11 +415,12 @@ def assertViewerDataRecorded(test, expected):
         test.assertEqual(expected['tree_children_length'],
                          len(model_viewer_data['tree']['children']))
 
-        # abs2prom map
-        abs2prom = model_viewer_data['abs2prom']
-        for io in ['input', 'output']:
-            for var in expected['abs2prom'][io]:
-                test.assertEqual(abs2prom[io][var], expected['abs2prom'][io][var])
+        if f_version < 6:
+            # abs2prom map
+            abs2prom = model_viewer_data['abs2prom']
+            for io in ['input', 'output']:
+                for var in expected['abs2prom'][io]:
+                    test.assertEqual(abs2prom[io][var], expected['abs2prom'][io][var])
 
 
 def assertSystemMetadataIdsRecorded(test, ids):
