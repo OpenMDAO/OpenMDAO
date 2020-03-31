@@ -31,6 +31,8 @@ SQL case database version history.
 ----------------------------------
 7 -- OpenMDAO 3.0
      Added derivatives field to table for recording problems.
+6 -- OpenMDAO 3.X
+     Removed abs2prom from the driver_metadata table.
 5 -- OpenMDAO 2.5
      Added source column (driver name, system/solver pathname) to global iterations table.
 4 -- OpenMDAO 2.4
@@ -43,7 +45,6 @@ SQL case database version history.
      Original implementation.
 """
 format_version = 7
-
 
 def array_to_blob(array):
     """
