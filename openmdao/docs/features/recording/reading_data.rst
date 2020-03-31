@@ -65,6 +65,8 @@ that.
     openmdao.recorders.tests.test_sqlite_reader.TestFeatureSqliteReader.test_feature_list_inputs_and_outputs_with_tags
     :layout: interleave
 
+
+
 Getting Variable Data from Case By Specifying Variable Name and Units Desired
 -----------------------------------------------------------------------------
 
@@ -87,5 +89,14 @@ A driver has the ability to record derivatives but it is not enabled by default.
 this option, the recorded cases will have a value for the :code:`jacobian`.
 
 .. embed-code::
-    openmdao.recorders.tests.test_sqlite_reader.TestFeatureSqliteReader.test_feature_reading_derivatives
+    openmdao.recorders.tests.test_sqlite_reader.TestFeatureSqliteReader.test_feature_reading_driver_derivatives
     :layout: interleave
+
+Problem recording can also include recording of the derivatives as this example shows.
+
+.. embed-code::
+    openmdao.recorders.tests.test_sqlite_reader.TestFeatureSqliteReader.test_feature_slqlite_reader_read_problem_derivatives_multiple_recordings
+    :layout: interleave
+
+For both :code:`Driver` and :code:`Problem`, the recording of the derivatives is not affected by
+the :code:`includes` and :code:`excludes` options.
