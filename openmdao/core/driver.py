@@ -1059,7 +1059,7 @@ def record_iteration(requester, prob, case_name):
 
     data = {
         'output': outs,
-        'input': ins,
+        'input': ins
     }
     if isinstance(requester, Problem) and requester.recording_options['record_derivatives'] and \
             prob.driver._designvars and prob.driver._responses:

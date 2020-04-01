@@ -2799,7 +2799,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         with assert_warning(DeprecationWarning, msg):
             options = cr.system_metadata
 
-    def test_slqlite_reader_problem_derivatives(self):
+    def test_sqlite_reader_problem_derivatives(self):
 
         prob = ParaboloidProblem()
 
@@ -2811,11 +2811,11 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         prob.setup()
         prob.set_solver_print(0)
-        from openmdao.recorders.tests.recorder_test_utils import run_driver
+        prob.run_driver()
 
-        t0, t1 = run_driver(prob)
         case_name = "c1"
         prob.record_state(case_name)
+
         prob.cleanup()
 
         cr = om.CaseReader('cases.sql')
@@ -3338,7 +3338,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         assert_near_equal(case['v'], 100./60., 1e-6)
         assert_near_equal(case.get_val('v', units='ft/s'), 5.46807, 1e-6)
 
-    def test_feature_slqlite_reader_read_problem_derivatives_multiple_recordings(self):
+    def test_feature_sqlite_reader_read_problem_derivatives_multiple_recordings(self):
         import openmdao.api as om
         from openmdao.test_suite.components.eggcrate import EggCrate
 
@@ -3523,10 +3523,34 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
                 raise e
 
     def test_problem_v6(self):
-        # the change from v5 to v7 was adding the derivatives to problem
+        # the change from v6 to v7 was adding the derivatives to problem
         # check to make sure reading a v6 file works when reading problem cases
 
-        filename = os.path.join(self.legacy_dir, 'case_database_v5.sql')
+        # The case file was created with this code:
+
+        # import numpy as np
+        # import openmdao.api as om
+        # from openmdao.test_suite.components.sellar import SellarDerivatives
+        #
+        # prob = om.Problem(model=SellarDerivatives())
+        #
+        # model = prob.model
+        # model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+        #                      upper=np.array([10.0, 10.0]))
+        # model.add_design_var('x', lower=0.0, upper=10.0)
+        # model.add_objective('obj')
+        # model.add_constraint('con1', upper=0.0)
+        # model.add_constraint('con2', upper=0.0)
+        #
+        # prob.add_recorder(om.SqliteRecorder("case_problem_v6.sql"))
+        #
+        # prob.setup()
+        # prob.run_driver()
+        #
+        # prob.record_state('final')
+        # prob.cleanup()
+
+        filename = os.path.join(self.legacy_dir, 'case_problem_v6.sql')
 
         cr = om.CaseReader(filename)
 
@@ -3537,46 +3561,12 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         self.assertEqual(sorted(cr.list_sources()), [
             'problem',
         ])
-
-        expected = {
-            # promoted names
-            "x": 1.,
-            "y1": 25.58830237,
-            "y2": 12.05848815,
-            "z": [5., 2.],
-            "obj": 28.58830817,
-            "con1": -22.42830237,
-            "con2": -11.94151185,
-            # unpromoted output names
-            "px.x": 1.,
-            "pz.z": [5., 2.],
-            "obj_cmp.obj": 28.58830817,
-            "con_cmp1.con1": -22.42830237,
-            "con_cmp2.con2": -11.94151185,
-            # unpromoted system names
-            "d1.x": 1.,
-            "d1.y1": 25.58830237,
-            "d1.y2": 12.05848815,
-            "d1.z": [5., 2.],
-        }
-
+ 
         case = cr.get_case('final')
 
         q = case.outputs.keys()
 
-        self.assertEqual(sorted(q), sorted(['z', 'x', 'obj', 'con1', 'con2']))
-
-        # for name in expected:
-        #     if name in ['d1.x', 'd1.y2', 'd1.z']:
-        #         # problem does not record lower level inputs
-        #         msg = "'Variable name \"%s\" not found.'" % name
-        #         with self.assertRaises(KeyError) as cm:
-        #             case[name]
-        #         self.assertEqual(str(cm.exception), msg)
-        #     else:
-        #         np.testing.assert_almost_equal(case[name], expected[name])
-
-
+        self.assertEqual(sorted(q), sorted(['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z']))
 
     def test_driver_v5(self):
         """ Not a big change to v6 but make sure reading of driver data from v5 works. """
@@ -3630,7 +3620,6 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
 
         assert_near_equal(case.outputs['x'], 7.16666667, 1e-6)
         assert_near_equal(case.outputs['y'], -7.83333333, 1e-6)
->>>>>>> 0533ba4ea5ae10af745614787ed39b227a7626c5
 
     def test_database_v4(self):
         # the change between v4 and v5 was the addition of the 'source' information
