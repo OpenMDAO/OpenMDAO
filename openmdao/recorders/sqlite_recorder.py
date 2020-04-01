@@ -46,6 +46,7 @@ SQL case database version history.
 """
 format_version = 7
 
+
 def array_to_blob(array):
     """
     Make numpy array in to BLOB type.
