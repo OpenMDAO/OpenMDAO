@@ -1053,10 +1053,12 @@ def record_iteration(requester, prob, case_name):
     outs = model._retrieve_data_of_kind(filt, 'output', 'nonlinear', parallel)
     ins = model._retrieve_data_of_kind(filt, 'input', 'nonlinear', parallel)
 
+
     data = {
         'output': outs,
         'input': ins
     }
+    from openmdao.core.problem import Problem
     if isinstance(requester, Problem) and requester.recording_options['record_derivatives'] and \
             prob.driver._designvars and prob.driver._responses:
         totals = requester.compute_totals(return_format='flat_dict_structured_key')
