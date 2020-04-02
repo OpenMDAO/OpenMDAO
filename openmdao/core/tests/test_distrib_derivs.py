@@ -1,7 +1,7 @@
 """ Test out some crucial linear GS tests in parallel with distributed comps."""
 
 import unittest
-import numpy
+import numpy as np
 import itertools
 
 import openmdao.api as om
@@ -69,15 +69,15 @@ class DistribExecComp(om.ExecComp):
         for name in outs:
             if name not in kwargs or not isinstance(kwargs[name], dict):
                 kwargs[name] = {}
-            kwargs[name]['value'] = numpy.ones(sizes[rank], float)
+            kwargs[name]['value'] = np.ones(sizes[rank], float)
 
         for name in allvars:
             if name not in outs:
                 if name not in kwargs or not isinstance(kwargs[name], dict):
                     kwargs[name] = {}
                 meta = kwargs[name]
-                meta['value'] = numpy.ones(sizes[rank], float)
-                meta['src_indices'] = numpy.arange(start, end, dtype=int)
+                meta['value'] = np.ones(sizes[rank], float)
+                meta['src_indices'] = np.arange(start, end, dtype=int)
 
         super(DistribExecComp, self).setup()
 
@@ -93,22 +93,22 @@ class DistribCoordComp(om.ExplicitComponent):
         rank = comm.rank
 
         if rank == 0:
-            self.add_input('invec', numpy.zeros((5, 3)),
+            self.add_input('invec', np.zeros((5, 3)),
                            src_indices=[[(0, 0), (0, 1), (0, 2)],
                                         [(1, 0), (1, 1), (1, 2)],
                                         [(2, 0), (2, 1), (2, 2)],
                                         [(3, 0), (3, 1), (3, 2)],
                                         [(4, 0), (4, 1), (4, 2)]])
-            self.add_output('outvec', numpy.zeros((5, 3)))
+            self.add_output('outvec', np.zeros((5, 3)))
         else:
-            self.add_input('invec', numpy.zeros((4, 3)),
+            self.add_input('invec', np.zeros((4, 3)),
                            src_indices=[[(5, 0), (5, 1), (5, 2)],
                                         [(6, 0), (6, 1), (6, 2)],
                                         [(7, 0), (7, 1), (7, 2)],
                                         # use some negative indices here to
                                         # make sure they work
                                         [(-1, 0), (8, 1), (-1, 2)]])
-            self.add_output('outvec', numpy.zeros((4, 3)))
+            self.add_output('outvec', np.zeros((4, 3)))
 
     def compute(self, inputs, outputs):
         if self.comm.rank == 0:
@@ -134,7 +134,7 @@ class MPITests2(unittest.TestCase):
     N_PROCS = 2
 
     def test_distrib_shape(self):
-        points = numpy.array([
+        points = np.array([
             [0., 0., 0.],
             [0., 0., 1.],
             [0., 1., 0.],
@@ -152,8 +152,8 @@ class MPITests2(unittest.TestCase):
         prob.model.add_subsystem('indep', om.IndepVarComp('x', points))
         prob.model.add_subsystem('comp', DistribCoordComp())
         prob.model.add_subsystem('total', om.ExecComp('y=x',
-                                                   x=numpy.zeros((9, 3)),
-                                                   y=numpy.zeros((9, 3))))
+                                                   x=np.zeros((9, 3)),
+                                                   y=np.zeros((9, 3))))
         prob.model.connect('indep.x', 'comp.invec')
         prob.model.connect('comp.outvec', 'total.x')
 
@@ -170,13 +170,13 @@ class MPITests2(unittest.TestCase):
         size = 3
         group = om.Group()
 
-        group.add_subsystem('P', om.IndepVarComp('x', numpy.arange(size)))
+        group.add_subsystem('P', om.IndepVarComp('x', np.arange(size)))
         group.add_subsystem('C1', DistribExecComp(['y=2.0*x', 'y=3.0*x'], arr_size=size,
-                                                  x=numpy.zeros(size),
-                                                  y=numpy.zeros(size)))
+                                                  x=np.zeros(size),
+                                                  y=np.zeros(size)))
         group.add_subsystem('C2', om.ExecComp(['z=3.0*y'],
-                                           y=numpy.zeros(size),
-                                           z=numpy.zeros(size)))
+                                           y=np.zeros(size),
+                                           z=np.zeros(size)))
 
         prob = om.Problem()
         prob.model = group
@@ -189,13 +189,13 @@ class MPITests2(unittest.TestCase):
         prob.run_model()
 
         J = prob.compute_totals(['C2.z'], ['P.x'])
-        assert_near_equal(J['C2.z', 'P.x'], numpy.diag([6.0, 6.0, 9.0]), 1e-6)
+        assert_near_equal(J['C2.z', 'P.x'], np.diag([6.0, 6.0, 9.0]), 1e-6)
 
         prob.setup(check=False, mode='rev')
         prob.run_model()
 
         J = prob.compute_totals(['C2.z'], ['P.x'])
-        assert_near_equal(J['C2.z', 'P.x'], numpy.diag([6.0, 6.0, 9.0]), 1e-6)
+        assert_near_equal(J['C2.z', 'P.x'], np.diag([6.0, 6.0, 9.0]), 1e-6)
 
     @parameterized.expand(itertools.product([om.NonlinearRunOnce, om.NonlinearBlockGS]),
                           name_func=_test_func_name)
@@ -203,24 +203,24 @@ class MPITests2(unittest.TestCase):
         size = 3
         prob = om.Problem()
         prob.model = root = om.Group()
-        root.add_subsystem('P', om.IndepVarComp('x', numpy.ones(size, dtype=float)))
+        root.add_subsystem('P', om.IndepVarComp('x', np.ones(size, dtype=float)))
         root.add_subsystem('C1', DistribExecComp(['y=3.0*x', 'y=2.0*x'], arr_size=size,
-                                                 x=numpy.zeros(size, dtype=float),
-                                                 y=numpy.zeros(size, dtype=float)))
+                                                 x=np.zeros(size, dtype=float),
+                                                 y=np.zeros(size, dtype=float)))
         sub = root.add_subsystem('sub', om.ParallelGroup())
         sub.add_subsystem('C2', om.ExecComp('y=1.5*x',
-                                         x=numpy.zeros(size),
-                                         y=numpy.zeros(size)))
+                                         x=np.zeros(size),
+                                         y=np.zeros(size)))
         sub.add_subsystem('C3', om.ExecComp(['y=5.0*x'],
-                                         x=numpy.zeros(size, dtype=float),
-                                         y=numpy.zeros(size, dtype=float)))
+                                         x=np.zeros(size, dtype=float),
+                                         y=np.zeros(size, dtype=float)))
 
         root.add_subsystem('C2', om.ExecComp(['y=x'],
-                                          x=numpy.zeros(size, dtype=float),
-                                          y=numpy.zeros(size, dtype=float)))
+                                          x=np.zeros(size, dtype=float),
+                                          y=np.zeros(size, dtype=float)))
         root.add_subsystem('C3', om.ExecComp(['y=x'],
-                                          x=numpy.zeros(size, dtype=float),
-                                          y=numpy.zeros(size, dtype=float)))
+                                          x=np.zeros(size, dtype=float),
+                                          y=np.zeros(size, dtype=float)))
         root.connect('sub.C2.y', 'C2.x')
         root.connect('sub.C3.y', 'C3.x')
 
@@ -239,8 +239,8 @@ class MPITests2(unittest.TestCase):
         assert_near_equal(prob['C2.y'], diag1)
         assert_near_equal(prob['C3.y'], diag2)
 
-        diag1 = numpy.diag(diag1)
-        diag2 = numpy.diag(diag2)
+        diag1 = np.diag(diag1)
+        diag2 = np.diag(diag2)
 
         J = prob.compute_totals(of=['C2.y', "C3.y"], wrt=['P.x'])
         assert_near_equal(J['C2.y', 'P.x'], diag1, 1e-6)
@@ -261,24 +261,24 @@ class MPITests2(unittest.TestCase):
         prob = om.Problem()
         prob.model = root = om.Group()
 
-        root.add_subsystem('P1', om.IndepVarComp('x', numpy.ones(size, dtype=float)))
-        root.add_subsystem('P2', om.IndepVarComp('x', numpy.ones(size, dtype=float)))
+        root.add_subsystem('P1', om.IndepVarComp('x', np.ones(size, dtype=float)))
+        root.add_subsystem('P2', om.IndepVarComp('x', np.ones(size, dtype=float)))
         sub = root.add_subsystem('sub', om.ParallelGroup())
 
         sub.add_subsystem('C1', om.ExecComp(['y=-2.0*x'],
-                                         x=numpy.zeros(size, dtype=float),
-                                         y=numpy.zeros(size, dtype=float)))
+                                         x=np.zeros(size, dtype=float),
+                                         y=np.zeros(size, dtype=float)))
         sub.add_subsystem('C2', om.ExecComp(['y=5.0*x'],
-                                         x=numpy.zeros(size, dtype=float),
-                                         y=numpy.zeros(size, dtype=float)))
+                                         x=np.zeros(size, dtype=float),
+                                         y=np.zeros(size, dtype=float)))
         root.add_subsystem('C3', DistribExecComp(['y=3.0*x1+7.0*x2', 'y=1.5*x1+3.5*x2'],
                                                  arr_size=size,
-                                                 x1=numpy.zeros(size, dtype=float),
-                                                 x2=numpy.zeros(size, dtype=float),
-                                                 y=numpy.zeros(size, dtype=float)))
+                                                 x1=np.zeros(size, dtype=float),
+                                                 x2=np.zeros(size, dtype=float),
+                                                 y=np.zeros(size, dtype=float)))
         root.add_subsystem('C4', om.ExecComp(['y=x'],
-                                          x=numpy.zeros(size, dtype=float),
-                                          y=numpy.zeros(size, dtype=float)))
+                                          x=np.zeros(size, dtype=float),
+                                          y=np.zeros(size, dtype=float)))
 
         root.connect("sub.C1.y", "C3.x1")
         root.connect("sub.C2.y", "C3.x2")
@@ -292,8 +292,8 @@ class MPITests2(unittest.TestCase):
         prob.setup(mode='fwd')
         prob.run_driver()
 
-        diag1 = numpy.diag([-6.0, -6.0, -3.0])
-        diag2 = numpy.diag([35.0, 35.0, 17.5])
+        diag1 = np.diag([-6.0, -6.0, -3.0])
+        diag2 = np.diag([35.0, 35.0, 17.5])
 
         J = prob.compute_totals(of=['C4.y'], wrt=['P1.x', 'P2.x'])
         assert_near_equal(J['C4.y', 'P1.x'], diag1, 1e-6)
@@ -340,9 +340,9 @@ class DistribStateImplicit(om.ImplicitComponent):
     def solve_nonlinear(self, i, o):
         o['states'] = i['a']
 
-        local_sum = numpy.zeros(1)
-        local_sum[0] = numpy.sum(o['states'])
-        tmp = numpy.zeros(1)
+        local_sum = np.zeros(1)
+        local_sum[0] = np.sum(o['states'])
+        tmp = np.zeros(1)
         self.comm.Allreduce(local_sum, tmp, op=MPI.SUM)
 
         o['out_var'] = tmp[0]
@@ -350,9 +350,9 @@ class DistribStateImplicit(om.ImplicitComponent):
     def apply_nonlinear(self, i, o, r):
         r['states'] = o['states'] - i['a']
 
-        local_sum = numpy.zeros(1)
-        local_sum[0] = numpy.sum(o['states'])
-        global_sum = numpy.zeros(1)
+        local_sum = np.zeros(1)
+        local_sum[0] = np.sum(o['states'])
+        global_sum = np.zeros(1)
         self.comm.Allreduce(local_sum, global_sum, op=MPI.SUM)
 
         r['out_var'] = o['out_var'] - global_sum[0]
@@ -362,8 +362,8 @@ class DistribStateImplicit(om.ImplicitComponent):
             if 'states' in d_o:
                 d_r['states'] += d_o['states']
 
-                local_sum = numpy.array([numpy.sum(d_o['states'])])
-                global_sum = numpy.zeros(1)
+                local_sum = np.array([np.sum(d_o['states'])])
+                global_sum = np.zeros(1)
                 self.comm.Allreduce(local_sum, global_sum, op=MPI.SUM)
                 d_r['out_var'] -= global_sum
 
@@ -377,7 +377,7 @@ class DistribStateImplicit(om.ImplicitComponent):
             if 'states' in d_o:
                 d_o['states'] += d_r['states']
 
-                tmp = numpy.zeros(1)
+                tmp = np.zeros(1)
                 if self.comm.rank == 0:
                     tmp[0] = d_r['out_var'].copy()
                 self.comm.Bcast(tmp, root=0)
@@ -388,7 +388,7 @@ class DistribStateImplicit(om.ImplicitComponent):
                 d_o['out_var'] += d_r['out_var']
 
             if 'a' in d_i:
-                    d_i['a'] -= numpy.sum(d_r['states'])
+                    d_i['a'] -= np.sum(d_r['states'])
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -402,7 +402,7 @@ class MPITests3(unittest.TestCase):
         p.model.add_subsystem('des_vars', om.IndepVarComp('a', val=10., units='m'), promotes=['*'])
         p.model.add_subsystem('icomp', DistribStateImplicit(), promotes=['*'])
 
-        expected = numpy.array([5.])
+        expected = np.array([5.])
 
         p.setup(mode='fwd')
         p.run_model()
@@ -413,6 +413,140 @@ class MPITests3(unittest.TestCase):
         p.run_model()
         jac = p.compute_totals(of=['out_var'], wrt=['a'], return_format='dict')
         assert_near_equal(jac['out_var']['a'][0], expected, 1e-6)
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class MPITests3(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def test_index_voi_bg(self):
+        # Before this bug was fixed, one proc would raise an exception, and this test would
+        # lock up.
+
+        class Phase(om.Group):
+
+            def initialize(self):
+                self.state_options = {}
+                self.options.declare('ode_class', default=None)
+
+            def add_state(self, name, targets=None):
+                if name not in self.state_options:
+                    self.state_options[name] = {}
+                    self.state_options[name]['name'] = name
+                    self.state_options[name]['shape'] = (1, )
+                    self.state_options[name]['targets'] = (targets, )
+
+            def setup(self):
+                indep = om.IndepVarComp()
+
+                for name, options in self.state_options.items():
+                    indep.add_output(name='states:{0}'.format(name),
+                                     shape=(3, np.prod(options['shape'])))
+
+                self.add_subsystem('indep_states', indep, promotes_outputs=['*'])
+
+                for name, options in self.state_options.items():
+                    self.add_design_var(name='states:{0}'.format(name))
+
+                ode_class = self.options['ode_class']
+                rhs_disc = ode_class(num_nodes=4)
+
+                self.add_subsystem('rhs_disc', rhs_disc)
+
+                for name, options in self.state_options.items():
+                    self.connect('states:{0}'.format(name),
+                                  ['rhs_disc.{0}'.format(tgt) for tgt in options['targets']])
+
+        class vanderpol_ode_group(om.Group):
+
+            def initialize(self):
+                self.options.declare('num_nodes', types=int)
+
+            def setup(self):
+                nn = self.options['num_nodes']
+
+                self.add_subsystem(name='vanderpol_ode_delay',
+                                   subsys=vanderpol_ode_delay(num_nodes=nn),
+                                   promotes_inputs=['x1'])
+
+                self.add_subsystem(name='vanderpol_ode_rate_collect',
+                                   subsys=vanderpol_ode_rate_collect(num_nodes=nn),
+                                   promotes_outputs=['x0dot'])
+
+                self.connect('vanderpol_ode_delay.x0dot', 'vanderpol_ode_rate_collect.partx0dot')
+
+        class vanderpol_ode_delay(om.ExplicitComponent):
+
+            def initialize(self):
+                self.options.declare('num_nodes', types=int)
+                self.options['distributed'] = True
+
+            def setup(self):
+                nn = self.options['num_nodes']
+                comm = self.comm
+                rank = comm.rank
+
+                sizes, offsets = evenly_distrib_idxs(comm.size, nn)
+                start = offsets[rank]
+                end = start + sizes[rank]
+
+                self.add_input('x1', val=np.ones(sizes[rank]),
+                               src_indices=np.arange(start, end, dtype=int))
+
+                self.add_output('x0dot', val=np.ones(sizes[rank]))
+
+                r = c = np.arange(sizes[rank])
+                self.declare_partials(of='x0dot', wrt='x1',  rows=r, cols=c)
+
+            def compute(self, inputs, outputs):
+                x1 = inputs['x1']
+                outputs['x0dot'] = 5.0 * x1**2
+
+            def compute_partials(self, inputs, jacobian):
+                x1 = inputs['x1']
+                jacobian['x0dot', 'x1'] = 10.0 * x1
+
+        class vanderpol_ode_rate_collect(om.ExplicitComponent):
+
+            def initialize(self):
+                self.options.declare('num_nodes', types=int)
+
+            def setup(self):
+                nn = self.options['num_nodes']
+                comm = self.comm
+                self.rank = comm.rank
+
+                self.add_input('partx0dot', val=np.ones(nn))
+
+                self.add_output('x0dot', val=np.ones(nn))
+
+                # partials
+                cols = np.arange(nn)
+                self.declare_partials(of='x0dot', wrt='partx0dot', rows=cols, cols=cols, val=1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['x0dot'] = inputs['partx0dot']
+
+
+        p = om.Problem()
+
+        phase = Phase(ode_class=vanderpol_ode_group)
+        phase.add_state('x1', targets='x1')
+        p.model = phase
+
+        phase.add_objective('rhs_disc.x0dot', index=-1)
+
+        p.setup(mode='rev')
+        p.final_setup()
+        p.run_model()
+
+        of ='rhs_disc.x0dot'
+        wrt = 'states:x1'
+        totals = p.check_totals(of=of, wrt=wrt, compact_print=False)
+
+        for key, val in totals.items():
+            assert_near_equal(val['rel error'][0], 0.0, 1e-6)
 
 
 if __name__ == "__main__":

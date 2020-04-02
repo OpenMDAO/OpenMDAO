@@ -29,6 +29,8 @@ from openmdao.solvers.solver import Solver
 """
 SQL case database version history.
 ----------------------------------
+6 -- OpenMDAO 3.X
+     Removed abs2prom from the driver_metadata table.
 5 -- OpenMDAO 2.5
      Added source column (driver name, system/solver pathname) to global iterations table.
 4 -- OpenMDAO 2.4
@@ -40,7 +42,7 @@ SQL case database version history.
 1 -- Through OpenMDAO 2.3
      Original implementation.
 """
-format_version = 5
+format_version = 6
 
 
 def array_to_blob(array):

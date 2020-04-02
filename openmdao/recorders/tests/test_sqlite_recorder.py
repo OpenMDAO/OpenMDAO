@@ -513,9 +513,9 @@ class TestSqliteRecorder(unittest.TestCase):
         cr = om.CaseReader("cases.sql")
         # Quick check to see that keys and values were recorded
         for key in ['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']:
-            self.assertTrue(key in cr.system_metadata.keys())
+            self.assertTrue(key in cr.system_options.keys())
 
-        value = cr.system_metadata['root']['component_options']['assembled_jac_type']
+        value = cr.system_options['root']['component_options']['assembled_jac_type']
         self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
 
     def test_without_n2_data(self):

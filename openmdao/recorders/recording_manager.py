@@ -237,5 +237,6 @@ def record_viewer_data(problem):
     if recorders:
         from openmdao.visualization.n2_viewer.n2_viewer import _get_viewer_data
         viewer_data = _get_viewer_data(problem)
+        viewer_data.pop('abs2prom', None)  # abs2prom already recorded in metadata table
         for recorder in recorders:
             recorder.record_viewer_data(viewer_data)
