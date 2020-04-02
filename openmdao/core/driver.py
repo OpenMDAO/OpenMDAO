@@ -1053,10 +1053,6 @@ def record_iteration(requester, prob, case_name):
     outs = model._retrieve_data_of_kind(filt, 'output', 'nonlinear', parallel)
     ins = model._retrieve_data_of_kind(filt, 'input', 'nonlinear', parallel)
 
-    from openmdao.core.problem import Problem
-    if not isinstance(requester, (Problem, Driver)):
-        raise ValueError('Unexpected object requesting recording: {0}'.format(requester))
-
     data = {
         'output': outs,
         'input': ins
