@@ -17,22 +17,28 @@ from openmdao.utils.shell_proc import check_call
 from openmdao.utils.assert_utils import assert_warning
 
 
-# set DEBUG to True if you want to view the generated HTML file(s)
-DEBUG = False
+# Whether to pop up a browser window for each N2
+DEBUG_BROWSER = False
+
+# set DEBUG_FILES to True if you want to view the generated HTML file(s)
+DEBUG_FILES = False
 
 
 class TestViewModelData(unittest.TestCase):
 
     def setUp(self):
-        if not DEBUG:
+        if not DEBUG_FILES:
             self.dir = mkdtemp()
         else:
             self.dir = os.getcwd()
 
         self.sqlite_db_filename = os.path.join(self.dir, "sellarstate_model.sqlite")
         self.sqlite_db_filename2 = os.path.join(self.dir, "sellarstate_model_view.sqlite")
+        self.compare_html_filename = os.path.join(self.dir, "compare_n2.html")
         self.sqlite_html_filename = os.path.join(self.dir, "sqlite_n2.html")
         self.problem_html_filename = os.path.join(self.dir, "problem_n2.html")
+        self.title_html_filename = os.path.join(self.dir, "title_n2.html")
+        self.conn_html_filename = os.path.join(self.dir, "conn_n2.html")
 
         self.expected_tree = json.loads("""
             {
@@ -349,7 +355,7 @@ class TestViewModelData(unittest.TestCase):
         self.expected_responses_names = []
 
     def tearDown(self):
-        if not DEBUG:
+        if not DEBUG_FILES:
             try:
                 rmtree(self.dir)
             except OSError as e:
@@ -651,7 +657,7 @@ class TestViewModelData(unittest.TestCase):
         p = Problem()
         p.model = SellarStateConnection()
         p.setup()
-        n2(p, outfile=self.problem_html_filename, show_browser=DEBUG)
+        n2(p, outfile=self.problem_html_filename, show_browser=DEBUG_BROWSER)
 
         # Check that the html file has been created and has something in it.
         self.assertTrue(os.path.isfile(self.problem_html_filename),
@@ -669,15 +675,24 @@ class TestViewModelData(unittest.TestCase):
         p.setup()
         p.final_setup()
         r.shutdown()
-        n2(self.sqlite_db_filename2, outfile=self.sqlite_html_filename, show_browser=DEBUG)
+        n2(p, outfile=self.compare_html_filename, show_browser=DEBUG_BROWSER)
+        n2(self.sqlite_db_filename2, outfile=self.sqlite_html_filename, show_browser=DEBUG_BROWSER)
 
         # Check that the html file has been created and has something in it.
         self.assertTrue(os.path.isfile(self.sqlite_html_filename),
-                        (self.problem_html_filename + " is not a valid file."))
+                        (self.sqlite_html_filename + " is not a valid file."))
         self.assertGreater(os.path.getsize(self.sqlite_html_filename), 100)
 
         # Check that there are no errors when running from the command line with a recording.
         check_call('openmdao n2 --no_browser %s' % self.sqlite_db_filename2)
+
+        # Compare the sizes of the files generated from the Problem and the recording
+        size1 = os.path.getsize(self.sqlite_html_filename)
+        size2 = os.path.getsize(self.compare_html_filename)
+        self.assertTrue(size1 == size2,
+                        'File size of ' + self.sqlite_html_filename + ' is ' + str(size1) +
+                        ', but size of ' + self.compare_html_filename + ' is ' + str(size2))
+                        
 
     def test_n2_command(self):
         """
@@ -694,14 +709,14 @@ class TestViewModelData(unittest.TestCase):
         p = Problem()
         p.model = SellarStateConnection()
         p.setup()
-        n2(p, outfile=self.problem_html_filename, show_browser=DEBUG,
+        n2(p, outfile=self.title_html_filename, show_browser=DEBUG_BROWSER,
            title="Sellar State Connection")
 
         # Check that the html file has been created and has something in it.
-        self.assertTrue(os.path.isfile(self.problem_html_filename),
-                        (self.problem_html_filename + " is not a valid file."))
+        self.assertTrue(os.path.isfile(self.title_html_filename),
+                        (self.title_html_filename + " is not a valid file."))
         self.assertTrue('OpenMDAO Model Hierarchy and N2 diagram: Sellar State Connection'
-                        in open(self.problem_html_filename).read())
+                        in open(self.title_html_filename).read())
 
     def test_n2_connection_error(self):
         """
@@ -720,14 +735,14 @@ class TestViewModelData(unittest.TestCase):
         with assert_warning(UserWarning, expected):
             p.setup()
 
-        n2(p, outfile=self.problem_html_filename, show_browser=DEBUG,
+        n2(p, outfile=self.conn_html_filename, show_browser=DEBUG_BROWSER,
            title="Bad Connection")
 
         # Check that the html file has been created and has something in it.
-        self.assertTrue(os.path.isfile(self.problem_html_filename),
-                        (self.problem_html_filename + " is not a valid file."))
+        self.assertTrue(os.path.isfile(self.conn_html_filename),
+                        (self.conn_html_filename + " is not a valid file."))
         self.assertTrue('OpenMDAO Model Hierarchy and N2 diagram: Bad Connection'
-                        in open(self.problem_html_filename).read())
+                        in open(self.conn_html_filename).read())
 
 
 if __name__ == "__main__":
