@@ -3,6 +3,7 @@ A console script wrapper for multiple openmdao functions.
 """
 
 import sys
+import re
 import os
 import argparse
 try:
@@ -423,6 +424,12 @@ def _cite_cmd(options, user_args):
 
     _load_and_exec(options.file[0], user_args)
 
+def _om_version():
+    __version__ = re.findall(
+        r"""__version__ = ["']+([0-9\.\-dev]*)["']+""",
+        open('openmdao/__init__.py').read(),
+    )[0]
+    return __version__
 
 # this dict should contain names mapped to tuples of the form:
 #   (setup_parser_func, executor, description)
@@ -484,6 +491,10 @@ def openmdao_cmd():
                                      ' openmdao n2 -o foo.html myscript.py -- -x --myarg=bar')
 
     # setting 'dest' here will populate the Namespace with the active subparser name
+    parser.add_argument('--version', action='version',
+                        help='Print the OpenMDAO version number and exit',
+                        version=_om_version())
+
     subs = parser.add_subparsers(title='Tools', metavar='', dest="subparser_name")
     for p, (parser_setup_func, executor, help_str) in sorted(_command_map.items()):
         subp = subs.add_parser(p, help=help_str)
