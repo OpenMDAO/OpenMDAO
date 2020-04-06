@@ -1474,7 +1474,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         prob.setup(force_alloc_complex=True)
         prob.run_model()
-        J = prob.check_partials(method='cs', out_stream=None)
+        J = prob.check_partials(method='cs', )#out_stream=None)
         assert_check_partials(J)
         self.assertEqual(comp.n_fwd, 1)
         self.assertEqual(comp.n_rev, 1)

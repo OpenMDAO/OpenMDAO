@@ -45,7 +45,7 @@ class ComplexStep(ApproximationScheme):
         # Only used when nested under complex step.
         self._fd = None
 
-    def add_approximation(self, abs_key, system, kwargs):
+    def add_approximation(self, abs_key, system, kwargs, vector=None):
         """
         Use this approximation scheme to approximate the derivative d(of)/d(wrt).
 
@@ -55,13 +55,18 @@ class ComplexStep(ApproximationScheme):
             Absolute name pairing of (of, wrt) for the derivative.
         system : System
             Containing System.
+        vector : ndarray or None
+            Direction for difference when using directional derivatives.
         kwargs : dict
             Additional keyword arguments, to be interpreted by sub-classes.
         """
         options = self.DEFAULT_OPTIONS.copy()
         options.update(kwargs)
 
-        key = (abs_key[1], options['step'], options['directional'])
+        step = options['step']
+        options['vector'] = vector
+
+        key = (abs_key[1], step, options['directional'])
         self._exec_dict[key].append((abs_key, options))
         self._reset()  # force later regen of approx_groups
 
