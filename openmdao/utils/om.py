@@ -6,6 +6,8 @@ import sys
 import re
 import os
 import argparse
+from openmdao import __version__ as version
+
 try:
     import pkg_resources
 except ImportError:
@@ -424,12 +426,6 @@ def _cite_cmd(options, user_args):
 
     _load_and_exec(options.file[0], user_args)
 
-def _om_version():
-    __version__ = re.findall(
-        r"""__version__ = ["']+([0-9\.\-dev]*)["']+""",
-        open('openmdao/__init__.py').read(),
-    )[0]
-    return __version__
 
 # this dict should contain names mapped to tuples of the form:
 #   (setup_parser_func, executor, description)
@@ -467,9 +463,8 @@ _command_map = {
     'view_coloring': (_view_coloring_setup_parser, _view_coloring_exec, 'View a colored jacobian.'),
     'view_connections': (_view_connections_setup_parser, _view_connections_cmd,
                          'View connections showing values and source/target units.'),
-    'view_mm': (_meta_model_parser, _meta_model_cmd, "View a metamodel."),
+    'view_mm': (_meta_model_parser, _meta_model_cmd, "View a metamodel.")
 }
-
 
 def openmdao_cmd():
     """
@@ -490,11 +485,9 @@ def openmdao_cmd():
                                      ' arguments, place those arguments after a "--". For example:'
                                      ' openmdao n2 -o foo.html myscript.py -- -x --myarg=bar')
 
-    # setting 'dest' here will populate the Namespace with the active subparser name
-    parser.add_argument('--version', action='version',
-                        help='Print the OpenMDAO version number and exit',
-                        version=_om_version())
+    parser.add_argument('--version', action='version', version=version)
 
+    # setting 'dest' here will populate the Namespace with the active subparser name
     subs = parser.add_subparsers(title='Tools', metavar='', dest="subparser_name")
     for p, (parser_setup_func, executor, help_str) in sorted(_command_map.items()):
         subp = subs.add_parser(p, help=help_str)
