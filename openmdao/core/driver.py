@@ -537,10 +537,6 @@ class Driver(object):
                     value = int(value)
                 else:
                     value = value.astype(np.int)
-            else:
-                # Error fully processed at a higher level.
-                msg = "Discrete des_vars should be integer scalars or arrays."
-                raise ValueError(msg)
 
             problem.model._discrete_outputs[name] = value
 

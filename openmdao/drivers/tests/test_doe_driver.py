@@ -989,38 +989,53 @@ class TestDOEDriver(unittest.TestCase):
                 self.assertEqual(outputs[name], expected_case[name])
                 self.assertTrue(isinstance(outputs[name], int))
 
-    def test_discrete_desvar_bad_type(self):
+    def test_discrete_desvar_alltypes(self):
+        # Make sure we can handle any allowed type for discrete variables.
+
+        class PassThrough(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_discrete_input('x', val='abc')
+                self.add_discrete_output('y', val='xyz')
+
+            def compute(self, inputs, outputs, discrete_inputs, discrete_outputs):
+                discrete_outputs['y'] = discrete_inputs['x']
+
         prob = om.Problem()
         model = prob.model
 
-        # Add independent variables
         indeps = model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
-        indeps.add_discrete_output('x', 4)
-        indeps.add_discrete_output('y', 3)
+        indeps.add_discrete_output('x', 'abc')
 
-        # Add components
-        model.add_subsystem('parab', ParaboloidDiscrete(), promotes=['*'])
+        model.add_subsystem('parab', PassThrough(), promotes=['*'])
 
-        # Specify design variable range and objective
         model.add_design_var('x')
-        model.add_design_var('y')
-        model.add_objective('f_xy')
+        model.add_constraint('y')
 
-        samples = [[('x', 'bad'), ('y', 1)],
-                   [('x', 3), ('y', 6)],
-                   [('x', -1), ('y', 3)],
+        my_obj = Paraboloid()
+        samples = [[('x', 'abc'), ],
+                   [('x', None), ],
+                   [('x', my_obj, ), ]
         ]
 
-        # Setup driver for 3 cases at a time
         prob.driver = om.DOEDriver(om.ListGenerator(samples))
         prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.setup()
-        with self.assertRaises(ValueError) as context:
-            prob.run_driver()
+        prob.run_driver()
+        prob.cleanup()
 
-        msg = 'Error assigning indeps.x = bad: Discrete des_vars should be integer scalars or arrays.'
-        self.assertEqual(str(context.exception), msg)
+        cr = om.CaseReader("cases.sql")
+        cases = cr.list_cases('driver')
+
+        expected = ['abc', None]
+
+        for case, expected_value in zip(cases, expected):
+            outputs = cr.get_case(case).outputs
+            self.assertEqual(outputs['x'], expected_value)
+
+        # Can't read/write objects through SQL case.
+        self.assertEqual(prob['y'], my_obj)
 
     def test_discrete_arraydesvar_list(self):
         prob = om.Problem()
