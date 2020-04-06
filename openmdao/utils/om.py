@@ -466,6 +466,7 @@ _command_map = {
     'view_mm': (_meta_model_parser, _meta_model_cmd, "View a metamodel.")
 }
 
+
 def openmdao_cmd():
     """
     Run an 'openmdao' sub-command or list help info for 'openmdao' command or sub-commands.
