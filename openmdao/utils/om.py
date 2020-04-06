@@ -5,6 +5,8 @@ A console script wrapper for multiple openmdao functions.
 import sys
 import os
 import argparse
+from openmdao import __version__ as version
+
 try:
     import pkg_resources
 except ImportError:
@@ -460,7 +462,7 @@ _command_map = {
     'view_coloring': (_view_coloring_setup_parser, _view_coloring_exec, 'View a colored jacobian.'),
     'view_connections': (_view_connections_setup_parser, _view_connections_cmd,
                          'View connections showing values and source/target units.'),
-    'view_mm': (_meta_model_parser, _meta_model_cmd, "View a metamodel."),
+    'view_mm': (_meta_model_parser, _meta_model_cmd, "View a metamodel.")
 }
 
 
@@ -482,6 +484,8 @@ def openmdao_cmd():
                                      ' If using a tool on a script that takes its own command line'
                                      ' arguments, place those arguments after a "--". For example:'
                                      ' openmdao n2 -o foo.html myscript.py -- -x --myarg=bar')
+
+    parser.add_argument('--version', action='version', version=version)
 
     # setting 'dest' here will populate the Namespace with the active subparser name
     subs = parser.add_subparsers(title='Tools', metavar='', dest="subparser_name")
