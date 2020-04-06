@@ -21,7 +21,7 @@ from openmdao.solvers.linesearch.tests.test_backtracking import ImplCompTwoState
 from openmdao.recorders.tests.sqlite_recorder_test_utils import assertMetadataRecorded, \
     assertDriverIterDataRecorded, assertSystemIterDataRecorded, assertSolverIterDataRecorded, \
     assertViewerDataRecorded, assertSystemMetadataIdsRecorded, assertSystemIterCoordsRecorded, \
-    assertDriverDerivDataRecorded
+    assertDriverDerivDataRecorded, assertProblemDerivDataRecorded
 
 from openmdao.recorders.tests.recorder_test_utils import run_driver
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
@@ -513,9 +513,9 @@ class TestSqliteRecorder(unittest.TestCase):
         cr = om.CaseReader("cases.sql")
         # Quick check to see that keys and values were recorded
         for key in ['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']:
-            self.assertTrue(key in cr.system_metadata.keys())
+            self.assertTrue(key in cr.system_options.keys())
 
-        value = cr.system_metadata['root']['component_options']['assembled_jac_type']
+        value = cr.system_options['root']['component_options']['assembled_jac_type']
         self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
 
     def test_without_n2_data(self):
@@ -1775,6 +1775,76 @@ class TestSqliteRecorder(unittest.TestCase):
         # includes no outputs except the the VOIs that are recorded by default
         self.assertEqual(set(final_case.outputs.keys()),
                          {'con1', 'con2', 'obj', 'x', 'z'})
+
+    def test_problem_recording_derivatives(self):
+        prob = ParaboloidProblem()
+
+        prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
+        prob.recording_options['record_derivatives'] = True
+        prob.add_recorder(self.recorder)
+
+        prob.setup()
+        prob.set_solver_print(0)
+        t0, t1 = run_driver(prob)
+        case_name = "state1"
+        prob.record_state(case_name)
+        prob.cleanup()
+
+        expected_derivs = {
+            "comp.f_xy,p1.x": np.array([[0.5]]),
+            "comp.f_xy,p2.y": np.array([[-0.5]]),
+            "con.c,p1.x": np.array([[-1.0]]),
+            "con.c,p2.y": np.array([[1.0]])
+        }
+
+        expected_data = ((case_name, (t0, t1), expected_derivs),)
+        assertProblemDerivDataRecorded(self, expected_data, self.eps)
+
+
+    def test_problem_recording_derivatives_option_false(self):
+        prob = ParaboloidProblem()
+
+        prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
+        # By default the option record_derivatives is False
+        prob.add_recorder(self.recorder)
+
+        prob.setup()
+        prob.set_solver_print(0)
+        t0, t1 = run_driver(prob)
+        case_name = "state1"
+        prob.record_state(case_name)
+        prob.cleanup()
+
+        expected_derivs = None
+        expected_data = ((case_name, (t0, t1), expected_derivs),)
+        assertProblemDerivDataRecorded(self, expected_data, self.eps)
+
+    def test_problem_recording_derivatives_no_voi(self):
+
+        prob = om.Problem(model=SellarDerivatives())
+
+        prob.recording_options['record_derivatives'] = True
+        prob.add_recorder(self.recorder)
+
+        prob.setup()
+        prob.set_solver_print(0)
+        t0, t1 = run_driver(prob)
+
+        case_name = "state1"
+        prob.record_state(case_name)
+
+        prob.cleanup()
+
+        cr = om.CaseReader(self.filename)
+
+        problem_cases = cr.list_cases('problem')
+        self.assertEqual(len(problem_cases), 1)
+
+        # No desvars or responses given so cannot compute total derivs
+        expected_derivs = None
+
+        expected_data = ((case_name, (t0, t1), expected_derivs),)
+        assertProblemDerivDataRecorded(self, expected_data, self.eps)
 
     def test_simple_paraboloid_scaled_desvars(self):
         prob = om.Problem()

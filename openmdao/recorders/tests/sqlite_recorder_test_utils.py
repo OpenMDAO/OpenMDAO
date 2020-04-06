@@ -62,7 +62,8 @@ def assertProblemDataRecorded(test, expected, tolerance):
             test.assertTrue(row_actual, 'Problem table does not contain the requested '
                             'case name: "{}"'.format(case))
 
-            counter, global_counter, case_name, timestamp, success, msg, outputs_text = row_actual
+            counter, global_counter, case_name, timestamp, success, msg, outputs_text, derivatives \
+                = row_actual
 
             if f_version >= 3:
                 outputs_actual = deserialize(outputs_text, abs2meta)
@@ -193,6 +194,51 @@ def assertDriverDerivDataRecorded(test, expected, tolerance, prefix=None):
             if totals_expected is None:
                 test.assertEqual(totals_actual, np.array(None, dtype=object))
             else:
+                actual = totals_actual[0]
+                # Check to see if the number of values in actual and expected match
+                test.assertEqual(len(actual), len(totals_expected))
+                for key, value in totals_expected.items():
+                    # Check to see if the keys in the actual and expected match
+                    test.assertTrue(key in actual.dtype.names,
+                                    '{} variable not found in actual data'
+                                    ' from recorder'.format(key))
+                    # Check to see if the values in actual and expected match
+                    assert_near_equal(actual[key], totals_expected[key], tolerance)
+
+
+def assertProblemDerivDataRecorded(test, expected, tolerance, prefix=None):
+    """
+    Expected can be from multiple cases.
+    """
+    with database_cursor(test.filename) as db_cur:
+
+        # iterate through the cases
+        for case_name, (t0, t1), totals_expected in expected:
+
+            # from the database, get the actual data recorded
+            db_cur.execute("SELECT * FROM problem_cases WHERE "
+                           "case_name=:case_name",
+                           {"case_name": case_name})
+            row_actual = db_cur.fetchone()
+
+            test.assertTrue(row_actual,
+                            'Problem case table does not contain the requested '
+                            'case name: "{}"'.format(case_name))
+
+            counter, global_counter, case_name, timestamp, success, msg, outputs, totals_blob = \
+                row_actual
+
+            totals_actual = blob_to_array(totals_blob)
+
+            test.assertEqual(success, 1)
+            test.assertEqual(msg, '')
+
+            if totals_expected is None:
+                test.assertEqual(totals_actual.shape, (),
+                                 msg="Expected empty array derivatives in case recorder")
+            else:
+                test.assertNotEqual(totals_actual.shape[0], 0,
+                                    msg="Expected non-empty array derivatives in case recorder")
                 actual = totals_actual[0]
                 # Check to see if the number of values in actual and expected match
                 test.assertEqual(len(actual), len(totals_expected))
@@ -380,10 +426,16 @@ def assertViewerDataRecorded(test, expected):
         test.assertTrue(isinstance(model_viewer_data, dict))
 
         # primary keys
-        test.assertEqual(set(model_viewer_data.keys()), {
-            'tree', 'sys_pathnames_list', 'connections_list', 'abs2prom',
+        if f_version >= 6:
+            test.assertEqual(set(model_viewer_data.keys()), {
+            'tree', 'sys_pathnames_list', 'connections_list',
             'driver', 'design_vars', 'responses', 'declare_partials_list'
-        })
+            })
+        else:
+            test.assertEqual(set(model_viewer_data.keys()), {
+                'tree', 'sys_pathnames_list', 'connections_list', 'abs2prom',
+                'driver', 'design_vars', 'responses', 'declare_partials_list'
+            })
 
         # system pathnames
         test.assertTrue(isinstance(model_viewer_data['sys_pathnames_list'], list))
@@ -409,11 +461,12 @@ def assertViewerDataRecorded(test, expected):
         test.assertEqual(expected['tree_children_length'],
                          len(model_viewer_data['tree']['children']))
 
-        # abs2prom map
-        abs2prom = model_viewer_data['abs2prom']
-        for io in ['input', 'output']:
-            for var in expected['abs2prom'][io]:
-                test.assertEqual(abs2prom[io][var], expected['abs2prom'][io][var])
+        if f_version < 6:
+            # abs2prom map
+            abs2prom = model_viewer_data['abs2prom']
+            for io in ['input', 'output']:
+                for var in expected['abs2prom'][io]:
+                    test.assertEqual(abs2prom[io][var], expected['abs2prom'][io][var])
 
 
 def assertSystemMetadataIdsRecorded(test, ids):
