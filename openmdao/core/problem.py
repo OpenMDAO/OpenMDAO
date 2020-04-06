@@ -949,6 +949,7 @@ class Problem(object):
         mfree_directions = {}
 
         # Analytic Jacobians
+        print_reverse = False
         for mode in ('fwd', 'rev'):
             model._inputs.set_vec(input_cache)
             model._outputs.set_vec(output_cache)
@@ -966,7 +967,8 @@ class Problem(object):
                 explicit = isinstance(comp, ExplicitComponent)
                 matrix_free = comp.matrix_free
                 c_name = comp.pathname
-                indep_key[c_name] = set()
+                if mode == 'fwd':
+                    indep_key[c_name] = set()
 
                 with comp._unscaled_context():
 
@@ -976,7 +978,7 @@ class Problem(object):
                     # Matrix-free components need to calculate their Jacobian by matrix-vector
                     # product.
                     if matrix_free:
-
+                        print_reverse = True
                         local_opts = comp._get_check_partial_options()
 
                         dstate = comp._vectors['output']['linear']
@@ -1067,6 +1069,11 @@ class Problem(object):
 
                     # These components already have a Jacobian with calculated derivatives.
                     else:
+
+                        if mode == 'rev':
+                            # Skip reverse mode because it is not different than forward.
+                            continue
+
                         subjacs = comp._jacobian._subjacs_info
 
                         for rel_key in product(of_list, wrt_list):
@@ -1203,8 +1210,8 @@ class Problem(object):
                 if wrt in local_opts and local_opts[wrt]['directional']:
                     deriv = partials_data[c_name][rel_key]
                     deriv['J_fwd'] = np.atleast_2d(np.sum(deriv['J_fwd'], axis=1)).T
-                    axis = 0 if comp.matrix_free else 1
-                    deriv['J_rev'] = np.atleast_2d(np.sum(deriv['J_rev'], axis=axis)).T
+                    if comp.matrix_free:
+                        deriv['J_rev'] = np.atleast_2d(np.sum(deriv['J_rev'], axis=0)).T
 
         # Conversion of defaultdict to dicts
         partials_data = {comp_name: dict(outer) for comp_name, outer in partials_data.items()}
@@ -1222,7 +1229,7 @@ class Problem(object):
 
         _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, out_stream,
                                   compact_print, comps, all_fd_options, indep_key=indep_key,
-                                  all_comps_provide_jacs=not self.model.matrix_free,
+                                  print_reverse=print_reverse,
                                   show_only_incorrect=show_only_incorrect)
 
         return partials_data
@@ -1637,7 +1644,7 @@ class Problem(object):
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
                               compact_print, system_list, global_options, totals=False,
-                              indep_key=None, all_comps_provide_jacs=False,
+                              indep_key=None, print_reverse=False,
                               show_only_incorrect=False):
     """
     Compute the relative and absolute errors in the given derivatives and print to the out_stream.
@@ -1663,8 +1670,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         Set to True if we are doing check_totals to skip a bunch of stuff.
     indep_key : dict of sets, optional
         Keyed by component name, contains the of/wrt keys that are declared not dependent.
-    all_comps_provide_jacs : bool, optional
-        Set to True if all components provide a Jacobian (are not matrix-free).
+    print_reverse : bool, optional
+        Set to True if compact_print results need to include columns for reverse mode.
     show_only_incorrect : bool, optional
         Set to True if output should print only the subjacs found to be incorrect.
     """
@@ -1672,14 +1679,11 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
     suppress_output = out_stream is None
 
     if compact_print:
-        if totals:
-            deriv_line = "{0} wrt {1} | {2:.4e} | {3:.4e} | {4:.4e} | {5:.4e}"
+        if print_reverse:
+            deriv_line = "{0} wrt {1} | {2:.4e} | {3} | {4:.4e} | {5:.4e} | {6} | {7}" \
+                         " | {8:.4e} | {9} | {10}"
         else:
-            if not all_comps_provide_jacs:
-                deriv_line = "{0} wrt {1} | {2:.4e} | {3} | {4:.4e} | {5:.4e} | {6} | {7}" \
-                             " | {8:.4e} | {9} | {10}"
-            else:
-                deriv_line = "{0} wrt {1} | {2:.4e} | {3:.4e} | {4:.4e} | {5:.4e}"
+            deriv_line = "{0} wrt {1} | {2:.4e} | {3:.4e} | {4:.4e} | {5:.4e}"
 
     # Keep track of the worst subjac in terms of relative error for fwd and rev
     if not suppress_output and compact_print and not totals:
@@ -1748,7 +1752,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         max_width_of = max(max_width_of, len(of) + 2)  # 2 to include quotes
                         max_width_wrt = max(max_width_wrt, len(wrt) + 2)
 
-                    if not all_comps_provide_jacs:
+                    if print_reverse:
                         header = \
                             "{0} wrt {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} | {10}" \
                             .format(
@@ -1829,8 +1833,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         derivative_info['rel error'] = rel_err
                     else:
                         derivative_info['rel error'] = rel_err = ErrorTuple(fwd_error / fwd_norm,
-                                                                            nan,
-                                                                            nan)
+                                                                            None,
+                                                                            None)
 
             else:
                 if do_rev:
@@ -1839,8 +1843,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                                                         fwd_rev_error / fd_norm)
                 else:
                     derivative_info['rel error'] = rel_err = ErrorTuple(fwd_error / fd_norm,
-                                                                        nan,
-                                                                        nan)
+                                                                        None,
+                                                                        None)
 
             # Skip printing the dependent keys if the derivatives are fine.
             if not compact_print and indep_key is not None:
@@ -1865,6 +1869,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                     else:
                         error_string = ''
                         for error in abs_err:
+                            if error is None:
+                                continue
                             if not np.isnan(error) and error >= abs_error_tol:
                                 error_string += ' >ABS_TOL'
                                 break
@@ -1874,6 +1880,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         # compared to the other components so far
                         is_worst_subjac = False
                         for i, error in enumerate(rel_err):
+                            if error is None:
+                                continue
                             if not np.isnan(error):
                                 #  only 1st and 2d errs
                                 if i < 2 and error > worst_subjac_rel_err:
@@ -1894,21 +1902,24 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                 wrt_padded = pad_name(wrt, max_width_wrt, quotes=False)
                             else:
                                 wrt_padded = pad_name(wrt, max_width_wrt, quotes=True)
-                            if not all_comps_provide_jacs:
+                            if print_reverse:
                                 deriv_info_line = \
                                     deriv_line.format(
                                         pad_name(of, max_width_of, quotes=True),
                                         wrt_padded,
                                         magnitude.forward,
-                                        _format_if_not_matrix_free(matrix_free, magnitude.reverse),
+                                        _format_if_not_matrix_free(matrix_free and not directional,
+                                                                   magnitude.reverse),
                                         magnitude.fd,
                                         abs_err.forward,
-                                        _format_if_not_matrix_free(matrix_free, abs_err.reverse),
+                                        _format_if_not_matrix_free(matrix_free and not directional,
+                                                                   abs_err.reverse),
                                         _format_if_not_matrix_free(matrix_free,
                                                                    abs_err.forward_reverse),
                                         rel_err.forward,
-                                        _format_if_not_matrix_free(matrix_free, rel_err.reverse),
-                                        _format_if_not_matrix_free(matrix_free,
+                                        _format_if_not_matrix_free(matrix_free and not directional,
+                                                                   rel_err.reverse),
+                                        _format_if_not_matrix_free(matrix_free and not directional,
                                                                    rel_err.forward_reverse),
                                     )
                             else:
@@ -1950,7 +1961,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                     if do_rev:
                         error_descs = ('(Jfor  - Jfd) ', '(Jrev  - Jfd) ', '(Jfor  - Jrev)')
                     elif do_rev_dp:
-                        error_descs = ('(Jfor  - Jfd) ', '(Adjoint Dot Product Test) ')
+                        error_descs = ('(Jfor  - Jfd) ', '(Jrev Dot Product Test) ')
                     else:
                         error_descs = ('(Jfor  - Jfd) ', )
 
