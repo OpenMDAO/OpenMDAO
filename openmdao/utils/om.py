@@ -3,7 +3,6 @@ A console script wrapper for multiple openmdao functions.
 """
 
 import sys
-import re
 import os
 import argparse
 from openmdao import __version__ as version
