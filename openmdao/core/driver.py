@@ -527,9 +527,7 @@ class Driver(object):
             # Note, drivers set values here and generally should know it is setting an integer.
             # However, the DOEdriver may pull a non-integer value from its generator, so we
             # convert it.
-            if isinstance(value, int):
-                pass
-            elif isinstance(value, float):
+            if isinstance(value, float):
                 value = int(value)
             elif isinstance(value, np.ndarray):
                 if isinstance(problem.model._discrete_outputs[name], int):
