@@ -175,7 +175,7 @@ class DistributedRecorderTest(unittest.TestCase):
         if prob.comm.rank == 0:
             expected_outputs.update(expected_objectives)
 
-            expected_data = ((coordinate, (t0, t1), expected_outputs, None),)
+            expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
             assertDriverIterDataRecorded(self, expected_data, self.eps)
 
     def test_recording_remote_voi(self):
@@ -254,7 +254,7 @@ class DistributedRecorderTest(unittest.TestCase):
 
             coordinate = [0, 'ScipyOptimize_SLSQP', (driver.iter_count-1,)]
 
-            expected_data = ((coordinate, (t0, t1), expected_outputs, None),)
+            expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
             assertDriverIterDataRecorded(self, expected_data, self.eps)
 
             expected_data = (('final', (t1, t2), expected_outputs),)
