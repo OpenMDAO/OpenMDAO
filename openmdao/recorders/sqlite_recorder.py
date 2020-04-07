@@ -29,6 +29,8 @@ from openmdao.solvers.solver import Solver
 """
 SQL case database version history.
 ----------------------------------
+7 -- OpenMDAO 3.0
+     Added derivatives field to table for recording problems.
 6 -- OpenMDAO 3.X
      Removed abs2prom from the driver_metadata table.
 5 -- OpenMDAO 2.5
@@ -42,7 +44,7 @@ SQL case database version history.
 1 -- Through OpenMDAO 2.3
      Original implementation.
 """
-format_version = 6
+format_version = 7
 
 
 def array_to_blob(array):
@@ -197,7 +199,7 @@ class SqliteRecorder(CaseRecorder):
 
                 c.execute("CREATE TABLE problem_cases(id INTEGER PRIMARY KEY, "
                           "counter INT, case_name TEXT, timestamp REAL, "
-                          "success INT, msg TEXT, inputs TEXT, outputs TEXT, residuals TEXT)")
+                          "success INT, msg TEXT, inputs TEXT, outputs TEXT, residuals TEXT, jacobian BLOB)")
                 c.execute("CREATE INDEX prob_name_ind on problem_cases(case_name)")
 
                 c.execute("CREATE TABLE system_iterations(id INTEGER PRIMARY KEY, "
@@ -435,6 +437,15 @@ class SqliteRecorder(CaseRecorder):
             inputs = data['input']
             residuals = data['residual']
 
+            driver = recording_requester.driver
+            if recording_requester.recording_options['record_derivatives'] and \
+                    driver._designvars and driver._responses:
+                totals = data['totals']
+            else:
+                totals = OrderedDict([])
+            totals_array = dict_to_structured_array(totals)
+            totals_blob = array_to_blob(totals_array)
+
             # convert to list so this can be dumped as JSON
             for in_out_resid in (inputs, outputs, residuals):
                 if in_out_resid is None:
@@ -453,7 +464,7 @@ class SqliteRecorder(CaseRecorder):
                           "timestamp, success, msg, inputs, outputs, residuals) VALUES(?,?,?,?,?,?,?,?)",
                           (self._counter, metadata['name'],
                            metadata['timestamp'], metadata['success'], metadata['msg'],
-                           inputs_text, outputs_text, residuals_text))
+                           inputs_text, outputs_text, residuals_text, totals_blob))
 
     def record_iteration_system(self, recording_requester, data, metadata):
         """
