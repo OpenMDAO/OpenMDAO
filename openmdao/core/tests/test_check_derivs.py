@@ -1394,6 +1394,8 @@ class TestProblemCheckPartials(unittest.TestCase):
         model = prob.model
         mycomp = model.add_subsystem('mycomp', ArrayCompCS(), promotes=['*'])
 
+        np.random.seed(1)
+
         prob.setup(check=False, force_alloc_complex=True)
         prob.run_model()
 
@@ -1448,18 +1450,91 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
+        np.random.seed(1)
+
         comp = TestDirectional(n=5)
         model.add_subsystem('comp', comp)
 
         prob.setup(force_alloc_complex=True)
         prob.run_model()
+
         J = prob.check_partials(method='cs', out_stream=None)
         assert_check_partials(J)
         self.assertEqual(comp.n_fwd, 1)
         self.assertEqual(comp.n_rev, 1)
 
         # Compact print needs to print the dot-product test.
-        J = prob.check_partials(method='cs', compact_print=True)
+        stream = StringIO()
+        J = prob.check_partials(method='cs', out_stream=stream, compact_print=True)
+        lines = stream.getvalue().splitlines()
+
+        self.assertEqual(lines[6][43:46], 'n/a')
+        self.assertEqual(lines[6][82:85], 'n/a')
+        assert_near_equal(float(lines[6][95:105]), 0.0, 1e-15)
+
+    def test_directional_mixed_matrix_free(self):
+        import openmdao.api as om
+
+        class ArrayCompMatrixFree(om.ExplicitComponent):
+
+            def setup(self):
+
+                J1 = np.array([[1.0, 3.0, -2.0, 7.0],
+                                [6.0, 2.5, 2.0, 4.0],
+                                [-1.0, 0.0, 8.0, 1.0],
+                                [1.0, 4.0, -5.0, 6.0]])
+
+                self.J1 = J1
+                self.J2 = J1 * 3.3
+                self.Jb = J1.T
+
+                # Inputs
+                self.add_input('x1', np.zeros([4]))
+                self.add_input('x2', np.zeros([4]))
+                self.add_input('bb', np.zeros([4]))
+
+                # Outputs
+                self.add_output('y1', np.zeros([4]))
+
+                self.declare_partials(of='*', wrt='*')
+                self.set_check_partial_options('x*', directional=True, method='fd')
+
+            def compute(self, inputs, outputs):
+                """
+                Execution.
+                """
+                outputs['y1'] = self.J1.dot(inputs['x1']) + self.J2.dot(inputs['x2']) + self.Jb.dot(inputs['bb'])
+
+            def compute_jacvec_product(self, inputs, dinputs, doutputs, mode):
+                """Returns the product of the incoming vector with the Jacobian."""
+
+                if mode == 'fwd':
+                    if 'x1' in dinputs:
+                        doutputs['y1'] += self.J1.dot(dinputs['x1'])
+                    if 'x2' in dinputs:
+                        doutputs['y1'] += self.J2.dot(dinputs['x2'])
+                    if 'bb' in dinputs:
+                        doutputs['y1'] += self.Jb.dot(dinputs['bb'])
+
+                elif mode == 'rev':
+                    if 'x1' in dinputs:
+                        dinputs['x1'] += self.J1.T.dot(doutputs['y1'])
+                    if 'x2' in dinputs:
+                        dinputs['x2'] += self.J2.T.dot(doutputs['y1'])
+                    if 'bb' in dinputs:
+                        dinputs['bb'] += self.Jb.T.dot(doutputs['y1'])
+
+        prob = om.Problem()
+        model = prob.model
+        mycomp = model.add_subsystem('mycomp', ArrayCompMatrixFree(), promotes=['*'])
+
+        np.random.seed(1)
+
+        prob.setup()
+        prob.run_model()
+
+        J = prob.check_partials(method='fd', out_stream=None)
+        assert_check_partials(J)
 
     def test_directional_vectorized(self):
 
@@ -1488,6 +1563,8 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
+
+        np.random.seed(1)
 
         comp = TestDirectional(n=5)
         model.add_subsystem('comp', comp)
@@ -1872,6 +1949,67 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
         mycomp = model.add_subsystem('mycomp', ArrayComp(), promotes=['*'])
+
+        prob.setup()
+        prob.run_model()
+
+        data = prob.check_partials()
+
+    def test_directional_matrix_free(self):
+        import openmdao.api as om
+
+        class ArrayCompMatrixFree(om.ExplicitComponent):
+
+            def setup(self):
+
+                J1 = np.array([[1.0, 3.0, -2.0, 7.0],
+                                [6.0, 2.5, 2.0, 4.0],
+                                [-1.0, 0.0, 8.0, 1.0],
+                                [1.0, 4.0, -5.0, 6.0]])
+
+                self.J1 = J1
+                self.J2 = J1 * 3.3
+                self.Jb = J1.T
+
+                # Inputs
+                self.add_input('x1', np.zeros([4]))
+                self.add_input('x2', np.zeros([4]))
+                self.add_input('bb', np.zeros([4]))
+
+                # Outputs
+                self.add_output('y1', np.zeros([4]))
+
+                self.declare_partials(of='*', wrt='*')
+                self.set_check_partial_options('*', directional=True)
+
+            def compute(self, inputs, outputs):
+                """
+                Execution.
+                """
+                outputs['y1'] = self.J1.dot(inputs['x1']) + self.J2.dot(inputs['x2']) + self.Jb.dot(inputs['bb'])
+
+            def compute_jacvec_product(self, inputs, dinputs, doutputs, mode):
+                """Returns the product of the incoming vector with the Jacobian."""
+
+                if mode == 'fwd':
+                    if 'x1' in dinputs:
+                        doutputs['y1'] += self.J1.dot(dinputs['x1'])
+                    if 'x2' in dinputs:
+                        doutputs['y1'] += self.J2.dot(dinputs['x2'])
+                    if 'bb' in dinputs:
+                        doutputs['y1'] += self.Jb.dot(dinputs['bb'])
+
+                elif mode == 'rev':
+                    if 'x1' in dinputs:
+                        dinputs['x1'] += self.J1.T.dot(doutputs['y1'])
+                    if 'x2' in dinputs:
+                        dinputs['x2'] += self.J2.T.dot(doutputs['y1'])
+                    if 'bb' in dinputs:
+                        dinputs['bb'] += self.Jb.T.dot(doutputs['y1'])
+
+        prob = om.Problem()
+        model = prob.model
+        mycomp = model.add_subsystem('mycomp', ArrayCompMatrixFree(), promotes=['*'])
 
         prob.setup()
         prob.run_model()

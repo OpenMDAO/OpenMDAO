@@ -347,15 +347,15 @@ class ApproximationScheme(object):
             out_slices = tmpJ['@out_slices']
 
             if J['vector'] is not None:
-                delta = data * J['vector']
+                app_data = self.apply_directional(data, J['vector'])
             else:
-                delta = data
+                app_data = data
 
             for i_count, idxs in enumerate(col_idxs):
                 if fd_count % num_par_fd == system._par_fd_id:
                     # run the finite difference
                     result = self._run_point(system, ((idx_info[0][0], idxs),),
-                                             delta, results_array, total)
+                                             app_data, results_array, total)
 
                     if is_parallel:
                         for of, (oview, out_idxs, _, _) in J['ofs'].items():

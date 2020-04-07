@@ -995,8 +995,11 @@ class Problem(object):
 
                         for inp in in_list:
                             inp_abs = rel_name2abs_name(comp, inp)
-                            directional = inp in local_opts and \
-                                local_opts[inp]['directional'] is True
+                            if mode == 'fwd':
+                                directional = inp in local_opts and \
+                                    local_opts[inp]['directional'] is True
+                            else:
+                                directional = c_name in mfree_directions
 
                             try:
                                 flat_view = dinputs._views_flat[inp_abs]
@@ -1007,7 +1010,9 @@ class Problem(object):
                             if directional:
                                 n_in = 1
                                 perturb = np.random.random(len(flat_view))
-                                mfree_directions[(c_name, inp)] = perturb
+                                if c_name not in mfree_directions:
+                                    mfree_directions[c_name] = {}
+                                mfree_directions[c_name][inp] = perturb
                             else:
                                 n_in = len(flat_view)
                                 perturb = 1.0
@@ -1050,8 +1055,8 @@ class Problem(object):
                                     else:
                                         if directional:
                                             # Dot product test for adjoint validity.
-                                            m = mfree_directions[(c_name, out)]
-                                            d = mfree_directions[(c_name, inp)]
+                                            m = mfree_directions[c_name][out]
+                                            d = mfree_directions[c_name][inp]
                                             mhat = derivs
                                             dhat = deriv['J_fwd'][:, idx]
 
@@ -1191,10 +1196,13 @@ class Problem(object):
                             fd_options[name] = value
 
                 all_fd_options[c_name][local_wrt] = fd_options
-                vector = mfree_directions.get((comp.pathname, local_wrt))
+                if c_name in mfree_directions:
+                    vector = mfree_directions[c_name].get(local_wrt)
+                else:
+                    vector = None
 
                 approximations[fd_options['method']].add_approximation(abs_key, self.model,
-                                                                       fd_options, vector = vector)
+                                                                       fd_options, vector=vector)
 
             approx_jac = {}
             for approximation in approximations.values():

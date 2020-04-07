@@ -321,3 +321,22 @@ class FiniteDifference(ApproximationScheme):
                     vec._data[idxs] -= delta
 
         return self._results_tmp
+
+    def apply_directional(self, data, direction):
+        """
+        Apply stepsize to direction and embed into approximation data.
+
+        Parameters
+        ----------
+        data : tuple
+            Tuple contains step size, and other info.
+        direction : ndarray
+            Vector containing derivative direction.
+
+        Returns
+        -------
+        ndarray
+            New tuple with new step direction.
+        """
+        deltas, coeffs, current_coeff = data
+        return (deltas * direction, coeffs, current_coeff)

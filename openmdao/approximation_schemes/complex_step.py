@@ -204,3 +204,21 @@ class ComplexStep(ApproximationScheme):
                 vec._data[idxs] -= delta
 
         return result_array
+
+    def apply_directional(self, data, direction):
+        """
+        Apply stepsize to direction and embed into approximation data.
+
+        Parameters
+        ----------
+        data : float
+            Step size for complex step.
+        direction : ndarray
+            Vector containing derivative direction.
+
+        Returns
+        -------
+        ndarray
+            New step direction.
+        """
+        return data * direction

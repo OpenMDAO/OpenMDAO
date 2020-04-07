@@ -137,6 +137,8 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6):
                 for error_type, tolerance in [('abs error', atol), ('rel error', rtol), ]:
                     actual = data[comp][var, wrt][error_type]
                     for norm, norm_type in zip(actual, norm_types):
+                        if norm is None:
+                            continue
                         if not np.isnan(norm):
                             if not np.allclose(norm, 0.0, atol=tolerance):
                                 wrt_string = '{0} wrt {1}'.format(var, wrt)
