@@ -189,7 +189,7 @@ class SqliteRecorder(CaseRecorder):
 
                 c.execute("CREATE TABLE driver_iterations(id INTEGER PRIMARY KEY, "
                           "counter INT, iteration_coordinate TEXT, timestamp REAL, "
-                          "success INT, msg TEXT, inputs TEXT, outputs TEXT)")
+                          "success INT, msg TEXT, inputs TEXT, outputs TEXT, residuals TEXT)")
                 c.execute("CREATE TABLE driver_derivatives(id INTEGER PRIMARY KEY, "
                           "counter INT, iteration_coordinate TEXT, timestamp REAL, "
                           "success INT, msg TEXT, derivatives BLOB)")
@@ -197,7 +197,7 @@ class SqliteRecorder(CaseRecorder):
 
                 c.execute("CREATE TABLE problem_cases(id INTEGER PRIMARY KEY, "
                           "counter INT, case_name TEXT, timestamp REAL, "
-                          "success INT, msg TEXT, outputs TEXT)")
+                          "success INT, msg TEXT, inputs TEXT, outputs TEXT, residuals TEXT)")
                 c.execute("CREATE INDEX prob_name_ind on problem_cases(case_name)")
 
                 c.execute("CREATE TABLE system_iterations(id INTEGER PRIMARY KEY, "
@@ -392,25 +392,27 @@ class SqliteRecorder(CaseRecorder):
         if self.connection:
             outputs = data['output']
             inputs = data['input']
+            residuals = data['residual']
 
             # convert to list so this can be dumped as JSON
-            for in_out in (inputs, outputs):
-                if in_out is None:
+            for in_out_resid in (inputs, outputs, residuals):
+                if in_out_resid is None:
                     continue
-                for var in in_out:
-                    in_out[var] = make_serializable(in_out[var])
+                for var in in_out_resid:
+                    in_out_resid[var] = make_serializable(in_out_resid[var])
 
             outputs_text = json.dumps(outputs)
             inputs_text = json.dumps(inputs)
+            residuals_text = json.dumps(residuals)
 
             with self.connection as c:
                 c = c.cursor()  # need a real cursor for lastrowid
 
                 c.execute("INSERT INTO driver_iterations(counter, iteration_coordinate, "
-                          "timestamp, success, msg, inputs, outputs) VALUES(?,?,?,?,?,?,?)",
+                          "timestamp, success, msg, inputs, outputs, residuals) VALUES(?,?,?,?,?,?,?,?)",
                           (self._counter, self._iteration_coordinate,
                            metadata['timestamp'], metadata['success'], metadata['msg'],
-                           inputs_text, outputs_text))
+                           inputs_text, outputs_text, residuals_text))
 
                 c.execute("INSERT INTO global_iterations(record_type, rowid, source) VALUES(?,?,?)",
                           ('driver', c.lastrowid, recording_requester._get_name()))
@@ -430,22 +432,28 @@ class SqliteRecorder(CaseRecorder):
         """
         if self.connection:
             outputs = data['output']
+            inputs = data['input']
+            residuals = data['residual']
 
             # convert to list so this can be dumped as JSON
-            if outputs is not None:
-                for var in outputs:
-                    outputs[var] = make_serializable(outputs[var])
+            for in_out_resid in (inputs, outputs, residuals):
+                if in_out_resid is None:
+                    continue
+                for var in in_out_resid:
+                    in_out_resid[var] = make_serializable(in_out_resid[var])
 
             outputs_text = json.dumps(outputs)
+            inputs_text = json.dumps(inputs)
+            residuals_text = json.dumps(residuals)
 
             with self.connection as c:
                 c = c.cursor()  # need a real cursor for lastrowid
 
                 c.execute("INSERT INTO problem_cases(counter, case_name, "
-                          "timestamp, success, msg, outputs) VALUES(?,?,?,?,?,?)",
+                          "timestamp, success, msg, inputs, outputs, residuals) VALUES(?,?,?,?,?,?,?,?)",
                           (self._counter, metadata['name'],
                            metadata['timestamp'], metadata['success'], metadata['msg'],
-                           outputs_text))
+                           inputs_text, outputs_text, residuals_text))
 
     def record_iteration_system(self, recording_requester, data, metadata):
         """
@@ -676,3 +684,21 @@ class SqliteRecorder(CaseRecorder):
         # close database connection
         if self.connection:
             self.connection.close()
+
+    def delete_recordings(self):
+        """
+        Delete all the recordings.
+        """
+        # close database connection
+        if self.connection:
+            self.connection.execute("DELETE FROM global_iterations" )
+            self.connection.execute("DELETE FROM driver_iterations" )
+            self.connection.execute("DELETE FROM driver_derivatives" )
+            self.connection.execute("DELETE FROM problem_cases" )
+            self.connection.execute("DELETE FROM system_iterations" )
+            self.connection.execute("DELETE FROM solver_iterations" )
+            self.connection.execute("DELETE FROM driver_metadata" )
+            self.connection.execute("DELETE FROM system_metadata" )
+            self.connection.execute("DELETE FROM solver_metadata" )
+
+
