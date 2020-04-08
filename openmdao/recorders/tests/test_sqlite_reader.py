@@ -15,6 +15,7 @@ from io import StringIO
 import openmdao.api as om
 from openmdao.recorders.sqlite_recorder import format_version
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
+from openmdao.recorders.tests.test_sqlite_recorder import ParaboloidProblem
 from openmdao.recorders.case import PromAbsDict
 from openmdao.core.tests.test_units import SpeedComp
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
@@ -2798,6 +2799,38 @@ class TestSqliteCaseReader(unittest.TestCase):
         with assert_warning(DeprecationWarning, msg):
             options = cr.system_metadata
 
+    def test_sqlite_reader_problem_derivatives(self):
+
+        prob = ParaboloidProblem()
+
+        prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
+        prob.recording_options['record_derivatives'] = True
+        recorder = om.SqliteRecorder('cases.sql')
+
+        prob.add_recorder(recorder)
+
+        prob.setup()
+        prob.set_solver_print(0)
+        prob.run_driver()
+
+        case_name = "c1"
+        prob.record_state(case_name)
+
+        prob.cleanup()
+
+        cr = om.CaseReader('cases.sql')
+
+        num_problem_cases = len(cr.list_cases('problem'))
+        self.assertEqual(num_problem_cases, 1)
+
+        c1 = cr.get_case('c1')
+        J = prob.compute_totals()
+        np.testing.assert_almost_equal(c1.derivatives[('f_xy', 'x')], J[('comp.f_xy', 'p1.x')])
+        np.testing.assert_almost_equal(c1.derivatives[('f_xy', 'y')], J[('comp.f_xy', 'p2.y')])
+        np.testing.assert_almost_equal(c1.derivatives[('c', 'x')], J[('con.c', 'p1.x')])
+        np.testing.assert_almost_equal(c1.derivatives[('c', 'y')], J[('con.c', 'p2.y')])
+
+
 @use_tempdirs
 class TestFeatureSqliteReader(unittest.TestCase):
 
@@ -2968,7 +3001,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         self.assertEqual(('inputs:', sorted(solver_vars['inputs']), 'outputs:', sorted(solver_vars['outputs'])),
                          ('inputs:', ['x', 'y1', 'y2', 'z'], 'outputs:', ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z']))
 
-    def test_feature_reading_derivatives(self):
+    def test_feature_reading_driver_derivatives(self):
         import openmdao.api as om
         from openmdao.test_suite.components.sellar_feature import SellarMDA
 
@@ -3305,6 +3338,57 @@ class TestFeatureSqliteReader(unittest.TestCase):
         assert_near_equal(case['v'], 100./60., 1e-6)
         assert_near_equal(case.get_val('v', units='ft/s'), 5.46807, 1e-6)
 
+    def test_feature_sqlite_reader_read_problem_derivatives_multiple_recordings(self):
+        import openmdao.api as om
+        from openmdao.test_suite.components.eggcrate import EggCrate
+
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('px', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('py', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('egg_crate', EggCrate(), promotes=['*'])
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
+
+        prob.recording_options['record_derivatives'] = True
+        recorder = om.SqliteRecorder('cases.sql')
+        prob.add_recorder(recorder)
+
+        prob.setup()
+        prob.set_solver_print(0)
+
+        prob['x'] = 2.5
+        prob['y'] = 2.5
+        prob.run_driver()
+        print(prob['x'], prob['y'], prob['f_xy'])
+        case_name_1 = "c1"
+        prob.record_state(case_name_1)
+
+        prob['x'] = 0.1
+        prob['y'] = -0.1
+        prob.run_driver()
+        print(prob['x'], prob['y'], prob['f_xy'])
+        case_name_2 = "c2"
+        prob.record_state(case_name_2)
+        prob.cleanup()
+
+        cr = om.CaseReader('cases.sql')
+
+        num_problem_cases = len(cr.list_cases('problem'))
+        self.assertEqual(num_problem_cases, 2)
+
+        c1 = cr.get_case(case_name_1)
+        c2 = cr.get_case(case_name_2)
+
+        # check that derivatives have been recorded properly.
+        assert_near_equal(c1.derivatives[('f_xy', 'x')][0], 0.0, 1e-4)
+        assert_near_equal(c1.derivatives[('f_xy', 'y')][0], 0.0, 1e-4)
+
+        assert_near_equal(c2.derivatives[('f_xy', 'x')][0], 0.0, 1e-4)
+        assert_near_equal(c2.derivatives[('f_xy', 'y')][0], 0.0, 1e-4)
+
 
 @use_tempdirs
 class TestPromAbsDict(unittest.TestCase):
@@ -3437,6 +3521,52 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
             # If directory already deleted, keep going
             if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
                 raise e
+
+    def test_problem_v6(self):
+        # the change from v6 to v7 was adding the derivatives to problem
+        # check to make sure reading a v6 file works when reading problem cases
+
+        # The case file was created with this code:
+
+        # import numpy as np
+        # import openmdao.api as om
+        # from openmdao.test_suite.components.sellar import SellarDerivatives
+        #
+        # prob = om.Problem(model=SellarDerivatives())
+        #
+        # model = prob.model
+        # model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+        #                      upper=np.array([10.0, 10.0]))
+        # model.add_design_var('x', lower=0.0, upper=10.0)
+        # model.add_objective('obj')
+        # model.add_constraint('con1', upper=0.0)
+        # model.add_constraint('con2', upper=0.0)
+        #
+        # prob.add_recorder(om.SqliteRecorder("case_problem_v6.sql"))
+        #
+        # prob.setup()
+        # prob.run_driver()
+        #
+        # prob.record_state('final')
+        # prob.cleanup()
+
+        filename = os.path.join(self.legacy_dir, 'case_problem_v6.sql')
+
+        cr = om.CaseReader(filename)
+
+        #
+        # check sources
+        #
+
+        self.assertEqual(sorted(cr.list_sources()), [
+            'problem',
+        ])
+ 
+        case = cr.get_case('final')
+
+        q = case.outputs.keys()
+
+        self.assertEqual(sorted(q), sorted(['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z']))
 
     def test_driver_v5(self):
         """ Not a big change to v6 but make sure reading of driver data from v5 works. """
