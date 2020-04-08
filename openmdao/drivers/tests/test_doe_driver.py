@@ -47,6 +47,34 @@ class ParaboloidArray(om.ExplicitComponent):
         outputs['f_xy'] = (x - 3.0)**2 + x * y + (y + 4.0)**2 - 3.0
 
 
+class ParaboloidDiscrete(om.ExplicitComponent):
+
+    def setup(self):
+        self.add_discrete_input('x', val=10, tags='xx')
+        self.add_discrete_input('y', val=0, tags='yy')
+        self.add_discrete_output('f_xy', val=0, tags='ff')
+
+    def compute(self, inputs, outputs, discrete_inputs, discrete_outputs):
+        x = discrete_inputs['x']
+        y = discrete_inputs['y']
+        f_xy = (x - 3.0)**2 + x * y + (y + 4.0)**2 - 3.0
+        discrete_outputs['f_xy'] = int(f_xy)
+
+
+class ParaboloidDiscreteArray(om.ExplicitComponent):
+
+    def setup(self):
+        self.add_discrete_input('x', val=np.ones((2, )), tags='xx')
+        self.add_discrete_input('y', val=np.ones((2, )), tags='yy')
+        self.add_discrete_output('f_xy', val=np.ones((2, )), tags='ff')
+
+    def compute(self, inputs, outputs, discrete_inputs, discrete_outputs):
+        x = discrete_inputs['x']
+        y = discrete_inputs['y']
+        f_xy = (x - 3.0)**2 + x * y + (y + 4.0)**2 - 3.0
+        discrete_outputs['f_xy'] = f_xy.astype(np.int)
+
+
 class TestErrors(unittest.TestCase):
 
     def test_generator_check(self):
@@ -915,6 +943,195 @@ class TestDOEDriver(unittest.TestCase):
         assert_near_equal(outputs['x'], 10.0, 1e-7)
         assert_near_equal(outputs['y'], 20.0, 1e-7)
         assert_near_equal(outputs['z'], 30.0, 1e-7)
+
+    def test_discrete_desvar_list(self):
+        prob = om.Problem()
+        model = prob.model
+
+        # Add independent variables
+        indeps = model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
+        indeps.add_discrete_output('x', 4)
+        indeps.add_discrete_output('y', 3)
+
+        # Add components
+        model.add_subsystem('parab', ParaboloidDiscrete(), promotes=['*'])
+
+        # Specify design variable range and objective
+        model.add_design_var('x')
+        model.add_design_var('y')
+        model.add_objective('f_xy')
+
+        samples = [[('x', 5), ('y', 1)],
+                   [('x', 3), ('y', 6)],
+                   [('x', -1), ('y', 3)],
+        ]
+
+        # Setup driver for 3 cases at a time
+        prob.driver = om.DOEDriver(om.ListGenerator(samples))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = om.CaseReader("cases.sql")
+        cases = cr.list_cases('driver')
+
+        expected = [{'x': 5, 'y': 1, 'f_xy': 31},
+                    {'x': 3, 'y': 6, 'f_xy': 115},
+                    {'x': -1, 'y': 3, 'f_xy': 59},
+        ]
+        self.assertEqual(len(cases), len(expected))
+
+        for case, expected_case in zip(cases, expected):
+            outputs = cr.get_case(case).outputs
+            for name in ('x', 'y', 'f_xy'):
+                self.assertEqual(outputs[name], expected_case[name])
+                self.assertTrue(isinstance(outputs[name], int))
+
+    def test_discrete_desvar_alltypes(self):
+        # Make sure we can handle any allowed type for discrete variables.
+
+        class PassThrough(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_discrete_input('x', val='abc')
+                self.add_discrete_output('y', val='xyz')
+
+            def compute(self, inputs, outputs, discrete_inputs, discrete_outputs):
+                discrete_outputs['y'] = discrete_inputs['x']
+
+        prob = om.Problem()
+        model = prob.model
+
+        indeps = model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
+        indeps.add_discrete_output('x', 'abc')
+
+        model.add_subsystem('parab', PassThrough(), promotes=['*'])
+
+        model.add_design_var('x')
+        model.add_constraint('y')
+
+        my_obj = Paraboloid()
+        samples = [[('x', 'abc'), ],
+                   [('x', None), ],
+                   [('x', my_obj, ), ]
+        ]
+
+        prob.driver = om.DOEDriver(om.ListGenerator(samples))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = om.CaseReader("cases.sql")
+        cases = cr.list_cases('driver')
+
+        expected = ['abc', None]
+
+        for case, expected_value in zip(cases, expected):
+            outputs = cr.get_case(case).outputs
+            self.assertEqual(outputs['x'], expected_value)
+
+        # Can't read/write objects through SQL case.
+        self.assertEqual(prob['y'], my_obj)
+
+    def test_discrete_arraydesvar_list(self):
+        prob = om.Problem()
+        model = prob.model
+
+        # Add independent variables
+        indeps = model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
+        indeps.add_discrete_output('x', np.ones((2, ), dtype=np.int))
+        indeps.add_discrete_output('y', np.ones((2, ), dtype=np.int))
+
+        # Add components
+        model.add_subsystem('parab', ParaboloidDiscreteArray(), promotes=['*'])
+
+        # Specify design variable range and objective
+        model.add_design_var('x')
+        model.add_design_var('y')
+        model.add_objective('f_xy')
+
+        samples = [[('x', np.array([5, 1])), ('y', np.array([1, 4]))],
+                   [('x', np.array([3, 2])), ('y', np.array([6, -3]))],
+                   [('x', np.array([-1, 0])), ('y', np.array([3, 5]))],
+        ]
+
+        # Setup driver for 3 cases at a time
+        prob.driver = om.DOEDriver(om.ListGenerator(samples))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = om.CaseReader("cases.sql")
+        cases = cr.list_cases('driver')
+
+        expected = [{'x': np.array([5, 1]), 'y': np.array([1, 4]), 'f_xy': np.array([31, 69])},
+                    {'x': np.array([3, 2]), 'y': np.array([6, -3]), 'f_xy': np.array([115, -7])},
+                    {'x': np.array([-1, 0]), 'y': np.array([3, 5]), 'f_xy': np.array([59, 87])},
+        ]
+        self.assertEqual(len(cases), len(expected))
+
+        for case, expected_case in zip(cases, expected):
+            outputs = cr.get_case(case).outputs
+            for name in ('x', 'y', 'f_xy'):
+                self.assertEqual(outputs[name][0], expected_case[name][0])
+                self.assertEqual(outputs[name][1], expected_case[name][1])
+
+
+    def test_discrete_desvar_csv(self):
+        prob = om.Problem()
+        model = prob.model
+
+        # Add independent variables
+        indeps = model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
+        indeps.add_discrete_output('x', 4)
+        indeps.add_discrete_output('y', 3)
+
+        # Add components
+        model.add_subsystem('parab', ParaboloidDiscrete(), promotes=['*'])
+
+        # Specify design variable range and objective
+        model.add_design_var('x')
+        model.add_design_var('y')
+        model.add_objective('f_xy')
+
+        samples = '\n'.join([" x ,   y",
+                             "5,  1",
+                             "3,  6",
+                             "-1,  3",
+                             ])
+
+        # this file contains design variable inputs in CSV format
+        with open('cases.csv', 'w') as f:
+            f.write(samples)
+
+        # Setup driver for 3 cases at a time
+        prob.driver = om.DOEDriver(om.CSVGenerator('cases.csv'))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = om.CaseReader("cases.sql")
+        cases = cr.list_cases('driver')
+
+        expected = [{'x': 5, 'y': 1, 'f_xy': 31},
+                    {'x': 3, 'y': 6, 'f_xy': 115},
+                    {'x': -1, 'y': 3, 'f_xy': 59},
+        ]
+        self.assertEqual(len(cases), len(expected))
+
+        for case, expected_case in zip(cases, expected):
+            outputs = cr.get_case(case).outputs
+            for name in ('x', 'y', 'f_xy'):
+                self.assertEqual(outputs[name], expected_case[name])
+                self.assertTrue(isinstance(outputs[name], int))
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")

@@ -387,7 +387,7 @@ class SimpleGADriver(Driver):
         objs = self.get_objective_values()
         nr_objectives = len(objs)
 
-        # Single objective, if there is nly one objective, which has only one element
+        # Single objective, if there is only one objective, which has only one element
         is_single_objective = (nr_objectives == 1) and (len(objs) == 1)
 
         obj_exponent = self.options['multi_obj_exponent']
