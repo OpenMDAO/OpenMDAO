@@ -8,6 +8,8 @@ import traceback
 import inspect
 import os
 
+from io import StringIO
+
 from docutils.parsers.rst.directives import unchanged, images
 
 from openmdao.docs._utils.docutil import get_source_code, remove_docstrings, \
@@ -118,7 +120,11 @@ class EmbedCodeDirective(Directive):
 
         if is_test:
             try:
-                source = replace_asserts_with_prints(dedent(strip_header(strip_decorators(dedent(source)))))
+                source = dedent(source)
+                decorators, source = strip_decorators(source)
+                source = strip_header(source)
+                source = dedent(source)
+                source = replace_asserts_with_prints(source)
                 source = remove_initial_empty_lines(source)
 
                 class_name = class_.__name__
@@ -137,9 +143,10 @@ class EmbedCodeDirective(Directive):
 
                 # for interleaving, we need to mark input/output blocks
                 if 'interleave' in layout:
-                    source = insert_output_start_stop_indicators(source)
-
-                code_to_run = '\n'.join([self_code, setup_code, source, teardown_code]).strip()
+                    interleaved = insert_output_start_stop_indicators(source)
+                    code_to_run = '\n'.join([self_code, setup_code, interleaved, teardown_code]).strip()
+                else:
+                    code_to_run = '\n'.join([self_code, setup_code, source, teardown_code]).strip()
             except Exception:
                 err = traceback.format_exc()
                 raise SphinxError("Problem with embed of " + path + ": \n" + str(err))
@@ -169,9 +176,23 @@ class EmbedCodeDirective(Directive):
                 if 'plot' in layout:
                     code_to_run = code_to_run + ('\nmatplotlib.pyplot.savefig("%s")' % plot_file_abs)
 
-            skipped, failed, run_outputs = run_code(code_to_run, path, module=module, cls=class_,
-                                                    imports_not_required=imports_not_required,
-                                                    shows_plot=shows_plot)
+            if is_test and decorators is not None:
+                # check whether test is skipped due to decorator
+                test_suite = unittest.TestLoader().loadTestsFromName(path)
+                test_result = unittest.TextTestRunner(stream=StringIO()).run(test_suite)
+                if len(test_result.skipped) > 0:
+                    skipped = True
+                    failed = False
+                    run_outputs = test_result.skipped[0][1]
+                else:
+                    # if it did not get skipped, then run normally
+                    skipped, failed, run_outputs = run_code(code_to_run, path, module=module, cls=class_,
+                                                            imports_not_required=imports_not_required,
+                                                            shows_plot=shows_plot)
+            else:
+                skipped, failed, run_outputs = run_code(code_to_run, path, module=module, cls=class_,
+                                                        imports_not_required=imports_not_required,
+                                                        shows_plot=shows_plot)
 
         #
         # Handle output
@@ -183,6 +204,7 @@ class EmbedCodeDirective(Directive):
             raise self.directive_error(2, run_outputs)
         elif skipped:
             io_nodes = [get_skip_output_node(run_outputs)]
+            self.state_machine.reporter.warning(run_outputs)
         else:
             if 'output' in layout:
                 output_blocks = run_outputs if isinstance(run_outputs, list) else [run_outputs]
@@ -230,6 +252,9 @@ class EmbedCodeDirective(Directive):
                 doc_nodes.append(body)
             elif skipped:
                 if not skip_fail_shown:
+                    body = nodes.literal_block(source, source)
+                    body['language'] = 'python'
+                    doc_nodes.append(body)
                     doc_nodes.extend(io_nodes)
                     skip_fail_shown = True
             else:
