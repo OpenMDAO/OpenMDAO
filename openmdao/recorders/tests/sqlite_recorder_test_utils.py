@@ -226,7 +226,7 @@ def assertProblemDerivDataRecorded(test, expected, tolerance, prefix=None):
                             'Problem case table does not contain the requested '
                             'case name: "{}"'.format(case_name))
 
-            counter, global_counter, case_name, timestamp, success, msg, outputs, totals_blob = \
+            counter, global_counter, case_name, timestamp, success, msg, inputs, outputs, residuals, totals_blob = \
                 row_actual
 
             totals_actual = blob_to_array(totals_blob)
