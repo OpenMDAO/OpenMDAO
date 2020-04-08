@@ -1718,7 +1718,7 @@ class TestSqliteRecorder(unittest.TestCase):
         # includes all outputs (default) minus the VOIs, which we have excluded
         self.assertEqual(set(final_case.outputs.keys()), {'x', 'y1', 'z', 'con1', 'y2', 'obj', 'con2'})
 
-    def test_problem_record_inputs_outputs_residuals(self):  ## NEW !!!!!
+    def test_problem_record_inputs_outputs_residuals(self):
         prob = om.Problem(model=SellarDerivatives())
 
         model = prob.model
@@ -1765,7 +1765,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.assertAlmostEqual(final_case.residuals['con2'][0], -1.3036682844358438e-11)
         # self.assertAlmostEqual(final_case.outputs['circuit.R1.I'][0], 0.09908047)
 
-    def test_problem_record_inputs(self):  ## NEW !!!!!
+    def test_problem_record_inputs(self):
 
         # By default you should not get any inputs recorded
         prob = ParaboloidProblem()
@@ -1822,7 +1822,7 @@ class TestSqliteRecorder(unittest.TestCase):
         final_case = cr.get_case('case5')
         self.assertEqual(final_case.residuals, None)
 
-    def test_problem_record_outputs(self):  ## NEW !!!!!
+    def test_problem_record_outputs(self):
 
         prob = ParaboloidProblem()
         prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
@@ -1863,7 +1863,7 @@ class TestSqliteRecorder(unittest.TestCase):
         final_case = cr.get_case('final3')
         self.assertEqual(final_case.residuals, None)
 
-    def test_problem_record_residuals(self):  ## NEW !!!!!
+    def test_problem_record_residuals(self):
 
         prob = ParaboloidProblem()
         prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
@@ -1905,7 +1905,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.assertEqual(final_case.residuals, None)
 
 
-    def test_driver_record_outputs(self):  ## NEW !!!!!
+    def test_driver_record_outputs(self):
 
         prob = ParaboloidProblem()
         driver = prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
@@ -1961,9 +1961,7 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_data = ((coordinate, (t0, t1), None, None, None),)
         assertDriverIterDataRecorded(self, expected_data, self.eps)
 
-
-
-    def test_driver_record_residuals(self):  ## NEW !!!!!
+    def test_driver_record_residuals(self):
 
         prob = ParaboloidProblem()
         driver = prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
@@ -2407,7 +2405,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         self.assertEqual(sorted(case.inputs.keys()), ['y1', 'y2', 'z'])
 
-    def test_feature_driver_options(self):   # UPDATED
+    def test_feature_driver_options(self):
         import openmdao.api as om
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
@@ -2454,8 +2452,6 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         assert_near_equal(constraints['con1'], prob['con1'], 1e-1)
         assert_near_equal(last_case.inputs['obj_cmp.x'], prob['x'])
         assert_near_equal(last_case.outputs['z'], prob['z'])
-
-
 
     def test_feature_solver_options(self):
         import openmdao.api as om
