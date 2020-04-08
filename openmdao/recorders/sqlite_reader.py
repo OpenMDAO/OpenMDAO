@@ -323,7 +323,7 @@ class SqliteCaseReader(BaseCaseReader):
         Returns
         -------
         dict
-            {'inputs':[list of keys], 'outputs':[list of keys], 'residuals':[list of keys]}. Does not recurse.
+            {'inputs':[key list], 'outputs':[key list], 'residuals':[key list]}. No recurse.
         """
         dct = {
             'inputs': [],
