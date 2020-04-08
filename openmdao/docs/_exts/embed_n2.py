@@ -44,11 +44,16 @@ class EmbedN2Directive(Directive):
         # check that the file exists
         if not os.path.isfile(np):
             raise IOError('File does not exist({0})'.format(np))
+        
+        # Generate N2 files into the target_dir. Those files are later copied
+        # into the top of the HTML hierarchy, so the HTML doc file needs a
+        # relative path to them.
+        target_dir = os.path.join(os.getcwd(), "_n2html")
 
         rel_dir = os.path.relpath(os.getcwd(),
                                   os.path.dirname(self.state.document.settings._source))
         html_base_name = os.path.basename(path_to_model).split('.')[0] + "_n2.html"
-        html_name = os.path.join(os.getcwd(), "_n2html", html_base_name)
+        html_name = os.path.join(target_dir, html_base_name)
         html_rel_name = os.path.join(rel_dir, html_base_name)
 
         cmd = subprocess.Popen(
