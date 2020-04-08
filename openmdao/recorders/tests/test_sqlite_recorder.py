@@ -2428,6 +2428,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         driver.recording_options['record_desvars'] = True
         driver.recording_options['record_inputs'] = True
         driver.recording_options['record_outputs'] = True
+        driver.recording_options['record_residuals'] = True
 
         recorder = om.SqliteRecorder("cases.sql")
         driver.add_recorder(recorder)
@@ -2452,6 +2453,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         assert_near_equal(constraints['con1'], prob['con1'], 1e-1)
         assert_near_equal(last_case.inputs['obj_cmp.x'], prob['x'])
         assert_near_equal(last_case.outputs['z'], prob['z'])
+        assert_near_equal(last_case.residuals['obj'], 0.0, tolerance = 1e-10)
 
     def test_feature_solver_options(self):
         import openmdao.api as om

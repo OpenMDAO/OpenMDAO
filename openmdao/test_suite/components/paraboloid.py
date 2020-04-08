@@ -39,8 +39,6 @@ class Paraboloid(om.ExplicitComponent):
         partials['f_xy', 'y'] = 2.0*y + 8.0 + x
 
 
-
-
 if __name__ == "__main__":
 
     model = om.Group()
