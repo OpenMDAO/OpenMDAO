@@ -237,10 +237,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         for i, iter_coord in enumerate(driver_cases):
             self.assertEqual(iter_coord, 'rank0:ScipyOptimize_SLSQP|{}'.format(i))
 
-
-
-
-    def test_driver_reading_outputs(self):  ## NEW !!!!!
+    def test_driver_reading_outputs(self):
 
         prob = ParaboloidProblem()
         driver = prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
@@ -273,7 +270,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         np.testing.assert_almost_equal(last_case.outputs['f_xy'], prob['f_xy'])
         np.testing.assert_almost_equal(last_case.outputs['x'], prob['x'])
 
-    def test_driver_reading_residuals(self):  ## NEW !!!!!
+    def test_driver_reading_residuals(self):
 
         prob = ParaboloidProblem()
         driver = prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
@@ -305,7 +302,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         last_case = cr.get_case(driver_cases[-1])
         np.testing.assert_almost_equal(last_case.residuals['f_xy'], 0.0)
         np.testing.assert_almost_equal(last_case.residuals['x'], 0.0)
-
 
     def test_reading_system_cases(self):
         prob = SellarProblem()
@@ -3594,6 +3590,53 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
             # If directory already deleted, keep going
             if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
                 raise e
+
+    def test_problem_v7(self):
+
+        # the change from v7 to v8 was adding the recording of input, output, and residuals to problem
+        # and also recording of output and residuals to Driver.
+        # check to make sure reading a v7 file works when reading problem and driver cases
+
+        # The v7 case file used in this test was created with this code:
+
+        # prob = SellarProblem(SellarDerivativesGrouped)
+        # prob.setup()
+        #
+        # driver = prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
+        #
+        # recorder = om.SqliteRecorder('case_problem_driver_v7.sql')
+        #
+        # driver.recording_options['record_desvars'] = True
+        # driver.recording_options['record_objectives'] = True
+        # driver.recording_options['record_constraints'] = True
+        # driver.add_recorder(recorder)
+        #
+        # prob.recording_options['includes'] = []
+        # prob.recording_options['record_objectives'] = True
+        # prob.recording_options['record_constraints'] = True
+        # prob.recording_options['record_desvars'] = True
+        # prob.add_recorder(recorder)
+        #
+        # fail = prob.run_driver()
+        #
+        # prob.record_state('final')
+        # prob.cleanup()
+
+        filename = os.path.join(self.legacy_dir, 'case_problem_driver_v7.sql')
+
+        cr = om.CaseReader(filename)
+
+        # check that we can get correct values from the driver iterations:
+        seventh_slsqp_iteration_case = cr.get_case('rank0:ScipyOptimize_SLSQP|6')
+        np.testing.assert_almost_equal(seventh_slsqp_iteration_case.outputs['z'],
+                                      [1.97846296, -2.21388305e-13], decimal=2)
+
+        # check that we can get correct values from the problem cases
+        problem_case = cr.get_case('final')
+        self.assertEqual(sorted(problem_case.outputs.keys()), sorted(['con1', 'con2', 'obj',
+                                                                      'x', 'z']))
+        np.testing.assert_almost_equal(problem_case.outputs['z'],
+                                      [1.97846296, -2.21388305e-13], decimal=2)
 
     def test_problem_v6(self):
         # the change from v6 to v7 was adding the derivatives to problem
