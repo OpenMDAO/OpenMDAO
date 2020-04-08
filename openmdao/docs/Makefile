@@ -46,7 +46,7 @@ clean:
 	rm -rf tmp
 	rm -rf make_sourcedocs
 	rm -rf doc_plot_*.png
-	rm -rf *.html
+	rm -rf *.html _n2html/*.html
 
 help:
 	@echo "Please use 'make <target>' where <target> is one of"
