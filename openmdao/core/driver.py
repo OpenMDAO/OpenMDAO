@@ -359,7 +359,8 @@ class Driver(object):
 
         # 1. If record_outputs is True, get the set of outputs
         # 2. Filter those using includes and excludes to get the baseline set of variables to record
-        # 3. Add or remove from that set any desvars, objs, and cons based on the recording options of those
+        # 3. Add or remove from that set any desvars, objs, and cons based on the recording
+        #    options of those
 
         # includes and excludes for outputs are specified using _promoted_ names
         # vectors are keyed on absolute name, discretes on relative/promoted name
@@ -394,7 +395,7 @@ class Driver(object):
             if recording_options['record_inputs']:
                 # sort the results since _var_allprocs_abs2prom isn't ordered
                 myinputs = sorted([n for n in model._var_allprocs_abs2prom['input']
-                                               if check_path(n, incl, excl)])
+                                  if check_path(n, incl, excl)])
 
         vars2record = {
             'input': myinputs,
@@ -1082,26 +1083,16 @@ def record_iteration(requester, prob, case_name):
         discrete_outputs = model._discrete_outputs
         filt = requester._filtered_vars_to_record
 
-        data = {'input': {}, 'output': {}, 'residual': {}}
+        data = {}
 
-        ####  Do I really need these ifs? I see System.record_iteration has them but isn't this
-        #   handled by _filtered_vars_to_record ?
-        if requester.recording_options['record_inputs'] and (inputs._names or len(discrete_inputs) > 0):
-            data['input'] = model._retrieve_data_of_kind(filt, 'input', vec_name, parallel)
+        data['input'] = model._retrieve_data_of_kind(filt, 'input', vec_name, parallel)
+        data['output'] = model._retrieve_data_of_kind(filt, 'output', vec_name, parallel)
+        data['residual'] = model._retrieve_data_of_kind(filt, 'residual', vec_name, parallel)
 
-        if requester.recording_options['record_outputs'] and (
-                outputs._names or len(discrete_outputs) > 0):
-            data['output'] = model._retrieve_data_of_kind(filt, 'output', vec_name, parallel)
-
-        if requester.recording_options['record_residuals'] and residuals._names:
-            data['residual'] = model._retrieve_data_of_kind(
-                filt, 'residual', vec_name, parallel)
-
-    from openmdao.core.problem import Problem
-    if isinstance(requester, Problem) and requester.recording_options['record_derivatives'] and \
-            prob.driver._designvars and prob.driver._responses:
-        totals = requester.compute_totals(return_format='flat_dict_structured_key')
-        data['totals'] = totals
+        if requester.recording_options['record_derivatives'] and \
+                prob.driver._designvars and prob.driver._responses:
+            totals = requester.compute_totals(return_format='flat_dict_structured_key')
+            data['totals'] = totals
 
     requester._rec_mgr.record_iteration(requester, data,
                                         requester._get_recorder_metadata(case_name))
