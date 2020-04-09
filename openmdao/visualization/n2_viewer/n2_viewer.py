@@ -223,7 +223,13 @@ def _get_viewer_data(data_source):
             return {}
 
     elif isinstance(data_source, str):
-        return CaseReader(data_source, pre_load=False).problem_metadata
+        data_dict = CaseReader(data_source, pre_load=False).problem_metadata
+
+        # Delete the variables key since it's not used in N2
+        if 'variables' in data_dict:
+            del data_dict['variables']
+
+        return data_dict
 
     else:
         raise TypeError(

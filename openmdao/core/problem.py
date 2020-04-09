@@ -209,6 +209,9 @@ class Problem(object):
         self.recording_options.declare('record_responses', types=bool, default=False,
                                        desc='Set True to record constraints and objectives at the '
                                             'problem level.')
+        self.recording_options.declare('record_derivatives', types=bool, default=False,
+                                       desc='Set to True to record derivatives for the problem '
+                                            'level')
         self.recording_options.declare('includes', types=list, default=['*'],
                                        desc='Patterns for variables to include in recording. \
                                        Uses fnmatch wildcards')
