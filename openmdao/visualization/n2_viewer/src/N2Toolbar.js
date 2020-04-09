@@ -12,7 +12,6 @@ class N2Toolbar {
     constructor(n2ui, sliderHeight = window.innerHeight * .95) {
         const self = this;
 
-        this.n2ui = n2ui;
         this.toolbarContainer = d3.select('#toolbarLoc');
         this.toolbar = d3.select('#true-toolbar');
         this.hideToolbarButton = d3.select('#hide-toolbar');
@@ -24,7 +23,7 @@ class N2Toolbar {
         d3.select('#model-slider').node.value = sliderHeight;
 
         this._setupExpandableButtons();
-        this._setupButtonFunctions();
+        this._setupButtonFunctions(n2ui);
 
         // Expand/contract the search bar
         d3.select('#searchbar-container')
@@ -86,9 +85,8 @@ class N2Toolbar {
     }
 
     /** Associate all of the buttons on the toolbar with a method in N2UserInterface. */
-    _setupButtonFunctions() {
+    _setupButtonFunctions(n2ui) {
         const self = this; // For callbacks that change "this". Alternative to using .bind().
-        const n2ui = this.n2ui;
 
         // There are a lot of simple click events, so iterate over this array of
         // [ selector, function ] elements and add a click handler for each.
