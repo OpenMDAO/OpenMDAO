@@ -10,8 +10,8 @@ function subsToolbar() {
     let windowWidth = window.innerWidth;
 
 
-    const modelHeightSlider = document.getElementById("model-slider");
-    modelHeightSlider.value = windowHeight * .95;
+    // const modelHeightSlider = document.getElementById("model-slider");
+    // modelHeightSlider.value = windowHeight * .95;
     let toolbar = document.getElementById("toolbarLoc");
 
     /************ Make the legend draggable ************/

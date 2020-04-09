@@ -36,7 +36,6 @@ class N2UserInterface {
         document.getElementById(
             'searchButtonId'
         ).onclick = this.searchButtonClicked.bind(this);
-        this._setupToolbar();
         this._setupSearch();
 
         this.legend = new N2Legend(this.n2Diag.modelData);
@@ -468,98 +467,6 @@ class N2UserInterface {
             nodeData.className = 'node-info-container hide-node-data';
             infoButton.className = 'fas icon-info-circle';
         }
-    }
-
-    /** Associate all of the buttons on the toolbar with a method in N2UserInterface. */
-    _setupToolbar() {
-        let self = this; // For callbacks that change "this". Alternative to using .bind().
-        // let toolbar = document.getElementById('toolbarDiv');
-
-        let toolbar = document.getElementById('true-toolbar');
-
-        toolbar.querySelector('#reset-graph').onclick = function() {
-            self.homeButtonClick();
-        };
-        toolbar.querySelector('#undo-graph').onclick = function() {
-            self.backButtonPressed();
-        };
-        toolbar.querySelector('#redo-graph').onclick = function() {
-            self.forwardButtonPressed();
-        };
-        // trueToolbar.querySelector("#upOneLevelButtonId").onclick =
-        //     function() {
-        //         self.upOneLevelButtonClick();
-        //     };
-        toolbar.querySelector('#expand-element').onclick = function() {
-            self.uncollapseButtonClick(self.n2Diag.zoomedElement);
-        };
-        toolbar.querySelector('#expand-all').onclick = function() {
-            self.uncollapseButtonClick(self.n2Diag.model.root);
-        };
-        toolbar.querySelector('#collapse-element').onclick = function() {
-            self.collapseOutputsButtonClick(self.n2Diag.zoomedElement);
-        };
-        toolbar.querySelector('#collapse-element-2').onclick = function() {
-            self.collapseOutputsButtonClick(self.n2Diag.zoomedElement);
-        };
-        toolbar.querySelector('#collapse-all').onclick = function() {
-            self.collapseOutputsButtonClick(self.n2Diag.model.root);
-        };
-        toolbar.querySelector('#expand-element').onclick = function() {
-            self.uncollapseButtonClick(self.n2Diag.zoomedElement);
-        };
-        toolbar.querySelector('#expand-all').onclick = function() {
-            self.uncollapseButtonClick(self.n2Diag.model.root);
-        };
-        toolbar.querySelector('#collapse-element').onclick = function() {
-            self.collapseOutputsButtonClick(self.n2Diag.zoomedElement);
-        };
-        toolbar.querySelector('#collapse-all').onclick = function() {
-            self.collapseOutputsButtonClick(self.n2Diag.model.root);
-        };
-        toolbar.querySelector('#hide-connections').onclick = function() {
-            self.n2Diag.clearArrows();
-        };
-        toolbar.querySelector('#show-connections').onclick = function() {
-            self.n2Diag.showArrows();
-        };
-        toolbar.querySelector('#show-all-connections').onclick = function() {
-            self.n2Diag.showAllArrows();
-        };
-        // toolbar.querySelector('#showCurrentPathButtonId').onclick = function() {
-        //     self.showPathCheckboxChange();
-        // };
-        toolbar.querySelector('#legend-button').onclick = function() {
-            self.toggleLegend();
-        };
-        toolbar.querySelector('#linear-solver-button').onclick = function() {
-            self.toggleSolverNamesCheckboxChange();
-        };
-
-        toolbar.querySelector('#text-slider').oninput = function(e) {
-            const fontSize = e.target.value;
-            self.n2Diag.fontSizeSelectChange(fontSize);
-
-            const fontSizeIndicator = trueToolbar.querySelector(
-                '#font-size-indicator'
-            );
-            fontSizeIndicator.innerHTML = fontSize + ' px';
-        };
-
-        toolbar.querySelector('#model-slider').onmouseup = function(e) {
-            const modelHeight = parseInt(e.target.value);
-            self.n2Diag.verticalResize(modelHeight);
-        };
-
-        toolbar.querySelector('#save-button').onclick = function() {
-            self.n2Diag.saveSvg();
-        };
-
-        toolbar.querySelector('#info-button').onclick = function() {
-            self.toggleNodeData();
-        };
-
-        document.getElementById('question-button').onclick = DisplayModal;
     }
 
     _setupSearch() {
