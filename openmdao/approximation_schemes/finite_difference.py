@@ -339,4 +339,4 @@ class FiniteDifference(ApproximationScheme):
             New tuple with new step direction.
         """
         deltas, coeffs, current_coeff = data
-        return (deltas * direction, coeffs, current_coeff)
+        return (np.outer(np.atleast_1d(deltas), direction), coeffs, current_coeff)

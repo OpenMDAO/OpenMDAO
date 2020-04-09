@@ -972,14 +972,14 @@ class Problem(object):
 
                 with comp._unscaled_context():
 
-                    of_list, wrt_list = \
-                        comp._get_potential_partials_lists(include_wrt_outputs=not explicit)
+                    imp = not explicit
+                    of_list, wrt_list = comp._get_potential_partials_lists(include_wrt_outputs=imp)
 
                     # Matrix-free components need to calculate their Jacobian by matrix-vector
                     # product.
                     if matrix_free:
                         print_reverse = True
-                        local_opts = comp._get_check_partial_options()
+                        local_opts = comp._get_check_partial_options(include_wrt_outputs=imp)
 
                         dstate = comp._vectors['output']['linear']
                         if mode == 'fwd':
@@ -1009,7 +1009,7 @@ class Problem(object):
 
                             if directional:
                                 n_in = 1
-                                perturb = np.random.random(len(flat_view))
+                                perturb = 2.0 * np.random.random(len(flat_view)) - 1.0
                                 if c_name not in mfree_directions:
                                     mfree_directions[c_name] = {}
                                 mfree_directions[c_name][inp] = perturb
@@ -1058,7 +1058,7 @@ class Problem(object):
                                             m = mfree_directions[c_name][out]
                                             d = mfree_directions[c_name][inp]
                                             mhat = derivs
-                                            dhat = deriv['J_fwd'][:, idx]
+                                            dhat = partials_data[c_name][inp, out]['J_fwd'][:, idx]
 
                                             deriv['directional_check'] = mhat.dot(m) - dhat.dot(d)
 
