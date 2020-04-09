@@ -1,10 +1,13 @@
 class N2Toolbar {
     constructor(sliderHeight = window.innerHeight * .95) {
         const self = this;
+        
         this.modelHeightSlider = d3.select('#model-slider');
         this.toolbar = d3.select('#toolbarLoc');
         this.hideToolbarButton = d3.select('#hide-toolbar');
         this.hideToolbarIcon = this.hideToolbarButton.select('i');
+        this.searchBar = d3.select('#awesompleteId');
+
         this.hidden = false;
 
         // Open expandable buttons when hovered over
@@ -36,6 +39,17 @@ class N2Toolbar {
             if (self.hidden) { self.show(); }
             else { self.hide(); }
         })
+
+        // Expand/contract the search bar
+        d3.select('#searchbar-container')
+            .on('mouseover', function() {
+                self.searchBar.style('width', '200px');
+                self.toolbar.style('z-index', '5');
+            })
+            .on('mouseout', function() {
+                self.searchBar.style('width', '0px');
+                self.toolbar.style('z-index', '1');
+            })
     }
 
     /** Slide everything to the left offscreen 75px, rotate the button */
