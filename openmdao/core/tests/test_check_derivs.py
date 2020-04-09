@@ -2083,6 +2083,8 @@ class TestCheckPartialsFeature(unittest.TestCase):
         data = prob.check_partials()
 
     def test_directional_matrix_free(self):
+        import numpy as np
+
         import openmdao.api as om
 
         class ArrayCompMatrixFree(om.ExplicitComponent):

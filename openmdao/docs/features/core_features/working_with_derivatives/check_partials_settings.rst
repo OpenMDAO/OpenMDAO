@@ -55,7 +55,7 @@ for each element of the array.
     :layout: interleave
 
 If your component is matrix-free and you request directional derivatives, then your reverse mode derivatives will be verified using the
-dot product test described `here`_.here.
+dot product test described `here`_.
 
 .. _here: http://www.reproducibility.org/RSF/book/gee/ajt/paper_html/node20.html
 
