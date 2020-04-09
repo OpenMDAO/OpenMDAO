@@ -85,7 +85,7 @@ class EmbedCodeDirective(Directive):
         #
         path = self.arguments[0]
         try:
-            source, indent, module, class_ = get_source_code(path)
+            source, indent, module, class_, method = get_source_code(path)
         except Exception as err:
             # Generally means the source couldn't be inspected or imported.
             # Raise as a Directive warning (level 2 in docutils).
@@ -176,19 +176,10 @@ class EmbedCodeDirective(Directive):
                 if 'plot' in layout:
                     code_to_run = code_to_run + ('\nmatplotlib.pyplot.savefig("%s")' % plot_file_abs)
 
-            if is_test and decorators is not None:
-                # check whether test is skipped due to decorator
-                test_suite = unittest.TestLoader().loadTestsFromName(path)
-                test_result = unittest.TextTestRunner(stream=StringIO()).run(test_suite)
-                if len(test_result.skipped) > 0:
-                    skipped = True
-                    failed = False
-                    run_outputs = test_result.skipped[0][1]
-                else:
-                    # if it did not get skipped, then run normally
-                    skipped, failed, run_outputs = run_code(code_to_run, path, module=module, cls=class_,
-                                                            imports_not_required=imports_not_required,
-                                                            shows_plot=shows_plot)
+            if is_test and getattr(method, '__unittest_skip__', False):
+                skipped = True
+                failed = False
+                run_outputs = method.__unittest_skip_why__
             else:
                 skipped, failed, run_outputs = run_code(code_to_run, path, module=module, cls=class_,
                                                         imports_not_required=imports_not_required,

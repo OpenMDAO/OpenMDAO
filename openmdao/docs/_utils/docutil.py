@@ -278,10 +278,13 @@ def get_source_code(path):
         The imported module.
     class or None
         The class specified by path.
+    method or None
+        The class method specified by path.
     """
 
     indent = 0
-    cls = None
+    class_obj = None
+    method_obj = None
 
     if path.endswith('.py'):
         if not os.path.isfile(path):
@@ -304,8 +307,8 @@ def get_source_code(path):
                 module_path = '.'.join(parts[:-1])
                 module = importlib.import_module(module_path)
                 class_name = parts[-1]
-                cls = getattr(module, class_name)
-                source = inspect.getsource(cls)
+                class_obj = getattr(module, class_name)
+                source = inspect.getsource(class_obj)
                 indent = 1
 
             except ImportError:
@@ -315,12 +318,12 @@ def get_source_code(path):
                 module = importlib.import_module(module_path)
                 class_name = parts[-2]
                 method_name = parts[-1]
-                cls = getattr(module, class_name)
-                meth = getattr(cls, method_name)
-                source = inspect.getsource(meth)
+                class_obj = getattr(module, class_name)
+                method_obj = getattr(class_obj, method_name)
+                source = inspect.getsource(method_obj)
                 indent = 2
 
-    return remove_leading_trailing_whitespace_lines(source), indent, module, cls
+    return remove_leading_trailing_whitespace_lines(source), indent, module, class_obj, method_obj
 
 
 def remove_raise_skip_tests(src):
