@@ -142,13 +142,13 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6):
                     if in_error:
                         wrt_string = '{0} wrt {1}'.format(var, wrt)
                         norm_string = '{}'.format(error_val)
-                        bad_derivs.append((wrt_string, norm_string, mode))
+                        bad_derivs.append((wrt_string, norm_string, error_type, mode))
                         len_wrt_width = max(len_wrt_width, len(wrt_string))
                         len_norm_width = max(len_norm_width, len(norm_string))
 
         if bad_derivs:
             comp_error_string = ''
-            for wrt_string, norm_string, mode in bad_derivs:
+            for wrt_string, norm_string, error_type, mode in bad_derivs:
                 err_msg = '{0} | {1} | {2} | {3}'.format(
                     pad_name(wrt_string, len_wrt_width),
                     pad_name(error_type.split()[0], len_absrel_width),
