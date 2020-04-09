@@ -122,11 +122,10 @@ class FiniteDifference(ApproximationScheme):
                                  "one of {}".format(system.msginfo, form,
                                                     list(DEFAULT_ORDER.keys())))
 
-        step = options['step']
         options['vector'] = vector
 
-        key = (abs_key[1], options['form'], options['order'],
-               step, options['step_calc'], options['directional'])
+        key = (abs_key[1], options['form'], options['order'], options['step'],
+               options['step_calc'], options['directional'])
         self._exec_dict[key].append((abs_key, options))
         self._reset()  # force later regen of approx_groups
 
