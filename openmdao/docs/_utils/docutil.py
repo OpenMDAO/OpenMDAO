@@ -601,8 +601,6 @@ def strip_decorators(src):
 
     Returns
     -------
-    str or None
-        Source code of any decorators, one per line.
     str
         Source code minus any decorators
     """
@@ -623,7 +621,7 @@ def strip_decorators(src):
     # get node for the first function
     function_node = parser.get_function()
     if not function_node.decorator_list:  # no decorators so no changes needed
-        return None, src
+        return src
 
     # Unfortunately, the ast library, for a decorated function, returns the line
     #   number for the first decorator when asking for the line number of the function
@@ -636,14 +634,9 @@ def strip_decorators(src):
         raise RuntimeError("Cannot determine line number for decorated function without args")
     lines = src.splitlines()
 
-    # return decorators, one line per decorator
-    decorator_src = ''.join(lines[:function_lineno - 1])
-    decorator_src = decorator_src.replace('@', '\n@')
-    decorator_src.lstrip()
-
     undecorated_src = '\n'.join(lines[function_lineno - 1:])
 
-    return decorator_src, undecorated_src
+    return undecorated_src
 
 
 def strip_header(src):

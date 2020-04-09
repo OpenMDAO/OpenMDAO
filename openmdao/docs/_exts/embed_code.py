@@ -8,8 +8,6 @@ import traceback
 import inspect
 import os
 
-from io import StringIO
-
 from docutils.parsers.rst.directives import unchanged, images
 
 from openmdao.docs._utils.docutil import get_source_code, remove_docstrings, \
@@ -121,7 +119,7 @@ class EmbedCodeDirective(Directive):
         if is_test:
             try:
                 source = dedent(source)
-                decorators, source = strip_decorators(source)
+                source = strip_decorators(source)
                 source = strip_header(source)
                 source = dedent(source)
                 source = replace_asserts_with_prints(source)
