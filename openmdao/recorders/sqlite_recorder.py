@@ -706,7 +706,6 @@ class SqliteRecorder(CaseRecorder):
         """
         Delete all the recordings.
         """
-        # close database connection
         if self.connection:
             self.connection.execute("DELETE FROM global_iterations")
             self.connection.execute("DELETE FROM driver_iterations")
