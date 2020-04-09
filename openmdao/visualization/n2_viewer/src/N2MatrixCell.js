@@ -454,18 +454,21 @@ class N2MatrixCell {
                 // Top
                 debugInfo("New offscreen outgoing connection on top" + debugStr);
                 this.offScreen.top.outgoing.add(tgtNode);
-            } else {
+            }
+            else {
                 // Bottom
                 debugInfo("New offscreen outgoing connection on bottom" + debugStr);
                 this.offScreen.bottom.outgoing.add(tgtNode);
             }
-        } else {
+        }
+        else {
             // Incoming
             if (srcNode.rootIndex < tgtNode.rootIndex) {
                 // Top
                 debugInfo("New offscreen incoming connection on top" + debugStr);
                 this.offScreen.top.incoming.add(srcNode);
-            } else {
+            }
+            else {
                 // Bottom
                 debugInfo("New offscreen incoming connection on bottom" + debugStr);
                 this.offScreen.bottom.incoming.add(srcNode);

@@ -404,7 +404,10 @@ class ModelData {
     identifyUnconnectedParam(node) { // Formerly updateRootTypes
         if (!node.hasOwnProperty('absPathName')) {
             console.warn("identifyUnconnectedParam error: absPathName not set for ", node);
-        } else if (node.isParam() && !node.hasChildren() && !this.hasAnyConnection(node.absPathName))
-            node.type = "unconnected_param";
+        }
+        else {
+            if (node.isParam() && !node.hasChildren() && !this.hasAnyConnection(node.absPathName))
+                node.type = "unconnected_param";
+        }
     }
 }

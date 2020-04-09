@@ -5,18 +5,18 @@
  * @typedef Toolbar
  */
 
-window.onload = function() {
+function subsToolbar() {
     let windowHeight = window.innerHeight;
     let windowWidth = window.innerWidth;
 
 
     const modelHeightSlider = document.getElementById("model-slider");
     modelHeightSlider.value = windowHeight * .95;
-
-    /** If a tab bar button has multiple nested button expand the view out  **/
-    const expandableViews = document.getElementsByClassName('expandable');
     let toolbar = document.getElementById("toolbarLoc");
 
+    /** If a tab bar button has multiple nested button expand the view out  **/
+//    const expandableViews = document.getElementsByClassName('expandable');
+/*
     for (let i = 0; i < expandableViews.length; i++) {
         let expandableView = expandableViews[i];
         const container = expandableView.querySelector('div');
@@ -35,8 +35,11 @@ window.onload = function() {
     function setMaxWidth(node, size) {
         node.style.maxWidth = size;
     }
+*/
+
 
     /************ Handle button clicks and setting the active button ************/
+    /*
     const expandableButtonsContainer = document.getElementsByClassName(
         'toolbar-group-expandable'
     );
@@ -51,6 +54,7 @@ window.onload = function() {
         // Loop through the child nodes to only select the buttons which are every odd index
         for (let x = 1; x < expandableButtons.length; x += 2) {
             const button = expandableButtons.item(x);
+            console.log(container.id + ' > ' + expandableButtons + ' > ' + button.id)
 
             // Only add this functioniality to buttons not to input fields which are the sliders
             if (button.tagName !== 'INPUT') {
@@ -69,6 +73,7 @@ window.onload = function() {
     }
 
     /************ Toggle Hiding the Toolbar ************/
+    /*
     const hideToolbarButton = document.getElementById('hide-toolbar');
     const hideToolbarIcon = hideToolbarButton.childNodes[1];
 

@@ -372,11 +372,13 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
         'N2Matrix', \
         'N2Arrow', \
         'N2Search', \
+        'N2Toolbar', \
+        'Toolbar', \
         'N2Diagram', \
         'N2UserInterface', \
         'defaults', \
-        'ptN2', \
-        'Toolbar'
+        'ptN2'
+        
     srcs = read_files(src_names, src_dir, 'js')
     styles = read_files(('awesomplete', 'partition_tree'), style_dir, 'css')
 

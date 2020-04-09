@@ -65,12 +65,13 @@ class N2Diagram {
 
         this.ui = new N2UserInterface(this);
 
+        this.toolbar = new N2Toolbar();
+        subsToolbar();
+
         this._setupSvgElements();
 
         this.matrix = new N2Matrix(this.model, this.layout, this.dom.n2Groups,
             true, this.ui.findRootOfChangeFunction);
-
-        // this.matrixMax = this.matrix;
 
         // TODO: Move to N2Layout
         this.scales = {
