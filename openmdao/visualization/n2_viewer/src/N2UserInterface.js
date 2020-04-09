@@ -1,5 +1,5 @@
 /**
- * Sets up the toolbar and handles input events.
+ * Handle input events for the matrix and toolbar.
  * @typedef N2UserInterface
  * @property {N2Diagram} n2Diag Reference to the main diagram.
  * @property {N2TreeNode} leftClickedNode The last node that was left-clicked.
