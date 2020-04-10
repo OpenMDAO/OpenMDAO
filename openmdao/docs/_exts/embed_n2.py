@@ -73,7 +73,6 @@ class EmbedN2Directive(Directive):
         rst.append(".. raw:: html", docname, self.lineno)
         rst.append("", docname, self.lineno)  # leave an empty line
         rst.append("    %s" % object_tag, docname, self.lineno)
-        # rst.append("   :file: %s" % html_name, docname, self.lineno)
 
         # Create a node.
         node = nodes.section()
