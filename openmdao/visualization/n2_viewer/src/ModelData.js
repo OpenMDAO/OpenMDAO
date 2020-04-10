@@ -239,7 +239,8 @@ class ModelData {
         for (let child of node.children) {
             if (child.name == nameArray[nameIndex]) {
                 return this._getObjectInTree(child, nameArray, nameIndex + 1);
-            } else {
+            }
+            else {
                 let numNames = child.name.split(":").length;
                 if (numNames >= 2 && nameIndex + numNames <= nameArray.length) {
                     let mergedName = nameArray[nameIndex];

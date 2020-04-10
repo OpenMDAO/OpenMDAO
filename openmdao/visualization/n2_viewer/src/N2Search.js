@@ -29,7 +29,7 @@ class N2Search {
 
         this.numMatches = 0;
         this.searchInputDiv = d3.select("#awesompleteId").node();
-        this.searchCountDiv = d3.select("#searchCountId").node();
+        this.searchCountDiv = d3.select("#searchCountId");
 
         this._setupAwesomplete();
         this._addEventListeners();
@@ -238,7 +238,7 @@ class N2Search {
             this.filteredWord.value.split(".")[0].trim() : "";
 
         this._countMatches();
-        this.searchCountDiv.innerHTML = "" + this.numMatches + " matches";
+        this.searchCountDiv.html("" + this.numMatches + " matches");
     }
 
     /**

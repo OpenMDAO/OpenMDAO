@@ -40,7 +40,7 @@ body {
 	justify-content: center;
 	overflow-y: scroll;
 	position: relative;
-	margin-left: 0px;
+	margin-left: -75px; /* Start with toolbar hidden */
 	transition: margin-left 0.4s;
 }
 

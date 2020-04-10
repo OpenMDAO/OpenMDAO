@@ -63,7 +63,7 @@
 	flex-direction: column;
 	justify-content: center;
 	align-items: center;
-	left: 0px;
+	left: -75px; /* Start hidden */
 	transition: left 0.5s;
 	z-index: 1;
 }
@@ -88,7 +88,7 @@
 	border-radius: 50%;
 	position: absolute;
 	bottom: 50px;
-	left: 45px;
+	left: -30px; /* Start hidden */
 	display: flex;
 	align-items: center;
 	justify-content: flex-end;
@@ -106,7 +106,7 @@
 	color: black;
 	margin-right: 10px;
 	cursor: pointer;
-	transform: rotate(0deg);
+	transform: rotate(-180deg); /* Start hidden */
 	transition: color 0.4s, transform 0.4s;
 }
 

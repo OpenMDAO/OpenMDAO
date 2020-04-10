@@ -18,7 +18,8 @@ class N2Toolbar {
         this.hideToolbarIcon = this.hideToolbarButton.select('i');
         this.searchBar = d3.select('#awesompleteId');
 
-        this.hidden = false;
+        this.hidden = true;
+        if (! EMBEDDED) this.show();
 
         d3.select('#model-slider').node().value = sliderHeight;
 

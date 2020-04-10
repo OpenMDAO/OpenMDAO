@@ -110,6 +110,7 @@ setup(
     package_data={
         'openmdao.devtools': ['*.wpr', ],
         'openmdao.visualization.n2_viewer': [
+            'assets/*',
             'libs/*.js',
             'src/*.js',
             'style/*.css',

@@ -27,7 +27,8 @@ class N2CellRenderer {
                     "y": 0
                 }
             }
-        } else {
+        }
+        else {
             for (let prop of ["size", "bottomRight", "topLeft"]) {
                 Object.assign(N2CellRenderer.prevDims[prop],
                     N2CellRenderer.dims[prop]);
