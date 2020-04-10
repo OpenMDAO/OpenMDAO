@@ -385,7 +385,8 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
         'icon', \
         'toolbar', \
         'nodedata', \
-        'legend'
+        'legend', \
+        'awesomplete'
 
     styles = read_files((style_names), style_dir, 'css')
 
