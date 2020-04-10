@@ -29,7 +29,7 @@ Recording Options Include and Exclude Matching
 
 The :code:`includes` and :code:`excludes` recording options provide support for Unix shell-style wildcards,
 which are not the same as regular expressions. The documentation for the :code:`fnmatchcase` function from the Python
-standard library documents the wildcards: https://docs.python.org/3.8/library/fnmatch.html#fnmatch.fnmatchcase.
+standard library documents the `wildcards <https://docs.python.org/3.8/library/fnmatch.html#fnmatch.fnmatchcase>`_.
 
 Recording Options Precedence
 ----------------------------
