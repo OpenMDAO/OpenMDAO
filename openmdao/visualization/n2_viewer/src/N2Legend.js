@@ -11,6 +11,8 @@ class N2Legend {
     constructor(modelData) {
         this._div = d3.select("#legend-div");
 
+        // TODO: The legend should't have to search through modelData itself,
+        // this info can be collected as modelData is built.
         this.nodes = modelData.tree.children;
         this.showSysVar = {
             'group': false,
