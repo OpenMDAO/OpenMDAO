@@ -378,9 +378,17 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
         'N2UserInterface', \
         'defaults', \
         'ptN2'
-        
+
     srcs = read_files(src_names, src_dir, 'js')
-    styles = read_files(('awesomplete', 'partition_tree'), style_dir, 'css')
+
+    style_names = \
+        'partition_tree', \
+        'icon', \
+        'toolbar', \
+        'nodedata', \
+        'legend'
+
+    styles = read_files((style_names), style_dir, 'css')
 
     with open(os.path.join(style_dir, "icomoon.woff"), "rb") as f:
         encoded_font = str(base64.b64encode(f.read()).decode("ascii"))
