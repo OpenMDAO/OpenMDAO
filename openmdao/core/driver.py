@@ -1074,34 +1074,28 @@ def record_iteration(requester, prob, case_name):
     model = prob.model
 
     inputs, outputs, residuals = model.get_nonlinear_vectors()
-    vec_name = 'nonlinear'
 
     parallel = requester._rec_mgr._check_parallel() if model.comm.size > 1 else False
 
-    outs = model._retrieve_data_of_kind(filt, 'output', 'nonlinear', parallel)
-    ins = model._retrieve_data_of_kind(filt, 'input', 'nonlinear', parallel)
+    # outs = model._retrieve_data_of_kind(filt, 'output', 'nonlinear', parallel)
+    # ins = model._retrieve_data_of_kind(filt, 'input', 'nonlinear', parallel)
 
-    data = {'input': ins, 'output': outs, 'residual': {}}
+    discrete_inputs = model._discrete_inputs
+    discrete_outputs = model._discrete_outputs
+
+    data = {'input': {}, 'output': {}, 'residual': {}}
+    if requester.recording_options['record_inputs'] and (inputs._names or len(discrete_inputs) > 0):
+        data['input'] = model._retrieve_data_of_kind(filt, 'input', 'nonlinear', parallel)
+
+    if requester.recording_options['record_outputs'] and \
+            (outputs._names or len(discrete_outputs) > 0):
+        data['output'] = model._retrieve_data_of_kind(filt, 'output', 'nonlinear', parallel)
 
     if requester.recording_options['record_residuals'] and residuals._names:
-        data['residual'] = model._retrieve_data_of_kind(
-            filt, 'residual', vec_name, parallel)
+        data['residual'] = model._retrieve_data_of_kind(filt, 'residual', 'nonlinear', parallel)
 
     from openmdao.core.problem import Problem
     if isinstance(requester, Problem):
-        inputs, outputs, residuals = model.get_nonlinear_vectors()
-        vec_name = 'nonlinear'
-
-        discrete_inputs = model._discrete_inputs
-        discrete_outputs = model._discrete_outputs
-        filt = requester._filtered_vars_to_record
-
-        data = {}
-
-        data['input'] = model._retrieve_data_of_kind(filt, 'input', vec_name, parallel)
-        data['output'] = model._retrieve_data_of_kind(filt, 'output', vec_name, parallel)
-        data['residual'] = model._retrieve_data_of_kind(filt, 'residual', vec_name, parallel)
-
         if requester.recording_options['record_derivatives'] and \
                 prob.driver._designvars and prob.driver._responses:
             totals = requester.compute_totals(return_format='flat_dict_structured_key')
