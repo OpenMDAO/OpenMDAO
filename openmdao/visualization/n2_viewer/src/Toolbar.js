@@ -16,6 +16,7 @@ window.onload = function() {
     /** If a tab bar button has multiple nested button expand the view out  **/
     const expandableViews = document.getElementsByClassName('expandable');
     let toolbar = document.getElementById("toolbarLoc");
+
     for (let i = 0; i < expandableViews.length; i++) {
         let expandableView = expandableViews[i];
         const container = expandableView.querySelector('div');
@@ -166,5 +167,14 @@ window.onload = function() {
             document.onmouseup = null;
             document.onmousemove = null;
         }
+    }
+
+    if (_EMBEDDED) { // Hide toolbar/legend if embedded
+        toolbar.style.left = '-75px';
+        hideToolbarButton.style.left = '-30px';
+        hideToolbarIcon.style.transform = 'rotate(-180deg)';
+        matrix.style.marginLeft = '-75px';
+
+        d3.select("#legend-div").style('display', 'none');
     }
 }

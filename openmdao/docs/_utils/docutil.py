@@ -709,7 +709,7 @@ def sync_multi_output_blocks(run_output):
 
         for i, outp in enumerate(proc_output_blocks):
             for tag in outp:
-                if outp[tag].strip():
+                if str(outp[tag]).strip():
                     if tag in synced_blocks:
                         synced_blocks[tag] += "(rank %d) %s\n" % (i, outp[tag])
                     else:

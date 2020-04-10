@@ -15,28 +15,49 @@ class EmbedN2Directive(Directive):
     .. embed-n2::
         ../../examples/model.py
 
-    The 1 argument is the model file to be diagrammed.
+    The 1 required argument is the model file to be diagrammed.
+    The 2 optional arguments are width and height of the embedded object.
 
     What the above will do is replace the directive and its arg with an N2 diagram.
 
     """
 
     required_arguments = 1
-    optional_arguments = 0
+    optional_arguments = 2
     has_content = True
 
     def run(self):
         path_to_model = self.arguments[0]
+
+        if len(self.arguments) >= 2 and self.arguments[1]:
+            n2_width = self.arguments[1]
+            if len(self.arguments) == 3 and self.arguments[2]:
+                n2_height = self.arguments[2]
+            else:
+                n2_height = n2_width / 2
+        else:
+            n2_width = 1300
+            n2_height = 700
 
         np = os.path.normpath(os.path.join(os.getcwd(), path_to_model))
 
         # check that the file exists
         if not os.path.isfile(np):
             raise IOError('File does not exist({0})'.format(np))
+        
+        # Generate N2 files into the target_dir. Those files are later copied
+        # into the top of the HTML hierarchy, so the HTML doc file needs a
+        # relative path to them.
+        target_dir = os.path.join(os.getcwd(), "_n2html")
 
-        html_name = os.path.join(os.getcwd(), (os.path.basename(path_to_model).split('.')[0] + "_n2.html"))
+        rel_dir = os.path.relpath(os.getcwd(),
+                                  os.path.dirname(self.state.document.settings._source))
+        html_base_name = os.path.basename(path_to_model).split('.')[0] + "_n2.html"
+        html_name = os.path.join(target_dir, html_base_name)
+        html_rel_name = os.path.join(rel_dir, html_base_name)
 
-        cmd = subprocess.Popen(['openmdao', 'n2', np, '--no_browser', '--embed', '-o' + html_name])
+        cmd = subprocess.Popen(
+            ['openmdao', 'n2', np, '--no_browser', '--embed', '-o' + html_name])
         cmd_out, cmd_err = cmd.communicate()
 
         rst = ViewList()
@@ -46,8 +67,12 @@ class EmbedN2Directive(Directive):
         # or errors, third argument is the line number.
         env = self.state.document.settings.env
         docname = env.doc2path(env.docname)
+        object_tag = str("<object width='{}' height='{}' type='text/html' data='{}'></object>"
+                         .format(n2_width, n2_height, html_rel_name))
+
         rst.append(".. raw:: html", docname, self.lineno)
-        rst.append("   :file: %s" % html_name, docname, self.lineno)
+        rst.append("", docname, self.lineno)  # leave an empty line
+        rst.append("    %s" % object_tag, docname, self.lineno)
 
         # Create a node.
         node = nodes.section()

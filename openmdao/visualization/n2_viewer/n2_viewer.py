@@ -392,6 +392,9 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
                       title=title,
                       styles=styles, embeddable=embeddable)
 
+    if (embeddable):
+        h.insert("non-embedded-n2", "embedded-n2")
+
     # put all style and JS into index
     h.insert('{{fontello}}', encoded_font)
 
