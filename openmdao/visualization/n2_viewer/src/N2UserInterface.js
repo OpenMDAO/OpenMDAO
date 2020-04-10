@@ -210,10 +210,9 @@ class N2UserInterface {
 
         if (this.forwardButtonHistory.length == 0) return;
         let node = this.forwardButtonHistory.pop().node;
-        this.n2Diag.dom.parentDiv.querySelector('#forwardButtonId').disabled = this
-            .forwardButtonHistory.length == 0 ?
-            'disabled' :
-            false;
+        d3.select('#forwardButtonId').attr('disabled',
+            (this.forwardButtonHistory.length == 0));
+
         for (let obj = node; obj != null; obj = obj.parent) {
             // make sure history item is not minimized
             if (obj.isMinimized) return;
@@ -464,19 +463,12 @@ class N2UserInterface {
     update() {
         testThis(this, 'N2UserInterface', 'update');
 
-        this.n2Diag.dom.parentDiv.querySelector('#undo-graph').disabled = this
-            .backButtonHistory.length == 0 ?
-            'disabled' :
-            false;
-        this.n2Diag.dom.parentDiv.querySelector('#redo-graph').disabled = this
-            .forwardButtonHistory.length == 0 ?
-            'disabled' :
-            false;
-        this.n2Diag.dom.parentDiv.querySelector('#reset-graph').disabled = this
-            .n2Diag.zoomedElement === this.n2Diag.model.root ?
-            'disabled' :
-            false;
-
+        d3.select('#undo-graph').attr('disabled',
+            (this.backButtonHistory.length == 0));
+        d3.select('#redo-graph').attr('disabled',
+            (this.forwardButtonHistory.length == 0));
+        d3.select('#reset-graph').attr('disabled',
+            (this.n2Diag.zoomedElement === this.n2Diag.model.root));
     }
 
     /** Called when the search button is actually or effectively clicked to start a search. */
