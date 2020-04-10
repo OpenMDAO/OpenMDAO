@@ -3207,6 +3207,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
 
         case = cr.get_case(system_cases[1])
 
+        # list_inputs will print a report to the screen
         case_inputs = sorted(case.list_inputs())
 
         assert_near_equal(case_inputs[0][1]['value'], [1.], tolerance=1e-10) # d1.x
@@ -3261,7 +3262,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         self.assertEqual(sorted([inp[0] for inp in inputs]), sorted(['rect.length',]))
 
         # Inputs with multiple tags
-        inputs = case.list_inputs(out_stream=None, tags=["tag2", "tag3"])
+        inputs = case.list_inputs(out_stream=None, tags=["tag1", "tag2"])
         self.assertEqual(sorted([inp[0] for inp in inputs]), sorted(['rect.width', 'rect.length']))
 
         # Outputs with tag that does match
@@ -3561,7 +3562,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         self.assertEqual(sorted(cr.list_sources()), [
             'problem',
         ])
- 
+
         case = cr.get_case('final')
 
         q = case.outputs.keys()
