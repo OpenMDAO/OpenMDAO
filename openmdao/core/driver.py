@@ -1077,9 +1077,6 @@ def record_iteration(requester, prob, case_name):
 
     parallel = requester._rec_mgr._check_parallel() if model.comm.size > 1 else False
 
-    # outs = model._retrieve_data_of_kind(filt, 'output', 'nonlinear', parallel)
-    # ins = model._retrieve_data_of_kind(filt, 'input', 'nonlinear', parallel)
-
     discrete_inputs = model._discrete_inputs
     discrete_outputs = model._discrete_outputs
 
