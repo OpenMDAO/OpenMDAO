@@ -2122,6 +2122,122 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         self.assertEqual(sorted(case.inputs.keys()), ['y1', 'y2', 'z'])
 
+    def test_feature_basic_case_recording(self):
+        import openmdao.api as om
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', 35.0, units='degF', lower=32.0, upper=212.0)
+
+        model.add_subsystem('p', ivc, promotes=['x'])
+        model.add_subsystem('comp1', om.ExecComp('y1 = 2.0*x',
+                                                x={'value': 2.0, 'units': 'degF'},
+                                                y1={'value': 2.0, 'units': 'degF'}),
+                            promotes=['x', 'y1'])
+
+        model.add_subsystem('comp2', om.ExecComp('y2 = 3.0*x',
+                                                x={'value': 2.0, 'units': 'degF'},
+                                                y2={'value': 2.0, 'units': 'degF'}),
+                            promotes=['x', 'y2'])
+
+        model.add_design_var('x', units='degC', lower=0.0, upper=100.0)
+        model.add_constraint('y1', units='degC', lower=0.0, upper=100.0)
+        model.add_objective('y2', units='degC')
+
+        driver = prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9)
+        driver.recording_options['includes'] = []
+        driver.recording_options['record_objectives'] = True
+        driver.recording_options['record_constraints'] = True
+        driver.recording_options['record_desvars'] = True
+
+        recorder = om.SqliteRecorder("cases.sql")
+        driver.add_recorder(recorder)
+
+        prob.setup()
+        prob.set_solver_print(0)
+        prob.run_driver()
+        prob.cleanup()
+
+        # You can treat a case object like a problem. Below we'll show some examples of that
+        cr = om.CaseReader("cases.sql")
+        driver_cases = cr.list_cases('driver')
+
+        case = cr.get_case(driver_cases[0])
+
+        # These options will give outputs as the model sees them
+        # Gets value but will not convert units
+        print(case.__getitem__("y1")) # DegF
+
+        # get_val can convert your result's units if desired
+        print(case.get_val("y1", units='K')) # Converted to Kelvin
+
+        assert_near_equal(case.get_val("y1", units='K'), 294.26111111, 1e-3)
+        assert_near_equal(case.__getitem__("y1"), 70., 1e-3)
+
+        # list_outputs will list your model's outputs
+        case.list_outputs()
+
+        # These options will give outputs as the driver sees them
+        objectives = case.get_objectives()
+        design_vars = case.get_design_vars()
+        constraints = case.get_constraints()
+
+        print(objectives)
+        print(design_vars)
+        print(constraints)
+
+        assert_near_equal(objectives['y2'], 40.55555556, 1e-4)
+        assert_near_equal(design_vars['x'], 1.66666667, 1e-4)
+        assert_near_equal(constraints['y1'], 21.11111111, 1e-4)
+
+    def test_feature_basic_case_plot(self):
+        from openmdao.test_suite.components.sellar_feature import SellarMDA
+        import numpy as np
+
+        prob = om.Problem(model=SellarMDA())
+
+        model = prob.model
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                                upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        driver = prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9)
+        driver.add_recorder(om.SqliteRecorder('cases.sql'))
+
+        prob.setup()
+        prob.set_solver_print(0)
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = om.CaseReader('cases.sql')
+
+        cases = cr.get_cases()
+
+        dv_x_values =[case.__getitem__("x") for case in cases]
+        dv_z_values =[case.__getitem__("z") for case in cases]
+
+        # Below is a short script to see the numerical path the design vars took to convergence
+        import matplotlib.pyplot as plt
+
+        fig, (ax1,ax2) = plt.subplots(1,2)
+        ax1.plot(np.arange(len(dv_x_values)), np.array(dv_x_values))
+
+        ax1.set(xlabel='Iterations', ylabel='Design Var: X',
+            title='Optimization History')
+        ax1.grid()
+
+        ax2.plot(np.arange(len(dv_z_values)), np.array(dv_z_values))
+
+        ax2.set(xlabel='Iterations', ylabel='Design Var: Z',
+            title='Optimization History')
+        ax2.grid()
+
+
     def test_feature_driver_options(self):
         import openmdao.api as om
         from openmdao.test_suite.components.sellar import SellarDerivatives

@@ -7,6 +7,8 @@ Recording Data
 .. toctree::
     :maxdepth: 1
 
+    basic_case_recording.rst
+    advanced_case_recording.rst
     saving_data.rst
     case_reader.rst
     solver_options.rst
