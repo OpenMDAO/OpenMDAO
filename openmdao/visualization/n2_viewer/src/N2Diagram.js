@@ -66,7 +66,6 @@ class N2Diagram {
         this.ui = new N2UserInterface(this);
 
         this.toolbar = new N2Toolbar(this.ui);
-        subsToolbar();
 
         this._setupSvgElements();
 

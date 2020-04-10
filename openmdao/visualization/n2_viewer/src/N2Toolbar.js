@@ -20,7 +20,7 @@ class N2Toolbar {
 
         this.hidden = false;
 
-        d3.select('#model-slider').node.value = sliderHeight;
+        d3.select('#model-slider').node().value = sliderHeight;
 
         this._setupExpandableButtons();
         this._setupButtonFunctions(n2ui);
@@ -56,8 +56,8 @@ class N2Toolbar {
     }
 
     toggle() {
-        if (this.hidden) { this.show(); }
-        else { this.hide(); }
+        if (this.hidden) this.show();
+        else this.hide();
     }
 
     _setupExpandableButtons() {
@@ -73,20 +73,18 @@ class N2Toolbar {
                 d3.select(this).style('max-width', '0');
                 self.toolbarContainer.style('z-index', '1')
             })
+    }
 
+    /** When an expanded button is clicked, update the 'root' button to the same icon/function. */
+    _setRootButton(clickedNode) {
+        let container = d3.select(clickedNode.parentNode.parentNode);
+        let button = d3.select(clickedNode);
+        let rootButton = container.select('i');
 
-        // When an expanded button is clicked, update the 'root' button
-        // to the same icon and function.
-        d3.selectAll('.toolbar-group-expandable > i')
-            .on('click', function () {
-                let container = d3.select(this.parentNode.parentNode);
-                let button = d3.select(this);
-
-                container.select('i')
-                    .attr('class', button.attr('class'))
-                    .attr('id', button.attr('id'))
-                    .on('click', button.node.onclick);
-            })
+        rootButton
+            .attr('class', button.attr('class'))
+            .attr('id', button.attr('id'))
+            .node().onclick = button.node().onclick;
     }
 
     /** Associate all of the buttons on the toolbar with a method in N2UserInterface. */
@@ -102,15 +100,14 @@ class N2Toolbar {
             ['#expand-element', e => { n2ui.uncollapseButtonClick(n2ui.n2Diag.zoomedElement) }],
             ['#expand-all', e => { n2ui.uncollapseButtonClick(n2ui.n2Diag.model.root) }],
             ['#collapse-element', e => { n2ui.collapseOutputsButtonClick(n2ui.n2Diag.zoomedElement) }],
-            ['#collapse-element-2', e => { n2ui.collapseOutputsButtonClick(n2ui.n2Diag.zoomedElement) }],
-            ['#collapse-all', e => { n2ui.collapseOutputsButtonClick(n2ui.n2Diag.model.root) }],
-            ['#expand-element', e => { n2ui.uncollapseButtonClick(n2ui.n2Diag.zoomedElement) }],
-            ['#expand-all', e => { n2ui.uncollapseButtonClick(n2ui.n2Diag.model.root) }],
-            ['#collapse-element', e => { n2ui.collapseOutputsButtonClick(n2ui.n2Diag.zoomedElement) }],
-            ['#collapse-all', e => { n2ui.collapseOutputsButtonClick(n2ui.n2Diag.model.root) }],
-            ['#hide-connections', e => { n2ui.n2Diag.clearArrows() }],
-            ['#show-connections', e => { n2ui.n2Diag.showArrows() }],
-            ['#show-all-connections', e => { n2ui.n2Diag.showAllArrows() }],
+            ['#collapse-element-2',function() { n2ui.collapseOutputsButtonClick(n2ui.n2Diag.zoomedElement); self._setRootButton(this) }],
+            ['#collapse-all', function() { n2ui.collapseOutputsButtonClick(n2ui.n2Diag.model.root); self._setRootButton(this) }],
+            ['#expand-element', function() { n2ui.uncollapseButtonClick(n2ui.n2Diag.zoomedElement); self._setRootButton(this) }],
+            ['#expand-all', function() { n2ui.uncollapseButtonClick(n2ui.n2Diag.model.root); self._setRootButton(this) }],
+            ['#show-connections', e => { n2ui.n2Diag.showArrows(); self._setRootButton(this) }],
+            ['#hide-connections', function() { n2ui.n2Diag.clearArrows(); self._setRootButton(this) }],
+            ['#show-connections-2', function() { n2ui.n2Diag.showArrows(); self._setRootButton(this) }],
+            ['#show-all-connections', function() { n2ui.n2Diag.showAllArrows(); self._setRootButton(this) }],
             ['#legend-button', e => { n2ui.toggleLegend() }],
             ['#linear-solver-button', e => { n2ui.toggleSolverNamesCheckboxChange() }],
             ['#save-button', e => { n2ui.n2Diag.saveSvg() }],
@@ -124,7 +121,7 @@ class N2Toolbar {
         }
 
         // The font size slider is a range input
-        this.toolbar.select('#text-slider').on('input', e => {
+        this.toolbar.select('#text-slider').on('input', function() {
             const fontSize = this.value;
             n2ui.n2Diag.fontSizeSelectChange(fontSize);
 
@@ -133,7 +130,7 @@ class N2Toolbar {
         });
 
         // The model height slider is a range input
-        this.toolbar.select('#model-slider').on('mouseup', e => {
+        this.toolbar.select('#model-slider').on('mouseup', function() {
             const modelHeight = parseInt(this.value);
             n2ui.n2Diag.verticalResize(modelHeight);
         });

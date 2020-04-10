@@ -373,7 +373,6 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
         'N2Arrow', \
         'N2Search', \
         'N2Toolbar', \
-        'Toolbar', \
         'N2Diagram', \
         'N2UserInterface', \
         'defaults', \

@@ -4,7 +4,8 @@
 	position: absolute;
 	bottom: 20px;
 	z-index: 2;
-	display: none;
+    visibility: hidden;
+    display: flex;
 	border-top-left-radius: 35px;
 	border-bottom-left-radius: 35px;
 	border-top-right-radius: 100px;

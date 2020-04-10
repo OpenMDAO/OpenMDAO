@@ -1,15 +1,16 @@
 /**
- * Draw a box under the diagram describing each of the element types.
+ * Draw a symbol describing each of the element types.
  * @typedef N2Legend
- * @property {String} title The label to put at the top of the legend.
  * @property {Boolean} shown Whether the legend is currently drawn or not.
  */
 class N2Legend {
     /**
-     * Initializes the legend object, but doesn't draw it yet.
-     * @param {String} [title = "LEGEND"] The label at the top of the legend box.
+     * Initializes the legend object. 
+     * @param {ModelData} modelData Symbols are only displayed if they're in the model
      */
     constructor(modelData) {
+        this._div = d3.select("#legend-div");
+
         this.nodes = modelData.tree.children;
         this.showSysVar = {
             'group': false,
@@ -46,13 +47,16 @@ class N2Legend {
             { 'name': modelData.tree.nonlinear_solver, 'color': rootNonLinearSolver.color }
         ];
 
-        this.setDisplayBooleans(this.nodes);
-        this.shown = false; // Not shown until show() is called
-        this._div = d3.select("#legend-div");
-        this.setup();
+        this._setDisplayBooleans(this.nodes);
+        this._setupContents();
+
+        // Get the initial setting from the style sheet
+        this.hidden = (this._div.style('visibility') == 'hidden');
+
+        this._setupDrag();
     }
 
-    setDisplayBooleans(nodes) {
+    _setDisplayBooleans(nodes) {
         for (let node of nodes) {
             const {
                 group,
@@ -68,8 +72,10 @@ class N2Legend {
             const linearSolver = node.linear_solver;
             const nonLinearSolver = node.nonlinear_solver;
 
-            const linearSolverIndex = this.linearSolvers.indexOf(this.linearSolvers.find(x => x.name === linearSolver))
-            const nonLinearSolverIndex = this.nonLinearSolvers.indexOf(this.nonLinearSolvers.find(x => x.name === nonLinearSolver));
+            const linearSolverIndex =
+                this.linearSolvers.indexOf(this.linearSolvers.find(x => x.name === linearSolver))
+            const nonLinearSolverIndex =
+                this.nonLinearSolvers.indexOf(this.nonLinearSolvers.find(x => x.name === nonLinearSolver));
 
             if (linearSolverIndex < 0 && linearSolver !== undefined) {
                 let solverStyle = N2Style.solverStyleObject.find(x => x.ln === linearSolver);
@@ -78,6 +84,7 @@ class N2Legend {
                     'color': solverStyle.color
                 });
             }
+
             if (nonLinearSolverIndex < 0 && nonLinearSolver !== undefined) {
                 let solverStyle = N2Style.solverStyleObject.find(x => x.nl === nonLinearSolver);
                 this.nonLinearSolvers.push({
@@ -101,7 +108,7 @@ class N2Legend {
                         'color': N2Style.color.component
                     })
                 }
-                this.setDisplayBooleans(node.children);
+                this._setDisplayBooleans(node.children);
             }
             else {
                 if (!this.showSysVar.input && node.isParam()) {
@@ -136,104 +143,79 @@ class N2Legend {
         }
     }
 
-    setup() {
-        const sysVarContainer = document.getElementById("sys-var-legend");
-        const linearContainer = document.getElementById("linear-legend");
+    /**
+     * Create elements in the legend divs for the supplied item
+     * @param {Object} item Contains the name and color of the item
+     * @param {Object} container The div to append into
+     */
+    _addItem(item, container) {
+        const newDiv = container
+            .append('div')
+            .attr('class', 'legend-box-container');
 
-        for (let i = 0; i < this.sysAndVar.length; i++) {
-            const item = this.sysAndVar[i];
+        newDiv.append('div')
+            .attr('class', 'legend-box')
+            .style('background-color', item.color);
 
-            const legendBoxContainer = document.createElement("div");
-            legendBoxContainer.setAttribute('class', 'legend-box-container');
+        newDiv.append('p')
+            .html(item.name);
+    }
 
-            const legendBox = document.createElement('div');
-            legendBox.setAttribute('class', 'legend-box');
-            legendBox.style.backgroundColor = item.color;
+    /** Add symbols for all of the items that were discovered */
+    _setupContents() {
+        const legendBoxContainer = d3.select('#sys-var-legend');
+        for (let item of this.sysAndVar) this._addItem(item, legendBoxContainer);
 
-            const title = document.createElement('p');
-            title.innerHTML = item.name;
+        const solversContainer = d3.select('#linear-legend')
+        for (let item of this.linearSolvers) this._addItem(item, solversContainer);
+    }
 
-            legendBoxContainer.appendChild(legendBox);
-            legendBoxContainer.appendChild(title);
+    /** Listen for the event to begin dragging the legend */
+    _setupDrag() {
+        const self = this;
 
-            sysVarContainer.appendChild(legendBoxContainer);
-        }
+        this._div.on('mousedown', function() {
+            let dragDiv = d3.select(this);
+            self._startPos = [d3.event.clientX, d3.event.clientY]
+            self._offset = [d3.event.clientX - parseInt(dragDiv.style('left')), 
+                d3.event.clientY - parseInt(dragDiv.style('top'))];
 
-        for (let i = 0; i < this.linearSolvers.length; i++) {
-            const item = this.linearSolvers[i];
+            let w = d3.select(window)
+                .on("mousemove", e => {
+                    dragDiv
+                        .style('top', (d3.event.clientY - self._offset[1]) + 'px')
+                        .style('left', (d3.event.clientX - self._offset[0]) + 'px');
+                })
+                .on("mouseup", e => {
+                    w.on("mousemove", null).on("mouseup", null);
+                    
+                });
 
-            const legendBoxContainer = document.createElement("div");
-            legendBoxContainer.setAttribute('class', 'legend-box-container');
-
-            const legendBox = document.createElement('div');
-            legendBox.setAttribute('class', 'legend-box');
-            legendBox.style.backgroundColor = item.color;
-
-            const title = document.createElement('p');
-            title.innerHTML = item.name;
-
-            legendBoxContainer.appendChild(legendBox);
-            legendBoxContainer.appendChild(title);
-
-            linearContainer.appendChild(legendBoxContainer);
-        }
+            d3.event.preventDefault();
+        })
     }
 
     hide() {
-        this._div.style('display', 'none');
-        this.shown = false;
+        this._div.style('visibility', 'hidden');
+        this.hidden = true;
     }
 
-    show(showLinearSolverNames, solverStyles) {
-        this.shown = true;
-        this._div.style('display', 'flex');
+    show() {
+        this._div.style('visibility', 'visible');
+        this.hidden = false;
     }
 
+    /**
+     * Wipe the current solvers legend area and populate with the other type.
+     * @param {Boolean} linear True to use linear solvers, false for non-linear.
+     */
     toggleSolvers(linear) {
-        const solversContainer = document.getElementById("linear-legend");
-        if (linear) {
-            solversContainer.innerHTML = '';
-            for (let i = 0; i < this.linearSolvers.length; i++) {
-                const item = this.linearSolvers[i];
+        const solversContainer = d3.select('#linear-legend')
+        solversContainer.html('');
 
-                const legendBoxContainer = document.createElement("div");
-                legendBoxContainer.setAttribute('class', 'legend-box-container');
-
-                const legendBox = document.createElement('div');
-                legendBox.setAttribute('class', 'legend-box');
-                legendBox.style.backgroundColor = item.color;
-
-                const title = document.createElement('p');
-                title.innerHTML = item.name;
-
-                legendBoxContainer.appendChild(legendBox);
-                legendBoxContainer.appendChild(title);
-
-                solversContainer.appendChild(legendBoxContainer);
-            }
-        } else {
-            solversContainer.innerHTML = '';
-            for (let i = 0; i < this.nonLinearSolvers.length; i++) {
-                const item = this.nonLinearSolvers[i];
-
-                const legendBoxContainer = document.createElement("div");
-                legendBoxContainer.setAttribute('class', 'legend-box-container');
-
-                const legendBox = document.createElement('div');
-                legendBox.setAttribute('class', 'legend-box');
-                legendBox.style.backgroundColor = item.color;
-
-                const title = document.createElement('p');
-                title.innerHTML = item.name;
-
-                legendBoxContainer.appendChild(legendBox);
-                legendBoxContainer.appendChild(title);
-
-                solversContainer.appendChild(legendBoxContainer);
-            }
-        }
+        const solvers = linear ? this.linearSolvers : this.nonLinearSolvers;
+        for (let item of solvers) this._addItem(item, solversContainer);
     }
-
 
     /**
      * If legend is shown, hide it; if it's hidden, show it.
@@ -241,9 +223,7 @@ class N2Legend {
      * @param {Object} solverStyles Solver names, types, and styles including color.
      */
     toggle(showLinearSolverNames, solverStyles) {
-        if (this.shown) this.hide();
-        else this.show(showLinearSolverNames, solverStyles);
+        if (this.hidden) this.show();
+        else this.hide();
     }
-
-
 }

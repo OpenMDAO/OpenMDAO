@@ -441,15 +441,10 @@ class N2UserInterface {
     /** React to the toggle legend button, and show or hide the legend below the N2. */
     toggleLegend() {
         testThis(this, 'N2UserInterface', 'toggleLegend');
-        this.legend.toggle(
-            this.n2Diag.showLinearSolverNames,
-            this.n2Diag.style.solvers
-        );
+        this.legend.toggle();
 
-        this.n2Diag.dom.parentDiv.querySelector('#legend-button').className = this
-            .legend.shown ?
-            'fas icon-key active-tab-icon' :
-            'fas icon-key';
+        d3.select('#legend-button').attr('class',
+            this.legend.hidden? 'fas icon-key' : 'fas icon-key active-tab-icon');
     }
 
     toggleNodeData() {
