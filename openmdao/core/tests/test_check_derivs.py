@@ -2138,7 +2138,7 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
-        mycomp = model.add_subsystem('mycomp', ArrayCompMatrixFree(), promotes=['*'])
+        model.add_subsystem('mycomp', ArrayCompMatrixFree(), promotes=['*'])
 
         prob.setup()
         prob.run_model()
