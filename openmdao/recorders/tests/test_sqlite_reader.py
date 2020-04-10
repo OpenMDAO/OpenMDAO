@@ -21,6 +21,7 @@ from openmdao.core.tests.test_units import SpeedComp
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
 from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStates
 from openmdao.test_suite.components.paraboloid import Paraboloid
+from openmdao.test_suite.components.paraboloid_problem import ParaboloidProblem
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
     SellarDis1withDerivatives, SellarDis2withDerivatives, SellarProblem
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
@@ -179,10 +180,12 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         driver = prob.driver = om.ScipyOptimizeDriver(tol=1e-9, disp=False)
 
-        driver.recording_options['record_desvars'] = True
+        driver.recording_options['record_desvars'] = False
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
         driver.recording_options['record_derivatives'] = True
+        driver.recording_options['record_inputs'] = True
+        driver.recording_options['includes'] = ['*']
         driver.add_recorder(self.recorder)
 
         prob.setup()
@@ -196,8 +199,8 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # check source vars
         source_vars = cr.list_source_vars('driver')
-        self.assertEqual(sorted(source_vars['inputs']), [])
-        self.assertEqual(sorted(source_vars['outputs']), ['con1', 'con2', 'obj', 'x', 'z'])
+        self.assertEqual(sorted(source_vars['inputs']), ['x', 'y1', 'y2', 'z'])
+        self.assertEqual(sorted(source_vars['outputs']), ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z'])
 
         # check that we got the correct number of cases
         driver_cases = cr.list_cases('driver')
@@ -233,6 +236,72 @@ class TestSqliteCaseReader(unittest.TestCase):
         # Test to see if the case keys (iteration coords) come back correctly
         for i, iter_coord in enumerate(driver_cases):
             self.assertEqual(iter_coord, 'rank0:ScipyOptimize_SLSQP|{}'.format(i))
+
+    def test_driver_reading_outputs(self):
+
+        prob = ParaboloidProblem()
+        driver = prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
+        driver.recording_options['record_desvars'] = False
+        driver.recording_options['record_objectives'] = False
+        driver.recording_options['record_constraints'] = False
+        driver.recording_options['record_inputs'] = False
+        driver.recording_options['record_outputs'] = True
+        driver.recording_options['record_residuals'] = False
+        driver.recording_options['includes'] = ['*']
+        driver.add_recorder(self.recorder)
+
+        prob.setup()
+        prob.set_solver_print(0)
+        prob.run_driver()
+
+        cr = om.CaseReader(self.filename)
+
+        # check that we only have driver cases
+        self.assertEqual(cr.list_sources(), ['driver'])
+
+        # check source vars
+        source_vars = cr.list_source_vars('driver')
+        self.assertEqual(sorted(source_vars['inputs']), [])
+        self.assertEqual(sorted(source_vars['outputs']), ['c', 'f_xy', 'x', 'y'])
+
+        # Test values from the last case
+        driver_cases = cr.list_cases('driver')
+        last_case = cr.get_case(driver_cases[-1])
+        np.testing.assert_almost_equal(last_case.outputs['f_xy'], prob['f_xy'])
+        np.testing.assert_almost_equal(last_case.outputs['x'], prob['x'])
+
+    def test_driver_reading_residuals(self):
+
+        prob = ParaboloidProblem()
+        driver = prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
+        driver.recording_options['record_desvars'] = False
+        driver.recording_options['record_objectives'] = False
+        driver.recording_options['record_constraints'] = False
+        driver.recording_options['record_inputs'] = False
+        driver.recording_options['record_outputs'] = False
+        driver.recording_options['record_residuals'] = True
+        driver.recording_options['includes'] = ['*']
+        driver.add_recorder(self.recorder)
+
+        prob.setup()
+        prob.set_solver_print(0)
+        prob.run_driver()
+
+        cr = om.CaseReader(self.filename)
+
+        # check that we only have driver cases
+        self.assertEqual(cr.list_sources(), ['driver'])
+
+        # check source vars
+        source_vars = cr.list_source_vars('driver')
+        self.assertEqual(sorted(source_vars['inputs']), [])
+        self.assertEqual(sorted(source_vars['residuals']), ['c', 'f_xy', 'x', 'y'])
+
+        # Test values from the last case
+        driver_cases = cr.list_cases('driver')
+        last_case = cr.get_case(driver_cases[-1])
+        np.testing.assert_almost_equal(last_case.residuals['f_xy'], 0.0)
+        np.testing.assert_almost_equal(last_case.residuals['x'], 0.0)
 
     def test_reading_system_cases(self):
         prob = SellarProblem()
@@ -3076,7 +3145,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         cr = om.CaseReader(filename)
         case = cr.get_case(-1)
 
-        self.assertEqual(sorted(case.outputs.keys()), ['c', 'f_xy', 'x'])
+        self.assertEqual(sorted(case.outputs.keys()), ['c', 'f_xy', 'x', 'y'])
 
         # Second case with record_desvars = False and includes = []
         recorder = om.SqliteRecorder(filename)
@@ -3106,7 +3175,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         cr = om.CaseReader(filename)
         case = cr.get_case(0)
 
-        self.assertEqual(sorted(case.outputs.keys()), ['c', 'f_xy', 'x'])
+        self.assertEqual(sorted(case.outputs.keys()), ['c', 'f_xy', 'x', 'y'])
 
         # Fourth case with record_desvars = False and includes = ['*']
         recorder = om.SqliteRecorder(filename)
@@ -3121,7 +3190,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         cr = om.CaseReader(filename)
         case = cr.get_case(0)
 
-        self.assertEqual(sorted(case.outputs.keys()), ['c', 'f_xy'])
+        self.assertEqual(sorted(case.outputs.keys()), ['c', 'f_xy', 'x'])
 
     def test_feature_driver_options_with_values(self):
         import openmdao.api as om
@@ -3521,6 +3590,53 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
             # If directory already deleted, keep going
             if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
                 raise e
+
+    def test_problem_v7(self):
+
+        # the change from v7 to v8 was adding the recording of input, output, and residuals to problem
+        # and also recording of output and residuals to Driver.
+        # check to make sure reading a v7 file works when reading problem and driver cases
+
+        # The v7 case file used in this test was created with this code:
+
+        # prob = SellarProblem(SellarDerivativesGrouped)
+        # prob.setup()
+        #
+        # driver = prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
+        #
+        # recorder = om.SqliteRecorder('case_problem_driver_v7.sql')
+        #
+        # driver.recording_options['record_desvars'] = True
+        # driver.recording_options['record_objectives'] = True
+        # driver.recording_options['record_constraints'] = True
+        # driver.add_recorder(recorder)
+        #
+        # prob.recording_options['includes'] = []
+        # prob.recording_options['record_objectives'] = True
+        # prob.recording_options['record_constraints'] = True
+        # prob.recording_options['record_desvars'] = True
+        # prob.add_recorder(recorder)
+        #
+        # fail = prob.run_driver()
+        #
+        # prob.record_state('final')
+        # prob.cleanup()
+
+        filename = os.path.join(self.legacy_dir, 'case_problem_driver_v7.sql')
+
+        cr = om.CaseReader(filename)
+
+        # check that we can get correct values from the driver iterations:
+        seventh_slsqp_iteration_case = cr.get_case('rank0:ScipyOptimize_SLSQP|6')
+        np.testing.assert_almost_equal(seventh_slsqp_iteration_case.outputs['z'],
+                                      [1.97846296, -2.21388305e-13], decimal=2)
+
+        # check that we can get correct values from the problem cases
+        problem_case = cr.get_case('final')
+        self.assertEqual(sorted(problem_case.outputs.keys()), sorted(['con1', 'con2', 'obj',
+                                                                      'x', 'z']))
+        np.testing.assert_almost_equal(problem_case.outputs['z'],
+                                      [1.97846296, -2.21388305e-13], decimal=2)
 
     def test_problem_v6(self):
         # the change from v6 to v7 was adding the derivatives to problem
