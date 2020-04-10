@@ -55,6 +55,11 @@ class N2Toolbar {
         this.hidden = false;
     }
 
+    toggle() {
+        if (this.hidden) { this.show(); }
+        else { this.hide(); }
+    }
+
     _setupExpandableButtons() {
         const self = this;
 
@@ -109,31 +114,28 @@ class N2Toolbar {
             ['#legend-button', e => { n2ui.toggleLegend() }],
             ['#linear-solver-button', e => { n2ui.toggleSolverNamesCheckboxChange() }],
             ['#save-button', e => { n2ui.n2Diag.saveSvg() }],
-            ['#info-button', e => { n2ui.toggleNodeData() }]
+            ['#info-button', e => { n2ui.toggleNodeData() }],
+            ['#hide-toolbar', e => { self.toggle() }],
+            ['#question-button', DisplayModal ]
         ];
 
         for (let evt of clickEventArray) {
-            this.toolbar.select(evt[0]).on('click', evt[1]);
+            d3.select(evt[0]).on('click', evt[1]);
         }
 
-        this.toolbar.select('#text-slider').on('input', function (e) {
-            const fontSize = e.target.value;
+        // The font size slider is a range input
+        this.toolbar.select('#text-slider').on('input', e => {
+            const fontSize = this.value;
             n2ui.n2Diag.fontSizeSelectChange(fontSize);
 
             const fontSizeIndicator = self.toolbar.select('#font-size-indicator');
-            fontSizeIndicator.attr('innerHTML', fontSize + ' px');
+            fontSizeIndicator.html(fontSize + ' px');
         });
 
-        this.toolbar.select('#model-slider').on('mouseup', function (e) {
-            const modelHeight = parseInt(e.target.value);
+        // The model height slider is a range input
+        this.toolbar.select('#model-slider').on('mouseup', e => {
+            const modelHeight = parseInt(this.value);
             n2ui.n2Diag.verticalResize(modelHeight);
         });
-
-        d3.select('#question-button').on('click', DisplayModal);
-
-        this.hideToolbarButton.on('click', function () {
-            if (self.hidden) { self.show(); }
-            else { self.hide(); }
-        })
     }
 }

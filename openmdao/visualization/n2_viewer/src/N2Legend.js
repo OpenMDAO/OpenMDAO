@@ -12,56 +12,48 @@ class N2Legend {
     constructor(modelData) {
         this.nodes = modelData.tree.children;
         this.showSysVar = {
-            group: false,
-            component: false,
-            input: false,
-            unconnectedInput: false,
-            outputExplicit: false,
-            outputImplicit: false,
-            collapsed: true,
-            connection: true
+            'group': false,
+            'component': false,
+            'input': false,
+            'unconnectedInput': false,
+            'outputExplicit': false,
+            'outputImplicit': false,
+            'collapsed': true,
+            'connection': true
         };
 
         this.showN2Symbols = {
-            scalar: false,
-            vector: false,
-            collapsedVariables: false
+            'scalar': false,
+            'vector': false,
+            'collapsedVariables': false
         };
 
-        this.sysAndVar = [{
-            name: "Connection",
-            color: N2Style.color.connection
-        }, {
-            name: "Collapsed",
-            color: N2Style.color.collapsed
-        }];
+        this.sysAndVar = [
+            { 'name': "Connection", 'color': N2Style.color.connection },
+            { 'name': "Collapsed", 'color': N2Style.color.collapsed }
+        ];
+
         this.n2Symbols = [];
-        const rootLinearSolver = N2Style.solverStyleObject.find(x => x.ln === modelData.tree.linear_solver);
-        const rootNonLinearSolver = N2Style.solverStyleObject.find(x => x.nl === modelData.tree.nonlinear_solver);
-        this.linearSolvers = [{
-            name: modelData.tree.linear_solver,
-            color: rootLinearSolver.color
-        }];
-        this.nonLinearSolvers = [{
-            name: modelData.tree.nonlinear_solver,
-            color: rootNonLinearSolver.color
-        }];
+        const rootLinearSolver =
+            N2Style.solverStyleObject.find(x => x.ln === modelData.tree.linear_solver);
+        const rootNonLinearSolver =
+            N2Style.solverStyleObject.find(x => x.nl === modelData.tree.nonlinear_solver);
+        this.linearSolvers = [
+            { 'name': modelData.tree.linear_solver, 'color': rootLinearSolver.color }
+        ];
+
+        this.nonLinearSolvers = [
+            { 'name': modelData.tree.nonlinear_solver, 'color': rootNonLinearSolver.color }
+        ];
 
         this.setDisplayBooleans(this.nodes);
-
-
-        this.title = "Legend";
         this.shown = false; // Not shown until show() is called
-
         this._div = d3.select("#legend-div");
-
-
         this.setup();
     }
 
     setDisplayBooleans(nodes) {
-        for (let i = 0; i < nodes.length; i++) {
-            const node = nodes[i];
+        for (let node of nodes) {
             const {
                 group,
                 component,
@@ -73,7 +65,6 @@ class N2Legend {
                 connection
             } = this.showSysVar;
 
-
             const linearSolver = node.linear_solver;
             const nonLinearSolver = node.nonlinear_solver;
 
@@ -83,63 +74,66 @@ class N2Legend {
             if (linearSolverIndex < 0 && linearSolver !== undefined) {
                 let solverStyle = N2Style.solverStyleObject.find(x => x.ln === linearSolver);
                 this.linearSolvers.push({
-                    name: solverStyle.ln,
-                    color: solverStyle.color
+                    'name': solverStyle.ln,
+                    'color': solverStyle.color
                 });
             }
             if (nonLinearSolverIndex < 0 && nonLinearSolver !== undefined) {
                 let solverStyle = N2Style.solverStyleObject.find(x => x.nl === nonLinearSolver);
                 this.nonLinearSolvers.push({
-                    name: solverStyle.nl,
-                    color: solverStyle.color
+                    'name': solverStyle.nl,
+                    'color': solverStyle.color
                 });
             }
 
-            if (node.children !== undefined && node.children.length > 0) {
-                if (!this.showSysVar.group && node.subsystem_type === 'group') {
+            if (node.hasChildren()) {
+                if (!this.showSysVar.group && node.isGroup()) {
                     this.showSysVar.group = true;
                     this.sysAndVar.push({
-                        name: 'Group',
-                        color: N2Style.color.group
+                        'name': 'Group',
+                        'color': N2Style.color.group
                     })
-                } else if (!this.showSysVar.component && node.subsystem_type === 'component') {
+                }
+                else if (!this.showSysVar.component && node.isComponent()) {
                     this.showSysVar.component = true;
                     this.sysAndVar.push({
-                        name: 'Component',
-                        color: N2Style.color.component
+                        'name': 'Component',
+                        'color': N2Style.color.component
                     })
                 }
                 this.setDisplayBooleans(node.children);
-            } else {
-                if (!this.showSysVar.input && node.type === 'param') {
+            }
+            else {
+                if (!this.showSysVar.input && node.isParam()) {
                     this.showSysVar.input = true;
                     this.sysAndVar.push({
-                        name: 'Input',
-                        color: N2Style.color.param
+                        'name': 'Input',
+                        'color': N2Style.color.param
                     })
-                } else if (!this.showSysVar.outputExplicit && node.type === 'unknown' && !node.implicit) {
+                }
+                else if (!this.showSysVar.outputExplicit && node.isExplicitOutput()) {
                     this.showSysVar.outputExplicit = true;
                     this.sysAndVar.push({
-                        name: 'Explicit Output',
-                        color: N2Style.color.unknownExplicit
+                        'name': 'Explicit Output',
+                        'color': N2Style.color.unknownExplicit
                     })
-                } else if (!this.showSysVar.outputImplicit && node.type === 'unknown' && node.implicit) {
+                }
+                else if (!this.showSysVar.outputImplicit && node.isImplicitOutput()) {
                     this.showSysVar.outputImplicit = true;
                     this.sysAndVar.push({
-                        name: 'Implicit Output',
-                        color: N2Style.color.unknownImplicit
+                        'name': 'Implicit Output',
+                        'color': N2Style.color.unknownImplicit
                     })
-                } else if (!this.showSysVar.unconnectedInput && node.type === "unconnectedParam") {
+                }
+                else if (!this.showSysVar.unconnectedInput && node.isUnconnectedParam()) {
                     this.showSysVar.unconnectedInput = true;
                     this.sysAndVar.push({
-                        name: 'Unconnected Input',
-                        color: N2Style.color.unconnectedParam
+                        'name': 'Unconnected Input',
+                        'color': N2Style.color.unconnectedParam
                     })
                 }
             }
         }
-
-
     }
 
     setup() {
@@ -247,9 +241,8 @@ class N2Legend {
      * @param {Object} solverStyles Solver names, types, and styles including color.
      */
     toggle(showLinearSolverNames, solverStyles) {
-        if (this.shown) {
-            this.hide();
-        } else this.show(showLinearSolverNames, solverStyles);
+        if (this.shown) this.hide();
+        else this.show(showLinearSolverNames, solverStyles);
     }
 
 

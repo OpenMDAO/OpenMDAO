@@ -80,9 +80,8 @@ class N2UserInterface {
                 this.collapsedRightClickNode = undefined;
             }
 
-            this.findRootOfChangeFunction = this.findRootOfChangeForRightClick.bind(
-                this
-            );
+            this.findRootOfChangeFunction =
+                this.findRootOfChangeForRightClick.bind(this);
 
             N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
             this.lastClickWasLeft = false;
