@@ -192,8 +192,13 @@ class EmbedCodeDirective(Directive):
             # an environment where mpi or pyoptsparse are missing.
             raise self.directive_error(2, run_outputs)
         elif skipped:
+            # issue a warning unless it's about missing SNOPT when building a Travis pull request
+            PR = os.environ.get("TRAVIS_PULL_REQUEST")
+            if not (PR and PR != "false" and "pyoptsparse is not providing SNOPT" in run_outputs):
+                self.state_machine.reporter.warning(run_outputs)
+
             io_nodes = [get_skip_output_node(run_outputs)]
-            self.state_machine.reporter.warning(run_outputs)
+
         else:
             if 'output' in layout:
                 output_blocks = run_outputs if isinstance(run_outputs, list) else [run_outputs]
