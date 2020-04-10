@@ -94,15 +94,12 @@ class N2Search {
     _addEventListeners() {
         let self = this;
 
-        window.addEventListener("awesomplete-selectcomplete", function(e) {
-            // User made a selection from dropdown.
-            // This is fired after the selection is applied
-            self.searchInputEventListener(e);
-            this.searchAwesomplete.evaluate();
-        }.bind(self), false);
+       d3.select('body').on('awesomplete-selectcomplete', function() {
+           self.searchInputEventListener();
+           self.searchAwesomplete.evaluate();
+       });
 
-        // Use Capture not bubble so that this will be the first input event
-        window.addEventListener('input', self.searchInputEventListener.bind(self), true);
+       d3.select('body').on('input', this.searchInputEventListener.bind(this));
     }
 
     /**
@@ -192,10 +189,10 @@ class N2Search {
      * React to each value entered into the search input box.
      * @param {Event} e The object describing the keypress event.
      */
-    searchInputEventListener(e) {
+    searchInputEventListener() {
         testThis(this, 'N2Search', 'searchInputEventListener');
 
-        let target = e.target;
+        let target = d3.event.target;
         if (target.id != "awesompleteId") return;
 
         //valid characters AlphaNumeric : _ ? * space .
