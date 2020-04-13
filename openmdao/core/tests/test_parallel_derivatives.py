@@ -5,11 +5,14 @@ from io import StringIO
 import sys
 import unittest
 import time
+import random
 from distutils.version import LooseVersion
 
 import numpy as np
 
 import openmdao.api as om
+from openmdao.test_suite.components.sellar import SellarDerivatives, \
+    SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.groups.parallel_groups import FanOutGrouped, FanInGrouped
 from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.mpi import MPI
