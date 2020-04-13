@@ -165,11 +165,16 @@ class N2Legend {
 
     /** Add symbols for all of the items that were discovered */
     _setupContents() {
-        const legendBoxContainer = d3.select('#sys-var-legend');
-        for (let item of this.sysAndVar) this._addItem(item, legendBoxContainer);
+        const sysVarContainer = d3.select('#sys-var-legend');
+        for (let item of this.sysAndVar) this._addItem(item, sysVarContainer);
+
+        sysVarContainer.style('width', sysVarContainer.node().scrollWidth + 'px')
 
         const solversContainer = d3.select('#linear-legend')
         for (let item of this.linearSolvers) this._addItem(item, solversContainer);
+
+        solversContainer.style('width', solversContainer.node().scrollWidth + 'px');
+
     }
 
     /** Listen for the event to begin dragging the legend */
