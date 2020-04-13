@@ -741,7 +741,10 @@ class Group(System):
                                                        INT_DTYPE)
 
                 for ind, subsys in enumerate(self._subsystems_myproc):
-                    if isinstance(subsys, Component) and subsys.options['distributed']:
+                    if isinstance(subsys, Component):
+                        if subsys.options['distributed']:
+                            n_distrib_vars += 1
+                    elif subsys._has_distrib_vars:
                         n_distrib_vars += 1
 
                     if vec_name not in subsys._rel_vec_names:

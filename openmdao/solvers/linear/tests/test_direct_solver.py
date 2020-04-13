@@ -861,6 +861,32 @@ class TestDirectSolverRemoteErrors(unittest.TestCase):
         self.assertEqual(str(cm.exception),
                          "Group (<model>) has a DirectSolver solver and contains a distributed system.")
 
+    def test_distrib_direct_subbed(self):
+        size = 3
+        prob = om.Problem()
+        group = prob.model = om.Group()
+
+        group.add_subsystem('P', om.IndepVarComp('x', np.arange(size)))
+        sub = group.add_subsystem('sub', om.Group())
+
+        sub.add_subsystem('C1', DistribExecComp(['y=2.0*x', 'y=3.0*x'], arr_size=size,
+                                                x=np.zeros(size),
+                                                y=np.zeros(size)))
+        sub.add_subsystem('C2', om.ExecComp(['z=3.0*y'],
+                                            y=np.zeros(size),
+                                            z=np.zeros(size)))
+
+        prob.model.linear_solver = om.DirectSolver()
+        group.connect('P.x', 'sub.C1.x')
+        group.connect('sub.C1.y', 'sub.C2.y')
+
+        prob.setup(check=False, mode='fwd')
+        with self.assertRaises(Exception) as cm:
+            prob.run_model()
+
+        self.assertEqual(str(cm.exception),
+                         "Group (<model>) has a DirectSolver solver and contains a distributed system.")
+
     def test_par_direct(self):
         prob = om.Problem()
         model = prob.model
