@@ -1,5 +1,5 @@
 /**
- * Sets up the toolbar and handles input events.
+ * Handle input events for the matrix and toolbar.
  * @typedef N2UserInterface
  * @property {N2Diagram} n2Diag Reference to the main diagram.
  * @property {N2TreeNode} leftClickedNode The last node that was left-clicked.
@@ -33,14 +33,11 @@ class N2UserInterface {
         this._setupCollapseDepthElement();
         this.updateClickedIndices();
 
-        document.getElementById(
-            'searchButtonId'
-        ).onclick = this.searchButtonClicked.bind(this);
-        this._setupToolbar();
+        d3.select('#searchButtonId')
+            .on('click', this.searchButtonClicked.bind(this));
         this._setupSearch();
 
         this.legend = new N2Legend(this.n2Diag.modelData);
-        this.toggleLegend();
     }
 
     /** Set up the menu for selecting an arbitrary depth to collapse to. */
@@ -81,9 +78,8 @@ class N2UserInterface {
                 this.collapsedRightClickNode = undefined;
             }
 
-            this.findRootOfChangeFunction = this.findRootOfChangeForRightClick.bind(
-                this
-            );
+            this.findRootOfChangeFunction =
+                this.findRootOfChangeForRightClick.bind(this);
 
             N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
             this.lastClickWasLeft = false;
@@ -157,7 +153,8 @@ class N2UserInterface {
                 exitIndex =
                     this.leftClickedNode.rootIndex -
                     this.n2Diag.zoomedElementPrev.rootIndex;
-            } else {
+            }
+            else {
                 enterIndex =
                     this.n2Diag.zoomedElementPrev.rootIndex -
                     this.leftClickedNode.rootIndex;
@@ -185,11 +182,8 @@ class N2UserInterface {
                 node: this.leftClickedNode,
             });
             this.collapse();
-        } else {
-            //   this.n2Diag.dom.parentDiv.querySelector ('#backButtonId').disabled = this
-            //     .backButtonHistory.length == 0
-            //     ? 'disabled'
-            //     : false;
+        }
+        else {
             for (let obj = node; obj != null; obj = obj.parent) {
                 //make sure history item is not minimized
                 if (obj.isMinimized) return;
@@ -216,10 +210,9 @@ class N2UserInterface {
 
         if (this.forwardButtonHistory.length == 0) return;
         let node = this.forwardButtonHistory.pop().node;
-        this.n2Diag.dom.parentDiv.querySelector('#forwardButtonId').disabled = this
-            .forwardButtonHistory.length == 0 ?
-            'disabled' :
-            false;
+        d3.select('#forwardButtonId').attr('disabled',
+            (this.forwardButtonHistory.length == 0));
+
         for (let obj = node; obj != null; obj = obj.parent) {
             // make sure history item is not minimized
             if (obj.isMinimized) return;
@@ -422,144 +415,30 @@ class N2UserInterface {
         this.n2Diag.update();
     }
 
-    /**
-     * React to the show path button press and show paths if they're not already
-     * show, and vice-versa.
-     */
-    // showPathCheckboxChange() {
-    //     testThis(this, 'N2UserInterface', 'showPathCheckboxChange');
-
-    //     this.n2Diag.showPath = !this.n2Diag.showPath;
-    //     this.n2Diag.dom.parentDiv.querySelector(
-    //         '#currentPathId'
-    //     ).style.display = this.n2Diag.showPath ? 'block' : 'none';
-    //     this.n2Diag.dom.parentDiv.querySelector(
-    //             '#showCurrentPathButtonId'
-    //         ).className = this.n2Diag.showPath ?
-    //         'myButton myButtonToggledOn' :
-    //         'myButton';
-    // }
-
     /** React to the toggle legend button, and show or hide the legend below the N2. */
     toggleLegend() {
         testThis(this, 'N2UserInterface', 'toggleLegend');
-        this.legend.toggle(
-            this.n2Diag.showLinearSolverNames,
-            this.n2Diag.style.solvers
-        );
+        this.legend.toggle();
 
-        this.n2Diag.dom.parentDiv.querySelector('#legend-button').className = this
-            .legend.shown ?
-            'fas icon-key active-tab-icon' :
-            'fas icon-key';
+        d3.select('#legend-button').attr('class',
+            this.legend.hidden? 'fas icon-key' : 'fas icon-key active-tab-icon');
     }
 
     toggleNodeData() {
         testThis(this, 'N2UserInterface', 'toggleNodeData');
 
-        const infoButton = document.querySelector('#info-button');
-        const nodeData = document.querySelector('#node-data-container');
-        const nodeDataClassName = nodeData.className;
+        const infoButton = d3.select('#info-button');
+        const nodeData = d3.select('#node-data-container');
+        const nodeDataClassName = nodeData.attr('class');
 
         if (nodeDataClassName.includes('hide-node-data')) {
-            nodeData.className = 'node-info-container';
-            infoButton.className = 'fas icon-info-circle active-tab-icon';
-        } else {
-            nodeData.className = 'node-info-container hide-node-data';
-            infoButton.className = 'fas icon-info-circle';
+            nodeData.attr('class', 'node-info-container');
+            infoButton.attr('class', 'fas icon-info-circle active-tab-icon');
         }
-    }
-
-    /** Associate all of the buttons on the toolbar with a method in N2UserInterface. */
-    _setupToolbar() {
-        let self = this; // For callbacks that change "this". Alternative to using .bind().
-        // let toolbar = document.getElementById('toolbarDiv');
-
-        let toolbar = document.getElementById('true-toolbar');
-
-        toolbar.querySelector('#reset-graph').onclick = function() {
-            self.homeButtonClick();
-        };
-        toolbar.querySelector('#undo-graph').onclick = function() {
-            self.backButtonPressed();
-        };
-        toolbar.querySelector('#redo-graph').onclick = function() {
-            self.forwardButtonPressed();
-        };
-        // trueToolbar.querySelector("#upOneLevelButtonId").onclick =
-        //     function() {
-        //         self.upOneLevelButtonClick();
-        //     };
-        toolbar.querySelector('#expand-element').onclick = function() {
-            self.uncollapseButtonClick(self.n2Diag.zoomedElement);
-        };
-        toolbar.querySelector('#expand-all').onclick = function() {
-            self.uncollapseButtonClick(self.n2Diag.model.root);
-        };
-        toolbar.querySelector('#collapse-element').onclick = function() {
-            self.collapseOutputsButtonClick(self.n2Diag.zoomedElement);
-        };
-        toolbar.querySelector('#collapse-element-2').onclick = function() {
-            self.collapseOutputsButtonClick(self.n2Diag.zoomedElement);
-        };
-        toolbar.querySelector('#collapse-all').onclick = function() {
-            self.collapseOutputsButtonClick(self.n2Diag.model.root);
-        };
-        toolbar.querySelector('#expand-element').onclick = function() {
-            self.uncollapseButtonClick(self.n2Diag.zoomedElement);
-        };
-        toolbar.querySelector('#expand-all').onclick = function() {
-            self.uncollapseButtonClick(self.n2Diag.model.root);
-        };
-        toolbar.querySelector('#collapse-element').onclick = function() {
-            self.collapseOutputsButtonClick(self.n2Diag.zoomedElement);
-        };
-        toolbar.querySelector('#collapse-all').onclick = function() {
-            self.collapseOutputsButtonClick(self.n2Diag.model.root);
-        };
-        toolbar.querySelector('#hide-connections').onclick = function() {
-            self.n2Diag.clearArrows();
-        };
-        toolbar.querySelector('#show-connections').onclick = function() {
-            self.n2Diag.showArrows();
-        };
-        toolbar.querySelector('#show-all-connections').onclick = function() {
-            self.n2Diag.showAllArrows();
-        };
-        // toolbar.querySelector('#showCurrentPathButtonId').onclick = function() {
-        //     self.showPathCheckboxChange();
-        // };
-        toolbar.querySelector('#legend-button').onclick = function() {
-            self.toggleLegend();
-        };
-        toolbar.querySelector('#linear-solver-button').onclick = function() {
-            self.toggleSolverNamesCheckboxChange();
-        };
-
-        toolbar.querySelector('#text-slider').oninput = function(e) {
-            const fontSize = e.target.value;
-            self.n2Diag.fontSizeSelectChange(fontSize);
-
-            const fontSizeIndicator = trueToolbar.querySelector(
-                '#font-size-indicator'
-            );
-            fontSizeIndicator.innerHTML = fontSize + ' px';
-        };
-
-        toolbar.querySelector('#model-slider').onmouseup = function(e) {
-            const modelHeight = parseInt(e.target.value);
-            self.n2Diag.verticalResize(modelHeight);
-        };
-
-        toolbar.querySelector('#save-button').onclick = function() {
-            self.n2Diag.saveSvg();
-        };
-
-        toolbar.querySelector('#info-button').onclick = function() {
-            self.toggleNodeData();
-        };
-
-        document.getElementById('question-button').onclick = DisplayModal;
+        else {
+            nodeData.attr('class', 'node-info-container hide-node-data');
+            infoButton.attr('class', 'fas icon-info-circle');
+        }
     }
 
     _setupSearch() {
@@ -584,30 +463,12 @@ class N2UserInterface {
     update() {
         testThis(this, 'N2UserInterface', 'update');
 
-        // this.n2Diag.dom.parentDiv.querySelector('#currentPathId').innerHTML =
-        //     'PATH: root' +
-        //     (this.n2Diag.zoomedElement.parent ? '.' : '') +
-        //     this.n2Diag.zoomedElement.absPathName;
-        this.n2Diag.dom.parentDiv.querySelector('#undo-graph').disabled = this
-            .backButtonHistory.length == 0 ?
-            'disabled' :
-            false;
-        this.n2Diag.dom.parentDiv.querySelector('#redo-graph').disabled = this
-            .forwardButtonHistory.length == 0 ?
-            'disabled' :
-            false;
-        // this.n2Diag.dom.parentDiv.querySelector('#upOneLevelButtonId').disabled =
-        //     this.n2Diag.zoomedElement === this.n2Diag.model.root ? 'disabled' : false;
-        this.n2Diag.dom.parentDiv.querySelector('#reset-graph').disabled = this
-            .n2Diag.zoomedElement === this.n2Diag.model.root ?
-            'disabled' :
-            false;
-
-        // for (let i = 2; i <= this.n2Diag.model.maxDepth; ++i) {
-        //     this.n2Diag.dom.parentDiv.querySelector(
-        //         '#idCollapseDepthOption' + i
-        //     ).style.display = i <= this.n2Diag.zoomedElement.depth ? 'none' : 'block';
-        // }
+        d3.select('#undo-graph').attr('disabled',
+            (this.backButtonHistory.length == 0));
+        d3.select('#redo-graph').attr('disabled',
+            (this.forwardButtonHistory.length == 0));
+        d3.select('#reset-graph').attr('disabled',
+            (this.n2Diag.zoomedElement === this.n2Diag.model.root));
     }
 
     /** Called when the search button is actually or effectively clicked to start a search. */

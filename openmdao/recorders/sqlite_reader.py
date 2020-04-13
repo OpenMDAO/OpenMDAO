@@ -323,11 +323,12 @@ class SqliteCaseReader(BaseCaseReader):
         Returns
         -------
         dict
-            {'inputs':[list of keys], 'outputs':[list of keys]}. Does not recurse.
+            {'inputs':[key list], 'outputs':[key list], 'residuals':[key list]}. No recurse.
         """
         dct = {
             'inputs': [],
             'outputs': [],
+            'residuals': [],
         }
 
         case = None
@@ -354,6 +355,8 @@ class SqliteCaseReader(BaseCaseReader):
             dct['inputs'] = list(case.inputs)
         if case.outputs:
             dct['outputs'] = list(case.outputs)
+        if case.residuals:
+            dct['residuals'] = list(case.residuals)
 
         return dct
 

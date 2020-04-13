@@ -209,6 +209,15 @@ class Problem(object):
         self.recording_options.declare('record_responses', types=bool, default=False,
                                        desc='Set True to record constraints and objectives at the '
                                             'problem level.')
+        self.recording_options.declare('record_inputs', types=bool, default=False,
+                                       desc='Set True to record inputs at the '
+                                            'problem level.')
+        self.recording_options.declare('record_outputs', types=bool, default=True,
+                                       desc='Set True to record outputs at the '
+                                            'problem level.')
+        self.recording_options.declare('record_residuals', types=bool, default=False,
+                                       desc='Set True to record residuals at the '
+                                            'problem level.')
         self.recording_options.declare('record_derivatives', types=bool, default=False,
                                        desc='Set to True to record derivatives for the problem '
                                             'level')

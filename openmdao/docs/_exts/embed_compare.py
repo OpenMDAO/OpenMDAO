@@ -68,7 +68,7 @@ class EmbedCompareDirective(Directive):
         # for RIGHT side, get the code block, and reduce it if requested
         arg = self.arguments
         right_method = arg[0]
-        text, _, _, _ = get_source_code(right_method)
+        text, _, _, _, _ = get_source_code(right_method)
         if len(arg) == 3:
             start_txt = arg[1]
             end_txt = arg[2]

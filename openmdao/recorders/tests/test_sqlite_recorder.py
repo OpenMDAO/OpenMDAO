@@ -16,6 +16,7 @@ from openmdao.test_suite.components.ae_tests import AEComp
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesGrouped, \
     SellarProblem, SellarStateConnection, SellarProblemWithArrays, SellarDis1, SellarDis2
 from openmdao.test_suite.components.paraboloid import Paraboloid
+from openmdao.test_suite.components.paraboloid_problem import ParaboloidProblem
 from openmdao.solvers.linesearch.tests.test_backtracking import ImplCompTwoStates
 
 from openmdao.recorders.tests.sqlite_recorder_test_utils import assertMetadataRecorded, \
@@ -34,25 +35,6 @@ OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
 if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
-
-class ParaboloidProblem(om.Problem):
-    """
-    Paraboloid problem with Constraint.
-    """
-
-    def __init__(self):
-        super(ParaboloidProblem, self).__init__()
-
-        model = self.model
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
-        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
-
-        model.add_design_var('x', lower=-50.0, upper=50.0)
-        model.add_design_var('y', lower=-50.0, upper=50.0)
-        model.add_objective('f_xy')
-        model.add_constraint('c', upper=-15.0)
 
 class Cycle(om.Group):
 
@@ -117,7 +99,7 @@ class TestSqliteRecorder(unittest.TestCase):
         coordinate = [0, 'Driver', (0, )]
         expected_outputs = {"px.x": [1.0, ], "pz.z": [5.0, 2.0]}
 
-        expected_data = ((coordinate, (t0, t1), expected_outputs, None),)
+        expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
         assertDriverIterDataRecorded(self, expected_data, self.eps)
 
     def test_add_recorder_after_setup(self):
@@ -138,7 +120,7 @@ class TestSqliteRecorder(unittest.TestCase):
         coordinate = [0, 'Driver', (0, )]
         expected_outputs = {"px.x": [1.0, ], "pz.z": [5.0, 2.0]}
 
-        expected_data = ((coordinate, (t0, t1), expected_outputs, None),)
+        expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
         assertDriverIterDataRecorded(self, expected_data, self.eps)
 
     def test_only_objectives_recorded(self):
@@ -159,7 +141,7 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_objectives = {"obj_cmp.obj": [28.58830817, ]}
         expected_outputs = expected_objectives
 
-        expected_data = ((coordinate, (t0, t1), expected_outputs, None),)
+        expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
         assertDriverIterDataRecorded(self, expected_data, self.eps)
 
     def test_only_constraints_recorded(self):
@@ -183,7 +165,7 @@ class TestSqliteRecorder(unittest.TestCase):
         }
         expected_outputs = expected_constraints
 
-        expected_data = ((coordinate, (t0, t1), expected_outputs, None),)
+        expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
         assertDriverIterDataRecorded(self, expected_data, self.eps)
 
     def test_simple_driver_recording(self):
@@ -219,7 +201,7 @@ class TestSqliteRecorder(unittest.TestCase):
             "con.y": -7.8333333
         }
 
-        expected_data = ((coordinate, (t0, t1), expected_outputs, expected_inputs),)
+        expected_data = ((coordinate, (t0, t1), expected_outputs, expected_inputs, None),)
         assertDriverIterDataRecorded(self, expected_data, self.eps)
 
         expected_derivs = {
@@ -253,7 +235,7 @@ class TestSqliteRecorder(unittest.TestCase):
         }
         expected_outputs = expected_constraints
 
-        expected_data = ((coordinate, (t0, t1), expected_outputs, None),)
+        expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
         assertDriverIterDataRecorded(self, expected_data, self.eps)
 
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
@@ -293,7 +275,7 @@ class TestSqliteRecorder(unittest.TestCase):
             "con.y": -7.8333333
         }
 
-        expected_data = ((coordinate, (t0, t1), expected_outputs, expected_inputs),)
+        expected_data = ((coordinate, (t0, t1), expected_outputs, expected_inputs, None),)
         assertDriverIterDataRecorded(self, expected_data, self.eps)
 
         expected_derivs = {
@@ -342,12 +324,12 @@ class TestSqliteRecorder(unittest.TestCase):
         }
 
         expected_data = (
-            (run1_coord, (run1_t0, run1_t1), expected_outputs, expected_inputs),
+            (run1_coord, (run1_t0, run1_t1), expected_outputs, expected_inputs, None),
         )
         assertDriverIterDataRecorded(self, expected_data, self.eps, prefix='Run1')
 
         expected_data = (
-            (run2_coord, (run2_t0, run2_t1), expected_outputs, expected_inputs),
+            (run2_coord, (run2_t0, run2_t1), expected_outputs, expected_inputs, None),
         )
         assertDriverIterDataRecorded(self, expected_data, self.eps, prefix='Run2')
 
@@ -392,7 +374,7 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_outputs.update(expected_objectives)
         expected_outputs.update(expected_constraints)
 
-        expected_data = ((coordinate, (t0, t1), expected_outputs, expected_inputs),)
+        expected_data = ((coordinate, (t0, t1), expected_outputs, expected_inputs, None),)
         assertDriverIterDataRecorded(self, expected_data, self.eps)
 
     def test_driver_records_metadata(self):
@@ -627,7 +609,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         coordinate = [0, 'ScipyOptimize_SLSQP', (3, )]
 
-        expected_desvars = {"p1.x": prob["p1.x"]}
+        expected_desvars = {"p1.x": prob["p1.x"], "p2.y": prob["p2.y"]}
         expected_objectives = {"comp.f_xy": prob['comp.f_xy']}
         expected_constraints = {"con.c": prob['con.c']}
 
@@ -645,7 +627,7 @@ class TestSqliteRecorder(unittest.TestCase):
             "con.y": -7.8333333
         }
 
-        expected_data = ((coordinate, (t0, t1), expected_outputs, expected_inputs),)
+        expected_data = ((coordinate, (t0, t1), expected_outputs, expected_inputs, None),)
         assertDriverIterDataRecorded(self, expected_data, self.eps)
 
     def test_includes_post_setup(self):
@@ -669,7 +651,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         coordinate = [0, 'ScipyOptimize_SLSQP', (3, )]
 
-        expected_desvars = {"p1.x": prob["p1.x"]}
+        expected_desvars = {"p1.x": prob["p1.x"], "p2.y": prob["p2.y"]}
         expected_objectives = {"comp.f_xy": prob['comp.f_xy']}
         expected_constraints = {"con.c": prob['con.c']}
 
@@ -684,7 +666,7 @@ class TestSqliteRecorder(unittest.TestCase):
             "con.y": -7.8333333
         }
 
-        expected_data = ((coordinate, (t0, t1), expected_outputs, expected_inputs),)
+        expected_data = ((coordinate, (t0, t1), expected_outputs, expected_inputs, None),)
         assertDriverIterDataRecorded(self, expected_data, self.eps)
 
     def test_record_system_with_hierarchy(self):
@@ -1246,7 +1228,7 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_outputs.update(expected_objectives)
         expected_outputs.update(expected_constraints)
 
-        expected_driver_data = ((coordinate, (t0, t1), expected_outputs, None),)
+        expected_driver_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
         assertDriverIterDataRecorded(self, expected_driver_data, self.eps)
 
         #
@@ -1545,7 +1527,7 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_outputs.update(expected_constraints)
         expected_outputs.update(expected_sysincludes)
 
-        expected_data = ((coordinate, (t0, t1), expected_outputs, None),)
+        expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
         assertDriverIterDataRecorded(self, expected_data, self.eps)
 
     def test_recorder_file_already_exists_no_append(self):
@@ -1581,7 +1563,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_outputs = {"px.x": [1.0, ], "pz.z": [5.0, 2.0]}
 
-        expected_data = ((coordinate, (t0, t1), expected_outputs, None),)
+        expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
         assertDriverIterDataRecorded(self, expected_data, self.eps)
 
     def test_recorder_cleanup(self):
@@ -1729,12 +1711,313 @@ class TestSqliteRecorder(unittest.TestCase):
         objectives = final_case.get_objectives()
         constraints = final_case.get_constraints()
 
-        self.assertEqual(len(desvars), 0)
-        self.assertEqual(len(objectives), 0)
-        self.assertEqual(len(constraints), 0)
+        self.assertEqual(len(desvars), 2)
+        self.assertEqual(len(objectives), 1)
+        self.assertEqual(len(constraints), 2)
 
         # includes all outputs (default) minus the VOIs, which we have excluded
-        self.assertEqual(set(final_case.outputs.keys()), {'y1', 'y2'})
+        self.assertEqual(set(final_case.outputs.keys()), {'x', 'y1', 'z', 'con1', 'y2', 'obj', 'con2'})
+
+    def test_problem_record_inputs_outputs_residuals(self):
+        prob = om.Problem(model=SellarDerivatives())
+
+        model = prob.model
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                                  upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        prob.add_recorder(om.SqliteRecorder("cases.sql"))
+        prob.recording_options['includes'] = ['*']
+        prob.recording_options['record_inputs'] = True
+        prob.recording_options['record_outputs'] = True
+        prob.recording_options['record_residuals'] = True
+
+        prob.setup()
+        prob.run_driver()
+
+        prob.record_state('final')
+        prob.cleanup()
+
+        cr = om.CaseReader("cases.sql")
+
+        problem_cases = cr.list_cases('problem')
+        self.assertEqual(len(problem_cases), 1)
+
+        final_case = cr.get_case('final')
+
+        desvars = final_case.get_design_vars()
+        objectives = final_case.get_objectives()
+        constraints = final_case.get_constraints()
+
+        self.assertEqual(len(desvars), 2)
+        self.assertEqual(len(objectives), 1)
+        self.assertEqual(len(constraints), 2)
+
+        # includes all outputs (default) minus the VOIs, which we have excluded
+        self.assertEqual(set(final_case.outputs.keys()), {'con2', 'z', 'con1', 'y1', 'x', 'y2', 'obj'})
+        self.assertEqual(set(final_case.inputs.keys()), {'y1', 'x', 'y2', 'z'})
+        self.assertEqual(set(final_case.residuals.keys()), {'con2', 'z', 'con1', 'y1', 'x', 'y2', 'obj'})
+        self.assertAlmostEqual(final_case.inputs['d2.y1'][0], 25.58830236987513)
+        self.assertAlmostEqual(final_case.outputs['con2'][0], -11.94151184938868)
+        self.assertAlmostEqual(final_case.residuals['con2'][0], -1.3036682844358438e-11)
+        # self.assertAlmostEqual(final_case.outputs['circuit.R1.I'][0], 0.09908047)
+
+    def test_problem_record_inputs(self):
+
+        # By default you should not get any inputs recorded
+        prob = ParaboloidProblem()
+        prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
+        prob.add_recorder(self.recorder)
+        prob.setup()
+        prob.set_solver_print(0)
+        prob.run_driver()
+        prob.record_state('case1')
+        cr = om.CaseReader(self.filename)
+        final_case = cr.get_case('case1')
+        self.assertEqual(final_case.residuals, None)
+
+        # Turn on inputs recording for Problem
+        prob.recording_options['record_inputs'] = True
+        prob.setup()
+        prob.run_driver()
+        prob.record_state('case2')
+        cr = om.CaseReader(self.filename)
+        final_case = cr.get_case('case2')
+        self.assertEqual(set(final_case.inputs.keys()), {'y', 'x'})
+        self.assertAlmostEqual(final_case.inputs['comp.y'][0], -7.833333333333334)
+
+        # Default is includes = ['*'] and excludes = []
+
+        # Run again with excludes.
+        prob.recording_options['excludes'] = ['*y']
+        prob.setup()
+        prob.run_driver()
+        prob.record_state('case3')
+        cr = om.CaseReader(self.filename)
+        final_case = cr.get_case('case3')
+        self.assertEqual(set(final_case.inputs.keys()), {'x'})
+
+        # Run again with includes.
+        prob.recording_options['excludes'] = []
+        prob.recording_options['includes'] = ['*y']
+        prob.setup()
+        prob.run_driver()
+        prob.record_state('case4')
+        cr = om.CaseReader(self.filename)
+        final_case = cr.get_case('case4')
+        self.assertEqual(set(final_case.inputs.keys()), {'y'})
+
+        # run again with record_residuals = False
+        prob.recording_options['includes'] = ['*']
+        prob.recording_options['excludes'] = []
+        prob.recording_options['record_residuals'] = False
+        prob.setup()
+        prob.run_driver()
+        prob.record_state('case5')
+        prob.cleanup()
+        cr = om.CaseReader(self.filename)
+        final_case = cr.get_case('case5')
+        self.assertEqual(final_case.residuals, None)
+
+    def test_problem_record_outputs(self):
+
+        prob = ParaboloidProblem()
+        prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
+        prob.recording_options['record_residuals'] = True
+        # driver.recording_options['includes'] = ['*']
+        # driver.recording_options['excludes'] = ['y*']
+        prob.add_recorder(self.recorder)
+
+        prob.setup()
+        prob.set_solver_print(0)
+        prob.run_driver()
+
+        prob.record_state('final')
+        cr = om.CaseReader(self.filename)
+        final_case = cr.get_case('final')
+        self.assertEqual(set(final_case.residuals.keys()), {'f_xy', 'y', 'x', 'c'})
+        self.assertAlmostEqual(final_case.residuals['f_xy'][0], 0.0)
+
+        # run again with includes and excludes
+        prob.recording_options['excludes'] = ['f*']
+        prob.recording_options['includes'] = ['x*']
+        prob.setup()
+        prob.run_driver()
+        prob.record_state('final2')
+        cr = om.CaseReader(self.filename)
+        final_case = cr.get_case('final2')
+        self.assertEqual(set(final_case.residuals.keys()), {'x'})
+
+        # run again with record_residuals = False
+        prob.recording_options['includes'] = ['*']
+        prob.recording_options['excludes'] = []
+        prob.recording_options['record_residuals'] = False
+        prob.setup()
+        prob.run_driver()
+        prob.record_state('final3')
+        prob.cleanup()
+        cr = om.CaseReader(self.filename)
+        final_case = cr.get_case('final3')
+        self.assertEqual(final_case.residuals, None)
+
+    def test_problem_record_residuals(self):
+
+        prob = ParaboloidProblem()
+        prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
+        prob.recording_options['record_residuals'] = True
+        # driver.recording_options['includes'] = ['*']
+        # driver.recording_options['excludes'] = ['y*']
+        prob.add_recorder(self.recorder)
+
+        prob.setup()
+        prob.set_solver_print(0)
+        prob.run_driver()
+
+        prob.record_state('final')
+        cr = om.CaseReader(self.filename)
+        final_case = cr.get_case('final')
+        self.assertEqual(set(final_case.residuals.keys()), {'f_xy', 'y', 'x', 'c'})
+        self.assertAlmostEqual(final_case.residuals['f_xy'][0], 0.0)
+
+        # run again with includes and excludes
+        prob.recording_options['excludes'] = ['f*']
+        prob.recording_options['includes'] = ['x*']
+        prob.setup()
+        prob.run_driver()
+        prob.record_state('final2')
+        cr = om.CaseReader(self.filename)
+        final_case = cr.get_case('final2')
+        self.assertEqual(set(final_case.residuals.keys()), {'x'})
+
+        # run again with record_residuals = False
+        prob.recording_options['includes'] = ['*']
+        prob.recording_options['excludes'] = []
+        prob.recording_options['record_residuals'] = False
+        prob.setup()
+        prob.run_driver()
+        prob.record_state('final3')
+        prob.cleanup()
+        cr = om.CaseReader(self.filename)
+        final_case = cr.get_case('final3')
+        self.assertEqual(final_case.residuals, None)
+
+
+    def test_driver_record_outputs(self):
+
+        prob = ParaboloidProblem()
+        driver = prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
+        driver.recording_options['record_desvars'] = False
+        driver.recording_options['record_objectives'] = False
+        driver.recording_options['record_constraints'] = False
+        driver.recording_options['record_inputs'] = False
+        driver.recording_options['record_outputs'] = True
+        driver.recording_options['record_residuals'] = False
+        driver.recording_options['includes'] = ['*']
+        driver.add_recorder(self.recorder)
+
+        prob.setup()
+        prob.set_solver_print(0)
+        t0, t1 = run_driver(prob)
+
+        coordinate = [0, 'ScipyOptimize_SLSQP', (4, )]
+
+        expected_outputs = {
+            "p2.y": -7.83333333,
+            "con.c": -15.,
+            "p1.x": 7.16666667,
+            "comp.f_xy": -27.08333333
+        }
+
+        expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
+        assertDriverIterDataRecorded(self, expected_data, self.eps)
+
+        # run again with includes and excludes
+        self.recorder.delete_recordings()
+
+        driver.recording_options['excludes'] = ['f*']
+        driver.recording_options['includes'] = ['x*']
+        prob.setup()
+        t0, t1 = run_driver(prob)
+
+        expected_outputs = {
+            "p1.x": 7.16666667,
+        }
+        expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
+        assertDriverIterDataRecorded(self, expected_data, self.eps)
+
+
+        # run again with record_residuals = False
+        self.recorder.delete_recordings()
+        driver.recording_options['includes'] = ['*']
+        driver.recording_options['excludes'] = []
+        driver.recording_options['record_outputs'] = False
+        prob.setup()
+        t0, t1 = run_driver(prob)
+        prob.cleanup()
+
+        expected_data = ((coordinate, (t0, t1), None, None, None),)
+        assertDriverIterDataRecorded(self, expected_data, self.eps)
+
+    def test_driver_record_residuals(self):
+
+        prob = ParaboloidProblem()
+        driver = prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
+        driver.recording_options['record_desvars'] = False
+        driver.recording_options['record_objectives'] = False
+        driver.recording_options['record_constraints'] = False
+        driver.recording_options['record_inputs'] = False
+        driver.recording_options['record_outputs'] = False
+        driver.recording_options['record_residuals'] = True
+        driver.recording_options['includes'] = ['*']
+        driver.add_recorder(self.recorder)
+
+        prob.setup()
+        prob.set_solver_print(0)
+        t0, t1 = run_driver(prob)
+
+        coordinate = [0, 'ScipyOptimize_SLSQP', (4, )]
+
+        expected_residuals = {
+            "p2.y": 0.0,
+            "con.c": 0.0,
+            "p1.x": 0.0,
+            "comp.f_xy": 0.0
+        }
+
+        expected_data = ((coordinate, (t0, t1), None, None, expected_residuals),)
+        assertDriverIterDataRecorded(self, expected_data, self.eps)
+
+
+        # run again with includes and excludes
+        self.recorder.delete_recordings()
+
+        driver.recording_options['excludes'] = ['f*']
+        driver.recording_options['includes'] = ['x*']
+        prob.setup()
+        t0, t1 = run_driver(prob)
+
+        expected_residuals = {
+            "p1.x": 0.0,
+        }
+        expected_data = ((coordinate, (t0, t1), None, None, expected_residuals),)
+        assertDriverIterDataRecorded(self, expected_data, self.eps)
+
+
+        # run again with record_residuals = False
+        self.recorder.delete_recordings()
+        driver.recording_options['includes'] = ['*']
+        driver.recording_options['excludes'] = []
+        driver.recording_options['record_residuals'] = False
+        prob.setup()
+        t0, t1 = run_driver(prob)
+        prob.cleanup()
+
+        expected_data = ((coordinate, (t0, t1), None, None, None),)
+        assertDriverIterDataRecorded(self, expected_data, self.eps)
+
 
     def test_problem_record_options_includes(self):
         prob = om.Problem(model=SellarDerivatives())
@@ -2139,10 +2422,13 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         model.add_constraint('con2', upper=0.0)
 
         driver = prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9)
-        driver.recording_options['includes'] = []
+        driver.recording_options['includes'] = ['*']
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
         driver.recording_options['record_desvars'] = True
+        driver.recording_options['record_inputs'] = True
+        driver.recording_options['record_outputs'] = True
+        driver.recording_options['record_residuals'] = True
 
         recorder = om.SqliteRecorder("cases.sql")
         driver.add_recorder(recorder)
@@ -2156,16 +2442,18 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         driver_cases = cr.list_cases('driver')
 
-        case = cr.get_case(driver_cases[0])
+        last_case = cr.get_case(driver_cases[-1])
 
-        objectives = case.get_objectives()
-        design_vars = case.get_design_vars()
-        constraints = case.get_constraints()
+        objectives = last_case.get_objectives()
+        design_vars = last_case.get_design_vars()
+        constraints = last_case.get_constraints()
 
-        assert_near_equal(objectives['obj'], 28.58, 1e-1)
-
-        assert_near_equal(design_vars, case.get_design_vars(), 1e-1)
-        assert_near_equal(constraints, case.get_constraints(), 1e-1)
+        assert_near_equal(objectives['obj'], prob['obj'], 1e-1)
+        assert_near_equal(design_vars['x'], prob['x'], 1e-1)
+        assert_near_equal(constraints['con1'], prob['con1'], 1e-1)
+        assert_near_equal(last_case.inputs['obj_cmp.x'], prob['x'])
+        assert_near_equal(last_case.outputs['z'], prob['z'])
+        assert_near_equal(last_case.residuals['obj'], 0.0, tolerance = 1e-10)
 
     def test_feature_solver_options(self):
         import openmdao.api as om
