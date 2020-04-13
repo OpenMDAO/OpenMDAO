@@ -549,13 +549,9 @@ class Solver(object):
         from openmdao.core.group import Group
         if (isinstance(s, Group) and s._has_distrib_vars) or (isinstance(s, Component) and
                                                               s.options['distributed']):
-            raise RuntimeError("%s has a %s solver and contains a distributed system." %
-                               (s.msginfo, type(self).__name__))
-
-        if not (np.all(s._var_sizes['nonlinear']['output']) and
-                np.all(s._var_sizes['nonlinear']['input'])):
-            raise RuntimeError("%s has a %s solver and contains remote variables." %
-                               (s.msginfo, type(self).__name__))
+            msg = "{} linear solver in {} cannot be used in or above a ParallelGroup or a " + \
+                "distributed component."
+            raise RuntimeError(msg.format(type(self).__name__, s.msginfo))
 
 
 class NonlinearSolver(Solver):
