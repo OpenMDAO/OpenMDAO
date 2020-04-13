@@ -1,14 +1,15 @@
 /******************* Legend styling *******************/
 #legend-div {
-	position: absolute;
-	bottom: 20px;
+    position: absolute;
+    left: 200px;
+	top: 90%;
 	z-index: 2;
     visibility: hidden;
     display: flex;
     flex-direction: row;
     border-radius: 15px;
-	cursor: grab;
-    margin: 0 auto;
+    cursor: grab;
+    box-shadow: 3px 3px 3px 1px rgba(0, 0, 0, 0.2);
 }
 
 .legend-box-container {
