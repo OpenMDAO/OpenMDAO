@@ -123,6 +123,7 @@ install:
 # NOTE: not using -e on purpose here, to catch packaging errors
 - echo ">>> Installing OpenMDAO";
   pip install .[all];
+  pyppeteer-install;
 
 # display summary of installed packages and their versions
 - conda list
