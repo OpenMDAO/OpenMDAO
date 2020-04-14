@@ -1,9 +1,10 @@
 /******************* Legend styling *******************/
+
 #legend-div {
     position: absolute;
     left: 200px;
-	top: 90%;
-	z-index: 2;
+    top: 90%;
+    z-index: 2;
     visibility: hidden;
     display: flex;
     flex-direction: row;
@@ -14,23 +15,23 @@
 }
 
 .legend-box-container {
-	display: flex;
-	align-items: center;
-	margin-left: 15px;
+    display: flex;
+    align-items: center;
+    margin-left: 15px;
 }
 
 .legend-box-container p {
     display: flex;
-	font-size: 14px;
+    font-size: 14px;
     margin-left: 4px;
     white-space: nowrap;
 }
 
 .legend-box {
     display: flex;
-	width: 12px;
-	height: 12px;
-	border-radius: 2px;
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
 }
 
 .legend-title-container {
@@ -55,20 +56,20 @@
 }
 
 .draggable {
-	position: absolute;
-	width: 100px;
+    position: absolute;
+    width: 100px;
     height: 20px;
     left: 50%;
-	background-color: #42926b;
-	border-top-left-radius: 25px;
-	border-top-right-radius: 25px;
-	display: flex;
-	justify-content: center;
+    background-color: #42926b;
+    border-top-left-radius: 25px;
+    border-top-right-radius: 25px;
+    display: flex;
+    justify-content: center;
     align-items: center;
     transform: translate(-50%, -20px)
 }
 
-.draggable > .icon-key {
+.draggable>.icon-key {
     color: white;
 }
 
@@ -79,7 +80,7 @@
     height: 20px;
     width: 20px;
     display: flex;
-	justify-content: center;
+    justify-content: center;
     align-items: center;
     z-index: 4;
     cursor: default;
@@ -94,28 +95,27 @@
     vertical-align: middle;
 }
 
-.sys-var-container::-webkit-scrollbar,
-.linear-solvers-container::-webkit-scrollbar,
-.n2-symbols-container::-webkit-scrollbar {
-	display: none;
+.sys-var-container::-webkit-scrollbar, .linear-solvers-container::-webkit-scrollbar, .n2-symbols-container::-webkit-scrollbar {
+    display: none;
 }
 
 /* Systems and Varaibles Container */
+
 .sys-var-container {
     height: 90px;
-	border-radius: 15px;
-	border: 1px solid #98daba;
+    border-radius: 15px;
+    border: 1px solid #98daba;
     display: flex;
     flex-direction: row;
-	background-color: white;
-	z-index: 1;
+    background-color: white;
+    z-index: 1;
     overflow-y: scroll;
 }
 
 #sys-var-legend {
     width: auto;
     height: 90px;
-	display: flex;
+    display: flex;
     flex-wrap: wrap;
     flex-direction: column;
     margin-right: 45px;
@@ -123,16 +123,17 @@
 }
 
 /* N2 Symbols Group */
+
 .n2-symbols-container {
-	height: 90px;
-	min-height: 45px;
-	border-radius: 15px;
-	border: 1px solid #66b48e;
-	display: flex;
-	align-items: center;
+    height: 90px;
+    min-height: 45px;
+    border-radius: 15px;
+    border: 1px solid #66b48e;
+    display: flex;
+    align-items: center;
     padding-right: 45px;
-	background-color: white;
-	z-index: 2;
+    background-color: white;
+    z-index: 2;
     overflow: scroll;
     margin-left: -20px;
 }
@@ -145,79 +146,80 @@
 }
 
 .symbol {
-	display: flex;
-	align-items: center;
-	margin: 2px 0;
+    display: flex;
+    align-items: center;
+    margin: 2px 0;
 }
 
 .symbol p {
-	font-size: 14px;
-	margin: 0;
-	margin-left: 8px;
+    font-size: 14px;
+    margin: 0;
+    margin-left: 8px;
 }
 
 .symbol-outer {
-	position: relative;
-	display: flex;
-	justify-content: center;
-	align-items: center;
-	width: 18px;
-	height: 18px;
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 18px;
+    height: 18px;
 }
 
 .symbol-inner {
-	position: absolute;
-	margin: 0 auto;
+    position: absolute;
+    margin: 0 auto;
 }
 
 .scalar {
-	border: 2px solid #cecece;
+    border: 2px solid #cecece;
 }
 
 .scalar .symbol-inner {
-	width: 14px;
-	height: 14px;
-	border-radius: 50%;
-	background-color: #9fc4c6;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background-color: #9fc4c6;
 }
 
 .vector {
-	border: 2px solid #cecece;
+    border: 2px solid #cecece;
 }
 
 .vector .symbol-inner {
-	width: 12px;
-	height: 12px;
-	background-color: #9fc4c6;
+    width: 12px;
+    height: 12px;
+    background-color: #9fc4c6;
 }
 
 .collapsed {
-	border: 2px solid #9fc4c6;
+    border: 2px solid #9fc4c6;
 }
 
 .collapsed .symbol-inner {
-	width: 12px;
-	height: 12px;
-	background-color: #9fc4c6;
+    width: 12px;
+    height: 12px;
+    background-color: #9fc4c6;
 }
 
 /* Linear Solvers Group */
+
 .linear-solvers-container {
     height: 90px;
     border-radius: 15px;
-	border: 1px solid #42926b;
-	display: flex;
-	flex-wrap: wrap;
-	margin-left: -20px;
-	background-color: white;
-	z-index: 3;
-	overflow: hidden;
-	overflow-y: scroll;
+    border: 1px solid #42926b;
+    display: flex;
+    flex-wrap: wrap;
+    margin-left: -20px;
+    background-color: white;
+    z-index: 3;
+    overflow: hidden;
+    overflow-y: scroll;
     -ms-overflow-style: none;
 }
 
 #linear-legend {
-	display: flex;
+    display: flex;
     flex-wrap: wrap;
     flex-direction: column;
     margin-right: 20px;
