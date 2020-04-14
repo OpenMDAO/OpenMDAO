@@ -4,7 +4,7 @@
 Adding Subsystems to a Group and Promoting Variables
 ****************************************************
 
-To add a Component or another Group to a Group, use the :code:add_subsystem method.
+To add a Component or another Group to a Group, use the :code:`add_subsystem` method.
 
 .. automethod:: openmdao.core.group.Group.add_subsystem
     :noindex:
