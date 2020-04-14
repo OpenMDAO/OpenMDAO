@@ -231,11 +231,13 @@ class N2Legend {
      * @param {Boolean} linear True to use linear solvers, false for non-linear.
      */
     toggleSolvers(linear) {
-        const solversContainer = d3.select('#linear-legend')
-        solversContainer.html('');
+        const solversLegend = d3.select('#linear-legend')
+        solversLegend.html('');
 
         const solvers = linear ? this.linearSolvers : this.nonLinearSolvers;
-        for (let item of solvers) this._addItem(item, solversContainer);
+        for (let item of solvers) this._addItem(item, solversLegend);
+
+        solversLegend.style('width', solversLegend.node().scrollWidth + 'px');
     }
 
     /**
