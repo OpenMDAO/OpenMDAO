@@ -34,9 +34,9 @@ from openmdao.utils.name_maps import name2abs_name
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
     _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS
 import openmdao.utils.coloring as coloring_mod
-from openmdao.utils.general_utils import determine_adder_scaler, find_matches, \
+from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, ContainsAll, all_ancestors, \
-    simple_warning, make_set, match_includes_excludes
+    simple_warning, make_set, match_includes_excludes, warn_deprecation
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.utils.units import unit_conversion
@@ -2451,6 +2451,29 @@ class System(object):
                 subsys._linear_solver._set_solver_print(level=level, type_=type_)
             if subsys.nonlinear_solver is not None and type_ != 'LN':
                 subsys.nonlinear_solver._set_solver_print(level=level, type_=type_)
+
+    def _set_solver_print(self, level=2, depth=1e99, type_='all'):
+        """
+        Control printing for solvers and subsolvers in the model.
+
+        This method has been deprecated and users should instead use
+        set_solver_print (no leading underscore).
+
+        Parameters
+        ----------
+        level : int
+            iprint level. Set to 2 to print residuals each iteration; set to 1
+            to print just the iteration totals; set to 0 to disable all printing
+            except for failures, and set to -1 to disable all printing including failures.
+        depth : int
+            How deep to recurse. For example, you can set this to 0 if you only want
+            to print the top level linear and nonlinear solver messages. Default
+            prints everything.
+        type_ : str
+            Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
+        """
+        warn_deprecation('System._set_solver_print has been renamed System.set_solver_print')
+        self.set_solver_print(level, depth, type_)
 
     def _set_approx_partials_meta(self):
         # this will load a static coloring (if any) and will populate wrt_matches if
