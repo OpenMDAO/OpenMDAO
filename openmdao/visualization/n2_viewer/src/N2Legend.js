@@ -56,6 +56,19 @@ class N2Legend {
         this.hidden = (this._div.style('visibility') == 'hidden');
 
         this._setupDrag();
+
+        let self = this;
+        this.closeDiv = d3.select('#close-legend');
+        this.closeButton = this.closeDiv.select('p');
+
+        this.closeDiv
+            .on('mouseenter', e => { self.closeButton.style('color', 'red'); })
+            .on('mouseout', e => { self.closeButton.style('color', 'black'); })
+            .on('click', e => { 
+                self.hide(); 
+                self.closeButton.style('color', 'black');
+                d3.select('#legend-button').attr('class', 'fas icon-key');
+            })
     }
 
     _setDisplayBooleans(nodes) {
@@ -182,7 +195,7 @@ class N2Legend {
         const self = this;
 
         this._div.on('mousedown', function() {
-            let dragDiv = d3.select(this);
+            let dragDiv = d3.select(this).style('cursor', 'grabbing');
             self._startPos = [d3.event.clientX, d3.event.clientY]
             self._offset = [d3.event.clientX - parseInt(dragDiv.style('left')), 
                 d3.event.clientY - parseInt(dragDiv.style('top'))];
@@ -194,6 +207,7 @@ class N2Legend {
                         .style('left', (d3.event.clientX - self._offset[0]) + 'px');
                 })
                 .on("mouseup", e => {
+                    dragDiv.style('cursor', 'grab');
                     w.on("mousemove", null).on("mouseup", null);
                     
                 });
