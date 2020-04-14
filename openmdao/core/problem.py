@@ -1403,7 +1403,7 @@ class Problem(object):
         if (level, depth, type_) not in self._solver_print_cache:
             self._solver_print_cache.append((level, depth, type_))
 
-        self.model._set_solver_print(level=level, depth=depth, type_=type_)
+        self.model.set_solver_print(level=level, depth=depth, type_=type_)
 
     def list_problem_vars(self,
                           show_promoted_name=True,

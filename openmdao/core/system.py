@@ -2417,7 +2417,7 @@ class System(object):
         """
         self._linear_solver = solver
 
-    def _set_solver_print(self, level=2, depth=1e99, type_='all'):
+    def set_solver_print(self, level=2, depth=1e99, type_='all'):
         """
         Control printing for solvers and subsolvers in the model.
 
@@ -2445,7 +2445,7 @@ class System(object):
             if current_depth >= depth:
                 continue
 
-            subsys._set_solver_print(level=level, depth=depth - current_depth, type_=type_)
+            subsys.set_solver_print(level=level, depth=depth - current_depth, type_=type_)
 
             if subsys._linear_solver is not None and type_ != 'NL':
                 subsys._linear_solver._set_solver_print(level=level, type_=type_)
