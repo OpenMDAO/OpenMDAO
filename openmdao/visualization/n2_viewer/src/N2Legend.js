@@ -183,10 +183,10 @@ class N2Legend {
 
         sysVarContainer.style('width', sysVarContainer.node().scrollWidth + 'px')
 
-        const solversContainer = d3.select('#linear-legend')
-        for (let item of this.linearSolvers) this._addItem(item, solversContainer);
+        const solversLegend = d3.select('#linear-legend')
+        for (let item of this.linearSolvers) this._addItem(item, solversLegend);
 
-        solversContainer.style('width', solversContainer.node().scrollWidth + 'px');
+        solversLegend.style('width', solversLegend.node().scrollWidth + 'px');
 
     }
 

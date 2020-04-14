@@ -9,6 +9,7 @@
     flex-direction: row;
     border-radius: 15px;
     cursor: grab;
+    opacity: 0.8;
     box-shadow: 3px 3px 3px 1px rgba(0, 0, 0, 0.2);
 }
 
@@ -23,7 +24,6 @@
 	font-size: 14px;
     margin-left: 4px;
     white-space: nowrap;
-
 }
 
 .legend-box {
@@ -38,7 +38,6 @@
     width: 40px;
     display: inline-block;
     background-color: #42926b;
-
     overflow: visible;
 }
 
@@ -79,11 +78,6 @@
     right: -18px;
     height: 20px;
     width: 20px;
-    /*
-    border-radius: 10px;
-    background: white;
-    border: 1px solid #42926b;
-    */
     display: flex;
 	justify-content: center;
     align-items: center;
@@ -104,14 +98,6 @@
 .linear-solvers-container::-webkit-scrollbar,
 .n2-symbols-container::-webkit-scrollbar {
 	display: none;
-}
-
-.circle-icon {
-	width: 10px;
-	height: 10px;
-	background-color: white;
-	margin: 0 5px;
-	border-radius: 5px;
 }
 
 /* Systems and Varaibles Container */
@@ -231,7 +217,6 @@
 }
 
 #linear-legend {
-    width: auto;
 	display: flex;
     flex-wrap: wrap;
     flex-direction: column;
