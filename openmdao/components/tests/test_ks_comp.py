@@ -121,6 +121,42 @@ class TestKSFunction(unittest.TestCase):
         self.assertTrue(np.all(stress0 < 100.0))
         self.assertTrue(np.all(stress1 < 100.0))
 
+    def test_beam_stress_ks_add_constraint(self):
+        E = 1.
+        L = 1.
+        b = 0.1
+        volume = 0.01
+        max_bending = 100.0
+
+        num_cp = 5
+        num_elements = 25
+        num_load_cases = 2
+
+        prob = om.Problem(model=MultipointBeamGroup(E=E, L=L, b=b, volume=volume, max_bending = max_bending,
+                                                    num_elements=num_elements, num_cp=num_cp,
+                                                    num_load_cases=num_load_cases,
+                                                    ks_add_constraint=True))
+
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        prob.setup(mode='rev')
+
+        prob.run_driver()
+
+        stress0 = prob['parallel.sub_0.stress_comp.stress_0']
+        stress1 = prob['parallel.sub_0.stress_comp.stress_1']
+
+        # Test that the the maximum constraint prior to aggregation is close to "active".
+        assert_near_equal(max(stress0), 100.0, tolerance=5e-2)
+        assert_near_equal(max(stress1), 100.0, tolerance=5e-2)
+
+        # Test that no original constraint is violated.
+        self.assertTrue(np.all(stress0 < 100.0))
+        self.assertTrue(np.all(stress1 < 100.0))
+
     def test_upper(self):
 
         prob = om.Problem()

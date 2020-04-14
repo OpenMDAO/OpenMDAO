@@ -141,6 +141,22 @@ class KSComp(ExplicitComponent):
                              desc="Set to True to reverse sign of input constraints.")
         self.options.declare('rho', 50.0, desc="Constraint Aggregation Factor.")
         self.options.declare('upper', 0.0, desc="Upper bound for constraint, default is zero.")
+        self.options.declare('add_constraint', types=bool, default=False,
+                             desc='If True, add a constraint on the resulting output of the KSComp.'
+                                  ' If False, the user will be expected to add a constraint '
+                                  'explicitly.')
+        self.options.declare('scaler', types=(int, float), allow_none=True, default=None,
+                             desc="Scaler for constraint, if added, default is one.")
+        self.options.declare('adder', types=(int, float), allow_none=True, default=None,
+                             desc="Adder for constraint, if added, default is zero.")
+        self.options.declare('ref0', types=(int, float), allow_none=True, default=None,
+                             desc="Zero-reference for constraint, if added, default is zero.")
+        self.options.declare('ref', types=(int, float), allow_none=True, default=None,
+                             desc="Unit reference for constraint, if added, default is one.")
+        self.options.declare('parallel_deriv_color', types=str, allow_none=True, default=None,
+                             desc='If specified, this design var will be grouped for parallel '
+                                  'derivative calculations with other variables sharing the same '
+                                  'parallel_deriv_color.')
 
     def setup(self):
         """
@@ -156,6 +172,11 @@ class KSComp(ExplicitComponent):
 
         # Outputs
         self.add_output('KS', shape=(vec_size, 1), desc="Value of the aggregate KS function")
+
+        if opts['add_constraint']:
+            self.add_constraint(name='KS', upper=0.0, scaler=opts['scaler'], adder=opts['adder'],
+                                ref0=opts['ref0'], ref=opts['ref'],
+                                parallel_deriv_color=opts['parallel_deriv_color'])
 
         rows = np.zeros(width, dtype=np.int)
         cols = range(width)
