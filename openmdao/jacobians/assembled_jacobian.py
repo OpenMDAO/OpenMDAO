@@ -284,8 +284,8 @@ class AssembledJacobian(Jacobian):
             else:
                 global_conns = system._conn_global_abs_in2out
 
-            output_names = set(n for n in system._var_abs_names['output'])
-            input_names = set(n for n in system._var_abs_names['input'])
+            output_names = set(system._var_abs_names['output'])
+            input_names = set(system._var_abs_names['input'])
 
             rev_conns = defaultdict(list)
             for tgt, src in global_conns.items():

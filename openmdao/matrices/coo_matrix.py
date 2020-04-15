@@ -16,8 +16,6 @@ class COOMatrix(Matrix):
     ----------
     _coo : coo_matrix
         COO matrix. Used as a basis for conversion to CSC, CSR, Dense in inherited classes.
-    _first_gather : bool
-        If True, this is the first time the matrix has been gathered (MPI only).
     """
 
     def __init__(self, comm, is_internal):
@@ -33,7 +31,6 @@ class COOMatrix(Matrix):
         """
         super(COOMatrix, self).__init__(comm, is_internal)
         self._coo = None
-        self._first_gather = True
 
     def _build_coo(self, system):
         """
@@ -294,36 +291,3 @@ class COOMatrix(Matrix):
             The converted mask array.
         """
         return mask
-
-    def _get_assembled_matrix(self, system):
-        assert self._is_internal
-        if self._first_gather:
-            self._first_gather = False
-
-            # only need to gather the row/col indices the first time. After that we only need
-            # the data.
-            all_mtx = system.comm.gather(self._coo, root=0)
-
-            if system.comm.rank == 0:
-                data = []
-                rows = []
-                cols = []
-                for i, mtx in enumerate(all_mtx):
-                    data.append(mtx.data)
-                    rows.append(mtx.row)
-                    cols.append(mtx.col)
-
-                data = np.hstack(data)
-                self._gathered_rows = rows = np.hstack(rows)
-                self._gathered_cols = cols = np.hstack(cols)
-
-                return csc_matrix((data, (rows, cols)), shape=self._matrix.shape)
-        else:
-            all_data = system.comm.gather(self._coo.data, root=0)
-
-            if system.comm.rank == 0:
-                data = np.hstack(all_data)
-                rows = self._gathered_rows
-                cols = self._gathered_cols
-
-                return csc_matrix((data, (rows, cols)), shape=self._matrix.shape)
