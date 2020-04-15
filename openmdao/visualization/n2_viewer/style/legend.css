@@ -55,46 +55,6 @@
     transform: rotate(-90deg) translate(-77px, 3px);
 }
 
-.draggable {
-    position: absolute;
-    width: 100px;
-    height: 20px;
-    left: 50%;
-    background-color: #42926b;
-    border-top-left-radius: 25px;
-    border-top-right-radius: 25px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    transform: translate(-50%, -20px)
-}
-
-.draggable>.icon-key {
-    color: white;
-}
-
-#close-legend {
-    position: absolute;
-    top: -20px;
-    right: -18px;
-    height: 20px;
-    width: 20px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 4;
-    cursor: default;
-}
-
-#close-legend p {
-    color: black;
-    font-weight: bold;
-    font-size: 20pt;
-    text-align: center;
-    margin: auto;
-    vertical-align: middle;
-}
-
 .sys-var-container::-webkit-scrollbar, .linear-solvers-container::-webkit-scrollbar, .n2-symbols-container::-webkit-scrollbar {
     display: none;
 }
@@ -224,4 +184,50 @@
     flex-direction: column;
     margin-right: 20px;
     overflow-x: hidden;
+}
+
+.draggable {
+    position: absolute;
+    width: 100px;
+    height: 20px;
+    left: 50%;
+    background-color: #42926b;
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transform: translate(-50%, -20px)
+}
+
+.draggable>.icon-key {
+    color: white;
+}
+
+#draggable-legend-dots p {
+    color: white;
+    padding-left: 5px;
+    padding-right: 5px;
+}
+
+#close-legend {
+    position: absolute;
+    top: -20px;
+    right: -18px;
+    height: 20px;
+    width: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 4;
+    cursor: default;
+}
+
+#close-legend p {
+    color: black;
+    font-weight: bold;
+    font-size: 20pt;
+    text-align: center;
+    margin: auto;
+    vertical-align: middle;
 }
