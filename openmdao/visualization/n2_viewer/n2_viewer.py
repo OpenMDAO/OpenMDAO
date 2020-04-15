@@ -419,7 +419,7 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
 
     # Help
     help_txt = ('Left clicking on a node in the partition tree will navigate to that node. '
-                'Right clicking on a node in the model hierarchy will collapse/uncollapse it. '
+                'Right clicking on a node in the model hierarchy will collapse/expand it. '
                 'A click on any element in the N^2 diagram will allow those arrows to persist.')
 
     h.add_help(help_txt, footer="OpenMDAO Model Hierarchy and N^2 diagram")
