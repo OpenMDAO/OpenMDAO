@@ -113,7 +113,6 @@
 }
 
 #sys-var-legend {
-    width: auto;
     height: 90px;
     display: flex;
     flex-wrap: wrap;
@@ -155,6 +154,7 @@
     font-size: 14px;
     margin: 0;
     margin-left: 8px;
+    white-space: nowrap;
 }
 
 .symbol-outer {
@@ -209,18 +209,19 @@
     border-radius: 15px;
     border: 1px solid #42926b;
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: row;
     margin-left: -20px;
+    margin-right: 0;
     background-color: white;
     z-index: 3;
-    overflow: hidden;
     overflow-y: scroll;
-    -ms-overflow-style: none;
 }
 
 #linear-legend {
+    height: 90px;
     display: flex;
     flex-wrap: wrap;
     flex-direction: column;
     margin-right: 20px;
+    overflow-x: hidden;
 }
