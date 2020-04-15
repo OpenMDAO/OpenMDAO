@@ -2460,6 +2460,11 @@ class System(object):
     def _setup_solver_print(self, recurse=True):
         """
         Apply the cached solver print settings during setup.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
         """
         for level, depth, type_ in self._solver_print_cache:
             self._set_solver_print(level, depth, type_)
