@@ -316,6 +316,45 @@ class TestSolverPrint(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
+    def test_feature_set_solver_print4(self):
+        import numpy as np
+
+        import openmdao.api as om
+        from openmdao.test_suite.components.double_sellar import SubSellar
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])))
+
+        sub1 = model.add_subsystem('sub1', om.Group())
+        sub2 = sub1.add_subsystem('sub2', om.Group())
+        g1 = sub2.add_subsystem('g1', SubSellar())
+        g2 = model.add_subsystem('g2', SubSellar())
+
+        model.connect('pz.z', 'sub1.sub2.g1.z')
+        model.connect('sub1.sub2.g1.y2', 'g2.x')
+        model.connect('g2.y2', 'sub1.sub2.g1.x')
+
+        model.nonlinear_solver = om.NewtonSolver()
+        model.linear_solver = om.ScipyKrylov()
+        model.nonlinear_solver.options['solve_subsystems'] = True
+        model.nonlinear_solver.options['max_sub_solves'] = 0
+
+        g1.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        g1.linear_solver = om.LinearBlockGS()
+
+        g2.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        g2.linear_solver = om.ScipyKrylov()
+        g2.linear_solver.precon = om.LinearBlockGS()
+        g2.linear_solver.precon.options['maxiter'] = 2
+
+        prob.set_solver_print(level=-1)
+        g2.set_solver_print(level=2, type_='NL')
+
+        prob.setup()
+        prob.run_model()
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class MPITests(unittest.TestCase):

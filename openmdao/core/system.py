@@ -118,6 +118,8 @@ class System(object):
         publishing work that uses this class.
     _full_comm : MPI.Comm or None
         MPI communicator object used when System's comm is split for parallel FD.
+    _solver_print_cache : list
+        Allows solver iprints to be set to requested values after setup calls.
     _subsystems_allprocs : [<System>, ...]
         List of all subsystems (children of this system).
     _subsystems_myproc : [<System>, ...]
@@ -368,6 +370,8 @@ class System(object):
         self.iter_count = 0
 
         self.cite = ""
+
+        self._solver_print_cache = []
 
         self._subsystems_allprocs = []
         self._subsystems_myproc = []
@@ -899,6 +903,7 @@ class System(object):
         # Same situation with solvers, partials, and Jacobians.
         # If we're updating, we just need to re-run setup on these, but no recursion necessary.
         self._setup_solvers(recurse=recurse)
+        self._setup_solver_print(recurse=recurse)
         if self._use_derivatives:
             self._setup_partials(recurse=recurse)
             self._setup_jacobians(recurse=recurse)
@@ -2417,9 +2422,9 @@ class System(object):
         """
         self._linear_solver = solver
 
-    def set_solver_print(self, level=2, depth=1e99, type_='all'):
+    def _set_solver_print(self, level=2, depth=1e99, type_='all'):
         """
-        Control printing for solvers and subsolvers in the model.
+        Apply the given print settings to the internal solvers, recursively.
 
         Parameters
         ----------
@@ -2445,12 +2450,43 @@ class System(object):
             if current_depth >= depth:
                 continue
 
-            subsys.set_solver_print(level=level, depth=depth - current_depth, type_=type_)
+            subsys._set_solver_print(level=level, depth=depth - current_depth, type_=type_)
 
             if subsys._linear_solver is not None and type_ != 'NL':
                 subsys._linear_solver._set_solver_print(level=level, type_=type_)
             if subsys.nonlinear_solver is not None and type_ != 'LN':
                 subsys.nonlinear_solver._set_solver_print(level=level, type_=type_)
+
+    def _setup_solver_print(self, recurse=True):
+        """
+        Apply the cached solver print settings during setup.
+        """
+        for level, depth, type_ in self._solver_print_cache:
+            self._set_solver_print(level, depth, type_)
+
+        if recurse:
+            for subsys in self._subsystems_myproc:
+                subsys._setup_solver_print(recurse=recurse)
+
+    def set_solver_print(self, level=2, depth=1e99, type_='all'):
+        """
+        Control printing for solvers and subsolvers in the model.
+
+        Parameters
+        ----------
+        level : int
+            iprint level. Set to 2 to print residuals each iteration; set to 1
+            to print just the iteration totals; set to 0 to disable all printing
+            except for failures, and set to -1 to disable all printing including failures.
+        depth : int
+            How deep to recurse. For example, you can set this to 0 if you only want
+            to print the top level linear and nonlinear solver messages. Default
+            prints everything.
+        type_ : str
+            Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
+        """
+        if (level, depth, type_) not in self._solver_print_cache:
+            self._solver_print_cache.append((level, depth, type_))
 
     def _set_approx_partials_meta(self):
         # this will load a static coloring (if any) and will populate wrt_matches if

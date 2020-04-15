@@ -97,5 +97,15 @@ top solver and the solver in 'g2', but not the solver in 'sub1.sub2.g1'.
     openmdao.solvers.tests.test_solver_iprint.TestSolverPrint.test_feature_set_solver_print3
     :layout: interleave
 
+The `set_solver_print` method can also be called on Systems.
+For instance, if we want to print detailed output from group 'g2' down, we can first call
+`set_solver_print` on the problem or the top level model with a level of "-1", and then call it
+on group 'g2' with a level of "2".
+
+.. embed-code::
+    openmdao.solvers.tests.test_solver_iprint.TestSolverPrint.test_feature_set_solver_print4
+    :layout: interleave
+
+
 
 .. tags:: Solver
