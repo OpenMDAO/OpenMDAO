@@ -1,8 +1,5 @@
 """Define the DenseMatrix class."""
 import numpy as np
-from numpy import ndarray
-
-from scipy.sparse import coo_matrix
 
 from openmdao.matrices.coo_matrix import COOMatrix
 
