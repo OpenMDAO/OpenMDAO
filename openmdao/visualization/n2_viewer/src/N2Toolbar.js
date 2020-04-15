@@ -141,26 +141,34 @@ class N2Toolbar {
         ];
 
         for (let evt of clickEventArray) {
-        	let toolbarButton = d3.select(evt[0]);
-        	let displayText = "";
+            let toolbarButton = d3.select(evt[0]);
+            let displayText = "";
 
             toolbarButton
-	            .on('click', evt[1])
-	            .on("mouseover", function(d) {
-	            	if (evt.length == 3) {
-	            		displayText = evt[2];
-	            	} else {
-	            		displayText = evt[2]() ? evt[3] : evt[4];
-	            	}
-	            	return n2ui.n2Diag.dom.toolTip.text(displayText).style("visibility", "visible");
-	            })
-	            .on("mouseleave", function(d) {
-	                return n2ui.n2Diag.dom.toolTip.style("visibility", "hidden");
-	            })
-	            .on("mousemove", function() {
-	                return n2ui.n2Diag.dom.toolTip.style("top", (d3.event.pageY - 30) + "px")
-	                        .style("left", (d3.event.pageX + 5) + "px");
-	            });
+                .on('click', function(d) {
+                    evt[1]();
+                    if (evt.length == 3) {
+                        displayText = evt[2];
+                    } else {
+                        displayText = evt[2]() ? evt[3] : evt[4];
+                    }
+                    n2ui.n2Diag.dom.toolTip.text(displayText);
+                })
+                .on("mouseover", function(d) {
+                    if (evt.length == 3) {
+                        displayText = evt[2];
+                    } else {
+                        displayText = evt[2]() ? evt[3] : evt[4];
+                    }
+                    return n2ui.n2Diag.dom.toolTip.text(displayText).style("visibility", "visible");
+                })
+                .on("mouseleave", function(d) {
+                    return n2ui.n2Diag.dom.toolTip.style("visibility", "hidden");
+                })
+                .on("mousemove", function() {
+                    return n2ui.n2Diag.dom.toolTip.style("top", (d3.event.pageY - 30) + "px")
+                            .style("left", (d3.event.pageX + 5) + "px");
+                });
         }
 
         // The font size slider is a range input
