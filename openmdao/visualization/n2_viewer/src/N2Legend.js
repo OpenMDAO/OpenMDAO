@@ -56,6 +56,19 @@ class N2Legend {
         this.hidden = (this._div.style('visibility') == 'hidden');
 
         this._setupDrag();
+
+        let self = this;
+        this.closeDiv = d3.select('#close-legend');
+        this.closeButton = this.closeDiv.select('p');
+
+        this.closeDiv
+            .on('mouseenter', e => { self.closeButton.style('color', 'red'); })
+            .on('mouseout', e => { self.closeButton.style('color', 'black'); })
+            .on('click', e => { 
+                self.hide(); 
+                self.closeButton.style('color', 'black');
+                d3.select('#legend-button').attr('class', 'fas icon-key');
+            })
     }
 
     _setDisplayBooleans(nodes) {
@@ -165,11 +178,16 @@ class N2Legend {
 
     /** Add symbols for all of the items that were discovered */
     _setupContents() {
-        const legendBoxContainer = d3.select('#sys-var-legend');
-        for (let item of this.sysAndVar) this._addItem(item, legendBoxContainer);
+        const sysVarContainer = d3.select('#sys-var-legend');
+        for (let item of this.sysAndVar) this._addItem(item, sysVarContainer);
 
-        const solversContainer = d3.select('#linear-legend')
-        for (let item of this.linearSolvers) this._addItem(item, solversContainer);
+        sysVarContainer.style('width', sysVarContainer.node().scrollWidth + 'px')
+
+        const solversLegend = d3.select('#linear-legend')
+        for (let item of this.linearSolvers) this._addItem(item, solversLegend);
+
+        solversLegend.style('width', solversLegend.node().scrollWidth + 'px');
+
     }
 
     /** Listen for the event to begin dragging the legend */
@@ -177,7 +195,7 @@ class N2Legend {
         const self = this;
 
         this._div.on('mousedown', function() {
-            let dragDiv = d3.select(this);
+            let dragDiv = d3.select(this).style('cursor', 'grabbing');
             self._startPos = [d3.event.clientX, d3.event.clientY]
             self._offset = [d3.event.clientX - parseInt(dragDiv.style('left')), 
                 d3.event.clientY - parseInt(dragDiv.style('top'))];
@@ -189,6 +207,7 @@ class N2Legend {
                         .style('left', (d3.event.clientX - self._offset[0]) + 'px');
                 })
                 .on("mouseup", e => {
+                    dragDiv.style('cursor', 'grab');
                     w.on("mousemove", null).on("mouseup", null);
                     
                 });
@@ -212,11 +231,13 @@ class N2Legend {
      * @param {Boolean} linear True to use linear solvers, false for non-linear.
      */
     toggleSolvers(linear) {
-        const solversContainer = d3.select('#linear-legend')
-        solversContainer.html('');
+        const solversLegend = d3.select('#linear-legend')
+        solversLegend.html('');
 
         const solvers = linear ? this.linearSolvers : this.nonLinearSolvers;
-        for (let item of solvers) this._addItem(item, solversContainer);
+        for (let item of solvers) this._addItem(item, solversLegend);
+
+        solversLegend.style('width', solversLegend.node().scrollWidth + 'px');
     }
 
     /**
