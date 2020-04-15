@@ -1,12 +1,11 @@
 """Define the COOmatrix class."""
-from collections import Counter, defaultdict
 import numpy as np
 from numpy import ndarray
 from scipy.sparse import coo_matrix, csc_matrix
 
 from collections import OrderedDict
 
-from openmdao.matrices.matrix import Matrix, _compute_index_map, sparse_types
+from openmdao.matrices.matrix import Matrix, _compute_index_map
 
 
 class COOMatrix(Matrix):
@@ -53,20 +52,9 @@ class COOMatrix(Matrix):
         submats = self._submats
         metadata = self._metadata
         pre_metadata = self._key_ranges = OrderedDict()
-        if system is None:
-            owns = None
-            iproc = 0
-            abs2meta = None
-        else:
-            owns = system._owning_rank
-            iproc = system.comm.rank
-            abs2meta = system._var_allprocs_abs2meta
 
         start = end = 0
         for key, (info, loc, src_indices, shape, factor) in submats.items():
-            wrt_dist = abs2meta[key[1]]['distributed'] if abs2meta and owns else False
-            if owns and not (owns[key[1]] == iproc or wrt_dist or abs2meta[key[0]]['distributed']):
-                continue  # only keep stuff that this rank owns
 
             val = info['value']
             rows = info['rows']
@@ -75,17 +63,13 @@ class COOMatrix(Matrix):
             full_size = np.prod(shape)
             if dense:
                 if src_indices is None:
-                    if wrt_dist:
-                        delta = np.prod(info['shape'])
-                    else:
-                        delta = full_size
+                    delta = full_size
                 else:
-                    if wrt_dist:
-                        delta = info['shape'][0] * len(src_indices)
-                    else:
-                        delta = shape[0] * len(src_indices)
+                    delta = shape[0] * len(src_indices)
+
             elif rows is None:  # sparse matrix
                 delta = val.data.size
+
             else:  # list sparse format
                 delta = len(rows)
 
