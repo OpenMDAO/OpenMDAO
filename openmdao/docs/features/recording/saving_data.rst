@@ -4,6 +4,36 @@
 Case Recorder Settings
 ***********************
 
+Table of CaseRecorder Options
+----------------------------------------------------------------
+Below is a table of options that can be applied to the user's CaseRecorder
+
+.. csv-table:: Recorder Options Table
+   :header: "Record Options", "Driver", "Problem", "Solver", "System"
+   :widths: 25, 10, 10, 10, 10
+
+   "record_constraints", "X", "", "", "X"
+   "record_desvars", "X", "", "", "X"
+   "record_objectives", "X", "", "", "X"
+   "record_derivatives", "X", "", "", "O F"
+   "record_responses", "X", "", "", "X"
+   "record_inputs", "X", "X", "X", "O F"
+   "record_outputs", "O T", "X", "X", "O T"
+   "record_residuals", "O F", "X T", "O F", "OF"
+   "record_metadata", "X>A", "X>A", "A", "A"
+   "record_model_metadata", "X>A", "X>A", "A", "A"
+   "record_abs_error", "", "", "X T", "O F"
+   "record_rel_error", "", "", "X T", "O F"
+   "record_solver_residuals", "", "", "X F", "O F"
+   "includes", "X", "X", "X", "X"
+   "excludes", "X", "X", "X", "X"
+   "options_excludes", "O", "X", "O", "O"
+
+| x - Existing option
+| o - Proposed new option
+| a - Always record
+| x>a - was optional now always
+| T or F - default for that option
 
 Specifying a Case Prefix
 ------------------------
