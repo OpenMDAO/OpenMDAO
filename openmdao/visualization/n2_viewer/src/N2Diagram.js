@@ -65,12 +65,12 @@ class N2Diagram {
 
         this.ui = new N2UserInterface(this);
 
+        this.toolbar = new N2Toolbar(this.ui);
+
         this._setupSvgElements();
 
         this.matrix = new N2Matrix(this.model, this.layout, this.dom.n2Groups,
             true, this.ui.findRootOfChangeFunction);
-
-        // this.matrixMax = this.matrix;
 
         // TODO: Move to N2Layout
         this.scales = {
@@ -825,12 +825,13 @@ class N2Diagram {
             const arrow = this.arrowCache.find(o => o.cell.row === cell.row && o.cell.col === cell.col);
             const arrowIndex = this.arrowCache.indexOf(arrow);
             this.arrowCache.splice(arrowIndex, 1);
-        } else {
+        }
+        else {
             const arrow = {
-                cell: cell,
-                element: this.dom.n2OuterGroup
+                'cell': cell,
+                'element': this.dom.n2OuterGroup
                     .selectAll("path.n2_hover_elements, circle.n2_hover_elements"),
-                className: newClassName
+                'className': newClassName
             }
             this.arrowCache.push(arrow);
             this.dom.n2OuterGroup
@@ -840,13 +841,10 @@ class N2Diagram {
     }
 
     setActiveNode(cell) {
-        const dataContainer = document.getElementById("node-data");
-        const nodeName = dataContainer.querySelector("#node-name");
-        const nodePath = dataContainer.querySelector("#node-path");
-        const nodeType = dataContainer.querySelector("#node-type");
-        const nodeValue = dataContainer.querySelector("#node-value");
-        const nodeUnit = dataContainer.querySelector("#node-unit");
-        const nodeShape = dataContainer.querySelector("#node-shape");
+        const dataContainer = d3.select("#node-data");
+        const nodeName = dataContainer.select("#node-name");
+        const nodePath = dataContainer.select("#node-path");
+        const nodeType = dataContainer.select("#node-type");
 
         const {
             name,
@@ -854,9 +852,9 @@ class N2Diagram {
             type
         } = cell.obj;
 
-        nodeName.innerHTML = name;
-        nodePath.innerHTML = absPathName;
-        nodeType.innerHTML = type;
+        nodeName.html(name);
+        nodePath.html(absPathName);
+        nodeType.html(type);
     }
 
     mouseClickAll(cell) {
@@ -864,7 +862,8 @@ class N2Diagram {
         let selection = this.dom.n2OuterGroup.selectAll("." + newClassName);
         if (selection.size() > 0) {
             selection.remove();
-        } else {
+        }
+        else {
             this.dom.n2OuterGroup
                 .selectAll("path.n2_hover_elements, circle.n2_hover_elements")
                 .attr("class", newClassName);

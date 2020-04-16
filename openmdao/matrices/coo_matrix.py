@@ -1,12 +1,11 @@
 """Define the COOmatrix class."""
-from collections import Counter, defaultdict
 import numpy as np
 from numpy import ndarray
 from scipy.sparse import coo_matrix, csc_matrix
 
 from collections import OrderedDict
 
-from openmdao.matrices.matrix import Matrix, _compute_index_map, sparse_types
+from openmdao.matrices.matrix import Matrix, _compute_index_map
 
 
 class COOMatrix(Matrix):
@@ -17,8 +16,6 @@ class COOMatrix(Matrix):
     ----------
     _coo : coo_matrix
         COO matrix. Used as a basis for conversion to CSC, CSR, Dense in inherited classes.
-    _first_gather : bool
-        If True, this is the first time the matrix has been gathered (MPI only).
     """
 
     def __init__(self, comm, is_internal):
@@ -34,7 +31,6 @@ class COOMatrix(Matrix):
         """
         super(COOMatrix, self).__init__(comm, is_internal)
         self._coo = None
-        self._first_gather = True
 
     def _build_coo(self, system):
         """
@@ -53,20 +49,9 @@ class COOMatrix(Matrix):
         submats = self._submats
         metadata = self._metadata
         pre_metadata = self._key_ranges = OrderedDict()
-        if system is None:
-            owns = None
-            iproc = 0
-            abs2meta = None
-        else:
-            owns = system._owning_rank
-            iproc = system.comm.rank
-            abs2meta = system._var_allprocs_abs2meta
 
         start = end = 0
         for key, (info, loc, src_indices, shape, factor) in submats.items():
-            wrt_dist = abs2meta[key[1]]['distributed'] if abs2meta and owns else False
-            if owns and not (owns[key[1]] == iproc or wrt_dist or abs2meta[key[0]]['distributed']):
-                continue  # only keep stuff that this rank owns
 
             val = info['value']
             rows = info['rows']
@@ -75,17 +60,13 @@ class COOMatrix(Matrix):
             full_size = np.prod(shape)
             if dense:
                 if src_indices is None:
-                    if wrt_dist:
-                        delta = np.prod(info['shape'])
-                    else:
-                        delta = full_size
+                    delta = full_size
                 else:
-                    if wrt_dist:
-                        delta = info['shape'][0] * len(src_indices)
-                    else:
-                        delta = shape[0] * len(src_indices)
+                    delta = shape[0] * len(src_indices)
+
             elif rows is None:  # sparse matrix
                 delta = val.data.size
+
             else:  # list sparse format
                 delta = len(rows)
 
@@ -310,36 +291,3 @@ class COOMatrix(Matrix):
             The converted mask array.
         """
         return mask
-
-    def _get_assembled_matrix(self, system):
-        assert self._is_internal
-        if self._first_gather:
-            self._first_gather = False
-
-            # only need to gather the row/col indices the first time. After that we only need
-            # the data.
-            all_mtx = system.comm.gather(self._coo, root=0)
-
-            if system.comm.rank == 0:
-                data = []
-                rows = []
-                cols = []
-                for i, mtx in enumerate(all_mtx):
-                    data.append(mtx.data)
-                    rows.append(mtx.row)
-                    cols.append(mtx.col)
-
-                data = np.hstack(data)
-                self._gathered_rows = rows = np.hstack(rows)
-                self._gathered_cols = cols = np.hstack(cols)
-
-                return csc_matrix((data, (rows, cols)), shape=self._matrix.shape)
-        else:
-            all_data = system.comm.gather(self._coo.data, root=0)
-
-            if system.comm.rank == 0:
-                data = np.hstack(all_data)
-                rows = self._gathered_rows
-                cols = self._gathered_cols
-
-                return csc_matrix((data, (rows, cols)), shape=self._matrix.shape)

@@ -1,0 +1,54 @@
+/******************* Node Data styling *******************/
+.node-info-container {
+	position: absolute;
+	right: 0;
+	overflow: hidden;
+	background-color: white;
+	border-top-left-radius: 20px;
+	border-bottom-left-radius: 20px;
+	border-top: 1px solid #42926b;
+	border-left: 1px solid #42926b;
+	border-bottom: 1px solid #42926b;
+	width: 200px;
+	z-index: 10;
+	transition: opacity 0.25s;
+}
+
+.hide-node-data {
+	opacity: 0;
+}
+
+.info-header {
+	background-color: #42926b;
+	padding: 6px 12px;
+}
+
+.info-header p {
+	color: white;
+	text-align: center;
+}
+
+.node-data-container {
+	width: 100%;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+
+.node-data {
+	display: flex;
+	justify-content: space-between;
+	font-size: 13px;
+	width: 90%;
+	align-self: center;
+}
+
+.node-data p:first-child {
+	font-weight: 600;
+}
+
+.node-data p:nth-child(2) {
+}
+
+.node-data-name {
+}
