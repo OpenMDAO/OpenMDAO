@@ -283,6 +283,50 @@ class TestKSFunctionFeatures(unittest.TestCase):
 
         assert_near_equal(prob['ks.KS'][0], -12.0)
 
+    def test_add_constraint(self):
+        import numpy as np
+        import openmdao.api as om
+        import matplotlib.pyplot as plt
+
+        n = 50
+        prob = om.Problem()
+        model = prob.model
+
+        prob.driver = om.ScipyOptimizeDriver()
+
+        ivc = model.add_subsystem('ivc', om.IndepVarComp())
+        ivc.add_output('x', val=np.linspace(-np.pi/2, np.pi/2, n))
+        ivc.add_output('k', val=5.0)
+
+        model.add_subsystem('comp', om.ExecComp('y = -3.0*x**2 + k', x=np.zeros((n, )),
+                                                y=np.zeros((n, )), k=0.0))
+        model.add_subsystem('ks', om.KSComp(width=n, upper=4.0, add_constraint=True))
+
+        model.add_design_var('ivc.k', lower=-10, upper=10)
+        model.add_objective('ivc.k', scaler=-1)
+
+        model.connect('ivc.x', 'comp.x')
+        model.connect('ivc.k', 'comp.k')
+        model.connect('comp.y', 'ks.g')
+
+        prob.setup()
+        prob.run_driver()
+
+        self.assertTrue(max(prob.get_val('comp.y')) <= 4.0)
+
+        fig, ax = plt.subplots()
+
+        x = prob.get_val('ivc.x')
+        y = prob.get_val('comp.y')
+
+        ax.plot(x, y, 'r.')
+        ax.plot(x, 4.0*np.ones_like(x), 'k--')
+        ax.text(-0.25, 0, f"k = {prob.get_val('ivc.k')[0]:6.3f}")
+
+        plt.show()
+
+
+
 
 if __name__ == "__main__":
     unittest.main()
