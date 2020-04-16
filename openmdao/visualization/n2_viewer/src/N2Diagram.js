@@ -46,7 +46,8 @@ class N2Diagram {
             'svg': d3.select("#svgId"),
             'svgStyle': document.createElement("style"),
             'toolTip': d3.select(".tool-tip"),
-            'arrowMarker': d3.select("#arrow")
+            'arrowMarker': d3.select("#arrow"),
+            'nodeInfo': d3.select('#node-data')
         };
 
         // Append the new style section.
@@ -332,17 +333,6 @@ class N2Diagram {
                 .attr("width", innerDims.height)
                 .attr("height", offgridHeight);
 
-            /*
-            this.dom.n2Groups.offgrid.top
-                .append("text")
-                .attr("x", 0).attr("y", 0)
-                // .attr("transform", "translate(0 0)")
-                //.attr("width", innerDims.height)
-                //.attr("height", offgridHeight)
-                //.style("fill", "black")
-                .text("HOWDY.HOWDY.HOWDY.HOWDY");
-                */
-
             this.dom.n2Groups.offgrid.bottom
                 .attr("transform", "translate(0 " + innerDims.height + offgridHeight + ")")
                 .attr("width", outerDims.height)
@@ -375,6 +365,8 @@ class N2Diagram {
                 self.ui.rightClick(d, this);
             })
             .on("mouseover", function(d) {
+                self.setActiveNode(d);
+
                 if (self.model.abs2prom != undefined) {
                     if (d.isParam()) {
                         return self.dom.toolTip.text(
@@ -389,6 +381,7 @@ class N2Diagram {
                 }
             })
             .on("mouseleave", function(d) {
+                self.clearActiveNode();
                 if (self.model.abs2prom != undefined) {
                     return self.dom.toolTip.style("visibility", "hidden");
                 }
@@ -541,6 +534,8 @@ class N2Diagram {
                 self.ui.rightClick(d, this);
             })
             .on("mouseover", function(d) {
+                self.setActiveNode(d)
+
                 if (self.model.abs2prom != undefined) {
                     if (d.isParam()) {
                         return self.dom.toolTip.text(self.model.abs2prom.input[d.absPathName])
@@ -553,6 +548,8 @@ class N2Diagram {
                 }
             })
             .on("mouseleave", function(d) {
+                self.clearActiveNode();
+
                 if (self.model.abs2prom != undefined) {
                     return self.dom.toolTip.style("visibility", "hidden");
                 }
@@ -684,17 +681,11 @@ class N2Diagram {
             const arrow = this.arrowCache[i];
             this.mouseOverOnDiagonal(arrow.cell);
             arrow.element.attr('class', arrow.className);
-
-
-            // this.dom.n2OuterGroup
-            //     .selectAll("path.n2_hover_elements, circle.n2_hover_elements")
-            //     .attr("class", arrow.newClassName);
         };
 
     }
 
     showAllArrows() {
-
         for (let i = 0; i < this.matrix.visibleCells.length; i++) {
             const cell = this.matrix.visibleCells[i];
             if (cell.renderer.color !== "black") {
@@ -789,8 +780,10 @@ class N2Diagram {
      * @param {N2MatrixCell} cell The cell the event occured on.
      */
     mouseOverOnDiagonal(cell) {
-        if (this.matrix.cellExists(cell))
+        if (this.matrix.cellExists(cell)) {
             this.matrix.mouseOverOnDiagonal(cell);
+            this.setActiveNode(cell.obj);
+        }
     }
 
     /**
@@ -798,8 +791,9 @@ class N2Diagram {
      * rather than setting one up that points directly to a specific matrix.
      */
     mouseOverOffDiagonal(cell) {
-        if (this.matrix.cellExists(cell))
+        if (this.matrix.cellExists(cell)) {
             this.matrix.mouseOverOffDiagonal(cell);
+        }
     }
 
     /** When the mouse leaves a cell, remove all temporary arrows. */
@@ -807,7 +801,9 @@ class N2Diagram {
         this.dom.n2OuterGroup.selectAll(".n2_hover_elements").remove();
         d3.selectAll("div.offgrid")
             .style("visibility", "hidden")
-            .node().innerHTML = '';
+            .html('');
+
+        this.clearActiveNode();
     }
 
     /**
@@ -816,8 +812,6 @@ class N2Diagram {
      * @param {N2MatrixCell} cell The cell the event occured on.
      */
     mouseClick(cell) {
-        this.setActiveNode(cell);
-
         let newClassName = "n2_hover_elements_" + cell.row + "_" + cell.col;
         let selection = this.dom.n2OuterGroup.selectAll("." + newClassName);
         if (selection.size() > 0) {
@@ -840,21 +834,37 @@ class N2Diagram {
         }
     }
 
-    setActiveNode(cell) {
-        const dataContainer = d3.select("#node-data");
-        const nodeName = dataContainer.select("#node-name");
-        const nodePath = dataContainer.select("#node-path");
-        const nodeType = dataContainer.select("#node-type");
+    setActiveNode(obj) {
+        function mirror(val) { return val; }
+        function yesNo(val) { return val? 'Yes' : 'No'; }
 
-        const {
-            name,
-            absPathName,
-            type
-        } = cell.obj;
+        const propList = [
+            { 'key': 'name', 'desc': 'Name', 'fn': mirror },
+            { 'key': 'absPathName', 'desc': 'Path', 'fn': mirror  },
+            { 'key': 'class', 'desc': 'Class', 'fn': mirror  },
+            { 'key': 'type', 'desc': 'Type', 'fn': mirror  },
+            { 'key': 'dtype', 'desc': 'DType', 'fn': mirror  },
+            { 'key': 'subsystem_type', 'desc': 'Subsystem Type', 'fn': mirror  },
+            { 'key': 'component_type', 'desc': 'Component Type', 'fn': mirror  },
+            { 'key': 'implicit', 'desc': 'Implicit', 'fn': yesNo  },
+            { 'key': 'is_parallel', 'desc': 'Parallel', 'fn': yesNo },
+            { 'key': 'linear_solver', 'desc': 'Linear Solver', 'fn': mirror  },
+            { 'key': 'nonlinear_solver', 'desc': 'Non-Linear Solver', 'fn': mirror  }
+        ]
 
-        nodeName.html(name);
-        nodePath.html(absPathName);
-        nodeType.html(type);
+        for (const prop of propList) {
+            if (obj.propExists(prop.key)) {
+                const newDiv = this.dom.nodeInfo.append('div')
+                    .attr('class', 'node-data');
+                
+                newDiv.append('p').text(prop.desc);
+                newDiv.append('p').text(prop.fn(obj[prop.key]));
+            }
+        }
+    }
+
+    clearActiveNode() {
+        this.dom.nodeInfo.html('');
     }
 
     mouseClickAll(cell) {
