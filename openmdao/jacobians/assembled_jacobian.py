@@ -11,8 +11,6 @@ from openmdao.matrices.csr_matrix import CSRMatrix
 from openmdao.matrices.csc_matrix import CSCMatrix
 from openmdao.utils.units import unit_conversion
 from openmdao.utils.array_utils import _flatten_src_indices
-from openmdao.utils.mpi import MPI
-from openmdao.vectors.vector import INT_DTYPE
 
 _empty_dict = {}
 
@@ -114,13 +112,11 @@ class AssembledJacobian(Jacobian):
         ext_mtx = self._matrix_class(system.comm, False)
 
         iproc = system.comm.rank
-        abs2idx = system._var_allprocs_abs2idx['nonlinear']
         in_sizes = system._var_sizes['nonlinear']['input']
         out_ranges = self._out_ranges
         in_ranges = self._in_ranges
 
         abs2prom_out = system._var_abs2prom['output']
-        owns = system._owning_rank
         conns = {} if isinstance(system, Component) else system._conn_global_abs_in2out
         abs_key2shape = self._abs_key2shape
 
@@ -280,23 +276,16 @@ class AssembledJacobian(Jacobian):
             int_mtx = self._int_mtx
             ext_mtx = self._ext_mtx[system.pathname]
             subjacs = system._subjacs_info
-            owned = system._owning_rank
-            irank = system.comm.rank
-            meta = system._var_allprocs_abs2meta
             sys_inputs = system._var_allprocs_abs2prom['input']
             sys_outputs = system._var_allprocs_abs2prom['output']
 
             if isinstance(system, Component):
                 global_conns = _empty_dict
-                iscomp = True
             else:
                 global_conns = system._conn_global_abs_in2out
-                iscomp = False
 
-            output_names = set(n for n in system._var_abs_names['output']
-                               if iscomp or owned[n] == irank or meta[n]['distributed'])
-            input_names = set(n for n in system._var_abs_names['input']
-                              if iscomp or owned[n] == irank or meta[n]['distributed'])
+            output_names = set(system._var_abs_names['output'])
+            input_names = set(system._var_abs_names['input'])
 
             rev_conns = defaultdict(list)
             for tgt, src in global_conns.items():
@@ -310,7 +299,7 @@ class AssembledJacobian(Jacobian):
             iters_in_ext = []
 
             for abs_key in subjacs:
-                ofname, wrtname = abs_key
+                _, wrtname = abs_key
                 if wrtname in sys_outputs:
                     if wrtname in output_names:
                         if abs_key in int_mtx._submats:
@@ -378,6 +367,7 @@ class AssembledJacobian(Jacobian):
                 ext_mtx._update_submat(key, subjacs[key]['value'])
 
         int_mtx._post_update()
+
         if ext_mtx is not None:
             ext_mtx._post_update()
 
