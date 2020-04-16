@@ -1,8 +1,5 @@
 """Define the DenseMatrix class."""
 import numpy as np
-from numpy import ndarray
-
-from scipy.sparse import coo_matrix
 
 from openmdao.matrices.coo_matrix import COOMatrix
 
@@ -116,10 +113,3 @@ class DenseMatrix(COOMatrix):
         """
         # this will add any repeated entries together
         self._matrix = self._coo.toarray()
-
-    def _get_assembled_matrix(self, system):
-        mat = super(DenseMatrix, self)._get_assembled_matrix(system)
-        if mat is None:
-            return mat
-
-        return mat.toarray()

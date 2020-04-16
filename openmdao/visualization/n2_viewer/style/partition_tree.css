@@ -173,3 +173,43 @@ div.offgrid {
 	position: absolute;
 	opacity: 0.7;
 }
+
+
+/* The Close Button */
+.close {
+	color: white;
+	float: right;
+	font-size: 28px;
+	font-weight: bold;
+}
+
+.close:hover,
+.close:focus {
+	color: #000;
+	text-decoration: none;
+	cursor: pointer;
+}
+
+.modal-header {
+	font-family: helvetica, sans-serif;
+	font-size: 20px;
+	padding: 2px 16px;
+	background-color: steelblue;
+	color: white;
+	margin: 2px;
+	padding: 10px;
+}
+
+.modal-body {
+	padding: 2px 16px;
+}
+
+.modal-footer {
+	font-family: helvetica, sans-serif;
+	font-size: 12px;
+	padding: 2px 16px;
+	background-color: steelblue;
+	color: white;
+	margin: 2px;
+	padding: 10px;
+}

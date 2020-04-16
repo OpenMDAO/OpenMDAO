@@ -1,245 +1,233 @@
 /******************* Legend styling *******************/
+
 #legend-div {
-	width: 90%;
-	position: absolute;
-	bottom: 20px;
-	z-index: 2;
+    position: absolute;
+    left: 200px;
+    top: 90%;
+    z-index: 2;
     visibility: hidden;
     display: flex;
-	border-top-left-radius: 35px;
-	border-bottom-left-radius: 35px;
-	border-top-right-radius: 100px;
-	border-bottom-right-radius: 100px;
-	cursor: grab;
-	margin: 0 auto;
+    flex-direction: row;
+    border-radius: 15px;
+    cursor: grab;
+    opacity: 0.8;
+    box-shadow: 3px 3px 3px 1px rgba(0, 0, 0, 0.2);
 }
 
 .legend-box-container {
-	display: flex;
-	align-items: center;
-	margin-left: 15px;
+    display: flex;
+    align-items: center;
+    margin-left: 15px;
 }
 
 .legend-box-container p {
-	font-size: 14px;
-	margin-left: 4px;
+    display: flex;
+    font-size: 14px;
+    margin-left: 4px;
+    white-space: nowrap;
 }
 
 .legend-box {
-	width: 12px;
-	height: 12px;
-	border-radius: 2px;
+    display: flex;
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+}
+
+.legend-title-container {
+    height: 100%;
+    width: 40px;
+    display: inline-block;
+    background-color: #42926b;
+    overflow: visible;
 }
 
 .legend-title {
-	text-align: center;
-	width: 60px;
-	font-size: 14px;
-	transform: rotate(-90deg);
+    text-align: center;
+    font-weight: bold;
+    vertical-align: middle;
+    width: 90px;
+    height: 40px;
+    font-size: 14px;
+    color: white;
+    position: relative;
+    transform-origin: 0 0;
+    transform: rotate(-90deg) translate(-77px, 3px);
 }
 
-.draggable {
-	position: absolute;
-	width: 6%;
-	height: 20px;
-	background-color: #42926b;
-	top: -20px;
-	left: 47%;
-	border-top-left-radius: 25px;
-	border-top-right-radius: 25px;
-	display: flex;
-	justify-content: center;
-	align-items: center;
-}
-
-.sys-var-container::-webkit-scrollbar,
-.linear-solvers-container::-webkit-scrollbar,
-.n2-symbols-container::-webkit-scrollbar {
-	display: none;
-}
-
-.circle-icon {
-	width: 10px;
-	height: 10px;
-	background-color: white;
-	margin: 0 5px;
-	border-radius: 5px;
-}
-
-/* N2 Symbols Group */
-.n2-symbols-container {
-	height: 90px;
-	min-height: 45px;
-	width: 25%;
-	border-top-left-radius: 35px;
-	border-bottom-left-radius: 35px;
-	border-top-right-radius: 100px;
-	border-bottom-right-radius: 100px;
-	border: 1px solid #66b48e;
-	display: flex;
-	align-items: center;
-	margin-left: -5%;
-	background-color: white;
-	z-index: 2;
-	overflow: scroll;
-}
-
-.n2-symbols-container .legend-title {
-	margin-left: 20%;
-}
-
-#symbols-legend {
-	display: flex;
-	flex-direction: column;
-}
-
-.symbol {
-	display: flex;
-	align-items: center;
-	margin: 2px 0;
-}
-
-.symbol p {
-	font-size: 14px;
-	margin: 0;
-	margin-left: 8px;
-}
-
-.symbol-outer {
-	position: relative;
-	display: flex;
-	justify-content: center;
-	align-items: center;
-	width: 18px;
-	height: 18px;
-}
-
-.symbol-inner {
-	position: absolute;
-	margin: 0 auto;
-}
-
-.scalar {
-	border: 2px solid #cecece;
-}
-
-.scalar .symbol-inner {
-	width: 14px;
-	height: 14px;
-	border-radius: 50%;
-	background-color: #9fc4c6;
-}
-
-.vector {
-	border: 2px solid #cecece;
-}
-
-.vector .symbol-inner {
-	width: 12px;
-	height: 12px;
-	background-color: #9fc4c6;
-}
-
-.collapsed {
-	border: 2px solid #9fc4c6;
-}
-
-.collapsed .symbol-inner {
-	width: 12px;
-	height: 12px;
-	background-color: #9fc4c6;
-}
-
-/* Linear Solvers Group */
-.linear-solvers-container {
-	height: 90px;
-	min-height: 45px;
-	width: 45%;
-	border-top-left-radius: 35px;
-	border-bottom-left-radius: 35px;
-	border-top-right-radius: 100px;
-	border-bottom-right-radius: 100px;
-	border: 1px solid #42926b;
-	display: flex;
-	flex-wrap: wrap;
-	margin-left: -5%;
-	background-color: white;
-	z-index: 1;
-	overflow: hidden;
-	overflow-y: scroll;
-	-ms-overflow-style: none;
-}
-
-#linear-legend {
-	display: flex;
-	flex-wrap: wrap;
-}
-
-.linear-solvers-container .legend-title {
-	margin-left: 12%;
+.sys-var-container::-webkit-scrollbar, .linear-solvers-container::-webkit-scrollbar, .n2-symbols-container::-webkit-scrollbar {
+    display: none;
 }
 
 /* Systems and Varaibles Container */
+
 .sys-var-container {
-	height: 90px;
-	min-height: 45px;
-	width: 40%;
-	border-top-left-radius: 35px;
-	border-bottom-left-radius: 35px;
-	border-top-right-radius: 100px;
-	border-bottom-right-radius: 100px;
-	border: 1px solid #98daba;
-	display: flex;
-	background-color: white;
-	z-index: 3;
-	overflow-y: scroll;
-	-ms-overflow-style: none;
+    height: 90px;
+    border-radius: 15px;
+    border: 1px solid #98daba;
+    display: flex;
+    flex-direction: row;
+    background-color: white;
+    z-index: 1;
+    overflow-y: scroll;
 }
 
-.sys-var-container .legend-title {
-	margin-left: 2%;
+#sys-var-legend {
+    height: 90px;
+    display: flex;
+    flex-wrap: wrap;
+    flex-direction: column;
+    margin-right: 45px;
+    overflow-x: hidden;
 }
 
-.sys-var-container div {
-	display: flex;
-	flex-wrap: wrap;
+/* N2 Symbols Group */
+
+.n2-symbols-container {
+    height: 90px;
+    min-height: 45px;
+    border-radius: 15px;
+    border: 1px solid #66b48e;
+    display: flex;
+    align-items: center;
+    padding-right: 45px;
+    background-color: white;
+    z-index: 2;
+    overflow: scroll;
+    margin-left: -20px;
 }
 
-/* The Close Button */
-.close {
-	color: white;
-	float: right;
-	font-size: 28px;
-	font-weight: bold;
+#symbols-legend {
+    display: flex;
+    width: auto;
+    flex-direction: column;
+    padding-left: 8px;
 }
 
-.close:hover,
-.close:focus {
-	color: #000;
-	text-decoration: none;
-	cursor: pointer;
+.symbol {
+    display: flex;
+    align-items: center;
+    margin: 2px 0;
 }
 
-.modal-header {
-	font-family: helvetica, sans-serif;
-	font-size: 20px;
-	padding: 2px 16px;
-	background-color: steelblue;
-	color: white;
-	margin: 2px;
-	padding: 10px;
+.symbol p {
+    font-size: 14px;
+    margin: 0;
+    margin-left: 8px;
+    white-space: nowrap;
 }
 
-.modal-body {
-	padding: 2px 16px;
+.symbol-outer {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 18px;
+    height: 18px;
 }
 
-.modal-footer {
-	font-family: helvetica, sans-serif;
-	font-size: 12px;
-	padding: 2px 16px;
-	background-color: steelblue;
-	color: white;
-	margin: 2px;
-	padding: 10px;
+.symbol-inner {
+    position: absolute;
+    margin: 0 auto;
+}
+
+.scalar {
+    border: 2px solid #cecece;
+}
+
+.scalar .symbol-inner {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background-color: #9fc4c6;
+}
+
+.vector {
+    border: 2px solid #cecece;
+}
+
+.vector .symbol-inner {
+    width: 12px;
+    height: 12px;
+    background-color: #9fc4c6;
+}
+
+.collapsed {
+    border: 2px solid #9fc4c6;
+}
+
+.collapsed .symbol-inner {
+    width: 12px;
+    height: 12px;
+    background-color: #9fc4c6;
+}
+
+/* Linear Solvers Group */
+
+.linear-solvers-container {
+    height: 90px;
+    border-radius: 15px;
+    border: 1px solid #42926b;
+    display: flex;
+    flex-direction: row;
+    margin-left: -20px;
+    margin-right: 0;
+    background-color: white;
+    z-index: 3;
+    overflow-y: scroll;
+}
+
+#linear-legend {
+    height: 90px;
+    display: flex;
+    flex-wrap: wrap;
+    flex-direction: column;
+    margin-right: 20px;
+    overflow-x: hidden;
+}
+
+.draggable {
+    position: absolute;
+    width: 100px;
+    height: 20px;
+    left: 50%;
+    background-color: #42926b;
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transform: translate(-50%, -20px)
+}
+
+.draggable>.icon-key {
+    color: white;
+}
+
+#draggable-legend-dots p {
+    color: white;
+    padding-left: 5px;
+    padding-right: 5px;
+}
+
+#close-legend {
+    position: absolute;
+    top: -20px;
+    right: -18px;
+    height: 20px;
+    width: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 4;
+    cursor: default;
+}
+
+#close-legend p {
+    color: black;
+    font-weight: bold;
+    font-size: 20pt;
+    text-align: center;
+    margin: auto;
+    vertical-align: middle;
 }

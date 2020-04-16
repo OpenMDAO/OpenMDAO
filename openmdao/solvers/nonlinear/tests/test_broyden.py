@@ -770,8 +770,9 @@ class TestBryodenMPI(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             prob.run_model()
 
-        self.assertEqual(str(cm.exception),
-                         "Group (sub) has a BroydenSolver solver and contains a distributed system.")
+        msg = "BroydenSolver linear solver in Group (sub) cannot be used in or above a ParallelGroup or a " + \
+            "distributed component."
+        self.assertEqual(str(cm.exception), msg)
 
 
 class TestBryodenFeature(unittest.TestCase):
