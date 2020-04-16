@@ -92,33 +92,83 @@ class N2Toolbar {
     _setupButtonFunctions(n2ui) {
         const self = this; // For callbacks that change "this". Alternative to using .bind().
 
-        // There are a lot of simple click events, so iterate over this array of
-        // [ selector, function ] elements and add a click handler for each.
+        // There are a lot of simple click and mouse over/leave/move events, so iterate over this array of arrays.
+        // There are two kinds of sub-arrays in this array.
+        // For buttons that always have the same tooltip no matter the state of the application, the array is of length 3
+        //    and has these elements:
+        //        [ selector, click function, tooltip text ]
+        // For buttons that have two different tooltips depending on the state of the application, the array is of length 5
+        //    and has these elements:
+        //        [ selector, click function, predicate function, tooltip text when predicate is true, tooltip text when predicate is false ]
         const clickEventArray = [
-            ['#reset-graph', e => { n2ui.homeButtonClick() }],
-            ['#undo-graph', e => { n2ui.backButtonPressed() }],
-            ['#redo-graph', e => { n2ui.forwardButtonPressed() }],
-            ['#expand-element', e => { n2ui.uncollapseButtonClick(n2ui.n2Diag.zoomedElement) }],
-            ['#expand-all', e => { n2ui.uncollapseButtonClick(n2ui.n2Diag.model.root) }],
-            ['#collapse-element', e => { n2ui.collapseOutputsButtonClick(n2ui.n2Diag.zoomedElement) }],
-            ['#collapse-element-2',function() { n2ui.collapseOutputsButtonClick(n2ui.n2Diag.zoomedElement); self._setRootButton(this) }],
-            ['#collapse-all', function() { n2ui.collapseOutputsButtonClick(n2ui.n2Diag.model.root); self._setRootButton(this) }],
-            ['#expand-element', function() { n2ui.uncollapseButtonClick(n2ui.n2Diag.zoomedElement); self._setRootButton(this) }],
-            ['#expand-all', function() { n2ui.uncollapseButtonClick(n2ui.n2Diag.model.root); self._setRootButton(this) }],
-            ['#show-connections', e => { n2ui.n2Diag.showArrows(); self._setRootButton(this) }],
-            ['#hide-connections', function() { n2ui.n2Diag.clearArrows(); self._setRootButton(this) }],
-            ['#show-connections-2', function() { n2ui.n2Diag.showArrows(); self._setRootButton(this) }],
-            ['#show-all-connections', function() { n2ui.n2Diag.showAllArrows(); self._setRootButton(this) }],
-            ['#legend-button', e => { n2ui.toggleLegend() }],
-            ['#linear-solver-button', e => { n2ui.toggleSolverNamesCheckboxChange() }],
-            ['#save-button', e => { n2ui.n2Diag.saveSvg() }],
-            ['#info-button', e => { n2ui.toggleNodeData() }],
-            ['#hide-toolbar', e => { self.toggle() }],
-            ['#question-button', DisplayModal ]
+            ['#reset-graph', e => { n2ui.homeButtonClick() }, "View entire model starting from root"],
+            ['#undo-graph', e => { n2ui.backButtonPressed() }, "Move back in view history"],
+            ['#redo-graph', e => { n2ui.forwardButtonPressed()}, "Move forward in view history"],
+
+            ['#collapse-element', e => { n2ui.collapseOutputsButtonClick(n2ui.n2Diag.zoomedElement)}, "Control variable collapsing" ],
+            ['#collapse-element-2',function() { n2ui.collapseOutputsButtonClick(n2ui.n2Diag.zoomedElement); self._setRootButton(this) },
+            	"Collapse only variables in current view"],
+            ['#collapse-all', function() { n2ui.collapseOutputsButtonClick(n2ui.n2Diag.model.root); self._setRootButton(this) },
+            	"Collapse all variables in entire model"],
+            ['#expand-element', function() { n2ui.uncollapseButtonClick(n2ui.n2Diag.zoomedElement); self._setRootButton(this) },
+            	"Expand only variables in current view"],
+            ['#expand-all', function() { n2ui.uncollapseButtonClick(n2ui.n2Diag.model.root); self._setRootButton(this) },
+            	"Expand all variables in entire model"],
+
+            ['#show-connections', e => { n2ui.n2Diag.showArrows(); self._setRootButton(this) }, "Set connections visibility"],
+            ['#hide-connections', function() { n2ui.n2Diag.clearArrows(); self._setRootButton(this) }, "Hide all connection arrows"],
+            ['#show-connections-2', function() { n2ui.n2Diag.showArrows(); self._setRootButton(this) }, "Show pinned connection arrows"],
+            ['#show-all-connections', function() { n2ui.n2Diag.showAllArrows(); self._setRootButton(this) }, "Show all connections in model"],
+
+            ['#linear-solver-button', e => { n2ui.toggleSolverNamesCheckboxChange() }, pred => { return  n2ui.n2Diag.showLinearSolverNames },
+            	"Show non-linear solvers", "Show linear solvers"],
+
+            ['#legend-button', e => { n2ui.toggleLegend() }, pred => { return n2ui.legend.hidden }, "Show legend", "Hide legend"],
+
+            ['#text-slider-button', null, "Set text height"],
+            ['#depth-slider-button', null, "Set collapse depth"],
+            ['#model-slider-button', null, "Set model height"],
+
+            ['#save-button', e => { n2ui.n2Diag.saveSvg() }, "Save to SVG"],
+
+            ['#info-button', e => { n2ui.toggleNodeData() }, pred => { return !d3.select('#info-button').attr('class').includes('active-tab-icon') },
+            	"Show connection matrix information", "Hide connection matrix information"],
+
+            ['#question-button', DisplayModal, pred => { return  parentDiv.querySelector("#myModal").style.display === "block"},
+            	"Hide N2 diagram help", "Show N2 diagram help" ],
+
+            ['#hide-toolbar', e => { self.toggle() }, pred => { return  this.hidden }, "Show toolbar", "Hide toolbar"],
         ];
 
         for (let evt of clickEventArray) {
-            d3.select(evt[0]).on('click', evt[1]);
+            let toolbarButton = d3.select(evt[0]);
+            let displayText = "";
+
+            toolbarButton
+                .on('click', function(d) {
+                    evt[1]();
+                    if (evt.length == 3) {
+                        displayText = evt[2];
+                    } else {
+                        displayText = evt[2]() ? evt[3] : evt[4];
+                    }
+                    n2ui.n2Diag.dom.toolTip.text(displayText);
+                })
+                .on("mouseover", function(d) {
+                    if (evt.length == 3) {
+                        displayText = evt[2];
+                    } else {
+                        displayText = evt[2]() ? evt[3] : evt[4];
+                    }
+                    return n2ui.n2Diag.dom.toolTip.text(displayText).style("visibility", "visible");
+                })
+                .on("mouseleave", function(d) {
+                    return n2ui.n2Diag.dom.toolTip.style("visibility", "hidden");
+                })
+                .on("mousemove", function() {
+                    return n2ui.n2Diag.dom.toolTip.style("top", (d3.event.pageY - 30) + "px")
+                            .style("left", (d3.event.pageX + 5) + "px");
+                });
         }
 
         // The font size slider is a range input
