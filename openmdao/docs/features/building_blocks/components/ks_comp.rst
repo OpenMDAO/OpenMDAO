@@ -85,6 +85,6 @@ conservative.
 
 .. embed-code::
     openmdao.components.tests.test_ks_comp.TestKSFunctionFeatures.test_add_constraint
-    :layout: interleave
+    :layout: code, plot
 
 .. tags:: KSComp, Component, Constraints, Optimization

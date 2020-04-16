@@ -321,11 +321,12 @@ class TestKSFunctionFeatures(unittest.TestCase):
 
         ax.plot(x, y, 'r.')
         ax.plot(x, 4.0*np.ones_like(x), 'k--')
+        ax.set_xlabel('x')
+        ax.set_ylabel('y')
+        ax.grid(True)
         ax.text(-0.25, 0, f"k = {prob.get_val('ivc.k')[0]:6.3f}")
 
         plt.show()
-
-
 
 
 if __name__ == "__main__":
