@@ -72,9 +72,6 @@ is still satisfied if it is less than zero.
     openmdao.components.tests.test_ks_comp.TestKSFunctionFeatures.test_lower_flag
     :layout: interleave
 
-
-.. tags:: KSComp, Component, Constraints, Optimization
-
 Typically, the KSComp is used to provide a constraint which aggregates many values into a single scalar constraint.
 Consider the following simple example, where we seek to maximize the peak of a parabola but also
 keep the peak of the parabola below a certain threshold value.  Clearly, the solution here is to have the peak of
@@ -89,3 +86,5 @@ conservative.
 .. embed-code::
     openmdao.components.tests.test_ks_comp.TestKSFunctionFeatures.test_add_constraint
     :layout: interleave
+
+.. tags:: KSComp, Component, Constraints, Optimization
