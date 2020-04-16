@@ -1,8 +1,8 @@
 .. _saving_data:
 
-**************
-Case Recording
-**************
+***********************
+Case Recorder Settings
+***********************
 
 
 Specifying a Case Prefix

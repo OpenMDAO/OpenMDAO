@@ -4,10 +4,12 @@
 Problem Recording
 *****************
 
-You can attach a recorder to the :class:`Problem` itself. This allows you to record an
-arbitrary case at a point of your choosing. This feature can be useful if you only record a
+You might also want to attach a recorder to the :class:`Problem` itself. This allows you to record
+an arbitrary case at a point of your choosing. This feature can be useful if you only record a
 limited number of variables during the run but would like to see a more complete list of values
 after the run.
+
+The options are a subset of those for driver recording.
 
 Problem Recording Options
 ^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -4,10 +4,10 @@
 Driver Recording
 *****************
 
-To view the data coming off a :class:`Driver` such as the convergence of the model as the driver
-finds a solution, you can attach a :class:`CaseRecorder<openmdao.recorders.case_recorder.CaseRecorder>`.
-By default, a recorder attached to a driver will record the design variables, constraints and
-objectives.
+A :class:`CaseRecorder<openmdao.recorders.case_recorder.CaseRecorder>` is commonly attached to the
+problem’s Driver in order to gain insight into the convergence of the model as the driver finds a
+solution. By default, a recorder attached to a driver will record the design variables, constraints
+and objectives.
 
 Driver Recording Options
 ^^^^^^^^^^^^^^^^^^^^^^^^
