@@ -2551,8 +2551,10 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         driver.recording_options['record_constraints'] = True
         driver.recording_options['record_desvars'] = True
 
-        # Attach recorder to the problem
+        # Attach recorder to the problem and set record_constraints to False
         prob.add_recorder(recorder)
+        prob.recording_options['includes'] = []
+        prob.recording_options['record_constraints'] = True
         # record everything for problem level. (so you can see the total model for the final
         # optimized configuration)
         prob.setup()
@@ -2636,7 +2638,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         print("Driver Objectives: ", objectives, "\nDriver Design Vars: ", design_vars,
               "\nDriver Constraints: ", constraints)
 
-        # You can also inspect the final values by listing the cases of Problem
+        # You can also inspect the final values by listing the cases of PROBLEM
         cr.list_cases('problem')
 
         # Get the final case and inspect the variables of interest

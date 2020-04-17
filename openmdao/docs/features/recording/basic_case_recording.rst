@@ -4,6 +4,16 @@
 Basic Recording Example
 ************************
 
+Recording Terminology
+---------------------
+
+1. Cases
+2. Case recorder
+3. Sources
+
+Case Recorder: An OpenMDAO module used to store data about the optimization in an SQL file.
+Sources: The different parts of an OpenMDAO model to probe for data. `Problem`, `Driver`, and `System`
+
 Basic Recording Example
 ------------------------
 
