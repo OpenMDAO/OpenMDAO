@@ -63,6 +63,7 @@ class MultipointBeamGroup(om.Group):
         self.options.declare('num_cp', 50)
         self.options.declare('num_load_cases', 1)
         self.options.declare('parallel_derivs', False, types=bool, allow_none=True)
+        self.options.declare('ks_add_constraint', default=False, types=bool)
 
     def setup(self):
         E = self.options['E']
@@ -132,21 +133,24 @@ class MultipointBeamGroup(om.Group):
                             'stress_comp.displacements_%d' % k,
                             src_indices=np.arange(2 *num_nodes))
 
-                comp = om.KSComp(width=num_elements)
-                comp.options['upper'] = max_bending
+                if parallel_derivs:
+                    color = 'red_%d' % k
+                else:
+                    color = None
+
+                comp = om.KSComp(width=num_elements, upper=max_bending,
+                                 add_constraint=self.options['ks_add_constraint'],
+                                 parallel_deriv_color=color)
+
                 sub.add_subsystem('KS_%d' % k, comp)
 
                 sub.connect(
                     'stress_comp.stress_%d' % k,
                     'KS_%d.g' % k)
 
-                if parallel_derivs:
-                    color = 'red_%d' % k
-                else:
-                    color = None
-
-                sub.add_constraint('KS_%d.KS' % k, upper=0.0,
-                                   parallel_deriv_color=color)
+                if not self.options['ks_add_constraint']:
+                    sub.add_constraint('KS_%d.KS' % k, upper=0.0,
+                                       parallel_deriv_color=color)
 
         comp = VolumeComp(num_elements=num_elements, b=b, L=L)
         self.add_subsystem('volume_comp', comp)
