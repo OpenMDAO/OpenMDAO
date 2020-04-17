@@ -3,10 +3,13 @@ import unittest
 
 import numpy as np
 
+import matplotlib.pyplot as plt
+plt.switch_backend('Agg')
+
 import openmdao.api as om
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_stress import MultipointBeamGroup
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class TestKSFunction(unittest.TestCase):
