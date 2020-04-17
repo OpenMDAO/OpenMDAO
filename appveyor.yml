@@ -107,5 +107,5 @@ install:
 - cmd: conda list
 
 test_script:
-- sh: testflo openmdao -n 1;
-- cmd: testflo openmdao -n 1
+- sh: testflo openmdao -n 1 --timeout=120;
+- cmd: testflo openmdao -n 1 --timeout=120
