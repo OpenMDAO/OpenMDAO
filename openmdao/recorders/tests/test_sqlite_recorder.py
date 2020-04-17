@@ -2405,7 +2405,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         self.assertEqual(sorted(case.inputs.keys()), ['y1', 'y2', 'z'])
 
-    def test_feature_basic_case_recording(self):
+    def test_feature_get_val(self):
         import openmdao.api as om
 
         prob = om.Problem()
@@ -2431,10 +2431,6 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
 
         driver = prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9)
-        driver.recording_options['includes'] = []
-        driver.recording_options['record_objectives'] = True
-        driver.recording_options['record_constraints'] = True
-        driver.recording_options['record_desvars'] = True
 
         # Create a recorder variable
         recorder = om.SqliteRecorder("cases.sql")
@@ -2457,28 +2453,82 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         # These options will give outputs as the model sees them
         # Gets value but will not convert units
-        print(case.__getitem__("y1")) # DegF
+        deg_f_var = case['y1'] # DegF
 
         # get_val can convert your result's units if desired
-        print(case.get_val("y1", units='K')) # Converted to Kelvin
+        kelvin_var = case.get_val("y1", units='K') # Converted to Kelvin
 
-        assert_near_equal(case.get_val("y1", units='K'), 294.26111111, 1e-3)
-        assert_near_equal(case.__getitem__("y1"), 70., 1e-3)
+        assert_near_equal(kelvin_var, 294.26111111, 1e-3)
+        assert_near_equal(deg_f_var, 70., 1e-3)
+
+    def test_feature_basic_case_recording(self):
+        import openmdao.api as om
+
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        # build the model
+        prob = om.Problem()
+        indeps = prob.model.add_subsystem('indeps', om.IndepVarComp())
+        indeps.add_output('x', 3.0)
+        indeps.add_output('y', -4.0)
+
+        prob.model.add_subsystem('parab', Paraboloid())
+
+        # define the component whose output will be constrained
+        prob.model.add_subsystem('const', om.ExecComp('g = x + y'))
+
+        prob.model.connect('indeps.x', ['parab.x', 'const.x'])
+        prob.model.connect('indeps.y', ['parab.y', 'const.y'])
+
+        # setup the optimization
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'COBYLA'
+
+        prob.model.add_design_var('indeps.x', lower=-50, upper=50)
+        prob.model.add_design_var('indeps.y', lower=-50, upper=50)
+        prob.model.add_objective('parab.f_xy')
+
+        # to add the constraint to the model
+        prob.model.add_constraint('const.g', lower=0, upper=10.)
+        # prob.model.add_constraint('const.g', equals=0.)
+
+        # Create a recorder variable
+        recorder = om.SqliteRecorder("cases.sql")
+        # Attach a recorder to the Driver
+        prob.add_recorder(recorder)
+
+        prob.setup()
+        prob.set_solver_print(0)
+        prob.run_driver()
+        prob.record_state("after_run_driver")
+        prob.cleanup()
+
+        # You can treat a case object like a problem. Below we'll show an example of that
+        # Instantiate your CaseReader
+        cr = om.CaseReader("cases.sql")
+        # Isolate "driver" as your source
+        driver_cases = cr.list_cases('problem')
+
+        # Get the first case from the recorder
+        case = cr.get_case('after_run_driver')
 
         # list_outputs will list your model's outputs
         case.list_outputs()
 
-        # These options will give outputs as the driver sees them
+        # This code below will find all the objectives, design variables, and constraints that the
+        # problem source contains
         objectives = case.get_objectives()
         design_vars = case.get_design_vars()
         constraints = case.get_constraints()
 
         print("Objectives : ", objectives, "\nDesign Variables: ", design_vars, "\nConstraints: ",
-              constraints)
+            constraints)
 
-        assert_near_equal(objectives['y2'], 40.55555556, 1e-4)
-        assert_near_equal(design_vars['x'], 1.66666667, 1e-4)
-        assert_near_equal(constraints['y1'], 21.11111111, 1e-4)
+        # You can single out particular keys from the above dictionaries
+        assert_near_equal(objectives['parab.f_xy'], -27, 1e-4)
+        assert_near_equal(design_vars['indeps.x'], 6.99999912, 1e-4)
+        assert_near_equal(constraints['const.g'], 0., 1e-4)
+
 
     def test_feature_basic_case_plot(self):
         import openmdao.api as om
@@ -2508,8 +2558,8 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         cases = cr.get_cases()
 
         # List comprehension to hold Design Variable data
-        dv_x_values =[case.__getitem__("x") for case in cases]
-        dv_z_values =[case.__getitem__("z") for case in cases]
+        dv_x_values = [case["x"] for case in cases]
+        dv_z_values = [case["z"] for case in cases]
 
         # Below is a short script to see the path the design variables took to convergence
         import matplotlib.pyplot as plt
@@ -2524,6 +2574,8 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         ax2.set(xlabel='Iterations', ylabel='Design Var: Z', title='Optimization History')
         ax2.grid()
+        # There are two lines in the right plot because "Z" contains two variables that are being
+        # optimized
 
     def test_feature_advanced_example(self):
         import openmdao.api as om
