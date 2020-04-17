@@ -4,11 +4,11 @@
 System Recording
 *****************
 
-System and Solver Recording
+System Recording
 ---------------------------
 
 If you need to focus on a smaller part of your model, it may be useful to attach a case recorder to
-a particular :code:`System` or :code:`Solver`. There are slightly different options when recording from these objects.
+a particular :code:`System`. There are slightly different options when recording from these objects.
 
 System Recording Options
 ^^^^^^^^^^^^^^^^^^^^^^^^

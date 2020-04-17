@@ -4,7 +4,6 @@
 Solver Recording
 *****************
 
-
 Solver Recording Options
 ^^^^^^^^^^^^^^^^^^^^^^^^
 .. embed-options::
