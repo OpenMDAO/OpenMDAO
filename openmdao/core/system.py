@@ -3104,6 +3104,15 @@ class System(object):
             msg = "{}: Output not found for response {}."
             raise RuntimeError(msg.format(self.msginfo, str(err)))
 
+        # check to make sure none of the vars are distributed
+        abs2meta = self._var_allprocs_abs2meta
+        for abs_name in out:
+            meta = abs2meta[abs_name]
+            if meta['distributed']:
+                msg = "{}: Output {} is from a distributed component and cannot \
+                yet be used as an objective or constraint"
+                raise NotImplementedError(msg.format(self.msginfo, abs_name))
+
         if get_sizes:
             # Size them all
             sizes = self._var_sizes['nonlinear']['output']
