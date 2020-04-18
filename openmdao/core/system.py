@@ -3107,11 +3107,16 @@ class System(object):
         # check to make sure none of the vars are distributed
         abs2meta = self._var_allprocs_abs2meta
         for abs_name in out:
-            meta = abs2meta[abs_name]
-            if meta['distributed']:
-                msg = "{}: Output {} is from a distributed component and cannot \
-                yet be used as an objective or constraint"
-                raise NotImplementedError(msg.format(self.msginfo, abs_name))
+            try:
+                meta = abs2meta[abs_name]
+                if meta['distributed']:
+                    msg = "{}: Output {} is from a distributed component and cannot \
+                    yet be used as an objective or constraint"
+                    raise NotImplementedError(msg.format(self.msginfo, abs_name))
+            except KeyError:
+                # Discrete outputs have separate metadata but not 'distributed' yet
+                # meta = self._var_allprocs_discrete['output'][abs_name]
+                pass
 
         if get_sizes:
             # Size them all
