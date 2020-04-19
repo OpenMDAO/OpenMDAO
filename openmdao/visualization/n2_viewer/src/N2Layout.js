@@ -99,7 +99,8 @@ class N2Layout {
             d3.selection.prototype.transition = returnThis;
             d3.selection.prototype.duration = returnThis;
             d3.selection.prototype.delay = returnThis;
-        } else { // OK, enable transitions.
+        }
+        else { // OK, enable transitions.
             debugInfo("Allowing transitions: ", this.visibleNodes.length,
                 " visible nodes, max allowed: ", N2TransitionDefaults.maxNodes)
 
@@ -140,7 +141,8 @@ class N2Layout {
         // Check cache first
         if (this.textRenderer.widthCache.propExists(text)) {
             width = this.textRenderer.widthCache[text];
-        } else {
+        }
+        else {
             // Not found, render and return new width.
             this.textRenderer.textSvg.text(text);
             width = this.textRenderer.workNode.getBoundingClientRect().width;
@@ -183,7 +185,8 @@ class N2Layout {
 
         if (!this.showLinearSolverNames && node.hasOwnProperty("solve_subsystems") && node.solve_subsystems) {
             return solver_name + " (sub_solve)";
-        } else {
+        }
+        else {
             return solver_name;
         }
     }
@@ -231,13 +234,15 @@ class N2Layout {
     _computeLeaves(node = this.model.root) {
         if (node.varIsHidden) {
             node.numLeaves = 0;
-        } else if (node.hasChildren() && !node.isMinimized) {
+        }
+        else if (node.hasChildren() && !node.isMinimized) {
             node.numLeaves = 0;
             for (let child of node.children) {
                 this._computeLeaves(child);
                 node.numLeaves += child.numLeaves;
             }
-        } else {
+        }
+        else {
             node.numLeaves = 1;
         }
     }
@@ -267,7 +272,8 @@ class N2Layout {
             for (let child of node[childrenProp]) {
                 this._setColumnWidthsFromWidestText(child, childrenProp, colArr, leafArr, widthProp);
             }
-        } else { //leaf
+        }
+        else { //leaf
             leafArr[node.depth] = Math.max(leafArr[node.depth], width);
         }
     }

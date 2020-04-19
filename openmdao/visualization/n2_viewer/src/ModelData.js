@@ -239,7 +239,8 @@ class ModelData {
         for (let child of node.children) {
             if (child.name == nameArray[nameIndex]) {
                 return this._getObjectInTree(child, nameArray, nameIndex + 1);
-            } else {
+            }
+            else {
                 let numNames = child.name.split(":").length;
                 if (numNames >= 2 && nameIndex + numNames <= nameArray.length) {
                     let mergedName = nameArray[nameIndex];
@@ -404,7 +405,10 @@ class ModelData {
     identifyUnconnectedParam(node) { // Formerly updateRootTypes
         if (!node.hasOwnProperty('absPathName')) {
             console.warn("identifyUnconnectedParam error: absPathName not set for ", node);
-        } else if (node.isParam() && !node.hasChildren() && !this.hasAnyConnection(node.absPathName))
-            node.type = "unconnected_param";
+        }
+        else {
+            if (node.isParam() && !node.hasChildren() && !this.hasAnyConnection(node.absPathName))
+                node.type = "unconnected_param";
+        }
     }
 }

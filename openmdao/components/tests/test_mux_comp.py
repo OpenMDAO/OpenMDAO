@@ -235,7 +235,6 @@ class TestFeature(unittest.TestCase):
         import numpy as np
 
         import openmdao.api as om
-        from openmdao.utils.assert_utils import assert_near_equal
 
         # The number of elements to be muxed
         n = 3

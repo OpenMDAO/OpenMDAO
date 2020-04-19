@@ -5,13 +5,14 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
+from openmdao.core.tests.test_distrib_derivs import DistribExecComp
 from openmdao.solvers.linear.tests.linear_test_base import LinearSolverTests
+from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleJacVec
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.mpi import MPI
-from openmdao.core.tests.test_distrib_derivs import DistribExecComp
 try:
     from openmdao.vectors.petsc_vector import PETScVector
 except ImportError:
@@ -858,8 +859,65 @@ class TestDirectSolverRemoteErrors(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             prob.run_model()
 
-        self.assertEqual(str(cm.exception),
-                         "Group (<model>) has a DirectSolver solver and contains a distributed system.")
+        msg = "DirectSolver linear solver in Group (<model>) cannot be used in or above a ParallelGroup or a " + \
+            "distributed component."
+        self.assertEqual(str(cm.exception), msg)
+
+    def test_distrib_direct_subbed(self):
+        size = 3
+        prob = om.Problem()
+        group = prob.model = om.Group()
+
+        group.add_subsystem('P', om.IndepVarComp('x', np.arange(size)))
+        sub = group.add_subsystem('sub', om.Group())
+
+        sub.add_subsystem('C1', DistribExecComp(['y=2.0*x', 'y=3.0*x'], arr_size=size,
+                                                x=np.zeros(size),
+                                                y=np.zeros(size)))
+        sub.add_subsystem('C2', om.ExecComp(['z=3.0*y'],
+                                            y=np.zeros(size),
+                                            z=np.zeros(size)))
+
+        prob.model.linear_solver = om.DirectSolver()
+        group.connect('P.x', 'sub.C1.x')
+        group.connect('sub.C1.y', 'sub.C2.y')
+
+        prob.setup(check=False, mode='fwd')
+        with self.assertRaises(Exception) as cm:
+            prob.run_model()
+
+        msg = "DirectSolver linear solver in Group (<model>) cannot be used in or above a ParallelGroup or a " + \
+            "distributed component."
+        self.assertEqual(str(cm.exception), msg)
+
+    def test_par_direct_subbed(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 1.0))
+        model.add_subsystem('p2', om.IndepVarComp('x', 1.0))
+
+        parallel = model.add_subsystem('parallel', om.ParallelGroup())
+        parallel.add_subsystem('c1', om.ExecComp(['y=-2.0*x']))
+        parallel.add_subsystem('c2', om.ExecComp(['y=5.0*x']))
+
+        model.add_subsystem('c3', om.ExecComp(['y=3.0*x1+7.0*x2']))
+
+        model.connect("parallel.c1.y", "c3.x1")
+        model.connect("parallel.c2.y", "c3.x2")
+
+        model.connect("p1.x", "parallel.c1.x")
+        model.connect("p2.x", "parallel.c2.x")
+
+        model.linear_solver = om.DirectSolver()
+
+        prob.setup(check=False, mode='fwd')
+        with self.assertRaises(Exception) as cm:
+            prob.run_model()
+
+        msg = "DirectSolver linear solver in Group (<model>) cannot be used in or above a ParallelGroup or a " + \
+            "distributed component."
+        self.assertEqual(str(cm.exception), msg)
 
     def test_par_direct(self):
         prob = om.Problem()
@@ -878,8 +936,9 @@ class TestDirectSolverRemoteErrors(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             prob.run_model()
 
-        self.assertEqual(str(cm.exception),
-                         "Group (<model>) has a DirectSolver solver and contains remote variables.")
+        msg = "DirectSolver linear solver in Group (<model>) cannot be used in or above a ParallelGroup or a " + \
+            "distributed component."
+        self.assertEqual(str(cm.exception), msg)
 
 
 
@@ -904,6 +963,46 @@ class TestDirectSolverFeature(unittest.TestCase):
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_near_equal(J['obj', 'z'][0][0], 9.61001056, .00001)
         assert_near_equal(J['obj', 'z'][0][1], 1.78448534, .00001)
+
+
+class TestDirectSolverMPI(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def test_serial_in_mpi(self):
+        # Tests that we can take an MPI model with a DirectSolver and run it in mpi with more
+        # procs. This verifies fix of a bug.
+
+        prob = om.Problem(model=DoubleSellar())
+        model = prob.model
+
+        g1 = model.g1
+        g1.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        g1.nonlinear_solver.options['rtol'] = 1.0e-5
+        g1.linear_solver = om.DirectSolver(assemble_jac=True)
+        g1.options['assembled_jac_type'] = 'dense'
+
+        g2 = model.g2
+        g2.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        g2.nonlinear_solver.options['rtol'] = 1.0e-5
+        g2.linear_solver = om.DirectSolver(assemble_jac=True)
+        g2.options['assembled_jac_type'] = 'dense'
+
+        model.nonlinear_solver = om.NewtonSolver()
+        model.linear_solver = om.ScipyKrylov(assemble_jac=True)
+        model.options['assembled_jac_type'] = 'dense'
+
+        model.nonlinear_solver.options['solve_subsystems'] = True
+
+        prob.set_solver_print(level=0)
+
+        prob.setup()
+        prob.run_model()
+
+        assert_near_equal(prob['g1.y1'], 0.64, .00001)
+        assert_near_equal(prob['g1.y2'], 0.80, .00001)
+        assert_near_equal(prob['g2.y1'], 0.64, .00001)
+        assert_near_equal(prob['g2.y2'], 0.80, .00001)
 
 
 if __name__ == "__main__":
