@@ -277,6 +277,7 @@ class ApproximationScheme(object):
             self._approx_groups.append((wrt, data, in_idx, tmpJ, [(arr, in_idx)], None))
 
     def _compute_approximations(self, system, jac, total, under_cs):
+        from openmdao.core.component import Component
         # Clean vector for results
         results_array = system._outputs._data.copy() if total else system._residuals._data.copy()
 
@@ -290,6 +291,7 @@ class ApproximationScheme(object):
         par_fd_w_serial_model = use_parallel_fd and system._num_par_fd == system._full_comm.size
         num_par_fd = system._num_par_fd if use_parallel_fd else 1
         is_parallel = use_parallel_fd or system.comm.size > 1
+        is_distributed = isinstance(system, Component) and system.options['distributed']
 
         results = defaultdict(list)
         iproc = system.comm.rank
@@ -353,7 +355,7 @@ class ApproximationScheme(object):
 
                     if is_parallel:
                         for of, (oview, out_idxs, _, _) in J['ofs'].items():
-                            if owns[of] == iproc:
+                            if owns[of] == iproc or is_distributed:
                                 results[(of, wrt)].append(
                                     (i_count,
                                         self._transform_result(
@@ -394,7 +396,7 @@ class ApproximationScheme(object):
             # convert COO matrix to dense for easier slicing
             Jcolored = self._j_colored.toarray()
 
-        elif is_parallel:  # uncolored with parallel systems
+        elif is_parallel and not is_distributed:  # uncolored with parallel systems
             results = _gather_jac_results(mycomm, results)
 
         if colored_approx_groups is not None:

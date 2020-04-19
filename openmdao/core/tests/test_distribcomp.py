@@ -180,6 +180,44 @@ class DistribInputDistribOutputComp(om.ExplicitComponent):
         self.add_input('invec', np.ones(sizes[rank], float))
         self.add_output('outvec', np.ones(sizes[rank], float))
 
+class DistribCompWithDerivs(om.ExplicitComponent):
+    """Uses 2 procs and takes input var slices, but also computes partials"""
+
+    def initialize(self):
+        self.options['distributed'] = True
+
+        self.options.declare('arr_size', types=int, default=11,
+                             desc="Size of input and output vectors.")
+
+    def compute(self, inputs, outputs):
+        outputs['outvec'] = inputs['invec']*2.0
+
+    def compute_partials(self, inputs, J):
+        sizes = self.sizes
+        comm = self.comm
+        rank = comm.rank
+
+        J['outvec', 'invec'] = 2.0 * np.ones((sizes[rank],))
+
+    def setup(self):
+
+        comm = self.comm
+        rank = comm.rank
+
+        arr_size = self.options['arr_size']
+
+        sizes, offsets = evenly_distrib_idxs(comm.size, arr_size)
+        self.sizes = sizes
+        self.offsets = offsets
+
+        start = offsets[rank]
+        end = start + sizes[rank]
+
+        # don't set src_indices on the input and just use default behavior
+        self.add_input('invec', np.ones(sizes[rank], float))
+        self.add_output('outvec', np.ones(sizes[rank], float))
+        self.declare_partials('outvec', 'invec', rows=np.arange(0, sizes[rank]), 
+                                                 cols=np.arange(0, sizes[rank]))
 
 class DistribInputDistribOutputDiscreteComp(DistribInputDistribOutputComp):
 
@@ -326,6 +364,32 @@ class MPITests(unittest.TestCase):
         p.run_model()
 
         self.assertTrue(all(C2._outputs['outvec'] == np.ones(size, float)*7.5))
+
+    def test_distrib_check_partials(self):
+        # will produce uneven array sizes which we need for the test
+        size = 11
+
+        p = om.Problem()
+        top = p.model
+        C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
+        C2 = top.add_subsystem("C2", DistribCompWithDerivs(arr_size=size))
+        top.connect('C1.outvec', 'C2.invec')
+
+        p.setup()
+
+        # Conclude setup but don't run model.
+        p.final_setup()
+
+        # run the model and check partials
+        p.run_model
+
+        # this used to fail (bug #1279)
+        cpd = p.check_partials(out_stream=None)
+        for (of, wrt) in cpd['C2']:
+            print(of)
+            print(wrt)
+            print(cpd['C2'][of, wrt]['rel error'])
+            np.testing.assert_almost_equal(cpd['C2'][of, wrt]['rel error'], 0.0, decimal=5)
 
     def test_list_inputs_outputs(self):
         size = 11
