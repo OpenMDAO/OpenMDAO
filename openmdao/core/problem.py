@@ -1232,7 +1232,6 @@ class Problem(object):
 
                         deriv['directional_fd_rev'] = dhat.dot(d) - mhat.dot(m)
 
-
         # Conversion of defaultdict to dicts
         partials_data = {comp_name: dict(outer) for comp_name, outer in partials_data.items()}
 
@@ -1844,7 +1843,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                 else:
                     # If fd_norm is zero, let's use fwd_norm as the divisor for relative
                     # check. That way we don't accidentally squelch a legitimate problem.
-                    if do_rev:
+                    if do_rev or do_rev_dp:
                         rel_err = ErrorTuple(fwd_error / fwd_norm,
                                              rev_error / fwd_norm,
                                              fwd_rev_error / fwd_norm)
@@ -1855,7 +1854,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                                                             None)
 
             else:
-                if do_rev:
+                if do_rev or do_rev_dp:
                     derivative_info['rel error'] = rel_err = ErrorTuple(fwd_error / fd_norm,
                                                                         rev_error / fd_norm,
                                                                         fwd_rev_error / fd_norm)
@@ -1930,14 +1929,14 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                                                    magnitude.reverse),
                                         magnitude.fd,
                                         abs_err.forward,
-                                        _format_if_not_matrix_free(matrix_free and not directional,
+                                        _format_if_not_matrix_free(matrix_free,
                                                                    abs_err.reverse),
                                         _format_if_not_matrix_free(matrix_free,
                                                                    abs_err.forward_reverse),
                                         rel_err.forward,
-                                        _format_if_not_matrix_free(matrix_free and not directional,
+                                        _format_if_not_matrix_free(matrix_free,
                                                                    rel_err.reverse),
-                                        _format_if_not_matrix_free(matrix_free and not directional,
+                                        _format_if_not_matrix_free(matrix_free,
                                                                    rel_err.forward_reverse),
                                     )
                             else:
