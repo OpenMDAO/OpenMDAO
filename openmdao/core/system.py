@@ -26,7 +26,7 @@ from openmdao.vectors.vector import INT_DTYPE
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
-from openmdao.utils.units import is_compatible, get_conversion
+from openmdao.utils.units import is_compatible, unit_conversion
 from openmdao.utils.variable_table import write_var_table
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.graph_utils import all_connected_nodes
@@ -1684,7 +1684,7 @@ class System(object):
                           "were specified."
                     raise RuntimeError(msg.format(self.msginfo, name, var_units, units))
 
-                factor, offset = get_conversion(var_units, units)
+                factor, offset = unit_conversion(var_units, units)
                 base_adder, base_scaler = determine_adder_scaler(None, None,
                                                                  dv[name]['adder'],
                                                                  dv[name]['scaler'])
@@ -1718,7 +1718,7 @@ class System(object):
                     raise RuntimeError(msg.format(self.msginfo, type_dict[meta['type']],
                                                   name, var_units, units))
 
-                factor, offset = get_conversion(var_units, units)
+                factor, offset = unit_conversion(var_units, units)
                 base_adder, base_scaler = determine_adder_scaler(None, None,
                                                                  resp[name]['adder'],
                                                                  resp[name]['scaler'])
