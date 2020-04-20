@@ -1701,6 +1701,71 @@ class TestProblemCheckPartials(unittest.TestCase):
         msg = "ArrayCompMatrixFree (mycomp): For matrix free components, directional should be set to True for all inputs."
         self.assertEqual(str(cm.exception), msg)
 
+    def test_directional_mimo(self):
+
+        class DirectionalComp(om.ExplicitComponent):
+
+            def initialize(self):
+                self.options.declare('n', default=1, desc='vector size')
+
+            def setup(self):
+                n = self.options['n']
+                self.add_input('in', shape=n)
+                self.add_input('in2', shape=n)
+                self.add_output('out', shape=n)
+                self.add_output('out2', shape=n)
+
+                self.set_check_partial_options(wrt='*', directional=True, method='cs')
+                self.mat = np.random.rand(n, n)
+                self.mat2 = np.random.rand(n, n)
+
+            def compute(self,inputs,outputs):
+                outputs['out'] = self.mat.dot(inputs['in']) + self.mat2.dot(inputs['in2'])
+                outputs['out2'] = 2.0 * self.mat.dot(inputs['in']) - self.mat2.dot(inputs['in2'])
+
+            def compute_jacvec_product(self,inputs,d_inputs,d_outputs, mode):
+                if mode == 'fwd':
+                    if 'out' in d_outputs:
+                        if 'in' in d_inputs:
+                            d_outputs['out'] += self.mat.dot(d_inputs['in'])
+                        if 'in2' in d_inputs:
+                            d_outputs['out'] += self.mat2.dot(d_inputs['in2'])
+                    if 'out2' in d_outputs:
+                        if 'in' in d_inputs:
+                            d_outputs['out2'] += 2.0 * self.mat.dot(d_inputs['in'])
+                        if 'in2' in d_inputs:
+                            d_outputs['out2'] += -1.0 * self.mat2.dot(d_inputs['in2'])
+
+                if mode == 'rev':
+                    if 'out' in d_outputs:
+                        if 'in' in d_inputs:
+                            d_inputs['in'] += self.mat.transpose().dot(d_outputs['out'])
+                        if 'in2' in d_inputs:
+                            d_inputs['in2'] += self.mat2.transpose().dot(d_outputs['out'])
+                    if 'out2' in d_outputs:
+                        if 'in' in d_inputs:
+                            # This one is wrong in reverse.
+                            d_inputs['in'] += 999.0 * self.mat.transpose().dot(d_outputs['out2'])
+                        if 'in2' in d_inputs:
+                            d_inputs['in2'] += -1.0 * self.mat2.transpose().dot(d_outputs['out2'])
+
+        prob = om.Problem()
+        comp = DirectionalComp(n=2)
+        prob.model.add_subsystem('comp', comp)
+
+        prob.setup(force_alloc_complex=True)
+        prob.run_model()
+        partials = prob.check_partials(method='cs', out_stream=None)
+
+        self.assertGreater(np.abs(partials['comp']['out2', 'in']['directional_check']),
+                           1e-3, msg='Reverse deriv is supposed to be wrong.')
+        assert_near_equal(np.abs(partials['comp']['out', 'in']['directional_check']),
+                          0.0, 1e-12)
+        assert_near_equal(np.abs(partials['comp']['out', 'in2']['directional_check']),
+                          0.0, 1e-12)
+        assert_near_equal(np.abs(partials['comp']['out2', 'in2']['directional_check']),
+                          0.0, 1e-12)
+
     def test_bug_local_method(self):
         # This fixes a bug setting the check method on a component overrode the requested method for
         # subsequent components.
