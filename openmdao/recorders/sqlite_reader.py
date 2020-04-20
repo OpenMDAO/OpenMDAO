@@ -648,10 +648,12 @@ class SqliteCaseReader(BaseCaseReader):
 
         for table in tables:
             case = table.get_case(case_id)
-            if case:
+            if case and case.outputs is not None:
                 for key, value in case.outputs.items():
                     if isinstance(case[key], list):
                         case.outputs[key] = np.asarray(value)
+                return case
+            elif case:
                 return case
 
         raise RuntimeError('Case not found:', case_id)
