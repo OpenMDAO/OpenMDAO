@@ -3,10 +3,13 @@ import unittest
 
 import numpy as np
 
+import matplotlib.pyplot as plt
+plt.switch_backend('Agg')
+
 import openmdao.api as om
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_stress import MultipointBeamGroup
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class TestKSFunction(unittest.TestCase):
@@ -100,6 +103,42 @@ class TestKSFunction(unittest.TestCase):
         prob = om.Problem(model=MultipointBeamGroup(E=E, L=L, b=b, volume=volume, max_bending = max_bending,
                                                     num_elements=num_elements, num_cp=num_cp,
                                                     num_load_cases=num_load_cases))
+
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        prob.setup(mode='rev')
+
+        prob.run_driver()
+
+        stress0 = prob['parallel.sub_0.stress_comp.stress_0']
+        stress1 = prob['parallel.sub_0.stress_comp.stress_1']
+
+        # Test that the the maximum constraint prior to aggregation is close to "active".
+        assert_near_equal(max(stress0), 100.0, tolerance=5e-2)
+        assert_near_equal(max(stress1), 100.0, tolerance=5e-2)
+
+        # Test that no original constraint is violated.
+        self.assertTrue(np.all(stress0 < 100.0))
+        self.assertTrue(np.all(stress1 < 100.0))
+
+    def test_beam_stress_ks_add_constraint(self):
+        E = 1.
+        L = 1.
+        b = 0.1
+        volume = 0.01
+        max_bending = 100.0
+
+        num_cp = 5
+        num_elements = 25
+        num_load_cases = 2
+
+        prob = om.Problem(model=MultipointBeamGroup(E=E, L=L, b=b, volume=volume, max_bending = max_bending,
+                                                    num_elements=num_elements, num_cp=num_cp,
+                                                    num_load_cases=num_load_cases,
+                                                    ks_add_constraint=True))
 
         prob.driver = om.ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
@@ -246,6 +285,51 @@ class TestKSFunctionFeatures(unittest.TestCase):
         prob.run_model()
 
         assert_near_equal(prob['ks.KS'][0], -12.0)
+
+    def test_add_constraint(self):
+        import numpy as np
+        import openmdao.api as om
+        import matplotlib.pyplot as plt
+
+        n = 50
+        prob = om.Problem()
+        model = prob.model
+
+        prob.driver = om.ScipyOptimizeDriver()
+
+        ivc = model.add_subsystem('ivc', om.IndepVarComp())
+        ivc.add_output('x', val=np.linspace(-np.pi/2, np.pi/2, n))
+        ivc.add_output('k', val=5.0)
+
+        model.add_subsystem('comp', om.ExecComp('y = -3.0*x**2 + k', x=np.zeros((n, )),
+                                                y=np.zeros((n, )), k=0.0))
+        model.add_subsystem('ks', om.KSComp(width=n, upper=4.0, add_constraint=True))
+
+        model.add_design_var('ivc.k', lower=-10, upper=10)
+        model.add_objective('ivc.k', scaler=-1)
+
+        model.connect('ivc.x', 'comp.x')
+        model.connect('ivc.k', 'comp.k')
+        model.connect('comp.y', 'ks.g')
+
+        prob.setup()
+        prob.run_driver()
+
+        self.assertTrue(max(prob.get_val('comp.y')) <= 4.0)
+
+        fig, ax = plt.subplots()
+
+        x = prob.get_val('ivc.x')
+        y = prob.get_val('comp.y')
+
+        ax.plot(x, y, 'r.')
+        ax.plot(x, 4.0*np.ones_like(x), 'k--')
+        ax.set_xlabel('x')
+        ax.set_ylabel('y')
+        ax.grid(True)
+        ax.text(-0.25, 0, f"k = {prob.get_val('ivc.k')[0]:6.3f}")
+
+        plt.show()
 
 
 if __name__ == "__main__":
