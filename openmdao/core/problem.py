@@ -1066,7 +1066,7 @@ class Problem(object):
                                             mhat = derivs
                                             dhat = partials_data[c_name][inp, out]['J_fwd'][:, idx]
 
-                                            deriv['directional_check'] = mhat.dot(m) - dhat.dot(d)
+                                            deriv['directional_fwd_rev'] = mhat.dot(m) - dhat.dot(d)
 
                                         # Allocate first time
                                         if jac_key not in deriv:
@@ -1223,6 +1223,15 @@ class Problem(object):
                     deriv['J_fwd'] = np.atleast_2d(np.sum(deriv['J_fwd'], axis=1)).T
                     if comp.matrix_free:
                         deriv['J_rev'] = np.atleast_2d(np.sum(deriv['J_rev'], axis=0)).T
+
+                        # Dot product test for adjoint validity.
+                        m = mfree_directions[c_name][rel_key[0]].flatten()
+                        d = mfree_directions[c_name][wrt].flatten()
+                        mhat = partial.flatten()
+                        dhat = deriv['J_rev'].flatten()
+
+                        deriv['directional_fd_rev'] = dhat.dot(d) - mhat.dot(m)
+
 
         # Conversion of defaultdict to dicts
         partials_data = {comp_name: dict(outer) for comp_name, outer in partials_data.items()}
@@ -1810,7 +1819,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
             fwd_error = np.linalg.norm(forward - fd)
             if do_rev_dp:
-                rev_error = fwd_rev_error = derivative_info['directional_check']
+                fwd_rev_error = derivative_info['directional_fwd_rev']
+                rev_error = derivative_info['directional_fd_rev']
             elif do_rev:
                 rev_error = np.linalg.norm(reverse - fd)
                 fwd_rev_error = np.linalg.norm(forward - reverse)
@@ -1969,7 +1979,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                     if do_rev:
                         error_descs = ('(Jfor  - Jfd) ', '(Jrev  - Jfd) ', '(Jfor  - Jrev)')
                     elif do_rev_dp:
-                        error_descs = ('(Jfor  - Jfd) ', '(Jrev Dot Product Test) ')
+                        error_descs = ('(Jfor  - Jfd) ', '(Jrev - Jfd  Dot Product Test) ',
+                                       '(Jrev - Jfor Dot Product Test) ')
                     else:
                         error_descs = ('(Jfor  - Jfd) ', )
 

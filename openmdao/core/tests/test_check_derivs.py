@@ -1757,13 +1757,13 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.run_model()
         partials = prob.check_partials(method='cs', out_stream=None)
 
-        self.assertGreater(np.abs(partials['comp']['out2', 'in']['directional_check']),
+        self.assertGreater(np.abs(partials['comp']['out2', 'in']['directional_fwd_rev']),
                            1e-3, msg='Reverse deriv is supposed to be wrong.')
-        assert_near_equal(np.abs(partials['comp']['out', 'in']['directional_check']),
+        assert_near_equal(np.abs(partials['comp']['out', 'in']['directional_fwd_rev']),
                           0.0, 1e-12)
-        assert_near_equal(np.abs(partials['comp']['out', 'in2']['directional_check']),
+        assert_near_equal(np.abs(partials['comp']['out', 'in2']['directional_fwd_rev']),
                           0.0, 1e-12)
-        assert_near_equal(np.abs(partials['comp']['out2', 'in2']['directional_check']),
+        assert_near_equal(np.abs(partials['comp']['out2', 'in2']['directional_fwd_rev']),
                           0.0, 1e-12)
 
     def test_bug_local_method(self):
