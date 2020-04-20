@@ -1469,7 +1469,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         lines = stream.getvalue().splitlines()
 
         self.assertEqual(lines[6][43:46], 'n/a')
-        self.assertEqual(lines[6][82:85], 'n/a')
+        assert_near_equal(float(lines[6][82:85]), 0.0, 1e-15)
         assert_near_equal(float(lines[6][95:105]), 0.0, 1e-15)
 
     def test_directional_mixed_matrix_free(self):
