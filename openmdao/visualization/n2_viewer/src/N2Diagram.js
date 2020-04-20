@@ -465,16 +465,6 @@ class N2Diagram {
             .text(self.layout.getText.bind(self.layout));
     }
 
-    rightRoundedRect(x, y, width, height, radius) {
-        return "M" + x + "," + y +
-            "h" + (width - radius) +
-            "a" + radius + "," + radius + " 0 0 1 " + radius + "," + radius +
-            "v" + (height - 2 * radius) +
-            "a" + radius + "," + radius + " 0 0 1 " + -radius + "," + radius +
-            "h" + (radius - width) +
-            "z";
-    }
-
     _runPartitionTransition(selection) {
         let self = this; // For callbacks that change "this". Alternative to using .bind().
 
