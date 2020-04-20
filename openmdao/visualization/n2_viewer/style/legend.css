@@ -10,7 +10,7 @@
     flex-direction: row;
     border-radius: 15px;
     cursor: grab;
-    opacity: 0.8;
+    opacity: 0.95;
     box-shadow: 3px 3px 3px 1px rgba(0, 0, 0, 0.2);
 }
 
