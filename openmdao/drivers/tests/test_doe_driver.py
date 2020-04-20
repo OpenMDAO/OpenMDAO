@@ -1037,6 +1037,38 @@ class TestDOEDriver(unittest.TestCase):
         # Can't read/write objects through SQL case.
         self.assertEqual(prob['y'], my_obj)
 
+    def test_discrete_array_output(self):
+        prob = om.Problem()
+        model = prob.model
+
+        # Add independent variables
+        indeps = model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
+        indeps.add_discrete_output('x', np.ones((2, ), dtype=np.int))
+        indeps.add_discrete_output('y', np.ones((2, ), dtype=np.int))
+
+        # Add components
+        model.add_subsystem('parab', ParaboloidDiscreteArray(), promotes=['*'])
+
+        # Specify design variable range and objective
+        model.add_design_var('x', np.array([5, 1]))
+        model.add_design_var('y', np.array([1, 4]))
+        model.add_objective('f_xy')
+
+
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = om.CaseReader("cases.sql")
+        cases = cr.list_cases('driver')
+
+        for case in cases:
+            outputs = cr.get_case(case).outputs
+            for name in ('x', 'y', 'f_xy'):
+                self.assertTrue(isinstance(outputs[name], np.ndarray))
+
     def test_discrete_arraydesvar_list(self):
         prob = om.Problem()
         model = prob.model
