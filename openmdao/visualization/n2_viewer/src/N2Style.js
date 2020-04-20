@@ -216,7 +216,7 @@ N2Style.color = {
     'componentBox': '#555',
     'background': '#eee',
     'gridline': 'white',
-    'treestroke': '#eee',
+    'treeStroke': '#eee',
     'unknownGroup': '#888',
     'param': '#30B0AD',
     'paramGroup': 'Orchid',
