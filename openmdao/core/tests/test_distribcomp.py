@@ -386,9 +386,6 @@ class MPITests(unittest.TestCase):
         # this used to fail (bug #1279)
         cpd = p.check_partials(out_stream=None)
         for (of, wrt) in cpd['C2']:
-            print(of)
-            print(wrt)
-            print(cpd['C2'][of, wrt]['rel error'])
             np.testing.assert_almost_equal(cpd['C2'][of, wrt]['rel error'], 0.0, decimal=5)
 
     def test_list_inputs_outputs(self):
