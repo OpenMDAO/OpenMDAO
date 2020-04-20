@@ -12,6 +12,7 @@ import numpy as np
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.solvers.solver import NonlinearSolver
 from openmdao.recorders.recording_iteration_stack import Recording
+from openmdao.utils.general_utils import simple_warning
 
 
 def _print_violations(unknowns, lower, upper):
@@ -95,21 +96,173 @@ class LinesearchSolver(NonlinearSolver):
             Step size parameter.
         """
         system = self._system()
+        if not system._has_bounds:
+            return
+
         options = self.options
-        u = system._outputs
         method = options['bound_enforcement']
         lower = system._lower_bounds
         upper = system._upper_bounds
 
         if options['print_bound_enforce']:
-            _print_violations(u, lower, upper)
+            _print_violations(system._outputs, lower, upper)
 
         if method == 'vector':
-            u._enforce_bounds_vector(step, alpha, lower, upper)
+            _enforce_bounds_vector(system._outputs, step, alpha, lower, upper)
         elif method == 'scalar':
-            u._enforce_bounds_scalar(step, alpha, lower, upper)
+            _enforce_bounds_scalar(system._outputs, step, alpha, lower, upper)
         elif method == 'wall':
-            u._enforce_bounds_wall(step, alpha, lower, upper)
+            _enforce_bounds_wall(system._outputs, step, alpha, lower, upper)
+
+
+def _enforce_bounds_vector(u, du, alpha, lower_bounds, upper_bounds):
+    """
+    Enforce lower/upper bounds, backtracking the entire vector together.
+
+    This method modifies both self (u) and step (du) in-place.
+
+    Parameters
+    ----------
+    du : <Vector>
+        Newton step; the backtracking is applied to this vector in-place.
+    alpha : float
+        step size.
+    lower_bounds : <Vector>
+        Lower bounds vector.
+    upper_bounds : <Vector>
+        Upper bounds vector.
+    """
+    # The assumption is that alpha * du has been added to self (i.e., u)
+    # just prior to this method being called. We are currently in the
+    # initialization of a line search, and we're trying to ensure that
+    # the u does not violate bounds in the first iteration. If it does,
+    # we modify the du vector directly.
+
+    # This is the required change in step size, relative to the du vector.
+    d_alpha = 0
+
+    # Find the largest amount a bound is violated
+    # where positive means a bound is violated - i.e. the required d_alpha.
+    mask = du._data != 0
+    if mask.any():
+        abs_du_mask = np.abs(du._data[mask])
+        u_mask = u._data[mask]
+
+        # Check lower bound
+        max_d_alpha = np.amax((lower_bounds._data[mask] - u_mask) / abs_du_mask)
+        if max_d_alpha > d_alpha:
+            d_alpha = max_d_alpha
+
+        # Check upper bound
+        max_d_alpha = np.amax((u_mask - upper_bounds._data[mask]) / abs_du_mask)
+        if max_d_alpha > d_alpha:
+            d_alpha = max_d_alpha
+
+    if d_alpha > 0:
+        # d_alpha will not be negative because it was initialized to be 0
+        # and we've only done max operations.
+        # d_alpha will not be greater than alpha because the assumption is that
+        # the original point was valid - i.e., no bounds were violated.
+        # Therefore 0 <= d_alpha <= alpha.
+
+        # We first update u to reflect the required change to du.
+        u.add_scal_vec(-d_alpha, du)
+
+        # At this point, we normalize d_alpha by alpha to figure out the relative
+        # amount that the du vector has to be reduced, then apply the reduction.
+        du *= 1 - d_alpha / alpha
+
+
+def _enforce_bounds_scalar(u, du, alpha, lower_bounds, upper_bounds):
+    """
+    Enforce lower/upper bounds on each scalar separately, then backtrack as a vector.
+
+    This method modifies both self (u) and step (du) in-place.
+
+    Parameters
+    ----------
+    du : <Vector>
+        Newton step; the backtracking is applied to this vector in-place.
+    alpha : float
+        step size.
+    lower_bounds : <Vector>
+        Lower bounds vector.
+    upper_bounds : <Vector>
+        Upper bounds vector.
+    """
+    # The assumption is that alpha * step has been added to this vector
+    # just prior to this method being called. We are currently in the
+    # initialization of a line search, and we're trying to ensure that
+    # the initial step does not violate bounds. If it does, we modify
+    # the step vector directly.
+
+    # enforce bounds on step in-place.
+    u_data = u._data
+
+    # If u > lower, we're just adding zero. Otherwise, we're adding
+    # the step required to get up to the lower bound.
+    # For du, we normalize by alpha since du eventually gets
+    # multiplied by alpha.
+    change_lower = np.maximum(u_data, lower_bounds._data) - u_data
+
+    # If u < upper, we're just adding zero. Otherwise, we're adding
+    # the step required to get down to the upper bound, but normalized
+    # by alpha since du eventually gets multiplied by alpha.
+    change_upper = np.minimum(u_data, upper_bounds._data) - u_data
+
+    change = change_lower + change_upper
+
+    u_data += change
+    du._data += change / alpha
+
+
+def _enforce_bounds_wall(u, du, alpha, lower_bounds, upper_bounds):
+    """
+    Enforce lower/upper bounds on each scalar separately, then backtrack along the wall.
+
+    This method modifies both self (u) and step (du) in-place.
+
+    Parameters
+    ----------
+    du : <Vector>
+        Newton step; the backtracking is applied to this vector in-place.
+    alpha : float
+        step size.
+    lower_bounds : <Vector>
+        Lower bounds vector.
+    upper_bounds : <Vector>
+        Upper bounds vector.
+    """
+    # The assumption is that alpha * step has been added to this vector
+    # just prior to this method being called. We are currently in the
+    # initialization of a line search, and we're trying to ensure that
+    # the initial step does not violate bounds. If it does, we modify
+    # the step vector directly.
+
+    # enforce bounds on step in-place.
+    u_data = u._data
+    du_data = du._data
+
+    # If u > lower, we're just adding zero. Otherwise, we're adding
+    # the step required to get up to the lower bound.
+    # For du, we normalize by alpha since du eventually gets
+    # multiplied by alpha.
+    change_lower = np.maximum(u_data, lower_bounds._data) - u_data
+
+    # If u < upper, we're just adding zero. Otherwise, we're adding
+    # the step required to get down to the upper bound, but normalized
+    # by alpha since du eventually gets multiplied by alpha.
+    change_upper = np.minimum(u_data, upper_bounds._data) - u_data
+
+    change = change_lower + change_upper
+
+    u_data += change
+    du_data += change / alpha
+
+    # Now we ensure that we will backtrack along the wall during the
+    # line search by setting the entries of du at the bounds to zero.
+    changed_either = change.astype(bool)
+    du_data[changed_either] = 0.
 
 
 class BoundsEnforceLS(LinesearchSolver):
@@ -134,6 +287,21 @@ class BoundsEnforceLS(LinesearchSolver):
         for unused_option in ("atol", "rtol", "maxiter", "err_on_non_converge"):
             opt.undeclare(unused_option)
 
+    def _setup_solvers(self, system, depth):
+        """
+        Assign system instance, set depth, and optionally perform setup.
+
+        Parameters
+        ----------
+        system : System
+            pointer to the owning system.
+        depth : int
+            depth of the current system (already incremented).
+        """
+        super(BoundsEnforceLS, self)._setup_solvers(system, depth)
+        if not system._has_bounds:
+            simple_warning(f"{self.msginfo}: linesearch is active but no bounds have been set.")
+
     def _solve(self):
         """
         Run the iterative solver.
@@ -143,6 +311,10 @@ class BoundsEnforceLS(LinesearchSolver):
 
         u = system._outputs
         du = system._vectors['output']['linear']
+
+        if not system._has_bounds:
+            u += du
+            return
 
         self._run_apply()
 
@@ -232,7 +404,8 @@ class ArmijoGoldsteinLS(LinesearchSolver):
         # Initial step length based on the input step length parameter
         u.add_scal_vec(alpha, du)
 
-        self._enforce_bounds(step=du, alpha=alpha)
+        if system._has_bounds:
+            self._enforce_bounds(step=du, alpha=alpha)
 
         try:
             cache = self._solver_info.save_cache()

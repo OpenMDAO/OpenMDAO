@@ -537,66 +537,6 @@ class Vector(object):
                                   type(self).__name__)
         return None  # silence lint warning about missing return value.
 
-    def _enforce_bounds_vector(self, du, alpha, lower_bounds, upper_bounds):
-        """
-        Enforce lower/upper bounds, backtracking the entire vector together.
-
-        This method modifies both self (u) and step (du) in-place.
-
-        Parameters
-        ----------
-        du : <Vector>
-            Newton step; the backtracking is applied to this vector in-place.
-        alpha : float
-            step size.
-        lower_bounds : <Vector>
-            Lower bounds vector.
-        upper_bounds : <Vector>
-            Upper bounds vector.
-        """
-        raise NotImplementedError('_enforce_bounds_vector not defined for vector type %s' %
-                                  type(self).__name__)
-
-    def _enforce_bounds_scalar(self, du, alpha, lower_bounds, upper_bounds):
-        """
-        Enforce lower/upper bounds on each scalar separately, then backtrack as a vector.
-
-        This method modifies both self (u) and step (du) in-place.
-
-        Parameters
-        ----------
-        du : <Vector>
-            Newton step; the backtracking is applied to this vector in-place.
-        alpha : float
-            step size.
-        lower_bounds : <Vector>
-            Lower bounds vector.
-        upper_bounds : <Vector>
-            Upper bounds vector.
-        """
-        raise NotImplementedError('_enforce_bounds_scalar not defined for vector type %s' %
-                                  type(self).__name__)
-
-    def _enforce_bounds_wall(self, du, alpha, lower_bounds, upper_bounds):
-        """
-        Enforce lower/upper bounds on each scalar separately, then backtrack along the wall.
-
-        This method modifies both self (u) and step (du) in-place.
-
-        Parameters
-        ----------
-        du : <Vector>
-            Newton step; the backtracking is applied to this vector in-place.
-        alpha : float
-            step size.
-        lower_bounds : <Vector>
-            Lower bounds vector.
-        upper_bounds : <Vector>
-            Upper bounds vector.
-        """
-        raise NotImplementedError('_enforce_bounds_wall not defined for vector type %s' %
-                                  type(self).__name__)
-
     def set_complex_step_mode(self, active, keep_real=False):
         """
         Turn on or off complex stepping mode.
