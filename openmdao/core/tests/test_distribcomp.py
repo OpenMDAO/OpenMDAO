@@ -381,7 +381,7 @@ class MPITests(unittest.TestCase):
         p.final_setup()
 
         # run the model and check partials
-        p.run_model
+        p.run_model()
 
         # this used to fail (bug #1279)
         cpd = p.check_partials(out_stream=None)
