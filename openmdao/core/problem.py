@@ -1056,6 +1056,9 @@ class Problem(object):
                                         deriv[jac_key][:, idx] = derivs
 
                                     else:
+                                        key = inp, out
+                                        deriv = partials_data[c_name][key]
+
                                         if directional:
                                             # Dot product test for adjoint validity.
                                             m = mfree_directions[c_name][out]
@@ -1064,9 +1067,6 @@ class Problem(object):
                                             dhat = partials_data[c_name][inp, out]['J_fwd'][:, idx]
 
                                             deriv['directional_check'] = mhat.dot(m) - dhat.dot(d)
-
-                                        key = inp, out
-                                        deriv = partials_data[c_name][key]
 
                                         # Allocate first time
                                         if jac_key not in deriv:
