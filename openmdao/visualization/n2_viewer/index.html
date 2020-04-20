@@ -101,16 +101,6 @@
                     </svg>
                 </div>
 
-                <!-- Information on selected Node -->
-                <div class="node-info-container hide-node-data" id="node-data-container">
-                    <div class="info-header">
-                        <p>Node Data</p>
-                    </div>
-
-                    <div class="node-data-container" id="node-data">
-                    </div>
-                </div>
-
                 <!-- Legend to show all symbols -->
                 <div class="legend" id="legend-div">
                     <div class="sys-var-container">
@@ -162,6 +152,20 @@
         <div id="connectionId"></div>
     </div>
 </div>
+
+<table id="node-info-container" class='info-hidden' cellpadding='0' cellspacing='0'>
+    <thead>
+        <tr>
+            <th scope='col' colspan='2'>Name</th>
+        </tr>
+    </thead>
+    <tbody></tbody>
+    <tfoot>
+        <tr>
+            <th scope='col' colspan='2'>&nbsp;</th>
+        </tr>
+    </tfoot>
+</table>
 
 <div class="tool-tip" style="position: absolute; visibility: hidden;"></div>
 <div id="top" class="offgrid" style="visibility: hidden;"></div>
