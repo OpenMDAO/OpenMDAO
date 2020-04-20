@@ -287,6 +287,20 @@ class Vector(object):
 
         return (n[idx:] for n in system._var_abs_names[self._typ] if n in self._names)
 
+    def _abs_val_iter(self, flat=True):
+        """
+        Iterate over the items in the vector, using absolute names.
+
+        Parameters
+        ----------
+        flat : bool
+            If True, return the flattened values.
+        """
+        arrs = self._views_flat if flat else self._views
+
+        for name, val in arrs.items():
+            yield name, val
+
     def __contains__(self, name):
         """
         Check if the variable is involved in the current mat-vec product.
