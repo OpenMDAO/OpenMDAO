@@ -227,7 +227,6 @@ class TestFeature(unittest.TestCase):
         import numpy as np
 
         import openmdao.api as om
-        from openmdao.utils.assert_utils import assert_near_equal
 
         n = 100
 

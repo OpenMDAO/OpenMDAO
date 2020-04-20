@@ -29,6 +29,9 @@ from openmdao.solvers.solver import Solver
 """
 SQL case database version history.
 ----------------------------------
+8 -- OpenMDAO 3.0
+     Added inputs, outputs, and residuals fields to problem_cases table. Added
+     outputs and residuals fields to driver_iterations table
 7 -- OpenMDAO 3.0
      Added derivatives field to table for recording problems.
 6 -- OpenMDAO 3.X
@@ -44,7 +47,7 @@ SQL case database version history.
 1 -- Through OpenMDAO 2.3
      Original implementation.
 """
-format_version = 7
+format_version = 8
 
 
 def array_to_blob(array):
@@ -191,7 +194,7 @@ class SqliteRecorder(CaseRecorder):
 
                 c.execute("CREATE TABLE driver_iterations(id INTEGER PRIMARY KEY, "
                           "counter INT, iteration_coordinate TEXT, timestamp REAL, "
-                          "success INT, msg TEXT, inputs TEXT, outputs TEXT)")
+                          "success INT, msg TEXT, inputs TEXT, outputs TEXT, residuals TEXT)")
                 c.execute("CREATE TABLE driver_derivatives(id INTEGER PRIMARY KEY, "
                           "counter INT, iteration_coordinate TEXT, timestamp REAL, "
                           "success INT, msg TEXT, derivatives BLOB)")
@@ -199,7 +202,8 @@ class SqliteRecorder(CaseRecorder):
 
                 c.execute("CREATE TABLE problem_cases(id INTEGER PRIMARY KEY, "
                           "counter INT, case_name TEXT, timestamp REAL, "
-                          "success INT, msg TEXT, outputs TEXT, jacobian BLOB )")
+                          "success INT, msg TEXT, inputs TEXT, outputs TEXT, residuals TEXT, "
+                          "jacobian BLOB)")
                 c.execute("CREATE INDEX prob_name_ind on problem_cases(case_name)")
 
                 c.execute("CREATE TABLE system_iterations(id INTEGER PRIMARY KEY, "
@@ -394,25 +398,28 @@ class SqliteRecorder(CaseRecorder):
         if self.connection:
             outputs = data['output']
             inputs = data['input']
+            residuals = data['residual']
 
             # convert to list so this can be dumped as JSON
-            for in_out in (inputs, outputs):
-                if in_out is None:
+            for in_out_resid in (inputs, outputs, residuals):
+                if in_out_resid is None:
                     continue
-                for var in in_out:
-                    in_out[var] = make_serializable(in_out[var])
+                for var in in_out_resid:
+                    in_out_resid[var] = make_serializable(in_out_resid[var])
 
             outputs_text = json.dumps(outputs)
             inputs_text = json.dumps(inputs)
+            residuals_text = json.dumps(residuals)
 
             with self.connection as c:
                 c = c.cursor()  # need a real cursor for lastrowid
 
                 c.execute("INSERT INTO driver_iterations(counter, iteration_coordinate, "
-                          "timestamp, success, msg, inputs, outputs) VALUES(?,?,?,?,?,?,?)",
+                          "timestamp, success, msg, inputs, outputs, residuals) "
+                          "VALUES(?,?,?,?,?,?,?,?)",
                           (self._counter, self._iteration_coordinate,
                            metadata['timestamp'], metadata['success'], metadata['msg'],
-                           inputs_text, outputs_text))
+                           inputs_text, outputs_text, residuals_text))
 
                 c.execute("INSERT INTO global_iterations(record_type, rowid, source) VALUES(?,?,?)",
                           ('driver', c.lastrowid, recording_requester._get_name()))
@@ -432,6 +439,8 @@ class SqliteRecorder(CaseRecorder):
         """
         if self.connection:
             outputs = data['output']
+            inputs = data['input']
+            residuals = data['residual']
 
             driver = recording_requester.driver
             if recording_requester.recording_options['record_derivatives'] and \
@@ -443,20 +452,25 @@ class SqliteRecorder(CaseRecorder):
             totals_blob = array_to_blob(totals_array)
 
             # convert to list so this can be dumped as JSON
-            if outputs is not None:
-                for var in outputs:
-                    outputs[var] = make_serializable(outputs[var])
+            for in_out_resid in (inputs, outputs, residuals):
+                if in_out_resid is None:
+                    continue
+                for var in in_out_resid:
+                    in_out_resid[var] = make_serializable(in_out_resid[var])
 
             outputs_text = json.dumps(outputs)
+            inputs_text = json.dumps(inputs)
+            residuals_text = json.dumps(residuals)
 
             with self.connection as c:
                 c = c.cursor()  # need a real cursor for lastrowid
 
                 c.execute("INSERT INTO problem_cases(counter, case_name, "
-                          "timestamp, success, msg, outputs, jacobian) VALUES(?,?,?,?,?,?,?)",
+                          "timestamp, success, msg, inputs, outputs, residuals, jacobian) "
+                          "VALUES(?,?,?,?,?,?,?,?,?)",
                           (self._counter, metadata['name'],
                            metadata['timestamp'], metadata['success'], metadata['msg'],
-                           outputs_text, totals_blob))
+                           inputs_text, outputs_text, residuals_text, totals_blob))
 
     def record_iteration_system(self, recording_requester, data, metadata):
         """
@@ -687,3 +701,18 @@ class SqliteRecorder(CaseRecorder):
         # close database connection
         if self.connection:
             self.connection.close()
+
+    def delete_recordings(self):
+        """
+        Delete all the recordings.
+        """
+        if self.connection:
+            self.connection.execute("DELETE FROM global_iterations")
+            self.connection.execute("DELETE FROM driver_iterations")
+            self.connection.execute("DELETE FROM driver_derivatives")
+            self.connection.execute("DELETE FROM problem_cases")
+            self.connection.execute("DELETE FROM system_iterations")
+            self.connection.execute("DELETE FROM solver_iterations")
+            self.connection.execute("DELETE FROM driver_metadata")
+            self.connection.execute("DELETE FROM system_metadata")
+            self.connection.execute("DELETE FROM solver_metadata")

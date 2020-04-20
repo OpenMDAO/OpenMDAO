@@ -13,6 +13,10 @@ implements the Kreisselmeier-Steinhauser Function to aggregate constraint vector
 By default, the constraint vector "g" is assumed be of the form where g<=0 satisfies the constraints, but other forms can
 be specified using the "upper" and "lower_flag" options.
 
+The output "KS" should be constrained with an upper-bound of zero to satisfy the aggregated constraint.
+By default, it is left to the user to provide this constraint.  However, setting option "add_constraint"
+to True will cause the KSComp to automatically add a constraint to the optimization.
+
 KSComp Options
 --------------
 
@@ -68,5 +72,19 @@ is still satisfied if it is less than zero.
     openmdao.components.tests.test_ks_comp.TestKSFunctionFeatures.test_lower_flag
     :layout: interleave
 
+Typically, the KSComp is used to provide a constraint which aggregates many values into a single scalar constraint.
+Consider the following simple example, where we seek to maximize the peak of a parabola but also
+keep the peak of the parabola below a certain threshold value.  Clearly, the solution here is to have the peak of
+the parabola lie on the peak constraint.
+
+Note the resulting value of the offset "k" is not exactly 4.0 as we might expect.  The KS function
+provides a differentiable constraint aggregation, but the resulting scalar constraint is slightly
+conservative.
+
+**add_constraint**
+
+.. embed-code::
+    openmdao.components.tests.test_ks_comp.TestKSFunctionFeatures.test_add_constraint
+    :layout: code, plot
 
 .. tags:: KSComp, Component, Constraints, Optimization

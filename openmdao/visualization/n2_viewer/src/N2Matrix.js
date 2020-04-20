@@ -61,6 +61,7 @@ class N2Matrix {
     get cellDims() {
         return N2CellRenderer.dims;
     }
+
     get prevCellDims() {
         return N2CellRenderer.prevDims;
     }
@@ -99,7 +100,8 @@ class N2Matrix {
     cell(row, col, doThrow = false) {
         if (this.exists(row, col)) {
             return this.grid[row][col];
-        } else if (doThrow) {
+        }
+        else if (doThrow) {
             throw "No node in matrix at (" + row + ", " + col + ").";
         }
 
@@ -206,7 +208,8 @@ class N2Matrix {
                 if (tgtIdx != -1) {
                     let newCell = new N2MatrixCell(srcIdx, tgtIdx, diagNode, tgt, model);
                     this._addCell(srcIdx, tgtIdx, newCell);
-                } else if (tgt.isConnectable()) {
+                }
+                else if (tgt.isConnectable()) {
                     newDiagCell.addOffScreenConn(diagNode, tgt);
                 }
             }
@@ -258,7 +261,8 @@ class N2Matrix {
                 curNode.parentComponent &&
                 startINode.parentComponent === curNode.parentComponent) {
                 ++currentBox.stopI;
-            } else {
+            }
+            else {
                 currentBox = {
                     "startI": ri,
                     "stopI": ri
@@ -586,7 +590,8 @@ class N2Matrix {
             debugInfo("Drawing gridlines.")
             this._drawHorizontalLines();
             this._drawVerticalLines();
-        } else {
+        }
+        else {
             debugInfo("Erasing gridlines.")
             this.n2Groups.gridlines.selectAll('.horiz_line').remove();
             this.n2Groups.gridlines.selectAll(".vert_line").remove();

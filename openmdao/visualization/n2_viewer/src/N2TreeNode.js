@@ -104,19 +104,25 @@ class N2TreeNode {
     }
 
     /** True if this.type is 'unknown'. */
-    isUnknown() {
-        return (this.type == 'unknown');
-    }
+    isUnknown() { return (this.type == 'unknown'); }
+
+    /** True if this is an unknown and it's not implicit */
+    isExplicitOutput() { return (this.isUnknown() && !this.implicit); }
+
+    /** True if this is an unknown and it is implicit */
+    isImplicitOutput() { return (this.isUnknown() && this.implicit); }
 
     /** True if this.type is 'param', 'unconnected_param', or 'unknown'. */
-    isParamOrUnknown() {
-        return this.type.match(paramOrUnknownRegex);
-    }
+    isParamOrUnknown() { return this.type.match(paramOrUnknownRegex); }
 
     /** True is this.type is 'subsystem' */
-    isSubsystem() {
-        return (this.type == 'subsystem');
-    }
+    isSubsystem() { return (this.type == 'subsystem'); }
+
+    /** True if it's a subsystem and this.subsystem_type is 'group' */
+    isGroup() { return ( this.isSubsystem() && this.subsystem_type == 'group'); }
+
+    /** True if it's a subsystem and this.subsystem_type is 'component' */
+    isComponent() { return ( this.isSubsystem() && this.subsystem_type == 'component'); }
 
     /** Not connectable if this is a param group or parents are minimized. */
     isConnectable() {

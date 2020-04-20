@@ -372,16 +372,29 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
         'N2Matrix', \
         'N2Arrow', \
         'N2Search', \
+        'N2Toolbar', \
         'N2Diagram', \
         'N2UserInterface', \
         'defaults', \
-        'ptN2', \
-        'Toolbar'
+        'ptN2'
+
     srcs = read_files(src_names, src_dir, 'js')
-    styles = read_files(('awesomplete', 'partition_tree'), style_dir, 'css')
+
+    style_names = \
+        'partition_tree', \
+        'icon', \
+        'toolbar', \
+        'nodedata', \
+        'legend', \
+        'awesomplete'
+
+    styles = read_files((style_names), style_dir, 'css')
 
     with open(os.path.join(style_dir, "icomoon.woff"), "rb") as f:
         encoded_font = str(base64.b64encode(f.read()).decode("ascii"))
+
+    with open(os.path.join(style_dir, "logo_png.b64"), "r") as f:
+        logo_png = str(f.read())
 
     if title:
         title = "OpenMDAO Model Hierarchy and N2 diagram: %s" % title
@@ -392,8 +405,13 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
                       title=title,
                       styles=styles, embeddable=embeddable)
 
+    if (embeddable):
+        h.insert("non-embedded-n2", "embedded-n2")
+
     # put all style and JS into index
     h.insert('{{fontello}}', encoded_font)
+
+    h.insert('{{logo_png}}', logo_png)
 
     for k, v in lib_dct.items():
         h.insert('{{{}_lib}}'.format(k), write_script(libs[v], indent=_IND))
@@ -406,7 +424,7 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
 
     # Help
     help_txt = ('Left clicking on a node in the partition tree will navigate to that node. '
-                'Right clicking on a node in the model hierarchy will collapse/uncollapse it. '
+                'Right clicking on a node in the model hierarchy will collapse/expand it. '
                 'A click on any element in the N^2 diagram will allow those arrows to persist.')
 
     h.add_help(help_txt, footer="OpenMDAO Model Hierarchy and N^2 diagram")

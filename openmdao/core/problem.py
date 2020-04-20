@@ -93,8 +93,6 @@ class Problem(object):
         Derivatives calculation mode assigned by the user.  If set to 'auto', _mode will be
         automatically assigned to 'fwd' or 'rev' based on relative sizes of design variables vs.
         responses.
-    _solver_print_cache : list
-        Allows solver iprints to be set to requested values after setup calls.
     _initial_condition_cache : dict
         Any initial conditions that are set at the problem level via setitem are cached here
         until they can be processed.
@@ -174,8 +172,6 @@ class Problem(object):
 
         self.comm = comm
 
-        self._solver_print_cache = []
-
         self._mode = None  # mode is assigned in setup()
 
         self._initial_condition_cache = {}
@@ -208,6 +204,15 @@ class Problem(object):
                                             'problem level')
         self.recording_options.declare('record_responses', types=bool, default=False,
                                        desc='Set True to record constraints and objectives at the '
+                                            'problem level.')
+        self.recording_options.declare('record_inputs', types=bool, default=False,
+                                       desc='Set True to record inputs at the '
+                                            'problem level.')
+        self.recording_options.declare('record_outputs', types=bool, default=True,
+                                       desc='Set True to record outputs at the '
+                                            'problem level.')
+        self.recording_options.declare('record_residuals', types=bool, default=False,
+                                       desc='Set True to record residuals at the '
                                             'problem level.')
         self.recording_options.declare('record_derivatives', types=bool, default=False,
                                        desc='Set to True to record derivatives for the problem '
@@ -816,11 +821,6 @@ class Problem(object):
             self._setup_recording()
             record_viewer_data(self)
 
-        # Now that setup has been called, we can set the iprints.
-        for items in self._solver_print_cache:
-            self.set_solver_print(level=items[0], depth=items[1], type_=items[2])
-        self._solver_print_cache = []
-
         if self._setup_status < 2:
             self._setup_status = 2
             self._set_initial_conditions()
@@ -1422,10 +1422,7 @@ class Problem(object):
         type_ : str
             Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
         """
-        if (level, depth, type_) not in self._solver_print_cache:
-            self._solver_print_cache.append((level, depth, type_))
-
-        self.model._set_solver_print(level=level, depth=depth, type_=type_)
+        self.model.set_solver_print(level=level, depth=depth, type_=type_)
 
     def list_problem_vars(self,
                           show_promoted_name=True,

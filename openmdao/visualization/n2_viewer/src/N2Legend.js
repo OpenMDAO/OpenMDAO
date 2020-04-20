@@ -1,67 +1,78 @@
 /**
- * Draw a box under the diagram describing each of the element types.
+ * Draw a symbol describing each of the element types.
  * @typedef N2Legend
- * @property {String} title The label to put at the top of the legend.
  * @property {Boolean} shown Whether the legend is currently drawn or not.
  */
 class N2Legend {
     /**
-     * Initializes the legend object, but doesn't draw it yet.
-     * @param {String} [title = "LEGEND"] The label at the top of the legend box.
+     * Initializes the legend object. 
+     * @param {ModelData} modelData Symbols are only displayed if they're in the model
      */
     constructor(modelData) {
+        this._div = d3.select("#legend-div");
+
+        // TODO: The legend should't have to search through modelData itself,
+        // this info can be collected as modelData is built.
         this.nodes = modelData.tree.children;
         this.showSysVar = {
-            group: false,
-            component: false,
-            input: false,
-            unconnectedInput: false,
-            outputExplicit: false,
-            outputImplicit: false,
-            collapsed: true,
-            connection: true
+            'group': false,
+            'component': false,
+            'input': false,
+            'unconnectedInput': false,
+            'outputExplicit': false,
+            'outputImplicit': false,
+            'collapsed': true,
+            'connection': true
         };
 
         this.showN2Symbols = {
-            scalar: false,
-            vector: false,
-            collapsedVariables: false
+            'scalar': false,
+            'vector': false,
+            'collapsedVariables': false
         };
 
-        this.sysAndVar = [{
-            name: "Connection",
-            color: N2Style.color.connection
-        }, {
-            name: "Collapsed",
-            color: N2Style.color.collapsed
-        }];
+        this.sysAndVar = [
+            { 'name': "Connection", 'color': N2Style.color.connection },
+            { 'name': "Collapsed", 'color': N2Style.color.collapsed }
+        ];
+
         this.n2Symbols = [];
-        const rootLinearSolver = N2Style.solverStyleObject.find(x => x.ln === modelData.tree.linear_solver);
-        const rootNonLinearSolver = N2Style.solverStyleObject.find(x => x.nl === modelData.tree.nonlinear_solver);
-        this.linearSolvers = [{
-            name: modelData.tree.linear_solver,
-            color: rootLinearSolver.color
-        }];
-        this.nonLinearSolvers = [{
-            name: modelData.tree.nonlinear_solver,
-            color: rootNonLinearSolver.color
-        }];
+        const rootLinearSolver =
+            N2Style.solverStyleObject.find(x => x.ln === modelData.tree.linear_solver);
+        const rootNonLinearSolver =
+            N2Style.solverStyleObject.find(x => x.nl === modelData.tree.nonlinear_solver);
+        this.linearSolvers = [
+            { 'name': modelData.tree.linear_solver, 'color': rootLinearSolver.color }
+        ];
 
-        this.setDisplayBooleans(this.nodes);
+        this.nonLinearSolvers = [
+            { 'name': modelData.tree.nonlinear_solver, 'color': rootNonLinearSolver.color }
+        ];
 
+        this._setDisplayBooleans(this.nodes);
+        this._setupContents();
 
-        this.title = "Legend";
-        this.shown = false; // Not shown until show() is called
+        // Get the initial setting from the style sheet
+        this.hidden = (this._div.style('visibility') == 'hidden');
 
-        this._div = d3.select("#legend-div");
+        this._setupDrag();
 
+        let self = this;
+        this.closeDiv = d3.select('#close-legend');
+        this.closeButton = this.closeDiv.select('p');
 
-        this.setup();
+        this.closeDiv
+            .on('mouseenter', e => { self.closeButton.style('color', 'red'); })
+            .on('mouseout', e => { self.closeButton.style('color', 'black'); })
+            .on('click', e => { 
+                self.hide(); 
+                self.closeButton.style('color', 'black');
+                d3.select('#legend-button').attr('class', 'fas icon-key');
+            })
     }
 
-    setDisplayBooleans(nodes) {
-        for (let i = 0; i < nodes.length; i++) {
-            const node = nodes[i];
+    _setDisplayBooleans(nodes) {
+        for (let node of nodes) {
             const {
                 group,
                 component,
@@ -73,173 +84,161 @@ class N2Legend {
                 connection
             } = this.showSysVar;
 
-
             const linearSolver = node.linear_solver;
             const nonLinearSolver = node.nonlinear_solver;
 
-            const linearSolverIndex = this.linearSolvers.indexOf(this.linearSolvers.find(x => x.name === linearSolver))
-            const nonLinearSolverIndex = this.nonLinearSolvers.indexOf(this.nonLinearSolvers.find(x => x.name === nonLinearSolver));
+            const linearSolverIndex =
+                this.linearSolvers.indexOf(this.linearSolvers.find(x => x.name === linearSolver))
+            const nonLinearSolverIndex =
+                this.nonLinearSolvers.indexOf(this.nonLinearSolvers.find(x => x.name === nonLinearSolver));
 
             if (linearSolverIndex < 0 && linearSolver !== undefined) {
                 let solverStyle = N2Style.solverStyleObject.find(x => x.ln === linearSolver);
                 this.linearSolvers.push({
-                    name: solverStyle.ln,
-                    color: solverStyle.color
+                    'name': solverStyle.ln,
+                    'color': solverStyle.color
                 });
             }
+
             if (nonLinearSolverIndex < 0 && nonLinearSolver !== undefined) {
                 let solverStyle = N2Style.solverStyleObject.find(x => x.nl === nonLinearSolver);
                 this.nonLinearSolvers.push({
-                    name: solverStyle.nl,
-                    color: solverStyle.color
+                    'name': solverStyle.nl,
+                    'color': solverStyle.color
                 });
             }
 
-            if (node.children !== undefined && node.children.length > 0) {
-                if (!this.showSysVar.group && node.subsystem_type === 'group') {
+            if (node.hasChildren()) {
+                if (!this.showSysVar.group && node.isGroup()) {
                     this.showSysVar.group = true;
                     this.sysAndVar.push({
-                        name: 'Group',
-                        color: N2Style.color.group
-                    })
-                } else if (!this.showSysVar.component && node.subsystem_type === 'component') {
-                    this.showSysVar.component = true;
-                    this.sysAndVar.push({
-                        name: 'Component',
-                        color: N2Style.color.component
+                        'name': 'Group',
+                        'color': N2Style.color.group
                     })
                 }
-                this.setDisplayBooleans(node.children);
-            } else {
-                if (!this.showSysVar.input && node.type === 'param') {
+                else if (!this.showSysVar.component && node.isComponent()) {
+                    this.showSysVar.component = true;
+                    this.sysAndVar.push({
+                        'name': 'Component',
+                        'color': N2Style.color.component
+                    })
+                }
+                this._setDisplayBooleans(node.children);
+            }
+            else {
+                if (!this.showSysVar.input && node.isParam()) {
                     this.showSysVar.input = true;
                     this.sysAndVar.push({
-                        name: 'Input',
-                        color: N2Style.color.param
+                        'name': 'Input',
+                        'color': N2Style.color.param
                     })
-                } else if (!this.showSysVar.outputExplicit && node.type === 'unknown' && !node.implicit) {
+                }
+                else if (!this.showSysVar.outputExplicit && node.isExplicitOutput()) {
                     this.showSysVar.outputExplicit = true;
                     this.sysAndVar.push({
-                        name: 'Explicit Output',
-                        color: N2Style.color.unknownExplicit
+                        'name': 'Explicit Output',
+                        'color': N2Style.color.unknownExplicit
                     })
-                } else if (!this.showSysVar.outputImplicit && node.type === 'unknown' && node.implicit) {
+                }
+                else if (!this.showSysVar.outputImplicit && node.isImplicitOutput()) {
                     this.showSysVar.outputImplicit = true;
                     this.sysAndVar.push({
-                        name: 'Implicit Output',
-                        color: N2Style.color.unknownImplicit
+                        'name': 'Implicit Output',
+                        'color': N2Style.color.unknownImplicit
                     })
-                } else if (!this.showSysVar.unconnectedInput && node.type === "unconnectedParam") {
+                }
+                else if (!this.showSysVar.unconnectedInput && node.isUnconnectedParam()) {
                     this.showSysVar.unconnectedInput = true;
                     this.sysAndVar.push({
-                        name: 'Unconnected Input',
-                        color: N2Style.color.unconnectedParam
+                        'name': 'Unconnected Input',
+                        'color': N2Style.color.unconnectedParam
                     })
                 }
             }
         }
+    }
 
+    /**
+     * Create elements in the legend divs for the supplied item
+     * @param {Object} item Contains the name and color of the item
+     * @param {Object} container The div to append into
+     */
+    _addItem(item, container) {
+        const newDiv = container
+            .append('div')
+            .attr('class', 'legend-box-container');
+
+        newDiv.append('div')
+            .attr('class', 'legend-box')
+            .style('background-color', item.color);
+
+        newDiv.append('p')
+            .html(item.name);
+    }
+
+    /** Add symbols for all of the items that were discovered */
+    _setupContents() {
+        const sysVarContainer = d3.select('#sys-var-legend');
+        for (let item of this.sysAndVar) this._addItem(item, sysVarContainer);
+
+        sysVarContainer.style('width', sysVarContainer.node().scrollWidth + 'px')
+
+        const solversLegend = d3.select('#linear-legend')
+        for (let item of this.linearSolvers) this._addItem(item, solversLegend);
+
+        solversLegend.style('width', solversLegend.node().scrollWidth + 'px');
 
     }
 
-    setup() {
-        const sysVarContainer = document.getElementById("sys-var-legend");
-        const linearContainer = document.getElementById("linear-legend");
+    /** Listen for the event to begin dragging the legend */
+    _setupDrag() {
+        const self = this;
 
-        for (let i = 0; i < this.sysAndVar.length; i++) {
-            const item = this.sysAndVar[i];
+        this._div.on('mousedown', function() {
+            let dragDiv = d3.select(this).style('cursor', 'grabbing');
+            self._startPos = [d3.event.clientX, d3.event.clientY]
+            self._offset = [d3.event.clientX - parseInt(dragDiv.style('left')), 
+                d3.event.clientY - parseInt(dragDiv.style('top'))];
 
-            const legendBoxContainer = document.createElement("div");
-            legendBoxContainer.setAttribute('class', 'legend-box-container');
+            let w = d3.select(window)
+                .on("mousemove", e => {
+                    dragDiv
+                        .style('top', (d3.event.clientY - self._offset[1]) + 'px')
+                        .style('left', (d3.event.clientX - self._offset[0]) + 'px');
+                })
+                .on("mouseup", e => {
+                    dragDiv.style('cursor', 'grab');
+                    w.on("mousemove", null).on("mouseup", null);
+                    
+                });
 
-            const legendBox = document.createElement('div');
-            legendBox.setAttribute('class', 'legend-box');
-            legendBox.style.backgroundColor = item.color;
-
-            const title = document.createElement('p');
-            title.innerHTML = item.name;
-
-            legendBoxContainer.appendChild(legendBox);
-            legendBoxContainer.appendChild(title);
-
-            sysVarContainer.appendChild(legendBoxContainer);
-        }
-
-        for (let i = 0; i < this.linearSolvers.length; i++) {
-            const item = this.linearSolvers[i];
-
-            const legendBoxContainer = document.createElement("div");
-            legendBoxContainer.setAttribute('class', 'legend-box-container');
-
-            const legendBox = document.createElement('div');
-            legendBox.setAttribute('class', 'legend-box');
-            legendBox.style.backgroundColor = item.color;
-
-            const title = document.createElement('p');
-            title.innerHTML = item.name;
-
-            legendBoxContainer.appendChild(legendBox);
-            legendBoxContainer.appendChild(title);
-
-            linearContainer.appendChild(legendBoxContainer);
-        }
+            d3.event.preventDefault();
+        })
     }
 
     hide() {
-        this._div.style('display', 'none');
-        this.shown = false;
+        this._div.style('visibility', 'hidden');
+        this.hidden = true;
     }
 
-    show(showLinearSolverNames, solverStyles) {
-        this.shown = true;
-        this._div.style('display', 'flex');
+    show() {
+        this._div.style('visibility', 'visible');
+        this.hidden = false;
     }
 
+    /**
+     * Wipe the current solvers legend area and populate with the other type.
+     * @param {Boolean} linear True to use linear solvers, false for non-linear.
+     */
     toggleSolvers(linear) {
-        const solversContainer = document.getElementById("linear-legend");
-        if (linear) {
-            solversContainer.innerHTML = '';
-            for (let i = 0; i < this.linearSolvers.length; i++) {
-                const item = this.linearSolvers[i];
+        const solversLegend = d3.select('#linear-legend')
+        solversLegend.html('');
 
-                const legendBoxContainer = document.createElement("div");
-                legendBoxContainer.setAttribute('class', 'legend-box-container');
+        const solvers = linear ? this.linearSolvers : this.nonLinearSolvers;
+        for (let item of solvers) this._addItem(item, solversLegend);
 
-                const legendBox = document.createElement('div');
-                legendBox.setAttribute('class', 'legend-box');
-                legendBox.style.backgroundColor = item.color;
-
-                const title = document.createElement('p');
-                title.innerHTML = item.name;
-
-                legendBoxContainer.appendChild(legendBox);
-                legendBoxContainer.appendChild(title);
-
-                solversContainer.appendChild(legendBoxContainer);
-            }
-        } else {
-            solversContainer.innerHTML = '';
-            for (let i = 0; i < this.nonLinearSolvers.length; i++) {
-                const item = this.nonLinearSolvers[i];
-
-                const legendBoxContainer = document.createElement("div");
-                legendBoxContainer.setAttribute('class', 'legend-box-container');
-
-                const legendBox = document.createElement('div');
-                legendBox.setAttribute('class', 'legend-box');
-                legendBox.style.backgroundColor = item.color;
-
-                const title = document.createElement('p');
-                title.innerHTML = item.name;
-
-                legendBoxContainer.appendChild(legendBox);
-                legendBoxContainer.appendChild(title);
-
-                solversContainer.appendChild(legendBoxContainer);
-            }
-        }
+        solversLegend.style('width', solversLegend.node().scrollWidth + 'px');
     }
-
 
     /**
      * If legend is shown, hide it; if it's hidden, show it.
@@ -247,10 +246,7 @@ class N2Legend {
      * @param {Object} solverStyles Solver names, types, and styles including color.
      */
     toggle(showLinearSolverNames, solverStyles) {
-        if (this.shown) {
-            this.hide();
-        } else this.show(showLinearSolverNames, solverStyles);
+        if (this.hidden) this.show();
+        else this.hide();
     }
-
-
 }

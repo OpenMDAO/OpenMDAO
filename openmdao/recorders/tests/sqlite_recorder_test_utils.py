@@ -62,8 +62,7 @@ def assertProblemDataRecorded(test, expected, tolerance):
             test.assertTrue(row_actual, 'Problem table does not contain the requested '
                             'case name: "{}"'.format(case))
 
-            counter, global_counter, case_name, timestamp, success, msg, outputs_text, derivatives \
-                = row_actual
+            counter, global_counter, case_name, timestamp, success, msg, inputs_text, outputs_text, residuals_text, derivatives = row_actual
 
             if f_version >= 3:
                 outputs_actual = deserialize(outputs_text, abs2meta)
@@ -103,7 +102,7 @@ def assertDriverIterDataRecorded(test, expected, tolerance, prefix=None):
         f_version, abs2meta = get_format_version_abs2meta(db_cur)
 
         # iterate through the cases
-        for coord, (t0, t1), outputs_expected, inputs_expected in expected:
+        for coord, (t0, t1), outputs_expected, inputs_expected, residuals_expected in expected:
             iter_coord = format_iteration_coordinate(coord, prefix=prefix)
             # from the database, get the actual data recorded
             db_cur.execute("SELECT * FROM driver_iterations WHERE "
@@ -116,11 +115,12 @@ def assertDriverIterDataRecorded(test, expected, tolerance, prefix=None):
                             'iteration coordinate: "{}"'.format(iter_coord))
 
             counter, global_counter, iteration_coordinate, timestamp, success, msg,\
-                inputs_text, outputs_text = row_actual
+                inputs_text, outputs_text, residuals_text = row_actual
 
             if f_version >= 3:
                 inputs_actual = deserialize(inputs_text, abs2meta)
                 outputs_actual = deserialize(outputs_text, abs2meta)
+                residuals_actual = deserialize(residuals_text, abs2meta)
             elif f_version in (1, 2):
                 inputs_actual = blob_to_array(inputs_text)
                 outputs_actual = blob_to_array(outputs_text)
@@ -133,7 +133,8 @@ def assertDriverIterDataRecorded(test, expected, tolerance, prefix=None):
 
             for vartype, actual, expected in (
                 ('outputs', outputs_actual, outputs_expected),
-                ('inputs', inputs_actual, inputs_expected)
+                ('inputs', inputs_actual, inputs_expected),
+                ('residuals', residuals_actual, residuals_expected)
             ):
 
                 if expected is None:
@@ -225,7 +226,7 @@ def assertProblemDerivDataRecorded(test, expected, tolerance, prefix=None):
                             'Problem case table does not contain the requested '
                             'case name: "{}"'.format(case_name))
 
-            counter, global_counter, case_name, timestamp, success, msg, outputs, totals_blob = \
+            counter, global_counter, case_name, timestamp, success, msg, inputs, outputs, residuals, totals_blob = \
                 row_actual
 
             totals_actual = blob_to_array(totals_blob)

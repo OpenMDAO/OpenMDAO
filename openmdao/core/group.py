@@ -78,7 +78,8 @@ class Group(System):
     _setup_procs_finished : bool
         Flag to check if setup_procs is complete
     _has_distrib_vars : bool
-        If True, this Group contains distributed variables.
+        If True, this Group contains distributed variables. Only used to determine if a parallel
+        group or distributed component is below a DirectSolver so that we can raise an exception.
     _raise_connection_errors : bool
         Flag indicating whether connection errors are raised as an Exception.
     """
@@ -741,7 +742,10 @@ class Group(System):
                                                        INT_DTYPE)
 
                 for ind, subsys in enumerate(self._subsystems_myproc):
-                    if isinstance(subsys, Component) and subsys.options['distributed']:
+                    if isinstance(subsys, Component):
+                        if subsys.options['distributed']:
+                            n_distrib_vars += 1
+                    elif subsys._has_distrib_vars or subsys._mpi_proc_allocator.parallel:
                         n_distrib_vars += 1
 
                     if vec_name not in subsys._rel_vec_names:

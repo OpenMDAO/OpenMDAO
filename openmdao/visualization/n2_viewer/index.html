@@ -1,4 +1,4 @@
-<div id="all_pt_n2_content_div">
+<div id="all_pt_n2_content_div" class="non-embedded-n2">
     <div id="ptN2ContentDivId">
         <!-- The Model -->
         {{help}}
@@ -6,7 +6,7 @@
         <!-- Toolbar -->
         <div>
             <div id="toolbarLoc">
-                <img src="../../assets/logo.png" id="company-logo" />
+                <img id="company-logo" alt="OpenMDAO" src="data:image/png;base64,{{logo_png}}"/>
                 <div class="searchbar-container" id="searchbar-container">
                     <button class="search-button" id="searchButtonId" title="Search">
                         <i class="fas icon-search"></i>
@@ -36,7 +36,7 @@
                             <i class="fas icon-show-connections" id="show-connections"></i>
                             <i class="fas icon-caret-right caret"></i>
                             <div class="toolbar-group-expandable" id="connections-expandable">
-                                <i class="fas icon-show-connections" id="show-connections"></i>
+                                <i class="fas icon-show-connections" id="show-connections-2"></i>
                                 <i class="fas icon-hide-connections" id="hide-connections"></i>
                                 <i class="fas icon-bezier-curve" id="show-all-connections"></i>
                             </div>
@@ -49,8 +49,8 @@
                             <i class="fas icon-text-height" id="text-slider-button"></i>
                             <i class="fas icon-caret-right caret"></i>
                             <div class="toolbar-group-expandable" id="text-width-expandable">
-                                <input type="range" min="8" max="14" value="10" class="slider" id="text-slider" />
-                                <p id="font-size-indicator">8 px</p>
+                                <input type="range" min="8" max="14" value="11" class="slider" id="text-slider" />
+                                <p id="font-size-indicator">11 px</p>
                             </div>
                         </div>
                         <div class="expandable">
@@ -79,13 +79,6 @@
                 <i class="fas icon-chevron-left hide-toolbar-button"></i>
             </div>
         </div>
-
-        <!-- <div style="display: none;">
-			{{toolbar}}
-		</div>
-		<div id="currentPathId" class="path_string" style="display:none"></div>
-		-->
-
         <div class="content-container">
             <div id="d3_content_div">
                 <!-- 2D Matrix Showing All Inputs/Outputs and Functions -->
@@ -147,11 +140,15 @@
                 <!-- Legend to show all symbols -->
                 <div class="legend" id="legend-div">
                     <div class="sys-var-container">
-                        <p class="legend-title">Systems & Variables</p>
+                        <div class="legend-title-container">
+                            <p class="legend-title">Systems &amp;&nbsp;Variables</p>
+                        </div>
                         <div id="sys-var-legend"></div>
                     </div>
                     <div class="n2-symbols-container">
-                        <p class="legend-title">N2 Symbols</p>
+                        <div class="legend-title-container">
+                            <p class="legend-title">N2<br/>Symbols</p>
+                        </div>
                         <div id="symbols-legend">
                             <div class="symbol">
                                 <div class="symbol-outer scalar">
@@ -174,14 +171,17 @@
                         </div>
                     </div>
                     <div class="linear-solvers-container">
-                        <p class="legend-title">Linear Solvers</p>
+                        <div class="legend-title-container">
+                            <p class="legend-title">Linear Solvers</p>
+                        </div>
                         <div id="linear-legend"></div>
                     </div>
                     <div class="draggable">
-                        <div class="circle-icon"></div>
-                        <div class="circle-icon"></div>
-                        <div class="circle-icon"></div>
+                        <div id='draggable-legend-dots'><p>&#42889;&#42889;&#42889;&#42889;&#42889;&#42889;</p></div>
+                        <div class="icon-key"></div>
+                        <div id='draggable-legend-dots'><p>&#42889;&#42889;&#42889;&#42889;&#42889;&#42889;</p></div>
                     </div>
+                    <div id="close-legend"><p>&#x2717</p></div>
                 </div>
             </div>
         </div>
@@ -198,5 +198,5 @@
 {d3_lib} {awesomplete_lib} {vk_beautify_lib} {{model_data}} {modal_lib}
 {utils_lib} {symboltype_lib} {n2treenode_lib} {modeldata_lib} {n2style_lib}
 {n2layout_lib} {n2matrixcell_lib} {n2legend_lib} {n2matrix_lib} {n2arrow_lib}
-{n2search_lib} {n2diagram_lib} {n2userinterface_lib} {defaults_lib} {ptn2_lib}
-{toolbar_lib}
+{n2search_lib} {n2toolbar_lib} {n2diagram_lib}
+{n2userinterface_lib} {defaults_lib} {ptn2_lib}

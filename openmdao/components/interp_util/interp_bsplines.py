@@ -45,7 +45,7 @@ class InterpBSplines(InterpAlgorithm):
         **kwargs : dict
             Interpolator-specific options to pass onward.
         """
-        super(InterpBSplines, self).__init__(grid, values, interp)
+        super(InterpBSplines, self).__init__(grid, values, interp, **kwargs)
 
         self._vectorized = True
         self.k = self.options['order'] + 1

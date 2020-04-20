@@ -151,6 +151,12 @@ class Driver(object):
                                             'level')
         self.recording_options.declare('record_inputs', types=bool, default=True,
                                        desc='Set to True to record inputs at the driver level')
+        self.recording_options.declare('record_outputs', types=bool, default=True,
+                                       desc='Set True to record outputs at the '
+                                            'driver level.')
+        self.recording_options.declare('record_residuals', types=bool, default=False,
+                                       desc='Set True to record residuals at the '
+                                            'driver level.')
 
         # What the driver supports.
         self.supports = OptionsDictionary(parent_name=type(self).__name__)
@@ -351,45 +357,51 @@ class Driver(object):
         # includes and excludes for outputs are specified using promoted names
         abs2prom = model._var_allprocs_abs2prom['output']
 
-        allvars = []
-        # if desvars, etc. are not wanted, we need to exclude them from the outputs even if
-        # they match the includes list.
-        skip = set()
+        # 1. If record_outputs is True, get the set of outputs
+        # 2. Filter those using includes and excludes to get the baseline set of variables to record
+        # 3. Add or remove from that set any desvars, objs, and cons based on the recording
+        #    options of those
 
+        # includes and excludes for outputs are specified using _promoted_ names
+        # vectors are keyed on absolute name, discretes on relative/promoted name
+        myinputs = myoutputs = myresiduals = []
+
+        if recording_options['record_outputs']:
+            myoutputs = sorted([n for n, prom in abs2prom.items() if check_path(prom, incl, excl)])
+
+            views = model._outputs._views
+
+            if model._var_discrete['output']:
+                # if we have discrete outputs then residual name set doesn't match output one
+                if recording_options['record_residuals']:
+                    myresiduals = [n for n in myoutputs if n in views]
+            elif recording_options['record_residuals']:
+                myresiduals = myoutputs
+
+        elif recording_options['record_residuals']:
+            myresiduals = [n for n in model._residuals._views
+                           if check_path(abs2prom[n], incl, excl)]
+
+        myoutputs = set(myoutputs)
         if recording_options['record_desvars']:
-            allvars.extend(self._designvars)
-        else:
-            skip.update(self._designvars)
+            myoutputs.update(self._designvars)
         if recording_options['record_objectives'] or recording_options['record_responses']:
-            allvars.extend(self._objs)
-        else:
-            skip.update(self._objs)
+            myoutputs.update(self._objs)
         if recording_options['record_constraints'] or recording_options['record_responses']:
-            allvars.extend(self._cons)
-        else:
-            skip.update(self._cons)
-
-        vars2record = {
-            'output': [n for n in allvars
-                       if n in abs2prom and check_path(abs2prom[n], incl, excl, True)]
-        }
+            myoutputs.update(self._cons)
 
         # inputs (if in options). inputs use _absolute_ names for includes/excludes
         if 'record_inputs' in recording_options:
             if recording_options['record_inputs']:
                 # sort the results since _var_allprocs_abs2prom isn't ordered
-                vars2record['input'] = sorted([n for n in model._var_allprocs_abs2prom['input']
-                                               if check_path(n, incl, excl)])
-            else:
-                vars2record['input'] = []
+                myinputs = sorted([n for n in model._var_allprocs_abs2prom['input']
+                                  if check_path(n, incl, excl)])
 
-        if incl:
-            # loop over abs2prom (which includes both continuous and discrete outputs) since
-            # the order doesn't matter (we're sorting it at the end).
-            vars2record['output'].extend(n for n, prom in abs2prom.items() if n not in skip and
-                                         check_path(prom, incl, excl))
-            # remove dups and make sure order is the same on all procs
-            vars2record['output'] = sorted(set(vars2record['output']))
+        vars2record = {
+            'input': myinputs,
+            'output': list(myoutputs),
+            'residual': myresiduals
+        }
 
         return vars2record
 
@@ -1061,20 +1073,30 @@ def record_iteration(requester, prob, case_name):
     filt = requester._filtered_vars_to_record
     model = prob.model
 
+    inputs, outputs, residuals = model.get_nonlinear_vectors()
+
     parallel = requester._rec_mgr._check_parallel() if model.comm.size > 1 else False
 
-    outs = model._retrieve_data_of_kind(filt, 'output', 'nonlinear', parallel)
-    ins = model._retrieve_data_of_kind(filt, 'input', 'nonlinear', parallel)
+    discrete_inputs = model._discrete_inputs
+    discrete_outputs = model._discrete_outputs
 
-    data = {
-        'output': outs,
-        'input': ins
-    }
+    data = {'input': {}, 'output': {}, 'residual': {}}
+    if requester.recording_options['record_inputs'] and (inputs._names or len(discrete_inputs) > 0):
+        data['input'] = model._retrieve_data_of_kind(filt, 'input', 'nonlinear', parallel)
+
+    if requester.recording_options['record_outputs'] and \
+            (outputs._names or len(discrete_outputs) > 0):
+        data['output'] = model._retrieve_data_of_kind(filt, 'output', 'nonlinear', parallel)
+
+    if requester.recording_options['record_residuals'] and residuals._names:
+        data['residual'] = model._retrieve_data_of_kind(filt, 'residual', 'nonlinear', parallel)
+
     from openmdao.core.problem import Problem
-    if isinstance(requester, Problem) and requester.recording_options['record_derivatives'] and \
-            prob.driver._designvars and prob.driver._responses:
-        totals = requester.compute_totals(return_format='flat_dict_structured_key')
-        data['totals'] = totals
+    if isinstance(requester, Problem):
+        if requester.recording_options['record_derivatives'] and \
+                prob.driver._designvars and prob.driver._responses:
+            totals = requester.compute_totals(return_format='flat_dict_structured_key')
+            data['totals'] = totals
 
     requester._rec_mgr.record_iteration(requester, data,
                                         requester._get_recorder_metadata(case_name))
