@@ -4,7 +4,7 @@
 Adding Subsystems to a Group and Promoting Variables
 ****************************************************
 
-To add a Component or another Group to a Group, use the add_subsystem method.
+To add a Component or another Group to a Group, use the :code:`add_subsystem` method.
 
 .. automethod:: openmdao.core.group.Group.add_subsystem
     :noindex:
@@ -75,14 +75,29 @@ Promote with an alias to connect an input to a source
     :layout: interleave
 
 
-Promote the input and output from the configure function
----------------------------------------------------------
+**************************************************
+Promote Inputs and Outputs After Adding Subsystems
+**************************************************
+
+It is also possible to promote inputs and outputs after a subsystem has been added
+to a Group using the :code:`promotes` method.
+
+.. automethod:: openmdao.core.group.Group.promotes
+    :noindex:
+
+Usage
+*****
+
+Promote any subsystem inputs and outputs from the configure function
+--------------------------------------------------------------------
 
 .. embed-code::
     openmdao.core.tests.test_group.TestGroup.test_promotes_any
     :layout: interleave
 
-This functionality can also be achieved by calling `inputs` and `outputs` individually.
+
+Promote specific inputs and outputs from the configure function
+---------------------------------------------------------------
 
 .. embed-code::
     openmdao.core.tests.test_group.TestGroup.test_promotes_inputs_and_outputs
