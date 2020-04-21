@@ -53,6 +53,10 @@ class LinesearchSolver(NonlinearSolver):
     _do_subsolve : bool
         Flag used by parent solver to tell the line search whether to solve subsystems while
         backtracking.
+    _lower_bounds : ndarray or None
+        Lower bounds array.
+    _upper_bounds : ndarray or None
+        Upper bounds array.
     """
 
     def __init__(self, **kwargs):
@@ -67,6 +71,8 @@ class LinesearchSolver(NonlinearSolver):
         super(LinesearchSolver, self).__init__(**kwargs)
         # Parent solver sets this to control whether to solve subsystems.
         self._do_subsolve = False
+        self._lower_bounds = None
+        self._upper_bounds = None
 
     def _declare_options(self):
         """
@@ -99,9 +105,6 @@ class LinesearchSolver(NonlinearSolver):
         """
         super(LinesearchSolver, self)._setup_solvers(system, depth)
         if system._has_bounds:
-            self._lower_bounds = lower = np.full(len(system._outputs), -np.inf)
-            self._upper_bounds = upper = np.full(len(system._outputs), np.inf)
-
             abs2meta = system._var_abs2meta
             start = end = 0
             for abs_name, val in system._outputs._abs_val_iter():
@@ -123,14 +126,18 @@ class LinesearchSolver(NonlinearSolver):
                     ref = ref.flatten()
 
                 if var_lower is not None:
+                    if self._lower_bounds is None:
+                        self._lower_bounds = np.full(len(system._outputs), -np.inf)
                     if not np.isscalar(var_lower):
                         var_lower = var_lower.flatten()
-                    lower[start:end] = (var_lower - ref0) / (ref - ref0)
+                    self._lower_bounds[start:end] = (var_lower - ref0) / (ref - ref0)
 
                 if var_upper is not None:
+                    if self._upper_bounds is None:
+                        self._upper_bounds = np.full(len(system._outputs), np.inf)
                     if not np.isscalar(var_upper):
                         var_upper = var_upper.flatten()
-                    upper[start:end] = (var_upper - ref0) / (ref - ref0)
+                    self._upper_bounds[start:end] = (var_upper - ref0) / (ref - ref0)
 
                 start = end
         else:
