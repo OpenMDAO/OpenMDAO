@@ -216,7 +216,7 @@ class DistribCompWithDerivs(om.ExplicitComponent):
         # don't set src_indices on the input and just use default behavior
         self.add_input('invec', np.ones(sizes[rank], float))
         self.add_output('outvec', np.ones(sizes[rank], float))
-        self.declare_partials('outvec', 'invec', rows=np.arange(0, sizes[rank]), 
+        self.declare_partials('outvec', 'invec', rows=np.arange(0, sizes[rank]),
                                                  cols=np.arange(0, sizes[rank]))
 
 class DistribInputDistribOutputDiscreteComp(DistribInputDistribOutputComp):
@@ -340,10 +340,10 @@ class NOMPITests(unittest.TestCase):
         self.assertTrue(all(C2._outputs['outvec'] == np.array(range(size, 0, -1), float)*4))
 
 
-@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+#@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class MPITests(unittest.TestCase):
 
-    N_PROCS = 2
+    #N_PROCS = 2
 
     def test_distrib_full_in_out(self):
         size = 11
@@ -386,7 +386,7 @@ class MPITests(unittest.TestCase):
         # this used to fail (bug #1279)
         cpd = p.check_partials(out_stream=None)
         for (of, wrt) in cpd['C2']:
-            np.testing.assert_almost_equal(cpd['C2'][of, wrt]['rel error'], 0.0, decimal=5)
+            np.testing.assert_almost_equal(cpd['C2'][of, wrt]['rel error'][0], 0.0, decimal=5)
 
     def test_list_inputs_outputs(self):
         size = 11
