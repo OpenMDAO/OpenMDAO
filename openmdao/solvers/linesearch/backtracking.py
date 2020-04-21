@@ -121,22 +121,22 @@ class LinesearchSolver(NonlinearSolver):
                 ref = meta['ref']
 
                 if not np.isscalar(ref0):
-                    ref0 = ref0.flatten()
+                    ref0 = ref0.ravel()
                 if not np.isscalar(ref):
-                    ref = ref.flatten()
+                    ref = ref.ravel()
 
                 if var_lower is not None:
                     if self._lower_bounds is None:
                         self._lower_bounds = np.full(len(system._outputs), -np.inf)
                     if not np.isscalar(var_lower):
-                        var_lower = var_lower.flatten()
+                        var_lower = var_lower.ravel()
                     self._lower_bounds[start:end] = (var_lower - ref0) / (ref - ref0)
 
                 if var_upper is not None:
                     if self._upper_bounds is None:
                         self._upper_bounds = np.full(len(system._outputs), np.inf)
                     if not np.isscalar(var_upper):
-                        var_upper = var_upper.flatten()
+                        var_upper = var_upper.ravel()
                     self._upper_bounds[start:end] = (var_upper - ref0) / (ref - ref0)
 
                 start = end
