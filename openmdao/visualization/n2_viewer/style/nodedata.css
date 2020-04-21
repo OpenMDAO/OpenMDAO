@@ -36,6 +36,7 @@
     border-bottom: 1px solid #a0a0a0;
     border-right: 1px solid #a0a0a0;
     padding: 3px;
+    white-space: nowrap;
 }
 
 #node-info-container tbody td {
@@ -47,12 +48,17 @@
     border-left: 0;
     border-bottom: 1px solid #a0a0a0;
     padding: 3px;
+    white-space: nowrap;
 }
 
 #node-info-container tfoot th {
     background-color: #42926b;
     padding: 2px;
     font-size: 11pt;
+}
+
+.caps {
+    text-transform: capitalize;
 }
 
 .info-header {

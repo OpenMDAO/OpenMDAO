@@ -349,7 +349,7 @@ class N2Diagram {
             });
 
         // Create a new SVG group for each node in zoomedNodes
-        let nodeEnter = selection.enter().append("svg:g")
+        let nodeEnter = selection.enter().append("g")
             .attr("class", function (d) {
                 return "partition_group " + self.style.getNodeClass(d);
             })
@@ -366,34 +366,15 @@ class N2Diagram {
             })
             .on("mouseover", function (d) {
                 self.ui.nodeInfoBox.update(d3.event, d, d3.select(this).select('rect').style('fill'));
-
-                if (self.model.abs2prom != undefined) {
-                    if (d.isParam()) {
-                        return self.dom.toolTip.text(
-                            self.model.abs2prom.input[d.absPathName])
-                            .style("visibility", "visible");
-                    }
-                    if (d.isUnknown()) {
-                        return self.dom.toolTip.text(
-                            self.model.abs2prom.output[d.absPathName])
-                            .style("visibility", "visible");
-                    }
-                }
             })
             .on("mouseleave", function (d) {
                 self.ui.nodeInfoBox.clear();
-                if (self.model.abs2prom != undefined) {
-                    return self.dom.toolTip.style("visibility", "hidden");
-                }
             })
             .on("mousemove", function () {
-                if (self.model.abs2prom != undefined) {
-                    return self.dom.toolTip.style("top", (d3.event.pageY - 30) + "px")
-                        .style("left", (d3.event.pageX + 5) + "px");
-                }
+                self.ui.nodeInfoBox.move(d3.event);
             });
 
-        nodeEnter.append("svg:rect")
+        nodeEnter.append("rect")
             .attr("width", function (d) {
                 return d.prevDims.width * self.prevTransitCoords.model.x;
             })
@@ -404,7 +385,7 @@ class N2Diagram {
                 return d.absPathName.replace(/\./g, '_');
             });
 
-        nodeEnter.append("svg:text")
+        nodeEnter.append("text")
             .attr("dy", ".35em")
             .attr("transform", function (d) {
                 let anchorX = d.prevDims.width * self.prevTransitCoords.model.x -
