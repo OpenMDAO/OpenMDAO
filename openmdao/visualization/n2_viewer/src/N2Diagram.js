@@ -46,7 +46,8 @@ class N2Diagram {
             'svg': d3.select("#svgId"),
             'svgStyle': document.createElement("style"),
             'toolTip': d3.select(".tool-tip"),
-            'arrowMarker': d3.select("#arrow")
+            'arrowMarker': d3.select("#arrow"),
+            'nodeInfo': d3.select('#node-data')
         };
 
         // Append the new style section.
@@ -204,11 +205,11 @@ class N2Diagram {
 
         this.dom.n2Groups = {};
         for (let gName of ['elements', 'gridlines', 'componentBoxes',
-                'dots', 'highlights', 'arrows'
-            ]) {
+            'dots', 'highlights', 'arrows'
+        ]) {
             this.dom.n2Groups[gName] =
                 this.dom.n2InnerGroup.append('g')
-                .attr('id', 'n2' + gName);
+                    .attr('id', 'n2' + gName);
         };
 
         for (let clippedGrp of ['elements', 'gridlines', 'componentBoxes', 'dots']) {
@@ -255,7 +256,7 @@ class N2Diagram {
         this.scales.model.x
             .domain([this.zoomedElement.dims.x, 1])
             .range([this.zoomedElement.dims.x ? this.layout.size.parentNodeWidth : 0,
-                this.layout.size.partitionTree.width
+            this.layout.size.partitionTree.width
             ]);
         this.scales.model.y
             .domain([this.zoomedElement.dims.y, this.zoomedElement.dims.y +
@@ -276,7 +277,7 @@ class N2Diagram {
             ]);
         this.scales.solver.y
             .domain([this.zoomedElement.solverDims.y,
-                this.zoomedElement.solverDims.y + this.zoomedElement.solverDims.height
+            this.zoomedElement.solverDims.y + this.zoomedElement.solverDims.height
             ])
             .range([0, this.layout.size.solverTree.height]);
 
@@ -321,9 +322,9 @@ class N2Diagram {
             this.dom.pSolverTreeGroup
                 .attr("height", innerDims.height)
                 .attr("transform", "translate(" + (this.dims.size.partitionTree.width +
-                        innerDims.margin +
-                        innerDims.height +
-                        innerDims.margin) + " " +
+                    innerDims.margin +
+                    innerDims.height +
+                    innerDims.margin) + " " +
                     innerDims.margin + ")");
 
             let offgridHeight = this.dims.size.font + 2;
@@ -331,17 +332,6 @@ class N2Diagram {
                 .attr("transform", "translate(" + innerDims.margin + " 0)")
                 .attr("width", innerDims.height)
                 .attr("height", offgridHeight);
-
-            /*
-            this.dom.n2Groups.offgrid.top
-                .append("text")
-                .attr("x", 0).attr("y", 0)
-                // .attr("transform", "translate(0 0)")
-                //.attr("width", innerDims.height)
-                //.attr("height", offgridHeight)
-                //.style("fill", "black")
-                .text("HOWDY.HOWDY.HOWDY.HOWDY");
-                */
 
             this.dom.n2Groups.offgrid.bottom
                 .attr("transform", "translate(0 " + innerDims.height + offgridHeight + ")")
@@ -354,46 +344,49 @@ class N2Diagram {
         let self = this; // For callbacks that change "this". Alternative to using .bind().
 
         let selection = this.dom.pTreeGroup.selectAll(".partition_group")
-            .data(this.layout.zoomedNodes, function(node) {
+            .data(this.layout.zoomedNodes, function (node) {
                 return node.id;
             });
 
         // Create a new SVG group for each node in zoomedNodes
         let nodeEnter = selection.enter().append("svg:g")
-            .attr("class", function(d) {
+            .attr("class", function (d) {
                 return "partition_group " + self.style.getNodeClass(d);
             })
-            .attr("transform", function(d) {
+            .attr("transform", function (d) {
                 return "translate(" +
                     self.prevScales.model.x(d.prevDims.x) + " " +
                     self.prevScales.model.y(d.prevDims.y) + ")";
             })
-            .on("click", function(d) {
+            .on("click", function (d) {
                 self.ui.leftClick(d);
             })
-            .on("contextmenu", function(d) {
+            .on("contextmenu", function (d) {
                 self.ui.rightClick(d, this);
             })
-            .on("mouseover", function(d) {
+            .on("mouseover", function (d) {
+                self.ui.nodeInfoBox.update(d3.event, d, d3.select(this).select('rect').style('fill'));
+
                 if (self.model.abs2prom != undefined) {
                     if (d.isParam()) {
                         return self.dom.toolTip.text(
-                                self.model.abs2prom.input[d.absPathName])
+                            self.model.abs2prom.input[d.absPathName])
                             .style("visibility", "visible");
                     }
                     if (d.isUnknown()) {
                         return self.dom.toolTip.text(
-                                self.model.abs2prom.output[d.absPathName])
+                            self.model.abs2prom.output[d.absPathName])
                             .style("visibility", "visible");
                     }
                 }
             })
-            .on("mouseleave", function(d) {
+            .on("mouseleave", function (d) {
+                self.ui.nodeInfoBox.clear();
                 if (self.model.abs2prom != undefined) {
                     return self.dom.toolTip.style("visibility", "hidden");
                 }
             })
-            .on("mousemove", function() {
+            .on("mousemove", function () {
                 if (self.model.abs2prom != undefined) {
                     return self.dom.toolTip.style("top", (d3.event.pageY - 30) + "px")
                         .style("left", (d3.event.pageX + 5) + "px");
@@ -401,25 +394,25 @@ class N2Diagram {
             });
 
         nodeEnter.append("svg:rect")
-            .attr("width", function(d) {
+            .attr("width", function (d) {
                 return d.prevDims.width * self.prevTransitCoords.model.x;
             })
-            .attr("height", function(d) {
+            .attr("height", function (d) {
                 return d.prevDims.height * self.prevTransitCoords.model.y;
             })
-            .attr("id", function(d) {
+            .attr("id", function (d) {
                 return d.absPathName.replace(/\./g, '_');
             });
 
         nodeEnter.append("svg:text")
             .attr("dy", ".35em")
-            .attr("transform", function(d) {
+            .attr("transform", function (d) {
                 let anchorX = d.prevDims.width * self.prevTransitCoords.model.x -
                     self.layout.size.rightTextMargin;
                 return "translate(" + anchorX + " " + d.prevDims.height *
                     self.prevTransitCoords.model.y / 2 + ")";
             })
-            .style("opacity", function(d) {
+            .style("opacity", function (d) {
                 if (d.depth < self.zoomedElement.depth) return 0;
                 return d.textOpacity;
             })
@@ -440,32 +433,32 @@ class N2Diagram {
 
         let nodeUpdate = d3Refs.nodeEnter.merge(d3Refs.selection)
             .transition(sharedTransition)
-            .attr("class", function(d) {
+            .attr("class", function (d) {
                 return "partition_group " + self.style.getNodeClass(d);
             })
-            .attr("transform", function(d) {
+            .attr("transform", function (d) {
                 return "translate(" + self.scales.model.x(d.dims.x) + " " +
                     self.scales.model.y(d.dims.y) + ")";
             });
 
         nodeUpdate.select("rect")
-            .attr("width", function(d) {
+            .attr("width", function (d) {
                 return d.dims.width * self.transitCoords.model.x;
             })
-            .attr("height", function(d) {
+            .attr("height", function (d) {
                 return d.dims.height * self.transitCoords.model.y;
             })
             .attr('rx', 12)
             .attr('ry', 12);
 
         nodeUpdate.select("text")
-            .attr("transform", function(d) {
+            .attr("transform", function (d) {
                 let anchorX = d.dims.width * self.transitCoords.model.x -
                     self.layout.size.rightTextMargin;
                 return "translate(" + anchorX + " " + d.dims.height *
                     self.transitCoords.model.y / 2 + ")";
             })
-            .style("opacity", function(d) {
+            .style("opacity", function (d) {
                 if (d.depth < self.zoomedElement.depth) return 0;
                 return d.textOpacity;
             })
@@ -487,22 +480,22 @@ class N2Diagram {
 
         // Transition exiting nodes to the parent's new position.
         let nodeExit = selection.exit().transition(sharedTransition)
-            .attr("transform", function(d) {
+            .attr("transform", function (d) {
                 return "translate(" + self.scales.model.x(d.dims.x) + "," +
                     self.scales.model.y(d.dims.y) + ")";
             })
             .remove();
 
         nodeExit.select("rect")
-            .attr("width", function(d) {
+            .attr("width", function (d) {
                 return d.dims.width * self.transitCoords.model.x;
             })
-            .attr("height", function(d) {
+            .attr("height", function (d) {
                 return d.dims.height * self.transitCoords.model.y;
             });
 
         nodeExit.select("text")
-            .attr("transform", function(d) {
+            .attr("transform", function (d) {
                 let anchorX = d.dims.width * self.transitCoords.model.x -
                     self.layout.size.rightTextMargin;
                 return "translate(" + anchorX + "," + d.dims.height *
@@ -515,32 +508,34 @@ class N2Diagram {
         let self = this; // For callbacks that change "this". Alternative to using .bind().
 
         let selection = self.dom.pSolverTreeGroup.selectAll(".solver_group")
-            .data(self.layout.zoomedSolverNodes, function(d) {
+            .data(self.layout.zoomedSolverNodes, function (d) {
                 return d.id;
             });
 
         let nodeEnter = selection.enter().append("svg:g")
-            .attr("class", function(d) {
+            .attr("class", function (d) {
                 let solver_class = self.style.getSolverClass(self.showLinearSolverNames, {
                     'linear': d.linear_solver,
                     'nonLinear': d.nonlinear_solver
                 });
                 return solver_class + " solver_group " + self.style.getNodeClass(d);
             })
-            .attr("transform", function(d) {
+            .attr("transform", function (d) {
                 let x = 1.0 - d.prevSolverDims.x - d.prevSolverDims.width;
                 // The magic for reversing the blocks on the right side
                 // The solver tree goes from the root on the right and expands to the left
                 return "translate(" + self.prevScales.solver.x(x) + "," +
                     self.prevScales.solver.y(d.prevSolverDims.y) + ")";
             })
-            .on("click", function(d) {
+            .on("click", function (d) {
                 self.ui.leftClick(d);
             })
-            .on("contextmenu", function(d) {
+            .on("contextmenu", function (d) {
                 self.ui.rightClick(d, this);
             })
-            .on("mouseover", function(d) {
+            .on("mouseover", function (d) {
+                self.ui.nodeInfoBox.update(d3.event, d, d3.select(this).select('rect').style('fill'))
+
                 if (self.model.abs2prom != undefined) {
                     if (d.isParam()) {
                         return self.dom.toolTip.text(self.model.abs2prom.input[d.absPathName])
@@ -552,38 +547,40 @@ class N2Diagram {
                     }
                 }
             })
-            .on("mouseleave", function(d) {
+            .on("mouseleave", function (d) {
+                self.ui.nodeInfoBox.clear();
+
                 if (self.model.abs2prom != undefined) {
-                    return self.dom.toolTip.style("visibility", "hidden");
+                    self.dom.toolTip.style("visibility", "hidden");
                 }
             })
-            .on("mousemove", function() {
+            .on("mousemove", function () {
                 if (self.model.abs2prom != undefined) {
-                    return self.dom.toolTip.style("top", (d3.event.pageY - 30) + "px")
+                    self.dom.toolTip.style("top", (d3.event.pageY - 30) + "px")
                         .style("left", (d3.event.pageX + 5) + "px");
                 }
             });
 
         nodeEnter.append("svg:rect")
-            .attr("width", function(d) {
+            .attr("width", function (d) {
                 return d.prevSolverDims.width * self.prevTransitCoords.solver.x;
             })
-            .attr("height", function(d) {
+            .attr("height", function (d) {
                 return d.prevSolverDims.height * self.prevTransitCoords.solver.y;
             })
-            .attr("id", function(d) {
+            .attr("id", function (d) {
                 return d.absPathName.replace(/\./g, '_');
             });
 
         nodeEnter.append("svg:text")
             .attr("dy", ".35em")
-            .attr("transform", function(d) {
+            .attr("transform", function (d) {
                 let anchorX = d.prevSolverDims.width * self.prevTransitCoords.solver.x -
                     self.layout.size.rightTextMargin;
                 return "translate(" + anchorX + "," + d.prevSolverDims.height *
                     self.prevTransitCoords.solver.y / 2 + ")";
             })
-            .style("opacity", function(d) {
+            .style("opacity", function (d) {
                 if (d.depth < self.zoomedElement.depth) return 0;
                 return d.textOpacity;
             })
@@ -604,14 +601,14 @@ class N2Diagram {
 
         let nodeUpdate = d3Refs.nodeEnter.merge(d3Refs.selection)
             .transition(sharedTransition)
-            .attr("class", function(d) {
+            .attr("class", function (d) {
                 let solver_class = self.style.getSolverClass(self.showLinearSolverNames, {
                     'linear': d.linear_solver,
                     'nonLinear': d.nonlinear_solver
                 });
                 return solver_class + " solver_group " + self.style.getNodeClass(d);
             })
-            .attr("transform", function(d) {
+            .attr("transform", function (d) {
                 let x = 1.0 - d.solverDims.x - d.solverDims.width;
                 // The magic for reversing the blocks on the right side
 
@@ -622,23 +619,23 @@ class N2Diagram {
 
 
         nodeUpdate.select("rect")
-            .attr("width", function(d) {
+            .attr("width", function (d) {
                 return d.solverDims.width * self.transitCoords.solver.x;
             })
-            .attr("height", function(d) {
+            .attr("height", function (d) {
                 return d.solverDims.height * self.transitCoords.solver.y;
             })
             .attr('rx', 12)
             .attr('ry', 12);
 
         nodeUpdate.select("text")
-            .attr("transform", function(d) {
+            .attr("transform", function (d) {
                 let anchorX = d.solverDims.width * self.transitCoords.solver.x -
                     self.layout.size.rightTextMargin;
                 return "translate(" + anchorX + "," + d.solverDims.height *
                     self.transitCoords.solver.y / 2 + ")";
             })
-            .style("opacity", function(d) {
+            .style("opacity", function (d) {
                 if (d.depth < self.zoomedElement.depth) return 0;
                 return d.textOpacity;
             })
@@ -651,22 +648,22 @@ class N2Diagram {
         // Transition exiting nodes to the parent's new position.
         let nodeExit = selection.exit()
             .transition(sharedTransition)
-            .attr("transform", function(d) {
+            .attr("transform", function (d) {
                 return "translate(" + self.scales.solver.x(d.solverDims.x) + "," +
                     self.scales.solver.y(d.solverDims.y) + ")";
             })
             .remove();
 
         nodeExit.select("rect")
-            .attr("width", function(d) {
+            .attr("width", function (d) {
                 return d.solverDims.width * self.transitCoords.solver.x;
             })
-            .attr("height", function(d) {
+            .attr("height", function (d) {
                 return d.solverDims.height * self.transitCoords.solver.y;
             });
 
         nodeExit.select("text")
-            .attr("transform", function(d) {
+            .attr("transform", function (d) {
                 let anchorX = d.solverDims.width * self.transitCoords.solver.x -
                     self.layout.size.rightTextMargin;
                 return "translate(" + anchorX + "," + d.solverDims.height *
@@ -684,17 +681,11 @@ class N2Diagram {
             const arrow = this.arrowCache[i];
             this.mouseOverOnDiagonal(arrow.cell);
             arrow.element.attr('class', arrow.className);
-
-
-            // this.dom.n2OuterGroup
-            //     .selectAll("path.n2_hover_elements, circle.n2_hover_elements")
-            //     .attr("class", arrow.newClassName);
         };
 
     }
 
     showAllArrows() {
-
         for (let i = 0; i < this.matrix.visibleCells.length; i++) {
             const cell = this.matrix.visibleCells[i];
             if (cell.renderer.color !== "black") {
@@ -789,8 +780,10 @@ class N2Diagram {
      * @param {N2MatrixCell} cell The cell the event occured on.
      */
     mouseOverOnDiagonal(cell) {
-        if (this.matrix.cellExists(cell))
+        if (this.matrix.cellExists(cell)) {
             this.matrix.mouseOverOnDiagonal(cell);
+            this.ui.nodeInfoBox.update(d3.event, cell.obj, cell.color());
+        }
     }
 
     /**
@@ -798,8 +791,9 @@ class N2Diagram {
      * rather than setting one up that points directly to a specific matrix.
      */
     mouseOverOffDiagonal(cell) {
-        if (this.matrix.cellExists(cell))
+        if (this.matrix.cellExists(cell)) {
             this.matrix.mouseOverOffDiagonal(cell);
+        }
     }
 
     /** When the mouse leaves a cell, remove all temporary arrows. */
@@ -807,7 +801,9 @@ class N2Diagram {
         this.dom.n2OuterGroup.selectAll(".n2_hover_elements").remove();
         d3.selectAll("div.offgrid")
             .style("visibility", "hidden")
-            .node().innerHTML = '';
+            .html('');
+
+        this.ui.nodeInfoBox.clear();
     }
 
     /**
@@ -816,8 +812,6 @@ class N2Diagram {
      * @param {N2MatrixCell} cell The cell the event occured on.
      */
     mouseClick(cell) {
-        this.setActiveNode(cell);
-
         let newClassName = "n2_hover_elements_" + cell.row + "_" + cell.col;
         let selection = this.dom.n2OuterGroup.selectAll("." + newClassName);
         if (selection.size() > 0) {
@@ -840,21 +834,8 @@ class N2Diagram {
         }
     }
 
-    setActiveNode(cell) {
-        const dataContainer = d3.select("#node-data");
-        const nodeName = dataContainer.select("#node-name");
-        const nodePath = dataContainer.select("#node-path");
-        const nodeType = dataContainer.select("#node-type");
-
-        const {
-            name,
-            absPathName,
-            type
-        } = cell.obj;
-
-        nodeName.html(name);
-        nodePath.html(absPathName);
-        nodeType.html(type);
+    clearActiveNode() {
+        this.dom.nodeInfo.html('');
     }
 
     mouseClickAll(cell) {
