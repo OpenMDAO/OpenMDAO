@@ -345,11 +345,17 @@ class ApproximationScheme(object):
             J = tmpJ[wrt]
             full_idxs = J['loc_outvec_idxs']
             out_slices = tmpJ['@out_slices']
+
+            if J['vector'] is not None:
+                app_data = self.apply_directional(data, J['vector'])
+            else:
+                app_data = data
+
             for i_count, idxs in enumerate(col_idxs):
                 if fd_count % num_par_fd == system._par_fd_id:
                     # run the finite difference
                     result = self._run_point(system, ((idx_info[0][0], idxs),),
-                                             data, results_array, total)
+                                             app_data, results_array, total)
 
                     if is_parallel:
                         for of, (oview, out_idxs, _, _) in J['ofs'].items():
@@ -412,7 +418,8 @@ class ApproximationScheme(object):
         Jcolored = None  # clean up memory
 
         for wrt, _, _, tmpJ, _, _ in approx_groups:
-            ofs = tmpJ[wrt]['ofs']
+            J = tmpJ[wrt]
+            ofs = J['ofs']
             for of in ofs:
                 key = (of, wrt)
                 oview, _, rows_reduced, cols_reduced = ofs[of]
@@ -420,7 +427,7 @@ class ApproximationScheme(object):
                     for i, result in results[key]:
                         oview[:, i] = result
 
-                if mult != 1.0:
+                if J['vector'] is not None or mult != 1.0:
                     oview *= mult
 
                 if uses_voi_indices:
@@ -506,7 +513,8 @@ def _get_wrt_subjacs(system, approxs):
         if 'rows' in options and options['rows'] is not None:
             nondense[key] = options
         if wrt not in J:
-            J[wrt] = {'ofs': set(), 'tot_rows': 0, 'directional': options['directional']}
+            J[wrt] = {'ofs': set(), 'tot_rows': 0, 'directional': options['directional'],
+                      'vector': options['vector']}
 
         tmpJ = None
         if of not in ofdict and (approx_of is None or (approx_of and of in approx_of)):

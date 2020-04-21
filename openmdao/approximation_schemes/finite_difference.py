@@ -95,7 +95,7 @@ class FiniteDifference(ApproximationScheme):
         super(FiniteDifference, self).__init__()
         self._starting_ins = self._starting_outs = self._results_tmp = None
 
-    def add_approximation(self, abs_key, system, kwargs):
+    def add_approximation(self, abs_key, system, kwargs, vector=None):
         """
         Use this approximation scheme to approximate the derivative d(of)/d(wrt).
 
@@ -107,6 +107,8 @@ class FiniteDifference(ApproximationScheme):
             Containing System.
         kwargs : dict
             Additional keyword arguments, to be interpreted by sub-classes.
+        vector : ndarray or None
+            Direction for difference when using directional derivatives.
         """
         options = self.DEFAULT_OPTIONS.copy()
         options.update(kwargs)
@@ -120,8 +122,10 @@ class FiniteDifference(ApproximationScheme):
                                  "one of {}".format(system.msginfo, form,
                                                     list(DEFAULT_ORDER.keys())))
 
-        key = (abs_key[1], options['form'], options['order'],
-               options['step'], options['step_calc'], options['directional'])
+        options['vector'] = vector
+
+        key = (abs_key[1], options['form'], options['order'], options['step'],
+               options['step_calc'], options['directional'])
         self._exec_dict[key].append((abs_key, options))
         self._reset()  # force later regen of approx_groups
 
@@ -316,3 +320,22 @@ class FiniteDifference(ApproximationScheme):
                     vec._data[idxs] -= delta
 
         return self._results_tmp
+
+    def apply_directional(self, data, direction):
+        """
+        Apply stepsize to direction and embed into approximation data.
+
+        Parameters
+        ----------
+        data : tuple
+            Tuple contains step size, and other info.
+        direction : ndarray
+            Vector containing derivative direction.
+
+        Returns
+        -------
+        ndarray
+            New tuple with new step direction.
+        """
+        deltas, coeffs, current_coeff = data
+        return (np.outer(np.atleast_1d(deltas), direction), coeffs, current_coeff)

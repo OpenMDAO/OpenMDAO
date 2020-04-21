@@ -1084,11 +1084,16 @@ class Component(System):
         self._declared_partial_checks.append((wrt_list, method, form, step, step_calc,
                                               directional))
 
-    def _get_check_partial_options(self):
+    def _get_check_partial_options(self, include_wrt_outputs=True):
         """
         Return dictionary of partial options with pattern matches processed.
 
         This is called by check_partials.
+
+        Parameters
+        ----------
+        include_wrt_outputs : bool
+            If True, include outputs in the wrt list.
 
         Returns
         -------
@@ -1096,8 +1101,12 @@ class Component(System):
             Dictionary keyed by name with tuples of options (method, form, step, step_calc)
         """
         opts = {}
-        of, wrt = self._get_potential_partials_lists()
+        of, wrt = self._get_potential_partials_lists(include_wrt_outputs=include_wrt_outputs)
         invalid_wrt = []
+        matrix_free = self.matrix_free
+
+        if matrix_free:
+            n_directional = 0
 
         for wrt_list, method, form, step, step_calc, directional in self._declared_partial_checks:
             for pattern in wrt_list:
@@ -1125,9 +1134,18 @@ class Component(System):
                                        'step_calc': step_calc,
                                        'directional': directional}
 
+                    if matrix_free and directional:
+                        n_directional += 1
+
         if invalid_wrt:
             msg = "{}: Invalid 'wrt' variables specified for check_partial options: {}."
             raise ValueError(msg.format(self.msginfo, invalid_wrt))
+
+        if matrix_free:
+            if n_directional > 0 and n_directional < len(wrt):
+                msg = "{}: For matrix free components, directional should be set to True for " + \
+                      "all inputs."
+                raise ValueError(msg.format(self.msginfo))
 
         return opts
 

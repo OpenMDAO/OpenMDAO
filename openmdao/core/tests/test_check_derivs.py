@@ -224,7 +224,6 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         assert_near_equal(data['comp1'][('y', 'x')]['J_fd'][0][0], 2., 1e-9)
         assert_near_equal(data['comp1'][('y', 'x')]['J_fwd'][0][0], 2., 1e-15)
-        assert_near_equal(data['comp1'][('y', 'x')]['J_rev'][0][0], 2., 1e-15)
 
     def test_missing_entry(self):
         class MyComp(om.ExplicitComponent):
@@ -267,18 +266,14 @@ class TestProblemCheckPartials(unittest.TestCase):
         abs_error = data['comp']['y', 'x1']['abs error']
         rel_error = data['comp']['y', 'x1']['rel error']
         self.assertAlmostEqual(abs_error.forward, 0.)
-        self.assertAlmostEqual(abs_error.reverse, 0.)
         self.assertAlmostEqual(rel_error.forward, 0.)
-        self.assertAlmostEqual(rel_error.reverse, 0.)
         self.assertAlmostEqual(np.linalg.norm(data['comp']['y', 'x1']['J_fd'] - 3.), 0.,
                                delta=1e-6)
 
         abs_error = data['comp']['y', 'x2']['abs error']
         rel_error = data['comp']['y', 'x2']['rel error']
         self.assertAlmostEqual(abs_error.forward, 4.)
-        self.assertAlmostEqual(abs_error.reverse, 4.)
         self.assertAlmostEqual(rel_error.forward, 1.)
-        self.assertAlmostEqual(rel_error.reverse, 1.)
         self.assertAlmostEqual(np.linalg.norm(data['comp']['y', 'x2']['J_fd'] - 4.), 0.,
                                delta=1e-6)
 
@@ -313,9 +308,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         for comp_name, comp in data.items():
             for partial_name, partial in comp.items():
                 forward = partial['J_fwd']
-                reverse = partial['J_rev']
                 fd = partial['J_fd']
-                self.assertAlmostEqual(np.linalg.norm(forward - reverse), 0.)
                 self.assertAlmostEqual(np.linalg.norm(forward - fd), 0., delta=1e-6)
 
     def test_units(self):
@@ -359,8 +352,6 @@ class TestProblemCheckPartials(unittest.TestCase):
             for partial_name, partial in comp.items():
                 abs_error = partial['abs error']
                 self.assertAlmostEqual(abs_error.forward, 0.)
-                self.assertAlmostEqual(abs_error.reverse, 0.)
-                self.assertAlmostEqual(abs_error.forward_reverse, 0.)
 
         # Make sure we only FD this twice.
         # The count is 5 because in check_partials, there are two calls to apply_nonlinear
@@ -424,11 +415,9 @@ class TestProblemCheckPartials(unittest.TestCase):
         data = p.check_partials(out_stream=None)
         identity = np.eye(4)
         assert_near_equal(data['pt'][('bar', 'foo')]['J_fwd'], identity, 1e-15)
-        assert_near_equal(data['pt'][('bar', 'foo')]['J_rev'], identity, 1e-15)
         assert_near_equal(data['pt'][('bar', 'foo')]['J_fd'], identity, 1e-9)
 
         assert_near_equal(data['pt2'][('bar2', 'foo2')]['J_fwd'], identity, 1e-15)
-        assert_near_equal(data['pt2'][('bar2', 'foo2')]['J_rev'], identity, 1e-15)
         assert_near_equal(data['pt2'][('bar2', 'foo2')]['J_fd'], identity, 1e-9)
 
     def test_matrix_free_explicit(self):
@@ -532,9 +521,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         data = prob.check_partials(out_stream=None)
 
         assert_near_equal(data['comp']['y', 'extra']['J_fwd'], np.zeros((2, 2)))
-        assert_near_equal(data['comp']['y', 'extra']['J_rev'], np.zeros((2, 2)))
         assert_near_equal(data['comp']['y', 'dummy']['J_fwd'], np.zeros((2, 2)))
-        assert_near_equal(data['comp']['y', 'dummy']['J_rev'], np.zeros((2, 2)))
 
     def test_dependent_false_hide(self):
         # Test that we omit derivs declared with dependent=False
@@ -671,7 +658,6 @@ class TestProblemCheckPartials(unittest.TestCase):
         # This will fail unless you set the check_step.
         x_error = data['comp']['f_xy', 'x']['rel error']
         self.assertLess(x_error.forward, 1e-5)
-        self.assertLess(x_error.reverse, 1e-5)
 
     def test_set_step_global(self):
         prob = om.Problem()
@@ -693,7 +679,6 @@ class TestProblemCheckPartials(unittest.TestCase):
         # This will fail unless you set the global step.
         x_error = data['comp']['f_xy', 'x']['rel error']
         self.assertLess(x_error.forward, 1e-5)
-        self.assertLess(x_error.reverse, 1e-5)
 
     def test_complex_step_not_allocated(self):
         prob = om.Problem()
@@ -746,7 +731,6 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         x_error = data['comp']['f_xy', 'x']['rel error']
         self.assertLess(x_error.forward, 1e-5)
-        self.assertLess(x_error.reverse, 1e-5)
 
     def test_set_method_global(self):
         prob = om.Problem()
@@ -767,7 +751,6 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         x_error = data['comp']['f_xy', 'x']['rel error']
         self.assertLess(x_error.forward, 1e-5)
-        self.assertLess(x_error.reverse, 1e-5)
 
     def test_set_form_on_comp(self):
         prob = om.Problem()
@@ -791,7 +774,6 @@ class TestProblemCheckPartials(unittest.TestCase):
         # This will fail unless you set the check_step.
         x_error = data['comp']['f_xy', 'x']['rel error']
         self.assertLess(x_error.forward, 1e-3)
-        self.assertLess(x_error.reverse, 1e-3)
 
     def test_set_form_global(self):
         prob = om.Problem()
@@ -813,7 +795,6 @@ class TestProblemCheckPartials(unittest.TestCase):
         # This will fail unless you set the check_step.
         x_error = data['comp']['f_xy', 'x']['rel error']
         self.assertLess(x_error.forward, 1e-3)
-        self.assertLess(x_error.reverse, 1e-3)
 
     def test_set_step_calc_on_comp(self):
         prob = om.Problem()
@@ -837,7 +818,6 @@ class TestProblemCheckPartials(unittest.TestCase):
         # This will fail unless you set the check_step.
         x_error = data['comp']['f_xy', 'x']['rel error']
         self.assertLess(x_error.forward, 3e-3)
-        self.assertLess(x_error.reverse, 3e-3)
 
     def test_set_step_calc_global(self):
         prob = om.Problem()
@@ -859,7 +839,6 @@ class TestProblemCheckPartials(unittest.TestCase):
         # This will fail unless you set the global step.
         x_error = data['comp']['f_xy', 'x']['rel error']
         self.assertLess(x_error.forward, 3e-3)
-        self.assertLess(x_error.reverse, 3e-3)
 
     def test_set_check_option_precedence(self):
         # Test that we omit derivs declared with dependent=False
@@ -1415,6 +1394,8 @@ class TestProblemCheckPartials(unittest.TestCase):
         model = prob.model
         mycomp = model.add_subsystem('mycomp', ArrayCompCS(), promotes=['*'])
 
+        np.random.seed(1)
+
         prob.setup(check=False, force_alloc_complex=True)
         prob.run_model()
 
@@ -1469,15 +1450,152 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
+        np.random.seed(1)
+
         comp = TestDirectional(n=5)
         model.add_subsystem('comp', comp)
 
         prob.setup(force_alloc_complex=True)
         prob.run_model()
+
         J = prob.check_partials(method='cs', out_stream=None)
         assert_check_partials(J)
         self.assertEqual(comp.n_fwd, 1)
         self.assertEqual(comp.n_rev, 1)
+
+        # Compact print needs to print the dot-product test.
+        stream = StringIO()
+        J = prob.check_partials(method='cs', out_stream=stream, compact_print=True)
+        lines = stream.getvalue().splitlines()
+
+        self.assertEqual(lines[6][43:46], 'n/a')
+        assert_near_equal(float(lines[6][95:105]), 0.0, 1e-15)
+
+    def test_directional_mixed_matrix_free(self):
+
+        class ArrayCompMatrixFree(om.ExplicitComponent):
+
+            def setup(self):
+
+                J1 = np.array([[1.0, 3.0, -2.0, 7.0],
+                                [6.0, 2.5, 2.0, 4.0],
+                                [-1.0, 0.0, 8.0, 1.0],
+                                [1.0, 4.0, -5.0, 6.0]])
+
+                self.J1 = J1
+                self.J2 = J1 * 3.3
+                self.Jb = J1.T
+
+                # Inputs
+                self.add_input('x1', np.zeros([4]))
+                self.add_input('x2', np.zeros([4]))
+                self.add_input('bb', np.zeros([4]))
+
+                # Outputs
+                self.add_output('y1', np.zeros([4]))
+
+                self.declare_partials(of='*', wrt='*')
+                self.set_check_partial_options('*', directional=True, method='fd')
+
+            def compute(self, inputs, outputs):
+                """
+                Execution.
+                """
+                outputs['y1'] = self.J1.dot(inputs['x1']) + self.J2.dot(inputs['x2']) + self.Jb.dot(inputs['bb'])
+
+            def compute_jacvec_product(self, inputs, dinputs, doutputs, mode):
+                """Returns the product of the incoming vector with the Jacobian."""
+
+                if mode == 'fwd':
+                    if 'x1' in dinputs:
+                        doutputs['y1'] += self.J1.dot(dinputs['x1'])
+                    if 'x2' in dinputs:
+                        doutputs['y1'] += self.J2.dot(dinputs['x2'])
+                    if 'bb' in dinputs:
+                        doutputs['y1'] += self.Jb.dot(dinputs['bb'])
+
+                elif mode == 'rev':
+                    if 'x1' in dinputs:
+                        dinputs['x1'] += self.J1.T.dot(doutputs['y1'])
+                    if 'x2' in dinputs:
+                        dinputs['x2'] += self.J2.T.dot(doutputs['y1'])
+                    if 'bb' in dinputs:
+                        dinputs['bb'] += self.Jb.T.dot(doutputs['y1'])
+
+        prob = om.Problem()
+        model = prob.model
+        mycomp = model.add_subsystem('mycomp', ArrayCompMatrixFree(), promotes=['*'])
+
+        np.random.seed(1)
+
+        prob.setup()
+        prob.run_model()
+
+        J = prob.check_partials(method='fd', out_stream=None)
+        assert_check_partials(J)
+
+    def test_directional_mixed_matrix_free_central_diff(self):
+
+        class ArrayCompMatrixFree(om.ExplicitComponent):
+
+            def setup(self):
+
+                J1 = np.array([[1.0, 3.0, -2.0, 7.0],
+                                [6.0, 2.5, 2.0, 4.0],
+                                [-1.0, 0.0, 8.0, 1.0],
+                                [1.0, 4.0, -5.0, 6.0]])
+
+                self.J1 = J1
+                self.J2 = J1 * 3.3
+                self.Jb = J1.T
+
+                # Inputs
+                self.add_input('x1', np.zeros([4]))
+                self.add_input('x2', np.zeros([4]))
+                self.add_input('bb', np.zeros([4]))
+
+                # Outputs
+                self.add_output('y1', np.zeros([4]))
+
+                self.declare_partials(of='*', wrt='*')
+                self.set_check_partial_options('*', directional=True, method='fd', form='central')
+
+            def compute(self, inputs, outputs):
+                """
+                Execution.
+                """
+                outputs['y1'] = self.J1.dot(inputs['x1']) + self.J2.dot(inputs['x2']) + self.Jb.dot(inputs['bb'])
+
+            def compute_jacvec_product(self, inputs, dinputs, doutputs, mode):
+                """Returns the product of the incoming vector with the Jacobian."""
+
+                if mode == 'fwd':
+                    if 'x1' in dinputs:
+                        doutputs['y1'] += self.J1.dot(dinputs['x1'])
+                    if 'x2' in dinputs:
+                        doutputs['y1'] += self.J2.dot(dinputs['x2'])
+                    if 'bb' in dinputs:
+                        doutputs['y1'] += self.Jb.dot(dinputs['bb'])
+
+                elif mode == 'rev':
+                    if 'x1' in dinputs:
+                        dinputs['x1'] += self.J1.T.dot(doutputs['y1'])
+                    if 'x2' in dinputs:
+                        dinputs['x2'] += self.J2.T.dot(doutputs['y1'])
+                    if 'bb' in dinputs:
+                        dinputs['bb'] += self.Jb.T.dot(doutputs['y1'])
+
+        prob = om.Problem()
+        model = prob.model
+        mycomp = model.add_subsystem('mycomp', ArrayCompMatrixFree(), promotes=['*'])
+
+        np.random.seed(1)
+
+        prob.setup()
+        prob.run_model()
+
+        J = prob.check_partials(method='fd', out_stream=None)
+        assert_check_partials(J)
 
     def test_directional_vectorized(self):
 
@@ -1507,6 +1625,8 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
+        np.random.seed(1)
+
         comp = TestDirectional(n=5)
         model.add_subsystem('comp', comp)
 
@@ -1514,6 +1634,136 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.run_model()
         J = prob.check_partials(method='cs', out_stream=None)
         assert_check_partials(J)
+
+    def test_directional_mixed_error_message(self):
+        import openmdao.api as om
+
+        class ArrayCompMatrixFree(om.ExplicitComponent):
+
+            def setup(self):
+
+                J1 = np.array([[1.0, 3.0, -2.0, 7.0],
+                                [6.0, 2.5, 2.0, 4.0],
+                                [-1.0, 0.0, 8.0, 1.0],
+                                [1.0, 4.0, -5.0, 6.0]])
+
+                self.J1 = J1
+                self.J2 = J1 * 3.3
+                self.Jb = J1.T
+
+                # Inputs
+                self.add_input('x1', np.zeros([4]))
+                self.add_input('x2', np.zeros([4]))
+                self.add_input('bb', np.zeros([4]))
+
+                # Outputs
+                self.add_output('y1', np.zeros([4]))
+
+                self.declare_partials(of='*', wrt='*')
+                self.set_check_partial_options('x*', directional=True, method='fd')
+
+            def compute(self, inputs, outputs):
+                """
+                Execution.
+                """
+                outputs['y1'] = self.J1.dot(inputs['x1']) + self.J2.dot(inputs['x2']) + self.Jb.dot(inputs['bb'])
+
+            def compute_jacvec_product(self, inputs, dinputs, doutputs, mode):
+                """Returns the product of the incoming vector with the Jacobian."""
+
+                if mode == 'fwd':
+                    if 'x1' in dinputs:
+                        doutputs['y1'] += self.J1.dot(dinputs['x1'])
+                    if 'x2' in dinputs:
+                        doutputs['y1'] += self.J2.dot(dinputs['x2'])
+                    if 'bb' in dinputs:
+                        doutputs['y1'] += self.Jb.dot(dinputs['bb'])
+
+                elif mode == 'rev':
+                    if 'x1' in dinputs:
+                        dinputs['x1'] += self.J1.T.dot(doutputs['y1'])
+                    if 'x2' in dinputs:
+                        dinputs['x2'] += self.J2.T.dot(doutputs['y1'])
+                    if 'bb' in dinputs:
+                        dinputs['bb'] += self.Jb.T.dot(doutputs['y1'])
+
+        prob = om.Problem()
+        model = prob.model
+        mycomp = model.add_subsystem('mycomp', ArrayCompMatrixFree(), promotes=['*'])
+
+        prob.setup()
+        prob.run_model()
+
+        with self.assertRaises(ValueError) as cm:
+            J = prob.check_partials(method='fd', out_stream=None)
+
+        msg = "ArrayCompMatrixFree (mycomp): For matrix free components, directional should be set to True for all inputs."
+        self.assertEqual(str(cm.exception), msg)
+
+    def test_directional_mimo(self):
+
+        class DirectionalComp(om.ExplicitComponent):
+
+            def initialize(self):
+                self.options.declare('n', default=1, desc='vector size')
+
+            def setup(self):
+                n = self.options['n']
+                self.add_input('in', shape=n)
+                self.add_input('in2', shape=n)
+                self.add_output('out', shape=n)
+                self.add_output('out2', shape=n)
+
+                self.set_check_partial_options(wrt='*', directional=True, method='cs')
+                self.mat = np.random.rand(n, n)
+                self.mat2 = np.random.rand(n, n)
+
+            def compute(self,inputs,outputs):
+                outputs['out'] = self.mat.dot(inputs['in']) + self.mat2.dot(inputs['in2'])
+                outputs['out2'] = 2.0 * self.mat.dot(inputs['in']) - self.mat2.dot(inputs['in2'])
+
+            def compute_jacvec_product(self,inputs,d_inputs,d_outputs, mode):
+                if mode == 'fwd':
+                    if 'out' in d_outputs:
+                        if 'in' in d_inputs:
+                            d_outputs['out'] += self.mat.dot(d_inputs['in'])
+                        if 'in2' in d_inputs:
+                            d_outputs['out'] += self.mat2.dot(d_inputs['in2'])
+                    if 'out2' in d_outputs:
+                        if 'in' in d_inputs:
+                            d_outputs['out2'] += 2.0 * self.mat.dot(d_inputs['in'])
+                        if 'in2' in d_inputs:
+                            d_outputs['out2'] += -1.0 * self.mat2.dot(d_inputs['in2'])
+
+                if mode == 'rev':
+                    if 'out' in d_outputs:
+                        if 'in' in d_inputs:
+                            d_inputs['in'] += self.mat.transpose().dot(d_outputs['out'])
+                        if 'in2' in d_inputs:
+                            d_inputs['in2'] += self.mat2.transpose().dot(d_outputs['out'])
+                    if 'out2' in d_outputs:
+                        if 'in' in d_inputs:
+                            # This one is wrong in reverse.
+                            d_inputs['in'] += 999.0 * self.mat.transpose().dot(d_outputs['out2'])
+                        if 'in2' in d_inputs:
+                            d_inputs['in2'] += -1.0 * self.mat2.transpose().dot(d_outputs['out2'])
+
+        prob = om.Problem()
+        comp = DirectionalComp(n=2)
+        prob.model.add_subsystem('comp', comp)
+
+        prob.setup(force_alloc_complex=True)
+        prob.run_model()
+        partials = prob.check_partials(method='cs', out_stream=None)
+
+        self.assertGreater(np.abs(partials['comp']['out2', 'in']['directional_fwd_rev']),
+                           1e-3, msg='Reverse deriv is supposed to be wrong.')
+        assert_near_equal(np.abs(partials['comp']['out', 'in']['directional_fwd_rev']),
+                          0.0, 1e-12)
+        assert_near_equal(np.abs(partials['comp']['out', 'in2']['directional_fwd_rev']),
+                          0.0, 1e-12)
+        assert_near_equal(np.abs(partials['comp']['out2', 'in2']['directional_fwd_rev']),
+                          0.0, 1e-12)
 
     def test_bug_local_method(self):
         # This fixes a bug setting the check method on a component overrode the requested method for
@@ -1618,12 +1868,10 @@ class TestCheckPartialsFeature(unittest.TestCase):
         x1_error = data['comp']['y', 'x1']['abs error']
 
         assert_near_equal(x1_error.forward, 1., 1e-8)
-        assert_near_equal(x1_error.reverse, 1., 1e-8)
 
         x2_error = data['comp']['y', 'x2']['rel error']
 
         assert_near_equal(x2_error.forward, 9., 1e-8)
-        assert_near_equal(x2_error.reverse, 9., 1e-8)
 
     def test_feature_check_partials_suppress(self):
         import numpy as np
@@ -1892,6 +2140,69 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
         mycomp = model.add_subsystem('mycomp', ArrayComp(), promotes=['*'])
+
+        prob.setup()
+        prob.run_model()
+
+        data = prob.check_partials()
+
+    def test_directional_matrix_free(self):
+        import numpy as np
+
+        import openmdao.api as om
+
+        class ArrayCompMatrixFree(om.ExplicitComponent):
+
+            def setup(self):
+
+                J1 = np.array([[1.0, 3.0, -2.0, 7.0],
+                                [6.0, 2.5, 2.0, 4.0],
+                                [-1.0, 0.0, 8.0, 1.0],
+                                [1.0, 4.0, -5.0, 6.0]])
+
+                self.J1 = J1
+                self.J2 = J1 * 3.3
+                self.Jb = J1.T
+
+                # Inputs
+                self.add_input('x1', np.zeros([4]))
+                self.add_input('x2', np.zeros([4]))
+                self.add_input('bb', np.zeros([4]))
+
+                # Outputs
+                self.add_output('y1', np.zeros([4]))
+
+                self.declare_partials(of='*', wrt='*')
+                self.set_check_partial_options('*', directional=True)
+
+            def compute(self, inputs, outputs):
+                """
+                Execution.
+                """
+                outputs['y1'] = self.J1.dot(inputs['x1']) + self.J2.dot(inputs['x2']) + self.Jb.dot(inputs['bb'])
+
+            def compute_jacvec_product(self, inputs, dinputs, doutputs, mode):
+                """Returns the product of the incoming vector with the Jacobian."""
+
+                if mode == 'fwd':
+                    if 'x1' in dinputs:
+                        doutputs['y1'] += self.J1.dot(dinputs['x1'])
+                    if 'x2' in dinputs:
+                        doutputs['y1'] += self.J2.dot(dinputs['x2'])
+                    if 'bb' in dinputs:
+                        doutputs['y1'] += self.Jb.dot(dinputs['bb'])
+
+                elif mode == 'rev':
+                    if 'x1' in dinputs:
+                        dinputs['x1'] += self.J1.T.dot(doutputs['y1'])
+                    if 'x2' in dinputs:
+                        dinputs['x2'] += self.J2.T.dot(doutputs['y1'])
+                    if 'bb' in dinputs:
+                        dinputs['bb'] += self.Jb.T.dot(doutputs['y1'])
+
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('mycomp', ArrayCompMatrixFree(), promotes=['*'])
 
         prob.setup()
         prob.run_model()

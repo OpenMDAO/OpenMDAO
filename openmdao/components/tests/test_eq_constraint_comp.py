@@ -24,9 +24,6 @@ class TestEQConstraintComp(unittest.TestCase):
 
         cpd = prob.check_partials(out_stream=None)
 
-        for (of, wrt) in cpd['equal']:
-            assert_almost_equal(cpd['equal'][of, wrt]['abs error'], 0.0, decimal=5)
-
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
         # check results
@@ -88,9 +85,6 @@ class TestEQConstraintComp(unittest.TestCase):
 
         cpd = prob.check_partials(out_stream=None)
 
-        for (of, wrt) in cpd['equal']:
-            assert_almost_equal(cpd['equal'][of, wrt]['abs error'], 0.0, decimal=5)
-
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
     def test_create_on_init_add_constraint(self):
@@ -127,9 +121,6 @@ class TestEQConstraintComp(unittest.TestCase):
         assert_almost_equal(prob['g.y'], 27.)
 
         cpd = prob.check_partials(out_stream=None)
-
-        for (of, wrt) in cpd['equal']:
-            assert_almost_equal(cpd['equal'][of, wrt]['abs error'], 0.0, decimal=5)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -176,9 +167,6 @@ class TestEQConstraintComp(unittest.TestCase):
 
         cpd = prob.check_partials(out_stream=None)
 
-        for (of, wrt) in cpd['equal']:
-            assert_almost_equal(cpd['equal'][of, wrt]['abs error'], 0.0, decimal=5)
-
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
     def test_vectorized(self):
@@ -216,9 +204,6 @@ class TestEQConstraintComp(unittest.TestCase):
 
         cpd = prob.check_partials(out_stream=None)
 
-        for (of, wrt) in cpd['equal']:
-            assert_almost_equal(cpd['equal'][of, wrt]['abs error'], 0.0, decimal=5)
-
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
     def test_set_shape(self):
@@ -255,9 +240,6 @@ class TestEQConstraintComp(unittest.TestCase):
         assert_almost_equal(prob['g.y'], np.ones(n)*27.)
 
         cpd = prob.check_partials(out_stream=None)
-
-        for (of, wrt) in cpd['equal']:
-            assert_almost_equal(cpd['equal'][of, wrt]['abs error'], 0.0, decimal=5)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -304,9 +286,6 @@ class TestEQConstraintComp(unittest.TestCase):
 
         cpd = prob.check_partials(out_stream=None)
 
-        for (of, wrt) in cpd['equal']:
-            assert_almost_equal(cpd['equal'][of, wrt]['abs error'], 0.0, decimal=5)
-
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
     def test_scalar_with_mult(self):
@@ -338,8 +317,6 @@ class TestEQConstraintComp(unittest.TestCase):
         assert_near_equal(prob['f.y'], 4., 1e-6)
 
         cpd = prob.check_partials(out_stream=None)
-        for (of, wrt) in cpd['equal']:
-            assert_almost_equal(cpd['equal'][of, wrt]['abs error'], 0.0, decimal=5)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -406,8 +383,6 @@ class TestEQConstraintComp(unittest.TestCase):
         assert_near_equal(prob['f.y'], np.ones(n)*4., 1e-6)
 
         cpd = prob.check_partials(out_stream=None)
-        for (of, wrt) in cpd['equal']:
-            assert_almost_equal(cpd['equal'][of, wrt]['abs error'], 0.0, decimal=5)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -442,8 +417,6 @@ class TestEQConstraintComp(unittest.TestCase):
         assert_near_equal(prob['f.y'], np.ones(n)*4., 1e-6)
 
         cpd = prob.check_partials(out_stream=None)
-        for (of, wrt) in cpd['equal']:
-            assert_almost_equal(cpd['equal'][of, wrt]['abs error'], 0.0, decimal=5)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -472,9 +445,6 @@ class TestEQConstraintComp(unittest.TestCase):
         assert_near_equal(prob['f.y'], 4., 1e-6)
 
         cpd = prob.check_partials(out_stream=None)
-
-        for (of, wrt) in cpd['equal']:
-            assert_almost_equal(cpd['equal'][of, wrt]['abs error'], 0.0, decimal=5)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -509,8 +479,8 @@ class TestEQConstraintComp(unittest.TestCase):
         assert_near_equal(prob['f.y'], np.ones(n)*4., 1e-6)
 
         cpd = prob.check_partials(out_stream=None)
-        for (of, wrt) in cpd['equal']:
-            assert_almost_equal(cpd['equal'][of, wrt]['abs error'], 0.0, decimal=5)
+
+        assert_check_partials(cpd, atol=2e-5, rtol=2e-5)
 
     def test_specified_shape_rhs_val(self):
         prob = om.Problem()
@@ -532,8 +502,8 @@ class TestEQConstraintComp(unittest.TestCase):
         assert_near_equal(prob['equal.y'], np.ones(shape) - rhs, 1e-6)
 
         cpd = prob.check_partials(out_stream=None)
-        for (of, wrt) in cpd['equal']:
-            assert_almost_equal(cpd['equal'][of, wrt]['abs error'], 0.0, decimal=5)
+
+        assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
     def test_renamed_vars(self):
         prob = om.Problem()
@@ -567,9 +537,6 @@ class TestEQConstraintComp(unittest.TestCase):
         assert_almost_equal(prob['g.y'], 27.)
 
         cpd = prob.check_partials(out_stream=None)
-
-        for (of, wrt) in cpd['equal']:
-            assert_almost_equal(cpd['equal'][of, wrt]['abs error'], 0.0, decimal=5)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
