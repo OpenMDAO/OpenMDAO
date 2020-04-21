@@ -294,8 +294,7 @@ class ArmijoGoldsteinLS(LinesearchSolver):
         # Initial step length based on the input step length parameter
         u.add_scal_vec(alpha, du)
 
-        if system._has_bounds:
-            self._enforce_bounds(step=du, alpha=alpha)
+        self._enforce_bounds(step=du, alpha=alpha)
 
         try:
             cache = self._solver_info.save_cache()
