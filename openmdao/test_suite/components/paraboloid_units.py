@@ -46,7 +46,7 @@ if __name__ == "__main__":
     ivc.add_output('x', 3.0, units='m')
     ivc.add_output('y', -4.0, units='m')
     model.add_subsystem('des_vars', ivc)
-    model.add_subsystem('parab_comp', Paraboloid())
+    model.add_subsystem('parab_comp', ParaboloidWithUnits())
 
     model.connect('des_vars.x', 'parab_comp.x')
     model.connect('des_vars.y', 'parab_comp.y')

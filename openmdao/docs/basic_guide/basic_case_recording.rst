@@ -35,7 +35,7 @@ data from the recorder data and create a basic plot.
     openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_basic_case_plot
     :layout: interleave
 
-.. image:: images/des_var_opt.jpeg
+.. image:: images/des_var_opt.jpg
     :width: 600
 
 

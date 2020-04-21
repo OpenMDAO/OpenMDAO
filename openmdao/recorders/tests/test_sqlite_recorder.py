@@ -2419,7 +2419,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         prob.model.add_subsystem('parab', ParaboloidWithUnits())
 
         # define the component whose output will be constrained
-        prob.model.add_subsystem('const', om.ExecComp('g = x + y'))
+        prob.model.add_subsystem('const', om.ExecComp('g = x + y', x={'units': 'm'}, y={'units': 'm'}))
 
         prob.model.connect('indeps.x', ['parab.x', 'const.x'])
         prob.model.connect('indeps.y', ['parab.y', 'const.y'])
@@ -2427,6 +2427,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         # setup the optimization
         prob.driver = om.ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'COBYLA'
+        prob.driver.options['disp'] = False
 
         prob.model.add_design_var('indeps.x', lower=-50, upper=50)
         prob.model.add_design_var('indeps.y', lower=-50, upper=50)
@@ -2434,7 +2435,6 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         # to add the constraint to the model
         prob.model.add_constraint('const.g', lower=0, upper=10.)
-        # prob.model.add_constraint('const.g', equals=0.)
 
         # Create a recorder variable
         recorder = om.SqliteRecorder("cases.sql")
@@ -2442,10 +2442,8 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         prob.add_recorder(recorder)
 
         prob.setup()
-        prob.set_solver_print(0)
         prob.run_driver()
         prob.record_state("after_run_driver")
-        prob.cleanup()
 
         # Instantiate your CaseReader
         cr = om.CaseReader("cases.sql")
@@ -2483,48 +2481,66 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         assert_near_equal(distance_km, -0.027, 1e-3)
 
     def test_feature_basic_case_plot(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar_feature import SellarMDA
+        import matplotlib.pyplot as plt
         import numpy as np
 
-        prob = om.Problem(model=SellarMDA())
+        import openmdao.api as om
+        from openmdao.test_suite.components.paraboloid_units import ParaboloidWithUnits
 
-        model = prob.model
-        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
-        model.add_design_var('x', lower=0.0, upper=10.0)
-        model.add_objective('obj')
-        model.add_constraint('con1', upper=0.0)
-        model.add_constraint('con2', upper=0.0)
+        # build the model
+        prob = om.Problem()
+        indeps = prob.model.add_subsystem('indeps', om.IndepVarComp())
+        indeps.add_output('x', 3.0, units='m')
+        indeps.add_output('y', -4.0, units='m')
 
-        driver = prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9)
-        driver.add_recorder(om.SqliteRecorder('cases.sql'))
+        prob.model.add_subsystem('parab', ParaboloidWithUnits())
+
+        # define the component whose output will be constrained
+        prob.model.add_subsystem('const', om.ExecComp('g = x + y', x={'units': 'm'}, y={'units': 'm'}))
+
+        prob.model.connect('indeps.x', ['parab.x', 'const.x'])
+        prob.model.connect('indeps.y', ['parab.y', 'const.y'])
+
+        # setup the optimization
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'COBYLA'
+        prob.driver.options['disp'] = False
+
+        prob.model.add_design_var('indeps.x', lower=-50, upper=50, units='m')
+        prob.model.add_design_var('indeps.y', lower=-50, upper=50, units='m')
+        prob.model.add_objective('parab.f_xy', units='m')
+
+        # to add the constraint to the model
+        prob.model.add_constraint('const.g', lower=0, upper=10.)
+
+        # Create a recorder variable
+        recorder = om.SqliteRecorder("cases.sql")
+        # Attach a recorder to the Problem and Driver
+        prob.driver.add_recorder(recorder)
 
         prob.setup()
-        prob.set_solver_print(0)
         prob.run_driver()
-        prob.cleanup()
 
-        # Instantiate a CaseReader
-        cr = om.CaseReader('cases.sql')
+        # Instantiate your CaseReader
+        cr = om.CaseReader("cases.sql")
+        # Isolate "driver" as your source
+        driver_cases = cr.get_cases()
 
-        cases = cr.get_cases()
-
-        # List comprehension to hold Design Variable data
-        dv_x_values = [case["x"] for case in cases]
-        dv_z_values = [case["z"] for case in cases]
+        dv_x_values = [case["indeps.x"] for case in driver_cases]
+        dv_y_values = [case["indeps.y"] for case in driver_cases]
 
         # Below is a short script to see the path the design variables took to convergence
-        import matplotlib.pyplot as plt
 
         fig, (ax1, ax2) = plt.subplots(1, 2)
+        fig.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0.5, hspace=None)
         ax1.plot(np.arange(len(dv_x_values)), np.array(dv_x_values))
 
         ax1.set(xlabel='Iterations', ylabel='Design Var: X', title='Optimization History')
         ax1.grid()
 
-        ax2.plot(np.arange(len(dv_z_values)), np.array(dv_z_values))
+        ax2.plot(np.arange(len(dv_y_values)), np.array(dv_y_values))
 
-        ax2.set(xlabel='Iterations', ylabel='Design Var: Z', title='Optimization History')
+        ax2.set(xlabel='Iterations', ylabel='Design Var: Y', title='Optimization History')
         ax2.grid()
         # There are two lines in the right plot because "Z" contains two variables that are being
         # optimized
