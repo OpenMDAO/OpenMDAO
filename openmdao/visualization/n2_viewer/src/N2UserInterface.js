@@ -85,12 +85,14 @@ class NodeInfo {
     show() {
         this.toolbarButton.attr('class', 'fas icon-info-circle active-tab-icon');
         this.hidden = false;
+        d3.select('#all_pt_n2_content_div').classed('node-data-cursor', true);
     }
 
     /** Make the info box hidden if it's visible */
     hide() {
         this.toolbarButton.attr('class', 'fas icon-info-circle');
         this.hidden = true;
+        d3.select('#all_pt_n2_content_div').classed('node-data-cursor', false);
     }
 
     /** Toggle the visibility setting */

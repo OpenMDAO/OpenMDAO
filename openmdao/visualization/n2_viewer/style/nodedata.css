@@ -88,3 +88,7 @@
 	font-weight: 600;
 }
 
+.node-data-cursor {
+    cursor: crosshair;
+}
+
