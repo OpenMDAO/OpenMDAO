@@ -640,6 +640,49 @@ class TestConstrainedSimpleGA(unittest.TestCase):
         self.assertGreater(prob['radius'], 1.)
         self.assertGreater(prob['height'], 1.)
 
+    def test_driver_supports(self):
+
+        class Cylinder(om.ExplicitComponent):
+            """Main class"""
+
+            def setup(self):
+                self.add_input('radius', val=1.0)
+                self.add_input('height', val=1.0)
+
+                self.add_output('Area', val=1.0)
+                self.add_output('Volume', val=1.0)
+
+            def compute(self, inputs, outputs):
+                radius = inputs['radius']
+                height = inputs['height']
+
+                area = height * radius * 2 * 3.14 + 3.14 * radius ** 2 * 2
+                volume = 3.14 * radius ** 2 * height
+                outputs['Area'] = area
+                outputs['Volume'] = volume
+
+        prob = om.Problem()
+        prob.model.add_subsystem('cylinder', Cylinder(), promotes=['*'])
+
+        indeps = prob.model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
+        indeps.add_output('radius', 2.)  # height
+        indeps.add_output('height', 3.)  # radius
+
+        # setup the optimization
+        driver = prob.driver = om.SimpleGADriver()
+
+        prob.driver.supports['equality_constraints'] = False
+
+        prob.model.add_design_var('radius', lower=0.5, upper=5.)
+        prob.model.add_design_var('height', lower=0.5, upper=5.)
+        prob.model.add_objective('Area')
+        prob.model.add_constraint('Volume', lower=10.)
+
+        prob.setup()
+        prob.run_driver()
+
+        #self.assertRaises()
+
     def test_constrained_without_penalty(self):
 
         class Cylinder(om.ExplicitComponent):
