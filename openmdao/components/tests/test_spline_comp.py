@@ -276,6 +276,22 @@ class SplineCompTestCase(unittest.TestCase):
 
         derivs = prob.check_partials(out_stream=None, method='cs')
         assert_check_partials(derivs, atol=1e-14, rtol=1e-14)
+        
+    def test_bspline_bug(self):
+        # Tests a bug fix where the interp_options weren't passed into
+        # the bspline interp comp
+        bspline_options = {'order': 3}
+        comp = om.SplineComp(method='bsplines', num_cp=6, x_interp_val=self.x,
+                             interp_options=bspline_options)
+
+        self.prob.model.add_subsystem('atmosphere', comp)
+
+        comp.add_spline(y_cp_name='alt_cp', y_interp_name='alt', y_cp_val=self.y_cp, y_units='kft')
+
+        self.prob.setup(force_alloc_complex=True)
+        
+        # If we set the bspline order to 3, then k should internally be 4
+        self.assertEqual(comp.interps['alt'].table.k, 4)
 
     def test_error_messages(self):
         n_cp = 80
