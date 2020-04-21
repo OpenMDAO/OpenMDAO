@@ -24,17 +24,6 @@ objectives, you can use their methods like the example below.
     openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_basic_case_recording
     :layout: interleave
 
-
-`get_val` Example
-------------------
-
-Using `case['y1']` will give you the value of the output as is, but if you want to
-convert that value's units, use `get_val`.
-
-.. embed-code::
-    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_get_val
-    :layout: interleave
-
 Generating a Plot with Case Recording Data From Driver Source
 --------------------------------------------------------------
 

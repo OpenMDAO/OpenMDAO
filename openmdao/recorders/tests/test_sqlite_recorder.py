@@ -2405,66 +2405,10 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         self.assertEqual(sorted(case.inputs.keys()), ['y1', 'y2', 'z'])
 
-    def test_feature_get_val(self):
-        import openmdao.api as om
-
-        prob = om.Problem()
-        model = prob.model
-
-        ivc = om.IndepVarComp()
-        ivc.add_output('x', 35.0, units='degF', lower=32.0, upper=212.0)
-
-        model.add_subsystem('p', ivc, promotes=['x'])
-        model.add_subsystem('comp1', om.ExecComp('y1 = 2.0*x',
-                                                x={'value': 2.0, 'units': 'degF'},
-                                                y1={'value': 2.0, 'units': 'degF'}),
-                            promotes=['x', 'y1'])
-
-        model.add_subsystem('comp2', om.ExecComp('y2 = 3.0*x',
-                                                x={'value': 2.0, 'units': 'degF'},
-                                                y2={'value': 2.0, 'units': 'degF'}),
-                            promotes=['x', 'y2'])
-
-        model.add_design_var('x', units='degC', lower=0.0, upper=100.0)
-        model.add_constraint('y1', units='degC', lower=0.0, upper=100.0)
-        model.add_objective('y2', units='degC')
-
-
-        driver = prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9)
-
-        # Create a recorder variable
-        recorder = om.SqliteRecorder("cases.sql")
-        # Attach a recorder to the Driver
-        driver.add_recorder(recorder)
-
-        prob.setup()
-        prob.set_solver_print(0)
-        prob.run_driver()
-        prob.cleanup()
-
-        # You can treat a case object like a problem. Below we'll show an example of that
-        # Instantiate your CaseReader
-        cr = om.CaseReader("cases.sql")
-        # Isolate "driver" as your source
-        driver_cases = cr.list_cases('driver')
-
-        # Get the first case from the recorder
-        case = cr.get_case(driver_cases[0])
-
-        # These options will give outputs as the model sees them
-        # Gets value but will not convert units
-        deg_f_var = case['y1'] # DegF
-
-        # get_val can convert your result's units if desired
-        kelvin_var = case.get_val("y1", units='K') # Converted to Kelvin
-
-        assert_near_equal(kelvin_var, 294.26111111, 1e-3)
-        assert_near_equal(deg_f_var, 70., 1e-3)
-
     def test_feature_basic_case_recording(self):
         import openmdao.api as om
 
-        from openmdao.test_suite.components.paraboloid import Paraboloid
+        from openmdao.test_suite.components.paraboloid_units import ParaboloidWithUnits
 
         # build the model
         prob = om.Problem()
@@ -2494,7 +2438,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         # Create a recorder variable
         recorder = om.SqliteRecorder("cases.sql")
-        # Attach a recorder to the Driver
+        # Attach a recorder to the Problem
         prob.add_recorder(recorder)
 
         prob.setup()
@@ -2503,11 +2447,10 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         prob.record_state("after_run_driver")
         prob.cleanup()
 
-        # You can treat a case object like a problem. Below we'll show an example of that
         # Instantiate your CaseReader
         cr = om.CaseReader("cases.sql")
-        # Isolate "driver" as your source
-        driver_cases = cr.list_cases('problem')
+        # Isolate "problem" as your source
+        problem_cases = cr.list_cases('problem')
 
         # Get the first case from the recorder
         case = cr.get_case('after_run_driver')
@@ -2528,6 +2471,22 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         assert_near_equal(objectives['parab.f_xy'], -27, 1e-4)
         assert_near_equal(design_vars['indeps.x'], 6.99999912, 1e-4)
         assert_near_equal(constraints['const.g'], 0., 1e-4)
+
+        # You will need to isolate "driver" as your source
+        driver_cases = cr.list_cases('driver')
+
+        # Get the first case from the recorder
+        case = cr.get_case(driver_cases[0])
+
+        # These options will give outputs as the model sees them
+        # Gets value but will not convert units
+        distance = case['parab.f_xy'] # m
+
+        # get_val can convert your result's units if desired
+        distance_km = case.get_val("parab.f_xy", units='km') # Converted to km
+
+        assert_near_equal(distance, -27, 1e-3)
+        assert_near_equal(distance_km, -0.27, 1e-3)
 
 
     def test_feature_basic_case_plot(self):
