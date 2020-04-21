@@ -758,6 +758,16 @@ class N2Diagram {
     }
 
     /**
+     * Move the node info panel around if it's visible
+     * @param {N2MatrixCell} cell The cell the event occured on.
+     */
+    mouseMoveOnDiagonal(cell) {
+        if (this.matrix.cellExists(cell)) {
+            this.ui.nodeInfoBox.move(d3.event);
+        }
+    }
+
+    /**
      * Since the matrix can be destroyed and recreated, use this to invoke the callback
      * rather than setting one up that points directly to a specific matrix.
      */
@@ -832,6 +842,7 @@ class N2Diagram {
         let mf = {
             'overOffDiag': self.mouseOverOffDiagonal.bind(self),
             'overOnDiag': self.mouseOverOnDiagonal.bind(self),
+            'moveOnDiag': self.mouseMoveOnDiagonal.bind(self),
             'out': self.mouseOut.bind(self),
             'click': self.mouseClick.bind(self)
         }
