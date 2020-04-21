@@ -2453,7 +2453,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         # Get the first case from the recorder
         case = cr.get_case('after_run_driver')
 
-        # list_outputs will list your model's outputs
+        # list_outputs will list your model's outputs and return a list of them too
         case.list_outputs()
 
         # This code below will find all the objectives, design variables, and constraints that the
@@ -2589,7 +2589,6 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         prob.set_solver_print(0)
         prob.run_driver()
         prob.record_state("after_run_driver")
-        prob.cleanup()
 
         cr = om.CaseReader('cases.sql')
         cases = cr.get_cases()
@@ -2624,7 +2623,6 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         # Attach recorder to the problem
         prob.add_recorder(recorder)
-
         prob.setup()
 
         # Attach recorder to the solver
@@ -2638,7 +2636,6 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         prob.run_driver()
         # Add a record state after run driver
         prob.record_state("after_run_driver")
-        prob.cleanup()
 
         # Instantiate the Case Reader
         cr = om.CaseReader('cases.sql')
