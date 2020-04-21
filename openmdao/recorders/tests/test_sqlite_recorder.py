@@ -2416,7 +2416,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         indeps.add_output('x', 3.0)
         indeps.add_output('y', -4.0)
 
-        prob.model.add_subsystem('parab', Paraboloid())
+        prob.model.add_subsystem('parab', ParaboloidWithUnits())
 
         # define the component whose output will be constrained
         prob.model.add_subsystem('const', om.ExecComp('g = x + y'))
@@ -2472,12 +2472,6 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         assert_near_equal(design_vars['indeps.x'], 6.99999912, 1e-4)
         assert_near_equal(constraints['const.g'], 0., 1e-4)
 
-        # You will need to isolate "driver" as your source
-        driver_cases = cr.list_cases('driver')
-
-        # Get the first case from the recorder
-        case = cr.get_case(driver_cases[0])
-
         # These options will give outputs as the model sees them
         # Gets value but will not convert units
         distance = case['parab.f_xy'] # m
@@ -2486,8 +2480,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         distance_km = case.get_val("parab.f_xy", units='km') # Converted to km
 
         assert_near_equal(distance, -27, 1e-3)
-        assert_near_equal(distance_km, -0.27, 1e-3)
-
+        assert_near_equal(distance_km, -0.027, 1e-3)
 
     def test_feature_basic_case_plot(self):
         import openmdao.api as om
