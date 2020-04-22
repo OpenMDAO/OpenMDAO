@@ -65,12 +65,11 @@ class TestAssertUtils(unittest.TestCase):
             self.assertEqual(err_string.count('Component:'), 1)
             self.assertEqual(err_string.count('< output > wrt < variable >'), 1)
             self.assertEqual(err_string.count('norm'), 2)
-            self.assertEqual(err_string.count('y wrt x1'), 4)
-            self.assertEqual(err_string.count('y wrt x2'), 4)
-            self.assertEqual(err_string.count('abs'), 6)
-            self.assertEqual(err_string.count('rel'), 6)
+            self.assertEqual(err_string.count('y wrt x1'), 2)
+            self.assertEqual(err_string.count('y wrt x2'), 2)
+            self.assertEqual(err_string.count('abs'), 4)
+            self.assertEqual(err_string.count('rel'), 4)
             self.assertEqual(err_string.count('fwd-fd'), 4)
-            self.assertEqual(err_string.count('rev-fd'), 4)
         else:
             self.fail('Exception expected.')
 

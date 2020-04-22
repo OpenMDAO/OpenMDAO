@@ -85,12 +85,12 @@ class NewtonSolver(NonlinearSolver):
             raise ValueError(msg.format(self.msginfo))
 
         if self.linear_solver is not None:
-            self.linear_solver._setup_solvers(self._system(), self._depth + 1)
+            self.linear_solver._setup_solvers(system, self._depth + 1)
         else:
             self.linear_solver = system.linear_solver
 
         if self.linesearch is not None:
-            self.linesearch._setup_solvers(self._system(), self._depth + 1)
+            self.linesearch._setup_solvers(system, self._depth + 1)
 
     def _assembled_jac_solver_iter(self):
         """

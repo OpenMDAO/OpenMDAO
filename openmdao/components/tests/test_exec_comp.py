@@ -13,7 +13,7 @@ except ImportError:
 
 import openmdao.api as om
 from openmdao.components.exec_comp import _expr_dict
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 
 _ufunc_test_data = {
     'abs': {
@@ -681,12 +681,7 @@ class TestExecComp(unittest.TestCase):
 
         data = prob.check_partials(out_stream=None)
 
-        assert_near_equal(data['comp'][('y', 'x')]['abs error'][0], 0.0, 1e-5)
-        assert_near_equal(data['comp'][('y', 'x')]['abs error'][1], 0.0, 1e-5)
-        assert_near_equal(data['comp'][('y', 'x')]['abs error'][2], 0.0, 1e-5)
-        assert_near_equal(data['comp'][('y', 'x')]['rel error'][0], 0.0, 1e-5)
-        assert_near_equal(data['comp'][('y', 'x')]['rel error'][1], 0.0, 1e-5)
-        assert_near_equal(data['comp'][('y', 'x')]['rel error'][2], 0.0, 1e-5)
+        assert_check_partials(data, atol=1e-5, rtol=1e-5)
 
     def test_simple_array_model2(self):
         prob = om.Problem()
@@ -703,12 +698,7 @@ class TestExecComp(unittest.TestCase):
 
         data = prob.check_partials(out_stream=None)
 
-        assert_near_equal(data['comp'][('y', 'x')]['abs error'][0], 0.0, 1e-5)
-        assert_near_equal(data['comp'][('y', 'x')]['abs error'][1], 0.0, 1e-5)
-        assert_near_equal(data['comp'][('y', 'x')]['abs error'][2], 0.0, 1e-5)
-        assert_near_equal(data['comp'][('y', 'x')]['rel error'][0], 0.0, 1e-5)
-        assert_near_equal(data['comp'][('y', 'x')]['rel error'][1], 0.0, 1e-5)
-        assert_near_equal(data['comp'][('y', 'x')]['rel error'][2], 0.0, 1e-5)
+        assert_check_partials(data, atol=1e-5, rtol=1e-5)
 
     def test_complex_step(self):
         prob = om.Problem()
@@ -1138,7 +1128,7 @@ class TestExecCompParameterized(unittest.TestCase):
 
             for comp in cpd:
                 for (var, wrt) in cpd[comp]:
-                    np.testing.assert_almost_equal(cpd[comp][var, wrt]['abs error'], 0, decimal=4)
+                    np.testing.assert_almost_equal(cpd[comp][var, wrt]['abs error'][0], 0, decimal=4)
 
 
 if __name__ == "__main__":

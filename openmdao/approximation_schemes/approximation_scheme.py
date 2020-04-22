@@ -277,6 +277,7 @@ class ApproximationScheme(object):
             self._approx_groups.append((wrt, data, in_idx, tmpJ, [(arr, in_idx)], None))
 
     def _compute_approximations(self, system, jac, total, under_cs):
+        from openmdao.core.component import Component
         # Clean vector for results
         results_array = system._outputs._data.copy() if total else system._residuals._data.copy()
 
@@ -290,6 +291,7 @@ class ApproximationScheme(object):
         par_fd_w_serial_model = use_parallel_fd and system._num_par_fd == system._full_comm.size
         num_par_fd = system._num_par_fd if use_parallel_fd else 1
         is_parallel = use_parallel_fd or system.comm.size > 1
+        is_distributed = isinstance(system, Component) and system.options['distributed']
 
         results = defaultdict(list)
         iproc = system.comm.rank
@@ -345,15 +347,21 @@ class ApproximationScheme(object):
             J = tmpJ[wrt]
             full_idxs = J['loc_outvec_idxs']
             out_slices = tmpJ['@out_slices']
+
+            if J['vector'] is not None:
+                app_data = self.apply_directional(data, J['vector'])
+            else:
+                app_data = data
+
             for i_count, idxs in enumerate(col_idxs):
                 if fd_count % num_par_fd == system._par_fd_id:
                     # run the finite difference
                     result = self._run_point(system, ((idx_info[0][0], idxs),),
-                                             data, results_array, total)
+                                             app_data, results_array, total)
 
                     if is_parallel:
                         for of, (oview, out_idxs, _, _) in J['ofs'].items():
-                            if owns[of] == iproc:
+                            if owns[of] == iproc or is_distributed:
                                 results[(of, wrt)].append(
                                     (i_count,
                                         self._transform_result(
@@ -394,7 +402,7 @@ class ApproximationScheme(object):
             # convert COO matrix to dense for easier slicing
             Jcolored = self._j_colored.toarray()
 
-        elif is_parallel:  # uncolored with parallel systems
+        elif is_parallel and not is_distributed:  # uncolored with parallel systems
             results = _gather_jac_results(mycomm, results)
 
         if colored_approx_groups is not None:
@@ -412,7 +420,8 @@ class ApproximationScheme(object):
         Jcolored = None  # clean up memory
 
         for wrt, _, _, tmpJ, _, _ in approx_groups:
-            ofs = tmpJ[wrt]['ofs']
+            J = tmpJ[wrt]
+            ofs = J['ofs']
             for of in ofs:
                 key = (of, wrt)
                 oview, _, rows_reduced, cols_reduced = ofs[of]
@@ -420,7 +429,7 @@ class ApproximationScheme(object):
                     for i, result in results[key]:
                         oview[:, i] = result
 
-                if mult != 1.0:
+                if J['vector'] is not None or mult != 1.0:
                     oview *= mult
 
                 if uses_voi_indices:
@@ -506,7 +515,8 @@ def _get_wrt_subjacs(system, approxs):
         if 'rows' in options and options['rows'] is not None:
             nondense[key] = options
         if wrt not in J:
-            J[wrt] = {'ofs': set(), 'tot_rows': 0, 'directional': options['directional']}
+            J[wrt] = {'ofs': set(), 'tot_rows': 0, 'directional': options['directional'],
+                      'vector': options['vector']}
 
         tmpJ = None
         if of not in ofdict and (approx_of is None or (approx_of and of in approx_of)):

@@ -600,6 +600,7 @@ class TestScaling(unittest.TestCase):
                                 lower=np.array([[-5000.0, -4000.0], [-3000.0, -2000.0]]),
                                 upper=np.array([[5000.0, 4000.0], [3000.0, 2000.0]]))
                 self.add_output('total_volume', val=1.)
+                self.declare_partials(['*'], ['*'], method='cs')
 
             def compute(self, inputs, outputs):
                 super(ExpCompArrayScale, self).compute(inputs, outputs)
@@ -607,6 +608,10 @@ class TestScaling(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
+        
+        # bounds arrays don't exist any more unless there's a linesearch that uses them,
+        # so use Newton here even though we don't need to.
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
 
         model.add_subsystem('p1', om.IndepVarComp('x', np.ones((2, 2))))
         model.add_subsystem('comp', ExpCompArrayScale())
@@ -618,42 +623,47 @@ class TestScaling(unittest.TestCase):
 
         assert_near_equal(prob['comp.total_volume'], 4.)
 
+        slices = model._outputs.get_slice_dict()
+
         with model._scaled_context_all():
             val = model.comp._outputs['areas']
-            assert_near_equal(val[0, 0], (1.0 - 0.1)/(2 - 0.1))
-            assert_near_equal(val[0, 1], (1.0 - 0.2)/(3 - 0.2))
-            assert_near_equal(val[1, 0], (1.0 - 0.3)/(5 - 0.3))
-            assert_near_equal(val[1, 1], (1.0 - 0.4)/(7 - 0.4))
+            assert_near_equal(val[0, 0], (1.0 - 0.1)/(2 - 0.1), tolerance=1e-11)
+            assert_near_equal(val[0, 1], (1.0 - 0.2)/(3 - 0.2), tolerance=1e-11)
+            assert_near_equal(val[1, 0], (1.0 - 0.3)/(5 - 0.3), tolerance=1e-11)
+            assert_near_equal(val[1, 1], (1.0 - 0.4)/(7 - 0.4), tolerance=1e-11)
 
             val = model.comp._outputs['stuff']
-            assert_near_equal(val[0, 0], (2.0 - 0.6)/(11 - 0.6))
-            assert_near_equal(val[0, 1], (2.0 - 0.7)/(13 - 0.7))
-            assert_near_equal(val[1, 0], (2.0 - 0.8)/(17 - 0.8))
-            assert_near_equal(val[1, 1], (2.0 - 0.9)/(19 - 0.9))
+            assert_near_equal(val[0, 0], (2.0 - 0.6)/(11 - 0.6), tolerance=1e-11)
+            assert_near_equal(val[0, 1], (2.0 - 0.7)/(13 - 0.7), tolerance=1e-11)
+            assert_near_equal(val[1, 0], (2.0 - 0.8)/(17 - 0.8), tolerance=1e-11)
+            assert_near_equal(val[1, 1], (2.0 - 0.9)/(19 - 0.9), tolerance=1e-11)
 
-            lb = model.comp._lower_bounds['areas']
-            assert_near_equal(lb[0, 0], (-1000.0 - 0.1)/(2 - 0.1))
-            assert_near_equal(lb[0, 1], (-1000.0 - 0.2)/(3 - 0.2))
-            assert_near_equal(lb[1, 0], (-1000.0 - 0.3)/(5 - 0.3))
-            assert_near_equal(lb[1, 1], (-1000.0 - 0.4)/(7 - 0.4))
+            slc = slices['comp.areas']
+            lb = model.nonlinear_solver.linesearch._lower_bounds[slc]
 
-            ub = model.comp._upper_bounds['areas']
-            assert_near_equal(ub[0, 0], (1000.0 - 0.1)/(2 - 0.1))
-            assert_near_equal(ub[0, 1], (1000.0 - 0.2)/(3 - 0.2))
-            assert_near_equal(ub[1, 0], (1000.0 - 0.3)/(5 - 0.3))
-            assert_near_equal(ub[1, 1], (1000.0 - 0.4)/(7 - 0.4))
+            assert_near_equal(lb[0], (-1000.0 - 0.1)/(2 - 0.1))
+            assert_near_equal(lb[1], (-1000.0 - 0.2)/(3 - 0.2))
+            assert_near_equal(lb[2], (-1000.0 - 0.3)/(5 - 0.3))
+            assert_near_equal(lb[3], (-1000.0 - 0.4)/(7 - 0.4))
 
-            lb = model.comp._lower_bounds['stuff']
-            assert_near_equal(lb[0, 0], (-5000.0 - 0.6)/(11 - 0.6))
-            assert_near_equal(lb[0, 1], (-4000.0 - 0.7)/(13 - 0.7))
-            assert_near_equal(lb[1, 0], (-3000.0 - 0.8)/(17 - 0.8))
-            assert_near_equal(lb[1, 1], (-2000.0 - 0.9)/(19 - 0.9))
+            ub = model.nonlinear_solver.linesearch._upper_bounds[slc]
+            assert_near_equal(ub[0], (1000.0 - 0.1)/(2 - 0.1))
+            assert_near_equal(ub[1], (1000.0 - 0.2)/(3 - 0.2))
+            assert_near_equal(ub[2], (1000.0 - 0.3)/(5 - 0.3))
+            assert_near_equal(ub[3], (1000.0 - 0.4)/(7 - 0.4))
 
-            ub = model.comp._upper_bounds['stuff']
-            assert_near_equal(ub[0, 0], (5000.0 - 0.6)/(11 - 0.6))
-            assert_near_equal(ub[0, 1], (4000.0 - 0.7)/(13 - 0.7))
-            assert_near_equal(ub[1, 0], (3000.0 - 0.8)/(17 - 0.8))
-            assert_near_equal(ub[1, 1], (2000.0 - 0.9)/(19 - 0.9))
+            slc = slices['comp.stuff']
+            lb = model.nonlinear_solver.linesearch._lower_bounds[slc]
+            assert_near_equal(lb[0], (-5000.0 - 0.6)/(11 - 0.6))
+            assert_near_equal(lb[1], (-4000.0 - 0.7)/(13 - 0.7))
+            assert_near_equal(lb[2], (-3000.0 - 0.8)/(17 - 0.8))
+            assert_near_equal(lb[3], (-2000.0 - 0.9)/(19 - 0.9))
+
+            ub = model.nonlinear_solver.linesearch._upper_bounds[slc]
+            assert_near_equal(ub[0], (5000.0 - 0.6)/(11 - 0.6))
+            assert_near_equal(ub[1], (4000.0 - 0.7)/(13 - 0.7))
+            assert_near_equal(ub[2], (3000.0 - 0.8)/(17 - 0.8))
+            assert_near_equal(ub[3], (2000.0 - 0.9)/(19 - 0.9))
 
     def test_implicit_scale(self):
 
