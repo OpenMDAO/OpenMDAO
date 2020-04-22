@@ -1209,6 +1209,9 @@ class Group(System):
                 elif src_indices is not None:
                     src_indices = np.atleast_1d(src_indices)
 
+                    if np.prod(src_indices.shape) == 0:
+                        continue
+
                     # initial dimensions of indices shape must be same shape as target
                     for idx_d, inp_d in zip(src_indices.shape, in_shape):
                         if idx_d != inp_d:
@@ -1271,8 +1274,11 @@ class Group(System):
                             src_indices = src_indices[:, np.newaxis]
 
                         for d in range(source_dimensions):
-                            # when running under MPI, there is a value for each proc
-                            d_size = out_shape[d] * self.comm.size
+                            if allprocs_abs2meta[abs_out]['distributed'] is True or \
+                               allprocs_abs2meta[abs_in]['distributed'] is True:
+                                d_size = out_shape[d] * self.comm.size
+                            else:
+                                d_size = out_shape[d]
                             arr = src_indices[..., d]
                             if np.any(arr >= d_size) or np.any(arr <= -d_size):
                                 for i in arr.flat:
