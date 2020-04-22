@@ -174,9 +174,7 @@ class TestLinearSystemComp(unittest.TestCase):
 
         abs_errors = data['lingrp.lin'][('x', 'x')]['abs error']
         self.assertTrue(len(abs_errors) > 0)
-        for match in abs_errors:
-            abs_error = float(match)
-            self.assertTrue(abs_error < 1.e-6)
+        self.assertTrue(abs_errors[0] < 1.e-6)
 
     def test_solve_linear_vectorized(self):
         """Check against solve_linear."""
@@ -237,8 +235,7 @@ class TestLinearSystemComp(unittest.TestCase):
 
         abs_errors = data['lingrp.lin'][('x', 'x')]['abs error']
         self.assertTrue(len(abs_errors) > 0)
-        for match in abs_errors:
-            abs_error = float(match)
+        self.assertTrue(abs_errors[0] < 1.e-6)
 
     def test_solve_linear_vectorized_A(self):
         """Check against solve_linear."""
@@ -308,8 +305,7 @@ class TestLinearSystemComp(unittest.TestCase):
 
         abs_errors = data['lingrp.lin'][('x', 'x')]['abs error']
         self.assertTrue(len(abs_errors) > 0)
-        for match in abs_errors:
-            abs_error = float(match)
+        self.assertTrue(abs_errors[0] < 1.e-6)
 
     def test_feature_basic(self):
         import numpy as np

@@ -1,4 +1,165 @@
 /**
+ * Manage info for each node metadata property
+ * @typedef InfoPropDefault
+ * @property {String} key The identifier of the property.
+ * @property {String} desc The description (label) to display.
+ */
+class InfoPropDefault {
+    constructor(key, desc) {
+        this.key = key;
+        this.desc = desc;
+    }
+
+    /** Return the same message since this is the base class */
+    output(msg) { return msg; }
+}
+
+/**
+ * Outputs a Yes or No to display. 
+ * @typedef InfoPropYesNo
+ */
+class InfoPropYesNo extends InfoPropDefault {
+    constructor(key, desc) {
+        super(key, desc);
+    }
+
+    /** Return Yes or No when given True or False */
+    output(boolVal) { return boolVal? 'Yes' : 'No'; }
+}
+
+/**
+ * Manage a table containing all available metadata properties for
+ * the currently active node, as well as whether the table is
+ * visible or not.
+ * @typedef NodeInfo
+ */
+class NodeInfo {
+    /**
+     * Build a list of the properties we care about and set up
+     * references to the HTML elements.
+     */
+    constructor() {
+        this.propList = [
+            new InfoPropDefault('absPathName', 'Path'),
+            new InfoPropDefault('class', 'Class'),
+            new InfoPropDefault('type', 'Type'),
+            new InfoPropDefault('dtype', 'DType'),
+            new InfoPropDefault('subsystem_type', 'Subsystem Type'),
+            new InfoPropDefault('component_type', 'Component Type'),
+            new InfoPropYesNo('implicit', 'Implicit'),
+            new InfoPropYesNo('is_parallel', 'Parallel'),
+            new InfoPropDefault('linear_solver', 'Linear Solver'),
+            new InfoPropDefault('nonlinear_solver', 'Non-Linear Solver')
+        ];
+
+        this.table = d3.select('#node-info-container');
+        this.thead = this.table.select('thead');
+        this.tbody = this.table.select('tbody');
+        this.toolbarButton = d3.select('#info-button');
+        this.hidden = true;
+    }
+
+    /** Make the info box visible if it's hidden */
+    show() {
+        this.toolbarButton.attr('class', 'fas icon-info-circle active-tab-icon');
+        this.hidden = false;
+    }
+
+    /** Make the info box hidden if it's visible */
+    hide() {
+        this.toolbarButton.attr('class', 'fas icon-info-circle');
+        this.hidden = true;
+    }
+
+    /** Toggle the visibility setting */
+    toggle() {
+        if (this.hidden) this.show();
+        else this.hide();
+    }
+
+    /**
+     * Iterate over the list of known properties and display them
+     * if the specified object contains them.
+     * @param {Object} event The related event so we can get position.
+     * @param {N2TreeNode} obj The node to examine.
+     * @param {N2TreeNode} color The color to make the title bar.
+     */
+    update(event, obj, color = '#42926b') {
+        if (this.hidden) return;
+        // Put the name in the title
+        this.table.select('thead th')
+            .style('background-color', color)
+            .text(obj.name);
+
+        this.table.select('tfoot th')
+            .style('background-color', color);
+
+        for (const prop of this.propList) {
+            if (obj.propExists(prop.key) && obj[prop.key] != '') {
+                const newRow = this.tbody.append('tr');
+                
+                newRow.append('th')
+                    .attr('scope', 'row')
+                    .text(prop.desc);
+                newRow.append('td')
+                    .text(prop.output(obj[prop.key]));
+            }
+        }
+
+        // Solidify the size of the table after populating so that
+        // it can be positioned reliably by move().
+        this.table
+            .style('width', this.table.node().scrollWidth + 'px')
+            .style('height', this.table.node().scrollHeight + 'px')
+
+        this.move(event);
+        this.table.attr('class', 'info-visible');
+    }
+
+    /** Wipe the contents of the table body */
+    clear() {
+        if (this.hidden) return;
+        this.table
+            .attr('class', 'info-hidden')
+            .style('width', 'auto')
+            .style('height', 'auto')
+
+        this.tbody.html('');
+    }
+
+    /**
+     * Relocate the table to a position near the mouse
+     * @param {Object} event The triggering event containing the position.
+     */
+    move(event) {
+        if (this.hidden) return;
+        const offset = 30;
+
+        // Mouse is in left half of window, put box to right of mouse
+        if (event.clientX < window.innerWidth / 2) {
+            this.table.style('right', 'auto');
+            this.table.style('left', (event.clientX + offset) + 'px')
+        }
+        // Mouse is in right half of window, put box to left of mouse
+        else {
+            this.table.style('left', 'auto');
+            this.table.style('right', (window.innerWidth - event.clientX + offset) + 'px')
+        }
+
+        // Mouse is in top half of window, put box below mouse
+        if (event.clientY < window.innerHeight / 2) {
+            this.table.style('bottom', 'auto');
+            this.table.style('top', (event.clientY - offset) + 'px')
+        }
+        // Mouse is in bottom half of window, put box above mouse
+        else {
+            this.table.style('top', 'auto');
+            this.table.style('bottom', (window.innerHeight - event.clientY - offset) + 'px')
+        }
+    }
+}
+
+/**
  * Handle input events for the matrix and toolbar.
  * @typedef N2UserInterface
  * @property {N2Diagram} n2Diag Reference to the main diagram.
@@ -38,6 +199,7 @@ class N2UserInterface {
         this._setupSearch();
 
         this.legend = new N2Legend(this.n2Diag.modelData);
+        this.nodeInfoBox = new NodeInfo();
     }
 
     /** Set up the menu for selecting an arbitrary depth to collapse to. */
@@ -428,15 +590,14 @@ class N2UserInterface {
         testThis(this, 'N2UserInterface', 'toggleNodeData');
 
         const infoButton = d3.select('#info-button');
-        const nodeData = d3.select('#node-data-container');
-        const nodeDataClassName = nodeData.attr('class');
+        const nodeData = d3.select('#node-info-container');
 
-        if (nodeDataClassName.includes('hide-node-data')) {
-            nodeData.attr('class', 'node-info-container');
+        if (nodeData.classed('info-hidden')) {
+            nodeData.attr('class', 'info-visible');
             infoButton.attr('class', 'fas icon-info-circle active-tab-icon');
         }
         else {
-            nodeData.attr('class', 'node-info-container hide-node-data');
+            nodeData.attr('class', 'info-hidden');
             infoButton.attr('class', 'fas icon-info-circle');
         }
     }

@@ -445,7 +445,7 @@ class TestConnectionsIndices(unittest.TestCase):
             self.fail('Exception expected.')
 
         self.prob.model._raise_connection_errors = False
-        
+
         with assert_warning(UserWarning, expected):
             self.prob.setup()
 
@@ -466,7 +466,7 @@ class TestConnectionsIndices(unittest.TestCase):
             self.fail('Exception expected.')
 
         self.prob.model._raise_connection_errors = False
-        
+
         with assert_warning(UserWarning, expected):
             self.prob.setup()
 
@@ -487,7 +487,28 @@ class TestConnectionsIndices(unittest.TestCase):
             self.fail('Exception expected.')
 
         self.prob.model._raise_connection_errors = False
-        
+
+        with assert_warning(UserWarning, expected):
+            self.prob.setup()
+
+    def test_bad_value_bug(self):
+        # Should not be allowed because the 2nd index value within src_indices is outside
+        # the valid range for the source.  A bug prevented this from being checked.
+        self.prob.model.connect('idvp.arrout', 'arraycomp.inp', src_indices=[0, 100000])
+
+        expected = "Group (<model>): The source indices do not specify a valid index " + \
+                   "for the connection 'idvp.arrout' to 'arraycomp.inp'. " + \
+                   "Index '100000' is out of range for source dimension of size 5."
+
+        try:
+            self.prob.setup()
+        except ValueError as err:
+            self.assertEqual(str(err), expected)
+        else:
+            self.fail('Exception expected.')
+
+        self.prob.model._raise_connection_errors = False
+
         with assert_warning(UserWarning, expected):
             self.prob.setup()
 
