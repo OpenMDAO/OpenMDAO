@@ -8,8 +8,7 @@ Recording Terminology
 ---------------------
 
 | **Case**: A case is the state of an OpenMDAO model at a particular point in time.
-| **Case Recorder**: An OpenMDAO module used to store the state of a `Problem` before, during, or
-after execution in an SQL file.
+| **Case Recorder**: An OpenMDAO module used to store the state of a `Problem` before, during, or after execution in an SQL file.
 | **Sources**: The OpenMDAO objects responsible for recording the case. `Problem`, `Driver`, and `System`.
 
 Basic Recording Example
