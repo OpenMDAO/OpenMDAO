@@ -178,7 +178,7 @@ class AssembledJacobian(Jacobian):
                     shape = (res_size, in_end - in_offset)
                     ext_mtx._add_submat(abs_key, info, res_offset, in_offset, None, shape)
 
-        out_size = system._outputs._data.size
+        out_size = len(system._outputs)
         int_mtx._build(out_size, out_size, system)
 
         if ext_mtx._submats:
@@ -399,9 +399,9 @@ class AssembledJacobian(Jacobian):
                     d_residuals.iadd(ext_mtx._prod(d_inputs.asarray(), mode, mask=mask))
 
             else:  # rev
-                dresids = d_residuals._data
+                dresids = d_residuals.asarray()
                 if d_outputs._names:
-                    d_outputs._data += int_mtx._prod(dresids, mode)
+                    d_outputs += int_mtx._prod(dresids, mode)
                 if do_mask:
                     d_inputs.iadd(ext_mtx._prod(dresids, mode, mask=mask))
 

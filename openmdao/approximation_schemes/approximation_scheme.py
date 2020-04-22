@@ -288,7 +288,10 @@ class ApproximationScheme(object):
     def _compute_approximations(self, system, jac, total, under_cs):
         from openmdao.core.component import Component
         # Clean vector for results
-        results_array = system._outputs._data.copy() if total else system._residuals._data.copy()
+        if total:
+            results_array = system._outputs.asarray().copy()
+        else:
+            results_array = system._residuals.asarray().copy()
 
         # To support driver src_indices, we need to override some checks in Jacobian, but do it
         # selectively.

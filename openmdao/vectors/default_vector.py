@@ -208,7 +208,7 @@ class DefaultVector(Vector):
         if isinstance(vec, Vector):
             self.iadd(vec.asarray())
         else:
-            self.iadd(vec)
+            self._data += vec
         return self
 
     def __isub__(self, vec):
@@ -228,7 +228,7 @@ class DefaultVector(Vector):
         if isinstance(vec, Vector):
             self.isub(vec.asarray())
         else:
-            self.isub(vec)
+            self._data -= vec
         return self
 
     def __imul__(self, vec):
@@ -248,7 +248,7 @@ class DefaultVector(Vector):
         if isinstance(vec, Vector):
             self.imul(vec.asarray())
         else:
-            self.imul(vec)
+            self._data *= vec
         return self
 
     def add_scal_vec(self, val, vec):
@@ -262,7 +262,7 @@ class DefaultVector(Vector):
         vec : <Vector>
             this vector times val is added to self.
         """
-        self.iadd(val * vec.asarray())
+        self._data += (val * vec.asarray())
 
     def set_vec(self, vec):
         """
@@ -273,7 +273,7 @@ class DefaultVector(Vector):
         vec : <Vector>
             the vector whose values self is set to.
         """
-        self.set_val(vec.asarray())
+        self._data[:] = vec.asarray()
 
     def set_val(self, val, idxs=_full_slice):
         """
@@ -357,7 +357,7 @@ class DefaultVector(Vector):
         float
             The computed dot product value.
         """
-        return np.dot(self.asarray(), vec.asarray())
+        return np.dot(self._data, vec.asarray())
 
     def get_norm(self):
         """
@@ -368,7 +368,7 @@ class DefaultVector(Vector):
         float
             norm of this vector.
         """
-        return np.linalg.norm(self.asarray())
+        return np.linalg.norm(self._data)
 
     def get_slice_dict(self):
         """

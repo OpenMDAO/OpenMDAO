@@ -154,9 +154,9 @@ class ScipyKrylov(LinearSolver):
 
         # DO NOT REMOVE: frequently used for debugging
         # print('in', in_arr)
-        # print('out', b_vec._data)
+        # print('out', b_vec.asarray())
 
-        return b_vec._data
+        return b_vec.asarray()
 
     def _monitor(self, res):
         """
@@ -215,7 +215,7 @@ class ScipyKrylov(LinearSolver):
                 x_vec = system._vectors['residual'][vec_name]
                 b_vec = system._vectors['output'][vec_name]
 
-            x_vec_combined = x_vec._data
+            x_vec_combined = x_vec.asarray()
             size = x_vec_combined.size
             linop = LinearOperator((size, size), dtype=float,
                                    matvec=self._mat_vec)
@@ -231,15 +231,15 @@ class ScipyKrylov(LinearSolver):
             self._iter_count = 0
             if solver is gmres:
                 if LooseVersion(scipy.__version__) < LooseVersion("1.1"):
-                    x, info = solver(linop, b_vec._data.copy(), M=M, restart=restart,
+                    x, info = solver(linop, b_vec.asarray().copy(), M=M, restart=restart,
                                      x0=x_vec_combined, maxiter=maxiter, tol=atol,
                                      callback=self._monitor)
                 else:
-                    x, info = solver(linop, b_vec._data.copy(), M=M, restart=restart,
+                    x, info = solver(linop, b_vec.asarray().copy(), M=M, restart=restart,
                                      x0=x_vec_combined, maxiter=maxiter, tol=atol, atol='legacy',
                                      callback=self._monitor)
             else:
-                x, info = solver(linop, b_vec._data.copy(), M=M,
+                x, info = solver(linop, b_vec.asarray().copy(), M=M,
                                  x0=x_vec_combined, maxiter=maxiter, tol=atol,
                                  callback=self._monitor)
 
@@ -284,4 +284,4 @@ class ScipyKrylov(LinearSolver):
         self._solver_info.pop()
 
         # return resulting value of x vector
-        return x_vec._data.copy()
+        return x_vec.asarray().copy()

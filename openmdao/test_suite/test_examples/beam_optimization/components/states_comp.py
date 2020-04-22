@@ -73,7 +73,7 @@ class StatesComp(om.ImplicitComponent):
         num_entry = num_elements * 12 + 4
         ndim = num_entry + 4
 
-        data = np.zeros((ndim, ), dtype=inputs._data.dtype)
+        data = np.zeros((ndim, ), dtype=inputs.asarray().dtype)
         cols = np.empty((ndim, ))
         rows = np.empty((ndim, ))
 

@@ -210,7 +210,7 @@ class BoundsEnforceLS(LinesearchSolver):
         du = system._vectors['output']['linear']
 
         if not system._has_bounds:
-            u += du
+            u += du.asarray()
             return
 
         self._run_apply()
@@ -219,7 +219,7 @@ class BoundsEnforceLS(LinesearchSolver):
         if norm0 == 0.0:
             norm0 = 1.0
         self._norm0 = norm0
-        u += du
+        u += du.asarray()
 
         with Recording('BoundsEnforceLS', self._iter_count, self) as rec:
             self._enforce_bounds(step=du, alpha=1.0)
@@ -494,13 +494,14 @@ def _enforce_bounds_vector(u, du, alpha, lower_bounds, upper_bounds):
 
     # This is the required change in step size, relative to the du vector.
     d_alpha = 0
+    du_arr = du.asarray()
 
     # Find the largest amount a bound is violated
     # where positive means a bound is violated - i.e. the required d_alpha.
-    mask = du._data != 0
+    mask = du_arr != 0
     if mask.any():
-        abs_du_mask = np.abs(du._data[mask])
-        u_mask = u._data[mask]
+        abs_du_mask = np.abs(du_arr[mask])
+        u_mask = u.asarray()[mask]
 
         # Check lower bound
         if lower_bounds is not None:
@@ -555,7 +556,7 @@ def _enforce_bounds_scalar(u, du, alpha, lower_bounds, upper_bounds):
     # the step vector directly.
 
     # enforce bounds on step in-place.
-    u_data = u._data
+    u_data = u.asarray()
 
     # If u > lower, we're just adding zero. Otherwise, we're adding
     # the step required to get up to the lower bound.
@@ -571,7 +572,7 @@ def _enforce_bounds_scalar(u, du, alpha, lower_bounds, upper_bounds):
     change = change_lower + change_upper
 
     u_data += change
-    du._data += change / alpha
+    du += change / alpha
 
 
 def _enforce_bounds_wall(u, du, alpha, lower_bounds, upper_bounds):
@@ -600,8 +601,8 @@ def _enforce_bounds_wall(u, du, alpha, lower_bounds, upper_bounds):
     # the step vector directly.
 
     # enforce bounds on step in-place.
-    u_data = u._data
-    du_data = du._data
+    u_data = u.asarray()
+    du_data = du.asarray()
 
     # If u > lower, we're just adding zero. Otherwise, we're adding
     # the step required to get up to the lower bound.
