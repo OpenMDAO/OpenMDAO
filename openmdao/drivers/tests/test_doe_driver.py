@@ -1043,8 +1043,10 @@ class TestDOEDriver(unittest.TestCase):
 
         # Add independent variables
         indeps = model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
+        indeps.add_discrete_input('z', np.ones((2, ), dtype=np.int))
         indeps.add_discrete_output('x', np.ones((2, ), dtype=np.int))
         indeps.add_discrete_output('y', np.ones((2, ), dtype=np.int))
+        indeps.add_discrete_output('z', np.ones((2, ), dtype=np.int))
 
         # Add components
         model.add_subsystem('parab', ParaboloidDiscreteArray(), promotes=['*'])
@@ -1052,22 +1054,35 @@ class TestDOEDriver(unittest.TestCase):
         # Specify design variable range and objective
         model.add_design_var('x', np.array([5, 1]))
         model.add_design_var('y', np.array([1, 4]))
+        # model.add_design_var('z', np.array([2, 3]))
         model.add_objective('f_xy')
 
+        recorder = om.SqliteRecorder("cases.sql")
+        prob.driver.add_recorder(recorder)
+        prob.add_recorder(recorder)
+        prob.recording_options['record_inputs'] = True
 
-        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.setup()
         prob.run_driver()
+        prob.record_state("end")
         prob.cleanup()
 
         cr = om.CaseReader("cases.sql")
         cases = cr.list_cases('driver')
+        prob_cases = cr.list_cases('problem')
+
+        for case in prob_cases:
+            inputs = cr.get_case('end').inputs
+            for name in ('x', 'y', 'z'):
+                self.assertTrue(isinstance(inputs[name], np.ndarray))
+                self.assertTrue(inputs[name].shape, (2,))
 
         for case in cases:
             outputs = cr.get_case(case).outputs
             for name in ('x', 'y', 'f_xy'):
                 self.assertTrue(isinstance(outputs[name], np.ndarray))
+                self.assertTrue(outputs[name].shape, (2,))
 
     def test_discrete_arraydesvar_list(self):
         prob = om.Problem()
