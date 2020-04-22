@@ -196,10 +196,6 @@ class System(object):
         The outputs vector; points to _vectors['output']['nonlinear'].
     _residuals : <Vector>
         The residuals vector; points to _vectors['residual']['nonlinear'].
-    _lower_bounds : <Vector>
-        Vector of lower bounds, scaled and dimensionless.
-    _upper_bounds : <Vector>
-        Vector of upper bounds, scaled and dimensionless.
     _nonlinear_solver : <NonlinearSolver>
         Nonlinear solver to be used for solve_nonlinear.
     _linear_solver : <LinearSolver>
@@ -409,9 +405,6 @@ class System(object):
         self._residuals = None
         self._discrete_inputs = None
         self._discrete_outputs = None
-
-        self._lower_bounds = None
-        self._upper_bounds = None
 
         self._nonlinear_solver = None
         self._linear_solver = None
@@ -693,10 +686,6 @@ class System(object):
                 for vec_name, vec in vardict.items():
                     root_vectors[key][vec_name] = vec._root_vector
 
-        lower, upper = self._get_bounds_root_vectors(self._local_vector_class, initial)
-        root_vectors['lower'] = lower
-        root_vectors['upper'] = upper
-
         return root_vectors
 
     def _get_approx_scheme(self, method):
@@ -722,33 +711,6 @@ class System(object):
         if method not in self._approx_schemes:
             self._approx_schemes[method] = _supported_methods[method]()
         return self._approx_schemes[method]
-
-    def _get_bounds_root_vectors(self, vector_class, initial):
-        """
-        Get the root vectors for the lower and upper bounds vectors.
-
-        Parameters
-        ----------
-        vector_class : Vector
-            The Vector class used to instantiate the root vectors.
-        initial : bool
-            Whether we are reconfiguring - i.e., whether the model has been previously setup.
-
-        Returns
-        -------
-        Vector
-            Root vector for the lower bounds vector.
-        Vector
-            Root vector for the upper bounds vector.
-        """
-        if not initial:
-            return self._lower_bounds._root_vector, self._upper_bounds._root_vector
-        else:
-            lower = vector_class('nonlinear', 'output', self)
-            upper = vector_class('nonlinear', 'output', self)
-            lower._data[:] = -np.inf
-            upper._data[:] = np.inf
-            return lower, upper
 
     def resetup(self, setup_mode='full'):
         """
@@ -1838,51 +1800,9 @@ class System(object):
         self._outputs = vectors['output']['nonlinear']
         self._residuals = vectors['residual']['nonlinear']
 
-        self._setup_bounds(root_vectors['lower'], root_vectors['upper'], resize=resize)
-
         for subsys in self._subsystems_myproc:
             subsys._scale_factors = self._scale_factors
             subsys._setup_vectors(root_vectors, alloc_complex=alloc_complex)
-
-    def _setup_bounds(self, root_lower, root_upper, resize=False):
-        """
-        Compute the lower and upper bounds vectors and set their values.
-
-        Parameters
-        ----------
-        root_lower : Vector
-            Root vector for the lower bounds vector.
-        root_upper : Vector
-            Root vector for the upper bounds vector.
-        resize : bool
-            Whether to resize the root vectors - i.e, because this system is initiating a reconf.
-        """
-        vector_class = root_lower.__class__
-        self._lower_bounds = lower = vector_class(
-            'nonlinear', 'output', self, root_lower, resize=resize)
-
-        self._upper_bounds = upper = vector_class(
-            'nonlinear', 'output', self, root_upper, resize=resize)
-
-        if self._has_bounds:
-            abs2meta = self._var_abs2meta
-            for abs_name in self._var_abs_names['output']:
-                meta = abs2meta[abs_name]
-                var_lower = meta['lower']
-                var_upper = meta['upper']
-                ref0 = meta['ref0']
-                ref = meta['ref']
-
-                if not np.isscalar(ref0):
-                    ref0 = ref0.reshape(meta['shape'])
-                if not np.isscalar(ref):
-                    ref = ref.reshape(meta['shape'])
-
-                if var_lower is not None:
-                    lower._views[abs_name][:] = (var_lower - ref0) / (ref - ref0)
-
-                if var_upper is not None:
-                    upper._views[abs_name][:] = (var_upper - ref0) / (ref - ref0)
 
     def _compute_root_scale_factors(self):
         """
