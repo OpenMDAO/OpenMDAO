@@ -671,17 +671,14 @@ class TestConstrainedSimpleGA(unittest.TestCase):
         # setup the optimization
         driver = prob.driver = om.SimpleGADriver()
 
-        prob.driver.supports['equality_constraints'] = False
+        with self.assertRaises(KeyError) as raises_msg:
+            prob.driver.supports['equality_constraints'] = False
 
-        prob.model.add_design_var('radius', lower=0.5, upper=5.)
-        prob.model.add_design_var('height', lower=0.5, upper=5.)
-        prob.model.add_objective('Area')
-        prob.model.add_constraint('Volume', lower=10.)
+        exception = raises_msg.exception
 
-        prob.setup()
-        prob.run_driver()
+        msg = "SimpleGADriver: Tried to set read-only option 'equality_constraints'."
 
-        #self.assertRaises()
+        self.assertEqual(exception.args[0], msg)
 
     def test_constrained_without_penalty(self):
 
