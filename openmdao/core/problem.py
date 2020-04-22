@@ -595,7 +595,7 @@ class Problem(object):
         rvec = self.model._vectors[rkind]['linear']
         lvec = self.model._vectors[lkind]['linear']
 
-        rvec._data[:] = 0.
+        rvec.set_val(0.)
 
         # set seed values into dresids (fwd) or doutputs (rev)
         try:
@@ -754,8 +754,12 @@ class Problem(object):
 
         model_comm = self.driver._setup_comm(comm)
 
+        meta = {
+            'coloring_dir': self.options['coloring_dir'],
+            'nocopy_inputs': {},
+        }
         model._setup(model_comm, 'full', mode, distributed_vector_class, local_vector_class,
-                     derivatives, self.options)
+                     derivatives, meta)
 
         # Cache all args for final setup.
         self._check = check
@@ -941,8 +945,8 @@ class Problem(object):
         partials_data = defaultdict(lambda: defaultdict(dict))
 
         # Caching current point to restore after setups.
-        input_cache = model._inputs._clone()
-        output_cache = model._outputs._clone()
+        input_cache = model._inputs.asarray().copy()
+        output_cache = model._outputs.asarray().copy()
 
         # Keep track of derivative keys that are declared dependent so that we don't print them
         # unless they are in error.
@@ -954,8 +958,8 @@ class Problem(object):
         # Analytic Jacobians
         print_reverse = False
         for mode in ('fwd', 'rev'):
-            model._inputs.set_vec(input_cache)
-            model._outputs.set_vec(output_cache)
+            model._inputs.set_val(input_cache)
+            model._outputs.set_val(output_cache)
             # Make sure we're in a valid state
             model.run_apply_nonlinear()
 
@@ -1022,8 +1026,8 @@ class Problem(object):
 
                             for idx in range(n_in):
 
-                                dinputs.set_const(0.0)
-                                dstate.set_const(0.0)
+                                dinputs.set_val(0.0)
+                                dstate.set_val(0.0)
 
                                 # Dictionary access returns a scalar for 1d input, and we
                                 # need a vector for clean code, so use _views_flat.
@@ -1132,8 +1136,8 @@ class Problem(object):
 
                             partials_data[c_name][rel_key][jac_key] = deriv_value.copy()
 
-        model._inputs.set_vec(input_cache)
-        model._outputs.set_vec(output_cache)
+        model._inputs.set_val(input_cache)
+        model._outputs.set_val(output_cache)
         model.run_apply_nonlinear()
 
         # Finite Difference to calculate Jacobian

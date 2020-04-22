@@ -1,6 +1,7 @@
 """Define the ParallelGroup class."""
 
 from openmdao.core.group import Group
+from openmdao.utils.mpi import MPI
 
 
 class ParallelGroup(Group):
@@ -19,4 +20,5 @@ class ParallelGroup(Group):
             Group.
         """
         super(ParallelGroup, self).__init__(**kwargs)
-        self._mpi_proc_allocator.parallel = True
+        if MPI:
+            self._mpi_proc_allocator.parallel = True

@@ -86,6 +86,8 @@ class Vector(object):
         When True, values in the vector cannot be changed via the user __setitem__ API.
     _under_complex_step : bool
         When True, self._data is replaced with self._cplx_data.
+    _len : int
+        Total length of data vector (including shared memory parts).
     """
 
     # Listing of relevant citations that should be referenced when
@@ -122,6 +124,7 @@ class Vector(object):
         self._ncol = ncol
         self._icol = None
         self._relevant = relevant
+        self._len = 0
 
         self._system = weakref.ref(system)
 
@@ -190,7 +193,7 @@ class Vector(object):
         int
             Total flattened length of this vector.
         """
-        return self._data.size
+        return self._len
 
     def _clone(self, initialize_views=False):
         """
@@ -408,15 +411,6 @@ class Vector(object):
         raise NotImplementedError('_initialize_views not defined for vector type %s' %
                                   type(self).__name__)
 
-    def _clone_data(self):
-        """
-        For each item in _data, replace it with a copy of the data.
-
-        Must be implemented by the subclass.
-        """
-        raise NotImplementedError('_clone_data not defined for vector type %s' %
-                                  type(self).__name__)
-
     def __iadd__(self, vec):
         """
         Perform in-place vector addition.
@@ -508,7 +502,7 @@ class Vector(object):
         raise NotImplementedError('set_vec not defined for vector type %s' %
                                   type(self).__name__)
 
-    def set_const(self, val):
+    def set_val(self, val, idxs=_full_slice):
         """
         Set the value of this vector to a constant scalar value.
 
@@ -518,8 +512,10 @@ class Vector(object):
         ----------
         val : int or float
             scalar to set self to.
+        idxs : int or slice or tuple of ints and/or slices.
+            The locations where the data array should be updated.
         """
-        raise NotImplementedError('set_const not defined for vector type %s' %
+        raise NotImplementedError('set_val not defined for vector type %s' %
                                   type(self).__name__)
 
     def dot(self, vec):
@@ -568,12 +564,16 @@ class Vector(object):
             need to do this when temporarily disabling complex step for guess_nonlinear.
         """
         if active:
-            self._cplx_data[:] = self._data
-
+            arr = self.asarray()
         elif keep_real:
-            self._cplx_data[:] = self._data.real
+            arr = self.asarray().real
+        else:
+            arr = None
 
         self._data, self._cplx_data = self._cplx_data, self._data
         self._views, self._cplx_views = self._cplx_views, self._views
         self._views_flat, self._cplx_views_flat = self._cplx_views_flat, self._views_flat
         self._under_complex_step = active
+
+        if arr is not None:
+            self.set_val(arr)

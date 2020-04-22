@@ -20,8 +20,7 @@ class ReconfGroup(Group):
         self.size += 1
 
         for ind in range(self.size):
-            self.add_subsystem(
-                'C%i' % ind, ExecComp('y%i = %i * x + 1.' % (ind, ind)), promotes=['*'])
+            self.add_subsystem('C%i' % ind, ExecComp('y%i = %i * x + 1.' % (ind, ind)), promotes=['*'])
 
 
 class Test(unittest.TestCase):

@@ -22,7 +22,7 @@ import networkx as nx
 import openmdao
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 from openmdao.recorders.recording_manager import RecordingManager
-from openmdao.vectors.vector import INT_DTYPE
+from openmdao.vectors.vector import INT_DTYPE, _full_slice
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
@@ -71,8 +71,6 @@ _DEFAULT_COLORING_META = {
 
 _DEFAULT_COLORING_META.update(_DEF_COMP_SPARSITY_ARGS)
 
-_full_slice = slice(None)
-
 _recordable_funcs = frozenset(['_apply_linear', '_apply_nonlinear', '_solve_linear',
                                '_solve_nonlinear'])
 
@@ -104,8 +102,8 @@ class System(object):
         options dictionary
     recording_options : OptionsDictionary
         Recording options dictionary
-    _problem_options : OptionsDictionary
-        Problem level options.
+    _problem_meta : dict
+        Problem level metadata.
     under_complex_step : bool
         When True, this system is undergoing complex step.
     force_alloc_complex : bool
@@ -360,7 +358,7 @@ class System(object):
         self.recording_options.declare('options_excludes', types=list, default=[],
                                        desc='User-defined metadata to exclude in recording')
 
-        self._problem_options = None
+        self._problem_meta = None
 
         # Case recording related
         self.iter_count = 0
@@ -725,12 +723,12 @@ class System(object):
                     distributed_vector_class=self._distributed_vector_class,
                     local_vector_class=self._local_vector_class,
                     use_derivatives=self._use_derivatives,
-                    prob_options=self._problem_options)
+                    prob_meta=self._problem_meta)
         self._final_setup(self.comm, setup_mode=setup_mode,
                           force_alloc_complex=self._outputs._alloc_complex)
 
     def _setup(self, comm, setup_mode, mode, distributed_vector_class, local_vector_class,
-               use_derivatives, prob_options=None):
+               use_derivatives, prob_meta=None):
         """
         Perform setup for this system and its descendant systems.
 
@@ -755,11 +753,11 @@ class System(object):
             and associated transfers involved in intraprocess communication.
         use_derivatives : bool
             If True, perform any memory allocations necessary for derivative computation.
-        prob_options : OptionsDictionary
-            Problem level options dictionary.
+        prob_meta : dict
+            Problem level metadata dictionary.
         """
         # save a ref to the problem level options.
-        self._problem_options = prob_options
+        self._problem_meta = prob_meta
 
         # reset any coloring if a Coloring object was not set explicitly
         if self._coloring_info['dynamic'] or self._coloring_info['static'] is not None:
@@ -787,7 +785,7 @@ class System(object):
         # If we're only updating and not recursing, processors don't need to be redistributed.
         if recurse:
             # Besides setting up the processors, this method also builds the model hierarchy.
-            self._setup_procs(self.pathname, comm, mode, self._problem_options)
+            self._setup_procs(self.pathname, comm, mode, self._problem_meta)
 
         # Recurse model from the bottom to the top for configuring.
         # Set static_mode to False in all subsystems because inputs & outputs may be created.
@@ -1092,17 +1090,17 @@ class System(object):
         is_total = isinstance(self, Group)
 
         # compute perturbations
-        starting_inputs = self._inputs._data.copy()
+        starting_inputs = self._inputs.asarray().copy()
         in_offsets = starting_inputs.copy()
         in_offsets[in_offsets == 0.0] = 1.0
         in_offsets *= info['perturb_size']
 
-        starting_outputs = self._outputs._data.copy()
+        starting_outputs = self._outputs.asarray().copy()
         out_offsets = starting_outputs.copy()
         out_offsets[out_offsets == 0.0] = 1.0
         out_offsets *= info['perturb_size']
 
-        starting_resids = self._residuals._data.copy()
+        starting_resids = self._residuals.asarray().copy()
 
         # for groups, this does some setup of approximations
         self._setup_approx_coloring()
@@ -1114,10 +1112,10 @@ class System(object):
         for i in range(info['num_full_jacs']):
             # randomize inputs (and outputs if implicit)
             if i > 0:
-                self._inputs._data[:] = \
-                    starting_inputs + in_offsets * np.random.random(in_offsets.size)
-                self._outputs._data[:] = \
-                    starting_outputs + out_offsets * np.random.random(out_offsets.size)
+                self._inputs.set_val(
+                    starting_inputs + in_offsets * np.random.random(in_offsets.size))
+                self._outputs.set_val(
+                    starting_outputs + out_offsets * np.random.random(out_offsets.size))
 
                 if is_total:
                     self._solve_nonlinear()
@@ -1194,9 +1192,9 @@ class System(object):
             coloring_mod._CLASS_COLORINGS[coloring_fname] = coloring
 
         # restore original inputs/outputs
-        self._inputs._data[:] = starting_inputs
-        self._outputs._data[:] = starting_outputs
-        self._residuals._data[:] = starting_resids
+        self._inputs.set_val(starting_inputs)
+        self._outputs.set_val(starting_outputs)
+        self._residuals.set_val(starting_resids)
 
         self._first_call_to_linearize = save_first_call
 
@@ -1227,18 +1225,16 @@ class System(object):
             the actual offsets are, i.e. the offsets will be into a reduced jacobian
             containing only the matching columns.
         """
-        if wrt_matches is None:
-            wrt_matches = ContainsAll()
-        abs2meta = self._var_allprocs_abs2meta
         offset = end = 0
         for of, _offset, _end, sub_of_idx in self._jacobian_of_iter():
-            if of in wrt_matches:
+            if wrt_matches is None or of in wrt_matches:
                 end += (_end - _offset)
                 yield of, offset, end, sub_of_idx
                 offset = end
 
+        abs2meta = self._var_allprocs_abs2meta
         for wrt in self._var_allprocs_abs_names['input']:
-            if wrt in wrt_matches:
+            if wrt_matches is None or wrt in wrt_matches:
                 end += abs2meta[wrt]['size']
                 yield wrt, offset, end, _full_slice
                 offset = end
@@ -1257,7 +1253,7 @@ class System(object):
         str
             Full pathname of the coloring file.
         """
-        directory = self._problem_options['coloring_dir']
+        directory = self._problem_meta['coloring_dir']
         if not self.pathname:
             # total coloring
             return os.path.join(directory, 'total_coloring.pkl')
@@ -2222,10 +2218,10 @@ class System(object):
 
         if clear:
             if mode == 'fwd':
-                d_residuals.set_const(0.0)
+                d_residuals.set_val(0.0)
             else:  # rev
-                d_inputs.set_const(0.0)
-                d_outputs.set_const(0.0)
+                d_inputs.set_val(0.0)
+                d_outputs.set_val(0.0)
 
         if scope_out is None and scope_in is None:
             yield d_inputs, d_outputs, d_residuals
@@ -3346,7 +3342,8 @@ class System(object):
         """
         if self._outputs is None:
             # final setup has not been performed
-            if hasattr(self, '_local_system_set'):  # i.e. is a Group
+            from openmdao.core.group import Group
+            if isinstance(self, Group):
                 raise RuntimeError("{}: Unable to list outputs on a Group until model has "
                                    "been run.".format(self.msginfo))
 
@@ -4081,8 +4078,8 @@ class System(object):
             loc_val = val if val is not System._undefined else np.zeros(0)
             if rank is None:   # bcast
                 if distrib:
-                    idx = self._var_allprocs_abs2idx['nonlinear'][abs_name]
-                    sizes = self._var_sizes['nonlinear'][typ][:, idx]
+                    idx = self._var_allprocs_abs2idx[vec_name][abs_name]
+                    sizes = self._var_sizes[vec_name][typ][:, idx]
                     # TODO: could cache these offsets
                     offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
                     offsets[1:] = np.cumsum(sizes[:-1])
@@ -4096,8 +4093,8 @@ class System(object):
                     val = new_val
             else:   # retrieve to rank
                 if distrib:
-                    idx = self._var_allprocs_abs2idx['nonlinear'][abs_name]
-                    sizes = self._var_sizes['nonlinear'][typ][:, idx]
+                    idx = self._var_allprocs_abs2idx[vec_name][abs_name]
+                    sizes = self._var_sizes[vec_name][typ][:, idx]
                     # TODO: could cache these offsets
                     offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
                     offsets[1:] = np.cumsum(sizes[:-1])
@@ -4194,6 +4191,7 @@ class System(object):
         variables = filtered_vars.get(kind)
         if variables:
             views = self._vectors[kind][vec_name]._views
+            views_flat = self._vectors[kind][vec_name]._views_flat
             rank = self.comm.rank
             discrete_vec = None if kind == 'residual' else self._var_discrete[kind]
             offset = len(self.pathname) + 1 if self.pathname else 0
@@ -4209,18 +4207,16 @@ class System(object):
                 else:
                     vdict = {n: views[n] for n in variables}
             elif parallel:
-                sizes = self._var_sizes[vec_name][kind]
-                abs2idx = self._var_allprocs_abs2idx[vec_name]
                 if discrete_vec:
                     vdict = {}
                     for n in variables:
                         if n in views:
-                            if sizes[rank, abs2idx[n]] > 0:
+                            if views_flat[n].size > 0:
                                 vdict[n] = views[n]
                         elif n[offset:] in discrete_vec and self._owning_rank[n] == rank:
                             vdict[n] = discrete_vec[n[offset:]]['value']
                 else:
-                    vdict = {n: views[n] for n in variables if sizes[rank, abs2idx[n]] > 0}
+                    vdict = {n: views[n] for n in variables if views_flat[n].size > 0}
             else:
                 meta = self._var_allprocs_abs2meta
                 for name in variables:

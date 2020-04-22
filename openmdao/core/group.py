@@ -299,7 +299,7 @@ class Group(System):
 
         self.configure()
 
-    def _setup_procs(self, pathname, comm, mode, prob_options):
+    def _setup_procs(self, pathname, comm, mode, prob_meta):
         """
         Execute first phase of the setup process.
 
@@ -315,11 +315,11 @@ class Group(System):
         mode : string
             Derivatives calculation mode, 'fwd' for forward, and 'rev' for
             reverse (adjoint). Default is 'rev'.
-        prob_options : OptionsDictionary
-            Problem level options.
+        prob_meta : dict
+            Problem level metadata.
         """
         self.pathname = pathname
-        self._problem_options = prob_options
+        self._problem_meta = prob_meta
 
         self.options._parent_name = self.msginfo
         self.recording_options._parent_name = self.msginfo
@@ -417,7 +417,7 @@ class Group(System):
             subsys._use_derivatives = self._use_derivatives
             subsys._solver_info = self._solver_info
             subsys._recording_iter = self._recording_iter
-            subsys._setup_procs(subsys.pathname, sub_comm, mode, prob_options)
+            subsys._setup_procs(subsys.pathname, sub_comm, mode, prob_meta)
 
         # build a list of local subgroups to speed up later loops
         self._subgroups_myproc = [s for s in self._subsystems_myproc if isinstance(s, Group)]
@@ -620,8 +620,7 @@ class Group(System):
                 abs_names[type_].extend(subsys._var_abs_names[type_])
                 abs_names_discrete[type_].extend(subsys._var_abs_names_discrete[type_])
 
-                allprocs_discrete[type_].update({k: v for k, v in
-                                                 subsys._var_allprocs_discrete[type_].items()})
+                allprocs_discrete[type_].update(subsys._var_allprocs_discrete[type_])
                 var_discrete[type_].update({sub_prefix + k: v for k, v in
                                             subsys._var_discrete[type_].items()})
 
@@ -777,6 +776,10 @@ class Group(System):
                     sizes_in = sizes[type_][iproc, :].copy()
                     self.comm.Allgather(sizes_in, sizes[type_])
 
+        if self.pathname == '':  # only do at the top
+            self._problem_meta['top_sizes'] = self._var_sizes
+
+        if self.comm.size > 1:
             self._has_distrib_vars = self.comm.allreduce(n_distrib_vars) > 0
             if (self._has_distrib_vars or not np.all(self._var_sizes[vec_names[0]]['output']) or
                     not np.all(self._var_sizes[vec_names[0]]['input'])):
@@ -841,6 +844,7 @@ class Group(System):
         allprocs_prom2abs_list_in = self._var_allprocs_prom2abs_list['input']
         allprocs_prom2abs_list_out = self._var_allprocs_prom2abs_list['output']
         abs2meta = self._var_abs2meta
+        allprocs_abs2meta = self._var_allprocs_abs2meta
         pathname = self.pathname
 
         abs_in2out = {}
@@ -864,7 +868,7 @@ class Group(System):
 
                     # if connection is contained in a subgroup, add to conns
                     # to pass down to subsystems.
-                    if inparts[:nparts + 1] == outparts[:nparts + 1]:
+                    if inparts[nparts] == outparts[nparts]:
                         new_conns[inparts[nparts]][abs_in] = abs_out
 
         # Add implicit connections (only ones owned by this group)
@@ -973,6 +977,12 @@ class Group(System):
                 if inparts[:nparts + 1] == outparts[:nparts + 1]:
                     new_conns[inparts[nparts]][abs_in] = abs_out
 
+        # Compute global_abs_in2out by first adding this group's contributions,
+        # then adding contributions from systems above/below, then allgathering.
+        conn_list = list(global_abs_in2out.items())
+        conn_list.extend(abs_in2out.items())
+        global_abs_in2out.update(abs_in2out)
+
         # Recursion
         if recurse:
             distcomps = []
@@ -983,18 +993,10 @@ class Group(System):
                                                          conns=new_conns[subsys.name])
                     else:
                         subsys._setup_global_connections(recurse=recurse)
+                    global_abs_in2out.update(subsys._conn_global_abs_in2out)
+                    conn_list.extend(subsys._conn_global_abs_in2out.items())
                 elif subsys.options['distributed'] and subsys.comm.size > 1:
                     distcomps.append(subsys)
-
-        # Compute global_abs_in2out by first adding this group's contributions,
-        # then adding contributions from systems above/below, then allgathering.
-        conn_list = list(global_abs_in2out.items())
-        conn_list.extend(abs_in2out.items())
-        global_abs_in2out.update(abs_in2out)
-
-        for subsys in self._subgroups_myproc:
-            global_abs_in2out.update(subsys._conn_global_abs_in2out)
-            conn_list.extend(subsys._conn_global_abs_in2out.items())
 
         if len(conn_list) > len(global_abs_in2out):
             dupes = [n for n, val in Counter(tgt for tgt, src in conn_list).items() if val > 1]
@@ -1028,6 +1030,16 @@ class Group(System):
                 for comp in distcomps:
                     comp._update_dist_src_indices(global_abs_in2out)
 
+            # collect set of local (not remote, not distributed) subsystems so we can
+            # identify cross-process connections, which require the use of distributed
+            # instead of purely local vector and transfer objects.
+            self._local_system_set = set()
+            for s in self._subsystems_myproc:
+                if isinstance(s, Group):
+                    self._local_system_set.update(s._local_system_set)
+                elif not s.options['distributed']:
+                    self._local_system_set.add(s.pathname)
+
     def _setup_connections(self, recurse=True):
         """
         Compute dict of all connections owned by this Group.
@@ -1048,21 +1060,10 @@ class Group(System):
             for subsys in self._subsystems_myproc:
                 subsys._setup_connections(recurse)
 
-        if MPI:
-            # collect set of local (not remote, not distributed) subsystems so we can
-            # identify cross-process connections, which require the use of distributed
-            # instead of purely local vector and transfer objects.
-            self._local_system_set = set()
-            for s in self._subsystems_myproc:
-                if isinstance(s, Group):
-                    self._local_system_set.update(s._local_system_set)
-                elif not s.options['distributed']:
-                    self._local_system_set.add(s.pathname)
-
-        path_dot = pathname + '.' if pathname else ''
-        path_len = len(path_dot)
+        path_len = len(pathname + '.' if pathname else '')
 
         allprocs_abs2meta = self._var_allprocs_abs2meta
+        abs2meta = self._var_abs2meta
 
         nproc = self.comm.size
 
@@ -1071,34 +1072,32 @@ class Group(System):
         # ref or ref0 are defined for the output.
         for abs_in, abs_out in global_abs_in2out.items():
 
-            # First, check that this system owns both the input and output.
-            if abs_in[:path_len] == path_dot and abs_out[:path_len] == path_dot:
-                # Second, check that they are in different subsystems of this system.
-                out_subsys = abs_out[path_len:].split('.', 1)[0]
-                in_subsys = abs_in[path_len:].split('.', 1)[0]
-                if out_subsys != in_subsys:
-                    if abs_in in allprocs_discrete_in:
-                        self._conn_discrete_in2out[abs_in] = abs_out
-                    elif abs_out in allprocs_discrete_out:
-                        msg = f"{self.msginfo}: Can't connect discrete output '{abs_out}' " + \
-                              f"to continuous input '{abs_in}'."
-                        if self._raise_connection_errors:
-                            raise RuntimeError(msg)
-                        else:
-                            simple_warning(msg)
+            # Check that they are in different subsystems of this system.
+            out_subsys = abs_out[path_len:].split('.', 1)[0]
+            in_subsys = abs_in[path_len:].split('.', 1)[0]
+            if out_subsys != in_subsys:
+                if abs_in in allprocs_discrete_in:
+                    self._conn_discrete_in2out[abs_in] = abs_out
+                elif abs_out in allprocs_discrete_out:
+                    msg = f"{self.msginfo}: Can't connect discrete output '{abs_out}' " + \
+                          f"to continuous input '{abs_in}'."
+                    if self._raise_connection_errors:
+                        raise RuntimeError(msg)
                     else:
-                        abs_in2out[abs_in] = abs_out
+                        simple_warning(msg)
+                else:
+                    abs_in2out[abs_in] = abs_out
 
-                    if nproc > 1 and self._vector_class is None:
-                        # check for any cross-process data transfer.  If found, use
-                        # self._distributed_vector_class as our vector class.
-                        in_path = abs_in.rsplit('.', 1)[0]
-                        if in_path not in self._local_system_set:
+                if nproc > 1 and self._vector_class is None:
+                    # check for any cross-process data transfer.  If found, use
+                    # self._distributed_vector_class as our vector class.
+                    in_path = abs_in.rsplit('.', 1)[0]
+                    if in_path not in self._local_system_set:
+                        self._vector_class = self._distributed_vector_class
+                    else:
+                        out_path = abs_out.rsplit('.', 1)[0]
+                        if out_path not in self._local_system_set:
                             self._vector_class = self._distributed_vector_class
-                        else:
-                            out_path = abs_out.rsplit('.', 1)[0]
-                            if out_path not in self._local_system_set:
-                                self._vector_class = self._distributed_vector_class
 
             # if connected output has scaling then we need input scaling
             if not self._has_input_scaling and not (abs_in in allprocs_discrete_in or
@@ -1790,7 +1789,7 @@ class Group(System):
             self._residuals._under_complex_step = True
 
             self._outputs.set_complex_step_mode(True)
-            self._outputs._data[:] += imag_cache * 1j
+            self._outputs.iadd(imag_cache * 1j)
 
     def guess_nonlinear(self, inputs, outputs, residuals,
                         discrete_inputs=None, discrete_outputs=None):
@@ -1858,7 +1857,7 @@ class Group(System):
                 if rel_systems is not None:
                     for s in irrelevant_subs:
                         # zero out dvecs of irrelevant subsystems
-                        s._vectors['residual']['linear'].set_const(0.0)
+                        s._vectors['residual']['linear'].set_val(0.0)
 
             for subsys in self._subsystems_myproc:
                 if rel_systems is None or subsys.pathname in rel_systems:
@@ -1871,7 +1870,7 @@ class Group(System):
                     if rel_systems is not None:
                         for s in irrelevant_subs:
                             # zero out dvecs of irrelevant subsystems
-                            s._vectors['output']['linear'].set_const(0.0)
+                            s._vectors['output']['linear'].set_val(0.0)
 
     def _solve_linear(self, vec_names, mode, rel_systems):
         """
@@ -1976,9 +1975,7 @@ class Group(System):
         """
         self._has_approx = True
         self._approx_schemes = OrderedDict()
-        approx_scheme = self._get_approx_scheme(method)
-
-        default_opts = approx_scheme.DEFAULT_OPTIONS
+        default_opts = self._get_approx_scheme(method).DEFAULT_OPTIONS
 
         kwargs = {}
         for name, attr in (('step', step), ('form', form), ('step_calc', step_calc)):
@@ -2111,22 +2108,18 @@ class Group(System):
             containing only the matching columns.
         """
         if self._owns_approx_wrt:
-            if wrt_matches is None:
-                wrt_matches = ContainsAll()
-            abs2meta = self._var_allprocs_abs2meta
-            approx_of_idx = self._owns_approx_of_idx
-            approx_wrt_idx = self._owns_approx_wrt_idx
-
             offset = end = 0
             if self.pathname:  # doing semitotals, so include output columns
                 for of, _offset, _end, sub_of_idx in self._jacobian_of_iter():
-                    if of in wrt_matches:
+                    if wrt_matches is None or of in wrt_matches:
                         end += (_end - _offset)
                         yield of, offset, end, sub_of_idx
                         offset = end
 
+            abs2meta = self._var_allprocs_abs2meta
+            approx_wrt_idx = self._owns_approx_wrt_idx
             for wrt in self._owns_approx_wrt:
-                if wrt in wrt_matches:
+                if wrt_matches is None or wrt in wrt_matches:
                     if wrt in approx_wrt_idx:
                         sub_wrt_idx = approx_wrt_idx[wrt]
                         size = len(sub_wrt_idx)
@@ -2137,8 +2130,7 @@ class Group(System):
                     yield wrt, offset, end, sub_wrt_idx
                     offset = end
         else:
-            for tup in super(Group, self)._jacobian_wrt_iter(wrt_matches):
-                yield tup
+            yield from super(Group, self)._jacobian_wrt_iter(wrt_matches)
 
     def _update_wrt_matches(self, info):
         """

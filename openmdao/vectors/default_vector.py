@@ -4,7 +4,7 @@ import numbers
 
 import numpy as np
 
-from openmdao.vectors.vector import Vector, INT_DTYPE
+from openmdao.vectors.vector import Vector, INT_DTYPE, _full_slice
 from openmdao.vectors.default_transfer import DefaultTransfer
 from openmdao.utils.mpi import MPI, multi_proc_exception_check
 
@@ -66,8 +66,6 @@ class DefaultVector(Vector):
             zeros array of correct size.
         """
         system = self._system()
-        type_ = self._typ
-        iproc = self._iproc
         root_vec = self._root_vector
 
         cplx_data = None
@@ -76,9 +74,9 @@ class DefaultVector(Vector):
             scaling['phys'] = {}
             scaling['norm'] = {}
 
-        sizes = system._var_sizes[self._name][type_]
-        ind1 = system._ext_sizes[self._name][type_][0]
-        ind2 = ind1 + np.sum(sizes[iproc, :])
+        sizes = system._var_sizes[self._name][self._typ]
+        ind1 = system._ext_sizes[self._name][self._typ][0]
+        ind2 = ind1 + np.sum(sizes[self._iproc, :])
 
         data = root_vec._data[ind1:ind2]
 
@@ -142,7 +140,6 @@ class DefaultVector(Vector):
         system = self._system()
         type_ = self._typ
         kind = self._kind
-        iproc = self._iproc
         ncol = self._ncol
 
         do_scaling = self._do_scaling
@@ -157,38 +154,25 @@ class DefaultVector(Vector):
         self._cplx_views = cplx_views = {}
         self._cplx_views_flat = cplx_views_flat = {}
 
-        allprocs_abs2idx_t = system._var_allprocs_abs2idx[self._name]
-        sizes_t = system._var_sizes[self._name][type_]
-        offs = system._get_var_offsets()[self._name][type_]
-        if offs.size > 0:
-            offs = offs[iproc].copy()
-            # turn global offset into local offset
-            start = offs[0]
-            offs -= start
-        else:
-            offs = offs[0].copy()
-        offsets_t = offs
-
         abs2meta = system._var_abs2meta
+        start = end = 0
         for abs_name in system._var_relevant_names[self._name][type_]:
-            idx = allprocs_abs2idx_t[abs_name]
-
-            ind1 = offsets_t[idx]
-            ind2 = ind1 + sizes_t[iproc, idx]
-            shape = abs2meta[abs_name]['shape']
+            meta = abs2meta[abs_name]
+            end = start + meta['size']
+            shape = meta['shape']
             if ncol > 1:
                 if not isinstance(shape, tuple):
                     shape = (shape,)
                 shape = tuple(list(shape) + [ncol])
 
-            views_flat[abs_name] = v = self._data[ind1:ind2]
+            views_flat[abs_name] = v = self._data[start:end]
             if shape != v.shape:
                 v = v.view()
                 v.shape = shape
             views[abs_name] = v
 
             if alloc_complex:
-                cplx_views_flat[abs_name] = v = self._cplx_data[ind1:ind2]
+                cplx_views_flat[abs_name] = v = self._cplx_data[start:end]
                 if shape != v.shape:
                     v = v.view()
                     v.shape = shape
@@ -199,19 +183,13 @@ class DefaultVector(Vector):
                     scale0, scale1 = factors[abs_name][kind, scaleto]
                     vec = scaling[scaleto]
                     if vec[0] is not None:
-                        vec[0][ind1:ind2] = scale0
-                    vec[1][ind1:ind2] = scale1
+                        vec[0][start:end] = scale0
+                    vec[1][start:end] = scale1
+
+            start = end
 
         self._names = frozenset(views)
-
-    def _clone_data(self):
-        """
-        For each item in _data, replace it with a copy of the data.
-        """
-        self._data = self._data.copy()
-
-        if self._under_complex_step and self._cplx_data is not None:
-            self._cplx_data = self._cplx_data.copy()
+        self._len = end
 
     def __iadd__(self, vec):
         """
@@ -227,7 +205,10 @@ class DefaultVector(Vector):
         <Vector>
             self + vec
         """
-        self._data += vec._data
+        if isinstance(vec, Vector):
+            self.iadd(vec.asarray())
+        else:
+            self.iadd(vec)
         return self
 
     def __isub__(self, vec):
@@ -244,24 +225,30 @@ class DefaultVector(Vector):
         <Vector>
             self - vec
         """
-        self._data -= vec._data
+        if isinstance(vec, Vector):
+            self.isub(vec.asarray())
+        else:
+            self.isub(vec)
         return self
 
-    def __imul__(self, val):
+    def __imul__(self, vec):
         """
-        Perform in-place scalar multiplication.
+        Perform in-place multiplication.
 
         Parameters
         ----------
-        val : int or float
-            scalar to multiply self.
+        vec : Vector, int, float or ndarray
+            Value to multiply self.
 
         Returns
         -------
         <Vector>
-            self * val
+            self * vec
         """
-        self._data *= val
+        if isinstance(vec, Vector):
+            self.imul(vec.asarray())
+        else:
+            self.imul(vec)
         return self
 
     def add_scal_vec(self, val, vec):
@@ -275,7 +262,7 @@ class DefaultVector(Vector):
         vec : <Vector>
             this vector times val is added to self.
         """
-        self._data += val * vec._data
+        self.iadd(val * vec.asarray())
 
     def set_vec(self, vec):
         """
@@ -286,18 +273,75 @@ class DefaultVector(Vector):
         vec : <Vector>
             the vector whose values self is set to.
         """
-        self._data[:] = vec._data
+        self.set_val(vec.asarray())
 
-    def set_const(self, val):
+    def set_val(self, val, idxs=_full_slice):
         """
-        Set the value of this vector to a constant scalar value.
+        Fill the data array with the value at the specified indices or slice(s).
 
         Parameters
         ----------
-        val : int or float
-            scalar to set self to.
+        val : ndarray
+            Value to set into the data array.
+        idxs : int or slice or tuple of ints and/or slices.
+            The locations where the data array should be updated.
         """
-        self._data[:] = val
+        self._data[idxs] = val
+
+    def asarray(self, idxs=_full_slice):
+        """
+        Return parts of the data array at the specified indices or slice(s).
+
+        Parameters
+        ----------
+        idxs : int or slice or tuple of ints and/or slices.
+            The locations to pull from the data array.
+
+        Returns
+        -------
+        ndarray
+            Array of values.
+        """
+        return self._data[idxs]
+
+    def iadd(self, val, idxs=_full_slice):
+        """
+        Add the value to the data array at the specified indices or slice(s).
+
+        Parameters
+        ----------
+        val : ndarray
+            Value to set into the data array.
+        idxs : int or slice or tuple of ints and/or slices.
+            The locations where the data array should be updated.
+        """
+        self._data[idxs] += val
+
+    def isub(self, val, idxs=_full_slice):
+        """
+        Subtract the value from the data array at the specified indices or slice(s).
+
+        Parameters
+        ----------
+        val : ndarray
+            Value to set into the data array.
+        idxs : int or slice or tuple of ints and/or slices.
+            The locations where the data array should be updated.
+        """
+        self._data[idxs] -= val
+
+    def imul(self, val, idxs=_full_slice):
+        """
+        Multiply the value to the data array at the specified indices or slice(s).
+
+        Parameters
+        ----------
+        val : ndarray
+            Value to set into the data array.
+        idxs : int or slice or tuple of ints and/or slices.
+            The locations where the data array should be updated.
+        """
+        self._data[idxs] *= val
 
     def dot(self, vec):
         """
@@ -313,7 +357,7 @@ class DefaultVector(Vector):
         float
             The computed dot product value.
         """
-        return np.dot(self._data, vec._data)
+        return np.dot(self.asarray(), vec.asarray())
 
     def get_norm(self):
         """
@@ -324,7 +368,7 @@ class DefaultVector(Vector):
         float
             norm of this vector.
         """
-        return np.linalg.norm(self._data)
+        return np.linalg.norm(self.asarray())
 
     def get_slice_dict(self):
         """

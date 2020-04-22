@@ -152,7 +152,7 @@ class NonlinearBlockGS(NonlinearSolver):
                 # If MPI, piggyback on the residual vector to perform a distributed norm.
                 if system.comm.size > 1:
                     backup_r = residuals._data.copy()
-                    residuals._data[:] = temp
+                    residuals.set_val(temp)
                     temp_norm = residuals.get_norm()
                 else:
                     temp_norm = np.linalg.norm(temp)
@@ -164,10 +164,10 @@ class NonlinearBlockGS(NonlinearSolver):
                 # dot product.
                 if system.comm.size > 1:
                     backup_o = outputs._data.copy()
-                    outputs._data[:] = delta_outputs_n
+                    outputs.set_val(delta_outputs_n)
                     tddo = residuals.dot(outputs)
-                    residuals._data[:] = backup_r
-                    outputs._data[:] = backup_o
+                    residuals.set_val(backup_r)
+                    outputs.set_val(backup_o)
                 else:
                     tddo = temp.dot(delta_outputs_n)
 
@@ -183,9 +183,9 @@ class NonlinearBlockGS(NonlinearSolver):
 
             if not self.options['use_apply_nonlinear']:
                 with system._unscaled_context(outputs=[outputs]):
-                    outputs._data[:] = outputs_n
+                    outputs.set_val(outputs_n)
             else:
-                outputs._data[:] = outputs_n
+                outputs.set_val(outputs_n)
 
             # compute relaxed outputs
             outputs._data += theta_n * delta_outputs_n
@@ -196,7 +196,7 @@ class NonlinearBlockGS(NonlinearSolver):
         if not self.options['use_apply_nonlinear']:
             # Residual is the change in the outputs vector.
             with system._unscaled_context(outputs=[outputs], residuals=[residuals]):
-                residuals._data[:] = outputs._data - outputs_n
+                residuals.set_val(outputs._data - outputs_n)
 
     def _run_apply(self):
         """
@@ -236,7 +236,7 @@ class NonlinearBlockGS(NonlinearSolver):
 
             self._solver_info.pop()
             with system._unscaled_context(residuals=[residuals]):
-                residuals._data[:] = outputs._data - outputs_n
+                residuals.set_val(outputs._data - outputs_n)
 
     def _mpi_print_header(self):
         """

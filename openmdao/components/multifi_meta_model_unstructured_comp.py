@@ -110,11 +110,11 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
         self.options.declare('nfi', types=int, default=1, lower=1,
                              desc='Number of levels of fidelity.')
 
-    def _setup_procs(self, pathname, comm, mode, prob_options):
+    def _setup_procs(self, pathname, comm, mode, prob_meta):
         self._input_sizes = list(self._static_input_sizes)
 
         super(MultiFiMetaModelUnStructuredComp, self)._setup_procs(pathname, comm, mode,
-                                                                   prob_options)
+                                                                   prob_meta)
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
                   units=None, desc=''):

@@ -342,13 +342,13 @@ def get_input_idx_split(full_idxs, inputs, outputs, use_full_cols, is_total):
     if use_full_cols:
         out_size = outputs._data.size
         out_idxs = full_idxs[full_idxs < out_size]
-        in_idxs = full_idxs[full_idxs >= out_size]
-        if out_idxs.size > 0 and in_idxs.size > 0:
-            return [(inputs, in_idxs - out_size), (outputs, out_idxs)]
-        elif in_idxs.size > 0:
-            return [(inputs, in_idxs - out_size)]
-        else:
-            return [(outputs, out_idxs)]
+        in_idxs = full_idxs[full_idxs >= out_size] - out_size
+        if in_idxs.size > 0:
+            if out_idxs.size > 0:
+                return [(inputs, in_idxs), (outputs, out_idxs)]
+            else:
+                return [(inputs, in_idxs)]
+        return [(outputs, out_idxs)]
     elif is_total:
         return [(outputs, full_idxs)]
     else:

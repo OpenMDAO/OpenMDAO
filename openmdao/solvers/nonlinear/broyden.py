@@ -489,7 +489,7 @@ class BroydenSolver(NonlinearSolver):
             Array containing values of vector at desired states.
         """
         if self._full_inverse:
-            xm = vec._data.copy()
+            xm = vec.asarray().copy()
         else:
             states = self.options['state_vars']
             xm = self.xm.copy()
@@ -511,7 +511,7 @@ class BroydenSolver(NonlinearSolver):
         outputs = self._system()._outputs
 
         if self._full_inverse:
-            outputs._data[:] = new_val
+            outputs.set_val(new_val)
         else:
             states = self.options['state_vars']
             for name in states:
@@ -530,9 +530,9 @@ class BroydenSolver(NonlinearSolver):
         linear = self._system()._vectors['output']['linear']
 
         if self._full_inverse:
-            linear._data[:] = dx
+            linear.set_val(dx)
         else:
-            linear.set_const(0.0)
+            linear.set_val(0.0)
             for name in self.options['state_vars']:
                 i, j = self._idx[name]
                 linear[name] = dx[i:j]
@@ -555,7 +555,7 @@ class BroydenSolver(NonlinearSolver):
         d_out = system._vectors['output']['linear']
 
         inv_jac = self.Gm
-        d_res.set_const(0.0)
+        d_res.set_val(0.0)
 
         # Disable local fd
         approx_status = system._owns_approx_jac

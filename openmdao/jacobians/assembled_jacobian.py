@@ -82,13 +82,11 @@ class AssembledJacobian(Jacobian):
         OrderedDict
             Tuples of the form (start, end) keyed on variable name.
         """
-        iproc = system.comm.rank
-        abs2idx = system._var_allprocs_abs2idx['linear']
-        sizes = system._var_sizes['linear'][vtype]
-        start = end = 0
+        abs2meta = system._var_abs2meta
         ranges = OrderedDict()
+        start = end = 0
         for name in system._var_abs_names[vtype]:
-            end += sizes[iproc, abs2idx[name]]
+            end += abs2meta[name]['size']
             ranges[name] = (start, end)
             start = end
         return ranges
@@ -112,7 +110,6 @@ class AssembledJacobian(Jacobian):
         ext_mtx = self._matrix_class(system.comm, False)
 
         iproc = system.comm.rank
-        in_sizes = system._var_sizes['nonlinear']['input']
         out_ranges = self._out_ranges
         in_ranges = self._in_ranges
 
@@ -185,8 +182,7 @@ class AssembledJacobian(Jacobian):
         int_mtx._build(out_size, out_size, system)
 
         if ext_mtx._submats:
-            in_size = np.sum(in_sizes[iproc, :])
-            ext_mtx._build(out_size, in_size)
+            ext_mtx._build(out_size, len(system._vectors['input']['linear']))
         else:
             ext_mtx = None
 
@@ -231,14 +227,14 @@ class AssembledJacobian(Jacobian):
         conns = {} if isinstance(system, Component) else system._conn_global_abs_in2out
 
         iproc = system.comm.rank
-        sizes = system._var_sizes['nonlinear']['input']
-        abs2idx = system._var_allprocs_abs2idx['nonlinear']
+        sizes = system._var_sizes['linear']['input']
+        abs2idx = system._var_allprocs_abs2idx['linear']
         in_offset = {n: np.sum(sizes[iproc, :abs2idx[n]]) for n in
                      system._var_abs_names['input'] if n not in conns}
 
         subjacs_info = self._subjacs_info
 
-        sizes = system._var_sizes['nonlinear']['output']
+        sizes = system._var_sizes['linear']['output']
         for s in system.system_iter(recurse=True, include_self=True, typ=Component):
             for res_abs_name in s._var_abs_names['output']:
                 res_offset = np.sum(sizes[iproc, :abs2idx[res_abs_name]])
@@ -256,11 +252,8 @@ class AssembledJacobian(Jacobian):
                                             in_offset[in_abs_name] - ranges[2], None, info['shape'])
 
         if ext_mtx._submats:
-            sizes = system._var_sizes
-            iproc = system.comm.rank
-            out_size = np.sum(sizes['nonlinear']['output'][iproc, :])
-            in_size = np.sum(sizes['nonlinear']['input'][iproc, :])
-            ext_mtx._build(out_size, in_size)
+            ext_mtx._build(len(system._vectors['output']['linear']),
+                           len(system._vectors['input']['linear']))
         else:
             ext_mtx = None
 
@@ -276,8 +269,6 @@ class AssembledJacobian(Jacobian):
             int_mtx = self._int_mtx
             ext_mtx = self._ext_mtx[system.pathname]
             subjacs = system._subjacs_info
-            sys_inputs = system._var_allprocs_abs2prom['input']
-            sys_outputs = system._var_allprocs_abs2prom['output']
 
             if isinstance(system, Component):
                 global_conns = _empty_dict
@@ -287,9 +278,7 @@ class AssembledJacobian(Jacobian):
             output_names = set(system._var_abs_names['output'])
             input_names = set(system._var_abs_names['input'])
 
-            rev_conns = defaultdict(list)
-            for tgt, src in global_conns.items():
-                rev_conns[src].append(tgt)
+            rev_conns = None
 
             # This is the level where the AssembledJacobian is slotted.
             # The of and wrt are the inputs and outputs that it sees, if they are in the subjacs.
@@ -299,28 +288,28 @@ class AssembledJacobian(Jacobian):
             iters_in_ext = []
 
             for abs_key in subjacs:
-                _, wrtname = abs_key
-                if wrtname in sys_outputs:
-                    if wrtname in output_names:
-                        if abs_key in int_mtx._submats:
-                            iters.append(abs_key)
-                        else:
-                            # This happens when the src is an indepvarcomp that is
-                            # contained in the system.
-                            of, wrt = abs_key
-                            if wrt in rev_conns:
-                                for tgt in rev_conns[wrt]:
-                                    if (of, tgt) in int_mtx._submats:
-                                        iters.append(abs_key)
-                                        break
-                elif wrtname in sys_inputs:
-                    if wrtname in input_names:  # wrt is an input
-                        if wrtname in global_conns:
-                            iters.append(abs_key)
-                        elif ext_mtx is not None:
-                            iters_in_ext.append(abs_key)
-                elif ext_mtx is not None and wrtname in sys_inputs:
-                    iters_in_ext.append(abs_key)
+                ofname, wrtname = abs_key
+                if wrtname in output_names:
+                    if abs_key in int_mtx._submats:
+                        iters.append(abs_key)
+                    else:
+                        # This happens when the src is an indepvarcomp that is
+                        # contained in the system.
+                        of, wrt = abs_key
+                        if rev_conns is None:
+                            rev_conns = defaultdict(list)
+                            for tgt, src in global_conns.items():
+                                rev_conns[src].append(tgt)
+                        if wrt in rev_conns:
+                            for tgt in rev_conns[wrt]:
+                                if (of, tgt) in int_mtx._submats:
+                                    iters.append(abs_key)
+                                    break
+                elif wrtname in input_names:
+                    if wrtname in global_conns:
+                        iters.append(abs_key)
+                    elif ext_mtx is not None:
+                        iters_in_ext.append(abs_key)
 
             self._subjac_iters[system.pathname] = subjac_iters = (iters, iters_in_ext)
 
@@ -405,16 +394,16 @@ class AssembledJacobian(Jacobian):
 
             if mode == 'fwd':
                 if d_outputs._names:
-                    d_residuals._data += int_mtx._prod(d_outputs._data, mode)
+                    d_residuals.iadd(int_mtx._prod(d_outputs.asarray(), mode))
                 if do_mask:
-                    d_residuals._data += ext_mtx._prod(d_inputs._data, mode, mask=mask)
+                    d_residuals.iadd(ext_mtx._prod(d_inputs.asarray(), mode, mask=mask))
 
             else:  # rev
                 dresids = d_residuals._data
                 if d_outputs._names:
                     d_outputs._data += int_mtx._prod(dresids, mode)
                 if do_mask:
-                    d_inputs._data += ext_mtx._prod(dresids, mode, mask=mask)
+                    d_inputs.iadd(ext_mtx._prod(dresids, mode, mask=mask))
 
     def set_complex_step_mode(self, active):
         """

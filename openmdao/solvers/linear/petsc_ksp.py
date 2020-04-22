@@ -287,7 +287,7 @@ class PETScKrylov(LinearSolver):
             b_vec = system._vectors['output'][vec_name]
 
         # set value of x vector to KSP provided value
-        x_vec._data[:] = _get_petsc_vec_array(in_vec)
+        x_vec.set_val(_get_petsc_vec_array(in_vec))
 
         # apply linear
         scope_out, scope_in = system._get_scope()
@@ -373,7 +373,7 @@ class PETScKrylov(LinearSolver):
             ksp.solve(rhs_petsc_vec, sol_petsc_vec)
 
             # stuff the result into the x vector
-            x_vec._data[:] = sol_array
+            x_vec.set_val(sol_array)
 
             sol_petsc_vec = rhs_petsc_vec = None
 
@@ -396,7 +396,7 @@ class PETScKrylov(LinearSolver):
             mode = self._mode
 
             # Need to clear out any junk from the inputs.
-            system._vectors['input'][vec_name].set_const(0.0)
+            system._vectors['input'][vec_name].set_val(0.0)
 
             # assign x and b vectors based on mode
             if mode == 'fwd':
@@ -407,7 +407,7 @@ class PETScKrylov(LinearSolver):
                 b_vec = system._vectors['output'][vec_name]
 
             # set value of b vector to KSP provided value
-            b_vec._data[:] = _get_petsc_vec_array(in_vec)
+            b_vec.set_val(_get_petsc_vec_array(in_vec))
 
             # call the preconditioner
             self._solver_info.append_precon()

@@ -406,8 +406,8 @@ class Coloring(object):
         info = {'coloring': None, 'wrt_patterns': self._meta['wrt_patterns']}
         system._update_wrt_matches(info)
         if system.pathname:
-            wrt_matches = ['.'.join((system.pathname, n))
-                           for n in info['wrt_matches_prom']]
+            wrt_matches = set(['.'.join((system.pathname, n))
+                              for n in info['wrt_matches_prom']])
             # for partial and semi-total derivs, convert to promoted names
             ordered_of_info = system._jac_var_info_abs2prom(system._jacobian_of_iter())
             ordered_wrt_info = \
@@ -490,8 +490,11 @@ class Coloring(object):
             direction = 'fwd'
         else:
             direction = 'rev'
-        return 'Coloring (direction: %s, ncolors: %d, shape: %s' % (direction, self.total_solves(),
-                                                                    shape)
+
+        return (
+            f"Coloring (direction: {direction}, ncolors: {self.total_solves()}, shape: {shape}"
+            f", pct nonzero: {self._pct_nonzero:.2f}, tol: {self._meta.get('good_tol')}"
+        )
 
     def summary(self):
         """

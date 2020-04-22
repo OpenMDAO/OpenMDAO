@@ -3,7 +3,7 @@ import sys
 import numpy as np
 from petsc4py import PETSc
 
-from openmdao.vectors.default_vector import DefaultVector, INT_DTYPE
+from openmdao.vectors.default_vector import DefaultVector, INT_DTYPE, _full_slice
 from openmdao.vectors.petsc_transfer import PETScTransfer
 from openmdao.utils.mpi import MPI
 
@@ -17,9 +17,6 @@ CITATION = '''@InProceedings{petsc-efficient,
     Publisher = "Birkh{\"{a}}user Press",
     Year = "1997"
 }'''
-
-
-_full_slice = slice(None)
 
 
 class PETScVector(DefaultVector):

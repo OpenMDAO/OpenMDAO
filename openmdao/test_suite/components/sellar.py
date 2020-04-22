@@ -580,7 +580,7 @@ class SellarImplicitDis2(om.ImplicitComponent):
 
         z1 = inputs['z'][0]
         z2 = inputs['z'][1]
-        y1 = inputs['y1']
+        y1 = inputs['y1'].copy()
 
         y2 = outputs['y2']
 

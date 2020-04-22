@@ -5,8 +5,7 @@ import numpy as np
 from openmdao.utils.array_utils import sub2full_indices, get_input_idx_split
 import openmdao.utils.coloring as coloring_mod
 from openmdao.jacobians.jacobian import Jacobian
-
-_full_slice = slice(None)
+from openmdao.vectors.vector import _full_slice
 
 
 class ApproximationScheme(object):
@@ -44,6 +43,17 @@ class ApproximationScheme(object):
         self._j_data_offsets = None
         self._approx_groups_cached_under_cs = False
         self._exec_dict = defaultdict(list)
+
+    def __repr__(self):
+        """
+        Return a simple string representation.
+
+        Returns
+        -------
+        str
+            String containing class name and added approximation keys.
+        """
+        return f"{self.__class__.__name__}: {list(self._exec_dict.keys())}"
 
     def _reset(self):
         """
@@ -139,7 +149,6 @@ class ApproximationScheme(object):
         approx_wrt_idx = system._owns_approx_wrt_idx
 
         out_slices = outputs.get_slice_dict()
-        in_slices = inputs.get_slice_dict()
 
         is_total = isinstance(system, Group)
 

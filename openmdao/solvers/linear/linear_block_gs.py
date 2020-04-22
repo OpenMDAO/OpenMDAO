@@ -50,7 +50,7 @@ class LinearBlockGS(BlockLinearSolver):
                 for vec_name in vec_names:
                     if local and vec_name in subsys._rel_vec_names:
                         b_vec = system._vectors['output'][vec_name]
-                        b_vec.set_const(0.0)
+                        b_vec.set_val(0.0)
                     system._transfer(vec_name, mode, isub)
                     if local and vec_name in subsys._rel_vec_names:
                         b_vec *= -1.0
