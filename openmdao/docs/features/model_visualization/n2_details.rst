@@ -34,7 +34,7 @@ Model Hierarchy
 The model hierarchy is on the left side of the diagram. It is actually a mix of Systems and variables, both
 inputs and outputs.
 
-The top System, the root of the model, is on the left and the subsystem hierarchy is displayed on the right.
+The top System, the root of the model, is on the left and the subsystem hierarchy is displayed to its right.
 
 The colors indicate the type of
 item in the hierarchy. To see what the colors represent, an optional legend can be displayed using the |show_legend|
@@ -80,7 +80,7 @@ that connection.
 
 Clicking in the matrix on a connection or diagonal, lets you pin connection arrows so that they don't
 disappear when you hover away from the cell. You can clear these connections arrows by using the Clear Arrows and
-Connections button |clear_conn_arrows| in the toolbar.
+Connections button |hide_conn_arrows| in the toolbar.
 
 Solver Structure
 ----------------
@@ -100,7 +100,9 @@ Here is what section of the legend looks like for both linear and nonlinear solv
 .. |linear_solvers_legend| image:: images/linear_solvers_legend.png
    :align: top
 
-|linear_solvers_legend|    |nonlinear_solvers_legend|
+|linear_solvers_legend|
+
+|nonlinear_solvers_legend|
 
 When a System has a Newton nonlinear solver and the `solve_subsystems` option is set to True for that solver,
 the Solver Structure box for that System has the text `NL: Newton (sub_solve)`.
@@ -108,7 +110,7 @@ the Solver Structure box for that System has the text `NL: Newton (sub_solve)`.
 Toolbar
 -------
 
-The tool bar above the N2 diagram provides many useful capabilities.
+The tool bar to the left of the N2 diagram provides many useful capabilities.
 
 Zoomed Element
 **************
@@ -126,128 +128,169 @@ The buttons in the first group of the toolbar control the view.
 
 .. |return_to_root| image:: images/home.png
    :align: middle
-   :scale: 60 %
+   :scale: 40 %
 
-.. |back| image:: images/arrow-left.png
+.. |back| image:: images/back.png
    :align: middle
-   :scale: 60 %
+   :scale: 40 %
 
-.. |forward| image:: images/arrow-right.png
+.. |forward| image:: images/forward.png
    :align: middle
-   :scale: 60 %
+   :scale: 40 %
 
-.. |up_one_level| image:: images/arrow-up.png
-   :align: middle
-   :scale: 60 %
 
 +---------------------+-----------------+----------------------------------------------------------------------+
 | Button              | Title           | Description                                                          |
 +=====================+=================+======================================================================+
-| |return_to_root|    | Return to Root  | Make the view the entire model, starting from the root               |
+| |return_to_root|    | Return to Root  | View entire model starting from root                                 |
 +---------------------+-----------------+----------------------------------------------------------------------+
-| |back|              | Back            | Move back in the view history                                        |
+| |back|              | Back            | Move back in view history                                            |
 +---------------------+-----------------+----------------------------------------------------------------------+
-| |forward|           | Forward         | Move forward in the view history                                     |
-+---------------------+-----------------+----------------------------------------------------------------------+
-| |up_one_level|      | Up One Level    | Move the view up one level in the hierarchy                          |
+| |forward|           | Forward         | Move forward in view history                                         |
 +---------------------+-----------------+----------------------------------------------------------------------+
 
 Collapsing Variables
 ********************
 
-The next set of buttons lets you control the collapsing of elements from the right side of the hierarchy.
+The next set of buttons lets you control the collapsing of elements from the right side of the hierarchy. These
+buttons are revealed as a fly out menu as you hover over this button
 
-.. |uncollapse_view| image:: images/resize-full.png
+.. |control_collapse| image:: images/control_collapse.png
    :align: middle
    :scale: 40 %
 
-.. |uncollapse_all| image:: images/expand.png
-   :align: middle
-   :scale: 60 %
+|control_collapse|
 
-.. |collapse_view| image:: images/resize-small.png
+The buttons are:
+
+.. |collapse_view| image:: images/collapse_view.png
    :align: middle
    :scale: 40 %
 
-.. |collapse_all| image:: images/compress.png
+.. |expand_view| image:: images/expand_view.png
    :align: middle
-   :scale: 60 %
+   :scale: 40 %
 
-.. |collapse_depth| image:: images/sort-numeric-asc.png
+.. |collapse_all| image:: images/collapse_all.png
    :align: middle
-   :scale: 60 %
+   :scale: 40 %
+
+.. |expand_all| image:: images/expand_all.png
+   :align: middle
+   :scale: 40 %
+
+This is separate !
+
+.. |collapse_depth| image:: images/collapse_depth.png
+   :align: middle
+   :scale: 40 %
 
 
-+---------------------+----------------------------------------+------------------------------------------------------------------+
++---------------------+----------------------------------------+---------------------------------------------------------------------+
 | Button              | Title                                  | Description                                                      |
-+=====================+========================================+==================================================================+
-| |uncollapse_view|   | Uncollapse in View Only                | Uncollapse only the variables that are in the current view       |
-+---------------------+----------------------------------------+------------------------------------------------------------------+
-| |uncollapse_all|    | Uncollapse All                         | Uncollapse all the variables in the entire model                 |
-+---------------------+----------------------------------------+------------------------------------------------------------------+
-| |collapse_view|     | Collapse Variables in View Only        | Collapse only the variables in the current view                  |
-+---------------------+----------------------------------------+------------------------------------------------------------------+
-| |collapse_all|      | Collapse All Variables                 | Collapse all the variables in the entire model                   |
-+---------------------+----------------------------------------+------------------------------------------------------------------+
-| |collapse_depth|    | Collapse Depth                         | Sets the number of hierarchy levels shown in the view            |
-+---------------------+----------------------------------------+------------------------------------------------------------------+
++=====================+========================================+=====================================================================+
+| |collapse_view|     | Collapse variables in view only        | Collapse only the variables in the current view                     |
++---------------------+----------------------------------------+---------------------------------------------------------------------+
+| |expand_view|       | Expand variables in view only          | Expand only the variables in the current view                       |
++---------------------+----------------------------------------+---------------------------------------------------------------------+
+| |collapse_all|      | Collapse all variables                 | Collapse all the variables in the entire model                      |
++---------------------+----------------------------------------+---------------------------------------------------------------------+
+| |expand_all|        | Expand all variables                   | Expand all the variables in the entire model                        |
++---------------------+----------------------------------------+---------------------------------------------------------------------+
+| |collapse_depth|    | Collapse depth                         | Sets the number of hierarchy levels shown in the view               |
++---------------------+----------------------------------------+---------------------------------------------------------------------+
+
+Connections Arrow Visibility
+****************************
+
+The connections visibilty is controlled using the buttons off the menu:
+
+.. |connection_visibility| image:: images/connection_visibility.png
+   :align: middle
+   :scale: 40 %
+
+|connection_visibility|
+
+.. |show_conn_arrows| image:: images/show_conn_arrows.png
+   :align: middle
+   :scale: 40 %
+
+.. |hide_conn_arrows| image:: images/hide_conn_arrows.png
+   :align: middle
+   :scale: 40 %
+
+.. |show_all_conn_arrows| image:: images/show_all_conn_arrows.png
+   :align: middle
+   :scale: 40 %
+
+
++-----------------------+----------------------------------------+-----------------------------------------------------+
+| Button                | Title                                  | Description                                         |
++=======================+========================================+=====================================================+
+| |show_conn_arrows|    | Show pinned connection arrows          | Show pinned connection arrows                       |
++-----------------------+----------------------------------------+-----------------------------------------------------+
+| |hide_conn_arrows|    | Hide all connection arrows             | Hide all connection arrows                          |
++-----------------------+----------------------------------------+-----------------------------------------------------+
+| |show_all_conn_arrows|| Show all connections in model          | Show all connections in model                       |
++-----------------------+----------------------------------------+-----------------------------------------------------+
+
 
 Remaining Toolbar Buttons
 *************************
 
 The buttons in the remaining part of the toolbar offer a variety of other options:
 
-.. |clear_conn_arrows| image:: images/eraser.png
+.. |toggle_solver_names| image:: images/toggle_solver_names.png
    :align: middle
-   :scale: 60 %
+   :scale: 40 %
 
-.. |show_path| image:: images/terminal.png
+.. |show_legend| image:: images/show_legend.png
    :align: middle
-   :scale: 60 %
+   :scale: 40 %
 
-.. |show_legend| image:: images/map-signs.png
+.. |font_size| image:: images/font_size.png
    :align: middle
-   :scale: 60 %
+   :scale: 40 %
 
-.. |toggle_solver_names| image:: images/minus.png
+.. |model_height| image:: images/model_height.png
    :align: middle
-   :scale: 60 %
+   :scale: 40 %
 
-.. |font_size| image:: images/text-height.png
+.. |save_svg| image:: images/save_svg.png
    :align: middle
-   :scale: 60 %
+   :scale: 40 %
 
-.. |model_height| image:: images/resize-vertical.png
+.. |show_node_info| image:: images/show_node_info.png
    :align: middle
-   :scale: 60 %
+   :scale: 40 %
 
-.. |save_svg| image:: images/floppy-o.png
+.. |help| image:: images/help.png
    :align: middle
-   :scale: 60 %
-
-.. |help| image:: images/question.png
-   :align: middle
-   :scale: 60 %
+   :scale: 40 %
 
 +-----------------------+---------------------------------+-------------------------------------------------------------------+
 | Button                | Title                           | Description                                                       |
 +=======================+=================================+===================================================================+
-| |clear_conn_arrows|   | Clear Arrows and Connections    | Remove the arrows and connections displayed                       |
+| |toggle_solver_names| | Toggle Solver Names             | Show non-linear/ Show linear solvers                              |
 +-----------------------+---------------------------------+-------------------------------------------------------------------+
-| |show_path|           | Show Path                       | Show the full path to the System at the top of the view           |
-+-----------------------+---------------------------------+-------------------------------------------------------------------+
-| |show_legend|         | Show Legend                     | Show the legend explaining the colors and icons in the diagram    |
-+-----------------------+---------------------------------+-------------------------------------------------------------------+
-| |toggle_solver_names| | Toggle Solver Names             | Toggle between showing linear and nonlinear solvers               |
+| |show_legend|         | Show legend / Hide legend       | Show the legend explaining the colors and icons in the diagram    |
 +-----------------------+---------------------------------+-------------------------------------------------------------------+
 | |font_size|           | Font Size                       | Set the font size for the text in the diagram                     |
++-----------------------+---------------------------------+-------------------------------------------------------------------+
+| |collapse_depth|      | Set collapse depth              | Set the font size for the text in the diagram                     |
 +-----------------------+---------------------------------+-------------------------------------------------------------------+
 | |model_height|        | Model Height                    | Set the pixel height of the diagram. Default is 600 pixels        |
 +-----------------------+---------------------------------+-------------------------------------------------------------------+
 | |save_svg|            | Save SVG                        | Save the current view of the diagram to an SVG file               |
 +-----------------------+---------------------------------+-------------------------------------------------------------------+
+| |show_node_info|      | Show / Hide Node Info            | Show/Hide connection matrix information                           |
++-----------------------+---------------------------------+-------------------------------------------------------------------+
 | |help|                | Help                            | Sets the number of hierarchy levels shown in the view             |
 +-----------------------+---------------------------------+-------------------------------------------------------------------+
+
+Search bar
+----------
+The Show Node Info button brings up a small window that displays information about the item the cursor is hovering over.
 
 
 Search bar
@@ -255,7 +298,7 @@ Search bar
 
 .. |search| image:: images/search.png
    :align: middle
-   :scale: 60 %
+   :scale: 40 %
 
 The search bar below the Toolbar lets you search for variables in the model. This can be very useful when working
 with very large models.
@@ -275,6 +318,12 @@ Displayed Component Connectivity
 Between the search bar and the N2 diagram, there is a note about how the internal connectivity of components is
 controlled. This is controlled from a script using the `use_declare_partial_info` option to the `n2` function.
 A similar option exists when generating N2 diagrams from the command line.
+
+Show external connections
+-------------------------
+?????
+
+
 
 Legend
 ------
