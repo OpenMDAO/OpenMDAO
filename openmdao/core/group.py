@@ -1211,7 +1211,7 @@ class Group(System):
                         else:
                             simple_warning(msg)
 
-                if src_indices is not None:
+                elif src_indices is not None:
                     src_indices = np.atleast_1d(src_indices)
 
                     # initial dimensions of indices shape must be same shape as target
@@ -1268,25 +1268,29 @@ class Group(System):
                                 simple_warning(msg)
                         if src_indices.ndim > 1:
                             abs2meta[abs_in]['src_indices'] = \
-                                abs2meta[abs_in]['src_indices'].flatten()
+                                abs2meta[abs_in]['src_indices'].ravel()
                     else:
+                        # For 1D source, we allow user to specify a flat list without setting
+                        # flat_src_indices to True.
+                        if src_indices.ndim == 1:
+                            src_indices = src_indices[:, np.newaxis]
+
                         for d in range(source_dimensions):
                             # when running under MPI, there is a value for each proc
                             d_size = out_shape[d] * self.comm.size
-                            if src_indices.size > 0:
-                                arr = src_indices[..., d]
-                                if np.any(arr >= d_size) or np.any(arr <= -d_size):
-                                    for i in arr.flat:
-                                        if abs(i) >= d_size:
-                                            msg = f"{self.msginfo}: The source indices " + \
-                                                  f"do not specify a valid index for the " + \
-                                                  f"connection '{abs_out}' to '{abs_in}'. " + \
-                                                  f"Index '{i}' is out of range for source " + \
-                                                  f"dimension of size {d_size}."
-                                            if self._raise_connection_errors:
-                                                raise ValueError(msg)
-                                            else:
-                                                simple_warning(msg)
+                            arr = src_indices[..., d]
+                            if np.any(arr >= d_size) or np.any(arr <= -d_size):
+                                for i in arr.flat:
+                                    if abs(i) >= d_size:
+                                        msg = f"{self.msginfo}: The source indices " + \
+                                              f"do not specify a valid index for the " + \
+                                              f"connection '{abs_out}' to '{abs_in}'. " + \
+                                              f"Index '{i}' is out of range for source " + \
+                                              f"dimension of size {d_size}."
+                                        if self._raise_connection_errors:
+                                            raise ValueError(msg)
+                                        else:
+                                            simple_warning(msg)
 
     def _set_subsys_connection_errors(self, val=True):
         """
