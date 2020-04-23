@@ -421,6 +421,14 @@ class N2MatrixCell {
             n2MouseFuncs.overOffDiag);
     }
 
+     /**
+     * Select the mousemove callback depending on whether we"re on the diagonal.
+     * TODO: Remove these globals
+     */
+    mousemove() {
+        return (this.onDiagonal() ? n2MouseFuncs.moveOnDiag : null);
+    }
+
     /**
      * Choose a color based on our location and state of the associated N2TreeNode.
      */

@@ -3,11 +3,13 @@
  * @typedef InfoPropDefault
  * @property {String} key The identifier of the property.
  * @property {String} desc The description (label) to display.
+ * @property {Boolean} capitalize Whether to capitialize every word in the desc.
  */
 class InfoPropDefault {
-    constructor(key, desc) {
+    constructor(key, desc, capitalize = false) {
         this.key = key;
         this.desc = desc;
+        this.capitalize = capitalize;
     }
 
     /** Return the same message since this is the base class */
@@ -19,12 +21,30 @@ class InfoPropDefault {
  * @typedef InfoPropYesNo
  */
 class InfoPropYesNo extends InfoPropDefault {
-    constructor(key, desc) {
-        super(key, desc);
+    constructor(key, desc, capitalize = false) {
+        super(key, desc, capitalize);
     }
 
     /** Return Yes or No when given True or False */
-    output(boolVal) { return boolVal? 'Yes' : 'No'; }
+    output(boolVal) { return boolVal ? 'Yes' : 'No'; }
+}
+
+/**
+ * Rename params to inputs and unknowns to outputs. 
+ * @typedef InfoPropYesNo
+ */
+class InfoUpdateType extends InfoPropDefault {
+    constructor(key, desc, capitalize = false) {
+        super(key, desc, capitalize);
+    }
+
+    /** Replace the old terms with new ones */
+    output(msg) {
+        return msg
+            .replace(/param/, 'input')
+            .replace(/unknown/, 'output')
+            .replace('_', ' ');
+    }
 }
 
 /**
@@ -37,21 +57,23 @@ class NodeInfo {
     /**
      * Build a list of the properties we care about and set up
      * references to the HTML elements.
+     * @param {Object} abs2prom Object containing promoted variable names.
      */
-    constructor() {
+    constructor(abs2prom) {
         this.propList = [
-            new InfoPropDefault('absPathName', 'Path'),
+            new InfoPropDefault('absPathName', 'Absolute Name'),
             new InfoPropDefault('class', 'Class'),
-            new InfoPropDefault('type', 'Type'),
+            new InfoUpdateType('type', 'Type', true),
             new InfoPropDefault('dtype', 'DType'),
-            new InfoPropDefault('subsystem_type', 'Subsystem Type'),
-            new InfoPropDefault('component_type', 'Component Type'),
+            new InfoPropDefault('subsystem_type', 'Subsystem Type', true),
+            new InfoPropDefault('component_type', 'Component Type', true),
             new InfoPropYesNo('implicit', 'Implicit'),
             new InfoPropYesNo('is_parallel', 'Parallel'),
             new InfoPropDefault('linear_solver', 'Linear Solver'),
             new InfoPropDefault('nonlinear_solver', 'Non-Linear Solver')
         ];
 
+        this.abs2prom = abs2prom;
         this.table = d3.select('#node-info-container');
         this.thead = this.table.select('thead');
         this.tbody = this.table.select('tbody');
@@ -63,18 +85,33 @@ class NodeInfo {
     show() {
         this.toolbarButton.attr('class', 'fas icon-info-circle active-tab-icon');
         this.hidden = false;
+        d3.select('#all_pt_n2_content_div').classed('node-data-cursor', true);
     }
 
     /** Make the info box hidden if it's visible */
     hide() {
         this.toolbarButton.attr('class', 'fas icon-info-circle');
         this.hidden = true;
+        d3.select('#all_pt_n2_content_div').classed('node-data-cursor', false);
     }
 
     /** Toggle the visibility setting */
     toggle() {
         if (this.hidden) this.show();
         else this.hide();
+    }
+
+    _addPropertyRow(label, val, capitalize = false) {
+        const newRow = this.tbody.append('tr');
+
+        newRow.append('th')
+            .attr('scope', 'row')
+            .text(label);
+
+        const td = newRow.append('td')
+            .text(val);
+
+        if (capitalize) td.attr('class', 'caps');
     }
 
     /**
@@ -94,15 +131,18 @@ class NodeInfo {
         this.table.select('tfoot th')
             .style('background-color', color);
 
+        if (this.abs2prom) {
+            if (obj.isParam()) {
+                this._addPropertyRow('Promoted Name', this.abs2prom.input[obj.absPathName]);
+            }
+            else if (obj.isUnknown()) {
+                this._addPropertyRow('Promoted Name', this.abs2prom.output[obj.absPathName]);
+            }
+        }
+
         for (const prop of this.propList) {
             if (obj.propExists(prop.key) && obj[prop.key] != '') {
-                const newRow = this.tbody.append('tr');
-                
-                newRow.append('th')
-                    .attr('scope', 'row')
-                    .text(prop.desc);
-                newRow.append('td')
-                    .text(prop.output(obj[prop.key]));
+                this._addPropertyRow(prop.desc, prop.output(obj[prop.key]), prop.capitalize)
             }
         }
 
@@ -199,7 +239,7 @@ class N2UserInterface {
         this._setupSearch();
 
         this.legend = new N2Legend(this.n2Diag.modelData);
-        this.nodeInfoBox = new NodeInfo();
+        this.nodeInfoBox = new NodeInfo(this.n2Diag.model.abs2prom);
     }
 
     /** Set up the menu for selecting an arbitrary depth to collapse to. */
@@ -213,7 +253,7 @@ class N2UserInterface {
         collapseDepthElement.max = this.n2Diag.model.maxDepth - 1;
         collapseDepthElement.value = collapseDepthElement.max;
 
-        collapseDepthElement.onmouseup = function(e) {
+        collapseDepthElement.onmouseup = function (e) {
             const modelDepth = parseInt(e.target.value);
             self.collapseToDepthSelectChange(modelDepth);
         };
@@ -562,10 +602,10 @@ class N2UserInterface {
 
         this.n2Diag.toggleSolverNameType();
         this.n2Diag.dom.parentDiv.querySelector(
-                '#linear-solver-button'
-            ).className = !this.n2Diag.showLinearSolverNames ?
-            'fas icon-nonlinear-solver solver-button' :
-            'fas icon-linear-solver solver-button';
+            '#linear-solver-button'
+        ).className = !this.n2Diag.showLinearSolverNames ?
+                'fas icon-nonlinear-solver solver-button' :
+                'fas icon-linear-solver solver-button';
 
         this.legend.toggleSolvers(this.n2Diag.showLinearSolverNames);
 
@@ -583,7 +623,7 @@ class N2UserInterface {
         this.legend.toggle();
 
         d3.select('#legend-button').attr('class',
-            this.legend.hidden? 'fas icon-key' : 'fas icon-key active-tab-icon');
+            this.legend.hidden ? 'fas icon-key' : 'fas icon-key active-tab-icon');
     }
 
     toggleNodeData() {

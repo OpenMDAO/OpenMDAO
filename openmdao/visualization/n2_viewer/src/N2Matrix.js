@@ -370,6 +370,7 @@ class N2Matrix {
                 // "this" refers to the element here, so leave it alone:
                 d.renderer.renderPrevious(this)
                     .on('mouseover', d.mouseover())
+                    .on('mousemove', d.mousemove())
                     .on('mouseleave', n2MouseFuncs.out)
                     .on('click', n2MouseFuncs.click);
             });
