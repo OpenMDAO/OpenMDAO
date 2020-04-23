@@ -528,7 +528,7 @@ class TestPyoptSparse(unittest.TestCase):
         obj = prob['o']
         assert_near_equal(obj, 20.0, 1e-6)
 
-    def test_simple_driver_supports(self):
+    def test_driver_supports(self):
 
         prob = om.Problem()
         model = prob.model
