@@ -182,10 +182,6 @@ class System(object):
         Total number of allprocs variables in system before/after this one.
     _ext_sizes : {'input': (int, int), 'output': (int, int)}
         Total size of allprocs variables in system before/after this one.
-    _vec_names : [str, ...]
-        List of names of all vectors, including the nonlinear vector.
-    _lin_vec_names : [str, ...]
-        List of names of the linear vectors (i.e., the right-hand sides).
     _vectors : {'input': dict, 'output': dict, 'residual': dict}
         Dictionaries of vectors keyed by vec_name.
     _inputs : <Vector>
@@ -437,8 +433,6 @@ class System(object):
         self.supports_multivecs = False
 
         self._relevant = None
-        self._vec_names = None
-        self._vois = None
         self._mode = None
 
         self._scope_cache = {}
@@ -468,7 +462,6 @@ class System(object):
 
         self._filtered_vars_to_record = {}
         self._owning_rank = None
-        self._lin_vec_names = []
         self._coloring_info = _DEFAULT_COLORING_META.copy()
         self._first_call_to_linearize = True   # will check in first call to _linearize
 
@@ -584,7 +577,10 @@ class System(object):
             ext_num_vars = {}
             ext_sizes = {}
 
-            vec_names = self._lin_rel_vec_name_list if self._use_derivatives else self._vec_names
+            if self._use_derivatives:
+                vec_names = self._lin_rel_vec_name_list
+            else:
+                vec_names = self._problem_meta['vec_names']
 
             for vec_name in vec_names:
                 ext_num_vars[vec_name] = {}
@@ -625,8 +621,12 @@ class System(object):
 
         if initial:
             relevant = self._relevant
-            vec_names = self._rel_vec_name_list if self._use_derivatives else self._vec_names
-            vois = self._vois
+            if self._use_derivatives:
+                vec_names = self._rel_vec_name_list
+            else:
+                vec_names = self._problem_meta['vec_names']
+
+            vectorized_vois = self._problem_meta['vectorized_vois']
             abs2idx = self._var_allprocs_abs2idx
 
             # Check for complex step to set vectors up appropriately.
@@ -663,14 +663,13 @@ class System(object):
                 else:
                     alloc_complex = ln_alloc_complex
 
-                    if vec_name != 'linear':
-                        voi = vois[vec_name]
-                        if voi['vectorize_derivs']:
-                            if 'size' in voi:
-                                ncol = voi['size']
-                            else:
-                                owner = self._owning_rank[vec_name]
-                                ncol = sizes[owner, abs2idx[vec_name][vec_name]]
+                    if vec_name != 'linear' and vec_name in vectorized_vois:
+                        voi = vectorized_vois[vec_name]
+                        if 'size' in voi:
+                            ncol = voi['size']
+                        else:
+                            owner = self._owning_rank[vec_name]
+                            ncol = sizes[owner, abs2idx[vec_name][vec_name]]
                         rdct, _ = relevant[vec_name]['@all']
                         rel = rdct['output']
 
@@ -799,7 +798,8 @@ class System(object):
         # in the current system, by gathering data from immediate subsystems,
         # and no recursion is necessary.
         self._setup_var_data(recurse=recurse)
-        self._setup_vec_names(mode, self._vec_names, self._vois)
+        if self.pathname == '':
+            self._setup_vec_names(mode)
         self._setup_global_connections(recurse=recurse)
         self._setup_relevance(mode, self._relevant)
         self._setup_var_index_ranges(recurse=recurse)
@@ -1466,7 +1466,10 @@ class System(object):
         """
         self._var_allprocs_abs2idx = abs2idx = {}
 
-        vec_names = self._lin_rel_vec_name_list if self._use_derivatives else self._vec_names
+        if self._use_derivatives:
+            vec_names = self._lin_rel_vec_name_list
+        else:
+            vec_names = self._problem_meta['vec_names']
 
         for vec_name in vec_names:
             abs2idx[vec_name] = abs2idx_t = {}
@@ -1551,42 +1554,58 @@ class System(object):
         """
         pass
 
-    def _setup_vec_names(self, mode, vec_names=None, vois=None):
+    def _setup_vec_names(self, mode):
         """
-        Return the list of vec_names and the vois dict.
+        Compute the list of vec_names and the vois dict.
+
+        This is only called on the top level System during initial setup.
 
         Parameters
         ----------
         mode : str
             Derivative direction, either 'fwd' or 'rev'.
-        vec_names : list of str or None
-            The list of names of vectors. Depends on the value of mode.
-        vois : dict
-            Dictionary of either design vars or responses, depending on the value
-            of mode.
-
         """
-        self._vois = vois
-        if vec_names is None:  # should only occur at top level on full setup
-            if self._use_derivatives:
-                vec_names = ['nonlinear', 'linear']
-                if mode == 'fwd':
-                    self._vois = vois = self.get_design_vars(recurse=True, get_sizes=False)
-                else:  # rev
-                    self._vois = vois = self.get_responses(recurse=True, get_sizes=False)
-                vec_names.extend(sorted(set(voi for voi, data in vois.items()
-                                            if data['parallel_deriv_color'] is not None
-                                            or data['vectorize_derivs'])))
-            else:
-                vec_names = ['nonlinear']
-                self._vois = {}
+        if self._use_derivatives:
+            vec_names = ['nonlinear', 'linear']
+            vois = {}
+            for system in self.system_iter(include_self=True, recurse=True):
+                vois.update(tup for tup in system._get_vec_names_from_vois(mode))
 
-        self._vec_names = vec_names
-        self._lin_vec_names = vec_names[1:]  # only linear vec names
+            vec_names.extend(sorted(vois))
+        else:
+            vec_names = ['nonlinear']
+            vois = {}
 
-        for s in self.system_iter():
-            s._vec_names = vec_names
-            s._lin_vec_names = self._lin_vec_names
+        self._problem_meta['vec_names'] = vec_names
+        self._problem_meta['lin_vec_names'] = vec_names[1:]
+        self._problem_meta['vectorized_vois'] = {n: d for n, d in vois.items()
+                                                 if d['vectorize_derivs']}
+
+    def _get_vec_names_from_vois(self, mode):
+        """
+        Compute the list of vec_names and the vois dict.
+
+        This is only called on the top level System during initial setup.
+
+        Parameters
+        ----------
+        mode : str
+            Derivative direction, either 'fwd' or 'rev'.
+        """
+        if mode == 'fwd':
+            vois = self._design_vars
+            typ = "design variable"
+        else:
+            vois = self._responses
+            typ = "response"
+
+        pro2abs = self._var_allprocs_prom2abs_list['output']
+        try:
+            for prom_name, data in vois.items():
+                if data['parallel_deriv_color'] is not None or data['vectorize_derivs']:
+                    yield pro2abs[prom_name][0], data
+        except KeyError as err:
+            raise RuntimeError(f"{self.msginfo}: Output not found for {typ} {str(err)}.")
 
     def _init_relevance(self, mode):
         """
@@ -1708,7 +1727,7 @@ class System(object):
         self._var_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
 
         self._rel_vec_name_list = []
-        for vec_name in self._vec_names:
+        for vec_name in self._problem_meta['vec_names']:
             rel, relsys = relevant[vec_name]['@all']
             if self.pathname in relsys:
                 self._rel_vec_name_list.append(vec_name)
@@ -2291,7 +2310,10 @@ class System(object):
         """
         if self._var_offsets is None:
             offsets = self._var_offsets = {}
-            vec_names = self._lin_rel_vec_name_list if self._use_derivatives else self._vec_names
+            if self._use_derivatives:
+                vec_names = self._lin_rel_vec_name_list
+            else:
+                vec_names = self._problem_meta['vec_names']
 
             for vec_name in vec_names:
                 offsets[vec_name] = off_vn = {}

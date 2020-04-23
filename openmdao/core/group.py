@@ -516,7 +516,10 @@ class Group(System):
 
         subsystems_var_range = self._subsystems_var_range = {}
 
-        vec_names = self._lin_rel_vec_name_list if self._use_derivatives else self._vec_names
+        if self._use_derivatives:
+            vec_names = self._lin_rel_vec_name_list
+        else:
+            vec_names = self._problem_meta['vec_names']
 
         # First compute these on one processor for each subsystem
         for vec_name in vec_names:
@@ -727,7 +730,10 @@ class Group(System):
         sizes = self._var_sizes
         relnames = self._var_allprocs_relevant_names
 
-        vec_names = self._lin_rel_vec_name_list if self._use_derivatives else self._vec_names
+        if self._use_derivatives:
+            vec_names = self._lin_rel_vec_name_list
+        else:
+            vec_names = self._problem_meta['vec_names']
 
         n_distrib_vars = 0
 
@@ -1416,7 +1422,7 @@ class Group(System):
             if subsys._use_derivatives:
                 vec_names = subsys._lin_rel_vec_name_list
             else:
-                vec_names = subsys._vec_names
+                vec_names = subsys._problem_meta['vec_names']
 
             for vec_name in vec_names:
                 subsystems_var_range = self._subsystems_var_range[vec_name]

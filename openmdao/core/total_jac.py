@@ -301,7 +301,7 @@ class _TotalJacInfo(object):
             myoffset = rowcol_size * myrank
             owns = self.model._owning_rank
 
-            for vecname in model._lin_vec_names:
+            for vecname in model._problem_meta['lin_vec_names']:
                 sizes = self.model._var_sizes[vecname]['output']
                 abs2idx = self.model._var_allprocs_abs2idx[vecname]
                 abs2meta = self.model._var_allprocs_abs2meta
@@ -342,7 +342,7 @@ class _TotalJacInfo(object):
                 jac_scatters[vecname] = PETSc.Scatter().create(src_vec, src_indexset,
                                                                tgt_vec, tgt_indexset)
         else:
-            for vecname in model._lin_vec_names:
+            for vecname in model._problem_meta['lin_vec_names']:
                 jac_scatters[vecname] = None
 
     def _get_dict_J(self, J, wrt, prom_wrt, of, prom_of, wrt_meta, of_meta, return_format):
@@ -641,7 +641,7 @@ class _TotalJacInfo(object):
         myproc = self.comm.rank
         name2jinds = {}  # map varname to jac row or col idxs that we must scatter to other procs
 
-        for vecname in model._lin_vec_names:
+        for vecname in model._problem_meta['lin_vec_names']:
             inds = []
             jac_inds = []
             sizes = model._var_sizes[vecname]['output']
@@ -1293,7 +1293,7 @@ class _TotalJacInfo(object):
 
         # Prepare model for calculation by cleaning out the derivatives
         # vectors.
-        for vec_name in model._lin_vec_names:
+        for vec_name in model._problem_meta['lin_vec_names']:
             vec_dinput[vec_name].set_val(0.0)
             vec_doutput[vec_name].set_val(0.0)
             vec_dresid[vec_name].set_val(0.0)
@@ -1333,10 +1333,12 @@ class _TotalJacInfo(object):
                     with model._scaled_context_all():
                         if cache_key is not None and not has_lin_cons and self.mode == mode:
                             self._restore_linear_solution(vec_names, cache_key, self.mode)
-                            model._solve_linear(model._lin_vec_names, self.mode, rel_systems)
+                            model._solve_linear(model._problem_meta['lin_vec_names'], self.mode,
+                                                rel_systems)
                             self._save_linear_solution(vec_names, cache_key, self.mode)
                         else:
-                            model._solve_linear(model._lin_vec_names, mode, rel_systems)
+                            model._solve_linear(model._problem_meta['lin_vec_names'], mode,
+                                                rel_systems)
 
                     if debug_print:
                         print('Elapsed Time:', time.time() - t0, '\n', flush=True)
@@ -1379,7 +1381,7 @@ class _TotalJacInfo(object):
 
         # Prepare model for calculation by cleaning out the derivatives
         # vectors.
-        for vec_name in model._lin_vec_names:
+        for vec_name in model._problem_meta['lin_vec_names']:
             model._vectors['input'][vec_name].set_val(0.0)
             model._vectors['output'][vec_name].set_val(0.0)
             model._vectors['residual'][vec_name].set_val(0.0)
