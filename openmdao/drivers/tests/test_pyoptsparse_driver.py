@@ -528,6 +528,20 @@ class TestPyoptSparse(unittest.TestCase):
         obj = prob['o']
         assert_near_equal(obj, 20.0, 1e-6)
 
+    def test_simple_driver_supports(self):
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = pyOptSparseDriver(optimizer=OPTIMIZER, print_results=False)
+
     def test_fan_out(self):
         # This tests sparse-response specification.
         # This is a slightly modified FanOut
