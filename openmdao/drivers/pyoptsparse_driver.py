@@ -201,6 +201,7 @@ class pyOptSparseDriver(Driver):
 
         self.supports._read_only = False
         self.supports['gradients'] = self.options['optimizer'] in grad_drivers
+        self.supports._read_only = True
 
         if len(self._objs) > 1 and self.options['optimizer'] not in multi_obj_drivers:
             raise RuntimeError('Multiple objectives have been added to pyOptSparseDriver'

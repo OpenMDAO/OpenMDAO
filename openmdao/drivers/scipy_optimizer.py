@@ -194,6 +194,7 @@ class ScipyOptimizeDriver(Driver):
         self.supports['inequality_constraints'] = opt in _constraint_optimizers
         self.supports['two_sided_constraints'] = opt in _constraint_optimizers
         self.supports['equality_constraints'] = opt in _eq_constraint_optimizers
+        self.supports._read_only = True
 
         # Raises error if multiple objectives are not supported, but more objectives were defined.
         if not self.supports['multiple_objectives'] and len(self._objs) > 1:
