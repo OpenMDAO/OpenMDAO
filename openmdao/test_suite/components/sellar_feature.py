@@ -113,6 +113,110 @@ class SellarMDA(om.Group):
         self.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         self.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
+class SellarMDAWithUnits(om.Group):
+    """
+    Group containing the Sellar MDA.
+    """
+
+    class SellarDis1Units(om.ExplicitComponent):
+        """
+        Component containing Discipline 1 -- no derivatives version.
+        """
+
+        def setup(self):
+
+            # Global Design Variable
+            self.add_input('z', val=np.zeros(2), units='degC')
+
+            # Local Design Variable
+            self.add_input('x', val=0., units='degC')
+
+            # Coupling parameter
+            self.add_input('y2', val=1.0, units='degC')
+
+            # Coupling output
+            self.add_output('y1', val=1.0, units='degC')
+
+            # Finite difference all partials.
+            self.declare_partials('*', '*', method='fd')
+
+        def compute(self, inputs, outputs):
+            """
+            Evaluates the equation
+            y1 = z1**2 + z2 + x1 - 0.2*y2
+            """
+            z1 = inputs['z'][0]
+            z2 = inputs['z'][1]
+            x1 = inputs['x']
+            y2 = inputs['y2']
+
+            outputs['y1'] = z1**2 + z2 + x1 - 0.2*y2
+
+
+    class SellarDis2Units(om.ExplicitComponent):
+        """
+        Component containing Discipline 2 -- no derivatives version.
+        """
+
+        def setup(self):
+            # Global Design Variable
+            self.add_input('z', val=np.zeros(2), units='degC')
+
+            # Coupling parameter
+            self.add_input('y1', val=1.0, units='degC')
+
+            # Coupling output
+            self.add_output('y2', val=1.0, units='degC')
+
+            # Finite difference all partials.
+            self.declare_partials('*', '*', method='fd')
+
+        def compute(self, inputs, outputs):
+            """
+            Evaluates the equation
+            y2 = y1**(.5) + z1 + z2
+            """
+
+            z1 = inputs['z'][0]
+            z2 = inputs['z'][1]
+            y1 = inputs['y1']
+
+            # Note: this may cause some issues. However, y1 is constrained to be
+            # above 3.16, so lets just let it converge, and the optimizer will
+            # throw it out
+            if y1.real < 0.0:
+                y1 *= -1
+
+            outputs['y2'] = y1**.5 + z1 + z2
+
+    def setup(self):
+        indeps = self.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
+        indeps.add_output('x', 1.0, units='degC')
+        indeps.add_output('z', np.array([5.0, 2.0]), units='degC')
+
+        cycle = self.add_subsystem('cycle', om.Group(), promotes=['*'])
+        cycle.add_subsystem('d1', self.SellarDis1Units(), promotes_inputs=['x', 'z', 'y2'],
+                            promotes_outputs=['y1'])
+        cycle.add_subsystem('d2', self.SellarDis2Units(), promotes_inputs=['z', 'y1'],
+                            promotes_outputs=['y2'])
+
+        # Nonlinear Block Gauss Seidel is a gradient free solver
+        cycle.nonlinear_solver = om.NonlinearBlockGS()
+
+        self.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                  z={'value': np.array([0.0, 0.0]), 'units': 'degC'},
+                                                  x={'value': 0.0, 'units': 'degC'},
+                                                  y1={'units': 'degC'},
+                                                  y2={'units': 'degC'}),
+                           promotes=['x', 'z', 'y1', 'y2', 'obj'])
+
+        self.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1', y1={'units': 'degC'},
+                                                   con1={'units': 'degC'}),
+                           promotes=['con1', 'y1'])
+        self.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0', y2={'units': 'degC'},
+                                                   con2={'units': 'degC'}),
+                           promotes=['con2', 'y2'])
+
 
 class SellarMDALinearSolver(om.Group):
     """

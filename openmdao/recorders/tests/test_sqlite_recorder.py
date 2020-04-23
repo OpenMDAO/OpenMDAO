@@ -2407,54 +2407,52 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
     def test_feature_basic_case_recording(self):
         import openmdao.api as om
-
-        from openmdao.test_suite.components.paraboloid_units import ParaboloidWithUnits
+        from openmdao.test_suite.components.sellar_feature import SellarMDAWithUnits
+        import numpy as np
 
         # build the model
-        prob = om.Problem()
-        indeps = prob.model.add_subsystem('indeps', om.IndepVarComp())
-        indeps.add_output('x', 3.0)
-        indeps.add_output('y', -4.0)
+        prob = om.Problem(model=SellarMDAWithUnits())
 
-        prob.model.add_subsystem('parab', ParaboloidWithUnits())
-
-        # define the component whose output will be constrained
-        prob.model.add_subsystem('const', om.ExecComp('g = x + y', x={'units': 'm'}, y={'units': 'm'}))
-
-        prob.model.connect('indeps.x', ['parab.x', 'const.x'])
-        prob.model.connect('indeps.y', ['parab.y', 'const.y'])
+        model = prob.model
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                                upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
 
         # setup the optimization
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'COBYLA'
-        prob.driver.options['disp'] = False
-
-        prob.model.add_design_var('indeps.x', lower=-50, upper=50)
-        prob.model.add_design_var('indeps.y', lower=-50, upper=50)
-        prob.model.add_objective('parab.f_xy')
-
-        # to add the constraint to the model
-        prob.model.add_constraint('const.g', lower=0, upper=10.)
+        driver = prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
         # Create a recorder variable
-        recorder = om.SqliteRecorder("cases.sql")
-        # Attach a recorder to the Problem
+        recorder = om.SqliteRecorder('cases.sql')
+        # Attach a recorder to the problem
         prob.add_recorder(recorder)
 
         prob.setup()
+        prob.set_solver_print(0)
         prob.run_driver()
         prob.record_state("after_run_driver")
 
         # Instantiate your CaseReader
         cr = om.CaseReader("cases.sql")
         # Isolate "problem" as your source
-        problem_cases = cr.list_cases('problem')
-
+        driver_cases = cr.list_cases('problem')
         # Get the first case from the recorder
         case = cr.get_case('after_run_driver')
 
+        # These options will give outputs as the model sees them
+        # Gets value but will not convert units
+        const = case['con1'] #Getitem caputures your result
+
+        # get_val can convert your result's units if desired
+        const_K = case.get_val("con1", units='K') #Get val converts your result
+
+        assert_near_equal(const, -1.68550507e-10, 1e-3)
+        assert_near_equal(const_K, 273.15, 1e-3)
+
         # list_outputs will list your model's outputs and return a list of them too
-        case.list_outputs()
+        print(case.list_outputs())
 
         # This code below will find all the objectives, design variables, and constraints that the
         # problem source contains
@@ -2462,23 +2460,9 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         design_vars = case.get_design_vars()
         constraints = case.get_constraints()
 
-        print("Objectives : ", objectives, "\nDesign Variables: ", design_vars, "\nConstraints: ",
-            constraints)
-
-        # You can single out particular keys from the above dictionaries
-        assert_near_equal(objectives['parab.f_xy'], -27, 1e-4)
-        assert_near_equal(design_vars['indeps.x'], 6.99999912, 1e-4)
-        assert_near_equal(constraints['const.g'], 0., 1e-4)
-
-        # These options will give outputs as the model sees them
-        # Gets value but will not convert units
-        distance = case['parab.f_xy'] # m
-
-        # get_val can convert your result's units if desired
-        distance_km = case.get_val("parab.f_xy", units='km') # Converted to km
-
-        assert_near_equal(distance, -27, 1e-3)
-        assert_near_equal(distance_km, -0.027, 1e-3)
+        assert_near_equal(objectives['obj'], 3.18339395, 1e-4)
+        assert_near_equal(design_vars['x'], 0., 1e-4)
+        assert_near_equal(constraints['con1'], -1.68550507e-10, 1e-4)
 
     def test_feature_basic_case_plot(self):
         import matplotlib.pyplot as plt
