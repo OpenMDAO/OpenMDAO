@@ -318,7 +318,20 @@ def add_help(txt, header='Instructions', footer=''):
     head = write_div(content=header_txt, cls_attr="modal-header")
     foot = write_div(content=footer, cls_attr="modal-footer")
     body = write_div(content=write_paragraph(txt), cls_attr="modal-body")
-    modal_content = write_div(content=[head, body, foot], cls_attr="modal-content")
+    toolbar_help_header = write_div(content='Toolbar Help', cls_attr="modal-section-header")
+
+    # with open("/Users/hschilli/Documents/OpenMDAO/dev/I1319-update-n2-docs/inkscape_toolbar_help.svg", "r") as f:
+    with open("/Users/hschilli/Documents/OpenMDAO/dev/I1319-update-n2-docs/inkscape_toolbar_help.svg",
+              "r") as f:
+        help_diagram = f.read()
+
+    help_diagram = write_div(content=help_diagram, cls_attr="toolbar-help")
+
+
+    # help_diagram = '<object type="image/svg+xml" data="/Users/hschilli/Documents/OpenMDAO/dev/I1319-update-n2-docs/toolbar_help.svg" id="toolbar-help">' \
+    #                '  Your browser does not support SVG' \
+    #                '</object>'
+    modal_content = write_div(content=[head, body, toolbar_help_header, help_diagram, foot], cls_attr="modal-content")
     return write_div(content=modal_content, cls_attr="modal", uid="myModal")
 
 
