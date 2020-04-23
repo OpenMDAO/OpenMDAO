@@ -1067,14 +1067,14 @@ class TestDOEDriver(unittest.TestCase):
         cr = om.CaseReader("cases.sql")
         cases = cr.list_cases('problem')
 
-        for case in cases:
-            inputs = cr.get_case('end').inputs
-            outputs = cr.get_case(case).outputs
-            for name in ('x', 'y'):
-                self.assertTrue(isinstance(inputs[name], np.ndarray))
-                self.assertTrue(inputs[name].shape, (2,))
-                self.assertTrue(isinstance(outputs[name], np.ndarray))
-                self.assertTrue(outputs[name].shape, (2,))
+        case = cr.get_case('end')
+        inputs = case.inputs
+        outputs = case.outputs
+        for name in ('x', 'y'):
+            self.assertTrue(isinstance(inputs[name], np.ndarray))
+            self.assertTrue(inputs[name].shape, (2,))
+            self.assertTrue(isinstance(outputs[name], np.ndarray))
+            self.assertTrue(outputs[name].shape, (2,))
 
     def test_discrete_arraydesvar_list(self):
         prob = om.Problem()
