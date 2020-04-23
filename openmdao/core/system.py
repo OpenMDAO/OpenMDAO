@@ -798,9 +798,9 @@ class System(object):
         # in the current system, by gathering data from immediate subsystems,
         # and no recursion is necessary.
         self._setup_var_data(recurse=recurse)
+        self._setup_global_connections(recurse=recurse)
         if self.pathname == '':
             self._setup_vec_names(mode)
-        self._setup_global_connections(recurse=recurse)
         self._setup_relevance(mode, self._relevant)
         self._setup_var_index_ranges(recurse=recurse)
         self._setup_var_sizes(recurse=recurse)
