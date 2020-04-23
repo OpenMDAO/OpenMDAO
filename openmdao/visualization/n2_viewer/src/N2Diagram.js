@@ -44,15 +44,11 @@ class N2Diagram {
             'd3ContentDiv': parentDiv.querySelector("#d3_content_div"),
             'svgDiv': d3.select("#svgDiv"),
             'svg': d3.select("#svgId"),
-            'svgStyle': document.createElement("style"),
+            'svgStyle': d3.select("#svgId").append('style').attr('title', 'svgStyle'),
             'toolTip': d3.select(".tool-tip"),
             'arrowMarker': d3.select("#arrow"),
             'nodeInfo': d3.select('#node-data')
         };
-
-        // Append the new style section.
-        this.dom.svgStyle.setAttribute('title', 'svgStyle');
-        this.dom.parentDiv.querySelector("#svgId").appendChild(this.dom.svgStyle);
 
         this.transitionStartDelay = N2TransitionDefaults.startDelay;
 
@@ -647,23 +643,20 @@ class N2Diagram {
         this.dom.n2OuterGroup.selectAll("[class^=n2_hover_elements]").remove();
     }
 
+    /** Reveal arrows that had been hidden */
     showArrows() {
-        for (let i = 0; i < this.arrowCache.length; i++) {
-            const arrow = this.arrowCache[i];
-            this.mouseOverOnDiagonal(arrow.cell);
+        for (const arrow of this.arrowCache) {
+            this.matrix.mouseOverOnDiagonal(arrow.cell);
             arrow.element.attr('class', arrow.className);
-        };
-
+        }
     }
 
+    /** Display connection arrows for all inputs/outputs */
     showAllArrows() {
-        for (let i = 0; i < this.matrix.visibleCells.length; i++) {
-            const cell = this.matrix.visibleCells[i];
-            if (cell.renderer.color !== "black") {
-                this.mouseOverOnDiagonal(cell);
-                this.mouseClickAll(cell);
-            }
-        };
+        for (const cell of this.matrix.visibleCells) {
+            this.matrix.mouseOverOnDiagonal(cell);
+            this.mouseClickAll(cell);
+        }
     }
 
     /**
