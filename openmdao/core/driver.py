@@ -159,7 +159,7 @@ class Driver(object):
                                             'driver level.')
 
         # What the driver supports.
-        self.supports = OptionsDictionary(parent_name=type(self).__name__, read_only=False)
+        self.supports = OptionsDictionary(parent_name=type(self).__name__)
         self.supports.declare('inequality_constraints', types=bool, default=False)
         self.supports.declare('equality_constraints', types=bool, default=False)
         self.supports.declare('linear_constraints', types=bool, default=False)
