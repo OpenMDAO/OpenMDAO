@@ -80,7 +80,7 @@ class TestVisualization(unittest.TestCase):
         assert_near_equal(expected_array, actual_array, 1e-8)
 
         # plot with specified jac_method
-        fig, ax = om.partial_deriv_plot('y1', 'x1', check_partials_data, jac_method = "J_rev",
+        fig, ax = om.partial_deriv_plot('y1', 'x1', check_partials_data, jac_method = "J_fwd",
                                         title="specified jac_method")
         expected_array = np.array([[1., 0., 0., 1.],
                                    [0., 1., 0., 0.],

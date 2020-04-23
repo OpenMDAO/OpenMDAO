@@ -309,7 +309,19 @@ n2_gui_test_scripts = {
             "test": "click",
             "selector": "g#solver_tree rect#g1_d1",
             "button": "right"
-        }
+        },
+        {
+            "desc": "Right-click on partition tree element to collapse",
+            "test": "click",
+            "selector": "g#tree rect#g1",
+            "button": "right"
+        },
+        {
+            "desc": "Hover over N2 cell and check arrow count with collapsed group",
+            "test": "hoverArrow",
+            "selector": "g#n2elements rect#cellShape_15_15.vMid",
+            "arrowCount": 2
+        },
     ],
     "udpi_circuit": [
         {

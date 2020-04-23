@@ -1,4 +1,205 @@
 /**
+ * Manage info for each node metadata property
+ * @typedef InfoPropDefault
+ * @property {String} key The identifier of the property.
+ * @property {String} desc The description (label) to display.
+ * @property {Boolean} capitalize Whether to capitialize every word in the desc.
+ */
+class InfoPropDefault {
+    constructor(key, desc, capitalize = false) {
+        this.key = key;
+        this.desc = desc;
+        this.capitalize = capitalize;
+    }
+
+    /** Return the same message since this is the base class */
+    output(msg) { return msg; }
+}
+
+/**
+ * Outputs a Yes or No to display. 
+ * @typedef InfoPropYesNo
+ */
+class InfoPropYesNo extends InfoPropDefault {
+    constructor(key, desc, capitalize = false) {
+        super(key, desc, capitalize);
+    }
+
+    /** Return Yes or No when given True or False */
+    output(boolVal) { return boolVal ? 'Yes' : 'No'; }
+}
+
+/**
+ * Rename params to inputs and unknowns to outputs. 
+ * @typedef InfoPropYesNo
+ */
+class InfoUpdateType extends InfoPropDefault {
+    constructor(key, desc, capitalize = false) {
+        super(key, desc, capitalize);
+    }
+
+    /** Replace the old terms with new ones */
+    output(msg) {
+        return msg
+            .replace(/param/, 'input')
+            .replace(/unknown/, 'output')
+            .replace('_', ' ');
+    }
+}
+
+/**
+ * Manage a table containing all available metadata properties for
+ * the currently active node, as well as whether the table is
+ * visible or not.
+ * @typedef NodeInfo
+ */
+class NodeInfo {
+    /**
+     * Build a list of the properties we care about and set up
+     * references to the HTML elements.
+     * @param {Object} abs2prom Object containing promoted variable names.
+     */
+    constructor(abs2prom) {
+        this.propList = [
+            new InfoPropDefault('absPathName', 'Absolute Name'),
+            new InfoPropDefault('class', 'Class'),
+            new InfoUpdateType('type', 'Type', true),
+            new InfoPropDefault('dtype', 'DType'),
+            new InfoPropDefault('subsystem_type', 'Subsystem Type', true),
+            new InfoPropDefault('component_type', 'Component Type', true),
+            new InfoPropYesNo('implicit', 'Implicit'),
+            new InfoPropYesNo('is_parallel', 'Parallel'),
+            new InfoPropDefault('linear_solver', 'Linear Solver'),
+            new InfoPropDefault('nonlinear_solver', 'Non-Linear Solver')
+        ];
+
+        this.abs2prom = abs2prom;
+        this.table = d3.select('#node-info-container');
+        this.thead = this.table.select('thead');
+        this.tbody = this.table.select('tbody');
+        this.toolbarButton = d3.select('#info-button');
+        this.hidden = true;
+    }
+
+    /** Make the info box visible if it's hidden */
+    show() {
+        this.toolbarButton.attr('class', 'fas icon-info-circle active-tab-icon');
+        this.hidden = false;
+        d3.select('#all_pt_n2_content_div').classed('node-data-cursor', true);
+    }
+
+    /** Make the info box hidden if it's visible */
+    hide() {
+        this.toolbarButton.attr('class', 'fas icon-info-circle');
+        this.hidden = true;
+        d3.select('#all_pt_n2_content_div').classed('node-data-cursor', false);
+    }
+
+    /** Toggle the visibility setting */
+    toggle() {
+        if (this.hidden) this.show();
+        else this.hide();
+    }
+
+    _addPropertyRow(label, val, capitalize = false) {
+        const newRow = this.tbody.append('tr');
+
+        newRow.append('th')
+            .attr('scope', 'row')
+            .text(label);
+
+        const td = newRow.append('td')
+            .text(val);
+
+        if (capitalize) td.attr('class', 'caps');
+    }
+
+    /**
+     * Iterate over the list of known properties and display them
+     * if the specified object contains them.
+     * @param {Object} event The related event so we can get position.
+     * @param {N2TreeNode} obj The node to examine.
+     * @param {N2TreeNode} color The color to make the title bar.
+     */
+    update(event, obj, color = '#42926b') {
+        if (this.hidden) return;
+        // Put the name in the title
+        this.table.select('thead th')
+            .style('background-color', color)
+            .text(obj.name);
+
+        this.table.select('tfoot th')
+            .style('background-color', color);
+
+        if (this.abs2prom) {
+            if (obj.isParam()) {
+                this._addPropertyRow('Promoted Name', this.abs2prom.input[obj.absPathName]);
+            }
+            else if (obj.isUnknown()) {
+                this._addPropertyRow('Promoted Name', this.abs2prom.output[obj.absPathName]);
+            }
+        }
+
+        for (const prop of this.propList) {
+            if (obj.propExists(prop.key) && obj[prop.key] != '') {
+                this._addPropertyRow(prop.desc, prop.output(obj[prop.key]), prop.capitalize)
+            }
+        }
+
+        // Solidify the size of the table after populating so that
+        // it can be positioned reliably by move().
+        this.table
+            .style('width', this.table.node().scrollWidth + 'px')
+            .style('height', this.table.node().scrollHeight + 'px')
+
+        this.move(event);
+        this.table.attr('class', 'info-visible');
+    }
+
+    /** Wipe the contents of the table body */
+    clear() {
+        if (this.hidden) return;
+        this.table
+            .attr('class', 'info-hidden')
+            .style('width', 'auto')
+            .style('height', 'auto')
+
+        this.tbody.html('');
+    }
+
+    /**
+     * Relocate the table to a position near the mouse
+     * @param {Object} event The triggering event containing the position.
+     */
+    move(event) {
+        if (this.hidden) return;
+        const offset = 30;
+
+        // Mouse is in left half of window, put box to right of mouse
+        if (event.clientX < window.innerWidth / 2) {
+            this.table.style('right', 'auto');
+            this.table.style('left', (event.clientX + offset) + 'px')
+        }
+        // Mouse is in right half of window, put box to left of mouse
+        else {
+            this.table.style('left', 'auto');
+            this.table.style('right', (window.innerWidth - event.clientX + offset) + 'px')
+        }
+
+        // Mouse is in top half of window, put box below mouse
+        if (event.clientY < window.innerHeight / 2) {
+            this.table.style('bottom', 'auto');
+            this.table.style('top', (event.clientY - offset) + 'px')
+        }
+        // Mouse is in bottom half of window, put box above mouse
+        else {
+            this.table.style('top', 'auto');
+            this.table.style('bottom', (window.innerHeight - event.clientY - offset) + 'px')
+        }
+    }
+}
+
+/**
  * Handle input events for the matrix and toolbar.
  * @typedef N2UserInterface
  * @property {N2Diagram} n2Diag Reference to the main diagram.
@@ -38,6 +239,7 @@ class N2UserInterface {
         this._setupSearch();
 
         this.legend = new N2Legend(this.n2Diag.modelData);
+        this.nodeInfoBox = new NodeInfo(this.n2Diag.model.abs2prom);
     }
 
     /** Set up the menu for selecting an arbitrary depth to collapse to. */
@@ -51,7 +253,7 @@ class N2UserInterface {
         collapseDepthElement.max = this.n2Diag.model.maxDepth - 1;
         collapseDepthElement.value = collapseDepthElement.max;
 
-        collapseDepthElement.onmouseup = function(e) {
+        collapseDepthElement.onmouseup = function (e) {
             const modelDepth = parseInt(e.target.value);
             self.collapseToDepthSelectChange(modelDepth);
         };
@@ -400,10 +602,10 @@ class N2UserInterface {
 
         this.n2Diag.toggleSolverNameType();
         this.n2Diag.dom.parentDiv.querySelector(
-                '#linear-solver-button'
-            ).className = !this.n2Diag.showLinearSolverNames ?
-            'fas icon-nonlinear-solver solver-button' :
-            'fas icon-linear-solver solver-button';
+            '#linear-solver-button'
+        ).className = !this.n2Diag.showLinearSolverNames ?
+                'fas icon-nonlinear-solver solver-button' :
+                'fas icon-linear-solver solver-button';
 
         this.legend.toggleSolvers(this.n2Diag.showLinearSolverNames);
 
@@ -421,22 +623,21 @@ class N2UserInterface {
         this.legend.toggle();
 
         d3.select('#legend-button').attr('class',
-            this.legend.hidden? 'fas icon-key' : 'fas icon-key active-tab-icon');
+            this.legend.hidden ? 'fas icon-key' : 'fas icon-key active-tab-icon');
     }
 
     toggleNodeData() {
         testThis(this, 'N2UserInterface', 'toggleNodeData');
 
         const infoButton = d3.select('#info-button');
-        const nodeData = d3.select('#node-data-container');
-        const nodeDataClassName = nodeData.attr('class');
+        const nodeData = d3.select('#node-info-container');
 
-        if (nodeDataClassName.includes('hide-node-data')) {
-            nodeData.attr('class', 'node-info-container');
+        if (nodeData.classed('info-hidden')) {
+            nodeData.attr('class', 'info-visible');
             infoButton.attr('class', 'fas icon-info-circle active-tab-icon');
         }
         else {
-            nodeData.attr('class', 'node-info-container hide-node-data');
+            nodeData.attr('class', 'info-hidden');
             infoButton.attr('class', 'fas icon-info-circle');
         }
     }

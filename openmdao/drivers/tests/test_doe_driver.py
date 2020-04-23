@@ -1037,6 +1037,45 @@ class TestDOEDriver(unittest.TestCase):
         # Can't read/write objects through SQL case.
         self.assertEqual(prob['y'], my_obj)
 
+    def test_discrete_array_output(self):
+        prob = om.Problem()
+        model = prob.model
+
+        # Add independent variables
+        indeps = model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
+        indeps.add_discrete_output('x', np.ones((2, ), dtype=np.int))
+        indeps.add_discrete_output('y', np.ones((2, ), dtype=np.int))
+
+        # Add components
+        model.add_subsystem('parab', ParaboloidDiscreteArray(), promotes=['*'])
+
+        # Specify design variable range and objective
+        model.add_design_var('x', np.array([5, 1]))
+        model.add_design_var('y', np.array([1, 4]))
+        model.add_objective('f_xy')
+
+        recorder = om.SqliteRecorder("cases.sql")
+        prob.driver.add_recorder(recorder)
+        prob.add_recorder(recorder)
+        prob.recording_options['record_inputs'] = True
+
+        prob.setup()
+        prob.run_driver()
+        prob.record_state("end")
+        prob.cleanup()
+
+        cr = om.CaseReader("cases.sql")
+        cases = cr.list_cases('problem')
+
+        case = cr.get_case('end')
+        inputs = case.inputs
+        outputs = case.outputs
+        for name in ('x', 'y'):
+            self.assertTrue(isinstance(inputs[name], np.ndarray))
+            self.assertTrue(inputs[name].shape, (2,))
+            self.assertTrue(isinstance(outputs[name], np.ndarray))
+            self.assertTrue(outputs[name].shape, (2,))
+
     def test_discrete_arraydesvar_list(self):
         prob = om.Problem()
         model = prob.model

@@ -128,11 +128,7 @@ class TestUnitConversion(unittest.TestCase):
         for key1, val1 in data.items():
             for key2, val2 in val1.items():
                 assert_near_equal(val2['abs error'][0], 0.0, 1e-6)
-                assert_near_equal(val2['abs error'][1], 0.0, 1e-6)
-                assert_near_equal(val2['abs error'][2], 0.0, 1e-6)
                 assert_near_equal(val2['rel error'][0], 0.0, 1e-6)
-                assert_near_equal(val2['rel error'][1], 0.0, 1e-6)
-                assert_near_equal(val2['rel error'][2], 0.0, 1e-6)
 
     def test_basic_apply(self):
         """Test that output values and total derivatives are correct."""
@@ -258,11 +254,7 @@ class TestUnitConversion(unittest.TestCase):
         for key1, val1 in data.items():
             for key2, val2 in val1.items():
                 assert_near_equal(val2['abs error'][0], 0.0, 1e-6)
-                assert_near_equal(val2['abs error'][1], 0.0, 1e-6)
-                assert_near_equal(val2['abs error'][2], 0.0, 1e-6)
                 assert_near_equal(val2['rel error'][0], 0.0, 1e-6)
-                assert_near_equal(val2['rel error'][1], 0.0, 1e-6)
-                assert_near_equal(val2['rel error'][2], 0.0, 1e-6)
 
     def test_bad_units(self):
         """Test error handling when invalid units are declared."""

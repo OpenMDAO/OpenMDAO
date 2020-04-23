@@ -1,26 +1,68 @@
 /******************* Node Data styling *******************/
-.node-info-container {
+#node-info-container {
 	position: absolute;
-	right: 0;
 	overflow: hidden;
 	background-color: white;
-	border-top-left-radius: 20px;
-	border-bottom-left-radius: 20px;
-	border-top: 1px solid #42926b;
-	border-left: 1px solid #42926b;
-	border-bottom: 1px solid #42926b;
-	width: 200px;
+	border-radius: 10px;
+	border: 1px solid #a0a0a0;
 	z-index: 10;
-	transition: opacity 0.25s;
+    transition: opacity 0.25s;
+    box-shadow: 3px 3px 3px 1px rgba(0, 0, 0, 0.2);
+    min-width: 200px;
+    border-collapse: separate;
+    opacity: .95;
 }
 
-.hide-node-data {
-	opacity: 0;
+.info-hidden {
+    visibility: hidden;
+}
+
+.info-visible {
+    visibility: visible;
+}
+
+#node-info-container thead th {
+    background-color: #42926b;
+    color: black;
+    padding: 5px;
+    font-size: 11pt;
+}
+
+#node-info-container tbody th {
+    text-align: right;
+    font-size: 9pt;
+    margin-top: 0;
+    border-top: 0;
+    border-bottom: 1px solid #a0a0a0;
+    border-right: 1px solid #a0a0a0;
+    padding: 3px;
+    white-space: nowrap;
+}
+
+#node-info-container tbody td {
+    text-align: left;
+    font-size: 9pt;
+    margin-top: 0;
+    margin-left: 0;
+    border-top: 0;
+    border-left: 0;
+    border-bottom: 1px solid #a0a0a0;
+    padding: 3px;
+    white-space: nowrap;
+}
+
+#node-info-container tfoot th {
+    background-color: #42926b;
+    padding: 2px;
+    font-size: 11pt;
+}
+
+.caps {
+    text-transform: capitalize;
 }
 
 .info-header {
 	background-color: #42926b;
-	padding: 6px 12px;
 }
 
 .info-header p {
@@ -39,7 +81,6 @@
 	display: flex;
 	justify-content: space-between;
 	font-size: 13px;
-	width: 90%;
 	align-self: center;
 }
 
@@ -47,8 +88,7 @@
 	font-weight: 600;
 }
 
-.node-data p:nth-child(2) {
+.node-data-cursor {
+    cursor: context-menu;
 }
 
-.node-data-name {
-}
