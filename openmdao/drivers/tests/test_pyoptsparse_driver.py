@@ -534,13 +534,18 @@ class TestPyoptSparse(unittest.TestCase):
         model = prob.model
 
         model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
-        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
-
-        prob.set_solver_print(level=0)
 
         prob.driver = pyOptSparseDriver(optimizer=OPTIMIZER, print_results=False)
+
+        with self.assertRaises(KeyError) as raises_msg:
+            prob.driver.supports['equality_constraints'] = False
+
+        exception = raises_msg.exception
+
+        msg = "pyOptSparseDriver: Tried to set read-only option 'equality_constraints'."
+
+        self.assertEqual(exception.args[0], msg)
+
 
     def test_fan_out(self):
         # This tests sparse-response specification.
