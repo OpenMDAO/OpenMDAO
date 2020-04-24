@@ -122,8 +122,6 @@ class System(object):
         List of local subsystems that exist on this proc.
     _subsystems_inds : dict
         Dict mapping subsystem name to index into _subsystems_allprocs.
-    _subsystems_proc_range : (int, int)
-        List of ranges of each myproc subsystem's processors relative to those of this system.
     _var_promotes : { 'any': [], 'input': [], 'output': [] }
         Dictionary of lists of variable names/wildcards specifying promotion
         (used to calculate promoted names)
@@ -356,7 +354,6 @@ class System(object):
         self._subsystems_allprocs = []
         self._subsystems_myproc = []
         self._subsystems_inds = {}
-        self._subsystems_proc_range = []
 
         self._var_promotes = {'input': [], 'output': [], 'any': []}
         self._var_allprocs_abs_names = {'input': [], 'output': []}

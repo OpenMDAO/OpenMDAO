@@ -50,11 +50,10 @@ class Group(System):
         Object used to allocate MPI processes to subsystems.
     _proc_info : dict of subsys_name: (min_procs, max_procs, weight)
         Information used to determine MPI process allocation to subsystems.
-    _local_system_set : set or None
-        Set of pathnames of all fully local (not remote or distributed)
-        direct or indirect subsystems.
     _subgroups_myproc : list
         List of local subgroups.
+    _subsystems_proc_range : (int, int)
+        List of ranges of each myproc subsystem's processors relative to those of this system.
     _manual_connections : dict
         Dictionary of input_name: (output_name, src_indices) connections.
     _static_manual_connections : dict
@@ -99,8 +98,8 @@ class Group(System):
 
         super(Group, self).__init__(**kwargs)
 
-        self._local_system_set = None
         self._subgroups_myproc = None
+        self._subsystems_proc_range = []
         self._manual_connections = {}
         self._static_manual_connections = {}
         self._conn_abs_in2out = {}
@@ -290,12 +289,9 @@ class Group(System):
         for subsys in self._subsystems_myproc:
             subsys._configure()
 
-            if subsys._has_guess:
-                self._has_guess = True
-            if subsys._has_bounds:
-                self._has_bounds = True
-            if subsys.matrix_free:
-                self.matrix_free = True
+            self._has_bounds |= subsys._has_bounds
+            self._has_guess |= subsys._has_guess
+            self.matrix_free |= subsys.matrix_free
 
         self.configure()
 
@@ -395,8 +391,6 @@ class Group(System):
         for i, s in enumerate(self._subsystems_allprocs):
             inds[s.name] = i
             s.pathname = '.'.join((self.pathname, s.name)) if self.pathname else s.name
-
-        self._local_system_set = set()
 
         # Perform recursion
         for subsys in self._subsystems_myproc:
@@ -1019,16 +1013,6 @@ class Group(System):
                 for comp in distcomps:
                     comp._update_dist_src_indices(global_abs_in2out)
 
-            # collect set of local (not remote, not distributed) subsystems so we can
-            # identify cross-process connections, which require the use of distributed
-            # instead of purely local vector and transfer objects.
-            self._local_system_set = set()
-            for s in self._subsystems_myproc:
-                if isinstance(s, Group):
-                    self._local_system_set.update(s._local_system_set)
-                elif not s.options['distributed']:
-                    self._local_system_set.add(s.pathname)
-
     def _setup_connections(self, recurse=True):
         """
         Compute dict of all connections owned by this Group.
@@ -1080,13 +1064,9 @@ class Group(System):
                 if nproc > 1 and self._vector_class is None:
                     # check for any cross-process data transfer.  If found, use
                     # self._problem_meta['distributed_vector_class'] as our vector class.
-                    in_path = abs_in.rsplit('.', 1)[0]
-                    if in_path not in self._local_system_set:
+                    if (abs_in not in abs2meta or abs_out not in abs2meta or
+                            abs2meta[abs_in]['distributed'] or abs2meta[abs_out]['distributed']):
                         self._vector_class = self._problem_meta['distributed_vector_class']
-                    else:
-                        out_path = abs_out.rsplit('.', 1)[0]
-                        if out_path not in self._local_system_set:
-                            self._vector_class = self._problem_meta['distributed_vector_class']
 
             # if connected output has scaling then we need input scaling
             if not self._has_input_scaling and not (abs_in in allprocs_discrete_in or

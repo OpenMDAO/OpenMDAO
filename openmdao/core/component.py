@@ -160,7 +160,6 @@ class Component(System):
                 simple_warning(msg)
 
         self.comm = comm
-        self._subsystems_proc_range = []
 
         # Clear out old variable information so that we can call setup on the component.
         self._var_rel_names = {'input': [], 'output': []}

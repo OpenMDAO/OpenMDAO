@@ -66,7 +66,7 @@ class MuxComp(ExplicitComponent):
 
     def _post_configure(self):
         """
-        Declare inputs, outputs, and derivatives for the demux component.
+        Declare inputs, outputs, and derivatives for the mux component.
         """
         # set static mode to False because we are doing things that would normally be done in setup
         self._static_mode = False
