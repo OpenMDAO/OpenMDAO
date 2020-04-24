@@ -95,7 +95,7 @@ class Jacobian(object):
                 sz = abs2meta[wrt]['global_size']
             else:
                 sz = abs2meta[wrt]['size']
-            return (abs2meta[of]['global_size'], sz)
+            return (abs2meta[of]['size'], sz)
 
         return (abs2meta[of]['size'], abs2meta[wrt]['size'])
 
