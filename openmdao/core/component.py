@@ -558,6 +558,9 @@ class Component(System):
             'tags': make_set(tags),
         }
 
+        if metadata['type'] == np.ndarray:
+            metadata.update({'shape': val.shape})
+
         if self._static_mode:
             var_rel2meta = self._static_var_rel2meta
         else:
@@ -760,6 +763,9 @@ class Component(System):
             'desc': desc,
             'tags': make_set(tags)
         }
+
+        if metadata['type'] == np.ndarray:
+            metadata.update({'shape': val.shape})
 
         if self._static_mode:
             var_rel2meta = self._static_var_rel2meta
