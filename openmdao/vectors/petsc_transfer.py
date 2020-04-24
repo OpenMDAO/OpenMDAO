@@ -78,7 +78,7 @@ class PETScTransfer(DefaultTransfer):
         vectors = group._vectors
         offsets = group._get_var_offsets()
 
-        if group._use_derivatives:
+        if group._problem_meta['use_derivatives']:
             vec_names = group._lin_rel_vec_name_list
         else:
             vec_names = group._problem_meta['vec_names']
@@ -212,7 +212,7 @@ class PETScTransfer(DefaultTransfer):
                         vectors['input'][vec_name], vectors['output'][vec_name],
                         rev_xfer_in[isub], rev_xfer_out[isub], group.comm)
 
-        if group._use_derivatives:
+        if group._problem_meta['use_derivatives']:
             transfers['nonlinear'] = transfers['linear']
 
     def _transfer(self, in_vec, out_vec, mode='fwd'):

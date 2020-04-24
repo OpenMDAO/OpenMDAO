@@ -148,11 +148,7 @@ class Component(System):
         prob_meta : dict
             Problem level options.
         """
-        self.pathname = pathname
-        self._problem_meta = prob_meta
-
-        self.options._parent_name = self.msginfo
-        self.recording_options._parent_name = self.msginfo
+        super(Component, self)._setup_procs(pathname, comm, mode, prob_meta)
 
         orig_comm = comm
         if self._num_par_fd > 1:
@@ -164,22 +160,16 @@ class Component(System):
                 simple_warning(msg)
 
         self.comm = comm
-        self._mode = mode
         self._subsystems_proc_range = []
-        self._first_call_to_linearize = True
 
         # Clear out old variable information so that we can call setup on the component.
         self._var_rel_names = {'input': [], 'output': []}
         self._var_rel2meta = {}
-        self._design_vars = OrderedDict()
-        self._responses = OrderedDict()
 
         self._static_mode = False
         self._var_rel2meta.update(self._static_var_rel2meta)
         for type_ in ['input', 'output']:
             self._var_rel_names[type_].extend(self._static_var_rel_names[type_])
-        self._design_vars.update(self._static_design_vars)
-        self._responses.update(self._static_responses)
         self.setup()
 
         # check to make sure that if num_par_fd > 1 that this system is actually doing FD.
@@ -193,17 +183,18 @@ class Component(System):
 
         self._static_mode = True
 
-        if self.options['distributed']:
-            if self._distributed_vector_class is not None:
-                self._vector_class = self._distributed_vector_class
+        if self.options['distributed'] and comm.size > 1:
+            dist_vec_class = self._problem_meta['distributed_vector_class']
+            if dist_vec_class is not None:
+                self._vector_class = dist_vec_class
             else:
                 simple_warning("The 'distributed' option is set to True for Component %s, "
                                "but there is no distributed vector implementation (MPI/PETSc) "
                                "available. The default non-distributed vectors will be used."
                                % pathname)
-                self._vector_class = self._local_vector_class
+                self._vector_class = self._problem_meta['local_vector_class']
         else:
-            self._vector_class = self._local_vector_class
+            self._vector_class = self._problem_meta['local_vector_class']
 
     def _post_configure(self):
         """
@@ -313,7 +304,7 @@ class Component(System):
         sizes = self._var_sizes
         abs2meta = self._var_abs2meta
 
-        if self._use_derivatives:
+        if self._problem_meta['use_derivatives']:
             vec_names = self._lin_rel_vec_name_list
         else:
             vec_names = self._problem_meta['vec_names']
@@ -323,7 +314,7 @@ class Component(System):
             # at component level, _var_allprocs_* is the same as var_* since all vars exist in all
             # procs for a given component, so we don't have to mess with figuring out what vars are
             # local.
-            if self._use_derivatives:
+            if self._problem_meta['use_derivatives']:
                 relnames = self._var_allprocs_relevant_names[vec_name]
             else:
                 relnames = self._var_allprocs_abs_names
@@ -349,7 +340,7 @@ class Component(System):
                     for type_ in ['input', 'output']:
                         sizes[type_] = np.tile(sizes[type_][iproc], (nproc, 1))
 
-        if self._use_derivatives:
+        if self._problem_meta['use_derivatives']:
             self._var_sizes['nonlinear'] = self._var_sizes['linear']
 
         self._owned_sizes = self._var_sizes['nonlinear']['output']

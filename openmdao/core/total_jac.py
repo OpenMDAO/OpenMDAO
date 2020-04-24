@@ -115,7 +115,6 @@ class _TotalJacInfo(object):
         self.lin_sol_cache = {}
         self.debug_print = debug_print
         self.par_deriv = {}
-        self._recording_iter = driver._recording_iter
 
         if isinstance(wrt, str):
             wrt = [wrt]
@@ -126,7 +125,7 @@ class _TotalJacInfo(object):
         design_vars = driver._designvars
         responses = driver._responses
 
-        if not model._use_derivatives:
+        if not model._problem_meta['use_derivatives']:
             raise RuntimeError("Derivative support has been turned off but compute_totals "
                                "was called.")
 
@@ -1579,7 +1578,7 @@ class _TotalJacInfo(object):
         metadata : dict
             Dictionary containing execution metadata.
         """
-        self._recording_iter.push((requester._get_name(), requester.iter_count))
+        self.model._get_recording_iter().push((requester._get_name(), requester.iter_count))
 
         try:
             totals = self._get_dict_J(self.J, self.wrt, self.prom_wrt, self.of, self.prom_of,
@@ -1587,7 +1586,7 @@ class _TotalJacInfo(object):
             requester._rec_mgr.record_derivatives(requester, totals, metadata)
 
         finally:
-            self._recording_iter.pop()
+            self.model._get_recording_iter().pop()
 
 
 def _get_subjac(jac_meta, prom_out, prom_in, of_idx, wrt_idx):

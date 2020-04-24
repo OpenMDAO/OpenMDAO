@@ -163,7 +163,7 @@ class CaseRecorder(object):
         self._counter += 1
 
         self._iteration_coordinate = \
-            recording_requester._recording_iter.get_formatted_iteration_coordinate()
+            recording_requester._get_recording_iter().get_formatted_iteration_coordinate()
 
         if isinstance(recording_requester, Driver):
             self.record_iteration_driver(recording_requester, data, metadata)
@@ -256,7 +256,7 @@ class CaseRecorder(object):
                 raise RuntimeError("Non-parallel recorders should not be recording on ranks > 0")
 
         self._iteration_coordinate = \
-            recording_requester._recording_iter.get_formatted_iteration_coordinate()
+            recording_requester._get_recording_iter().get_formatted_iteration_coordinate()
 
         self.record_derivatives_driver(recording_requester, data, metadata)
 

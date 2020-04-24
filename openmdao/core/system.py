@@ -106,8 +106,6 @@ class System(object):
         Problem level metadata.
     under_complex_step : bool
         When True, this system is undergoing complex step.
-    force_alloc_complex : bool
-        When True, the vectors have been allocated for checking with complex step.
     iter_count : int
         Int that holds the number of times this system has iterated
         in a recording run.
@@ -194,8 +192,6 @@ class System(object):
         Nonlinear solver to be used for solve_nonlinear.
     _linear_solver : <LinearSolver>
         Linear solver to be used for solve_linear; not the Newton system.
-    _solver_info : SolverInfo
-        A stack-like object shared by all Solvers in the model.
     _approx_schemes : OrderedDict
         A mapping of approximation types to the associated ApproximationScheme.
     _jacobian : <Jacobian>
@@ -276,11 +272,7 @@ class System(object):
         Dict of list of var names to record
     _vector_class : class
         Class to use for data vectors.  After setup will contain the value of either
-        _distributed_vector_class or _local_vector_class.
-    _distributed_vector_class : class
-        Class to use for distributed data vectors.
-    _local_vector_class : class
-        Class to use for local data vectors.
+        _problem_meta['distributed_vector_class'] or _problem_meta['local_vector_class'].
     _assembled_jac : AssembledJacobian or None
         If not None, this is the AssembledJacobian owned by this system's linear_solver.
     _num_par_fd : int
@@ -288,8 +280,6 @@ class System(object):
         concurrent FD solves.
     _par_fd_id : int
         ID used to determine which columns in the jacobian will be computed when using parallel FD.
-    _use_derivatives : bool
-        If True, perform any memory allocations necessary for derivative computation.
     _has_approx : bool
         If True, this system or its descendent has declared approximated partial or semi-total
         derivatives.
@@ -416,7 +406,6 @@ class System(object):
         self._owns_approx_of_idx = {}
 
         self.under_complex_step = False
-        self.force_alloc_complex = False
 
         self._design_vars = OrderedDict()
         self._responses = OrderedDict()
@@ -451,9 +440,6 @@ class System(object):
         self._has_bounds = False
 
         self._vector_class = None
-        self._local_vector_class = None
-        self._distributed_vector_class = None
-        self._use_derivatives = True
         self._has_approx = False
 
         self._assembled_jac = None
@@ -577,7 +563,7 @@ class System(object):
             ext_num_vars = {}
             ext_sizes = {}
 
-            if self._use_derivatives:
+            if self._problem_meta['use_derivatives']:
                 vec_names = self._lin_rel_vec_name_list
             else:
                 vec_names = self._problem_meta['vec_names']
@@ -589,7 +575,7 @@ class System(object):
                     ext_num_vars[vec_name][type_] = (0, 0)
                     ext_sizes[vec_name][type_] = (0, 0)
 
-            if self._use_derivatives:
+            if self._problem_meta['use_derivatives']:
                 ext_num_vars['nonlinear'] = ext_num_vars['linear']
                 ext_sizes['nonlinear'] = ext_sizes['linear']
 
@@ -621,7 +607,7 @@ class System(object):
 
         if initial:
             relevant = self._relevant
-            if self._use_derivatives:
+            if self._problem_meta['use_derivatives']:
                 vec_names = self._rel_vec_name_list
             else:
                 vec_names = self._problem_meta['vec_names']
@@ -650,7 +636,7 @@ class System(object):
                 self._scale_factors = {}
 
             if self._vector_class is None:
-                self._vector_class = self._local_vector_class
+                self._vector_class = self._problem_meta['local_vector_class']
 
             vector_class = self._vector_class
 
@@ -719,15 +705,10 @@ class System(object):
             Must be one of 'full', 'reconf', or 'update'.
         """
         self._setup(self.comm, setup_mode=setup_mode, mode=self._mode,
-                    distributed_vector_class=self._distributed_vector_class,
-                    local_vector_class=self._local_vector_class,
-                    use_derivatives=self._use_derivatives,
                     prob_meta=self._problem_meta)
-        self._final_setup(self.comm, setup_mode=setup_mode,
-                          force_alloc_complex=self._outputs._alloc_complex)
+        self._final_setup(self.comm, setup_mode=setup_mode)
 
-    def _setup(self, comm, setup_mode, mode, distributed_vector_class, local_vector_class,
-               use_derivatives, prob_meta=None):
+    def _setup(self, comm, setup_mode, mode, prob_meta=None):
         """
         Perform setup for this system and its descendant systems.
 
@@ -744,14 +725,6 @@ class System(object):
             Must be one of 'full', 'reconf', or 'update'.
         mode : str
             Derivative direction, either 'fwd', or 'rev', or 'auto'
-        distributed_vector_class : type
-            Reference to the <Vector> class or factory function used to instantiate vectors
-            and associated transfers involved in interprocess communication.
-        local_vector_class : type
-            Reference to the <Vector> class or factory function used to instantiate vectors
-            and associated transfers involved in intraprocess communication.
-        use_derivatives : bool
-            If True, perform any memory allocations necessary for derivative computation.
         prob_meta : dict
             Problem level metadata dictionary.
         """
@@ -762,6 +735,8 @@ class System(object):
         if self._coloring_info['dynamic'] or self._coloring_info['static'] is not None:
             self._coloring_info['coloring'] = None
 
+        auto_ivc = None
+
         # 1. Full setup that must be called in the root system.
         if setup_mode == 'full':
             recurse = True
@@ -769,9 +744,17 @@ class System(object):
             self.pathname = ''
             self.comm = comm
             self._relevant = None
-            self._distributed_vector_class = distributed_vector_class
-            self._local_vector_class = local_vector_class
-            self._use_derivatives = use_derivatives
+
+            try:
+                # this is a full setup, so get rid of any existing auto_ivc
+                del self.auto_ivc
+            except AttributeError:
+                pass
+
+            from openmdao.core.indepvarcomp import IndepVarComp
+            # create the IndepVarComp that will contain all auto-ivc outputs
+            # auto_ivc = self.add_subsystem('auto_ivc', IndepVarComp())
+
         # 2. Partial setup called in the system initiating the reconfiguration.
         elif setup_mode == 'reconf':
             recurse = True
@@ -791,20 +774,46 @@ class System(object):
         with self._static_mode_all(False):
             self._configure()
 
-        # Recurse model from top to bottom for remaining setup.
-        self._post_configure()
+            # Recurse model from top to bottom for remaining setup.
+            self._post_configure()
 
         # For updating variable and connection data, setup needs to be performed only
         # in the current system, by gathering data from immediate subsystems,
         # and no recursion is necessary.
         self._setup_var_data(recurse=recurse)
         self._setup_global_connections(recurse=recurse)
+
         if self.pathname == '':
+            # if auto_ivc is not None:
+            #     self._setup_auto_ivcs()
             self._setup_vec_names(mode)
+
         self._setup_relevance(mode, self._relevant)
         self._setup_var_index_ranges(recurse=recurse)
         self._setup_var_sizes(recurse=recurse)
         self._setup_connections(recurse=recurse)
+
+    def _setup_auto_ivcs(self):
+        abs2prom = self._var_allprocs_abs2prom['input']
+        abs2meta = self._var_allprocs_abs2meta
+        abs_names = self._var_allprocs_abs_names['input']
+        conns = self._conn_global_abs_in2out
+        prom2ivc = {}
+        auto_ivc = self.auto_ivc
+        count = 0
+        for abs_in in abs_names:
+            if abs_in not in conns:
+                prom = abs2prom[abs_in]
+                if prom in prom2ivc:
+                    # connected inputs w/o a src. Connect them to the same IVC
+                    conns[abs_in] = prom2ivc[prom]
+                else:
+                    ivc_name = f"auto_ivc.v{count}"
+                    count += 1
+                    prom2ivc[prom] = ivc_name
+                    conns[abs_in] = ivc_name
+                    auto_ivc.add_output(ivc_name.rsplit('.', 1)[-1],
+                                        val=np.ones(abs2meta[abs_in]['shape']))
 
     def _post_configure(self):
         """
@@ -812,7 +821,7 @@ class System(object):
         """
         pass
 
-    def _final_setup(self, comm, setup_mode, force_alloc_complex=False):
+    def _final_setup(self, comm, setup_mode):
         """
         Perform final setup for this system and its descendant systems.
 
@@ -829,10 +838,6 @@ class System(object):
             The global communicator.
         setup_mode : str
             Must be one of 'full', 'reconf', or 'update'.
-        force_alloc_complex : bool
-            Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
-            detect when you need to do this, but in some cases (e.g., complex step is used
-            after a reconfiguration) you may need to set this to True.
         """
         # 1. Full setup that must be called in the root system.
         if setup_mode == 'full':
@@ -850,6 +855,8 @@ class System(object):
             recurse = False
             resize = False
 
+        force_alloc_complex = self._problem_meta['force_alloc_complex']
+
         # For vector-related, setup, recursion is always necessary, even for updating.
         # For reconfiguration setup, we resize the vectors once, only in the current system.
         ext_num_vars, ext_sizes = self._get_initial_global(initial)
@@ -864,7 +871,7 @@ class System(object):
         # If we're updating, we just need to re-run setup on these, but no recursion necessary.
         self._setup_solvers(recurse=recurse)
         self._setup_solver_print(recurse=recurse)
-        if self._use_derivatives:
+        if self._problem_meta['use_derivatives']:
             self._setup_partials(recurse=recurse)
             self._setup_jacobians(recurse=recurse)
 
@@ -1428,6 +1435,36 @@ class System(object):
             for subsys in self._subsystems_myproc:
                 subsys._setup_recording(recurse)
 
+    def _setup_procs(self, pathname, comm, mode, prob_meta):
+        """
+        Execute first phase of the setup process.
+
+        Distribute processors, assign pathnames, and call setup on the component.
+
+        Parameters
+        ----------
+        pathname : str
+            Global name of the system, including the path.
+        comm : MPI.Comm or <FakeComm>
+            MPI communicator object.
+        mode : string
+            Derivatives calculation mode, 'fwd' for forward, and 'rev' for
+            reverse (adjoint). Default is 'rev'.
+        prob_meta : dict
+            Problem level options.
+        """
+        self.pathname = pathname
+        self._problem_meta = prob_meta
+        self._first_call_to_linearize = True
+
+        self.options._parent_name = self.msginfo
+        self.recording_options._parent_name = self.msginfo
+        self._mode = mode
+        self._design_vars = OrderedDict()
+        self._responses = OrderedDict()
+        self._design_vars.update(self._static_design_vars)
+        self._responses.update(self._static_responses)
+
     def _setup_var_index_ranges(self, recurse=True):
         """
         Compute the division of variables by subsystem.
@@ -1466,7 +1503,7 @@ class System(object):
         """
         self._var_allprocs_abs2idx = abs2idx = {}
 
-        if self._use_derivatives:
+        if self._problem_meta['use_derivatives']:
             vec_names = self._lin_rel_vec_name_list
         else:
             vec_names = self._problem_meta['vec_names']
@@ -1477,7 +1514,7 @@ class System(object):
                 for i, abs_name in enumerate(self._var_allprocs_relevant_names[vec_name][type_]):
                     abs2idx_t[abs_name] = i
 
-        if self._use_derivatives:
+        if self._problem_meta['use_derivatives']:
             abs2idx['nonlinear'] = abs2idx['linear']
 
         # Recursion
@@ -1565,7 +1602,7 @@ class System(object):
         mode : str
             Derivative direction, either 'fwd' or 'rev'.
         """
-        if self._use_derivatives:
+        if self._problem_meta['use_derivatives']:
             vec_names = ['nonlinear', 'linear']
             vois = {}
             for system in self.system_iter(include_self=True, recurse=True):
@@ -1621,7 +1658,7 @@ class System(object):
         dict
             The relevance dictionary.
         """
-        if self._use_derivatives:
+        if self._problem_meta['use_derivatives']:
             desvars = self.get_design_vars(recurse=True, get_sizes=False)
             responses = self.get_responses(recurse=True, get_sizes=False)
             return get_relevant_vars(self._conn_global_abs_in2out, desvars, responses,
@@ -1768,7 +1805,7 @@ class System(object):
         self._ext_num_vars = ext_num_vars
         self._ext_sizes = ext_sizes
 
-    def _setup_vectors(self, root_vectors, resize=False, alloc_complex=False):
+    def _setup_vectors(self, root_vectors, resize=False):
         """
         Compute all vectors for all vec names and assign excluded variables lists.
 
@@ -1778,8 +1815,6 @@ class System(object):
             Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
         resize : bool
             Whether to resize the root vectors - i.e, because this system is initiating a reconf.
-        alloc_complex : bool
-            Whether to allocate any imaginary storage to perform complex step. Default is False.
         """
         self._vectors = vectors = {'input': OrderedDict(),
                                    'output': OrderedDict(),
@@ -1796,7 +1831,7 @@ class System(object):
                                "'problem.setup(force_alloc_complex=True)'".format(self.msginfo))
 
         if self._vector_class is None:
-            self._vector_class = self._local_vector_class
+            self._vector_class = self._problem_meta['local_vector_class']
 
         vector_class = self._vector_class
 
@@ -1817,7 +1852,7 @@ class System(object):
 
         for subsys in self._subsystems_myproc:
             subsys._scale_factors = self._scale_factors
-            subsys._setup_vectors(root_vectors, alloc_complex=alloc_complex)
+            subsys._setup_vectors(root_vectors)
 
     def _compute_root_scale_factors(self):
         """
@@ -1896,9 +1931,6 @@ class System(object):
         recurse : bool
             If True, setup jacobians in all descendants.
         """
-        if not self._use_derivatives:
-            return
-
         asm_jac_solvers = set()
         if self._linear_solver is not None:
             asm_jac_solvers.update(self._linear_solver._assembled_jac_solver_iter())
@@ -2310,7 +2342,7 @@ class System(object):
         """
         if self._var_offsets is None:
             offsets = self._var_offsets = {}
-            if self._use_derivatives:
+            if self._problem_meta['use_derivatives']:
                 vec_names = self._lin_rel_vec_name_list
             else:
                 vec_names = self._problem_meta['vec_names']
@@ -2327,7 +2359,7 @@ class System(object):
                     else:
                         off_vn[type_] = np.zeros(0, dtype=int).reshape((1, 0))
 
-            if self._use_derivatives:
+            if self._problem_meta['use_derivatives']:
                 offsets['nonlinear'] = offsets['linear']
 
         return self._var_offsets
@@ -3845,6 +3877,9 @@ class System(object):
             for s in self.system_iter(include_self=False, recurse=recurse):
                 s._rec_mgr.append(recorder)
 
+    def _get_recording_iter(self):
+        return self._problem_meta['recording_iter']
+
     def record_iteration(self):
         """
         Record an iteration of the current System.
@@ -3857,7 +3892,7 @@ class System(object):
             metadata = create_local_meta(self.pathname)
 
             # Get the data to record
-            stack_top = self._recording_iter.stack[-1][0]
+            stack_top = self._get_recording_iter().stack[-1][0]
             method = stack_top.rsplit('.', 1)[-1]
 
             if method not in _recordable_funcs:
@@ -3906,7 +3941,7 @@ class System(object):
         """
         Clear out the iprint stack from the solvers.
         """
-        self.nonlinear_solver._solver_info.clear()
+        self.nonlinear_solver._get_solver_info().clear()
 
     def _reset_iter_counts(self):
         """

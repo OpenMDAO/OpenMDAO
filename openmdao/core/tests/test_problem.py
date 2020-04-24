@@ -764,7 +764,7 @@ class TestProblem(unittest.TestCase):
 
                 self.declare_partials(of='y', wrt='x')
 
-                if not self.force_alloc_complex:
+                if not self._problem_meta['force_alloc_complex']:
                     raise RuntimeError('force_alloc_complex not set in component.')
 
             def compute(self, inputs, outputs):
@@ -804,7 +804,7 @@ class TestProblem(unittest.TestCase):
 
                 self.declare_partials(of='y', wrt='x')
 
-                if self.force_alloc_complex:
+                if self._problem_meta['force_alloc_complex']:
                     print("Vectors allocated for complex step.")
 
             def compute(self, inputs, outputs):

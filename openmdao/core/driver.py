@@ -251,7 +251,6 @@ class Driver(object):
             Pointer to the containing problem.
         """
         self._problem = weakref.ref(problem)
-        self._recording_iter = problem._recording_iter
         model = problem.model
 
         self._total_jac = None
@@ -695,6 +694,9 @@ class Driver(object):
         self.iter_count += 1
         return False
 
+    def _get_recording_iter(self):
+        return self._problem()._metadata['recording_iter']
+
     def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', global_names=None,
                         use_abs_names=True):
         """
@@ -740,7 +742,7 @@ class Driver(object):
             use_abs_names = global_names
 
         if problem.model._owns_approx_jac:
-            self._recording_iter.push(('_compute_totals_approx', 0))
+            self._get_recording_iter().push(('_compute_totals_approx', 0))
 
             try:
                 if total_jac is None:
@@ -755,7 +757,7 @@ class Driver(object):
                 else:
                     totals = total_jac.compute_totals_approx()
             finally:
-                self._recording_iter.pop()
+                self._get_recording_iter().pop()
 
         else:
             if total_jac is None:
@@ -766,12 +768,12 @@ class Driver(object):
                 if not total_jac.has_lin_cons:
                     self._total_jac = total_jac
 
-            self._recording_iter.push(('_compute_totals', 0))
+            self._get_recording_iter().push(('_compute_totals', 0))
 
             try:
                 totals = total_jac.compute_totals()
             finally:
-                self._recording_iter.pop()
+                self._get_recording_iter().pop()
 
         if self._rec_mgr._recorders and self.recording_options['record_derivatives']:
             metadata = create_local_meta(self._get_name())
@@ -938,7 +940,7 @@ class Driver(object):
             return
 
         problem = self._problem()
-        if not problem.model._use_derivatives:
+        if not problem.model._problem_meta['use_derivatives']:
             simple_warning("Derivatives are turned off.  Skipping simul deriv coloring.")
             return
 
@@ -964,8 +966,9 @@ class Driver(object):
             return
 
         if not MPI or MPI.COMM_WORLD.rank == 0:
+            rec_iter = self._get_recording_iter()
             header = 'Driver debug print for iter coord: {}'.format(
-                self._recording_iter.get_formatted_iteration_coordinate())
+                rec_iter.get_formatted_iteration_coordinate())
             print(header)
             print(len(header) * '-')
 

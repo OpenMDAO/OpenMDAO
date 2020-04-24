@@ -16,7 +16,7 @@ class NonlinearBlockJac(NonlinearSolver):
         Perform the operations in the iteration loop.
         """
         system = self._system()
-        self._solver_info.append_subsolver()
+        self._get_solver_info().append_subsolver()
         system._transfer('nonlinear', 'fwd')
 
         with Recording('NonlinearBlockJac', 0, self) as rec:
@@ -34,7 +34,7 @@ class NonlinearBlockJac(NonlinearSolver):
             rec.abs = 0.0
             rec.rel = 0.0
 
-        self._solver_info.pop()
+        self._get_solver_info().pop()
 
     def _mpi_print_header(self):
         """
@@ -45,7 +45,7 @@ class NonlinearBlockJac(NonlinearSolver):
             pathname = self._system().pathname
             if pathname:
                 nchar = len(pathname)
-                prefix = self._solver_info.prefix
+                prefix = self._get_solver_info().prefix
                 header = prefix + "\n"
                 header += prefix + nchar * "=" + "\n"
                 header += prefix + pathname + "\n"

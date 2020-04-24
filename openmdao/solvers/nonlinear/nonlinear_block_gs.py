@@ -132,9 +132,9 @@ class NonlinearBlockGS(NonlinearSolver):
             else:
                 outputs_n = outputs.asarray().copy()
 
-        self._solver_info.append_subsolver()
+        self._get_solver_info().append_subsolver()
         self._gs_iter()
-        self._solver_info.pop()
+        self._get_solver_info().pop()
 
         if use_aitken:
             # compute the change in the outputs after the NLBGS iteration
@@ -211,11 +211,11 @@ class NonlinearBlockGS(NonlinearSolver):
             # This option runs apply_nonlinear to calculate the residuals, and thus ends up
             # executing ExplicitComponents twice per iteration.
 
-            self._recording_iter.push(('_run_apply', 0))
+            self._get_recording_iter().push(('_run_apply', 0))
             try:
                 system._apply_nonlinear()
             finally:
-                self._recording_iter.pop()
+                self._get_recording_iter().pop()
 
         elif itercount < 1:
             # Run instead of calling apply, so that we don't "waste" the extra run. This also
@@ -227,14 +227,14 @@ class NonlinearBlockGS(NonlinearSolver):
             with system._unscaled_context(outputs=[outputs]):
                 outputs_n = outputs.asarray().copy()
 
-            self._solver_info.append_subsolver()
+            self._get_solver_info().append_subsolver()
             for isub, (subsys, local)in enumerate(system._all_subsystem_iter()):
                 system._transfer('nonlinear', 'fwd', isub)
                 if local:
                     subsys._solve_nonlinear()
                     system._check_child_reconf()
 
-            self._solver_info.pop()
+            self._get_solver_info().pop()
             with system._unscaled_context(residuals=[residuals]):
                 residuals.set_val(outputs.asarray() - outputs_n)
 
@@ -247,7 +247,7 @@ class NonlinearBlockGS(NonlinearSolver):
             pathname = self._system().pathname
             if pathname:
                 nchar = len(pathname)
-                prefix = self._solver_info.prefix
+                prefix = self._get_solver_info().prefix
                 header = prefix + "\n"
                 header += prefix + nchar * "=" + "\n"
                 header += prefix + pathname + "\n"

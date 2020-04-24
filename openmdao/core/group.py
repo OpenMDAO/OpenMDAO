@@ -318,12 +318,7 @@ class Group(System):
         prob_meta : dict
             Problem level metadata.
         """
-        self.pathname = pathname
-        self._problem_meta = prob_meta
-
-        self.options._parent_name = self.msginfo
-        self.recording_options._parent_name = self.msginfo
-
+        super(Group, self)._setup_procs(pathname, comm, mode, prob_meta)
         self._setup_procs_finished = False
 
         if self._num_par_fd > 1:
@@ -342,20 +337,14 @@ class Group(System):
                 simple_warning(msg)
 
         self.comm = comm
-        self._mode = mode
 
         self._subsystems_allprocs = []
         self._manual_connections = {}
-        self._design_vars = OrderedDict()
-        self._responses = OrderedDict()
-        self._first_call_to_linearize = True
         self._approx_subjac_keys = None
 
         self._static_mode = False
         self._subsystems_allprocs.extend(self._static_subsystems_allprocs)
         self._manual_connections.update(self._static_manual_connections)
-        self._design_vars.update(self._static_design_vars)
-        self._responses.update(self._static_responses)
 
         # Call setup function for this group.
         self.setup()
@@ -411,12 +400,6 @@ class Group(System):
 
         # Perform recursion
         for subsys in self._subsystems_myproc:
-            subsys._local_vector_class = self._local_vector_class
-            subsys._distributed_vector_class = self._distributed_vector_class
-            subsys.force_alloc_complex = self.force_alloc_complex
-            subsys._use_derivatives = self._use_derivatives
-            subsys._solver_info = self._solver_info
-            subsys._recording_iter = self._recording_iter
             subsys._setup_procs(subsys.pathname, sub_comm, mode, prob_meta)
 
         # build a list of local subgroups to speed up later loops
@@ -516,7 +499,7 @@ class Group(System):
 
         subsystems_var_range = self._subsystems_var_range = {}
 
-        if self._use_derivatives:
+        if self._problem_meta['use_derivatives']:
             vec_names = self._lin_rel_vec_name_list
         else:
             vec_names = self._problem_meta['vec_names']
@@ -561,7 +544,7 @@ class Group(System):
                         start, start + allprocs_counters[type_][isub]
                     )
 
-        if self._use_derivatives:
+        if self._problem_meta['use_derivatives']:
             subsystems_var_range['nonlinear'] = subsystems_var_range['linear']
 
         self._setup_var_index_maps(recurse=recurse)
@@ -730,7 +713,7 @@ class Group(System):
         sizes = self._var_sizes
         relnames = self._var_allprocs_relevant_names
 
-        if self._use_derivatives:
+        if self._problem_meta['use_derivatives']:
             vec_names = self._lin_rel_vec_name_list
         else:
             vec_names = self._problem_meta['vec_names']
@@ -789,8 +772,9 @@ class Group(System):
             self._has_distrib_vars = self.comm.allreduce(n_distrib_vars) > 0
             if (self._has_distrib_vars or not np.all(self._var_sizes[vec_names[0]]['output']) or
                     not np.all(self._var_sizes[vec_names[0]]['input'])):
-                if self._distributed_vector_class is not None:
-                    self._vector_class = self._distributed_vector_class
+                dist_vec_class = self._problem_meta['distributed_vector_class']
+                if dist_vec_class is not None:
+                    self._vector_class = dist_vec_class
                 else:
                     raise RuntimeError("{}: Distributed vectors are required but no distributed "
                                        "vector type has been set.".format(self.msginfo))
@@ -817,9 +801,9 @@ class Group(System):
                                 owns[n] = i
         else:
             self._owned_sizes = self._var_sizes[vec_names[0]]['output']
-            self._vector_class = self._local_vector_class
+            self._vector_class = self._problem_meta['local_vector_class']
 
-        if self._use_derivatives:
+        if self._problem_meta['use_derivatives']:
             self._var_sizes['nonlinear'] = self._var_sizes['linear']
 
         if self.comm.size > 1:
@@ -853,8 +837,6 @@ class Group(System):
         allprocs_abs2meta = self._var_allprocs_abs2meta
         pathname = self.pathname
 
-        abs_in2out = {}
-
         if pathname == '':
             path_len = 0
             nparts = 0
@@ -878,6 +860,7 @@ class Group(System):
                         new_conns[inparts[nparts]][abs_in] = abs_out
 
         # Add implicit connections (only ones owned by this group)
+        abs_in2out = {}
         for prom_name in allprocs_prom2abs_list_out:
             if prom_name in allprocs_prom2abs_list_in:
                 abs_out = allprocs_prom2abs_list_out[prom_name][0]
@@ -1063,7 +1046,7 @@ class Group(System):
 
         # Recursion
         if recurse:
-            for subsys in self._subsystems_myproc:
+            for subsys in self._subgroups_myproc:
                 subsys._setup_connections(recurse)
 
         path_len = len(pathname + '.' if pathname else '')
@@ -1096,14 +1079,14 @@ class Group(System):
 
                 if nproc > 1 and self._vector_class is None:
                     # check for any cross-process data transfer.  If found, use
-                    # self._distributed_vector_class as our vector class.
+                    # self._problem_meta['distributed_vector_class'] as our vector class.
                     in_path = abs_in.rsplit('.', 1)[0]
                     if in_path not in self._local_system_set:
-                        self._vector_class = self._distributed_vector_class
+                        self._vector_class = self._problem_meta['distributed_vector_class']
                     else:
                         out_path = abs_out.rsplit('.', 1)[0]
                         if out_path not in self._local_system_set:
-                            self._vector_class = self._distributed_vector_class
+                            self._vector_class = self._problem_meta['distributed_vector_class']
 
             # if connected output has scaling then we need input scaling
             if not self._has_input_scaling and not (abs_in in allprocs_discrete_in or
@@ -1423,7 +1406,7 @@ class Group(System):
             sub_ext_num_vars = {}
             sub_ext_sizes = {}
 
-            if subsys._use_derivatives:
+            if subsys._problem_meta['use_derivatives']:
                 vec_names = subsys._lin_rel_vec_name_list
             else:
                 vec_names = subsys._problem_meta['vec_names']
@@ -1447,7 +1430,7 @@ class Group(System):
                         ext_sizes[vec_name][type_][1] + np.sum(sizes[type_][iproc, idx2:]),
                     )
 
-            if subsys._use_derivatives:
+            if subsys._problem_meta['use_derivatives']:
                 sub_ext_num_vars['nonlinear'] = sub_ext_num_vars['linear']
                 sub_ext_sizes['nonlinear'] = sub_ext_sizes['linear']
 

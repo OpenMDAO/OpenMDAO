@@ -320,12 +320,12 @@ class BroydenSolver(NonlinearSolver):
         self.xm = self.get_vector(system._outputs)
 
         with Recording('Broyden', 0, self):
-            self._solver_info.append_solver()
+            self._get_solver_info().append_solver()
 
             # should call the subsystems solve before computing the first residual
             self._gs_iter()
 
-            self._solver_info.pop()
+            self._get_solver_info().pop()
 
         self._run_apply()
         norm = self._iter_get_norm()
@@ -380,14 +380,14 @@ class BroydenSolver(NonlinearSolver):
         delta_xm = -Gm.dot(fxm)
 
         if self.linesearch:
-            self._solver_info.append_subsolver()
+            self._get_solver_info().append_subsolver()
 
             self.set_states(self.xm)
             self.set_linear_vector(delta_xm)
             self.linesearch.solve()
             xm = self.get_vector(system._outputs)
 
-            self._solver_info.pop()
+            self._get_solver_info().pop()
 
         else:
             # Update the new states in the model.
@@ -396,9 +396,9 @@ class BroydenSolver(NonlinearSolver):
 
         # Run the model.
         with Recording('Broyden', 0, self):
-            self._solver_info.append_solver()
+            self._get_solver_info().append_solver()
             self._gs_iter()
-            self._solver_info.pop()
+            self._get_solver_info().pop()
 
         self._run_apply()
 
@@ -638,7 +638,7 @@ class BroydenSolver(NonlinearSolver):
             pathname = self._system().pathname
             if pathname:
                 nchar = len(pathname)
-                prefix = self._solver_info.prefix
+                prefix = self._get_solver_info().prefix
                 header = prefix + "\n"
                 header += prefix + nchar * "=" + "\n"
                 header += prefix + pathname + "\n"

@@ -1844,7 +1844,7 @@ def dynamic_total_coloring(driver, run_model=True, fname=None):
         The computed coloring.
     """
     problem = driver._problem()
-    if not problem.model._use_derivatives:
+    if not problem.model._problem_meta['use_derivatives']:
         simple_warning("Derivatives have been turned off. Skipping dynamic simul coloring.")
         return
 
@@ -1921,7 +1921,7 @@ def _total_coloring_cmd(options, user_args):
     _use_total_sparsity = False
 
     def _total_coloring(prob):
-        if prob.model._use_derivatives:
+        if prob.model._problem_meta['use_derivatives']:
             hooks._unregister_hook('final_setup', 'Problem')  # avoid recursive loop
             if options.outfile:
                 outfile = os.path.abspath(options.outfile)
@@ -2070,7 +2070,7 @@ def _partial_coloring_cmd(options, user_args):
             print(coloring.get_declare_partials_calls())
 
     def _partial_coloring(prob):
-        if prob.model._use_derivatives:
+        if prob.model._problem_meta['use_derivatives']:
             hooks._unregister_hook('final_setup', 'Problem')  # avoid recursive loop
 
             prob.run_model()  # get a consistent starting values for inputs and outputs

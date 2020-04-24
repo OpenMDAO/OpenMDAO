@@ -112,16 +112,10 @@ class Problem(object):
         Object that manages all recorders added to this problem.
     _check : bool
         If True, call check_config at the end of final_setup.
-    _recording_iter : _RecIteration
-        Manages recording of iterations.
     _filtered_vars_to_record : dict
         Dictionary of lists of design vars, constraints, etc. to record.
     _logger : object or None
         Object for logging config checks if _check is True.
-    _force_alloc_complex : bool
-        Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
-        detect when you need to do this, but in some cases (e.g., complex step is used
-        after a reconfiguration) you may need to set this to True.
     _name : str
         Problem name.
     """
@@ -341,6 +335,9 @@ class Problem(object):
 
         return val
 
+    def _get_recording_iter(self):
+        return self._metadata['recording_iter']
+
     def __getitem__(self, name):
         """
         Get an output/input variable.
@@ -509,9 +506,9 @@ class Problem(object):
         if case_prefix:
             if not isinstance(case_prefix, str):
                 raise TypeError(self.msginfo + ": The 'case_prefix' argument should be a string.")
-            self._recording_iter.prefix = case_prefix
+            self._get_recording_iter().prefix = case_prefix
         else:
-            self._recording_iter.prefix = None
+            self._get_recording_iter().prefix = None
 
         if self.model.iter_count > 0 and reset_iter_counts:
             self.driver.iter_count = 0
@@ -545,9 +542,9 @@ class Problem(object):
         if case_prefix:
             if not isinstance(case_prefix, str):
                 raise TypeError(self.msginfo + ": The 'case_prefix' argument should be a string.")
-            self._recording_iter.prefix = case_prefix
+            self._get_recording_iter().prefix = case_prefix
         else:
-            self._recording_iter.prefix = None
+            self._get_recording_iter().prefix = None
 
         if self.model.iter_count > 0 and reset_iter_counts:
             self.driver.iter_count = 0
@@ -727,7 +724,6 @@ class Problem(object):
             this enables the user to instantiate and setup in one line.
         """
         model = self.model
-        model.force_alloc_complex = force_alloc_complex
         comm = self.comm
 
         # PETScVector is required for MPI
@@ -747,24 +743,23 @@ class Problem(object):
 
         self._mode = self._orig_mode = mode
 
-        # this will be shared by all Solvers in the model
-        model._solver_info = SolverInfo()
-        self._recording_iter = _RecIteration()
-        model._recording_iter = self._recording_iter
-
         model_comm = self.driver._setup_comm(comm)
 
-        meta = {
+        # this metadata will be shared by all Systems/Solvers in the system tree
+        self._metadata = {
             'coloring_dir': self.options['coloring_dir'],
-            'nocopy_inputs': {},
+            'recording_iter': _RecIteration(),
+            'local_vector_class': local_vector_class,
+            'distributed_vector_class': distributed_vector_class,
+            'solver_info': SolverInfo(),
+            'use_derivatives': derivatives,
+            'force_alloc_complex': force_alloc_complex,
         }
-        model._setup(model_comm, 'full', mode, distributed_vector_class, local_vector_class,
-                     derivatives, meta)
+        model._setup(model_comm, 'full', mode, self._metadata)
 
         # Cache all args for final setup.
         self._check = check
         self._logger = logger
-        self._force_alloc_complex = force_alloc_complex
 
         self._setup_status = 1
 
@@ -792,8 +787,7 @@ class Problem(object):
             mode = self._orig_mode
 
         if self._setup_status < 2:
-            self.model._final_setup(self.comm, 'full',
-                                    force_alloc_complex=self._force_alloc_complex)
+            self.model._final_setup(self.comm, 'full')
 
         driver._setup_driver(self)
 
@@ -903,7 +897,7 @@ class Problem(object):
 
         model = self.model
 
-        if not model._use_derivatives:
+        if not model._problem_meta['use_derivatives']:
             raise RuntimeError(self.msginfo +
                                ": Can't check partials.  Derivative support has been turned off.")
 

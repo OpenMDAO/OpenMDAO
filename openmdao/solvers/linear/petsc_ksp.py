@@ -410,9 +410,9 @@ class PETScKrylov(LinearSolver):
             b_vec.set_val(_get_petsc_vec_array(in_vec))
 
             # call the preconditioner
-            self._solver_info.append_precon()
+            self._get_solver_info().append_precon()
             self.precon.solve([vec_name], mode)
-            self._solver_info.pop()
+            self._get_solver_info().pop()
 
             # stuff resulting value of x vector into result for KSP
             result.array[:] = x_vec.asarray()

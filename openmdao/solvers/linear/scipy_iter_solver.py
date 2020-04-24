@@ -279,9 +279,9 @@ class ScipyKrylov(LinearSolver):
         b_vec.set_val(in_vec)
 
         # call the preconditioner
-        self._solver_info.append_precon()
+        self._get_solver_info().append_precon()
         self.precon.solve([vec_name], mode)
-        self._solver_info.pop()
+        self._get_solver_info().pop()
 
         # return resulting value of x vector
         return x_vec.asarray().copy()
