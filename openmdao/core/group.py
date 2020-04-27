@@ -507,11 +507,12 @@ class Group(System):
             for type_ in ['input', 'output']:
                 allprocs_counters[type_] = np.zeros(nsub_allprocs, INT_DTYPE)
                 for subsys in self._subsystems_myproc:
-                    comm = subsys.comm if subsys._full_comm is None else subsys._full_comm
-                    if comm.rank == 0 and vec_name in subsys._rel_vec_names:
-                        isub = self._subsystems_inds[subsys.name]
-                        allprocs_counters[type_][isub] = \
-                            len(subsys._var_allprocs_relevant_names[vec_name][type_])
+                    if vec_name in subsys._rel_vec_names:
+                        comm = subsys.comm if subsys._full_comm is None else subsys._full_comm
+                        if comm.rank == 0:
+                            isub = self._subsystems_inds[subsys.name]
+                            allprocs_counters[type_][isub] = \
+                                len(subsys._var_allprocs_relevant_names[vec_name][type_])
 
             # If running in parallel, allgather
             if self.comm.size > 1:
