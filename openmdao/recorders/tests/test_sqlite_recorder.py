@@ -2432,7 +2432,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         prob.setup()
         prob.set_solver_print(0)
         prob.run_driver()
-        prob.record_state("after_run_driver")
+        prob.record("after_run_driver")
 
         # Instantiate your CaseReader
         cr = om.CaseReader("cases.sql")
@@ -2502,7 +2502,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         prob.set_solver_print(0)
         prob.run_driver()
-        prob.record_state("final_state")
+        prob.record("final_state")
 
         # Instantiate your CaseReader
         cr = om.CaseReader("cases.sql")
@@ -2644,7 +2644,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         prob.set_solver_print(0)
         prob.run_driver()
         # Add a record state after run driver
-        prob.record_state("after_run_driver")
+        prob.record("after_run_driver")
 
         # Instantiate the Case Reader
         cr = om.CaseReader('cases.sql')

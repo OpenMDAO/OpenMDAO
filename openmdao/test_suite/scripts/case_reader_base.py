@@ -35,7 +35,7 @@ def case_reader_base():
 
     prob.set_solver_print(0)
     prob.run_driver()
-    prob.record_state("final_state")
+    prob.record ("final_state")
 
     # Instantiate your CaseReader
     cr = om.CaseReader("cases.sql")
