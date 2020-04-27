@@ -183,7 +183,7 @@ class N2Legend {
 
         sysVarContainer.style('width', sysVarContainer.node().scrollWidth + 'px')
 
-        const solversLegend = d3.select('#linear-legend')
+        const solversLegend = d3.select('#solvers-legend')
         for (let item of this.linearSolvers) this._addItem(item, solversLegend);
 
         solversLegend.style('width', solversLegend.node().scrollWidth + 'px');
@@ -232,10 +232,10 @@ class N2Legend {
      */
     toggleSolvers(linear) {
 
-        const solversLegendTitle = d3.select('#linear-legend-title');
+        const solversLegendTitle = d3.select('#solvers-legend-title');
         solversLegendTitle.text(linear ? "Linear Solvers" : "Non-Linear Solvers");
 
-        const solversLegend = d3.select('#linear-legend');
+        const solversLegend = d3.select('#solvers-legend');
         solversLegend.html('');
 
         const solvers = linear ? this.linearSolvers : this.nonLinearSolvers;
