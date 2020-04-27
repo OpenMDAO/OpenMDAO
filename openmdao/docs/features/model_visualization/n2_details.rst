@@ -8,7 +8,7 @@ The N2 diagram has a number of sections:
 
 * Model hierarchy
 * Connection matrix
-* Solver structure
+* Solver hierarchy
 * Toolbar
 * Search bar
 * Legend
@@ -23,7 +23,7 @@ circuit model that is missing a connection as our example code.
 
 Here is the N2 diagram that is generated from this model.
 There are three parts to the N2 diagram. The model hierarchy is on the left, the connection matrix is displayed
-in the center, and the solver structure is shown on the right.
+in the center, and the solver hierarchy is shown on the right.
 
 .. embed-n2::
     ../test_suite/scripts/circuit_with_unconnected_input.py
@@ -31,7 +31,7 @@ in the center, and the solver structure is shown on the right.
 Model Hierarchy
 ---------------
 
-The model hierarchy is on the left side of the diagram. It is actually a mix of Systems and variables, both
+The model hierarchy is on the left side of the diagram. It is a mix of Systems and variables, both
 inputs and outputs.
 
 The top System, the root of the model, is on the left and the subsystem hierarchy is displayed to its right.
@@ -44,18 +44,18 @@ button. Here is the part of the legend that explains the colors of the model hie
     images/systems_and_variables_legend.png
     :align: center
 
-You can click in the model hierarchy to collapse and uncollapse sections of the hierarchy. Left clicking on a
+You can click in the model hierarchy to zoom into, and also collapse and expand sections of the hierarchy. Left clicking on a
 subsystem zooms the hierarchy display to just that subsystem in the hierarchy. Right clicking on a subsystem collapses all of the
 hierarchy to the right of it.
 
-Buttons on the toolbar, which are explained in the toolbar :ref:`Toolbar` section,
+Buttons on the toolbar, which are explained in the :ref:`Toolbar<toolbar>` section,
 also can be used to control what is displayed in the hierarchy.
 
 Connection Matrix
 -----------------
 The matrix in the middle of the diagram shows what items in the model are connected.
 
-The color of an item on a diagonal cell matches the color of the rightmost element in model hierarchy. The colors
+The color of an item on a diagonal cell matches the color of the rightmost element in the model hierarchy. The colors
 for the off-diagonal items, which indicate connections, are always black.
 
 The symbol of an item in the connection matrix indicates whether the variable is a scalar, vector, or collapsed variable.
@@ -64,7 +64,7 @@ The symbol of an item in the connection matrix indicates whether the variable is
     images/connection_matrix_legend.png
     :align: center
 
-Black boxes outline items in the matrix to show the grouping of the variables of the lowest level components.
+Boxes, with thin black line borders, outline items in the matrix to show the grouping of the variables of the lowest level Systems.
 
 When you hover over a connection in the matrix, arrows are drawn to indicate connections. The behavior is different
 depending on whether you hover over a diagonal or an off-diagonal cell.
@@ -87,38 +87,49 @@ Clicking in the matrix on a connection or diagonal, lets you pin connection arro
 disappear when you hover away from the cell. You can clear these connections arrows by using the
 `Hide all connection arrow button` |hide_conn_arrows| in the toolbar.
 
-Solver Structure
+Solver Hierarchy
 ----------------
 Each System in a model can potentially have a linear and nonlinear solver associated with it. On the right side
 of the N2 diagram, the hierarchy of the solvers is shown. This time the hierarchy goes from right to left with the root
 of the model on the right.
-You can switch between showing the linear or nonlinear
+You can switch between showing the names of the linear or nonlinear
 solvers using the button |toggle_solver_names| in the toolbar.
 
-The colors indicate the type of solver. The colors are shown in the Legend. The section of the legend showing
+The colors indicate the type of solver. The colors are shown in the legend. The section of the legend showing
 the colors of the solver types changes depending on which are displayed in the solver structure.
-Here is what section of the legend looks like for both linear and nonlinear solvers.
+Here is what the section of the legend looks like for both linear and non-linear solvers.
 
-.. figure:: images/nonlinear_solvers_legend.png
-    :align: center
+.. |nonlinear_solvers_legend| image:: images/nonlinear_solvers_legend.png
+    :align: middle
     :scale: 80 %
 
-    Non-Linear Solver Legend Section
-
-.. figure:: images/linear_solvers_legend.png
-    :align: center
+.. |linear_solvers_legend| image:: images/linear_solvers_legend.png
+    :align: middle
     :scale: 80 %
 
-    Linear Solver Legend Section
 
+.. table:: Solver Legend
+   :widths: auto
+   :align: center
 
-When a System has a Newton nonlinear solver and the `solve_subsystems` option is set to True for that solver,
-the Solver Structure box for that System has the text `NL: Newton (sub_solve)`.
+   +----------------------------+-------------------------+
+   | Non-Linear Solver Legend   | Linear Solver Legend    |
+   +============================+=========================+
+   | |nonlinear_solvers_legend| | |linear_solvers_legend| |
+   +----------------------------+-------------------------+
+
+.. note::
+
+    When a System has a Newton non-linear solver and the `solve_subsystems` option is set to True for that solver,
+    the Solver hierarchy box for that System has the text `NL: Newton (sub_solve)`.
+
+As in the model hierarchy, you can also do zooming, collapsing, and expanding in the Solver hierarchy using left and right mouse clicks.
+
+.. _toolbar:
 
 Toolbar
 -------
-
-The tool bar to the left of the N2 diagram provides many useful capabilities. Explanations for all the buttons
+The toolbar to the left of the N2 diagram provides many useful capabilities. Explanations for all the buttons
 is below. Tooltips are also provided for all the buttons as you hover over them.
 
 View Control
@@ -145,6 +156,7 @@ redo in apps.
    :align: middle
    :scale: 40 %
 
+|
 
 .. table:: Buttons to Control Hierarchy View
    :widths: auto
@@ -153,19 +165,20 @@ redo in apps.
    +---------------------+-----------------+----------------------------------------------------------------------+
    | Button              | Title           | Description                                                          |
    +=====================+=================+======================================================================+
-   | |return_to_root|    | Return to Root  | View entire model starting from root                                 |
+   | |return_to_root|    | Return to root  | View entire model starting from root                                 |
    +---------------------+-----------------+----------------------------------------------------------------------+
    | |back|              | Back            | Move back in view history                                            |
    +---------------------+-----------------+----------------------------------------------------------------------+
    | |forward|           | Forward         | Move forward in view history                                         |
    +---------------------+-----------------+----------------------------------------------------------------------+
 
+|
 
 Collapsing and Expanding the System Hierarchy
 *********************************************
 
 The next set of buttons lets you control the collapsing and expanding of elements in the System hierarchy. The first
-four buttons are revealed as a fly-out menu as you hover over this button, |control_collapse|
+four buttons are revealed as a fly-out menu as you hover over this button, |control_collapse|.
 
 .. |control_collapse| image:: images/control_collapse.png
    :align: middle
@@ -191,6 +204,8 @@ four buttons are revealed as a fly-out menu as you hover over this button, |cont
    :align: middle
    :scale: 40 %
 
+|
+
 .. table:: Buttons to Control Expanding and Collapsing of Hierarchy
    :widths: auto
    :align: left
@@ -209,17 +224,17 @@ four buttons are revealed as a fly-out menu as you hover over this button, |cont
    | |collapse_depth|    | Collapse depth                   | Sets the number of hierarchy levels shown in the view  |
    +---------------------+----------------------------------+--------------------------------------------------------+
 
+|
+
 Connections Arrow Visibility
 ****************************
 
 The connections visibility is controlled using the buttons that appear when hovering over
-the |connection_visibility| button:
+the |connection_visibility| button.
 
 .. |connection_visibility| image:: images/connection_visibility.png
    :align: middle
    :scale: 40 %
-
-
 
 .. |show_conn_arrows| image:: images/show_conn_arrows.png
    :align: middle
@@ -233,6 +248,8 @@ the |connection_visibility| button:
    :align: middle
    :scale: 40 %
 
+|
+
 .. table:: Buttons to Control Connections Arrow Visibility
    :widths: auto
    :align: left
@@ -240,13 +257,14 @@ the |connection_visibility| button:
    +-----------------------+--------------------------------+-----------------------------------------------------------------------------------+
    | Button                | Title                          | Description                                                                       |
    +=======================+================================+===================================================================================+
-   | |show_conn_arrows|    | Show pinned connection arrows  | Display all the connection arrows the user has pinned                             |
+   | |show_conn_arrows|    | Show pinned connection arrows  | Display all the connection arrows the user has pinned by clicking on a connection |
    +-----------------------+--------------------------------+-----------------------------------------------------------------------------------+
    | |hide_conn_arrows|    | Hide all connection arrows     | Hide all connection arrows, pinned or otherwise                                   |
    +-----------------------+--------------------------------+-----------------------------------------------------------------------------------+
    | |show_all_conn_arrows|| Show all connections in model  | Show all connections in model. These are not added to the "pinned" list of arrows |
    +-----------------------+--------------------------------+-----------------------------------------------------------------------------------+
 
+|
 
 Remaining Toolbar Buttons
 *************************
@@ -281,8 +299,9 @@ The buttons in the remaining part of the toolbar offer a variety of other option
    :align: middle
    :scale: 40 %
 
+|
+
 .. table:: Remaining Toolbar Buttons
-   :widths: auto
    :align: left
 
    +-----------------------+---------------------------------+----------------------------------------------------------------------------------------------------+
@@ -305,9 +324,12 @@ The buttons in the remaining part of the toolbar offer a variety of other option
    | |help|                | Help                            | Brings up the help window                                                                          |
    +-----------------------+---------------------------------+----------------------------------------------------------------------------------------------------+
 
+|
+
 Show Legend
 -----------
 If you click on the legend button |show_legend|, you will see the legend appear below the N2 diagram.
+The Legend window can then be dragged to a location of the user's choice.
 
 .. image::
     images/legend.png
@@ -318,7 +340,7 @@ Here are explanations of the sections in the legend:
 
     * The System & Variables section shows the colors for the different items in the model hierarchy.
 
-    * The N^2 Symbols section shows the icons used to indicate the type of connection in the connection matrix.
+    * The N2 Symbols section shows the icons used to indicate the type of connection in the connection matrix.
       The shape of the
       icon in the matrix shows whether the connection is between scalars, vectors, or groups. The color of the icon is based
       on the color associated with the variable of that type as shown in the System & Variables part of the legend.
@@ -327,13 +349,14 @@ Here are explanations of the sections in the legend:
       diagram. The colors indicate
       the type of solver, either linear or nonlinear, depending what is being displayed.
 
-The Legend window can be dragged to a location of the user's choice.
+
 
 Show Node Info
 --------------
-The Show Node Info button |show_node_info|, brings up a small window that displays information about the item the cursor is hovering over.
-Here are some examples of what the user can see when hovering over variables, Systems, connection matrix cell, and
-Solver.
+The Show Node Info button |show_node_info|, brings up a small window that displays information about the item the
+cursor is hovering over.
+Here are some examples of what the user can see when hovering over variables, Systems, connection matrix cells, and
+Solvers.
 
 .. |variable_node_info| image:: images/variable_node_info.png
     :align: middle
@@ -351,6 +374,8 @@ Solver.
     :align: middle
     :scale: 30 %
 
+|
+
 .. table:: Show Node Info Examples
    :widths: auto
    :align: left
@@ -360,6 +385,8 @@ Solver.
    +======================+====================+==================+=====================+
    | |variable_node_info| | |system_node_info| | |cell_node_info| | |solver_node_info|  |
    +----------------------+--------------------+------------------+---------------------+
+
+|
 
 Search bar
 ----------
@@ -389,7 +416,6 @@ with dashed line arrows. For example:
 .. image:: images/external_connection.png
     :align: center
     :scale: 30 %
-
 
 The dashed line arrow shows that `R2.V_out` variable is connected to `circuit.n2.V` even though that variable is no longer
 visible in the diagram.
