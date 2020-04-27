@@ -433,7 +433,10 @@ class pyOptSparseDriver(Driver):
             self.fail = False
 
             # These are various failed statuses.
-            if exit_status > 2:
+            if optimizer == 'IPOPT':
+                if exit_status not in {0, 1}:
+                    self.fail = True
+            elif exit_status > 2:
                 self.fail = True
 
         except KeyError:
