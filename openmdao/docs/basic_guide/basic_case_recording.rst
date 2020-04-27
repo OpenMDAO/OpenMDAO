@@ -24,18 +24,3 @@ objectives, you can use their methods like the example below.
     openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_basic_case_recording
     :layout: interleave
 
-Generating a Plot with Case Recording Data From Driver Source
---------------------------------------------------------------
-
-The `Driver` records information about the optimization of design variables, constraint variables,
-and objectives. It can be useful to see your design variables' paths to convergence. Below we show how to extract the
-data from the recorder data and create a basic plot.
-
-.. embed-code::
-    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_basic_case_plot
-    :layout: interleave
-
-.. image:: images/des_var_opt.jpg
-    :width: 600
-
-

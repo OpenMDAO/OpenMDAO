@@ -53,8 +53,4 @@ Recording and Reading Data
     :maxdepth: 1
 
     basic_case_recording.rst
-    advanced_case_recording.rst
-
-
-
 
