@@ -180,6 +180,7 @@ class DistribInputDistribOutputComp(om.ExplicitComponent):
         self.add_input('invec', np.ones(sizes[rank], float))
         self.add_output('outvec', np.ones(sizes[rank], float))
 
+
 class DistribCompWithDerivs(om.ExplicitComponent):
     """Uses 2 procs and takes input var slices, but also computes partials"""
 
@@ -218,6 +219,7 @@ class DistribCompWithDerivs(om.ExplicitComponent):
         self.add_output('outvec', np.ones(sizes[rank], float))
         self.declare_partials('outvec', 'invec', rows=np.arange(0, sizes[rank]),
                                                  cols=np.arange(0, sizes[rank]))
+
 
 class DistribInputDistribOutputDiscreteComp(DistribInputDistribOutputComp):
 
