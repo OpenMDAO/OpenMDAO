@@ -645,7 +645,7 @@ class Problem(object):
         for system in self.model.system_iter(include_self=True, recurse=True):
             system.cleanup()
 
-    def record_state(self, case_name):
+    def record(self, case_name):
         """
         Record the variables at the Problem level.
 
@@ -666,7 +666,7 @@ class Problem(object):
             Name used to identify this Problem case.
         """
         warn_deprecation("'Problem.record_iteration' has been deprecated. "
-                         "Use 'Problem.record_state' instead.")
+                         "Use 'Problem.record' instead.")
 
         record_iteration(self, self, case_name)
 

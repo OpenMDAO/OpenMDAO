@@ -1061,7 +1061,7 @@ class TestDOEDriver(unittest.TestCase):
 
         prob.setup()
         prob.run_driver()
-        prob.record_state("end")
+        prob.record("end")
         prob.cleanup()
 
         cr = om.CaseReader("cases.sql")
