@@ -1490,7 +1490,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         prob.run_driver()
 
-        prob.record_state('final')
+        prob.record('final')
         prob.cleanup()
 
         # expected input and output values after run_once
@@ -2030,8 +2030,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.model.nonlinear_solver.add_recorder(recorder)
 
         prob.run_driver()
-        prob.record_state('c_1')
-        prob.record_state('c_2')
+        prob.record('c_1')
+        prob.record('c_2')
         prob.cleanup()
 
         # without pre_load, we should get format_version and metadata but no cases
@@ -2106,8 +2106,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.model.nonlinear_solver.add_recorder(self.recorder)
 
         prob.run_driver()
-        prob.record_state('c_1')
-        prob.record_state('c_2')
+        prob.record('c_1')
+        prob.record('c_2')
         prob.cleanup()
 
         cr = om.CaseReader(self.filename, pre_load=False)
@@ -2384,7 +2384,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         fail = prob.run_driver()
 
-        prob.record_state('final')
+        prob.record('final')
         prob.cleanup()
 
         self.assertFalse(fail, 'Problem optimization failed.')
@@ -2883,7 +2883,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_driver()
 
         case_name = "c1"
-        prob.record_state(case_name)
+        prob.record(case_name)
 
         prob.cleanup()
 
@@ -3434,14 +3434,14 @@ class TestFeatureSqliteReader(unittest.TestCase):
         prob.run_driver()
         print(prob['x'], prob['y'], prob['f_xy'])
         case_name_1 = "c1"
-        prob.record_state(case_name_1)
+        prob.record(case_name_1)
 
         prob['x'] = 0.1
         prob['y'] = -0.1
         prob.run_driver()
         print(prob['x'], prob['y'], prob['f_xy'])
         case_name_2 = "c2"
-        prob.record_state(case_name_2)
+        prob.record(case_name_2)
         prob.cleanup()
 
         cr = om.CaseReader('cases.sql')
@@ -3620,7 +3620,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         #
         # fail = prob.run_driver()
         #
-        # prob.record_state('final')
+        # prob.record('final')
         # prob.cleanup()
 
         filename = os.path.join(self.legacy_dir, 'case_problem_driver_v7.sql')
@@ -3664,7 +3664,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         # prob.setup()
         # prob.run_driver()
         #
-        # prob.record_state('final')
+        # prob.record('final')
         # prob.cleanup()
 
         filename = os.path.join(self.legacy_dir, 'case_problem_v6.sql')

@@ -1626,7 +1626,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        prob.record_state('final')
+        prob.record('final')
         prob.cleanup()
 
         cr = om.CaseReader("cases.sql")
@@ -1657,7 +1657,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        msg = "'Problem.record_iteration' has been deprecated. Use 'Problem.record_state' instead."
+        msg = "'Problem.record_iteration' has been deprecated. Use 'Problem.record' instead."
 
         with assert_warning(DeprecationWarning, msg):
             prob.record_iteration('final')
@@ -1697,7 +1697,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        prob.record_state('final')
+        prob.record('final')
         prob.cleanup()
 
         cr = om.CaseReader("cases.sql")
@@ -1738,7 +1738,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        prob.record_state('final')
+        prob.record('final')
         prob.cleanup()
 
         cr = om.CaseReader("cases.sql")
@@ -1774,7 +1774,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.setup()
         prob.set_solver_print(0)
         prob.run_driver()
-        prob.record_state('case1')
+        prob.record('case1')
         cr = om.CaseReader(self.filename)
         final_case = cr.get_case('case1')
         self.assertEqual(final_case.residuals, None)
@@ -1783,7 +1783,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.recording_options['record_inputs'] = True
         prob.setup()
         prob.run_driver()
-        prob.record_state('case2')
+        prob.record('case2')
         cr = om.CaseReader(self.filename)
         final_case = cr.get_case('case2')
         self.assertEqual(set(final_case.inputs.keys()), {'y', 'x'})
@@ -1795,7 +1795,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.recording_options['excludes'] = ['*y']
         prob.setup()
         prob.run_driver()
-        prob.record_state('case3')
+        prob.record('case3')
         cr = om.CaseReader(self.filename)
         final_case = cr.get_case('case3')
         self.assertEqual(set(final_case.inputs.keys()), {'x'})
@@ -1805,7 +1805,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.recording_options['includes'] = ['*y']
         prob.setup()
         prob.run_driver()
-        prob.record_state('case4')
+        prob.record('case4')
         cr = om.CaseReader(self.filename)
         final_case = cr.get_case('case4')
         self.assertEqual(set(final_case.inputs.keys()), {'y'})
@@ -1816,7 +1816,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.recording_options['record_residuals'] = False
         prob.setup()
         prob.run_driver()
-        prob.record_state('case5')
+        prob.record('case5')
         prob.cleanup()
         cr = om.CaseReader(self.filename)
         final_case = cr.get_case('case5')
@@ -1835,7 +1835,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.set_solver_print(0)
         prob.run_driver()
 
-        prob.record_state('final')
+        prob.record('final')
         cr = om.CaseReader(self.filename)
         final_case = cr.get_case('final')
         self.assertEqual(set(final_case.residuals.keys()), {'f_xy', 'y', 'x', 'c'})
@@ -1846,7 +1846,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.recording_options['includes'] = ['x*']
         prob.setup()
         prob.run_driver()
-        prob.record_state('final2')
+        prob.record('final2')
         cr = om.CaseReader(self.filename)
         final_case = cr.get_case('final2')
         self.assertEqual(set(final_case.residuals.keys()), {'x'})
@@ -1857,7 +1857,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.recording_options['record_residuals'] = False
         prob.setup()
         prob.run_driver()
-        prob.record_state('final3')
+        prob.record('final3')
         prob.cleanup()
         cr = om.CaseReader(self.filename)
         final_case = cr.get_case('final3')
@@ -1876,7 +1876,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.set_solver_print(0)
         prob.run_driver()
 
-        prob.record_state('final')
+        prob.record('final')
         cr = om.CaseReader(self.filename)
         final_case = cr.get_case('final')
         self.assertEqual(set(final_case.residuals.keys()), {'f_xy', 'y', 'x', 'c'})
@@ -1887,7 +1887,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.recording_options['includes'] = ['x*']
         prob.setup()
         prob.run_driver()
-        prob.record_state('final2')
+        prob.record('final2')
         cr = om.CaseReader(self.filename)
         final_case = cr.get_case('final2')
         self.assertEqual(set(final_case.residuals.keys()), {'x'})
@@ -1898,7 +1898,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.recording_options['record_residuals'] = False
         prob.setup()
         prob.run_driver()
-        prob.record_state('final3')
+        prob.record('final3')
         prob.cleanup()
         cr = om.CaseReader(self.filename)
         final_case = cr.get_case('final3')
@@ -2037,7 +2037,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        prob.record_state('final')
+        prob.record('final')
         prob.cleanup()
 
         cr = om.CaseReader("cases.sql")
@@ -2070,7 +2070,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.set_solver_print(0)
         t0, t1 = run_driver(prob)
         case_name = "state1"
-        prob.record_state(case_name)
+        prob.record(case_name)
         prob.cleanup()
 
         expected_derivs = {
@@ -2095,7 +2095,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.set_solver_print(0)
         t0, t1 = run_driver(prob)
         case_name = "state1"
-        prob.record_state(case_name)
+        prob.record(case_name)
         prob.cleanup()
 
         expected_derivs = None
@@ -2114,7 +2114,7 @@ class TestSqliteRecorder(unittest.TestCase):
         t0, t1 = run_driver(prob)
 
         case_name = "state1"
-        prob.record_state(case_name)
+        prob.record(case_name)
 
         prob.cleanup()
 
@@ -2955,7 +2955,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         prob.setup()
         prob.run_driver()
-        prob.record_state('final')
+        prob.record('final')
         prob.cleanup()
 
         cr = om.CaseReader("cases.sql")
@@ -3009,7 +3009,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         prob.setup()
         prob.run_driver()
-        prob.record_state('final')
+        prob.record('final')
         prob.cleanup()
 
         cr = om.CaseReader("cases.sql")
@@ -3140,7 +3140,7 @@ class TestFeatureBasicRecording(unittest.TestCase):
         prob.run_driver()
 
         # record the final state of the problem
-        prob.record_state('final')
+        prob.record('final')
 
         # clean up and shut down
         prob.cleanup()

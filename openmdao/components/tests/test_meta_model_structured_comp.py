@@ -630,7 +630,7 @@ class TestMetaModelStructuredScipy(unittest.TestCase):
             if verbose:
                 print("Checking derivative pair:", i)
             if derivs['comp'][i]['J_fwd'].sum() != 0.0:
-                rel_err = max(derivs['comp'][i]['rel error'])
+                rel_err = derivs['comp'][i]['rel error'][0]
                 self.assertLessEqual(rel_err, tol)
 
     def test_error_msg_vectorized(self):
@@ -713,7 +713,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
             if verbose:
                 print("Checking derivative pair:", i)
             if derivs['comp'][i]['J_fwd'].sum() != 0.0:
-                rel_err = max(derivs['comp'][i]['rel error'])
+                rel_err = derivs['comp'][i]['rel error'][0]
                 self.assertLessEqual(rel_err, tol)
 
     def test_deriv1(self):

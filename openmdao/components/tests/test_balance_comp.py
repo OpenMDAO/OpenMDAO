@@ -9,7 +9,7 @@ import numpy as np
 from numpy.testing import assert_almost_equal
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_warning, assert_no_warning
+from openmdao.utils.assert_utils import assert_warning, assert_no_warning, assert_check_partials
 
 
 class TestBalanceComp(unittest.TestCase):
@@ -43,8 +43,7 @@ class TestBalanceComp(unittest.TestCase):
 
         cpd = prob.check_partials(out_stream=None)
 
-        for (of, wrt) in cpd['balance']:
-            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+        assert_check_partials(cpd, atol=2e-5, rtol=2e-5)
 
         # set an actual solver, and re-setup. Then check derivatives at a converged point
         prob.model.linear_solver = om.DirectSolver()
@@ -58,8 +57,7 @@ class TestBalanceComp(unittest.TestCase):
 
         cpd = prob.check_partials(out_stream=None)
 
-        for (of, wrt) in cpd['balance']:
-            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+        assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
     def test_create_on_init(self):
 
@@ -93,8 +91,7 @@ class TestBalanceComp(unittest.TestCase):
 
         cpd = prob.check_partials(out_stream=None)
 
-        for (of, wrt) in cpd['balance']:
-            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+        assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
     def test_balance_comp_options_exclude_no_error(self):
 
@@ -172,8 +169,7 @@ class TestBalanceComp(unittest.TestCase):
 
         cpd = prob.check_partials(out_stream=None)
 
-        for (of, wrt) in cpd['balance']:
-            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+        assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
     def test_vectorized(self):
 
@@ -213,8 +209,7 @@ class TestBalanceComp(unittest.TestCase):
 
         cpd = prob.check_partials(out_stream=None)
 
-        for (of, wrt) in cpd['balance']:
-            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+        assert_check_partials(cpd, atol=2e-5, rtol=2e-5)
 
     def test_vectorized_no_normalization(self):
 
@@ -254,8 +249,7 @@ class TestBalanceComp(unittest.TestCase):
 
         cpd = prob.check_partials(out_stream=None)
 
-        for (of, wrt) in cpd['balance']:
-            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+        assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
     def test_vectorized_with_mult(self):
 
@@ -299,8 +293,7 @@ class TestBalanceComp(unittest.TestCase):
 
         cpd = prob.check_partials(out_stream=None)
 
-        for (of, wrt) in cpd['balance']:
-            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+        assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
     def test_vectorized_with_default_mult(self):
         """
@@ -342,8 +335,7 @@ class TestBalanceComp(unittest.TestCase):
 
         cpd = prob.check_partials(out_stream=None)
 
-        for (of, wrt) in cpd['balance']:
-            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+        assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
     def test_shape(self):
         n = 100
@@ -415,8 +407,7 @@ class TestBalanceComp(unittest.TestCase):
             warnings.filterwarnings(action="error", category=np.ComplexWarning)
             cpd = prob.check_partials(out_stream=None, method='cs')
 
-        for (of, wrt) in cpd['balance']:
-            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=10)
+        assert_check_partials(cpd, atol=1e-10, rtol=1e-10)
 
     def test_scalar(self):
 
@@ -456,8 +447,7 @@ class TestBalanceComp(unittest.TestCase):
 
         cpd = prob.check_partials(out_stream=None)
 
-        for (of, wrt) in cpd['balance']:
-            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+        assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
     def test_scalar_with_guess_func(self):
 
@@ -497,8 +487,7 @@ class TestBalanceComp(unittest.TestCase):
         self.assertEqual(model.nonlinear_solver._iter_count, 1)
 
         cpd = prob.check_partials(out_stream=None)
-        for (of, wrt) in cpd['balance']:
-            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+        assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
     def test_scalar_with_guess_func_additional_input(self):
 
@@ -649,8 +638,7 @@ class TestBalanceComp(unittest.TestCase):
 
         cpd = prob.check_partials(out_stream=None)
 
-        for (of, wrt) in cpd['balance']:
-            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+        assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
     def test_scalar_with_mult(self):
 
@@ -694,8 +682,7 @@ class TestBalanceComp(unittest.TestCase):
 
         cpd = prob.check_partials(out_stream=None)
 
-        for (of, wrt) in cpd['balance']:
-            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+        assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
     def test_renamed_vars(self):
 
@@ -739,8 +726,7 @@ class TestBalanceComp(unittest.TestCase):
 
         cpd = prob.check_partials(out_stream=None)
 
-        for (of, wrt) in cpd['balance']:
-            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+        assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
     def test_feature_scalar(self):
         from numpy.testing import assert_almost_equal
@@ -890,8 +876,7 @@ class TestBalanceComp(unittest.TestCase):
 
         cpd = prob.check_partials(out_stream=None)
 
-        for (of, wrt) in cpd['balance']:
-            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+        assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
 
 if __name__ == '__main__':  # pragma: no cover

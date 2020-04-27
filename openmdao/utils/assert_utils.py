@@ -103,59 +103,58 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6):
     len_absrel_width = len(absrel_header)
     norm_types = ['fwd-fd', 'rev-fd', 'fd-rev']
     len_norm_type_width = max(len(s) for s in norm_types)
+
     for comp in data:
-        # First do a pass to get the max widths for the columns. Also check to see if any over tol
-        #  in this Component
         len_wrt_width = len(wrt_header)
         len_norm_width = len(norm_value_header)
-        over_tol = False
-        for (var, wrt) in data[comp]:
-            for error_type, tolerance in [('abs error', atol), ('rel error', rtol), ]:
-                actual = data[comp][var, wrt][error_type]
-                for norm, norm_type in zip(actual, norm_types):
-                    if not np.isnan(norm):
-                        if not np.allclose(norm, 0.0, atol=tolerance):
-                            over_tol = True
-                            wrt_string = '{0} wrt {1}'.format(var, wrt)
-                            norm_string = '{}'.format(norm)
-                            len_wrt_width = max(len_wrt_width, len(wrt_string))
-                            len_norm_width = max(len_norm_width, len(norm_string))
+        bad_derivs = []
 
-                    elif error_type == 'abs error' and norm_type == 'fwd-fd':
-                        # Capturing case where computed partials or output are NaN.
-                        over_tol = True
+        # Find all derivatives whose errors exceed tolerance.
+        # Also, size the output to precompute column extents.
+        for (var, wrt) in data[comp]:
+            pair_data = data[comp][var, wrt]
+            for error_type, tolerance in [('abs error', atol), ('rel error', rtol), ]:
+                actual = pair_data[error_type]
+                for error_val, mode in zip(actual, norm_types):
+                    in_error = False
+
+                    if error_val is None:
+                        # Reverse derivatives only computed on matrix free comps.
+                        continue
+
+                    if not np.isnan(error_val):
+                        if not np.allclose(error_val, 0.0, atol=tolerance):
+
+                            if error_type == 'rel error' and mode == 'fwd-fd' and \
+                               np.allclose(pair_data['J_fwd'], 0.0, atol=atol) and \
+                               np.allclose(pair_data['J_fd'], 0.0, atol=atol):
+                                # Special case: both fd and fwd are really tiny, so we want to
+                                # ignore the rather large relative errors.
+                                in_error = False
+                            else:
+                                # This is a bona-fide error.
+                                in_error = True
+
+                    elif error_type == 'abs error' and mode == 'fwd-fd':
+                        # Either analytic or approximated derivatives contain a NaN.
+                        in_error = True
+
+                    if in_error:
                         wrt_string = '{0} wrt {1}'.format(var, wrt)
-                        norm_string = '{}'.format(norm)
+                        norm_string = '{}'.format(error_val)
+                        bad_derivs.append((wrt_string, norm_string, error_type, mode))
                         len_wrt_width = max(len_wrt_width, len(wrt_string))
                         len_norm_width = max(len_norm_width, len(norm_string))
 
-        if over_tol:
+        if bad_derivs:
             comp_error_string = ''
-            for (var, wrt) in data[comp]:
-                for error_type, tolerance in [('abs error', atol), ('rel error', rtol), ]:
-                    actual = data[comp][var, wrt][error_type]
-                    for norm, norm_type in zip(actual, norm_types):
-                        if not np.isnan(norm):
-                            if not np.allclose(norm, 0.0, atol=tolerance):
-                                wrt_string = '{0} wrt {1}'.format(var, wrt)
-                                norm_string = '{}'.format(norm)
-                                err_msg = '{0} | {1} | {2} | {3}'.format(
-                                    pad_name(wrt_string, len_wrt_width),
-                                    pad_name(error_type.split()[0], len_absrel_width),
-                                    pad_name(norm_type, len_norm_type_width),
-                                    pad_name(norm_string, len_norm_width)) + '\n'
-                                comp_error_string += err_msg
-
-                        elif error_type == 'abs error' and norm_type == 'fwd-fd':
-                            # Capturing case where computed partials or output are NaN.
-                            wrt_string = '{0} wrt {1}'.format(var, wrt)
-                            norm_string = '{}'.format(norm)
-                            err_msg = '{0} | {1} | {2} | {3}'.format(
-                                pad_name(wrt_string, len_wrt_width),
-                                pad_name(error_type.split()[0], len_absrel_width),
-                                pad_name(norm_type, len_norm_type_width),
-                                pad_name(norm_string, len_norm_width)) + '\n'
-                            comp_error_string += err_msg
+            for wrt_string, norm_string, error_type, mode in bad_derivs:
+                err_msg = '{0} | {1} | {2} | {3}'.format(
+                    pad_name(wrt_string, len_wrt_width),
+                    pad_name(error_type.split()[0], len_absrel_width),
+                    pad_name(mode, len_norm_type_width),
+                    pad_name(norm_string, len_norm_width)) + '\n'
+                comp_error_string += err_msg
 
             name_header = 'Component: {}\n'.format(comp)
             len_name_header = len(name_header)

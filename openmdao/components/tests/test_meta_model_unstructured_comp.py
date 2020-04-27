@@ -9,7 +9,7 @@ from io import StringIO
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_partials
 from openmdao.utils.logger_utils import TestLogger
 
 
@@ -407,27 +407,17 @@ class MetaModelTestCase(unittest.TestCase):
         data = prob.check_partials(out_stream=None)
 
         Jf = data['mm'][('f', 'x')]['J_fwd']
-        Jr = data['mm'][('f', 'x')]['J_rev']
 
         assert_near_equal(Jf[0][0], -1., 1.e-3)
-        assert_near_equal(Jr[0][0], -1., 1.e-3)
 
-        abs_errors = data['mm'][('f', 'x')]['abs error']
-        self.assertTrue(len(abs_errors) > 0)
-        for match in abs_errors:
-            abs_error = float(match)
-            self.assertTrue(abs_error < 1.e-6)
+        assert_check_partials(data, atol=1e-6, rtol=1e-6)
 
         # Complex step
         prob.setup(force_alloc_complex=True)
         prob.model.mm.set_check_partial_options(wrt='*', method='cs')
         data = prob.check_partials(out_stream=None)
 
-        abs_errors = data['mm'][('f', 'x')]['abs error']
-        self.assertTrue(len(abs_errors) > 0)
-        for match in abs_errors:
-            abs_error = float(match)
-            self.assertTrue(abs_error < 1.e-6)
+        assert_check_partials(data, atol=1e-11, rtol=1e-11)
 
     def test_metamodel_feature(self):
         # create a MetaModelUnStructuredComp, specifying surrogates for the outputs
@@ -519,11 +509,7 @@ class MetaModelTestCase(unittest.TestCase):
 
         data = prob.check_partials(out_stream=None)
 
-        abs_errors = data['trig'][('y', 'x')]['abs error']
-        self.assertTrue(len(abs_errors) > 0)
-        for match in abs_errors:
-            abs_error = float(match)
-            self.assertTrue(abs_error < 1.e-6)
+        assert_check_partials(data, atol=1e-6, rtol=1e-6)
 
     def test_vectorized_kriging(self):
         # Test for coverage (handling the rmse)
@@ -597,34 +583,14 @@ class MetaModelTestCase(unittest.TestCase):
 
         data = prob.check_partials(out_stream=None)
 
-        abs_errors = data['mm'][('y', 'x')]['abs error']
-        self.assertTrue(len(abs_errors) > 0)
-        for match in abs_errors:
-            abs_error = float(match)
-            self.assertTrue(abs_error < 1.e-5)
-
-        abs_errors = data['mm'][('y', 'xx')]['abs error']
-        self.assertTrue(len(abs_errors) > 0)
-        for match in abs_errors:
-            abs_error = float(match)
-            self.assertTrue(abs_error < 1.e-5)
+        assert_check_partials(data, atol=1e-5, rtol=1e-5)
 
         # Complex step
         prob.setup(force_alloc_complex=True)
         prob.model.mm.set_check_partial_options(wrt='*', method='cs')
         data = prob.check_partials(out_stream=None)
 
-        abs_errors = data['mm'][('y', 'x')]['abs error']
-        self.assertTrue(len(abs_errors) > 0)
-        for match in abs_errors:
-            abs_error = float(match)
-            self.assertTrue(abs_error < 1.e-5)
-
-        abs_errors = data['mm'][('y', 'xx')]['abs error']
-        self.assertTrue(len(abs_errors) > 0)
-        for match in abs_errors:
-            abs_error = float(match)
-            self.assertTrue(abs_error < 1.e-5)
+        assert_check_partials(data, atol=1e-11, rtol=1e-11)
 
     def test_metamodel_feature_vector(self):
         # Like simple sine example, but with input of length n instead of scalar

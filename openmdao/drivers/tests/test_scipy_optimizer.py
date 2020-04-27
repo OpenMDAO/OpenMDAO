@@ -114,6 +114,25 @@ class TestMPIScatter(unittest.TestCase):
 
 class TestScipyOptimizeDriver(unittest.TestCase):
 
+    def test_driver_supports(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
+
+        with self.assertRaises(KeyError) as raises_msg:
+            prob.driver.supports['equality_constraints'] = False
+
+        exception = raises_msg.exception
+
+        msg = "ScipyOptimizeDriver: Tried to set read-only option 'equality_constraints'."
+
+        self.assertEqual(exception.args[0], msg)
+
     def test_compute_totals_basic_return_array(self):
         # Make sure 'array' return_format works.
 
