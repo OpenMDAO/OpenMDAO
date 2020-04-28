@@ -953,8 +953,14 @@ class TestGroup(unittest.TestCase):
         p.setup()
         p.run_model()
 
+        assert_near_equal(p['indep.x'], np.array([[0., 1., 2.],
+                                                  [3., 4., 5.],
+                                                  [6., 7., 8.],
+                                                  [9., 10., 11.]]))
+
         assert_near_equal(p['C1.x'], np.array([[0., 10.],
-                                                    [7., 4.]]))
+                                               [7., 4.]]))
+
         assert_near_equal(p['C1.y'], 42.)
 
     def test_promote_not_found1(self):

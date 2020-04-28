@@ -32,6 +32,7 @@ Usage
     openmdao.core.tests.test_group.TestGroup.test_connect_1_to_many
     :layout: interleave
 
+.. _connect_src_indices:
 
 3. Connect only part of an array output to an input of a smaller size.
 
