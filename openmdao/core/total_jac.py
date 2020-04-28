@@ -6,7 +6,6 @@ from copy import deepcopy
 import pprint
 import sys
 import time
-import traceback
 
 import numpy as np
 
@@ -18,10 +17,8 @@ except ImportError:
 
 from openmdao.vectors.vector import INT_DTYPE
 from openmdao.utils.general_utils import ContainsAll, simple_warning
-from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.mpi import MPI
 from openmdao.utils.coloring import _initialize_model_approx, Coloring
-from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 
 
 _contains_all = ContainsAll()
@@ -180,6 +177,7 @@ class _TotalJacInfo(object):
         self.output_meta = {'fwd': responses, 'rev': design_vars}
         self.input_vec = {'fwd': model._vectors['residual'], 'rev': model._vectors['output']}
         self.output_vec = {'fwd': model._vectors['output'], 'rev': model._vectors['residual']}
+        self._distributed_cons = driver._distributed_cons
 
         abs2meta = model._var_allprocs_abs2meta
 
@@ -450,7 +448,10 @@ class _TotalJacInfo(object):
                 # if name is in vois, then it has been declared as either a design var or
                 # a constraint or an objective.
                 meta = vois[name]
-                end += meta['size']
+                if meta['distributed'] is True:
+                    end += meta['global_size']
+                else:
+                    end += meta['size']
 
                 parallel_deriv_color = meta['parallel_deriv_color']
                 matmat = meta['vectorize_derivs']
@@ -733,8 +734,12 @@ class _TotalJacInfo(object):
 
         for name in names:
             if name in vois:
+                voi = vois[name]
                 # this 'size' already takes indices into account
-                size = vois[name]['size']
+                if voi['distributed'] is True:
+                    size = voi['global_size']
+                else:
+                    size = voi['size']
                 indices = vois[name]['indices']
             else:
                 size = abs2meta[name]['global_size']
@@ -1375,6 +1380,7 @@ class _TotalJacInfo(object):
         of = self.of
         wrt = self.wrt
         model = self.model
+        comm = model.comm
         return_format = self.return_format
 
         # Prepare model for calculation by cleaning out the derivatives
@@ -1414,10 +1420,12 @@ class _TotalJacInfo(object):
         of_idx = model._owns_approx_of_idx
         wrt_idx = model._owns_approx_wrt_idx
         wrt_meta = self.wrt_meta
+        out_meta = self.output_meta['fwd']
 
         totals = self.J_dict
         if return_format == 'flat_dict':
             for prom_out, output_name in zip(self.prom_of, of):
+                dist_con = self._distributed_cons.get(output_name)
                 for prom_in, input_name in zip(self.prom_wrt, wrt):
 
                     if output_name in wrt_meta and output_name != input_name:
@@ -1426,12 +1434,15 @@ class _TotalJacInfo(object):
                         continue
 
                     totals[prom_out, prom_in][:] = _get_subjac(approx_jac[output_name, input_name],
-                                                               prom_out, prom_in, of_idx, wrt_idx)
+                                                               prom_out, prom_in, of_idx, wrt_idx,
+                                                               dist_con, comm)
+
 
         elif return_format in ('dict', 'array'):
             for prom_out, output_name in zip(self.prom_of, of):
                 tot = totals[prom_out]
                 for prom_in, input_name in zip(self.prom_wrt, wrt):
+                    dist_con = self._distributed_cons.get(output_name)
 
                     if output_name in wrt_meta and output_name != input_name:
                         # Special case where we constrain an input, and need derivatives of that
@@ -1441,10 +1452,12 @@ class _TotalJacInfo(object):
                     if prom_out == prom_in and isinstance(tot[prom_in], dict):
                         rows, cols, data = tot[prom_in]['coo']
                         data[:] = _get_subjac(approx_jac[output_name, input_name],
-                                              prom_out, prom_in, of_idx, wrt_idx)[rows, cols]
+                                              prom_out, prom_in, of_idx, wrt_idx,
+                                              dist_con, comm)[rows, cols]
                     else:
                         tot[prom_in][:] = _get_subjac(approx_jac[output_name, input_name],
-                                                      prom_out, prom_in, of_idx, wrt_idx)
+                                                      prom_out, prom_in, of_idx, wrt_idx,
+                                                      dist_con, comm)
         else:
             msg = "Unsupported return format '%s." % return_format
             raise NotImplementedError(msg)
@@ -1588,7 +1601,7 @@ class _TotalJacInfo(object):
             self._recording_iter.pop()
 
 
-def _get_subjac(jac_meta, prom_out, prom_in, of_idx, wrt_idx):
+def _get_subjac(jac_meta, prom_out, prom_in, of_idx, wrt_idx, dist_resp, comm):
     """
     Return proper subjacobian based on input/output names and indices.
 
@@ -1604,12 +1617,17 @@ def _get_subjac(jac_meta, prom_out, prom_in, of_idx, wrt_idx):
         Mapping of promoted output name to indices.
     wrt_idx : dict
         Mapping of promoted input name to indices.
+    dist_resp : None or tuple
+        Tuple containing indices and sizes if this response is distributed.
+    comm : MPI.Comm or <FakeComm>
+        MPI communicator object.
 
     Returns
     -------
     ndarray
         The desired subjacobian.
     """
+    print(jac_meta)
     if jac_meta['rows'] is not None:  # sparse list format
         # This is a design variable that was declared as an obj/con.
         tot = np.eye(len(jac_meta['value']))
@@ -1617,9 +1635,26 @@ def _get_subjac(jac_meta, prom_out, prom_in, of_idx, wrt_idx):
             tot = tot[of_idx[prom_out], :]
         if prom_in in wrt_idx:
             tot = tot[:, wrt_idx[prom_in]]
-        return tot
     else:
-        return jac_meta['value']
+        tot = jac_meta['value']
+
+    if dist_resp:
+        n_wrt = tot.shape[1]
+        tot = tot.flatten()
+        idx, sizes = dist_resp
+        n_of_global = np.sum(sizes)
+
+        # Adjust sizes to account for wrt dimension in jacobian.
+        sizes = sizes * n_wrt
+
+        offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
+        offsets[1:] = np.cumsum(sizes[:-1])
+        all_tot = np.zeros(n_of_global * n_wrt)
+
+        comm.Allgatherv(tot, [all_tot, sizes, offsets, MPI.DOUBLE])
+        tot = all_tot.reshape((n_of_global, n_wrt))
+
+    return tot
 
 
 def _check_voi_meta(name, parallel_deriv_color, matmat, simul_coloring):

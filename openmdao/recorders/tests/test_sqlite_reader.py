@@ -3677,7 +3677,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         self.assertEqual(sorted(cr.list_sources()), [
             'problem',
         ])
- 
+
         case = cr.get_case('final')
 
         q = case.outputs.keys()

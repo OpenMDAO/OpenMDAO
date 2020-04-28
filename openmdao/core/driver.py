@@ -308,12 +308,14 @@ class Driver(object):
                 else:
                     owner = owning_ranks[vname]
                     sz = sizes[owner, i]
+
                 if vname in dv_set:
                     dv_dict[vname] = (owner, sz)
                 elif distributed:
                     idx = model._var_allprocs_abs2idx['nonlinear'][vname]
-                    sizes = model._var_sizes['nonlinear']['output'][:, idx]
-                    dist_con_dict[vname] = (idx, sizes)
+                    dist_sizes = model._var_sizes['nonlinear']['output'][:, idx]
+                    dist_con_dict[vname] = (idx, dist_sizes)
+
                 if vname in con_set:
                     con_dict[vname] = (owner, sz)
                 if vname in obj_set:
@@ -444,6 +446,8 @@ class Driver(object):
         remote_vois : dict
             Dict containing (owning_rank, size) for all remote vois of a particular
             type (design var, constraint, or objective).
+        distributed_vars : dict
+            Dict containing (indices, sizes) for all distributed responses.
         driver_scaling : bool
             When True, return values that are scaled according to either the adder and scaler or
             the ref and ref0 values that were specified when add_design_var, add_objective, and

@@ -291,7 +291,10 @@ class ApproximationScheme(object):
         par_fd_w_serial_model = use_parallel_fd and system._num_par_fd == system._full_comm.size
         num_par_fd = system._num_par_fd if use_parallel_fd else 1
         is_parallel = use_parallel_fd or system.comm.size > 1
-        is_distributed = isinstance(system, Component) and system.options['distributed']
+        if isinstance(system, Component):
+            is_distributed = system.options['distributed']
+        else:
+            is_distributed = system._has_distrib_vars and not use_parallel_fd
 
         results = defaultdict(list)
         iproc = system.comm.rank

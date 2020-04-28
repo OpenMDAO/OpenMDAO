@@ -310,7 +310,7 @@ class pyOptSparseDriver(Driver):
         for name, meta in con_meta.items():
             if meta['equals'] is None:
                 continue
-            size = meta['size']
+            size = meta['global_size'] if meta['distributed'] else meta['size']
             lower = upper = meta['equals']
             if fwd:
                 wrt = [v for v in indep_list if name in relevant[v]]
@@ -335,7 +335,7 @@ class pyOptSparseDriver(Driver):
         for name, meta in con_meta.items():
             if meta['equals'] is not None:
                 continue
-            size = meta['size']
+            size = meta['global_size'] if meta['distributed'] else meta['size']
 
             # Bounds - double sided is supported
             lower = meta['lower']
@@ -529,6 +529,7 @@ class pyOptSparseDriver(Driver):
 
         # print("Functions calculated")
         # print(dv_dict)
+        # print(func_dict, flush=True)
 
         self._in_user_function = False
         return func_dict, fail
