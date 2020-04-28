@@ -844,7 +844,7 @@ class MPIFeatureTests(unittest.TestCase):
                           np.ones((8,)) if model.comm.rank == 0 else np.ones((7,)))
         assert_near_equal(prob['C2.outvec'],
                           2*np.ones((8,)) if model.comm.rank == 0 else -3*np.ones((7,)))
-        assert_near_equal(prob['C3.out'], -5.)
+        assert_near_equal(prob['C3.sum'], -5.)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")

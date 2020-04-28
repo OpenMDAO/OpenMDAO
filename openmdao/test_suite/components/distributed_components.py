@@ -52,14 +52,12 @@ class Summer(om.ExplicitComponent):
                              desc="Size of input and output vectors.")
 
     def setup(self):
-        size = self.options['size']
+        self.add_input('invec', np.ones(self.options['size'], float))
 
-        self.add_input('invec', np.ones(size, float))
-
-        self.add_output('out', 0.0)
+        self.add_output('sum', 0.0, shape=1)
 
     def compute(self, inputs, outputs):
-        outputs['out'] = np.sum(inputs['invec'])
+        outputs['sum'] = np.sum(inputs['invec'])
 
 
 class DistribCompDerivs(om.ExplicitComponent):
@@ -102,9 +100,9 @@ class DistribCompDerivs(om.ExplicitComponent):
         mysize = inputs['invec'].size
 
         if self.comm.rank == 0:
-            J['outvec', 'invec'] = 2.0 * np.ones((mysize,))
+            J['outvec', 'invec'] = np.ones((mysize,)) * 2.0
         else:
-            J['outvec', 'invec'] = -3.0 * np.ones((mysize,))
+            J['outvec', 'invec'] = np.ones((mysize,)) * -3.0
 
 
 class SummerDerivs(om.ExplicitComponent):
@@ -115,14 +113,12 @@ class SummerDerivs(om.ExplicitComponent):
                              desc="Size of input and output vectors.")
 
     def setup(self):
-        size = self.options['size']
+        self.add_input('invec', np.ones(self.options['size'], float))
 
-        self.add_input('invec', np.ones(size, float))
-
-        self.add_output('out', 0.0)
+        self.add_output('sum', 0.0, shape=1)
 
         # the derivative is constant
-        self.declare_partials('out', 'invec', val=1.)
+        self.declare_partials('sum', 'invec', val=1.)
 
     def compute(self, inputs, outputs):
-        outputs['out'] = np.sum(inputs['invec'])
+        outputs['sum'] = np.sum(inputs['invec'])

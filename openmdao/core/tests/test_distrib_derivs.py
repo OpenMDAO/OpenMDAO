@@ -577,16 +577,16 @@ class MPIFeatureTests(unittest.TestCase):
         prob.run_model()
 
         assert_near_equal(prob['C2.invec'],
-                          np.ones((8,)) if model.comm.rank == 0 else np.ones((7,)))
+                          np.ones(8) if model.comm.rank == 0 else np.ones(7))
         assert_near_equal(prob['C2.outvec'],
-                          2*np.ones((8,)) if model.comm.rank == 0 else -3*np.ones((7,)))
-        assert_near_equal(prob['C3.out'], -5.)
+                          2*np.ones(8) if model.comm.rank == 0 else -3*np.ones(7))
+        assert_near_equal(prob['C3.sum'], -5.)
 
         assert_check_partials(prob.check_partials())
 
         J = prob.compute_totals(of=['C2.outvec'], wrt=['indep.x'])
         assert_near_equal(J[('C2.outvec', 'indep.x')], 
-                          np.eye(15)*np.append(np.ones(8)*2., np.ones(7)*-3))
+                          np.eye(15)*np.append(2*np.ones(8), -3*np.ones(7)))
 
 
 if __name__ == "__main__":
