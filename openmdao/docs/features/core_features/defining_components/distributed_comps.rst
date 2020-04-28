@@ -32,14 +32,7 @@ Component Options
 
 .. note::
 
-	If a Component is distributed then *all* of its outputs are distributed.
-
-.. note::
-
-	You should always specify *src_indices* when adding an input to a distributed 
-	component unless your input is equal to the size of the entire distributed output.
-	Otherwise, the assumed *src_indices* will be from 0 to 1 less than the 
-	size of your input, which is probably not what you want.
+    If a Component is distributed then *all* of its outputs are distributed.
 
 
 Distributed Component Example
@@ -48,20 +41,56 @@ Distributed Component Example
 The following example shows how to create a distributed component, `DistribComp`, 
 that distributes its computation evenly across the available processes. A second 
 component, `Summer`, sums the values from the distributed component into a scalar 
-output value.  Note that a component that takes a distributed output as input does
-not need to do anything special as OpenMDAO performs the required MPI operations 
-to make the full value available.
+output value.  
 
 These components can found in the OpenMDAO test suite:
 
 .. embed-code::
-  openmdao.test_suite.components.distributed_components.DistribComp
+    openmdao.test_suite.components.distributed_components.DistribComp
+
+.. note::
+
+    In this example component, we have explicitly specified *src_indices* when adding
+    the input. This is not really necessary in this case, because it replicates the
+    default behavior. If no *src_indices* are specified, OpenMDAO will assume an offset
+    that is the sum of the sizes in all ranks up to the current rank and a range equal
+    to the specified size (the size is given per the usual arguments to :code:`add_input`).
 
 .. embed-code::
-  openmdao.test_suite.components.distributed_components.Summer
+    openmdao.test_suite.components.distributed_components.Summer
 
-This example is run with 2 processes and a size of 15:
+.. note::
+
+    A component that takes a distributed output as input does not need to do anything
+    special as OpenMDAO performs the required MPI operations to make the full value 
+    available.
+
+This example is run with two processes and a :code:`size` of 15:
 
 .. embed-code::
-  openmdao.core.tests.test_distribcomp.MPIFeatureTests.test_distribcomp_feature
-  :layout: interleave
+    openmdao.core.tests.test_distribcomp.MPIFeatureTests.test_distribcomp_feature
+    :layout: interleave
+
+
+Distributed Component with Derivatives
+--------------------------------------
+
+Derivatives can be computed for distributed components as shown in the following
+variation on the example.  Also, in this version, we have taken advantage of the automatic
+determination of *src_indices*.
+
+
+.. embed-code::
+    openmdao.test_suite.components.distributed_components.DistribCompDerivs
+
+.. embed-code::
+    openmdao.test_suite.components.distributed_components.SummerDerivs
+
+
+This example is again run with two processes and a :code:`size` of 15.  We can use
+:ref:`assert_check_partials<feature_unit_testing_partials>` to verify that
+the partial derivatives are calculated correctly.
+
+.. embed-code::
+    openmdao.core.tests.test_distrib_derivs.MPIFeatureTests.test_distribcomp_derivs_feature
+    :layout: interleave

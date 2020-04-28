@@ -841,9 +841,9 @@ class MPIFeatureTests(unittest.TestCase):
         prob.run_model()
 
         assert_near_equal(prob['C2.invec'],
-                         np.ones((8,)) if model.comm.rank == 0 else np.ones((7,)))
+                          np.ones((8,)) if model.comm.rank == 0 else np.ones((7,)))
         assert_near_equal(prob['C2.outvec'],
-                         2*np.ones((8,)) if model.comm.rank == 0 else -3*np.ones((7,)))
+                          2*np.ones((8,)) if model.comm.rank == 0 else -3*np.ones((7,)))
         assert_near_equal(prob['C3.out'], -5.)
 
 
