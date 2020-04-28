@@ -2,7 +2,7 @@
 
 #legend-div {
     position: absolute;
-    left: 200px;
+    left: 50px;
     top: 90%;
     z-index: 2;
     visibility: hidden;

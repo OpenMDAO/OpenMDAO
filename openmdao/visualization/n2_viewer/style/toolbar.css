@@ -366,3 +366,29 @@
 	background: #98daba;
 	cursor: pointer;
 }
+
+.slider datalist {
+    color: white;
+    display: flex;
+}
+
+#model-slider-label {
+    min-width: 30px;
+    text-align: center;
+}
+
+#model-slider-fit {
+    color: white;
+    background: #42926b;
+    border-radius: 40%;
+    border: 1px solid white;
+    padding: 5px;
+    font-weight: 600;
+    margin-left: 5px;
+    -webkit-transition: 0.2s;
+	transition: opacity 0.2s, background 0.3s;
+}
+
+#model-slider-fit:active {
+    background: #264c39;
+}

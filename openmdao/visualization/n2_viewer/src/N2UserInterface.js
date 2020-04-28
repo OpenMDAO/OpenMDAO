@@ -240,6 +240,7 @@ class N2UserInterface {
 
         this.legend = new N2Legend(this.n2Diag.modelData);
         this.nodeInfoBox = new NodeInfo(this.n2Diag.model.abs2prom);
+        this.toolbar = new N2Toolbar(this);
     }
 
     /** Set up the menu for selecting an arbitrary depth to collapse to. */
@@ -474,7 +475,6 @@ class N2UserInterface {
         this.forwardButtonHistory = [];
         this._setupLeftClick(this.n2Diag.model.root);
         this.uncollapseButtonClick(this.n2Diag.model.root);
-        this.n2Diag.update();
     }
 
     /**

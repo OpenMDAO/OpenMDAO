@@ -30,6 +30,7 @@ class N2Diagram {
         this.model = new ModelData(modelJSON);
         this.zoomedElement = this.zoomedElementPrev = this.model.root;
         this.showPath = false;
+        this.manuallyResized = false; // If the diagram has been sized by the user
 
         // Assign this way because defaultDims is read-only.
         this.dims = JSON.parse(JSON.stringify(defaultDims));
@@ -37,35 +38,16 @@ class N2Diagram {
         // Keep track of arrows to show and hide them
         this.arrowCache = [];
 
-        // Find the divs for D3 content in the existing document, and add a style section.
-        let parentDiv = document.getElementById("ptN2ContentDivId");
-        this.dom = {
-            'parentDiv': parentDiv,
-            'd3ContentDiv': parentDiv.querySelector("#d3_content_div"),
-            'svgDiv': d3.select("#svgDiv"),
-            'svg': d3.select("#svgId"),
-            'svgStyle': d3.select("#svgId").append('style').attr('title', 'svgStyle'),
-            'toolTip': d3.select(".tool-tip"),
-            'arrowMarker': d3.select("#arrow"),
-            'nodeInfo': d3.select('#node-data')
-        };
-
+        this._referenceD3Elements();
         this.transitionStartDelay = N2TransitionDefaults.startDelay;
-
         this.chosenCollapseDepth = -1;
-
         this.showLinearSolverNames = true;
 
         this.style = new N2Style(this.dom.svgStyle, this.dims.size.font);
-        this.layout = new N2Layout(this.model, this.zoomedElement, this.showLinearSolverNames, this.dims);
+        this.layout = new N2Layout(this.model, this.zoomedElement,
+            this.showLinearSolverNames, this.dims);
         this.search = new N2Search(this.zoomedElement, this.model.root);
-
         this.ui = new N2UserInterface(this);
-
-        this.toolbar = new N2Toolbar(this.ui);
-
-        this._setupSvgElements();
-
         this.matrix = new N2Matrix(this.model, this.layout, this.dom.n2Groups,
             true, this.ui.findRootOfChangeFunction);
 
@@ -170,56 +152,47 @@ class N2Diagram {
     }
 
     /** 
-     * Add several elements, mostly groups, to the primary SVG element to
-     * be populated later. Stored in the .doms property.
+     * Setup internal references to D3 objects so we can avoid running
+     * d3.select() over and over later.
      */
-    _setupSvgElements() {
-        this.dom.clips = {
-            'partitionTree': this.dom.svg.select("#partitionTreeClip > rect"),
-            'n2Matrix': this.dom.svg.select("#n2MatrixClip > rect"),
-            'solverTree': this.dom.svg.select("#solverTreeClip > rect")
+    _referenceD3Elements() {
+        this.dom = {
+            'parentDiv': document.getElementById("ptN2ContentDivId"),
+            'd3ContentDiv': parentDiv.querySelector("#d3_content_div"),
+            'svgDiv': d3.select("#svgDiv"),
+            'svg': d3.select("#svgId"),
+            'svgStyle': d3.select("#svgId style"),
+            'toolTip': d3.select(".tool-tip"),
+            'arrowMarker': d3.select("#arrow"),
+            'nodeInfo': d3.select('#node-data'),
+            'n2OuterGroup': d3.select('g#n2outer'),
+            'n2InnerGroup': d3.select('g#n2inner'),
+            'pTreeGroup': d3.select('g#tree'),
+            'pSolverTreeGroup': d3.select('g#solver_tree'),
+            'n2BackgroundRect': d3.select('g#n2inner rect'),
+            'clips': {
+                'partitionTree': d3.select("#partitionTreeClip > rect"),
+                'n2Matrix': d3.select("#n2MatrixClip > rect"),
+                'solverTree': d3.select("#solverTreeClip > rect")
+            },
+            
         };
 
-        // ids given just so it is easier to see in Chrome dev tools when debugging
-        this.dom.n2OuterGroup = this.dom.svg.append('g')
-            .attr('id', 'n2outer');
+        let n2Groups = {};
+        this.dom.n2InnerGroup.selectAll('g').each(function () {
+            const d3elem = d3.select(this);
+            const name = new String(d3elem.attr('id')).replace(/n2/, '');
+            n2Groups[name] = d3elem;
+        })
+        this.dom.n2Groups = n2Groups;
 
-        this.dom.n2InnerGroup = this.dom.n2OuterGroup.append('g')
-            .attr('id', 'n2inner');
-
-        this.dom.pTreeGroup = this.dom.svg.append('g')
-            .attr('id', 'tree')
-            .attr('clip-path', 'url(#partitionTreeClip');
-
-        this.dom.pSolverTreeGroup = this.dom.svg.append('g')
-            .attr('id', 'solver_tree')
-            .attr('clip-path', 'url(#solverTreeClip');
-
-        this.dom.n2BackgroundRect = this.dom.n2InnerGroup.append('rect')
-            .attr('id', 'backgroundRect')
-            .attr('class', 'background');
-
-        this.dom.n2Groups = {};
-        for (let gName of ['elements', 'gridlines', 'componentBoxes',
-            'dots', 'highlights', 'arrows'
-        ]) {
-            this.dom.n2Groups[gName] =
-                this.dom.n2InnerGroup.append('g')
-                    .attr('id', 'n2' + gName);
-        };
-
-        for (let clippedGrp of ['elements', 'gridlines', 'componentBoxes', 'dots']) {
-            this.dom.n2Groups[clippedGrp].attr('clip-path', 'url(#n2MatrixClip)');
-        }
-
-        let ogg = {};
-        for (let oName of ['top', 'left', 'right', 'bottom']) {
-            ogg[oName] = this.dom.n2OuterGroup.append('g')
-                .attr('id', 'n2' + oName)
-                .attr('class', 'offgridLabel');
-        }
-        this.dom.n2Groups.offgrid = ogg;
-
+        let offgrid = {};
+        this.dom.n2OuterGroup.selectAll('g.offgridLabel').each(function () {
+            const d3elem = d3.select(this);
+            const name = new String(d3elem.attr('id')).replace(/n2/, '');
+            offgrid[name] = d3elem;
+        })
+        this.dom.n2Groups.offgrid = offgrid;
     }
 
     /**
@@ -682,7 +655,7 @@ class N2Diagram {
         }
 
         this._updateScale();
-        this.layout.updateTransitionInfo(this.dom, this.transitionStartDelay);
+        this.layout.updateTransitionInfo(this.dom, this.transitionStartDelay, this.manuallyResized);
 
         let d3PartRefs = this._createPartitionCells();
         this._setupPartitionTransition(d3PartRefs);
@@ -720,7 +693,6 @@ class N2Diagram {
      * @param {number} height The new height in pixels.
      */
     verticalResize(height) {
-
         this.clearArrows();
         this.updateSizes(height, this.dims.size.font);
 
