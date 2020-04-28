@@ -221,7 +221,7 @@ four buttons are revealed as a fly-out menu as you hover over this button, |cont
    +---------------------+----------------------------------+--------------------------------------------------------+
    | |expand_all|        | Expand all variables             | Expand all the variables in the entire model           |
    +---------------------+----------------------------------+--------------------------------------------------------+
-   | |collapse_depth|    | Collapse depth                   | Sets the number of hierarchy levels shown in the view  |
+   | |collapse_depth|    | Collapse depth                   | Set the number of hierarchy levels shown in the view   |
    +---------------------+----------------------------------+--------------------------------------------------------+
 
 |
@@ -319,9 +319,9 @@ The buttons in the remaining part of the toolbar offer a variety of other option
    +-----------------------+---------------------------------+----------------------------------------------------------------------------------------------------+
    | |save_svg|            | Save SVG                        | Save the current view of the diagram to an SVG file                                                |
    +-----------------------+---------------------------------+----------------------------------------------------------------------------------------------------+
-   | |show_node_info|      | Show / Hide Node Info           | Turning this on while result in information about the various nodes to be displayed while hovering |
+   | |show_node_info|      | Show / Hide Node Info           | Toggle info box that is displayed on hover                                                         |
    +-----------------------+---------------------------------+----------------------------------------------------------------------------------------------------+
-   | |help|                | Help                            | Brings up the help window                                                                          |
+   | |help|                | Help                            | Bring up the help window                                                                           |
    +-----------------------+---------------------------------+----------------------------------------------------------------------------------------------------+
 
 |
@@ -345,9 +345,8 @@ Here are explanations of the sections in the legend:
       icon in the matrix shows whether the connection is between scalars, vectors, or groups. The color of the icon is based
       on the color associated with the variable of that type as shown in the System & Variables part of the legend.
 
-    * Finally, there is a section describing the colors for the items in the solver hierarchy on the right of the
-      diagram. The colors indicate
-      the type of solver, either linear or nonlinear, depending what is being displayed.
+    * The Solvers section shows the colors used for the different solvers on the right side of the N2. Either the
+      Linear or Nonlinear solvers are shown depending on the state of the Toggle Solver Names button.
 
 
 
