@@ -478,22 +478,6 @@ class N2UserInterface {
     }
 
     /**
-     * When the up button is pushed, add the current zoomed element to the
-     * back button history, and zoom to its parent.
-     */
-    upOneLevelButtonClick() {
-        testThis(this, 'N2UserInterface', 'upOneLevelButtonClick');
-
-        if (this.n2Diag.zoomedElement === this.n2Diag.model.root) return;
-        this.backButtonHistory.push({
-            node: this.n2Diag.zoomedElement,
-        });
-        this.forwardButtonHistory = [];
-        this._setupLeftClick(this.n2Diag.zoomedElement.parent);
-        this.n2Diag.update();
-    }
-
-    /**
      * Minimize the specified node and recursively minimize its children.
      * @param {N2TreeNode} node The current node to operate on.
      */
