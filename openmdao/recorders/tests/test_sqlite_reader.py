@@ -2937,6 +2937,45 @@ class TestSqliteCaseReader(unittest.TestCase):
         np.testing.assert_almost_equal(c1.derivatives[('c', 'x,1')], J[('con.c', 'p1.x,1')])
         np.testing.assert_almost_equal(c1.derivatives[('c', 'y:2')], J[('con.c', 'p2.y:2')])
 
+    def test_comma_comp(self):
+        class CommaComp(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_input('some_{input,withcommas}', val=3)
+                self.add_output('an_{output,withcommas}', val=10)
+                self.declare_partials('*', '*', method='fd')
+
+            def compute(self, inputs, outputs):
+                outputs['an_{output,withcommas}'] = 2*inputs['some_{input,withcommas}']**2
+
+        p = om.Problem()
+
+        p.model.add_subsystem('dv', om.IndepVarComp('some_{input,withcommas}', val=26.), promotes=['*'])
+        p.model.add_subsystem('comma_comp', CommaComp(), promotes=['*'])
+
+        p.driver = om.ScipyOptimizeDriver()
+        p.driver.options['optimizer'] = 'SLSQP'
+        recorder = om.SqliteRecorder('cases.sql')
+        p.driver.add_recorder(recorder)
+        p.add_recorder(recorder)
+
+        p.recording_options['record_derivatives'] = True
+
+        p.model.add_design_var('some_{input,withcommas}', upper=100, lower=-100)
+        p.model.add_objective('an_{output,withcommas}')
+
+        p.setup()
+        p.run_driver()
+        p.record('final')
+
+        J = p.compute_totals()
+
+        cr = om.CaseReader("cases.sql")
+        case = cr.get_case('final')
+
+        for deriv_key in J:
+            np.testing.assert_almost_equal(case.derivatives[deriv_key], J[deriv_key])
+
 
 @use_tempdirs
 class TestFeatureSqliteReader(unittest.TestCase):
