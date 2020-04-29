@@ -2953,10 +2953,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         p.model.add_subsystem('dv', om.IndepVarComp('some_{input,withcommas}', val=26.), promotes=['*'])
         p.model.add_subsystem('comma_comp', CommaComp(), promotes=['*'])
 
-        p.driver = om.ScipyOptimizeDriver()
-        p.driver.options['optimizer'] = 'SLSQP'
         recorder = om.SqliteRecorder('cases.sql')
-        p.driver.add_recorder(recorder)
         p.add_recorder(recorder)
 
         p.recording_options['record_derivatives'] = True
