@@ -80,6 +80,9 @@ class Group(System):
     _has_distrib_vars : bool
         If True, this Group contains distributed variables. Only used to determine if a parallel
         group or distributed component is below a DirectSolver so that we can raise an exception.
+    _contains_parallel_group : bool
+        If True, this Group contains a ParallelGroup. Only used to determine if a parallel
+        group or distributed component is below a DirectSolver so that we can raise an exception.
     _raise_connection_errors : bool
         Flag indicating whether connection errors are raised as an Exception.
     """
@@ -110,6 +113,7 @@ class Group(System):
         self._approx_subjac_keys = None
         self._setup_procs_finished = False
         self._has_distrib_vars = False
+        self._contains_parallel_group = False
         self._raise_connection_errors = True
 
         # TODO: we cannot set the solvers with property setters at the moment
@@ -731,6 +735,7 @@ class Group(System):
         vec_names = self._lin_rel_vec_name_list if self._use_derivatives else self._vec_names
 
         n_distrib_vars = 0
+        n_parallel_sub = 0
 
         # Compute _var_sizes
         for vec_name in vec_names:
@@ -745,8 +750,10 @@ class Group(System):
                     if isinstance(subsys, Component):
                         if subsys.options['distributed']:
                             n_distrib_vars += 1
-                    elif subsys._has_distrib_vars or subsys._mpi_proc_allocator.parallel:
+                    elif subsys._has_distrib_vars:
                         n_distrib_vars += 1
+                    elif subsys._contains_parallel_group or subsys._mpi_proc_allocator.parallel:
+                        n_parallel_sub += 1
 
                     if vec_name not in subsys._rel_vec_names:
                         continue
@@ -778,8 +785,12 @@ class Group(System):
                     self.comm.Allgather(sizes_in, sizes[type_])
 
             self._has_distrib_vars = self.comm.allreduce(n_distrib_vars) > 0
-            if (self._has_distrib_vars or not np.all(self._var_sizes[vec_names[0]]['output']) or
-                    not np.all(self._var_sizes[vec_names[0]]['input'])):
+            self._contains_parallel_group = self.comm.allreduce(n_parallel_sub) > 0
+
+            if (self._has_distrib_vars or self._contains_parallel_group or
+                not np.all(self._var_sizes[vec_names[0]]['output']) or
+                not np.all(self._var_sizes[vec_names[0]]['input'])):
+
                 if self._distributed_vector_class is not None:
                     self._vector_class = self._distributed_vector_class
                 else:

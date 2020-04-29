@@ -626,7 +626,7 @@ class pyOptSparseDriver(Driver):
 
         # print("Derivatives calculated")
         # print(dv_dict)
-        # print(sens_dict)
+        # print(sens_dict, flush=True)
         self._in_user_function = False
         return sens_dict, fail
 

@@ -542,7 +542,7 @@ class Driver(object):
         dict
            Dictionary containing values of each design variable.
         """
-        return {n: self._get_voi_val(n, dv, self._remote_dvs, {}) \
+        return {n: self._get_voi_val(n, dv, self._remote_dvs, {})
                 for n, dv in self._designvars.items()}
 
     def set_design_var(self, name, value):
