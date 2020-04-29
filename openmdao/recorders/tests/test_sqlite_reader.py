@@ -3664,6 +3664,42 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
             if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
                 raise e
 
+    def test_problem_v8(self):
+        # class CommaComp(om.ExplicitComponent):
+
+        #     def setup(self):
+        #         self.add_input('some_{input,withcommas}', val=3)
+        #         self.add_output('an_{output,withcommas}', val=10)
+        #         self.declare_partials('*', '*', method='fd')
+
+        #     def compute(self, inputs, outputs):
+        #         outputs['an_{output,withcommas}'] = 2*inputs['some_{input,withcommas}']**2
+
+        # p = om.Problem()
+
+        # p.model.add_subsystem('dv', om.IndepVarComp('some_{input,withcommas}', val=26.), promotes=['*'])
+        # p.model.add_subsystem('comma_comp', CommaComp(), promotes=['*'])
+
+        # recorder = om.SqliteRecorder('case_problem_driver_v8.sql')
+        # p.add_recorder(recorder)
+
+        # p.recording_options['record_derivatives'] = True
+
+        # p.model.add_design_var('some_{input,withcommas}', upper=100, lower=-100)
+        # p.model.add_objective('an_{output,withcommas}')
+
+        # p.setup()
+        # p.run_driver()
+        # p.record('final')
+
+        filename = os.path.join(self.legacy_dir, 'case_problem_driver_v8.sql')
+
+        cr = om.CaseReader(filename)
+
+        case = cr.get_case('final')
+
+        np.testing.assert_almost_equal(case.derivatives._values[0], 104.000002011162)
+
     def test_problem_v7(self):
 
         # the change from v7 to v8 was adding the recording of input, output, and residuals to problem
