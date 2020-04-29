@@ -737,6 +737,8 @@ class PromAbsDict(dict):
         self._prom2abs = prom2abs
         self._abs2prom = abs2prom
 
+        DERIV_KEY_SEP = self._DERIV_KEY_SEP = '!'
+
         if isinstance(values, dict):
             # dict of values, keyed on either absolute or promoted names
             self._values = {}
@@ -751,8 +753,8 @@ class PromAbsDict(dict):
                     for abs_key in prom2abs[key]:
                         self._values[abs_key] = values[key]
                     super(PromAbsDict, self).__setitem__(key, values[key])
-                elif isinstance(key, tuple) or ',' in key:
-                    # derivative keys can be either (of, wrt) or 'of,wrt'
+                elif isinstance(key, tuple) or DERIV_KEY_SEP in key:
+                    # derivative keys can be either (of, wrt) or 'of!wrt'
                     abs_keys, prom_key = self._deriv_keys(key)
                     for abs_key in abs_keys:
                         self._values[abs_key] = values[key]
@@ -772,8 +774,8 @@ class PromAbsDict(dict):
                         super(PromAbsDict, self).__setitem__(prom_key, _AMBIGOUS_PROM_NAME)
                     else:
                         super(PromAbsDict, self).__setitem__(prom_key, self._values[key])
-                elif ',' in key:
-                    # derivative keys will be a string in the form of 'of,wrt'
+                elif DERIV_KEY_SEP in key:
+                    # derivative keys will be a string in the form of 'of!wrt'
                     abs_keys, prom_key = self._deriv_keys(key)
                     super(PromAbsDict, self).__setitem__(prom_key, self._values[key])
 
@@ -795,7 +797,7 @@ class PromAbsDict(dict):
         Parameters
         ----------
         key : tuple or string
-            derivative key as either (of, wrt) or 'of,wrt'.
+            derivative key as either (of, wrt) or 'of!wrt'.
 
         Returns
         -------
@@ -807,16 +809,19 @@ class PromAbsDict(dict):
         prom2abs = self._prom2abs
         abs2prom = self._abs2prom
 
+        DERIV_KEY_SEP = self._DERIV_KEY_SEP
+
         # derivative could be tuple or string, using absolute or promoted names
         if isinstance(key, tuple):
             of, wrt = key
         else:
-            of, wrt = re.sub('[( )]', '', key).split(',')
+            of, wrt = re.sub('[ ]', '', key).split(DERIV_KEY_SEP)
 
         # if promoted, will map to all connected absolute names
         abs_of = [of] if of in abs2prom else prom2abs[of]
         abs_wrt = [wrt] if wrt in abs2prom else prom2abs[wrt]
-        abs_keys = ['%s,%s' % (o, w) for o, w in itertools.product(abs_of, abs_wrt)]
+        abs_keys = ['%s%s%s' % (o, DERIV_KEY_SEP, w) \
+            for o, w in itertools.product(abs_of, abs_wrt)]
 
         prom_of = of if of in prom2abs else abs2prom[of]
         prom_wrt = wrt if wrt in prom2abs else abs2prom[wrt]
@@ -853,8 +858,8 @@ class PromAbsDict(dict):
             else:
                 return val
 
-        elif isinstance(key, tuple) or ',' in key:
-            # derivative keys can be either (of, wrt) or 'of,wrt'
+        elif isinstance(key, tuple) or self._DERIV_KEY_SEP in key:
+            # derivative keys can be either (of, wrt) or 'of!wrt'
             abs_keys, prom_key = self._deriv_keys(key)
             return super(PromAbsDict, self).__getitem__(prom_key)
 
@@ -871,8 +876,8 @@ class PromAbsDict(dict):
         value : any
             value for variable
         """
-        if isinstance(key, tuple) or ',' in key:
-            # derivative keys can be either (of, wrt) or 'of,wrt'
+        if isinstance(key, tuple) or self._DERIV_KEY_SEP in key:
+            # derivative keys can be either (of, wrt) or 'of!wrt'
             abs_keys, prom_key = self._deriv_keys(key)
 
             for abs_key in abs_keys:
@@ -902,10 +907,12 @@ class PromAbsDict(dict):
         str
             absolute names for variables contained in this dictionary.
         """
+        DERIV_KEY_SEP = self._DERIV_KEY_SEP
+
         for key in self._keys:
-            if ',' in key:
+            if DERIV_KEY_SEP in key:
                 # return derivative keys as tuples instead of strings
-                of, wrt = re.sub('[( )]', '', key).split(',')
+                of, wrt = re.sub('[ ]', '', key).split(DERIV_KEY_SEP)
                 yield (of, wrt)
             else:
                 yield key

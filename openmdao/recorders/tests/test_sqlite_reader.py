@@ -2870,8 +2870,44 @@ class TestSqliteCaseReader(unittest.TestCase):
 
     def test_sqlite_reader_problem_derivatives(self):
 
-        prob = ParaboloidProblem()
+        class UglyParaboloid(om.ExplicitComponent):
+            """
+            A version of the Paraboloid component with some odd but valid
+            variable names... for testing the parsing of derivative keys.
+            """
+            def setup(self):
+                self.add_input('x,1', val=0.0)
+                self.add_input('y:2', val=0.0)
+                self.add_output('f(xy)', val=0.0)
+                self.declare_partials('*', '*')
 
+            def compute(self, inputs, outputs):
+                x = inputs['x,1']
+                y = inputs['y:2']
+                outputs['f(xy)'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
+
+            def compute_partials(self, inputs, partials):
+                x = inputs['x,1']
+                y = inputs['y:2']
+                partials['f(xy)', 'x,1'] = 2.0*x - 6.0 + y
+                partials['f(xy)', 'y:2'] = 2.0*y + 8.0 + x
+
+        # make a model with some messy var names
+        model = om.Group()
+        model.add_subsystem('p1', om.IndepVarComp('x,1', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y:2', 50.0), promotes=['*'])
+        model.add_subsystem('comp', UglyParaboloid(), promotes=['*'])
+
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes_outputs=['c'])
+        model.connect('x,1', 'con.x')
+        model.connect('y:2', 'con.y')
+
+        model.add_design_var('x,1', lower=-50.0, upper=50.0)
+        model.add_design_var('y:2', lower=-50.0, upper=50.0)
+        model.add_objective('f(xy)')
+        model.add_constraint('c', upper=-15.0)
+
+        prob = om.Problem(model)
         prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
         prob.recording_options['record_derivatives'] = True
         recorder = om.SqliteRecorder('cases.sql')
@@ -2893,11 +2929,13 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(num_problem_cases, 1)
 
         c1 = cr.get_case('c1')
+        print(c1.derivatives)
+
         J = prob.compute_totals()
-        np.testing.assert_almost_equal(c1.derivatives[('f_xy', 'x')], J[('comp.f_xy', 'p1.x')])
-        np.testing.assert_almost_equal(c1.derivatives[('f_xy', 'y')], J[('comp.f_xy', 'p2.y')])
-        np.testing.assert_almost_equal(c1.derivatives[('c', 'x')], J[('con.c', 'p1.x')])
-        np.testing.assert_almost_equal(c1.derivatives[('c', 'y')], J[('con.c', 'p2.y')])
+        np.testing.assert_almost_equal(c1.derivatives[('f(xy)', 'x,1')], J[('comp.f(xy)', 'p1.x,1')])
+        np.testing.assert_almost_equal(c1.derivatives[('f(xy)', 'y:2')], J[('comp.f(xy)', 'p2.y:2')])
+        np.testing.assert_almost_equal(c1.derivatives[('c', 'x,1')], J[('con.c', 'p1.x,1')])
+        np.testing.assert_almost_equal(c1.derivatives[('c', 'y:2')], J[('con.c', 'p2.y:2')])
 
 
 @use_tempdirs
@@ -3524,21 +3562,21 @@ class TestPromAbsDict(unittest.TestCase):
         np.testing.assert_almost_equal(derivs[('obj', 'x')], expected, decimal=6)
         np.testing.assert_almost_equal(derivs[('obj', 'px.x')], expected, decimal=6)
         np.testing.assert_almost_equal(derivs[('obj_cmp.obj', 'px.x')], expected, decimal=6)
-        np.testing.assert_almost_equal(derivs['obj,x'], expected, decimal=6)
-        np.testing.assert_almost_equal(derivs['obj,px.x'], expected, decimal=6)
-        np.testing.assert_almost_equal(derivs['obj_cmp.obj,x'], expected, decimal=6)
+        np.testing.assert_almost_equal(derivs['obj!x'], expected, decimal=6)
+        np.testing.assert_almost_equal(derivs['obj!px.x'], expected, decimal=6)
+        np.testing.assert_almost_equal(derivs['obj_cmp.obj!x'], expected, decimal=6)
 
         # verify we can set derivs via tuple or string, with promoted or absolute names
         # (although users wouldn't normally do this, it's used when copying)
         for key, value in [(('obj', 'x'), 111.), (('obj', 'px.x'), 222.),
-                           ('obj_cmp.obj,x', 333.), ('obj_cmp.obj,px.x', 444.)]:
+                           ('obj_cmp.obj!x', 333.), ('obj_cmp.obj!px.x', 444.)]:
             derivs[key] = value
             self.assertEqual(derivs[('obj', 'x')], value)
             self.assertEqual(derivs[('obj', 'px.x')], value)
             self.assertEqual(derivs[('obj_cmp.obj', 'px.x')], value)
-            self.assertEqual(derivs['obj,x'], value)
-            self.assertEqual(derivs['obj,px.x'], value)
-            self.assertEqual(derivs['obj_cmp.obj,x'], value)
+            self.assertEqual(derivs['obj!x'], value)
+            self.assertEqual(derivs['obj!px.x'], value)
+            self.assertEqual(derivs['obj_cmp.obj!x'], value)
 
         # verify that we didn't mess up deriv keys by setting values
         self.assertEqual(set(derivs.keys()), set([
