@@ -751,7 +751,7 @@ class PromAbsDict(dict):
                     for abs_key in prom2abs[key]:
                         self._values[abs_key] = values[key]
                     super(PromAbsDict, self).__setitem__(key, values[key])
-                elif isinstance(key, tuple) or ',' in key:
+                elif isinstance(key, tuple) or '!' in key:
                     # derivative keys can be either (of, wrt) or 'of,wrt'
                     abs_keys, prom_key = self._deriv_keys(key)
                     for abs_key in abs_keys:
@@ -810,6 +810,8 @@ class PromAbsDict(dict):
         # derivative could be tuple or string, using absolute or promoted names
         if isinstance(key, tuple):
             of, wrt = key
+        elif '!' in key:
+            of, wrt = re.sub('[( )]', '', key).split('!')
         else:
             of, wrt = re.sub('[( )]', '', key).split(',')
 
