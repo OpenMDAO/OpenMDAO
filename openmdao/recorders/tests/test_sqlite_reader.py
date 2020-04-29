@@ -3665,6 +3665,12 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
                 raise e
 
     def test_problem_v8(self):
+
+        # The change from v8 to v9 was changing the character to split the derivatives from
+        # 'of,wrt' to 'of!wrt' to allow for commas
+
+        # The v8 case file used in this test was created with this code:
+
         # class CommaComp(om.ExplicitComponent):
 
         #     def setup(self):
