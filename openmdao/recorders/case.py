@@ -718,7 +718,7 @@ class PromAbsDict(dict):
     _abs2prom : dict
         Dictionary mapping absolute names to promoted names.
     _DERIV_KEY_SEP : str
-        Seperator character for derivative keys.
+        Separator character for derivative keys.
     """
 
     def __init__(self, values, prom2abs, abs2prom, data_format=current_version):
