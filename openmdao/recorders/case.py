@@ -718,6 +718,8 @@ class PromAbsDict(dict):
         Dictionary mapping promoted names to absolute names.
     _abs2prom : dict
         Dictionary mapping absolute names to promoted names.
+    _DERIV_KEY_SEP : str
+        Seperator key for derivatives.
     """
 
     def __init__(self, values, prom2abs, abs2prom):
@@ -819,15 +821,14 @@ class PromAbsDict(dict):
         if isinstance(key, tuple):
             of, wrt = key
         elif '!' in key:
-            of, wrt = re.sub('[( )]', '', key).split('!')
+            of, wrt = key.split('!')
         else:
-            of, wrt = re.sub('[ ]', '', key).split(DERIV_KEY_SEP)
+            of, wrt = key.split(DERIV_KEY_SEP)
 
         # if promoted, will map to all connected absolute names
         abs_of = [of] if of in abs2prom else prom2abs[of]
         abs_wrt = [wrt] if wrt in abs2prom else prom2abs[wrt]
-        abs_keys = ['%s%s%s' % (o, DERIV_KEY_SEP, w) \
-            for o, w in itertools.product(abs_of, abs_wrt)]
+        abs_keys = ['%s%s%s' % (o, DERIV_KEY_SEP, w) for o, w in itertools.product(abs_of, abs_wrt)]
 
         prom_of = of if of in prom2abs else abs2prom[of]
         prom_wrt = wrt if wrt in prom2abs else abs2prom[wrt]
@@ -918,7 +919,7 @@ class PromAbsDict(dict):
         for key in self._keys:
             if DERIV_KEY_SEP in key:
                 # return derivative keys as tuples instead of strings
-                of, wrt = re.sub('[ ]', '', key).split(DERIV_KEY_SEP)
+                of, wrt = key.split(DERIV_KEY_SEP)
                 yield (of, wrt)
             else:
                 yield key
