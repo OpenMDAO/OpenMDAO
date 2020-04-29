@@ -73,7 +73,7 @@ body {
 	/* Stay in place */
 	z-index: 9999;
 	/* Sit on top */
-	padding-top: 100px;
+	padding-top: 10px;
 	/* Location of the box */
 	left: 0;
 	top: 0;
@@ -95,10 +95,11 @@ body {
 	font-size: 14px;
 	position: relative;
 	background-color: #fefefe;
-	margin: auto;
+	margin: 10px 100px 10px 100px;
 	padding: 0;
 	border: 1px solid #888;
-	width: 80%;
+	width: auto;
+	min-width: 950px;
 	box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
 	-webkit-animation-name: animatetop;
 	-webkit-animation-duration: 0.4s;
@@ -212,4 +213,16 @@ div.offgrid {
 	color: white;
 	margin: 2px;
 	padding: 10px;
+}
+
+.modal-section-header {
+    font-size: 30px;
+	font-weight: bold;
+ 	padding: 0px 20px;
+ }
+
+.toolbar-help {
+	width: auto;
+ 	height: auto;
+	padding: 0px 20px;
 }

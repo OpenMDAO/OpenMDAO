@@ -14,6 +14,7 @@ from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.general_utils import printoptions, remove_whitespace
 
 from openmdao.test_suite.groups.parallel_groups import FanOutGrouped
+from openmdao.test_suite.components.distributed_components import DistribComp, Summer
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -61,26 +62,6 @@ class DistributedAdder(om.ExplicitComponent):
         outputs['y'] = inputs['x'] + 10.
 
 
-class Summer(om.ExplicitComponent):
-    """
-    Aggregation component that collects all the values from the distributed
-    vector addition and computes a total
-    """
-
-    def initialize(self):
-        self.options.declare('size', types=int, default=1,
-                             desc="Size of input and output vectors.")
-
-    def setup(self):
-        # NOTE: this component depends on the full y array, so OpenMDAO
-        #       will automatically gather all the values for it
-        self.add_input('y', val=np.zeros(self.options['size']))
-        self.add_output('sum', 0.0, shape=1)
-
-    def compute(self, inputs, outputs):
-        outputs['sum'] = np.sum(inputs['y'])
-
-
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class DistributedListVarsTest(unittest.TestCase):
 
@@ -94,7 +75,7 @@ class DistributedListVarsTest(unittest.TestCase):
 
         prob.model.add_subsystem('des_vars', om.IndepVarComp('x', np.ones(size)), promotes=['x'])
         prob.model.add_subsystem('plus', DistributedAdder(size=size), promotes=['x', 'y'])
-        prob.model.add_subsystem('summer', Summer(size=size), promotes=['y', 'sum'])
+        prob.model.add_subsystem('summer', Summer(size=size), promotes=[('invec', 'y'), 'sum'])
 
         prob.setup()
 
@@ -105,7 +86,7 @@ class DistributedListVarsTest(unittest.TestCase):
         stream = StringIO()
         inputs = sorted(prob.model.list_inputs(values=True, print_arrays=True, out_stream=stream))
         self.assertEqual(inputs[0][0], 'plus.x')
-        self.assertEqual(inputs[1][0], 'summer.y')
+        self.assertEqual(inputs[1][0], 'summer.invec')
         self.assertEqual(inputs[0][1]['value'].size, 50)  # should only return half that is local
         self.assertEqual(inputs[1][1]['value'].size, 100)
 
@@ -118,7 +99,7 @@ class DistributedListVarsTest(unittest.TestCase):
             self.assertEqual(text.count('\n  plus'), 1)
             self.assertEqual(text.count('\n    x'), 1)
             self.assertEqual(text.count('\n  summer'), 1)
-            self.assertEqual(text.count('\n    y'), 1)
+            self.assertEqual(text.count('\n    invec'), 1)
             # make sure all the arrays written have 100 elements in them
             self.assertEqual(len(text.split('[')[1].split(']')[0].split()), 100)
             self.assertEqual(len(text.split('[')[2].split(']')[0].split()), 100)
@@ -274,7 +255,6 @@ class DistributedListVarsTest(unittest.TestCase):
     def test_parallel_list_vars(self):
         print_opts = {'linewidth': 1024, 'precision': 1}
 
-        from distutils.version import LooseVersion
         if LooseVersion(np.__version__) >= LooseVersion("1.14"):
             print_opts['legacy'] = '1.13'
 
@@ -431,11 +411,8 @@ class DistributedListVarsTest(unittest.TestCase):
                                     '\nExpected: %s\nReceived: %s\n' % (line, text[i]))
 
     def test_distribcomp_list_vars(self):
-        from openmdao.test_suite.components.distributed_components import DistribComp, Summer
-
         print_opts = {'linewidth': 1024}
 
-        from distutils.version import LooseVersion
         if LooseVersion(np.__version__) >= LooseVersion("1.14"):
             print_opts['legacy'] = '1.13'
 
@@ -554,8 +531,6 @@ class DistributedListVarsTest(unittest.TestCase):
                     self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line),
                                      '\nExpected: %s\nReceived: %s\n' % (line, text[i]))
 
-        # note that the shape of the input variable for the non-distributed Summer component
-        # is different on each processor, use the all_procs argument to display on all processors
         stream = StringIO()
         with printoptions(**print_opts):
             model.C3.list_inputs(hierarchical=False, shape=True, global_shape=True, all_procs=True,
@@ -563,14 +538,11 @@ class DistributedListVarsTest(unittest.TestCase):
 
         text = stream.getvalue().split('\n')
 
-        if prob.comm.rank == 0:
-            norm = '|5.65685424949|'
-            shape = (8,)
-            value = '[2., 2., 2., 2., 2., 2., 2., 2.]'
-        else:
-            norm = '|7.93725393319|'
-            shape = (7,)
-            value = '[-3., -3., -3., -3., -3., -3., -3.]'
+        print('\n'.join(text))
+
+        norm = '|9.74679434481|'
+        shape = (15,)
+        value = '[2., 2., 2., 2., 2., 2., 2., 2., -3., -3., -3., -3., -3., -3., -3.]'
 
         expected = [
             "1 Input(s) in 'C3'",
@@ -588,7 +560,7 @@ class DistributedListVarsTest(unittest.TestCase):
                 self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line),
                                  '\nExpected: %s\nReceived: %s\n' % (line, text[i]))
 
-        assert_near_equal(prob['C3.out'], -5.)
+        assert_near_equal(prob['C3.sum'], -5.)
 
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")
@@ -632,7 +604,7 @@ class MPIFeatureTests(unittest.TestCase):
         # is different on each processor, use the all_procs argument to display on all processors
         model.C3.list_inputs(hierarchical=False, shape=True, global_shape=True, print_arrays=True, all_procs=True)
 
-        assert_near_equal(prob['C3.out'], -5.)
+        assert_near_equal(prob['C3.sum'], -5.)
 
 
 if __name__ == "__main__":
