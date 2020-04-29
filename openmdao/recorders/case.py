@@ -3,7 +3,6 @@ A Case class.
 """
 
 import sys
-import re
 import itertools
 
 from collections import OrderedDict
@@ -15,7 +14,7 @@ from openmdao.utils.record_util import deserialize, get_source_system
 from openmdao.utils.variable_table import write_var_table
 from openmdao.utils.general_utils import make_set, match_includes_excludes
 from openmdao.utils.units import unit_conversion
-import openmdao.recorders.sqlite_recorder as version
+from openmdao.recorders.sqlite_recorder import format_version as current_version
 
 _DEFAULT_OUT_STREAM = object()
 _AMBIGOUS_PROM_NAME = object()
@@ -722,7 +721,7 @@ class PromAbsDict(dict):
         Seperator key for derivatives.
     """
 
-    def __init__(self, values, prom2abs, abs2prom):
+    def __init__(self, values, prom2abs, abs2prom, data_format=current_version):
         """
         Initialize.
 
@@ -740,7 +739,7 @@ class PromAbsDict(dict):
         self._prom2abs = prom2abs
         self._abs2prom = abs2prom
 
-        if version.format_version <= 8:
+        if data_format <= 8:
             DERIV_KEY_SEP = self._DERIV_KEY_SEP = ','
         else:
             DERIV_KEY_SEP = self._DERIV_KEY_SEP = '!'
@@ -820,8 +819,6 @@ class PromAbsDict(dict):
         # derivative could be tuple or string, using absolute or promoted names
         if isinstance(key, tuple):
             of, wrt = key
-        elif '!' in key:
-            of, wrt = key.split('!')
         else:
             of, wrt = key.split(DERIV_KEY_SEP)
 
