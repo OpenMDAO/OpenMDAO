@@ -102,13 +102,13 @@
                             <path d="M0,-5L10,0L0,5L0,-5" class="arrowHead"></path>
                         </marker>
                         <clipPath id="partitionTreeClip">
-                            <rect x="0" y="0" width="1200" height="600" />
+                            <rect id="tree-clip-rect" x="0" y="0" width="1200" height="600" />
                         </clipPath>
                         <clipPath id="n2MatrixClip">
-                            <rect x="-1" y="-1" width="602" height="602" />
+                            <rect id="matrix-clip-rect" x="-1" y="-1" width="602" height="602" />
                         </clipPath>
                         <clipPath id="solverTreeClip">
-                            <rect x="0" y="0" width="1200" height="600" />
+                            <rect id="solver-clip-rect" x="0" y="0" width="1200" height="600" />
                         </clipPath>
                     </defs>
                     <g id='n2outer'>
@@ -129,6 +129,9 @@
                     <g id='tree' clip-path='url(#partitionTreeClip)'></g>
                     <g id='solver_tree' clip-path='url(#solverTreeClip)'></g>
                 </svg>
+                <div id='n2-resizer-box' class='inactive-resizer-box'>
+                    <p id='n2-resizer-handle' class='inactive-resizer-handle'></p>
+                </div>
             </div>
 
             <!-- Legend to show all symbols -->
@@ -172,16 +175,14 @@
                 </div>
                 <div class="draggable">
                     <div id='draggable-legend-dots'>
-                        <p>&#42889;&#42889;&#42889;&#42889;&#42889;&#42889;</p>
+                        <p class="legend-dots"></p>
                     </div>
                     <div class="icon-key"></div>
                     <div id='draggable-legend-dots'>
-                        <p>&#42889;&#42889;&#42889;&#42889;&#42889;&#42889;</p>
+                        <p class="legend-dots"></p>
                     </div>
                 </div>
-                <div id="close-legend">
-                    <p>&#x2717</p>
-                </div>
+                <div id="close-legend"><p></p></div>
             </div>
         </div>
         <div id="connectionId"></div>

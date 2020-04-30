@@ -223,11 +223,21 @@
     cursor: default;
 }
 
+#close-legend p::before {
+    content: '\2715'
+}
+
 #close-legend p {
     color: black;
     font-weight: bold;
-    font-size: 20pt;
+    font-size: 20px;
     text-align: center;
     margin: auto;
     vertical-align: middle;
+    width: 20px;
+    height: 20px;
+}
+
+p.legend-dots::before {
+    content: '\A789\A789\A789\A789\A789\A789';
 }

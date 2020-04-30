@@ -347,6 +347,11 @@ class N2Toolbar {
                 n2ui.n2Diag.manuallyResized = true;
                 const modelHeight = window.innerHeight * (parseInt(this.value) / 100);
                 n2ui.n2Diag.verticalResize(modelHeight);
+                /*
+                const gapSpace = (n2ui.n2Diag.dims.size.partitionTreeGap - 3) +
+                    n2ui.n2Diag.dims.size.unit;
+                d3.select('#n2-resizer-box').style('bottom', gapSpace);
+                */
             });
 
         this.toolbar.select('#model-slider-fit')
@@ -355,6 +360,12 @@ class N2Toolbar {
                 d3.select('#model-slider').node().value = '95';
                 d3.select('#model-slider-label').html("95%")
                 n2ui.n2Diag.verticalResize(window.innerHeight * .95);
+
+                /*
+                const gapSpace = (n2ui.n2Diag.dims.size.partitionTreeGap - 3) +
+                    n2ui.n2Diag.dims.size.unit;
+                d3.select('#n2-resizer-box').style('bottom', gapSpace);
+                */
             })
     }
 }

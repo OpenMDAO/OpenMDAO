@@ -523,7 +523,7 @@ class N2Layout {
 
         this.ratio = (window.innerWidth - 200) / outerDims.width;
         if (this.ratio > 1 || manuallyResized) this.ratio = 1;
-        
+
         dom.svgDiv
             .style("width", (outerDims.width * this.ratio) + this.size.unit)
             .style("height", (outerDims.height * this.ratio) + this.size.unit)
@@ -565,5 +565,15 @@ class N2Layout {
                 innerDims.height +
                 innerDims.margin) + " " +
                 innerDims.margin + ")");
+    }
+
+    calcWidthBasedOnNewHeight(height) {
+        return this.size.partitionTree.width + height + this.size.solverTree.width +
+            this.size.n2matrix.margin * 2;
+    }
+
+    calcHeightBasedOnNewWidth(width) {
+        return width - this.size.partitionTree.width - this.size.solverTree.width -
+            this.size.n2matrix.margin * 2;
     }
 }

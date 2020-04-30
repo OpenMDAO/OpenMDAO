@@ -237,6 +237,7 @@ class N2UserInterface {
         d3.select('#searchButtonId')
             .on('click', this.searchButtonClicked.bind(this));
         this._setupSearch();
+        this._setupResizerDrag();
 
         this.legend = new N2Legend(this.n2Diag.modelData);
         this.nodeInfoBox = new NodeInfo(this.n2Diag.model.abs2prom);
@@ -258,6 +259,91 @@ class N2UserInterface {
             const modelDepth = parseInt(e.target.value);
             self.collapseToDepthSelectChange(modelDepth);
         };
+    }
+
+    /** Set up event handlers for grabbing the bottom corner and dragging */
+    _setupResizerDrag() {
+        const handle = d3.select('#n2-resizer-handle');
+        const box = d3.select('#n2-resizer-box');
+        const body = d3.select('body');
+        const n2Diag = this.n2Diag;
+        const gapSpace = (n2Diag.dims.size.partitionTreeGap - 3) +
+            n2Diag.dims.size.unit;
+
+        box.style('bottom', gapSpace);
+
+        handle.on('mousedown', e => {
+            box
+                .style('top', gapSpace)
+                .style('bottom', gapSpace);
+
+            handle.attr('class', 'active-resizer-handle');
+            box.attr('class', 'active-resizer-box');
+
+            const startPos = {
+                'x': d3.event.clientX,
+                'y': d3.event.clientY
+            };
+            const startDims = {
+                'width': parseInt(box.style('width')),
+                'height': parseInt(box.style('height'))
+            };
+            const offset = {
+                'x': startPos.x - startDims.width,
+                'y': startPos.y - startDims.height
+            };
+            let newDims = {
+                'x': startDims.width,
+                'y': startDims.height
+            };
+
+            body.style('cursor', 'nwse-resize')
+                .on('mouseup', e => {
+                    n2Diag.manuallyResized = true;
+
+                    // Update the slider value and display
+                    const defHeight = window.innerHeight * .95;
+                    const newPercent = Math.round((newDims.y / defHeight) * 100);
+                    d3.select('#model-slider').node().value = newPercent;
+                    d3.select('#model-slider-label').html(newPercent + "%");
+
+                    // Perform the actual resize
+                    n2Diag.verticalResize(newDims.y);
+
+                    // Turn off the resizing box border and handle
+                    handle.attr('class', 'inactive-resizer-handle');
+                    box.attr('class', 'inactive-resizer-box');
+
+                    // Get rid of the drag event handlers
+                    body.style('cursor', 'default')
+                        .on('mousemove', null)
+                        .on('mouseup', null);
+                })
+                .on('mousemove', e => {
+                    const newHeight = d3.event.clientY - offset.y;
+                    if (newHeight < window.innerHeight * .5 ) return;
+
+                    newDims = {
+                        'x': d3.event.clientX - offset.x,
+                        'y': newHeight
+                    };
+
+                    // Maintain the ratio by only resizing in the least moved direction
+                    // and resizing the other direction by a fraction of that
+                    if (newDims.x < newDims.y) {
+                        newDims.y = n2Diag.layout.calcHeightBasedOnNewWidth(newDims.x);
+                    }
+                    else {
+                        newDims.x = n2Diag.layout.calcWidthBasedOnNewHeight(newDims.y);
+                    }
+
+                    box
+                        .style('width', newDims.x + 'px')
+                        .style('height', newDims.y + 'px');
+                });
+
+            d3.event.preventDefault();
+        });
     }
 
     /**

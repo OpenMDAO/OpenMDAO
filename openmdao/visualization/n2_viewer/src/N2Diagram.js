@@ -175,7 +175,7 @@ class N2Diagram {
                 'n2Matrix': d3.select("#n2MatrixClip > rect"),
                 'solverTree': d3.select("#solverTreeClip > rect")
             },
-            
+
         };
 
         let n2Groups = {};
@@ -193,7 +193,9 @@ class N2Diagram {
             offgrid[name] = d3elem;
         })
         this.dom.n2Groups.offgrid = offgrid;
-    }
+
+
+    }  
 
     /**
      * Make a copy of the previous transit coordinates and linear scalers before
