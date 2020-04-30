@@ -2929,7 +2929,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(num_problem_cases, 1)
 
         c1 = cr.get_case('c1')
-        print(c1.derivatives)
 
         J = prob.compute_totals()
         np.testing.assert_almost_equal(c1.derivatives[('f(xy)', 'x,1')], J[('comp.f(xy)', 'p1.x,1')])
