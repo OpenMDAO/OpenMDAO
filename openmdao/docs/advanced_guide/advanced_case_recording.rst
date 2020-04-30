@@ -12,6 +12,9 @@ relate that back to an XDSM for illustrative purposes.
     openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_advanced_example
     :layout: interleave
 
+.. note::
+    This
+
 
 The following XDSM diagram shows the SellarMDA component equations and their inputs and outputs. Through
 the different recorders we can access the different parts of the model. We'll take you through an
@@ -38,11 +41,11 @@ Solver
 ------
 
 Similar to the `system` recorder, we can query the cases recorded by the `solver` but in this case we will find the
-calculated value of obj_func. You can also access the values of inputs to the equation with the
-solver but in this case we'll focus on the obj_func value since we cannot get that information from
-the `system` recorder.
+calculated value of obj_comp. You can also access the values of inputs to the equation with the
+solver but in this case we'll focus on `y1` and `y2` values from the discipline functions going into
+the objective function the `system` recorder.
 
-We'll pass `'root.nonlinear_solver'` to the method list_cases, find how many cases there are and
+We'll pass `'root.cycle'` to the method list_cases, find how many cases there are and
 arbitrarily pick number 3.
 
 .. embed-code::

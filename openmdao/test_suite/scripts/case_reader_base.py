@@ -2,7 +2,7 @@ import openmdao.api as om
 from openmdao.test_suite.components.sellar_feature import SellarMDAWithUnits
 import numpy as np
 
-def case_reader_base():
+def example_case_reader():
     # build the model
     prob = om.Problem(model=SellarMDAWithUnits())
 
@@ -24,14 +24,14 @@ def case_reader_base():
     prob.add_recorder(recorder)
     # Attach a recorder to the driver
     driver.add_recorder(recorder)
-    # Attach a recorder to the solver
-    prob.model.nonlinear_solver.add_recorder(recorder)
 
     prob.setup()
 
     # To attach a recorder to the system, you need to call it after `setup` so the model hierarchy has been generated
     obj_cmp = prob.model.obj_cmp
     obj_cmp.add_recorder(recorder)
+    # Attach a recorder to the solver
+    model.cycle.add_recorder(recorder)
 
     prob.set_solver_print(0)
     prob.run_driver()
@@ -41,3 +41,4 @@ def case_reader_base():
     cr = om.CaseReader("cases.sql")
 
     return cr
+

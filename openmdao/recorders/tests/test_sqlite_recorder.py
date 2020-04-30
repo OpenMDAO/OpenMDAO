@@ -2508,9 +2508,9 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         cr = om.CaseReader("cases.sql")
 
     def test_feature_system_recorder(self):
-        from openmdao.test_suite.scripts.case_reader_base import case_reader_base
+        from openmdao.test_suite.scripts.case_reader_base import example_case_reader
 
-        cr = case_reader_base()
+        cr = example_case_reader()
         system_cases = cr.list_cases('root.obj_cmp')
 
         # Number of cases in the optimization
@@ -2519,28 +2519,29 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         # Get the keys of all the inputs to the obj_func
         case = cr.get_case(system_cases[0])
-        print("Key names of inputs to obj_func:", sorted(case.inputs.keys()))
+        self.assertEqual(list(case.inputs.keys()), ['x', 'y1', 'y2', 'z'])
 
         for i in range(num_cases):
             case = cr.get_case(system_cases[i])
             print(case['y1'])
 
     def test_feature_solver_recorder(self):
-        from openmdao.test_suite.scripts.case_reader_base import case_reader_base
+        from openmdao.test_suite.scripts.case_reader_base import example_case_reader
 
-        cr = case_reader_base()
-        solver_cases = cr.list_cases('root.nonlinear_solver')
+        cr = example_case_reader()
+        solver_cases = cr.list_cases('root.cycle')
 
         num_cases = len(solver_cases)
         print("Number of cases:", num_cases)
 
         case = cr.get_case(solver_cases[3])
-        print("Value of 'obj' at case 3:", case['obj'])
+        assert_near_equal(case['y1'], 4.17430704, 1e-8)
+        assert_near_equal(case['y2'], 4.28622419, 1e-8)
 
     def test_feature_driver_recorder(self):
-        from openmdao.test_suite.scripts.case_reader_base import case_reader_base
+        from openmdao.test_suite.scripts.case_reader_base import example_case_reader
 
-        cr = case_reader_base()
+        cr = example_case_reader()
 
         driver_cases = cr.list_cases('driver')
 
@@ -2550,19 +2551,25 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         design_vars = last_case.get_design_vars()
         constraints = last_case.get_constraints()
 
-        print(objectives, "\n", design_vars, "\n", constraints)
+        assert_near_equal(objectives['obj'], 3.18339395, 1e-8)
+        assert_near_equal(design_vars['x'], 0., 1e-8)
+        assert_near_equal(design_vars['z'][0], 1.97763888, 1e-8)
+        assert_near_equal(design_vars['z'][1], 1.25035459e-15, 1e-8)
+        assert_near_equal(constraints['con1'], -1.68550507e-10, 1e-8)
+        assert_near_equal(constraints['con2'], -20.24472223, 1e-8)
+
 
     def test_feature_problem_recorder(self):
-        from openmdao.test_suite.scripts.case_reader_base import case_reader_base
+        from openmdao.test_suite.scripts.case_reader_base import example_case_reader
 
-        cr = case_reader_base()
+        cr = example_case_reader()
         # get list of cases recorded on problem
         problem_cases = cr.list_cases('problem')
-        print("Name(s) of recorder states:", problem_cases)
+        print("Name(s) of recorder cases:", problem_cases)
 
         # get list of output variables recorded on problem
         problem_vars = cr.list_source_vars('problem')
-        print("Names of recorder variables:", problem_vars['outputs'])
+        self.assertEqual(sorted(problem_vars['outputs']), ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z'])
 
         # get the recorded case and check values
         case = cr.get_case('final_state')
@@ -2571,14 +2578,14 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         design_vars = case.get_design_vars()
         constraints = case.get_constraints()
 
-        print(objectives['obj'])
+        assert_near_equal(objectives['obj'], 3.18339395, 1e-8)
 
     def test_feature_plot_des_vars(self):
         import matplotlib.pyplot as plt
         import numpy as np
-        from openmdao.test_suite.scripts.case_reader_base import case_reader_base
+        from openmdao.test_suite.scripts.case_reader_base import example_case_reader
 
-        cr = case_reader_base()
+        cr = example_case_reader()
 
         driver_cases = cr.list_cases('driver')
 
@@ -2606,80 +2613,6 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         ax2.grid()
         # There are two lines in the right plot because "Z" contains two variables that are being
         # optimized
-
-
-    def test_feature_isolate_case(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar_feature import SellarMDA
-        import numpy as np
-
-        prob = om.Problem(model=SellarMDA())
-
-        model = prob.model
-        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
-                                upper=np.array([10.0, 10.0]))
-        model.add_design_var('x', lower=0.0, upper=10.0)
-        model.add_objective('obj')
-        model.add_constraint('con1', upper=0.0)
-        model.add_constraint('con2', upper=0.0)
-
-        recorder = om.SqliteRecorder('cases.sql')
-
-        # Attach recorder to the driver
-        driver = prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9)
-        driver.add_recorder(recorder)
-        # Record only design variables, objectives, constraints in Driver (to save space/recording time)
-        # driver.recording_options['includes'] = []
-        driver.recording_options['record_objectives'] = True
-        driver.recording_options['record_constraints'] = True
-        driver.recording_options['record_desvars'] = True
-
-        # Attach recorder to the problem
-        prob.add_recorder(recorder)
-        prob.setup()
-
-        # Attach recorder to the solver
-        # This is placed after setup to access SellarMDA's solver
-        prob.model.cycle.nonlinear_solver.add_recorder(recorder)
-
-        # Attach recorder to a component
-        prob.model.indeps.add_recorder(recorder)
-
-        prob.set_solver_print(0)
-        prob.run_driver()
-        # Add a record state after run driver
-        prob.record("after_run_driver")
-
-        # Instantiate the Case Reader
-        cr = om.CaseReader('cases.sql')
-
-        # Identify driver as the source
-        cases = cr.get_cases('driver')
-        driver_cases = cr.list_cases()
-        print(len(driver_cases))
-
-        # You can change driver_cases[30] to any int from 0-103 to inspect the variables at a
-        # different point in the optimization
-        case_list = cr.get_case(driver_cases[30])
-        objectives = case_list.get_objectives()
-        design_vars = case_list.get_design_vars()
-        constraints = case_list.get_constraints()
-
-        print("Driver Objectives: ", objectives, "\nDriver Design Vars: ", design_vars,
-              "\nDriver Constraints: ", constraints)
-
-        # You can also inspect the final values by listing the cases of PROBLEM
-        cr.list_cases('problem')
-
-        # Get the final case and inspect the variables of interest
-        case = cr.get_case('after_run_driver')
-
-        objectives = case.get_objectives()
-        design_vars = case.get_design_vars()
-        constraints = case.get_constraints()
-
-        print("Problem Objectives: ", objectives, "\nProblem Design Vars: ", design_vars,
-              "\nProblem Constraints: ", constraints)
 
     def test_feature_driver_options(self):
         import openmdao.api as om
