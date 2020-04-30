@@ -219,7 +219,11 @@ class ScipyOptimizeDriver(Driver):
                     d['scaler'] = None
                     d['total_adder'] = None
                     d['total_scaler'] = None
+                    # TODO - Need test
+                    #d['size'] = meta['size']
                     d['size'] = meta['size']
+                    d['global_size'] = meta['global_size']
+                    d['distributed'] = meta['distributed']
                     d['linear'] = True
                     self._cons[name] = d
 
@@ -316,7 +320,7 @@ class ScipyOptimizeDriver(Driver):
 
         if opt in _constraint_optimizers:
             for name, meta in self._cons.items():
-                size = meta['size']
+                size = meta['global_size'] if meta['distributed'] else meta['size']
                 upper = meta['upper']
                 lower = meta['lower']
                 equals = meta['equals']

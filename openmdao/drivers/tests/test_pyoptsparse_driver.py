@@ -9,8 +9,9 @@ from distutils.version import LooseVersion
 import numpy as np
 
 import openmdao.api as om
-from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
+from openmdao.test_suite.components.paraboloid import Paraboloid
+from openmdao.test_suite.components.paraboloid_distributed import DistParab
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.general_utils import set_pyoptsparse_opt, run_driver
@@ -175,6 +176,44 @@ class TestMPIScatter(unittest.TestCase):
 
         proc_vals = MPI.COMM_WORLD.allgather([prob['x'], prob['y'], prob['c'], prob['f_xy']])
         np.testing.assert_array_almost_equal(proc_vals[0], proc_vals[1])
+
+    def test_opt_distcomp(self):
+        size = 7
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', np.ones((size, )))
+        ivc.add_output('y', np.ones((size, )))
+        ivc.add_output('a', -3.0 + 0.6 * np.arange(size))
+
+        model.add_subsystem('p', ivc, promotes=['*'])
+        model.add_subsystem("parab", DistParab(arr_size=size, deriv_type='dense'), promotes=['*'])
+        model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
+                                               f_sum=np.ones((size, )),
+                                               f_xy=np.ones((size, ))),
+                            promotes=['*'])
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_constraint('f_xy', lower=0.0)
+        model.add_objective('f_sum', index=-1)
+
+        prob.driver = om.pyOptSparseDriver(optimizer='SNOPT')
+
+        prob.setup(force_alloc_complex=True)
+
+        prob.run_driver()
+
+        desvar = prob.driver.get_design_var_values()
+        con = prob.driver.get_constraint_values()
+        obj = prob.driver.get_objective_values()
+
+        assert_near_equal(obj['sum.f_sum'], 0.0, 2e-6)
+        assert_near_equal(con['parab.f_xy'],
+                          np.zeros(7),
+                          1e-5)
 
 
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
