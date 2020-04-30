@@ -2521,6 +2521,10 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         case = cr.get_case(system_cases[0])
         print("Key names of inputs to obj_func:", sorted(case.inputs.keys()))
 
+        for i in range(num_cases):
+            case = cr.get_case(system_cases[i])
+            print(case['y1'])
+
     def test_feature_solver_recorder(self):
         from openmdao.test_suite.scripts.case_reader_base import case_reader_base
 

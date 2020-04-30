@@ -7,14 +7,14 @@ Basic Recording Example
 Recording Terminology
 ---------------------
 
-| **Case**: A Case stores a snapshopt of all the variable values, metadata, and options of a model, or a sub-set of a model, at a particular point in time
-| **Case Recorder**: An OpenMDAO module used to store the state of a `Problem` before, during, or after execution in an SQL file.
-| **Sources**: The OpenMDAO objects responsible for recording the case. `Problem`, `Driver`, and `System`.
+| **Case**: A Case stores a snapshot of all the variable values, metadata, and options of a model, or a sub-set of a model, at a particular point in time
+| **Case Recorder**: An OpenMDAO module used to store a snapshot of a model before, during, or after execution in an SQL file.
+| **Sources**: The OpenMDAO objects responsible for recording the case. `Problem`, `Driver` are accessed by name and `System` or `Solver` by pathname.
 
 Basic Recording Example
 ------------------------
 
-Below is an basic example of how to create a recorder, attach it to a Problem, save the information,
+Below is a basic example of how to create a recorder, attach it to a Problem, save the information,
 and retrieve the data from the recorder. `list_outputs` is a quick way to show all of your outputs
 and their values at the time the case was recorded, and should you need to isolate a single value OpenMDAO provides two ways to
 retrieve them. To view all the design variables, constraints, and

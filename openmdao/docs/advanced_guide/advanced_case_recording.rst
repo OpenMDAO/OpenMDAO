@@ -4,18 +4,18 @@
 Advanced Recording Example
 ***************************
 
-Below we demonstrate a more advanced use case of case recording including the four different objects
-that a user can attach to. We will then show how to extract various data from the model and finally,
-relate that an XDSM for illustrative purposes.
+Below we demonstrate a more advanced example of case recording including the four different objects
+that a recorder can be attached to. We will then show how to extract various data from the model and finally,
+relate that back to an XDSM for illustrative purposes.
 
 .. embed-code::
     openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_advanced_example
     :layout: interleave
 
 
-Below we have an XDSM to show the SellarMDA component equations and their inputs and outputs. Through
+The following XDSM diagram shows the SellarMDA component equations and their inputs and outputs. Through
 the different recorders we can access the different parts of the model. We'll take you through an
-example of each object and relate it back to the diagram below.
+example of each object and relate it back to the diagram.
 
 .. image:: images/sellar_xdsm.jpg
     :width: 600
@@ -23,10 +23,10 @@ example of each object and relate it back to the diagram below.
 System
 -------
 First, we'll examine the `system` recorder. Suppose we want to know what the value of `y1` is going
-into the objective function (obj_func). Using the `list_cases` method, we'll query the objective
-function by passing in the string `root.obj_comp`. You could also access the discipline equations
+into the objective function (obj_func). Using the `list_cases` method, we'll get the list of cases
+that were recorded by the objective component `root.obj_comp`. You could also access the discipline equations
 by swapping out the subsystem `root.obj_comp` for `root.con_cmp1`. Next we use `get_case` to
-inspect which variables are in the dictionary. Here we find that `x, y1, y2, z` are returned.
+determine the input keys of the first case's dictionary. Here we find that `x, y1, y2, z` are returned.
 Since we originally sought find the value of `y1` going into the objective function, we'll loop
 through the 14 cases to find what the value is in each case.
 
@@ -37,7 +37,7 @@ through the 14 cases to find what the value is in each case.
 Solver
 ------
 
-Similar to the `system` recorder, we can query the `solver` but in this case we will find the
+Similar to the `system` recorder, we can query the cases recorded by the `solver` but in this case we will find the
 calculated value of obj_func. You can also access the values of inputs to the equation with the
 solver but in this case we'll focus on the obj_func value since we cannot get that information from
 the `system` recorder.
@@ -51,7 +51,7 @@ arbitrarily pick number 3.
 
 Driver
 ------
-If we want to view the convergence of the model, the best place to find that is in the `Driver`. By
+If we want to view the convergence of the model, the best place to find that by looking at the cases recorded by the `driver`. By
 default, a recorder attached to a driver will record the design variables, constraints and
 objectives, so we will print them for the model at the end of the optimization. We'll use the helper
 methods like `get_objectives`, `get_design_vars`, `get_constraints` to return the info we're seeking.
@@ -63,8 +63,8 @@ methods like `get_objectives`, `get_design_vars`, `get_constraints` to return th
 Problem
 --------
 
-A `Problem` recorder is best if you want to record an arbitrary case at a point in the model. In
-our case, we have placed our point at the end of the model.
+A `Problem` recorder is best if you want to record an arbitrary case before or after a run in the
+model but not during a run. In our case, we have placed our point at the end of the model.
 
 .. embed-code::
     openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_problem_recorder
