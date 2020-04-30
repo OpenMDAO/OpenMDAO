@@ -54,6 +54,8 @@ class IndepVarComp(ExplicitComponent):
         # A single variable is declared during instantiation
         if isinstance(name, str):
             self._indep.append((name, val, kwargs))
+            super(IndepVarComp, self).add_output(name, val, **kwargs)
+
 
         elif name is None:
             pass
@@ -74,16 +76,16 @@ class IndepVarComp(ExplicitComponent):
         Do any remaining setup that had to wait until after final user configuration.
         """
         # set static mode to False because we are doing things that would normally be done in setup
-        self._static_mode = False
+        # self._static_mode = False
 
-        self._var_rel_names = {'input': [], 'output': []}
-        self._var_rel2meta = {}
+        # self._var_rel_names = {'input': [], 'output': []}
+        # self._var_rel2meta = {}
 
-        for (name, val, kwargs) in self._indep + self._indep_external:
-            super(IndepVarComp, self).add_output(name, val, **kwargs)
+        # for (name, val, kwargs) in self._indep + self._indep_external:
+        #     super(IndepVarComp, self).add_output(name, val, **kwargs)
 
-        for (name, val, kwargs) in self._indep_external_discrete:
-            super(IndepVarComp, self).add_discrete_output(name, val, **kwargs)
+        # for (name, val, kwargs) in self._indep_external_discrete:
+        #     super(IndepVarComp, self).add_discrete_output(name, val, **kwargs)
 
         if len(self._indep) + len(self._indep_external) + len(self._indep_external_discrete) == 0:
             raise RuntimeError("{}: No outputs (independent variables) have been declared. "
@@ -91,9 +93,10 @@ class IndepVarComp(ExplicitComponent):
                                "instantiation or by calling add_output or add_discrete_output "
                                "afterwards.".format(self.msginfo))
 
-        self._static_mode = True
+        # self._static_mode = True
 
-        super(IndepVarComp, self)._post_configure()
+
+        # super(IndepVarComp, self)._post_configure()
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, tags=None):
@@ -154,6 +157,7 @@ class IndepVarComp(ExplicitComponent):
                   'res_ref': res_ref, 'tags': tags
                   }
         self._indep_external.append((name, val, kwargs))
+        super(IndepVarComp, self).add_output(name, val, **kwargs)
 
     def add_discrete_output(self, name, val, desc='', tags=None):
         """
@@ -178,6 +182,7 @@ class IndepVarComp(ExplicitComponent):
 
         kwargs = {'desc': desc, 'tags': tags}
         self._indep_external_discrete.append((name, val, kwargs))
+        super(IndepVarComp, self).add_discrete_output(name, val, **kwargs)
 
     def _linearize(self, jac=None, sub_do_ln=False):
         """
