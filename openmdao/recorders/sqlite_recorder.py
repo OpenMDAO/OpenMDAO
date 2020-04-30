@@ -29,6 +29,9 @@ from openmdao.solvers.solver import Solver
 """
 SQL case database version history.
 ----------------------------------
+9 -- OpenMDAO 3.0
+     Changed the character to split the derivatives from 'of,wrt' to 'of!wrt' to allow for commas
+     in variable names
 8 -- OpenMDAO 3.0
      Added inputs, outputs, and residuals fields to problem_cases table. Added
      outputs and residuals fields to driver_iterations table
@@ -47,7 +50,7 @@ SQL case database version history.
 1 -- Through OpenMDAO 2.3
      Original implementation.
 """
-format_version = 8
+format_version = 9
 
 
 def array_to_blob(array):
