@@ -3,9 +3,9 @@
 
 May 01, 2020
 
-OpenMDAO 3.1.0 is a periodic release of OpenMDAO.  
+OpenMDAO 3.1.0 is a periodic release of OpenMDAO.
 This release features more uniformity in recording options of Problem, Driver, System, and Solver.
-It adds more capability to the Problem recorder for when users only which to record the final state of the model rather than iteration-by-iteration.
+It adds more capability to the Problem recorder for when users only wish to record the final state of the model rather than iteration-by-iteration.
 There have been numerous updates relating to the N2 viewer and distributed components.
 
 ## Backwards Incompatible API Changes:
