@@ -77,6 +77,7 @@ body {
     left: -3px;
     visibility: visible;
     border: 3px dashed #98daba;
+    pointer-events: initial;
 }
 
 .hidden-resizer-box {
