@@ -9,7 +9,7 @@ that a recorder can be attached to. We will then show how to extract various dat
 relate that back to an XDSM for illustrative purposes.
 
 .. embed-code::
-    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureAdvancedExample.setUp
+    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureAdvancedExample.setUpClass
     :layout: interleave
 
 The following XDSM diagram shows the SellarMDA component equations and their inputs and outputs. Through

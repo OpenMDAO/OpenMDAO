@@ -2888,7 +2888,8 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
 class TestFeatureAdvancedExample(unittest.TestCase):
 
-    def setUp(self):
+    @classmethod
+    def setUpClass(cls):
         import openmdao.api as om
         from openmdao.test_suite.components.sellar_feature import SellarMDAWithUnits
         import numpy as np
@@ -2927,12 +2928,12 @@ class TestFeatureAdvancedExample(unittest.TestCase):
         prob.set_solver_print(0)
         prob.run_driver()
         prob.record("final_state")
-
-        # Instantiate your CaseReader
-        self.cr = om.CaseReader("cases.sql")
+        prob.cleanup()
 
     def test_feature_system_recorder(self):
-        cr = self.cr
+        # Instantiate your CaseReader
+        cr = om.CaseReader("cases.sql")
+
         system_cases = cr.list_cases('root.obj_cmp')
 
         # Number of cases in the optimization
@@ -2947,8 +2948,13 @@ class TestFeatureAdvancedExample(unittest.TestCase):
             case = cr.get_case(system_cases[i])
             print(case['y1'])
 
+    def setUp(self):
+        import openmdao.api as om
+
     def test_feature_solver_recorder(self):
-        cr = self.cr
+        # Instantiate your CaseReader
+        cr = om.CaseReader("cases.sql")
+
         solver_cases = cr.list_cases('root.cycle')
 
         num_cases = len(solver_cases)
@@ -2959,7 +2965,9 @@ class TestFeatureAdvancedExample(unittest.TestCase):
         assert_near_equal(case['y2'], 4.28622419, 1e-8)
 
     def test_feature_driver_recorder(self):
-        cr = self.cr
+        # Instantiate your CaseReader
+        cr = om.CaseReader("cases.sql")
+
         driver_cases = cr.list_cases('driver')
 
         last_case = cr.get_case(driver_cases[-1])
@@ -2977,7 +2985,9 @@ class TestFeatureAdvancedExample(unittest.TestCase):
 
 
     def test_feature_problem_recorder(self):
-        cr = self.cr
+        # Instantiate your CaseReader
+        cr = om.CaseReader("cases.sql")
+
         # get list of cases recorded on problem
         problem_cases = cr.list_cases('problem')
         print("Name(s) of recorder cases:", problem_cases)
@@ -3000,7 +3010,8 @@ class TestFeatureAdvancedExample(unittest.TestCase):
         import matplotlib.pyplot as plt
         import numpy as np
 
-        cr = self.cr
+        # Instantiate your CaseReader
+        cr = om.CaseReader("cases.sql")
         driver_cases = cr.list_cases('driver')
 
         dv_x_values = []
