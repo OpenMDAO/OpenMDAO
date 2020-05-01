@@ -41,4 +41,11 @@ Working with Analytic Derivatives
         derivs/partial_derivs_implicit.rst
         derivs/derivs_of_coupled_systems.rst
 
+--------------------------
+Recording and Reading Data
+--------------------------
 
+.. toctree::
+    :maxdepth: 1
+
+    advanced_case_recording.rst

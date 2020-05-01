@@ -1,8 +1,8 @@
 .. _reading_case_data:
 
-*****************************************
-Accessing Recorded Data from Case Objects
-*****************************************
+************************
+Getting Data from a Case
+************************
 
 The :class:`Case<openmdao.recorders.case.Case>` object contains all the information about a specific Case recording whether it was recorded by
 a problem, driver, system, or solver. :code:`Case` objects have a number methods for accessing variables and their values.
