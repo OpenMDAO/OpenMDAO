@@ -2452,7 +2452,16 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         assert_near_equal(const_K, 273.15, 1e-3)
 
         # list_outputs will list your model's outputs and return a list of them too
-        print(case.list_outputs())
+        outputs = case.list_outputs()
+        self.assertEqual(sorted(outputs), [
+                        ('con_cmp2.con2', {'value': array([-20.24472223])}),
+                        ('cycle.d1.y1', {'value': array([3.16])}),
+                        ('cycle.d2.y2', {'value': array([3.75527777])}),
+                        ('indeps.z', {'value': array([1.97763888e+00, 1.25035459e-15])}),
+                        ('indeps.x', {'value': array([0.])}),
+                        ('obj_cmp.obj', {'value': array([3.18339395])}),
+                        ('con_cmp1.con1', {'value': array([-1.68550507e-10])})
+        ])
 
         # This code below will find all the objectives, design variables, and constraints that the
         # problem source contains
@@ -2931,6 +2940,8 @@ class TestFeatureAdvancedExample(unittest.TestCase):
         prob.cleanup()
 
     def test_feature_system_recorder(self):
+        import openmdao.api as om
+
         # Instantiate your CaseReader
         cr = om.CaseReader("cases.sql")
 
@@ -2948,10 +2959,9 @@ class TestFeatureAdvancedExample(unittest.TestCase):
             case = cr.get_case(system_cases[i])
             print(case['y1'])
 
-    def setUp(self):
+    def test_feature_solver_recorder(self):
         import openmdao.api as om
 
-    def test_feature_solver_recorder(self):
         # Instantiate your CaseReader
         cr = om.CaseReader("cases.sql")
 
@@ -2965,6 +2975,8 @@ class TestFeatureAdvancedExample(unittest.TestCase):
         assert_near_equal(case['y2'], 4.28622419, 1e-8)
 
     def test_feature_driver_recorder(self):
+        import openmdao.api as om
+
         # Instantiate your CaseReader
         cr = om.CaseReader("cases.sql")
 
@@ -2985,12 +2997,14 @@ class TestFeatureAdvancedExample(unittest.TestCase):
 
 
     def test_feature_problem_recorder(self):
+        import openmdao.api as om
+
         # Instantiate your CaseReader
         cr = om.CaseReader("cases.sql")
 
         # get list of cases recorded on problem
         problem_cases = cr.list_cases('problem')
-        print("Name(s) of recorder cases:", problem_cases)
+        self.assertEqual(problem_cases, ['final_state'])
 
         # get list of output variables recorded on problem
         problem_vars = cr.list_source_vars('problem')
@@ -3009,6 +3023,7 @@ class TestFeatureAdvancedExample(unittest.TestCase):
     def test_feature_plot_des_vars(self):
         import matplotlib.pyplot as plt
         import numpy as np
+        import openmdao.api as om
 
         # Instantiate your CaseReader
         cr = om.CaseReader("cases.sql")
