@@ -33,8 +33,6 @@ class AddSubtractComp(ExplicitComponent):
     ----------
     _equations : list
         List of equation systems to be initialized with the system.
-    _has_initial_equation : bool
-        True if the component is instantiated with an equation, else False.
     _input_names : dict
         Dictionary of input names and key associated options for inputs so that a given
         input name can be used in multiple equations.
@@ -76,13 +74,12 @@ class AddSubtractComp(ExplicitComponent):
         # Add systems is used to store those systems provided upon initialization
         self._equations = []
 
-        self._has_initial_equation = False
+        # Input names will store the names of inputs and their key properties which must be
+        # the same across all equations in which they are used.
         self._input_names = {}
 
         if isinstance(output_name, str):
-            self._has_initial_equation = True
-            self._equations.append((output_name, input_names, vec_size, length, val,
-                                    scaling_factors, kwargs))
+            self.add_equation(output_name, input_names, vec_size, length, val, scaling_factors, kwargs)
         elif isinstance(output_name, collections.Iterable):
             raise NotImplementedError(self.msginfo + ': Declaring multiple addition systems '
                                       'on initiation is not implemented.'
@@ -105,14 +102,6 @@ class AddSubtractComp(ExplicitComponent):
         """
         self.options.declare('complex', types=bool, default=False,
                              desc="Allocate as complex (e.g. for complex-step verification)")
-
-    def setup(self):
-        """
-        Declare inputs, outputs, and derivatives for the add_subtract component.
-        """
-        if self._has_initial_equation:
-            op_name, ip_names, vec_size, length, val, scaling_factors, kwargs = self._equations[0]
-            self.add_equation(op_name, ip_names, vec_size, length, val, append=False, **kwargs)
 
     def add_equation(self, output_name, input_names, vec_size=1, length=1, val=1.0,
                      units=None, res_units=None, desc='', lower=None, upper=None, ref=1.0,
