@@ -31,8 +31,13 @@ class AddSubtractComp(ExplicitComponent):
 
     Attributes
     ----------
-    _add_systems : list
+    _equations : list
         List of equation systems to be initialized with the system.
+    _has_initial_equation : bool
+        True if the component is instantiated with an equation, else False.
+    _input_names : dict
+        Dictionary of input names and key associated options for inputs so that a given
+        input name can be used in multiple equations.
     """
 
     def __init__(self, output_name=None, input_names=None, vec_size=1, length=1,
@@ -68,11 +73,16 @@ class AddSubtractComp(ExplicitComponent):
         """
         super(AddSubtractComp, self).__init__()
 
-        self._add_systems = []
+        # Add systems is used to store those systems provided upon initialization
+        self._equations = []
+
+        self._has_initial_equation = False
+        self._input_names = {}
 
         if isinstance(output_name, str):
-            self._add_systems.append((output_name, input_names, vec_size, length, val,
-                                      scaling_factors, kwargs))
+            self._has_initial_equation = True
+            self._equations.append((output_name, input_names, vec_size, length, val,
+                                    scaling_factors, kwargs))
         elif isinstance(output_name, collections.Iterable):
             raise NotImplementedError(self.msginfo + ': Declaring multiple addition systems '
                                       'on initiation is not implemented.'
@@ -96,9 +106,17 @@ class AddSubtractComp(ExplicitComponent):
         self.options.declare('complex', types=bool, default=False,
                              desc="Allocate as complex (e.g. for complex-step verification)")
 
+    def setup(self):
+        """
+        Declare inputs, outputs, and derivatives for the add_subtract component.
+        """
+        if self._has_initial_equation:
+            op_name, ip_names, vec_size, length, val, scaling_factors, kwargs = self._equations[0]
+            self.add_equation(op_name, ip_names, vec_size, length, val, append=False, **kwargs)
+
     def add_equation(self, output_name, input_names, vec_size=1, length=1, val=1.0,
                      units=None, res_units=None, desc='', lower=None, upper=None, ref=1.0,
-                     ref0=0.0, res_ref=None, scaling_factors=None):
+                     ref0=0.0, res_ref=None, scaling_factors=None, append=True):
         """
         Add an addition/subtraction relation.
 
@@ -113,7 +131,7 @@ class AddSubtractComp(ExplicitComponent):
             (i.e number of rows, or vector length for a 1D vector)
             Default is 1
         length : int
-            Length of the second dimension of the input and ouptut vectors (i.e. number of columns)
+            Length of the second dimension of the input and output vectors (i.e. number of columns)
             Default is 1 which results in input/output vectors of size (vec_size,)
         scaling_factors : iterable of numeric
             Scaling factors to apply to each input.
@@ -150,12 +168,60 @@ class AddSubtractComp(ExplicitComponent):
         res_ref : float or ndarray
             Scaling parameter. The value in the user-defined res_units of this output's residual
             when the scaled value is 1. Default is 1.
+        append : bool
+            If True, add the given equation to the list.  If False, add the appropriate I/O but
+            do not append the given equation to the internal list.
         """
         kwargs = {'units': units, 'res_units': res_units, 'desc': desc,
                   'lower': lower, 'upper': upper, 'ref': ref, 'ref0': ref0,
                   'res_ref': res_ref}
-        self._add_systems.append((output_name, input_names, vec_size, length, val,
-                                  scaling_factors, kwargs))
+
+        if isinstance(input_names, str):
+            input_names = input_names
+
+        if scaling_factors is None:
+            scaling_factors = np.ones(len(input_names))
+        elif len(scaling_factors) != len(input_names):
+            raise ValueError(self.msginfo + ': Scaling factors list needs to be same length '
+                             'as input names')
+
+        if length == 1:
+            shape = (vec_size,)
+        else:
+            shape = (vec_size, length)
+
+        super(AddSubtractComp, self).add_output(output_name, val, shape=shape, **kwargs)
+
+        if append:
+            self._equations.append((output_name, input_names, vec_size, length, val,
+                                    scaling_factors, kwargs))
+
+        for i, input_name in enumerate(input_names):
+            if input_name not in self._input_names:
+                self.add_input(input_name, shape=shape, units=units,
+                               desc=desc + '_inp_' + input_name)
+                sf = scaling_factors[i]
+                self.declare_partials([output_name], [input_name],
+                                      val=sf * sp.eye(vec_size * length, format='csc'))
+                self._input_names[input_name] = {'vec_size': vec_size, 'length': length,
+                                                 'units': units}
+            else:
+                # Verify that the input is consistent with that added for a previous equation
+                prev_vec_size = self._input_names[input_name]['vec_size']
+                prev_length = self._input_names[input_name]['length']
+                prev_units = self._input_names[input_name]['units']
+                if vec_size != prev_vec_size:
+                    raise ValueError(self.msginfo + f': Input {input_name} was added in a previous '
+                                                    f'equation but had a different vec_size '
+                                                    f'({prev_vec_size} vs. {vec_size}.')
+                if length != prev_length:
+                    raise ValueError(self.msginfo + f': Input {input_name} was added in a previous '
+                                                    f'equation but had a different length '
+                                                    f'({prev_length} vs. {length}.')
+                if units != prev_units:
+                    raise ValueError(self.msginfo + f': Input {input_name} was added in a previous '
+                                                    f'equation but had different units '
+                                                    f'({prev_units} vs. {units}.')
 
     def add_output(self):
         """
@@ -163,45 +229,6 @@ class AddSubtractComp(ExplicitComponent):
         """
         raise NotImplementedError(self.msginfo + ': Use add_equation method, not add_output '
                                   'method to create an addition/subtraction relation')
-
-    def _post_configure(self):
-        """
-        Set up the addition/subtraction system at run time.
-        """
-        # set static mode to False because we are doing things that would normally be done in setup
-        self._static_mode = False
-
-        for (output_name, input_names, vec_size, length, val,
-             scaling_factors, kwargs) in self._add_systems:
-            if isinstance(input_names, str):
-                input_names = [input_names]
-
-            units = kwargs['units']
-            desc = kwargs['desc']
-
-            if scaling_factors is None:
-                scaling_factors = np.ones(len(input_names))
-
-            if len(scaling_factors) != len(input_names):
-                raise ValueError(self.msginfo + ': Scaling factors list needs to be same length '
-                                 'as input names')
-            if length == 1:
-                shape = (vec_size,)
-            else:
-                shape = (vec_size, length)
-
-            super(AddSubtractComp, self).add_output(output_name, val, shape=shape, **kwargs)
-
-            for i, input_name in enumerate(input_names):
-                self.add_input(input_name, shape=shape, units=units,
-                               desc=desc + '_inp_' + input_name)
-                sf = scaling_factors[i]
-                self.declare_partials([output_name], [input_name],
-                                      val=sf * sp.eye(vec_size * length, format='csc'))
-
-        self._static_mode = True
-
-        super(AddSubtractComp, self)._post_configure()
 
     def compute(self, inputs, outputs):
         """
@@ -216,7 +243,7 @@ class AddSubtractComp(ExplicitComponent):
         """
         complexify = self.options['complex']
         for (output_name, input_names, vec_size, length, val, scaling_factors,
-             kwargs) in self._add_systems:
+             kwargs) in self._equations:
             if isinstance(input_names, str):
                 input_names = [input_names]
 
