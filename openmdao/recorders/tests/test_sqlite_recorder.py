@@ -2452,16 +2452,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         assert_near_equal(const_K, 273.15, 1e-3)
 
         # list_outputs will list your model's outputs and return a list of them too
-        outputs = case.list_outputs()
-        self.assertEqual(sorted(outputs), [
-                        ('con_cmp2.con2', {'value': array([-20.24472223])}),
-                        ('cycle.d1.y1', {'value': array([3.16])}),
-                        ('cycle.d2.y2', {'value': array([3.75527777])}),
-                        ('indeps.z', {'value': array([1.97763888e+00, 1.25035459e-15])}),
-                        ('indeps.x', {'value': array([0.])}),
-                        ('obj_cmp.obj', {'value': array([3.18339395])}),
-                        ('con_cmp1.con1', {'value': array([-1.68550507e-10])})
-        ])
+        print(case.list_outputs())
 
         # This code below will find all the objectives, design variables, and constraints that the
         # problem source contains
