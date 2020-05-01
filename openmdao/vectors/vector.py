@@ -341,7 +341,7 @@ class Vector(object):
             else:
                 return self._views[abs_name][:, self._icol]
         else:
-            raise KeyError('Variable name "{}" not found.'.format(name))
+            raise KeyError(f"{self._system().msginfo}: Variable name '{name}' not found.")
 
     def __setitem__(self, name, value):
         """
@@ -354,30 +354,7 @@ class Vector(object):
         value : float or list or tuple or ndarray
             variable value to set
         """
-        abs_name = self.name2abs_name(name)
-        if abs_name is not None:
-            if self.read_only:
-                msg = "Attempt to set value of '{}' in {} vector when it is read only."
-                raise ValueError(msg.format(name, self._kind))
-
-            if self._icol is None:
-                slc = _full_slice
-                oldval = self._views[abs_name]
-            else:
-                slc = (_full_slice, self._icol)
-                oldval = self._views[abs_name][slc]
-
-            value = np.asarray(value)
-            if value.shape != () and value.shape != (1,) and oldval.shape != value.shape:
-                raise ValueError("Incompatible shape for '%s': "
-                                 "Expected %s but got %s." %
-                                 (name, oldval.shape, value.shape))
-
-            self._views[abs_name][slc] = value
-
-        else:
-            msg = 'Variable name "{}" not found.'
-            raise KeyError(msg.format(name))
+        self.set_var(name, value)
 
     def _initialize_data(self, root_vector):
         """
@@ -504,19 +481,57 @@ class Vector(object):
 
     def set_val(self, val, idxs=_full_slice):
         """
-        Set the value of this vector to a constant scalar value.
+        Set the data array of this vector to a scalar or array value, with optional indices.
 
         Must be implemented by the subclass.
 
         Parameters
         ----------
-        val : int or float
-            scalar to set self to.
+        val : float or ndarray
+            scalar or array to set data array to.
         idxs : int or slice or tuple of ints and/or slices.
             The locations where the data array should be updated.
         """
-        raise NotImplementedError('set_val not defined for vector type %s' %
+        raise NotImplementedError('set_arr not defined for vector type %s' %
                                   type(self).__name__)
+
+    def set_var(self, name, val, idxs=_full_slice):
+        """
+        Set the array view corresponding to the named variable, with optional indexing.
+
+        Parameters
+        ----------
+        name : str
+            The name of the variable.
+        val : float or ndarray
+            Scalar or array to set data array to.
+        idxs : int or slice or tuple of ints and/or slices.
+            The locations where the data array should be updated.
+        """
+        abs_name = self.name2abs_name(name)
+        if abs_name is None:
+            raise KeyError(f"{self._system().msginfo}: Variable name '{name}' not found.")
+
+        if self.read_only:
+            raise ValueError(f"{self._system().msginfo}: Attempt to set value of '{name}' in "
+                             f"{self._kind} vector when it is read only.")
+
+        if self._icol is None:
+            oldval = self._views[abs_name][idxs]
+        else:
+            idxs = (idxs, self._icol)
+            oldval = self._views[abs_name][idxs]
+
+        value = np.asarray(val)
+        if value.shape != () and value.shape != (1,) and oldval.shape != value.shape:
+            raise ValueError(f"{self._system().msginfo}: Incompatible shape for '{name}': "
+                             f"Expected {oldval.shape} but got {value.shape}.")
+
+        try:
+            self._views[abs_name][idxs] = value
+        except Exception as err:
+            raise ValueError(f"{self._system().msginfo}: Failed to set value of "
+                             f"'{name}': {str(err)}.")
 
     def dot(self, vec):
         """

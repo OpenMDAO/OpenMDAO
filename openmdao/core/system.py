@@ -732,8 +732,6 @@ class System(object):
         if self._coloring_info['dynamic'] or self._coloring_info['static'] is not None:
             self._coloring_info['coloring'] = None
 
-        auto_ivc = None
-
         # 1. Full setup that must be called in the root system.
         if setup_mode == 'full':
             recurse = True
@@ -741,16 +739,18 @@ class System(object):
             self.pathname = ''
             self.comm = comm
             self._relevant = None
-
             try:
                 # this is a full setup, so get rid of any existing auto_ivc
-                del self.auto_ivc
+                ivc = self.auto_ivc
             except AttributeError:
                 pass
-
-            from openmdao.core.indepvarcomp import IndepVarComp
-            # create the IndepVarComp that will contain all auto-ivc outputs
-            # auto_ivc = self.add_subsystem('auto_ivc', IndepVarComp())
+            else:
+                self._subsystems_allprocs.remove(ivc)
+                del self.auto_ivc
+                to_remove = [t for t, (s, _, _) in self._manual_connections.items()
+                             if s.startswith('auto_ivc.')]
+                for t in to_remove:
+                    del self._manual_connections[t]
 
         # 2. Partial setup called in the system initiating the reconfiguration.
         elif setup_mode == 'reconf':
@@ -781,36 +781,17 @@ class System(object):
         self._setup_global_connections(recurse=recurse)
 
         if self.pathname == '':
-            # if auto_ivc is not None:
-            #     self._setup_auto_ivcs()
-            self._setup_vec_names(mode)
+            from openmdao.core.group import Group
+            if isinstance(self, Group):
+                self._problem_meta['connections'] = self._conn_global_abs_in2out
+                if setup_mode == 'full':
+                    self._setup_auto_ivcs(mode)
+        self._setup_vec_names(mode)
 
         self._setup_relevance(mode, self._relevant)
         self._setup_var_index_ranges(recurse=recurse)
         self._setup_var_sizes(recurse=recurse)
         self._setup_connections(recurse=recurse)
-
-    def _setup_auto_ivcs(self):
-        abs2prom = self._var_allprocs_abs2prom['input']
-        abs2meta = self._var_allprocs_abs2meta
-        abs_names = self._var_allprocs_abs_names['input']
-        conns = self._conn_global_abs_in2out
-        prom2ivc = {}
-        auto_ivc = self.auto_ivc
-        count = 0
-        for abs_in in abs_names:
-            if abs_in not in conns:
-                prom = abs2prom[abs_in]
-                if prom in prom2ivc:
-                    # connected inputs w/o a src. Connect them to the same IVC
-                    conns[abs_in] = prom2ivc[prom]
-                else:
-                    ivc_name = f"auto_ivc.v{count}"
-                    count += 1
-                    prom2ivc[prom] = ivc_name
-                    conns[abs_in] = ivc_name
-                    auto_ivc.add_output(ivc_name.rsplit('.', 1)[-1],
-                                        val=np.ones(abs2meta[abs_in]['shape']))
 
     def _post_configure(self):
         """
@@ -1563,11 +1544,10 @@ class System(object):
                         raise RuntimeError("%s: Global size of output '%s' (%s) does not agree "
                                            "with local shape %s" % (self.msginfo, abs_name,
                                                                     global_size, local_shape))
-                    global_shape = tuple([dim1] + list(high_dims))
+                    mymeta['global_shape'] = tuple([dim1] + list(high_dims))
                 else:
                     high_size = 1
-                    global_shape = (global_size,)
-                mymeta['global_shape'] = global_shape
+                    mymeta['global_shape'] = (global_size,)
 
     def _setup_global_connections(self, recurse=True, conns=None):
         """
@@ -3006,12 +2986,19 @@ class System(object):
             recurse=True, its subsystems.
 
         """
-        pro2abs = self._var_allprocs_prom2abs_list['output']
+        pro2abs_out = self._var_allprocs_prom2abs_list['output']
+        pro2abs_in = self._var_allprocs_prom2abs_list['input']
+        conns = self._problem_meta.get('connections', {})
 
         # Human readable error message during Driver setup.
+        out = OrderedDict()
         try:
-            out = OrderedDict((pro2abs[name][0], data) for name, data in
-                              self._design_vars.items())
+            for name, data in self._design_vars.items():
+                if name in pro2abs_out:
+                    out[pro2abs_out[name][0]] = data
+                else:  # assume an input name else KeyError
+                    in_abs = pro2abs_in[name][0]
+                    out[conns[in_abs]] = data  # use connected output name
         except KeyError as err:
             msg = "{}: Output not found for design variable {}."
             raise RuntimeError(msg.format(self.msginfo, str(err)))
@@ -3020,12 +3007,12 @@ class System(object):
             # Size them all
             sizes = self._var_sizes['nonlinear']['output']
             abs2idx = self._var_allprocs_abs2idx['nonlinear']
-            for name in out:
-                if 'size' not in out[name]:
+            for name, meta in out.items():
+                if 'size' not in meta:
                     if name in abs2idx:
-                        out[name]['size'] = sizes[self._owning_rank[name], abs2idx[name]]
+                        meta['size'] = sizes[self._owning_rank[name], abs2idx[name]]
                     else:
-                        out[name]['size'] = 0  # discrete var, don't know size
+                        meta['size'] = 0  # discrete var, don't know size
 
         if recurse:
             for subsys in self._subsystems_myproc:
@@ -3216,7 +3203,8 @@ class System(object):
         """
         if self._inputs is None:
             # final setup has not been performed
-            if hasattr(self, '_loc_subsys_map'):  # i.e. is a Group
+            from openmdao.core.group import Group
+            if isinstance(self, Group):
                 raise RuntimeError("{}: Unable to list inputs on a Group until model has "
                                    "been run.".format(self.msginfo))
 
@@ -3325,6 +3313,7 @@ class System(object):
                      includes=None,
                      excludes=None,
                      all_procs=False,
+                     list_autoivcs=False,
                      out_stream=_DEFAULT_OUT_STREAM):
         """
         Return and optionally log a list of output names and other optional information.
@@ -3382,6 +3371,8 @@ class System(object):
             excludes nothing.
         all_procs : bool, optional
             When True, display output on all processors. Default is False.
+        list_autoivcs : bool
+            If True, include auto_ivc outputs in the listing.  Defaults to False.
         out_stream : file-like
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
@@ -3408,6 +3399,8 @@ class System(object):
             # Only gathering up values and metadata from this proc, if MPI
             meta = self._var_abs2meta
             var_names = self._outputs._views.keys()
+            if not list_autoivcs:
+                var_names = [v for v in var_names if not v.startswith('auto_ivc.')]
             abs2prom = self._var_abs2prom['output']
 
         allprocs_meta = self._var_allprocs_abs2meta
@@ -4173,7 +4166,7 @@ class System(object):
         return val
 
     def _get_val(self, name, units=None, indices=None, get_remote=False, rank=None,
-                 vec_name='nonlinear', kind=None, flat=False):
+                 vec_name='nonlinear', kind=None, flat=False, from_src=True):
         """
         Get an output/input/residual variable.
 
@@ -4200,24 +4193,70 @@ class System(object):
             will be either an input or output.
         flat : bool
             If True, return the flattened version of the value.
+        from_src : bool
+            If True, retrieve value of an input variable from its connected source.
 
         Returns
         -------
         object
             The value of the requested output/input variable.
         """
-        abs_name, typ = name2abs_name(self, name)
+        abs_name, typ = name2abs_name(self, name, check_unique=False)
         if abs_name is None:
             raise KeyError('{}: Variable "{}" not found.'.format(self.msginfo, name))
 
-        val = self._abs_get_val(abs_name, get_remote, rank, vec_name, kind, flat)
+        conns = self._problem_meta['connections']
+        if from_src and abs_name in conns:
+            if abs_name in self._var_abs2meta:
+                vmeta = self._var_abs2meta[abs_name]
+                src_indices = vmeta['src_indices']
+            else:
+                vmeta = self._var_allprocs_abs2meta[abs_name]
+                src_indices = None  # FIXME: remote var could have src_indices
+            src = conns[abs_name]
+            smeta = self._var_allprocs_abs2meta[src]
+            val = self._abs_get_val(src, get_remote, rank, vec_name, kind, flat)
+            if src_indices is not None:
+                if src.startswith('auto_ivc.'):
+                    raise RuntimeError(f"{self.msginfo}: Unconnected input '{name}' cannot "
+                                       "specify src_indices.")
+                val = val.ravel()[src_indices]
+                if get_remote:
+                    if rank is None and vmeta['distributed']:
+                        parts = self.comm.allgather(val)
+                        parts = [p for p in parts if p.size > 0]
+                        val = np.hstack(parts)
+                    elif vmeta['distributed']:
+                        parts = self.comm.gather(val, root=rank)
+                        if rank == self.comm.rank:
+                            parts = [p for p in parts if p.size > 0]
+                            val = np.hstack(parts)
+                        else:
+                            val = None
+                if vmeta['distributed']:
+                    val.shape = self._var_allprocs_abs2meta[abs_name]['global_shape']
+                else:
+                    val.shape = vmeta['shape']
 
-        # TODO: get indexed value BEFORE transferring the variable (might be much smaller)
-        if indices is not None:
-            val = val[indices]
+            # TODO: get indexed value BEFORE transferring the variable (might be much smaller)
+            if indices is not None:
+                val = val[indices]
 
-        if units is not None:
-            val = self.convert2units(abs_name, val, units)
+            if units is not None:
+                if smeta['units'] is not None:
+                    val = self.convert2units(src, val, units)
+                val = self.convert2units(abs_name, val, units)
+            elif vmeta['units'] is not None and smeta['units'] is not None:
+                val = self.convert2units(src, val, vmeta['units'])
+        else:
+            val = self._abs_get_val(abs_name, get_remote, rank, vec_name, kind, flat)
+
+            # TODO: get indexed value BEFORE transferring the variable (might be much smaller)
+            if indices is not None:
+                val = val[indices]
+
+            if units is not None:
+                val = self.convert2units(abs_name, val, units)
 
         return val
 
@@ -4284,7 +4323,8 @@ class System(object):
                                 vdict[name] = discrete_vec[name[offset:]]['value']
                     else:
                         vdict[name] = self._get_val(name, get_remote=True, rank=0,
-                                                    vec_name=vec_name, kind=kind)
+                                                    vec_name=vec_name, kind=kind,
+                                                    from_src=False)
 
         return vdict
 
@@ -4306,9 +4346,7 @@ class System(object):
         float or ndarray of float
             The value converted to the specified units.
         """
-        meta = self._get_var_meta(name)
-
-        base_units = meta['units']
+        base_units = self._get_var_meta(name)['units']
 
         if base_units is None:
             msg = "{}: Can't express variable '{}' with units of 'None' in units of '{}'."
@@ -4322,6 +4360,38 @@ class System(object):
 
         return (val + offset) * scale
 
+    def convert_from_units(self, name, val, units):
+        """
+        Convert the given value from the specified units to those of the named variable.
+
+        Parameters
+        ----------
+        name : str
+            Name of the variable.
+        val : float or ndarray of float
+            The value of the variable.
+        units : str
+            The units to convert to.
+
+        Returns
+        -------
+        float or ndarray of float
+            The value converted to the specified units.
+        """
+        base_units = self._get_var_meta(name)['units']
+
+        if base_units is None:
+            msg = "{}: Can't set variable '{}' with units 'None' to value with units '{}'."
+            raise TypeError(msg.format(self.msginfo, name, units))
+
+        try:
+            scale, offset = unit_conversion(units, base_units)
+        except TypeError:
+            msg = "{}: Can't set variable '{}' with units '{}' to value with units '{}'."
+            raise TypeError(msg.format(self.msginfo, name, base_units, units))
+
+        return (val + offset) * scale
+
     def _get_var_meta(self, name):
         """
         Get the metadata for a variable.
@@ -4329,7 +4399,7 @@ class System(object):
         Parameters
         ----------
         name : str
-            Promoted or relative variable name in the root system's namespace.
+            Variable name (promoted, relative, or absolute) in the root system's namespace.
 
         Returns
         -------

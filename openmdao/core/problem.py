@@ -5,7 +5,7 @@ import pprint
 import os
 import logging
 
-from collections import defaultdict, namedtuple
+from collections import defaultdict, namedtuple, OrderedDict
 from fnmatch import fnmatchcase
 from itertools import product
 
@@ -28,7 +28,6 @@ from openmdao.recorders.recording_iteration_stack import _RecIteration
 from openmdao.recorders.recording_manager import RecordingManager, record_viewer_data
 from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.general_utils import ContainsAll, pad_name, simple_warning, warn_deprecation
-
 from openmdao.utils.mpi import FakeComm
 from openmdao.utils.mpi import MPI
 from openmdao.utils.name_maps import prom_name2abs_name
@@ -36,11 +35,11 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import unit_conversion
 from openmdao.utils import coloring as coloring_mod
 from openmdao.utils.name_maps import abs_key2rel_key
-from openmdao.vectors.vector import INT_DTYPE
+from openmdao.vectors.vector import _full_slice, INT_DTYPE
 from openmdao.vectors.default_vector import DefaultVector
 from openmdao.utils.logger_utils import get_logger, TestLogger
-import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.hooks import _setup_hooks
+import openmdao.utils.coloring as coloring_mod
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -168,7 +167,7 @@ class Problem(object):
 
         self._mode = None  # mode is assigned in setup()
 
-        self._initial_condition_cache = {}
+        self._initial_condition_cache = OrderedDict()
 
         # Status of the setup of _model.
         # 0 -- Newly initialized problem or newly added model.
@@ -296,30 +295,18 @@ class Problem(object):
             proms = self.model._var_allprocs_prom2abs_list
             meta = self.model._var_abs2meta
             if name in meta:
-                if isinstance(self.model, Group) and name in self.model._conn_abs_in2out:
-                    src_name = self.model._conn_abs_in2out[name]
-                    val = meta[src_name]['value']
-                else:
-                    val = meta[name]['value']
-
+                val = meta[name]['value']
             elif name in proms['output']:
                 abs_name = prom_name2abs_name(self.model, name, 'output')
                 if abs_name in meta:
-                    val = meta[abs_name]['value']
+                    val = meta[abs_name]['value']  # output is local
 
             elif name in proms['input']:
                 abs_name = proms['input'][name][0]
                 conn = self.model._conn_abs_in2out
-                if abs_name in meta:
+                if abs_name in meta:  # input is local
                     if isinstance(self.model, Group) and abs_name in conn:
                         src_name = self.model._conn_abs_in2out[abs_name]
-                        # So, if the inputs and outputs are promoted to the same name, then we
-                        # allow getitem, but if they aren't, then we raise an error due to non
-                        # uniqueness.
-                        if name not in proms['output']:
-                            # This triggers a check for unconnected non-unique inputs, and
-                            # raises the same error as vector access.
-                            abs_name = prom_name2abs_name(self.model, name, 'input')
                         val = meta[src_name]['value']
                     else:
                         # This triggers a check for unconnected non-unique inputs, and
@@ -333,7 +320,7 @@ class Problem(object):
                 # Need to cache the "get" in case the user calls in-place numpy operations.
                 self._initial_condition_cache[name] = val
 
-        return val
+            return val
 
     def _get_recording_iter(self):
         return self._metadata['recording_iter']
@@ -411,34 +398,7 @@ class Problem(object):
         value : float or ndarray or any python object
             value to set this variable to.
         """
-        # Caching only needed if vectors aren't allocated yet.
-        if self._setup_status == 1:
-            self._initial_condition_cache[name] = value
-        else:
-            all_proms = self.model._var_allprocs_prom2abs_list
-
-            if name in all_proms['output']:
-                abs_name = all_proms['output'][name][0]
-            elif name in all_proms['input']:
-                abs_name = prom_name2abs_name(self.model, name, 'input')
-            else:
-                abs_name = name
-
-            if abs_name in self.model._outputs._views:
-                self.model._outputs[abs_name] = value
-            elif abs_name in self.model._inputs._views:
-                self.model._inputs[abs_name] = value
-            elif abs_name in self.model._discrete_outputs:
-                self.model._discrete_outputs[abs_name] = value
-            elif abs_name in self.model._discrete_inputs:
-                self.model._discrete_inputs[abs_name] = value
-            else:
-                # might be a remote var.  If so, just do nothing on this proc
-                if abs_name in self.model._var_allprocs_abs2meta:
-                    print("Variable '{}' is remote on rank {}.  "
-                          "Local assignment ignored.".format(name, self.comm.rank))
-                else:
-                    raise KeyError('{}: Variable "{}" not found.'.format(self.model.msginfo, name))
+        self.set_val(name, value)
 
     def set_val(self, name, value, units=None, indices=None):
         """
@@ -457,35 +417,96 @@ class Problem(object):
         indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
             Indices or slice to set to specified value.
         """
-        if units is not None:
-            base_units = self.model._get_var_meta(name)['units']
-
-            if base_units is None:
-                msg = "{}: Can't set variable '{}' with units 'None' to value with units '{}'."
-                raise TypeError(msg.format(self.msginfo, name, units))
-
-            try:
-                scale, offset = unit_conversion(units, base_units)
-            except TypeError:
-                msg = "{}: Can't set variable '{}' with units '{}' to value with units '{}'."
-                raise TypeError(msg.format(self.msginfo, name, base_units, units))
-
-            value = (value + offset) * scale
-
-        if indices is not None:
-            self[name][indices] = value
+        conns = self._metadata['connections']
+        all_proms = self.model._var_allprocs_prom2abs_list
+        all_meta = self.model._var_allprocs_abs2meta
+        if name in all_proms['output']:
+            abs_name = all_proms['output'][name][0]
+        elif name in all_proms['input']:
+            abs_name = all_proms['input'][name][0]
         else:
-            self[name] = value
+            abs_name = name
+
+        if abs_name in conns:
+            src = conns[abs_name]
+            tmeta = self.model._var_allprocs_abs2meta[abs_name]
+            if abs_name in self.model._var_abs2meta:
+                tlocmeta = self.model._var_abs2meta[abs_name]
+            else:
+                tlocmeta = None
+            smeta = self.model._var_allprocs_abs2meta[src]
+            tunits = tmeta['units']
+            if units is None:
+                if self._setup_status > 1:  # avoids double unit conversion
+                    units = tunits
+            else:
+                value = self.model.convert_from_units(abs_name, value, units)
+            if units is not None and smeta['units'] is not None:
+                value = self.model.convert_from_units(src, value, units)
+        elif units is not None:
+            value = self.model.convert_from_units(abs_name, value, units)
+
+        # Caching only needed if vectors aren't allocated yet.
+        if self._setup_status == 1:
+            if indices is not None:
+                try:
+                    self._initial_condition_cache[name][indices] = value
+                except Exception as err:
+                    raise RuntimeError(f"Failed to set value of '{name}': {str(err)}.")
+            else:
+                self._initial_condition_cache[name] = value
+        else:
+            if indices is None:
+                indices = _full_slice
+            if abs_name in self.model._outputs._views:
+                self.model._outputs.set_var(abs_name, value, indices)
+            elif abs_name in self.model._discrete_outputs:
+                self.model._discrete_outputs[abs_name] = value
+            elif abs_name in conns:  # input name given. Set value into output
+                if src in self.model._outputs._views:  # src is local
+                    if tmeta['has_src_indices']:
+                        if tlocmeta:  # target is local
+                            self.model._outputs.set_var(src, value,
+                                                        tlocmeta['src_indices'][indices])
+                        else:
+                            raise RuntimeError(f"{self.model.msginfo}: Can't set {abs_name}: remote"
+                                               " connected inputs with src_indices currently not"
+                                               " supported.")
+                    else:
+                        self.model._outputs.set_var(src, value, indices)
+                elif src in self.model._discrete_outputs:
+                    self.model._discrete_outputs[src] = value
+                # also set the input
+                if abs_name in self.model._inputs._views:
+                    self.model._inputs.set_var(abs_name, value, indices)
+                elif abs_name in self.model._discrete_inputs:
+                    self.model._discrete_inputs[src] = value
+                else:
+                    # might be a remote var.  If so, just do nothing on this proc
+                    if abs_name in self.model._var_allprocs_abs2meta:
+                        print(f"Variable '{name}' is remote on rank {self.comm.rank}.  "
+                              "Local assignment ignored.")
+                    else:
+                        raise KeyError(f'{self.model.msginfo}: Variable "{name}" not found.')
+            elif isinstance(self.model, Component):
+                if abs_name in self.model._inputs._views:
+                    self.model._inputs.set_var(abs_name, value, indices)
+                elif abs_name in self.model._discrete_inputs:
+                    self.model._discrete_inputs[abs_name] = value
+                else:
+                    raise KeyError(f'{self.model.msginfo}: Variable "{name}" not found.')
+            elif abs_name not in all_meta:
+                raise KeyError(f'{self.model.msginfo}: Variable "{name}" not found.')
 
     def _set_initial_conditions(self):
         """
         Set all initial conditions that have been saved in cache after setup.
         """
         for name, value in self._initial_condition_cache.items():
-            self[name] = value
+            self.set_val(name, value)
 
         # Clean up cache
-        self._initial_condition_cache = {}
+        self._initial_condition_cache = OrderedDict()
 
     def run_model(self, case_prefix=None, reset_iter_counts=True):
         """
@@ -754,6 +775,7 @@ class Problem(object):
             'solver_info': SolverInfo(),
             'use_derivatives': derivatives,
             'force_alloc_complex': force_alloc_complex,
+            'connections': {},
         }
         model._setup(model_comm, 'full', mode, self._metadata)
 

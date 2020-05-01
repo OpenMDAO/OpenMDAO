@@ -257,6 +257,9 @@ class Component(System):
                     meta_name: metadata[meta_name]
                     for meta_name in global_meta_names[type_]
                 }
+                if type_ == 'input':
+                    src_indices = metadata['src_indices']
+                    allprocs_abs2meta[abs_name]['has_src_indices'] = src_indices is not None
 
                 # Compute abs2meta
                 abs2meta[abs_name] = metadata

@@ -341,7 +341,8 @@ class TestProblem(unittest.TestCase):
         # check bad scalar value
         bad_val = -10*np.ones((10))
         prob['indep.num'] = bad_val
-        with self.assertRaisesRegex(ValueError, msg):
+        with self.assertRaisesRegex(ValueError, 
+                "Incompatible shape for '.*': Expected (.*) but got (.*)."):
             prob.final_setup()
         prob._initial_condition_cache = {}
 

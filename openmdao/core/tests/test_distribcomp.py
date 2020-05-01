@@ -333,7 +333,7 @@ class NOMPITests(unittest.TestCase):
         # Conclude setup but don't run model.
         p.final_setup()
 
-        C1._inputs['invec'] = np.array(range(size, 0, -1), float)
+        p['C1.invec'] = np.array(range(size, 0, -1), float)
 
         p.run_model()
 
@@ -359,7 +359,7 @@ class MPITests(unittest.TestCase):
         # Conclude setup but don't run model.
         p.final_setup()
 
-        C1._inputs['invec'] = np.ones(size, float) * 5.0
+        p['C1.invec'] = np.ones(size, float) * 5.0
 
         p.run_model()
 
@@ -522,7 +522,7 @@ class MPITests(unittest.TestCase):
         # Conclude setup but don't run model.
         p.final_setup()
 
-        C1._inputs['invec'] = np.array(range(size, 0, -1), float)
+        p['C1.invec'] = np.array(range(size, 0, -1), float)
 
         p.run_model()
 
@@ -541,10 +541,12 @@ class MPITests(unittest.TestCase):
         top.connect('C2.outvec', 'C3.x')
         p.setup()
 
+        #import wingdbstub
+        
         # Conclude setup but don't run model.
         p.final_setup()
 
-        C1._inputs['invec'] = np.array(range(size, 0, -1), float)
+        p['C1.invec'] = np.array(range(size, 0, -1), float)
 
         p.run_model()
 
@@ -566,7 +568,7 @@ class MPITests(unittest.TestCase):
         # Conclude setup but don't run model.
         p.final_setup()
 
-        C1._inputs['invec'] = np.array(range(size, 0, -1), float)
+        p['C1.invec'] = np.array(range(size, 0, -1), float)
 
         p.run_model()
 
@@ -588,7 +590,7 @@ class MPITests(unittest.TestCase):
         # Conclude setup but don't run model.
         p.final_setup()
 
-        C1._inputs['invec'] = np.array(range(size), float)
+        p['C1.invec'] = np.array(range(size), float)
 
         p.run_model()
 
@@ -616,13 +618,16 @@ class MPITests(unittest.TestCase):
         C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
         C2 = top.add_subsystem("C2", DistribOverlappingInputComp(arr_size=size))
         top.connect('C1.outvec', 'C2.invec')
+        
+        #import wingdbstub
+        
         p.setup()
 
         # Conclude setup but don't run model.
         p.final_setup()
 
         input_vec = np.array(range(size, 0, -1), float)
-        C1._inputs['invec'] = input_vec
+        p['C1.invec'] = input_vec
 
         # C1 (an InOutArrayComp) doubles the input_vec
         check_vec = input_vec * 2
@@ -661,7 +666,7 @@ class MPITests(unittest.TestCase):
         # Conclude setup but don't run model.
         p.final_setup()
 
-        C1._inputs['invec'] = np.array(range(size, 0, -1), float)
+        p['C1.invec'] = np.array(range(size, 0, -1), float)
 
         p.run_model()
 

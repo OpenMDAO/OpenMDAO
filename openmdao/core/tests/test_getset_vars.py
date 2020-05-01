@@ -1,8 +1,8 @@
 """Test getting/setting variables and subjacs with promoted/relative/absolute names."""
 
 import unittest
-
-from openmdao.api import Problem, Group, ExecComp, IndepVarComp, DirectSolver
+import numpy as np
+from openmdao.api import Problem, Group, ExecComp, IndepVarComp, DirectSolver, ParallelGroup
 
 
 class TestGetSetVariables(unittest.TestCase):
@@ -137,28 +137,29 @@ class TestGetSetVariables(unittest.TestCase):
         self.assertEqual(str(ctx.exception), msg.format('y'))
 
 
-        msg = '\'Variable name "{}" not found.\''
+        msg = "Group (g): Variable name '{}' not found."
         inputs, outputs, residuals = g.get_nonlinear_vectors()
 
         # inputs
-        with self.assertRaisesRegex(KeyError, msg.format('x')):
-            inputs['x'] = 5.0
-        with self.assertRaisesRegex(KeyError, msg.format('x')):
-            inputs['x']
-        with self.assertRaisesRegex(KeyError, msg.format('g.c.x')):
-            inputs['g.c.x'] = 5.0
-        with self.assertRaisesRegex(KeyError, msg.format('g.c.x')):
-            inputs['g.c.x']
+        for vname in ['x', 'g.c.x']:
+            with self.assertRaises(KeyError) as cm:
+               inputs[vname] = 5.0
+            self.assertEqual(cm.exception.args[0], f"Group (g): Variable name '{vname}' not found.")
+
+            with self.assertRaises(KeyError) as cm:
+               inputs[vname]
+            self.assertEqual(cm.exception.args[0], f"Group (g): Variable name '{vname}' not found.")
+
 
         # outputs
-        with self.assertRaisesRegex(KeyError, msg.format('y')):
-            outputs['y'] = 5.0
-        with self.assertRaisesRegex(KeyError, msg.format('y')):
-            outputs['y']
-        with self.assertRaisesRegex(KeyError, msg.format('g.c.y')):
-            outputs['g.c.y'] = 5.0
-        with self.assertRaisesRegex(KeyError, msg.format('g.c.y')):
-            outputs['g.c.y']
+        for vname in ['y', 'g.c.y']:
+            with self.assertRaises(KeyError) as cm:
+               outputs[vname] = 5.0
+            self.assertEqual(cm.exception.args[0], f"Group (g): Variable name '{vname}' not found.")
+
+            with self.assertRaises(KeyError) as cm:
+               outputs[vname]
+            self.assertEqual(cm.exception.args[0], f"Group (g): Variable name '{vname}' not found.")
 
         msg = r'Variable name pair \("{}", "{}"\) not found.'
         jac = g.linear_solver._assembled_jac
@@ -210,7 +211,7 @@ class TestGetSetVariables(unittest.TestCase):
 
         # -------------------------------------------------------------------
 
-        msg1 = 'Variable name "{}" not found.'
+        msg1 = "Group (g): Variable name '{}' not found."
         msg2 = "The promoted name x is invalid because it refers to multiple inputs: " \
                "[g.c2.x ,g.c3.x]. Access the value from the connected output variable x instead."
 
@@ -224,16 +225,22 @@ class TestGetSetVariables(unittest.TestCase):
             self.assertEqual(inputs['x'], 5.0)
         self.assertEqual(str(context.exception), msg2)
 
-        with self.assertRaisesRegex(KeyError, msg1.format('g.c2.x')):
+        with self.assertRaises(KeyError) as cm:
             inputs['g.c2.x'] = 5.0
-        with self.assertRaisesRegex(KeyError, msg1.format('g.c2.x')):
-            self.assertEqual(inputs['g.c2.x'], 5.0)
+        self.assertEqual(cm.exception.args[0], msg1.format('g.c2.x'))
+
+        with self.assertRaises(KeyError) as cm:
+            inputs['g.c2.x']
+        self.assertEqual(cm.exception.args[0], msg1.format('g.c2.x'))
 
         # outputs
-        with self.assertRaisesRegex(KeyError, msg1.format('g.c2.y')):
+        with self.assertRaises(KeyError) as cm:
             outputs['g.c2.y'] = 5.0
-        with self.assertRaisesRegex(KeyError, msg1.format('g.c2.y')):
-            self.assertEqual(outputs['g.c2.y'], 5.0)
+        self.assertEqual(cm.exception.args[0], msg1.format('g.c2.y'))
+
+        with self.assertRaises(KeyError) as cm:
+            outputs['g.c2.y']
+        self.assertEqual(cm.exception.args[0], msg1.format('g.c2.y'))
 
         msg1 = r'Variable name pair \("{}", "{}"\) not found.'
 
@@ -247,18 +254,6 @@ class TestGetSetVariables(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             self.assertEqual(jac['y', 'x'], 5.0)
         self.assertEqual(str(context.exception), msg2)
-
-        # absolute keys now allowed
-        # with self.assertRaisesRegex(KeyError, msg1.format('g.c2.y', 'g.c2.x')):
-        #     jac['g.c2.y', 'g.c2.x'] = 5.0
-        # with self.assertRaisesRegex(KeyError, msg1.format('g.c2.y', 'g.c2.x')):
-        #     deriv = jac['g.c2.y', 'g.c2.x']
-
-        # d(outputs)/d(outputs)
-        # with self.assertRaisesRegex(KeyError, msg1.format('g.c2.y', 'g.c2.y')):
-        #     jac['g.c2.y', 'g.c2.y'] = 5.0
-        # with self.assertRaisesRegex(KeyError, msg1.format('g.c2.y', 'g.c2.y')):
-        #     deriv = jac['g.c2.y', 'g.c2.y']
 
     def test_nested_promotion_errors(self):
         """
@@ -282,16 +277,8 @@ class TestGetSetVariables(unittest.TestCase):
 
         # -------------------------------------------------------------------
 
-        msg1 = "The promoted name g.x is invalid because it refers to multiple inputs: " \
-               "[g.c2.x, g.c3.x] that are not connected to an output variable."
-
-        # inputs (g.x is not connected)
-        # with self.assertRaisesRegex(RuntimeError, msg1.format('g.x')):
-        with self.assertRaises(Exception) as context:
-            p['g.x'] = 5.0
-            p.final_setup()
-
-        self.assertEqual(str(context.exception), msg1)
+        p['g.x'] = 5.0
+        p.final_setup()
 
         # Repeat test for post final_setup when vectors are allocated.
         p = Problem(model)
@@ -300,19 +287,12 @@ class TestGetSetVariables(unittest.TestCase):
 
         # -------------------------------------------------------------------
 
-        # inputs (g.x is not connected)
-        with self.assertRaises(Exception) as context:
-            p['g.x'] = 5.0
-            p.final_setup()
-        self.assertEqual(str(context.exception), msg1)
+        p['g.x'] = 5.0
+        p.final_setup()
 
         # Start from a clean state again
         p = Problem(model)
         p.setup()
-
-        with self.assertRaises(Exception) as context:
-            self.assertEqual(p['g.x'], 5.0)
-        self.assertEqual(str(context.exception), msg1)
 
         msg2 = "The promoted name x is invalid because it refers to multiple inputs: " \
                "[g.c2.x, g.c3.x] that are not connected to an output variable."
@@ -334,10 +314,6 @@ class TestGetSetVariables(unittest.TestCase):
         p.setup()
         p.final_setup()
 
-        with self.assertRaises(Exception) as context:
-            self.assertEqual(p['g.x'], 5.0)
-        self.assertEqual(str(context.exception), msg1)
-
         # d(outputs)/d(inputs)
         with self.assertRaises(Exception) as context:
             jac['y', 'x'] = 5.0
@@ -349,9 +325,6 @@ class TestGetSetVariables(unittest.TestCase):
 
         # -------------------------------------------------------------------
 
-        msg1 = "The promoted name g.x is invalid because it refers to multiple inputs: " \
-               "[g.c2.x ,g.c3.x]. Access the value from the connected output variable x instead."
-
         # From here, 'g.x' has a valid source.
         model.connect('x', 'g.x')
 
@@ -360,9 +333,7 @@ class TestGetSetVariables(unittest.TestCase):
 
         # inputs (g.x is connected to x)
         p['g.x'] = 5.0
-        with self.assertRaises(Exception) as context:
-            p.final_setup()
-        self.assertEqual(str(context.exception), msg1)
+        p.final_setup()
 
         # Repeat test for post final_setup when vectors are allocated.
         p = Problem(model)
@@ -370,17 +341,11 @@ class TestGetSetVariables(unittest.TestCase):
         p.final_setup()
 
         # inputs (g.x is connected to x)
-        with self.assertRaises(Exception) as context:
-            p['g.x'] = 5.0
-        self.assertEqual(str(context.exception), msg1)
+        p['g.x'] = 5.0
 
         # Final test, the getitem
         p = Problem(model)
         p.setup()
-
-        with self.assertRaises(Exception) as context:
-            self.assertEqual(p['g.x'], 5.0)
-        self.assertEqual(str(context.exception), msg1)
 
         # d(outputs)/d(inputs)
         with self.assertRaises(Exception) as context:
@@ -396,10 +361,6 @@ class TestGetSetVariables(unittest.TestCase):
         p.setup()
         p.final_setup()
 
-        with self.assertRaises(Exception) as context:
-            self.assertEqual(p['g.x'], 5.0)
-        self.assertEqual(str(context.exception), msg1)
-
         # d(outputs)/d(inputs)
         with self.assertRaises(Exception) as context:
             jac['y', 'x'] = 5.0
@@ -408,6 +369,163 @@ class TestGetSetVariables(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             self.assertEqual(jac['y', 'x'], 5.0)
         self.assertEqual(str(context.exception), msg2)
+
+    def test_serial_multi_src_inds(self):
+        p = Problem()
+        p.model.add_subsystem('indep', IndepVarComp('x', val=np.ones(10)))
+        p.model.add_subsystem('C1', ExecComp('y=x*2.', x=np.zeros(7), y=np.zeros(7)))
+        p.model.add_subsystem('C2', ExecComp('y=x*3.', x=np.zeros(3), y=np.zeros(3)))
+        p.model.connect('indep.x', 'C1.x', src_indices=list(range(7)))
+        p.model.connect('indep.x', 'C2.x', src_indices=list(range(7, 10)))
+        p.setup()
+
+        p['C1.x'] = (np.arange(7) + 1.) * 2.
+        p['C2.x'] = (np.arange(7,10) + 1.) * 3.
+
+        p.run_model()
+
+        np.testing.assert_allclose(p['indep.x'][:7], (np.arange(7) + 1.) * 2.)
+        np.testing.assert_allclose(p['indep.x'][7:10], (np.arange(7,10) + 1.) * 3.)
+        np.testing.assert_allclose(p['C1.x'], (np.arange(7) + 1.) * 2.)
+        np.testing.assert_allclose(p['C2.x'], (np.arange(7,10) + 1.) * 3.)
+        np.testing.assert_allclose(p['C1.y'], (np.arange(7) + 1.) * 4.)
+        np.testing.assert_allclose(p['C2.y'], (np.arange(7,10) + 1.) * 9.)
+
+    def test_serial_multi_src_inds_promoted(self):
+        p = Problem()
+        p.model.add_subsystem('indep', IndepVarComp('x', val=np.ones(10)), promotes=['x'])
+        p.model.add_subsystem('C1', ExecComp('y=x*2.',
+                                             x={'value': np.zeros(7),
+                                                'src_indices': list(range(7))},
+                                             y={'value': np.zeros(7)}),
+                              promotes=['x'])
+        p.model.add_subsystem('C2', ExecComp('y=x*3.',
+                                             x={'value': np.zeros(3),
+                                                'src_indices': list(range(7,10))},
+                                             y={'value': np.zeros(3)}),
+                              promotes=['x'])
+        p.setup()
+
+        p['C1.x'] = (np.arange(7) + 1.) * 2.
+        p['C2.x'] = (np.arange(7,10) + 1.) * 3.
+
+        p.run_model()
+
+        np.testing.assert_allclose(p['indep.x'][:7], (np.arange(7) + 1.) * 2.)
+        np.testing.assert_allclose(p['indep.x'][7:10], (np.arange(7,10) + 1.) * 3.)
+        np.testing.assert_allclose(p['C1.x'], (np.arange(7) + 1.) * 2.)
+        np.testing.assert_allclose(p['C2.x'], (np.arange(7,10) + 1.) * 3.)
+        np.testing.assert_allclose(p['C1.y'], (np.arange(7) + 1.) * 4.)
+        np.testing.assert_allclose(p['C2.y'], (np.arange(7,10) + 1.) * 9.)
+
+    def test_serial_multi_src_inds_units_promoted(self):
+        p = Problem()
+        indep = p.model.add_subsystem('indep', IndepVarComp(), promotes=['x'])
+        indep.add_output('x', units='inch', val=np.ones(10))
+        p.model.add_subsystem('C1', ExecComp('y=x*2.',
+                                             x={'value': np.zeros(7),
+                                                'units': 'ft',
+                                                'src_indices': list(range(7))},
+                                             y={'value': np.zeros(7), 'units': 'ft'}),
+                              promotes=['x'])
+        p.model.add_subsystem('C2', ExecComp('y=x*3.',
+                                             x={'value': np.zeros(3),
+                                                'units': 'inch',
+                                                'src_indices': list(range(7,10))},
+                                             y={'value': np.zeros(3), 'units': 'inch'}),
+                              promotes=['x'])
+        p.setup()
+
+        p['C1.x'] = np.ones(7) * 2.
+        p['C2.x'] = np.ones(3) * 3.
+
+        p.run_model()
+
+        np.testing.assert_allclose(p['indep.x'][:7], np.ones(7) * 24.)
+        np.testing.assert_allclose(p['indep.x'][7:10], np.ones(3) * 3.)
+        np.testing.assert_allclose(p['C1.x'], np.ones(7) * 2.)
+        np.testing.assert_allclose(p['C1.y'], np.ones(7) * 4.)
+        np.testing.assert_allclose(p['C2.x'], np.ones(3) * 3.)
+        np.testing.assert_allclose(p['C2.y'], np.ones(3) * 9.)
+
+    def test_serial_multi_src_inds_units_promoted_no_src(self):
+        p = Problem()
+        p.model.add_subsystem('C1', ExecComp('y=x*2.',
+                                             x={'value': np.zeros(7),
+                                                'units': 'ft',
+                                                'src_indices': list(range(7))},
+                                             y={'value': np.zeros(7), 'units': 'ft'}),
+                              promotes=['x'])
+        p.model.add_subsystem('C2', ExecComp('y=x*3.',
+                                             x={'value': np.zeros(3),
+                                                'units': 'inch',
+                                                'src_indices': list(range(7,10))},
+                                             y={'value': np.zeros(3), 'units': 'inch'}),
+                              promotes=['x'])
+
+        with self.assertRaises(RuntimeError) as cm:
+            p.setup()
+            
+        self.assertEqual(str(cm.exception), "Group (<model>): auto_ivcs with src_indices not supported yet.")
+
+    def test_serial_multi_src_inds_units_setval_promoted(self):
+        p = Problem()
+        indep = p.model.add_subsystem('indep', IndepVarComp(), promotes=['x'])
+        indep.add_output('x', units='inch', val=np.ones(10))
+        p.model.add_subsystem('C1', ExecComp('y=x*2.',
+                                             x={'value': np.zeros(7),
+                                                'units': 'ft',
+                                                'src_indices': list(range(7))},
+                                             y={'value': np.zeros(7), 'units': 'ft'}),
+                              promotes=['x'])
+        p.model.add_subsystem('C2', ExecComp('y=x*3.',
+                                             x={'value': np.zeros(3),
+                                                'units': 'inch',
+                                                'src_indices': list(range(7,10))},
+                                             y={'value': np.zeros(3), 'units': 'inch'}),
+                              promotes=['x'])
+        p.setup()
+
+        p.set_val('C1.x', np.ones(7) * 24., units='inch')
+        p.set_val('C2.x', np.ones(3) * 3., units='inch')
+
+        p.run_model()
+
+        np.testing.assert_allclose(p['indep.x'][:7], np.ones(7) * 24.)
+        np.testing.assert_allclose(p['indep.x'][7:10], np.ones(3) * 3.)
+        np.testing.assert_allclose(p['C1.x'], np.ones(7) * 2.)
+        np.testing.assert_allclose(p['C1.y'], np.ones(7) * 4.)
+        np.testing.assert_allclose(p['C2.x'], np.ones(3) * 3.)
+        np.testing.assert_allclose(p['C2.y'], np.ones(3) * 9.)
+
+
+class ParTestCase(unittest.TestCase):
+    N_PROCS = 2
+    
+    def test_par_multi_src_inds(self):
+        p = Problem()
+        p.model.add_subsystem('indep', IndepVarComp('x', val=np.ones(10)))
+        par = p.model.add_subsystem('par', ParallelGroup())
+        par.add_subsystem('C1', ExecComp('y=x*2.', x=np.zeros(7), y=np.zeros(7)))
+        par.add_subsystem('C2', ExecComp('y=x*3.', x=np.zeros(3), y=np.zeros(3)))
+        p.model.connect('indep.x', 'par.C1.x', src_indices=list(range(7)))
+        p.model.connect('indep.x', 'par.C2.x', src_indices=list(range(7, 10)))
+        
+        #import wingdbstub
+
+        p.setup()
+
+        p['par.C1.x'] = (np.arange(7) + 1.) * 2.
+        p['par.C2.x'] = (np.arange(7,10) + 1.) * 3.
+
+        p.run_model()
+
+        np.testing.assert_allclose(p['indep.x'][:7], (np.arange(7) + 1.) * 2.)
+        np.testing.assert_allclose(p['indep.x'][7:10], (np.arange(7,10) + 1.) * 3.)
+        np.testing.assert_allclose(p['C1.x'], (np.arange(7) + 1.) * 2.)
+        np.testing.assert_allclose(p['C2.x'], (np.arange(7,10) + 1.) * 3.)
+        np.testing.assert_allclose(p['C1.y'], (np.arange(7) + 1.) * 4.)
+        np.testing.assert_allclose(p['C2.y'], (np.arange(7,10) + 1.) * 9.)
 
 
 if __name__ == '__main__':

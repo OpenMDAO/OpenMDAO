@@ -481,6 +481,7 @@ class Case(object):
                      tags=None,
                      includes=None,
                      excludes=None,
+                     list_autoivcs=False,
                      out_stream=_DEFAULT_OUT_STREAM):
         """
         Return and optionally log a list of output names and other optional information.
@@ -530,6 +531,8 @@ class Case(object):
         excludes : None or list_like
             List of glob patterns for pathnames to exclude from the check. Default is None, which
             excludes nothing.
+        list_autoivcs : bool
+            If True, include auto_ivc outputs in the listing.  Defaults to False.
         out_stream : file-like
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
@@ -544,6 +547,9 @@ class Case(object):
         impl_outputs = []
 
         for var_name in self.outputs.absolute_names():
+            if not list_autoivcs and var_name.startswith('auto_ivc.'):
+                continue
+
             # Filter based on tags
             if tags and not (make_set(tags) & make_set(meta[var_name]['tags'])):
                 continue
@@ -776,17 +782,6 @@ class PromAbsDict(dict):
                     # derivative keys will be a string in the form of 'of,wrt'
                     abs_keys, prom_key = self._deriv_keys(key)
                     super(PromAbsDict, self).__setitem__(prom_key, self._values[key])
-
-    def __str__(self):
-        """
-        Get string representation of the dictionary.
-
-        Returns
-        -------
-        str
-            String representation of the dictionary.
-        """
-        return super(PromAbsDict, self).__str__()
 
     def _deriv_keys(self, key):
         """

@@ -77,7 +77,7 @@ def abs_key2rel_key(system, abs_key):
     return (abs_name2rel_name(system, abs_key[0]), abs_name2rel_name(system, abs_key[1]))
 
 
-def prom_name2abs_name(system, prom_name, type_):
+def prom_name2abs_name(system, prom_name, type_, check_unique=True):
     """
     Map the given promoted name to the absolute name.
 
@@ -91,6 +91,8 @@ def prom_name2abs_name(system, prom_name, type_):
         Promoted variable name in the owning system's namespace.
     type_ : str
         Either 'input' or 'output'.
+    check_unique : bool
+        If True, check promoted name for uniqueness and raise exception if it isn't.
 
     Returns
     -------
@@ -101,7 +103,7 @@ def prom_name2abs_name(system, prom_name, type_):
 
     if prom_name in prom2abs_lists:
         abs_list = prom2abs_lists[prom_name]
-        if len(abs_list) == 1:
+        if len(abs_list) == 1 or not check_unique:
             return abs_list[0]
         else:
             # looks like an aliased input, which must be set via the connected output
@@ -121,7 +123,7 @@ def prom_name2abs_name(system, prom_name, type_):
         return None
 
 
-def name2abs_name(system, name):
+def name2abs_name(system, name, check_unique=True):
     """
     Map the given promoted or relative name to the absolute name.
 
@@ -133,6 +135,8 @@ def name2abs_name(system, name):
         System to which name is relative.
     name : str
         Promoted or relative variable name in the owning system's namespace.
+    check_unique : bool
+        If True, check promoted name for uniqueness and raise exception if it isn't.
 
     Returns
     -------
@@ -150,8 +154,8 @@ def name2abs_name(system, name):
         abs_name = system._var_allprocs_prom2abs_list['output'][name][0]
         return (abs_name, 'output')
 
-    # This will raise an exception if name is not unique
-    abs_name = prom_name2abs_name(system, name, 'input')
+    # This may raise an exception if name is not unique
+    abs_name = prom_name2abs_name(system, name, 'input', check_unique)
     if abs_name is not None:
         return (abs_name, 'input')
 

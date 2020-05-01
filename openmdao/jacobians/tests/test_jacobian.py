@@ -344,7 +344,7 @@ class TestJacobian(unittest.TestCase):
 
         prob = Problem()
         comp = ExplicitSetItemComp(dtype, value, shape, constructor)
-        prob.model.add_subsystem('C1', comp)
+        comp = prob.model.add_subsystem('C1', comp)
         prob.setup()
 
         prob.set_solver_print(level=0)
@@ -353,7 +353,7 @@ class TestJacobian(unittest.TestCase):
         prob.model.run_linearize()
 
         expected = constructor(value)
-        J = prob.model._subsystems_allprocs[0]._jacobian
+        J = comp._jacobian
         jac_out = J['out', 'in']
 
         self.assertEqual(len(jac_out.shape), 2)

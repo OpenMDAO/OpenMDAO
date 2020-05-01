@@ -16,7 +16,6 @@ import openmdao.api as om
 from openmdao.test_suite.components.sellar import SellarDis2
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.logger_utils import TestLogger
-from openmdao.error_checking.check_config import _check_hanging_inputs
 
 class SimpleGroup(om.Group):
 
@@ -477,26 +476,6 @@ class TestGroup(unittest.TestCase):
 
         self.assertEqual(p.model._conn_global_abs_in2out['gouter.g.c0.x'], 'gouter.g.ivc.x')
 
-    def test_check_unconn_inputs_w_promote_rename(self):
-        p = om.Problem()
-        gouter = p.model.add_subsystem('gouter', om.Group())
-        gouter.add_subsystem('couter', om.ExecComp('xx = a * 3.'))
-        g = gouter.add_subsystem('g', om.Group(), promotes_inputs=['xx'])
-        g.add_subsystem('ivc', om.IndepVarComp('x', 2.), promotes_outputs=['x'])
-        g.add_subsystem('c0', om.ExecComp('y = 2*x'), promotes_inputs=[('x', 'xx')])
-
-        p.setup()
-
-        logger = TestLogger()
-        _check_hanging_inputs(p, logger)
-        for w in logger.get('warning'):
-            if 'The following inputs are not connected:' in w:
-                if "gouter.couter.a" in w and "gouter.xx" in w and 'gouter.g.c0.x':
-                    break
-        else:
-            self.fail("Expected warning not found.")
-        self.assertEqual(p.model._conn_global_abs_in2out, {})
-
     def test_invalid_subsys_name(self):
         p = om.Problem()
 
@@ -824,48 +803,37 @@ class TestGroup(unittest.TestCase):
     def test_unconnected_input_units_no_mismatch(self):
         p = om.Problem()
 
-        indep_comp = om.IndepVarComp()
-        indep_comp.add_output('x', np.ones(5), units='ft')
-
-        p.model.add_subsystem('indep', indep_comp)
         p.model.add_subsystem('comp1', om.ExecComp('y=sum(x)',
-                                                   x={'value': np.ones(5) * 6., 'units': 'inch'},
+                                                   x={'value': np.zeros(5), 'units': 'ft'},
                                                    y={'units': 'inch'}), promotes=['x'])
         p.model.add_subsystem('comp2', om.ExecComp('y=sum(x)',
-                                                   x={'value': np.ones(5) * .5, 'units': 'ft'},
+                                                   x={'value': np.zeros(5), 'units': 'ft'},
                                                    y={'units': 'inch'}), promotes=['x'])
 
-        testlogger = TestLogger()
+        p.model.add_input('x', units='ft')
 
-        p.setup(check=['unconnected_inputs'], logger=testlogger)
+        p.setup()
+        p['comp2.x'] = np.ones(5)
         p.run_model()
-
-        warnings = testlogger.get('warning')
-        self.assertEqual(len(warnings), 1)
-        self.assertTrue("connected input values don't match" not in warnings[0])
 
     def test_unconnected_input_units_mismatch(self):
         p = om.Problem()
 
-        indep_comp = om.IndepVarComp()
-        indep_comp.add_output('x', np.ones(5), units='ft')
-
-        p.model.add_subsystem('indep', indep_comp)
         p.model.add_subsystem('comp1', om.ExecComp('y=sum(x)',
-                                                   x={'value': np.ones(5) * 6., 'units': 'inch'},
+                                                   x={'value': np.zeros(5), 'units': 'inch'},
                                                    y={'units': 'inch'}), promotes=['x'])
         p.model.add_subsystem('comp2', om.ExecComp('y=sum(x)',
-                                                   x={'value': np.ones(5) * .6, 'units': 'ft'},
+                                                   x={'value': np.zeros(5), 'units': 'ft'},
                                                    y={'units': 'inch'}), promotes=['x'])
 
-        testlogger = TestLogger()
+        p.model.add_input('x', units='ft')
 
-        p.setup(check=['unconnected_inputs'], logger=testlogger)
+        p.setup()
+        p['comp2.x'] = np.ones(5)
+
         p.run_model()
-
-        warnings = testlogger.get('warning')
-        self.assertEqual(len(warnings), 1)
-        self.assertTrue("connected input values don't match" in warnings[0])
+        np.testing.assert_allclose(p['comp1.y'], 60.)
+        np.testing.assert_allclose(p['comp2.y'], 5.)
 
     def test_connect_1_to_many(self):
         import numpy as np
@@ -1570,7 +1538,7 @@ class TestConnect(unittest.TestCase):
         # source and target names can't be checked until setup
         # because setup is not called until then
         self.sub.connect('src.x', 'tgt.z', src_indices=[1])
-        
+
         with self.assertRaises(NameError) as context:
             self.prob.setup()
 
@@ -1604,7 +1572,7 @@ class TestConnect(unittest.TestCase):
         self.assertEqual(str(ctx.exception), msg)
 
         prob.model._raise_connection_errors = False
-        
+
         with assert_warning(UserWarning, msg):
             prob.setup()
 
@@ -1624,7 +1592,7 @@ class TestConnect(unittest.TestCase):
             prob.setup()
 
         self.prob.model._raise_connection_errors = False
-        
+
         with assert_warning(UserWarning, msg):
             prob.setup()
 
@@ -1646,7 +1614,7 @@ class TestConnect(unittest.TestCase):
         self.assertEqual(str(context.exception), msg)
 
         prob.model._raise_connection_errors = False
-        
+
         with assert_warning(UserWarning, msg):
             prob.setup()
 
@@ -1748,7 +1716,7 @@ class TestConnect(unittest.TestCase):
         self.assertEqual(str(context.exception), msg)
 
         self.prob.model._raise_connection_errors = False
-        
+
         with assert_warning(UserWarning, msg):
             self.prob.setup()
 
@@ -1769,7 +1737,7 @@ class TestConnect(unittest.TestCase):
         self.assertEqual(str(context.exception), msg)
 
         p.model._raise_connection_errors = False
-        
+
         with assert_warning(UserWarning, msg):
             p.setup()
 
@@ -1789,7 +1757,7 @@ class TestConnect(unittest.TestCase):
             self.fail('Exception expected.')
 
         self.prob.model._raise_connection_errors = False
-        
+
         with assert_warning(UserWarning, msg):
             self.prob.setup()
 
@@ -1810,7 +1778,7 @@ class TestConnect(unittest.TestCase):
             self.fail('Exception expected.')
 
         self.prob.model._raise_connection_errors = False
-        
+
         with assert_warning(UserWarning, msg):
             self.prob.setup()
 

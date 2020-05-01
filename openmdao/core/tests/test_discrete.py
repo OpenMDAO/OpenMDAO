@@ -556,27 +556,6 @@ class DiscreteTestCase(unittest.TestCase):
 
         np.testing.assert_almost_equal(J, np.array([[3.]]))
 
-    def test_discrete_unconn_inputs(self):
-        prob = om.Problem()
-        model = prob.model
-
-        c1 = model.add_subsystem('c1', PathCompEx(), promotes=['x'])
-        c2 = model.add_subsystem('c2', PathCompEx(), promotes=['x'])
-
-        testlogger = TestLogger()
-
-        prob.setup(check=['unconnected_inputs'], logger=testlogger)
-        prob.run_model()
-
-        expected_warning_1 = (
-            "The following inputs are not connected:\n"
-            "   x  (p):\n"
-            "      c1.x  c1\n"
-            "      c2.x  c2\n"
-        )
-
-        self.assertTrue(testlogger.contains('warning', expected_warning_1))
-
     def test_discrete_deriv_implicit(self):
         prob = om.Problem()
         model = prob.model

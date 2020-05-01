@@ -64,7 +64,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
     else:
         system = root
 
-    input_srcs = system._conn_global_abs_in2out
+    input_srcs = system._problem_meta['connections']
 
     connections = {
         tgt: src for tgt, src in input_srcs.items() if src is not None

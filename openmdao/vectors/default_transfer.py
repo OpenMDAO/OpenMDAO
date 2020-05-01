@@ -105,6 +105,7 @@ class DefaultTransfer(Transfer):
                         src_indices = _flatten_src_indices(src_indices, meta_in['shape'],
                                                            meta_out['global_shape'],
                                                            meta_out['global_size'])
+                        meta_in['src_indices'] = src_indices
 
                     # 1. Compute the output indices
                     offset = offsets_out[iproc, idx_out]

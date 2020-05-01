@@ -41,7 +41,7 @@ class TestConnections(unittest.TestCase):
         self.p['G3.G4.C3.x'] = 222.
         self.p['G3.G4.C4.x'] = 333.
 
-        self.p.final_setup()
+        self.p.run_model()
 
         self.assertEqual(self.C1._inputs['x'], 111.)
         self.assertEqual(self.C3._inputs['x'], 222.)
@@ -282,31 +282,6 @@ class TestConnections(unittest.TestCase):
 
 
 class TestConnectionsPromoted(unittest.TestCase):
-
-    def test_inp_inp_promoted_no_src(self):
-
-        p = Problem()
-        root = p.model
-
-        G1 = root.add_subsystem("G1", Group())
-        G2 = G1.add_subsystem("G2", Group())
-        G2.add_subsystem("C1", ExecComp('y=x*2.0'))
-        G2.add_subsystem("C2", ExecComp('y=x*2.0'))
-
-        G3 = root.add_subsystem("G3", Group())
-        G4 = G3.add_subsystem("G4", Group(), promotes=['x'])
-        G4.add_subsystem("C3", ExecComp('y=x*2.0'), promotes=['x'])
-        G4.add_subsystem("C4", ExecComp('y=x*2.0'), promotes=['x'])
-
-        p.setup()
-        p.final_setup()
-
-        # setting promoted name should set both inputs mapped to that name
-        with self.assertRaises(Exception) as context:
-            p['G3.x'] = 999.
-        self.assertEqual(str(context.exception),
-                         "The promoted name G3.x is invalid because it refers to multiple inputs: "
-                         "[G3.G4.C3.x, G3.G4.C4.x] that are not connected to an output variable.")
 
     def test_inp_inp_promoted_w_prom_src(self):
         p = Problem()

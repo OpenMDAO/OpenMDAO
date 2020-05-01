@@ -277,12 +277,12 @@ class DefaultVector(Vector):
 
     def set_val(self, val, idxs=_full_slice):
         """
-        Fill the data array with the value at the specified indices or slice(s).
+        Set the data array of this vector to a value, with optional indexing.
 
         Parameters
         ----------
-        val : ndarray
-            Value to set into the data array.
+        val : float or ndarray
+            scalar or array to set data array to.
         idxs : int or slice or tuple of ints and/or slices.
             The locations where the data array should be updated.
         """

@@ -376,7 +376,7 @@ def _flatten_src_indices(src_indices, shape_in, shape_out, size_out):
         The flattened src_indices.
     """
     if len(shape_out) == 1 or shape_in == src_indices.shape:
-        return convert_neg(src_indices.flatten(), size_out)
+        return convert_neg(src_indices.ravel(), size_out)
 
     entries = [list(range(x)) for x in shape_in]
     cols = np.vstack([src_indices[i] for i in product(*entries)])

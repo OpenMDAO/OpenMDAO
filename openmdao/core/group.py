@@ -56,6 +56,8 @@ class Group(System):
         List of ranges of each myproc subsystem's processors relative to those of this system.
     _manual_connections : dict
         Dictionary of input_name: (output_name, src_indices) connections.
+    _group_inputs : dict
+        Mapping of promoted names to certain metadata (src_indices, units).
     _static_manual_connections : dict
         Dictionary that stores all explicit connections added outside of setup.
     _conn_abs_in2out : {'abs_in': 'abs_out'}
@@ -101,6 +103,7 @@ class Group(System):
         self._subgroups_myproc = None
         self._subsystems_proc_range = []
         self._manual_connections = {}
+        self._group_inputs = {}
         self._static_manual_connections = {}
         self._conn_abs_in2out = {}
         self._conn_discrete_in2out = {}
@@ -160,6 +163,25 @@ class Group(System):
             system hieararchy with attribute access
         """
         pass
+
+    def add_input(self, name, src_indices=None, units=None):
+        """
+        Specify metadata for a connected promoted inputs without a source.
+
+        Parameters
+        ----------
+        name : str
+            The name of the promoted inputs.
+        src_indices : ndarray or None
+            Index array used to pull entries from a source into the promoted inputs.
+        units : str or None
+            Specifies units to be assumed for the source.
+        """
+        if name in self._group_inputs:
+            simple_warning(f"{self.msginfo}: Adding group input '{name}' which "
+                           "overrides a previous input of the same name.")
+        if src_indices is not None or units is not None:
+            self._group_inputs[name] = {'src_indices': src_indices, 'units': units}
 
     def _get_scope(self, excl_sub=None):
         """
@@ -577,6 +599,10 @@ class Group(System):
 
         allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
 
+        group_inputs = []
+        for n, meta in self._group_inputs.items():
+            meta['path'] = self.pathname
+
         for subsys in self._subsystems_myproc:
             if recurse:
                 subsys._setup_var_data(recurse)
@@ -621,6 +647,14 @@ class Group(System):
                     if prom_name not in allprocs_prom2abs_list[type_]:
                         allprocs_prom2abs_list[type_][prom_name] = []
                     allprocs_prom2abs_list[type_][prom_name].extend(sub_abs)
+                    if type_ == 'input' and isinstance(subsys, Group):
+                        if sub_prom in subsys._group_inputs:
+                            if len(sub_abs) > 1:
+                                group_inputs.append((prom_name, subsys._group_inputs[sub_prom]))
+                            else:
+                                simple_warning(f"{self.msginfo}: Group input '{sub_prom} was added "
+                                               "but is being ignored because only 1 input is "
+                                               "promoted to that name.")
 
         for prom_name, abs_list in allprocs_prom2abs_list['output'].items():
             if len(abs_list) > 1:
@@ -635,7 +669,7 @@ class Group(System):
                                                     mysub._full_comm.rank == 0)):
                 raw = (allprocs_abs_names, allprocs_discrete, allprocs_prom2abs_list,
                        allprocs_abs2prom, allprocs_abs2meta, self._has_output_scaling,
-                       self._has_resid_scaling)
+                       self._has_resid_scaling, group_inputs)
             else:
                 raw = (
                     {'input': [], 'output': []},
@@ -644,7 +678,8 @@ class Group(System):
                     {'input': {}, 'output': {}},
                     {},
                     False,
-                    False
+                    False,
+                    []
                 )
             gathered = self.comm.allgather(raw)
 
@@ -653,10 +688,13 @@ class Group(System):
                 allprocs_abs2prom[type_] = {}
                 allprocs_prom2abs_list[type_] = OrderedDict()
 
+            group_inputs = []
             for (myproc_abs_names, myproc_discrete, myproc_prom2abs_list, all_abs2prom,
-                 myproc_abs2meta, oscale, rscale) in gathered:
+                 myproc_abs2meta, oscale, rscale, ginputs) in gathered:
                 self._has_output_scaling |= oscale
                 self._has_resid_scaling |= rscale
+
+                group_inputs.extend(ginputs)
 
                 # Assemble in parallel allprocs_abs2meta
                 for n in myproc_abs2meta:
@@ -675,6 +713,27 @@ class Group(System):
                         if prom_name not in allprocs_prom2abs_list[type_]:
                             allprocs_prom2abs_list[type_][prom_name] = []
                         allprocs_prom2abs_list[type_][prom_name].extend(abs_names_list)
+
+        ginputs = self._group_inputs
+        for prom, meta in group_inputs:
+            if prom in ginputs:
+                # check for any conflicting src_indices, units, ...
+                for n, val in meta.items():
+                    if n == 'path':
+                        continue
+                    if (val is not None and ginputs[prom][n] is not None and
+                            not np.all(val == ginputs[prom][n])):
+                        raise RuntimeError(f"Groups '{self.pathname}' and '{meta['path']}' added "
+                                           f"the input '{prom}' with conflicting {n}.")
+                    ginputs[prom][n] = val
+            else:
+                ginputs[prom] = meta
+
+        if ginputs:
+            extra = set(ginputs).difference(self._var_allprocs_prom2abs_list['input'])
+            if extra:
+                raise RuntimeError(f"{self.msginfo}: The following group inputs could not be "
+                                   f"found: {sorted(extra)}.")
 
         if self._var_discrete['input'] or self._var_discrete['output']:
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
@@ -865,6 +924,8 @@ class Group(System):
                     if out_subsys != in_subsys:
                         abs_in2out[abs_in] = abs_out
 
+        src_ind_inputs = set()
+
         # Add explicit connections (only ones declared by this group)
         for prom_in, (prom_out, src_indices, flat_src_indices) in \
                 self._manual_connections.items():
@@ -932,19 +993,22 @@ class Group(System):
                         simple_warning(msg)
                         continue
 
-                if src_indices is not None and abs_in in abs2meta:
-                    meta = abs2meta[abs_in]
-                    if meta['src_indices'] is not None:
-                        msg = f"{self.msginfo}: src_indices has been defined in both " + \
-                              f"connect('{prom_out}', '{prom_in}') and " + \
-                              f"add_input('{prom_in}', ...)."
-                        if self._raise_connection_errors:
-                            raise RuntimeError(msg)
-                        else:
-                            simple_warning(msg)
-                            continue
-                    meta['src_indices'] = np.atleast_1d(src_indices)
-                    meta['flat_src_indices'] = flat_src_indices
+                if src_indices is not None:
+                    if abs_in in abs2meta:
+                        meta = abs2meta[abs_in]
+                        if meta['src_indices'] is not None:
+                            msg = f"{self.msginfo}: src_indices has been defined in both " + \
+                                  f"connect('{prom_out}', '{prom_in}') and " + \
+                                  f"add_input('{prom_in}', ...)."
+                            if self._raise_connection_errors:
+                                raise RuntimeError(msg)
+                            else:
+                                simple_warning(msg)
+                                continue
+                        meta['src_indices'] = np.atleast_1d(src_indices)
+                        meta['flat_src_indices'] = flat_src_indices
+
+                    src_ind_inputs.add(abs_in)
 
                 if abs_in in abs_in2out:
                     msg = f"{self.msginfo}: Input '{abs_in}' cannot be connected to " + \
@@ -1002,13 +1066,19 @@ class Group(System):
         # If running in parallel, allgather
         if self.comm.size > 1:
             if self._subsystems_myproc and self._subsystems_myproc[0].comm.rank == 0:
-                raw = global_abs_in2out
+                raw = (global_abs_in2out, src_ind_inputs)
             else:
-                raw = {}
+                raw = ({}, ())
             gathered = self.comm.allgather(raw)
 
-            for myproc_global_abs_in2out in gathered:
+            all_src_ind_ins = set()
+            for myproc_global_abs_in2out, src_ind_ins in gathered:
                 global_abs_in2out.update(myproc_global_abs_in2out)
+                all_src_ind_ins.update(src_ind_ins)
+            src_ind_inputs = all_src_ind_ins
+
+        for inp in src_ind_inputs:
+            allprocs_abs2meta[inp]['has_src_indices'] = True
 
             if recurse:
                 for comp in distcomps:
@@ -2294,3 +2364,107 @@ class Group(System):
                 graph.add_edge(src_sys, tgt_sys, conns=edge_data[key])
 
         return graph
+
+    def _setup_auto_ivcs(self, mode):
+        from openmdao.core.indepvarcomp import AutoIndepVarComp
+
+        # create the IndepVarComp that will contain all auto-ivc outputs
+        auto_ivc = AutoIndepVarComp()
+        auto_ivc.name = 'auto_ivc'
+        auto_ivc.pathname = auto_ivc.name
+
+        abs2prom = self._var_allprocs_abs2prom['input']
+        abs2meta = self._var_abs2meta
+        all_abs2meta = self._var_allprocs_abs2meta
+        abs_names = self._var_allprocs_abs_names['input']
+        discrete_ins = self._var_allprocs_discrete['input']
+        conns = self._problem_meta['connections']
+        prom2ivc = {}
+        count = 0
+        for abs_in in abs_names:
+            if abs_in not in conns:
+                prom = abs2prom[abs_in]
+                if prom in self._group_inputs:
+                    gmeta = self._group_inputs[prom]
+                else:
+                    gmeta = None
+
+                if prom in prom2ivc:
+                    # multiple connected inputs w/o a src. Connect them to the same IVC
+                    conns[abs_in] = prom2ivc[prom]
+                else:
+                    ivc_name = f"auto_ivc.v{count}"
+                    loc_out_name = ivc_name.rsplit('.', 1)[-1]
+                    count += 1
+                    prom2ivc[prom] = ivc_name
+                    conns[abs_in] = ivc_name
+                    if abs_in in discrete_ins:
+                        if abs_in in abs2meta:
+                            val = abs2meta[abs_in]['value']
+                        else:
+                            # TODO: fix this value (on all procs)
+                            val = None
+                            auto_ivc._add_remote(ivc_name)
+                        auto_ivc.add_discrete_output(loc_out_name, val=val)
+                    else:
+                        if abs_in in abs2meta:
+                            if abs2meta[abs_in]['src_indices'] is not None:
+                                raise RuntimeError(f"{self.msginfo}: auto_ivcs with src_indices "
+                                                   "not supported yet.")
+                            val = abs2meta[abs_in]['value']
+                        else:
+                            # TODO: this value has to be updated to match the val of the input
+                            #       (on all procs)
+                            val = np.ones(0)
+                            auto_ivc._add_remote(ivc_name)
+                        units = gmeta['units'] if gmeta else None
+                        auto_ivc.add_output(loc_out_name, val=val, units=units)
+
+        if not prom2ivc:
+            return
+
+        if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
+            raise RuntimeError("The top level system must not be a ParallelGroup.")
+
+        self.auto_ivc = auto_ivc
+        auto_ivc._setup_procs(auto_ivc.pathname, self.comm, mode, self._problem_meta)
+        auto_ivc._static_mode = False
+        try:
+            auto_ivc._configure()
+            auto_ivc._post_configure()
+        finally:
+            auto_ivc._static_mode = True
+        auto_ivc._setup_var_data()
+
+        # now update our own data structures based on the new auto_ivc component variables
+        self._loc_subsys_map[auto_ivc.name] = auto_ivc
+        self._subsystems_allprocs = [auto_ivc] + self._subsystems_allprocs
+        self._subsystems_myproc = [auto_ivc] + self._subsystems_myproc
+        self._subsystems_proc_range = [(0, self.comm.size)] + self._subsystems_proc_range
+        self._subsystems_inds = {s.name: i for i, s in enumerate(self._subsystems_allprocs)}
+        for typ in ('input', 'output'):
+            self._var_abs_names[typ] = auto_ivc._var_abs_names[typ] + self._var_abs_names[typ]
+            self._var_allprocs_abs_names[typ] = (auto_ivc._var_allprocs_abs_names[typ] +
+                                                 self._var_allprocs_abs_names[typ])
+            old = self._var_allprocs_prom2abs_list[typ]
+            p2abs = OrderedDict()
+            for name in auto_ivc._var_allprocs_abs_names[typ]:
+                p2abs[name] = [name]
+            p2abs.update(old)
+            self._var_allprocs_prom2abs_list[typ] = p2abs
+
+            self._var_abs2prom[typ].update(auto_ivc._var_abs2prom[typ])
+            self._var_allprocs_abs2prom[typ].update(auto_ivc._var_allprocs_abs2prom[typ])
+            self._var_allprocs_abs_names_discrete[typ] = (
+                auto_ivc._var_allprocs_abs_names_discrete[typ] +
+                self._var_allprocs_abs_names_discrete[typ])
+            self._var_abs_names_discrete[typ] = (auto_ivc._var_abs_names_discrete[typ] +
+                                                 self._var_abs_names_discrete[typ])
+            self._var_discrete[typ].update({'auto_ivc.' + k: v for k, v in
+                                            auto_ivc._var_discrete[typ].items()})
+
+        self._var_abs2meta.update(auto_ivc._var_abs2meta)
+        self._var_allprocs_abs2meta.update(auto_ivc._var_allprocs_abs2meta)
+
+        self._approx_subjac_keys = None  # this will force re-initialization
+        self._setup_procs_finished = True

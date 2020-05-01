@@ -708,7 +708,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
             prob.run_model()
 
         self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'x' in input vector "
+                         "ImpWithInitial (comp1): Attempt to set value of 'x' in input vector "
                          "when it is read only.")
 
     def test_guess_nonlinear_inputs_read_only_reset(self):
@@ -772,7 +772,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
             prob.run_model()
 
         self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'y' in residual vector "
+                         "ImpWithInitial (comp1): Attempt to set value of 'y' in residual vector "
                          "when it is read only.")
 
 
@@ -794,7 +794,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
             prob.model.run_apply_nonlinear()
 
         self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'a' in input vector "
+                         "BadComp (bad): Attempt to set value of 'a' in input vector "
                          "when it is read only.")
 
     def test_apply_nonlinear_outputs_read_only(self):
@@ -813,7 +813,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
             prob.model.run_apply_nonlinear()
 
         self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'x' in output vector "
+                         "BadComp (bad): Attempt to set value of 'x' in output vector "
                          "when it is read only.")
 
     def test_apply_nonlinear_read_only_reset(self):
@@ -849,7 +849,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
             prob.run_model()
 
         self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'a' in input vector "
+                         "BadComp (bad): Attempt to set value of 'a' in input vector "
                          "when it is read only.")
 
     def test_solve_nonlinear_inputs_read_only_reset(self):
@@ -884,7 +884,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
             prob.model.run_linearize()
 
         self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'a' in input vector "
+                         "BadComp (bad): Attempt to set value of 'a' in input vector "
                          "when it is read only.")
 
     def test_linearize_outputs_read_only(self):
@@ -903,7 +903,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
             prob.model.run_linearize()
 
         self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'x' in output vector "
+                         "BadComp (bad): Attempt to set value of 'x' in output vector "
                          "when it is read only.")
 
     def test_linearize_read_only_reset(self):
@@ -941,7 +941,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
             prob.model.run_apply_linear(['linear'], 'fwd')
 
         self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'a' in input vector "
+                         "BadComp (bad): Attempt to set value of 'a' in input vector "
                          "when it is read only.")
 
     def test_apply_linear_outputs_read_only(self):
@@ -961,7 +961,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
             prob.model.run_apply_linear(['linear'], 'fwd')
 
         self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'x' in output vector "
+                         "BadComp (bad): Attempt to set value of 'x' in output vector "
                          "when it is read only.")
 
     def test_apply_linear_dinputs_read_only(self):
@@ -981,7 +981,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
             prob.model.run_apply_linear(['linear'], 'fwd')
 
         self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'a' in input vector "
+                         "BadComp (bad): Attempt to set value of 'a' in input vector "
                          "when it is read only.")
 
     def test_apply_linear_doutputs_read_only(self):
@@ -1001,7 +1001,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
             prob.model.run_apply_linear(['linear'], 'fwd')
 
         self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'x' in output vector "
+                         "BadComp (bad): Attempt to set value of 'x' in output vector "
                          "when it is read only.")
 
     def test_apply_linear_dresids_read_only(self):
@@ -1021,7 +1021,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
             prob.model.run_apply_linear(['linear'], 'rev')
 
         self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'x' in residual vector "
+                         "BadComp (bad): Attempt to set value of 'x' in residual vector "
                          "when it is read only.")
 
     def test_apply_linear_read_only_reset(self):
@@ -1061,7 +1061,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
             prob.model.run_solve_linear(['linear'], 'rev')
 
         self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'x' in output vector "
+                         "BadComp (bad): Attempt to set value of 'x' in output vector "
                          "when it is read only.")
 
     def test_solve_linear_dresids_read_only(self):
@@ -1081,7 +1081,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
             prob.model.run_solve_linear(['linear'], 'fwd')
 
         self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'x' in residual vector "
+                         "BadComp (bad): Attempt to set value of 'x' in residual vector "
                          "when it is read only.")
 
     def test_solve_linear_read_only_reset(self):
