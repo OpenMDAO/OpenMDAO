@@ -17,7 +17,7 @@ There have been numerous updates relating to the N2 viewer and distributed compo
 - <POEM013> convert_units and unit_conversion added to openmdao.api. #1267
 - <POEM019> Fixed various issues with directional derivatives. #1314
 - Renamed Problem.record_iteration to Problem.record. #1355
-- Case reader `system_metadata` depreated and replaced by `system_options`. #1271 #1273
+- Case reader `system_metadata` deprecated and replaced by `system_options`. #1271 #1273
 
 ## Backwards Incompatible NON-API Changes:
 
