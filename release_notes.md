@@ -11,16 +11,16 @@ There have been numerous updates relating to the N2 viewer and distributed compo
 ## Backwards Incompatible API Changes:
 
 - <POEM001> Updates the definition of light year (ly) to the IAU definition and adds units for astronomical units (au) and parsec (pc).  #1204
-- <POEM014> Build-in XDSM viewer removed from OpenMDAO and is now supported as an external plugin. #1240
-- assert_rel_error deprecated replaced with assert_near_equal. #1192
+- <POEM014> Built-in XDSM viewer removed from OpenMDAO and is now supported as an external plugin. #1240
+- assert_rel_error deprecated replaced with assert_near_equal. #1260 #1264
 - <POEM017> Adds ability to specify units on design variables, constraints, and objectives. #1265
 - <POEM013> convert_units and unit_conversion added to openmdao.api. #1267
 - <POEM019> Fixed various issues with directional derivatives. #1314
-- Renamed Problem.record_state to Problem.record. #1355
+- Renamed Problem.record_iteration to Problem.record. #1355
+- Case reader `system_metadata` depreated and replaced by `system_options`. #1271 #1273
 
 ## Backwards Incompatible NON-API Changes:
 
-- Case reader `system_metadata` replaced by `system_options`. #1271
 - N2 viewer no longer treats colons in variable names as special separators. #1275
 
 ## New Features:
@@ -47,7 +47,7 @@ There have been numerous updates relating to the N2 viewer and distributed compo
 
 - Fixed a bug where dynamic coloring was not updated when doing subsequent setup calls. #1233
 - Fixed some output formatting issues in check_totals. #1258 #1259
-- Fixed a bug that occured when a jacobian was filled with an incorrect shape. #1261
+- Fixed a bug that occurred when a jacobian was filled with an incorrect shape. #1261
 - Fixed a bug in the Akima spline that resulted when using 4 points to define the spline. #1263
 - Fixed a bug where a driver's response indices were being changed during total derivative computation. #1288
 - Skip decorators are now correctly handled when running doc tests. #1310
