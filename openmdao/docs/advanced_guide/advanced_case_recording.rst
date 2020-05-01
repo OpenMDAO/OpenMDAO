@@ -9,12 +9,8 @@ that a recorder can be attached to. We will then show how to extract various dat
 relate that back to an XDSM for illustrative purposes.
 
 .. embed-code::
-    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_advanced_example
+    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureAdvancedExample.setUp
     :layout: interleave
-
-.. note::
-    This
-
 
 The following XDSM diagram shows the SellarMDA component equations and their inputs and outputs. Through
 the different recorders we can access the different parts of the model. We'll take you through an
@@ -34,7 +30,7 @@ Since we originally sought find the value of `y1` going into the objective funct
 through the 14 cases to find what the value is in each case.
 
 .. embed-code::
-    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_system_recorder
+    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureAdvancedExample.test_feature_system_recorder
     :layout: interleave
 
 Solver
@@ -49,7 +45,7 @@ We'll pass `'root.cycle'` to the method list_cases, find how many cases there ar
 arbitrarily pick number 3.
 
 .. embed-code::
-    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_solver_recorder
+    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureAdvancedExample.test_feature_solver_recorder
     :layout: interleave
 
 Driver
@@ -60,7 +56,7 @@ objectives, so we will print them for the model at the end of the optimization. 
 methods like `get_objectives`, `get_design_vars`, `get_constraints` to return the info we're seeking.
 
 .. embed-code::
-    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_driver_recorder
+    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureAdvancedExample.test_feature_driver_recorder
     :layout: interleave
 
 Problem
@@ -70,7 +66,7 @@ A `Problem` recorder is best if you want to record an arbitrary case before or a
 model but not during a run. In our case, we have placed our point at the end of the model.
 
 .. embed-code::
-    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_problem_recorder
+    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureAdvancedExample.test_feature_problem_recorder
     :layout: interleave
 
 
@@ -82,7 +78,7 @@ variables to their final values. To do this, we can list the cases of the driver
 with respect to the iteration number.
 
 .. embed-code::
-    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_plot_des_vars
+    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureAdvancedExample.test_feature_plot_des_vars
     :layout: interleave
 
 .. image:: images/design_vars.jpg

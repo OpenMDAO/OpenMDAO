@@ -48,4 +48,4 @@ Recording and Reading Data
 .. toctree::
     :maxdepth: 1
 
-        advanced_case_recording.rst
+    advanced_case_recording.rst
