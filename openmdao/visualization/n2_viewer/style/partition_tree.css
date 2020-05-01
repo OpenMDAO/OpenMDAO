@@ -87,9 +87,7 @@ body {
     position: absolute;
     right: -2px;
     bottom: 0px;
-    padding: 0;
     margin: 0;
-    width: 18px;
     height: 18px;
     cursor: nwse-resize;
     pointer-events: initial;
@@ -110,12 +108,20 @@ body {
     font-weight: bold;
     text-align: right;
     vertical-align: bottom;
+    width: 18px;
+    padding: 0;
 }
 
 .active-resizer-handle {
     background: lightblue;
     border: 1px solid lightblue;
     border-bottom-right-radius: 0;
+    color: #606060;
+    font-size: 9pt;
+    text-align: center;
+    width: auto;
+    padding: 0 5px 0 5px;
+    vertical-align: bottom;
 }
 
 /* The Modal (background) */

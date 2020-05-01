@@ -267,8 +267,8 @@ class N2UserInterface {
         const box = d3.select('#n2-resizer-box');
         const body = d3.select('body');
         const n2Diag = this.n2Diag;
-        const gapSpace = (n2Diag.dims.size.partitionTreeGap - 3) +
-            n2Diag.dims.size.unit;
+        const gapDist = n2Diag.dims.size.partitionTreeGap - 3;
+        const gapSpace = gapDist + n2Diag.dims.size.unit;
 
         box.style('bottom', gapSpace);
 
@@ -297,18 +297,22 @@ class N2UserInterface {
                 'y': startDims.height
             };
 
+            handle.html(Math.round(newDims.x) + ' x ' + newDims.y);
+
             body.style('cursor', 'nwse-resize')
                 .on('mouseup', e => {
                     n2Diag.manuallyResized = true;
 
                     // Update the slider value and display
-                    const defHeight = window.innerHeight * .95;
-                    const newPercent = Math.round((newDims.y / defHeight) * 100);
+                    const defaultHeight = window.innerHeight * .95;
+                    const newPercent = Math.round((newDims.y / defaultHeight) * 100);
                     d3.select('#model-slider').node().value = newPercent;
                     d3.select('#model-slider-label').html(newPercent + "%");
 
                     // Perform the actual resize
                     n2Diag.verticalResize(newDims.y);
+
+                    box.style('width', null).style('height', null);
 
                     // Turn off the resizing box border and handle
                     handle.attr('class', 'inactive-resizer-handle');
@@ -321,7 +325,7 @@ class N2UserInterface {
                 })
                 .on('mousemove', e => {
                     const newHeight = d3.event.clientY - offset.y;
-                    if (newHeight < window.innerHeight * .5 ) return;
+                    if (newHeight + gapDist * 2 < window.innerHeight * .5 ) return;
 
                     newDims = {
                         'x': d3.event.clientX - offset.x,
@@ -340,6 +344,8 @@ class N2UserInterface {
                     box
                         .style('width', newDims.x + 'px')
                         .style('height', newDims.y + 'px');
+
+                    handle.html(Math.round(newDims.x) + ' x ' + newDims.y);
                 });
 
             d3.event.preventDefault();
@@ -803,3 +809,4 @@ class N2UserInterface {
         }
     }
 }
+
