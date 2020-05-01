@@ -267,15 +267,11 @@ class N2UserInterface {
         const box = d3.select('#n2-resizer-box');
         const body = d3.select('body');
         const n2Diag = this.n2Diag;
-        const gapDist = n2Diag.dims.size.partitionTreeGap - 3;
-        const gapSpace = gapDist + n2Diag.dims.size.unit;
-
-        box.style('bottom', gapSpace);
 
         handle.on('mousedown', e => {
             box
-                .style('top', gapSpace)
-                .style('bottom', gapSpace);
+                .style('top', n2Diag.layout.gapSpace)
+                .style('bottom', n2Diag.layout.gapSpace);
 
             handle.attr('class', 'active-resizer-handle');
             box.attr('class', 'active-resizer-box');
@@ -325,27 +321,27 @@ class N2UserInterface {
                 })
                 .on('mousemove', e => {
                     const newHeight = d3.event.clientY - offset.y;
-                    if (newHeight + gapDist * 2 < window.innerHeight * .5 ) return;
+                    if (newHeight + n2Diag.layout.gapDist * 2 >= window.innerHeight * .5) {
+                        newDims = {
+                            'x': d3.event.clientX - offset.x,
+                            'y': newHeight
+                        };
 
-                    newDims = {
-                        'x': d3.event.clientX - offset.x,
-                        'y': newHeight
-                    };
+                        // Maintain the ratio by only resizing in the least moved direction
+                        // and resizing the other direction by a fraction of that
+                        if (newDims.x < newDims.y) {
+                            newDims.y = n2Diag.layout.calcHeightBasedOnNewWidth(newDims.x);
+                        }
+                        else {
+                            newDims.x = n2Diag.layout.calcWidthBasedOnNewHeight(newDims.y);
+                        }
 
-                    // Maintain the ratio by only resizing in the least moved direction
-                    // and resizing the other direction by a fraction of that
-                    if (newDims.x < newDims.y) {
-                        newDims.y = n2Diag.layout.calcHeightBasedOnNewWidth(newDims.x);
+                        box
+                            .style('width', newDims.x + 'px')
+                            .style('height', newDims.y + 'px');
+
+                        handle.html(Math.round(newDims.x) + ' x ' + newDims.y);
                     }
-                    else {
-                        newDims.x = n2Diag.layout.calcWidthBasedOnNewHeight(newDims.y);
-                    }
-
-                    box
-                        .style('width', newDims.x + 'px')
-                        .style('height', newDims.y + 'px');
-
-                    handle.html(Math.round(newDims.x) + ' x ' + newDims.y);
                 });
 
             d3.event.preventDefault();

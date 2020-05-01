@@ -349,8 +349,6 @@ class N2Toolbar {
                 n2ui.n2Diag.verticalResize(modelHeight);
                 const gapSpace = (n2ui.n2Diag.dims.size.partitionTreeGap - 3) +
                     n2ui.n2Diag.dims.size.unit;
-                // d3.select('#n2-resizer-box').style('bottom', gapSpace);
-
             });
 
         this.toolbar.select('#model-slider-fit')
@@ -362,7 +360,6 @@ class N2Toolbar {
 
                 const gapSpace = (n2ui.n2Diag.dims.size.partitionTreeGap - 3) +
                     n2ui.n2Diag.dims.size.unit;
-                // d3.select('#n2-resizer-box').style('bottom', gapSpace);
             })
     }
 }

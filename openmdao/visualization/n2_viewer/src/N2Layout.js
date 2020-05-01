@@ -34,8 +34,7 @@ class N2Layout {
 
         // Initial size values derived from read-only defaults
         this.size = dims.size;
-        this.svg = d3.select("#svgId")
-            .style('transform', 'scale(1)');
+        this.svg = d3.select("#svgId");
 
         this._setupTextRenderer();
         startTimer('N2Layout._updateTextWidths');
@@ -523,6 +522,8 @@ class N2Layout {
 
         this.ratio = (window.innerWidth - 200) / outerDims.width;
         if (this.ratio > 1 || manuallyResized) this.ratio = 1;
+        else if ( this.ratio < 1 )
+            debugInfo("Scaling diagram to " + Math.round(this.ratio * 100) + "%" );
 
         dom.svgDiv
             .style("width", (outerDims.width * this.ratio) + this.size.unit)
@@ -533,6 +534,12 @@ class N2Layout {
             .style("transform", "scale(" + this.ratio + ")")
             .attr("width", outerDims.width + this.size.unit)
             .attr("height", outerDims.height + this.size.unit);
+
+        this.gapDist = (this.size.partitionTreeGap * this.ratio) - 3;
+        this.gapSpace = this.gapDist + this.size.unit
+        d3.select('#n2-resizer-box')
+            .transition(sharedTransition)
+            .style('bottom', this.gapSpace);
 
         dom.pTreeGroup
             .transition(sharedTransition)
@@ -575,5 +582,17 @@ class N2Layout {
     calcHeightBasedOnNewWidth(width) {
         return width - this.size.partitionTree.width - this.size.solverTree.width -
             this.size.n2matrix.margin * 2;
+    }
+
+    calcFitDims() {
+        let height = window.innerHeight * 0.95;
+        let width = this.calcWidthBasedOnNewHeight(height);
+
+        if (width > window.innerWidth - 200) {
+            width = window.innerWidth - 200;
+            height = this.calcHeightBasedOnNewWidth(width);
+        }
+
+        return { 'width': width, 'height': height };
     }
 }
