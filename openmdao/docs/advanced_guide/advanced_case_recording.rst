@@ -61,8 +61,8 @@ methods like `get_objectives`, `get_design_vars`, `get_constraints` to return th
 Problem
 --------
 
-A `Problem` recorder is best if you want to record an arbitrary case before or after a run in the
-model but not during a run. In our case, we have placed our point at the end of the model.
+A `Problem` recorder is best if you want to record an arbitrary case before or after a running the
+model. In our case, we have placed our point at the end of the model.
 
 .. embed-code::
     openmdao.recorders.tests.test_sqlite_recorder.TestFeatureAdvancedExample.test_feature_problem_recorder
