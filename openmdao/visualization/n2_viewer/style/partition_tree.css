@@ -76,7 +76,7 @@ body {
 .active-resizer-box {
     left: -3px;
     visibility: visible;
-    border: 3px dashed lightblue;
+    border: 3px dashed #98daba;
 }
 
 .hidden-resizer-box {
@@ -113,15 +113,15 @@ body {
 }
 
 .active-resizer-handle {
-    background: lightblue;
-    border: 1px solid lightblue;
+    background: #98daba;
+    border: 1px solid #98daba;
     border-bottom-right-radius: 0;
-    color: #606060;
+    color: #006000;
     font-size: 9pt;
-    text-align: center;
+    align-items: center;
+    display: flex;
     width: auto;
-    padding: 0 5px 0 5px;
-    vertical-align: bottom;
+    padding: 1px 5px 1px 5px;
 }
 
 /* The Modal (background) */
