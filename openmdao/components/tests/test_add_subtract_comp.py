@@ -265,7 +265,7 @@ class TestAddSubtractUnits(unittest.TestCase):
 
 class TestWrongScalingFactorCount(unittest.TestCase):
 
-    def setUp(self):
+    def test_for_exception(self):
         self.nn = 5
         self.p = om.Problem()
 
@@ -280,15 +280,15 @@ class TestWrongScalingFactorCount(unittest.TestCase):
 
         adder=self.p.model.add_subsystem(name='add_subtract_comp',
                                    subsys=om.AddSubtractComp())
-        adder.add_equation('adder_output',['input_a','input_b','input_c'],vec_size=self.nn,length=3,scaling_factors=[1,-1])
 
-        self.p.model.connect('a', 'add_subtract_comp.input_a')
-        self.p.model.connect('b', 'add_subtract_comp.input_b')
-        self.p.model.connect('c', 'add_subtract_comp.input_c')
+        with self.assertRaises(ValueError) as err:
+            adder.add_equation('adder_output', ['input_a', 'input_b', 'input_c'], vec_size=self.nn,
+                               length=3, scaling_factors=[1, -1])
 
+        expected_msg = 'AddSubtractComp (add_subtract_comp): Scaling factors list needs to be ' \
+                       'same length as input names'
 
-    def test_for_exception(self):
-        self.assertRaises(ValueError,self.p.setup)
+        self.assertEqual(str(err.exception), expected_msg)
 
 
 class TestFeature(unittest.TestCase):

@@ -56,7 +56,6 @@ class IndepVarComp(ExplicitComponent):
             self._indep.append((name, val, kwargs))
             super(IndepVarComp, self).add_output(name, val, **kwargs)
 
-
         elif name is None:
             pass
 
@@ -94,8 +93,6 @@ class IndepVarComp(ExplicitComponent):
                                "afterwards.".format(self.msginfo))
 
         # self._static_mode = True
-
-
         # super(IndepVarComp, self)._post_configure()
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',

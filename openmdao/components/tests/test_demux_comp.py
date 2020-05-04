@@ -20,12 +20,8 @@ class TestDemuxCompOptions(unittest.TestCase):
 
         demux_comp = p.model.add_subsystem(name='demux_comp', subsys=om.DemuxComp(vec_size=nn))
 
-        demux_comp.add_var('a', shape=(nn,), axis=1)
-
-        p.model.connect('a', 'demux_comp.a')
-
         with self.assertRaises(RuntimeError) as ctx:
-            p.setup()
+            demux_comp.add_var('a', shape=(nn,), axis=1)
         self.assertEqual(str(ctx.exception),
                          "DemuxComp (demux_comp): Invalid axis (1) for variable 'a' of shape (10,)")
 
@@ -42,14 +38,8 @@ class TestDemuxCompOptions(unittest.TestCase):
 
         demux_comp = p.model.add_subsystem(name='demux_comp', subsys=om.DemuxComp(vec_size=nn))
 
-        demux_comp.add_var('a', shape=(nn, 7), axis=1)
-        demux_comp.add_var('b', shape=(3, nn), axis=1)
-
-        p.model.connect('a', 'demux_comp.a')
-        p.model.connect('b', 'demux_comp.b')
-
         with self.assertRaises(RuntimeError) as ctx:
-            p.setup()
+            demux_comp.add_var('a', shape=(nn, 7), axis=1)
         self.assertEqual(str(ctx.exception),
                          "DemuxComp (demux_comp): Variable 'a' cannot be demuxed along axis 1. Axis size is "
                          "7 but vec_size is 10.")
