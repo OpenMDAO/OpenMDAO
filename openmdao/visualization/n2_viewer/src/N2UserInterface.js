@@ -236,8 +236,10 @@ class N2UserInterface {
 
         d3.select('#searchButtonId')
             .on('click', this.searchButtonClicked.bind(this));
+
         this._setupSearch();
         this._setupResizerDrag();
+        this._setupWindowResizer();
 
         this.legend = new N2Legend(this.n2Diag.modelData);
         this.nodeInfoBox = new NodeInfo(this.n2Diag.model.abs2prom);
@@ -266,7 +268,6 @@ class N2UserInterface {
         const handle = d3.select('#n2-resizer-handle');
         const box = d3.select('#n2-resizer-box');
         const body = d3.select('body');
-        const n2Diag = this.n2Diag;
 
         handle.on('mousedown', e => {
             box
@@ -346,6 +347,24 @@ class N2UserInterface {
 
             d3.event.preventDefault();
         });
+
+    }
+
+    /** Respond to window resize events if the diagram hasn't been manually sized */
+    _setupWindowResizer() {
+        const self = this;
+        const n2Diag = self.n2Diag;
+
+        self.resizeTimeout = null;
+        d3.select(window).on('resize', function() {
+            if (! n2Diag.manuallyResized) {
+                clearTimeout(self.resizeTimeout);
+                self.resizeTimeout =
+                    setTimeout(function() {
+                        n2Diag.verticalResize(window.innerHeight * .95);
+                    }, 200);
+            }
+        })
     }
 
     /**

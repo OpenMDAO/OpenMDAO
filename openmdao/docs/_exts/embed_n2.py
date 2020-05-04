@@ -36,7 +36,7 @@ class EmbedN2Directive(Directive):
             else:
                 n2_height = n2_width / 2
         else:
-            n2_width = 1300
+            n2_width = 1200
             n2_height = 700
 
         np = os.path.normpath(os.path.join(os.getcwd(), path_to_model))
@@ -67,8 +67,13 @@ class EmbedN2Directive(Directive):
         # or errors, third argument is the line number.
         env = self.state.document.settings.env
         docname = env.doc2path(env.docname)
-        object_tag = str("<object width='{}' height='{}' type='text/html' data='{}'></object>"
-                         .format(n2_width, n2_height, html_rel_name))
+
+        object_tag = (
+            "<iframe width='" + str(n2_width) + "'"
+            " height='" + str(n2_height) + "'"
+            " style='border: 1px solid lightgray; resize: both;'"
+            " src='" + html_rel_name + "'></iframe>"
+        )
 
         rst.append(".. raw:: html", docname, self.lineno)
         rst.append("", docname, self.lineno)  # leave an empty line

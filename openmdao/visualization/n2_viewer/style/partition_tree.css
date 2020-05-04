@@ -34,7 +34,7 @@ body {
 	height: 100vh;
 	align-items: flex-start;
 	justify-content: baseline;
-	overflow-y: scroll;
+	overflow: auto;
 	position: relative;
 	margin-left: -75px;
 	transition: margin-left 0.4s;
