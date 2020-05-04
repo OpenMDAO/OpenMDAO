@@ -177,7 +177,7 @@
     overflow-y: scroll;
 }
 
-#linear-legend {
+#solvers-legend {
     height: 90px;
     display: flex;
     flex-wrap: wrap;

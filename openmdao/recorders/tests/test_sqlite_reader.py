@@ -1490,7 +1490,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         prob.run_driver()
 
-        prob.record_state('final')
+        prob.record('final')
         prob.cleanup()
 
         # expected input and output values after run_once
@@ -2030,8 +2030,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.model.nonlinear_solver.add_recorder(recorder)
 
         prob.run_driver()
-        prob.record_state('c_1')
-        prob.record_state('c_2')
+        prob.record('c_1')
+        prob.record('c_2')
         prob.cleanup()
 
         # without pre_load, we should get format_version and metadata but no cases
@@ -2106,8 +2106,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.model.nonlinear_solver.add_recorder(self.recorder)
 
         prob.run_driver()
-        prob.record_state('c_1')
-        prob.record_state('c_2')
+        prob.record('c_1')
+        prob.record('c_2')
         prob.cleanup()
 
         cr = om.CaseReader(self.filename, pre_load=False)
@@ -2384,7 +2384,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         fail = prob.run_driver()
 
-        prob.record_state('final')
+        prob.record('final')
         prob.cleanup()
 
         self.assertFalse(fail, 'Problem optimization failed.')
@@ -2870,8 +2870,44 @@ class TestSqliteCaseReader(unittest.TestCase):
 
     def test_sqlite_reader_problem_derivatives(self):
 
-        prob = ParaboloidProblem()
+        class UglyParaboloid(om.ExplicitComponent):
+            """
+            A version of the Paraboloid component with some odd but valid
+            variable names... for testing the parsing of derivative keys.
+            """
+            def setup(self):
+                self.add_input('x,1', val=0.0)
+                self.add_input('y:2', val=0.0)
+                self.add_output('f(xy)', val=0.0)
+                self.declare_partials('*', '*')
 
+            def compute(self, inputs, outputs):
+                x = inputs['x,1']
+                y = inputs['y:2']
+                outputs['f(xy)'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
+
+            def compute_partials(self, inputs, partials):
+                x = inputs['x,1']
+                y = inputs['y:2']
+                partials['f(xy)', 'x,1'] = 2.0*x - 6.0 + y
+                partials['f(xy)', 'y:2'] = 2.0*y + 8.0 + x
+
+        # make a model with some messy var names
+        model = om.Group()
+        model.add_subsystem('p1', om.IndepVarComp('x,1', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y:2', 50.0), promotes=['*'])
+        model.add_subsystem('comp', UglyParaboloid(), promotes=['*'])
+
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes_outputs=['c'])
+        model.connect('x,1', 'con.x')
+        model.connect('y:2', 'con.y')
+
+        model.add_design_var('x,1', lower=-50.0, upper=50.0)
+        model.add_design_var('y:2', lower=-50.0, upper=50.0)
+        model.add_objective('f(xy)')
+        model.add_constraint('c', upper=-15.0)
+
+        prob = om.Problem(model)
         prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
         prob.recording_options['record_derivatives'] = True
         recorder = om.SqliteRecorder('cases.sql')
@@ -2883,7 +2919,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_driver()
 
         case_name = "c1"
-        prob.record_state(case_name)
+        prob.record(case_name)
 
         prob.cleanup()
 
@@ -2893,12 +2929,48 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(num_problem_cases, 1)
 
         c1 = cr.get_case('c1')
-        J = prob.compute_totals()
-        np.testing.assert_almost_equal(c1.derivatives[('f_xy', 'x')], J[('comp.f_xy', 'p1.x')])
-        np.testing.assert_almost_equal(c1.derivatives[('f_xy', 'y')], J[('comp.f_xy', 'p2.y')])
-        np.testing.assert_almost_equal(c1.derivatives[('c', 'x')], J[('con.c', 'p1.x')])
-        np.testing.assert_almost_equal(c1.derivatives[('c', 'y')], J[('con.c', 'p2.y')])
 
+        J = prob.compute_totals()
+        np.testing.assert_almost_equal(c1.derivatives[('f(xy)', 'x,1')], J[('comp.f(xy)', 'p1.x,1')])
+        np.testing.assert_almost_equal(c1.derivatives[('f(xy)', 'y:2')], J[('comp.f(xy)', 'p2.y:2')])
+        np.testing.assert_almost_equal(c1.derivatives[('c', 'x,1')], J[('con.c', 'p1.x,1')])
+        np.testing.assert_almost_equal(c1.derivatives[('c', 'y:2')], J[('con.c', 'p2.y:2')])
+
+    def test_comma_comp(self):
+        class CommaComp(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_input('some_{input,withcommas}', val=3)
+                self.add_output('an_{output,withcommas}', val=10)
+                self.declare_partials('*', '*', method='fd')
+
+            def compute(self, inputs, outputs):
+                outputs['an_{output,withcommas}'] = 2*inputs['some_{input,withcommas}']**2
+
+        p = om.Problem()
+
+        p.model.add_subsystem('dv', om.IndepVarComp('some_{input,withcommas}', val=26.), promotes=['*'])
+        p.model.add_subsystem('comma_comp', CommaComp(), promotes=['*'])
+
+        recorder = om.SqliteRecorder('cases.sql')
+        p.add_recorder(recorder)
+
+        p.recording_options['record_derivatives'] = True
+
+        p.model.add_design_var('some_{input,withcommas}', upper=100, lower=-100)
+        p.model.add_objective('an_{output,withcommas}')
+
+        p.setup()
+        p.run_driver()
+        p.record('final')
+
+        J = p.compute_totals()
+
+        cr = om.CaseReader("cases.sql")
+        case = cr.get_case('final')
+
+        for deriv_key in J:
+            np.testing.assert_almost_equal(case.derivatives[deriv_key], J[deriv_key])
 
 @use_tempdirs
 class TestFeatureSqliteReader(unittest.TestCase):
@@ -3276,6 +3348,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
 
         case = cr.get_case(system_cases[1])
 
+        # list_inputs will print a report to the screen
         case_inputs = sorted(case.list_inputs())
 
         assert_near_equal(case_inputs[0][1]['value'], [1.], tolerance=1e-10) # d1.x
@@ -3330,7 +3403,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         self.assertEqual(sorted([inp[0] for inp in inputs]), sorted(['rect.length',]))
 
         # Inputs with multiple tags
-        inputs = case.list_inputs(out_stream=None, tags=["tag2", "tag3"])
+        inputs = case.list_inputs(out_stream=None, tags=["tag1", "tag2"])
         self.assertEqual(sorted([inp[0] for inp in inputs]), sorted(['rect.width', 'rect.length']))
 
         # Outputs with tag that does match
@@ -3433,14 +3506,14 @@ class TestFeatureSqliteReader(unittest.TestCase):
         prob.run_driver()
         print(prob['x'], prob['y'], prob['f_xy'])
         case_name_1 = "c1"
-        prob.record_state(case_name_1)
+        prob.record(case_name_1)
 
         prob['x'] = 0.1
         prob['y'] = -0.1
         prob.run_driver()
         print(prob['x'], prob['y'], prob['f_xy'])
         case_name_2 = "c2"
-        prob.record_state(case_name_2)
+        prob.record(case_name_2)
         prob.cleanup()
 
         cr = om.CaseReader('cases.sql')
@@ -3524,21 +3597,21 @@ class TestPromAbsDict(unittest.TestCase):
         np.testing.assert_almost_equal(derivs[('obj', 'x')], expected, decimal=6)
         np.testing.assert_almost_equal(derivs[('obj', 'px.x')], expected, decimal=6)
         np.testing.assert_almost_equal(derivs[('obj_cmp.obj', 'px.x')], expected, decimal=6)
-        np.testing.assert_almost_equal(derivs['obj,x'], expected, decimal=6)
-        np.testing.assert_almost_equal(derivs['obj,px.x'], expected, decimal=6)
-        np.testing.assert_almost_equal(derivs['obj_cmp.obj,x'], expected, decimal=6)
+        np.testing.assert_almost_equal(derivs['obj!x'], expected, decimal=6)
+        np.testing.assert_almost_equal(derivs['obj!px.x'], expected, decimal=6)
+        np.testing.assert_almost_equal(derivs['obj_cmp.obj!x'], expected, decimal=6)
 
         # verify we can set derivs via tuple or string, with promoted or absolute names
         # (although users wouldn't normally do this, it's used when copying)
         for key, value in [(('obj', 'x'), 111.), (('obj', 'px.x'), 222.),
-                           ('obj_cmp.obj,x', 333.), ('obj_cmp.obj,px.x', 444.)]:
+                           ('obj_cmp.obj!x', 333.), ('obj_cmp.obj!px.x', 444.)]:
             derivs[key] = value
             self.assertEqual(derivs[('obj', 'x')], value)
             self.assertEqual(derivs[('obj', 'px.x')], value)
             self.assertEqual(derivs[('obj_cmp.obj', 'px.x')], value)
-            self.assertEqual(derivs['obj,x'], value)
-            self.assertEqual(derivs['obj,px.x'], value)
-            self.assertEqual(derivs['obj_cmp.obj,x'], value)
+            self.assertEqual(derivs['obj!x'], value)
+            self.assertEqual(derivs['obj!px.x'], value)
+            self.assertEqual(derivs['obj_cmp.obj!x'], value)
 
         # verify that we didn't mess up deriv keys by setting values
         self.assertEqual(set(derivs.keys()), set([
@@ -3591,6 +3664,49 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
             if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
                 raise e
 
+    def test_problem_v8(self):
+
+        # The change from v8 to v9 was changing the character to split the derivatives from
+        # 'of,wrt' to 'of!wrt' to allow for commas
+
+        # The v8 case file used in this test was created with this code:
+
+        # class CommaComp(om.ExplicitComponent):
+
+        #     def setup(self):
+        #         self.add_input('input_var', val=3)
+        #         self.add_output('output_var', val=10)
+        #         self.declare_partials('*', '*', method='fd')
+
+        #     def compute(self, inputs, outputs):
+        #         outputs['output_var'] = 2*inputs['input_var']**2
+
+        # p = om.Problem()
+
+        # p.model.add_subsystem('dv', om.IndepVarComp('input_var', val=26.),
+        #                       promotes=['*'])
+        # p.model.add_subsystem('comma_comp', CommaComp(), promotes=['*'])
+
+        # recorder = om.SqliteRecorder('case_problem_driver_v8.sql')
+        # p.add_recorder(recorder)
+
+        # p.recording_options['record_derivatives'] = True
+
+        # p.model.add_design_var('input_var', upper=100, lower=-100)
+        # p.model.add_objective('output_var')
+
+        # p.setup()
+        # p.run_driver()
+        # p.record('final')
+
+        filename = os.path.join(self.legacy_dir, 'case_problem_driver_v8.sql')
+
+        cr = om.CaseReader(filename)
+
+        case = cr.get_case('final')
+
+        np.testing.assert_almost_equal(case.derivatives._values[0], 104.000002011162)
+
     def test_problem_v7(self):
 
         # the change from v7 to v8 was adding the recording of input, output, and residuals to problem
@@ -3619,7 +3735,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         #
         # fail = prob.run_driver()
         #
-        # prob.record_state('final')
+        # prob.record('final')
         # prob.cleanup()
 
         filename = os.path.join(self.legacy_dir, 'case_problem_driver_v7.sql')
@@ -3663,7 +3779,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         # prob.setup()
         # prob.run_driver()
         #
-        # prob.record_state('final')
+        # prob.record('final')
         # prob.cleanup()
 
         filename = os.path.join(self.legacy_dir, 'case_problem_v6.sql')
@@ -3677,7 +3793,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         self.assertEqual(sorted(cr.list_sources()), [
             'problem',
         ])
- 
+
         case = cr.get_case('final')
 
         q = case.outputs.keys()

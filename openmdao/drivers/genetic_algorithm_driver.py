@@ -74,6 +74,7 @@ class SimpleGADriver(Driver):
         self.supports['linear_constraints'] = False
         self.supports['simultaneous_derivatives'] = False
         self.supports['active_set'] = False
+        self.supports._read_only = True
 
         self._desvar_idx = {}
         self._ga = None

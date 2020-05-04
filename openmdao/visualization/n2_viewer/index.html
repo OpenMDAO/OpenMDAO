@@ -64,7 +64,8 @@
                             <i class="fas icon-model-height" id="model-slider-button"></i>
                             <i class="fas icon-caret-right caret"></i>
                             <div class="toolbar-group-expandable" id="model-height-expandable">
-                                <input type="range" class="slider" id="model-slider" list="model-slider-data" min='50' max='200' value='95'/>
+                                <input type="range" class="slider" id="model-slider" list="model-slider-data" min='50'
+                                    max='200' value='95' />
                                 <datalist id="model-slider-data">
                                     <option value='50'></option>
                                     <option value='75'></option>
@@ -124,7 +125,7 @@
                         <g id='n2top' class='offgridLabel'></g>
                         <g id='n2left' class='offgridLabel'></g>
                         <g id='n2right' class='offgridLabel'></g>
-                        <g id='n2bottom' class='offgridLabel'></g>                        
+                        <g id='n2bottom' class='offgridLabel'></g>
                     </g>
                     <g id='tree' clip-path='url(#partitionTreeClip)'></g>
                     <g id='solver_tree' clip-path='url(#solverTreeClip)'></g>
@@ -169,9 +170,9 @@
                 </div>
                 <div class="linear-solvers-container">
                     <div class="legend-title-container">
-                        <p class="legend-title">Linear Solvers</p>
+                        <p class="legend-title" id="solvers-legend-title">Linear Solvers</p>
                     </div>
-                    <div id="linear-legend"></div>
+                    <div id="solvers-legend"></div>
                 </div>
                 <div class="draggable">
                     <div id='draggable-legend-dots'>
@@ -182,7 +183,9 @@
                         <p class="legend-dots"></p>
                     </div>
                 </div>
-                <div id="close-legend"><p></p></div>
+                <div id="close-legend">
+                    <p></p>
+                </div>
             </div>
         </div>
         <div id="connectionId"></div>
