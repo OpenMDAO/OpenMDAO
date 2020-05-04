@@ -1,4 +1,72 @@
 **********************************
+# Release Notes for OpenMDAO 3.1.0
+
+May 01, 2020
+
+OpenMDAO 3.1.0 is a periodic release of OpenMDAO.
+This release features more uniformity in recording options of Problem, Driver, System, and Solver.
+It adds more capability to the Problem recorder for when users only wish to record the final state of the model rather than iteration-by-iteration.
+There have been numerous updates relating to the N2 viewer and distributed components.
+
+## Backwards Incompatible API Changes:
+
+- <POEM001> Updates the definition of light year (ly) to the IAU definition and adds units for astronomical units (au) and parsec (pc).  #1204
+- <POEM014> Built-in XDSM viewer removed from OpenMDAO and is now supported as an external plugin. #1240
+- assert_rel_error deprecated replaced with assert_near_equal. #1260 #1264
+- <POEM017> Adds ability to specify units on design variables, constraints, and objectives. #1265
+- <POEM013> convert_units and unit_conversion added to openmdao.api. #1267
+- <POEM019> Fixed various issues with directional derivatives. #1314
+- Renamed Problem.record_iteration to Problem.record. #1355
+- Case reader `system_metadata` deprecated and replaced by `system_options`. #1271 #1273
+
+## Backwards Incompatible NON-API Changes:
+
+- N2 viewer no longer treats colons in variable names as special separators. #1275
+
+## New Features:
+
+- Enabled certain command-line debugging functions to work with problems embedded in tests. #1222
+- Added default opt_settings for IPOPT and added a demonstration of the sellar problem using IPOPT via pyoptsparse. #1234
+- compute_total_coloring can now be called with `of` and `wrt` lists rather than just on desvars and responses. #1241
+- Added ability to deprecate options in OptionsDictionary. #1253
+- Improved reporting of ill-conditioned Jacobians in DirectSolver. #1192
+- We can use the directional derivative for check_partials derivative calculation of a matrix-free subjacobian. #1274
+- DOEDriver now supports discrete variables. #1293
+- Added an option 'record_derivatives' to Problem and then provided a way to access this information via a case reader. #1281
+- Added --version command to the command line interface. #1300
+- Added recording of inputs, outputs, and residuals to Problem. Add recording of outputs and residuals to Driver. #1311
+- Raise error if DirectSolver or BroydenSolver are above a parallel group or distributed component. #1321
+- Added option to KSComp to automatically add a corresponding constraint to the optimization. #1323
+- set_solver_print is now a public method on System. #1325
+- Added/updated docs for Group promotes() method. #1326
+- Users are now prevented from adding objective or constraints on distributed components.  This is a temporary fix until a more comprehensive solution is implemented. #1333
+- Bounds arrays are now only allocated when required by the linesearch, saving signficant memory for very large models. #1345
+- The N2 info panel now displays both the absolute and promoted names of variables. #1309
+
+## Bug Fixes:
+
+- Fixed a bug where dynamic coloring was not updated when doing subsequent setup calls. #1233
+- Fixed some output formatting issues in check_totals. #1258 #1259
+- Fixed a bug that occurred when a jacobian was filled with an incorrect shape. #1261
+- Fixed a bug in the Akima spline that resulted when using 4 points to define the spline. #1263
+- Fixed a bug where a driver's response indices were being changed during total derivative computation. #1288
+- Skip decorators are now correctly handled when running doc tests. #1310
+- Cleaned up the feature documentation for MatrixVectorProductComp. #1320
+- Fixed an MPI hang when using DirectSolver on a serial model run on multiple procs. #1329
+- Fixed FD derivatives on distributed components. #1337
+- Fixed bug in options passing for BSplineComp which was causing hangs. #1338
+- Fixed a bug for case where src_indices are declared for a 1D source, and are given as a flat list with flat_src_indices set to False. If any entry beyond the first were out-of-bounds, no exception was being raised. #1347
+- Correctly raise connection error in mpi when src_indices are out-of-bounds. #1353
+- Fix for a hang when setting up a distributed comp with flat_src_indices. #1353
+- Fixed a bug where driver `supports` options could be overridden by the user. #1358
+- Fixed a bug in CaseRecorder that was causing an error if a variable name contained a comma. #1380
+- Fixed sizing issues for the N2 diagram.
+- Fixed a bug that was preventing the N2 diagram from displaying in the event of a connection error. #1194
+- Fixed a missing image in the N2 diagram and updated the legend. #1324
+- Fixed a bug in rendering when a selected connection contained a variable out of the current scope. #1335
+- Fixed differences in rendering an N2 from a recorded file vs an in-memory model. #1299
+
+**********************************
 # Release Notes for OpenMDAO 3.0.0
 
 March 05, 2020

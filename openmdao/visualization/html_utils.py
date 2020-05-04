@@ -296,7 +296,7 @@ def add_dropdown(title, id_naming=None, options=None, button_content='', header=
     return write_div(content=content, cls_attr='dropdown', indent=indent, **kwargs)
 
 
-def add_help(txt, header='Instructions', footer=''):
+def add_help(txt, diagram_filepath, header='Instructions', footer=''):
     """
     Add a popup help.
 
@@ -304,6 +304,8 @@ def add_help(txt, header='Instructions', footer=''):
     ----------
     txt : str
         Help message/instructions.
+    diagram_filepath : str
+        File path to the diagram file in SVG format.
     header : str
         Message header.
     footer : str
@@ -318,7 +320,14 @@ def add_help(txt, header='Instructions', footer=''):
     head = write_div(content=header_txt, cls_attr="modal-header")
     foot = write_div(content=footer, cls_attr="modal-footer")
     body = write_div(content=write_paragraph(txt), cls_attr="modal-body")
-    modal_content = write_div(content=[head, body, foot], cls_attr="modal-content")
+    toolbar_help_header = write_div(content='Toolbar Help', cls_attr="modal-section-header")
+
+    with open(diagram_filepath, "r") as f:
+        help_diagram = f.read()
+    help_diagram = write_div(content=help_diagram, cls_attr="toolbar-help")
+
+    modal_content = write_div(content=[head, body, toolbar_help_header, help_diagram, foot],
+                              cls_attr="modal-content")
     return write_div(content=modal_content, cls_attr="modal", uid="myModal")
 
 
@@ -602,7 +611,7 @@ class DiagramWriter(TemplateWriter):
         self.toolbar = Toolbar()
         self.help = None
 
-    def add_help(self, txt, header='Instructions', footer=''):
+    def add_help(self, txt, diagram_filepath, header='Instructions', footer=''):
         """
         Add a modal with instructions.
 
@@ -610,6 +619,8 @@ class DiagramWriter(TemplateWriter):
         ----------
         txt : str
             Text.
+        diagram_filepath : str
+            File path to the diagram file in SVG format.
         header : str
             Title of the modal.
         footer : str
@@ -620,7 +631,8 @@ class DiagramWriter(TemplateWriter):
         str
             String of HTML for the help dialog.
         """
-        self.help = add_help(txt=txt, header=header, footer=footer)
+        self.help = add_help(txt=txt, diagram_filepath=diagram_filepath, header=header,
+                             footer=footer)
         return self.help
 
     def write(self, outfile):

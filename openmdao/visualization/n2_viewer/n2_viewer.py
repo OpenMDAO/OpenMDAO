@@ -354,6 +354,7 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     libs_dir = os.path.join(vis_dir, "libs")
     src_dir = os.path.join(vis_dir, "src")
     style_dir = os.path.join(vis_dir, "style")
+    assets_dir = os.path.join(vis_dir, "assets")
 
     # grab the libraries, src and style
     lib_dct = {'d3': 'd3.v5.min', 'awesomplete': 'awesomplete',
@@ -425,9 +426,10 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     # Help
     help_txt = ('Left clicking on a node in the partition tree will navigate to that node. '
                 'Right clicking on a node in the model hierarchy will collapse/expand it. '
-                'A click on any element in the N^2 diagram will allow those arrows to persist.')
-
-    h.add_help(help_txt, footer="OpenMDAO Model Hierarchy and N^2 diagram")
+                'A click on any element in the N2 diagram will allow those arrows to persist.')
+    help_diagram_svg_filepath = os.path.join(assets_dir, "toolbar_help.svg")
+    h.add_help(help_txt, help_diagram_svg_filepath,
+               footer="OpenMDAO Model Hierarchy and N2 diagram")
 
     # Write output file
     h.write(outfile)

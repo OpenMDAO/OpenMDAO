@@ -145,6 +145,7 @@ class pyOptSparseDriver(Driver):
         # What we don't support yet
         self.supports['active_set'] = False
         self.supports['integer_design_vars'] = False
+        self.supports._read_only = True
 
         # The user places optimizer-specific settings in here.
         self.opt_settings = {}
@@ -198,7 +199,9 @@ class pyOptSparseDriver(Driver):
         """
         super(pyOptSparseDriver, self)._setup_driver(problem)
 
+        self.supports._read_only = False
         self.supports['gradients'] = self.options['optimizer'] in grad_drivers
+        self.supports._read_only = True
 
         if len(self._objs) > 1 and self.options['optimizer'] not in multi_obj_drivers:
             raise RuntimeError('Multiple objectives have been added to pyOptSparseDriver'
@@ -430,7 +433,10 @@ class pyOptSparseDriver(Driver):
             self.fail = False
 
             # These are various failed statuses.
-            if exit_status > 2:
+            if optimizer == 'IPOPT':
+                if exit_status not in {0, 1}:
+                    self.fail = True
+            elif exit_status > 2:
                 self.fail = True
 
         except KeyError:

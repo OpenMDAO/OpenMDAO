@@ -549,6 +549,46 @@ class MPITests3(unittest.TestCase):
             assert_near_equal(val['rel error'][0], 0.0, 1e-6)
 
 
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class MPIFeatureTests(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def test_distribcomp_derivs_feature(self):
+        import numpy as np
+        import openmdao.api as om
+        from openmdao.test_suite.components.distributed_components import DistribCompDerivs, SummerDerivs
+        from openmdao.utils.assert_utils import assert_check_partials
+
+        size = 15
+
+        model = om.Group()
+        model.add_subsystem("indep", om.IndepVarComp('x', np.zeros(size)))
+        model.add_subsystem("C2", DistribCompDerivs(size=size))
+        model.add_subsystem("C3", SummerDerivs(size=size))
+
+        model.connect('indep.x', 'C2.invec')
+        model.connect('C2.outvec', 'C3.invec')
+
+        prob = om.Problem(model)
+        prob.setup()
+
+        prob['indep.x'] = np.ones(size)
+        prob.run_model()
+
+        assert_near_equal(prob['C2.invec'],
+                          np.ones(8) if model.comm.rank == 0 else np.ones(7))
+        assert_near_equal(prob['C2.outvec'],
+                          2*np.ones(8) if model.comm.rank == 0 else -3*np.ones(7))
+        assert_near_equal(prob['C3.sum'], -5.)
+
+        assert_check_partials(prob.check_partials())
+
+        J = prob.compute_totals(of=['C2.outvec'], wrt=['indep.x'])
+        assert_near_equal(J[('C2.outvec', 'indep.x')], 
+                          np.eye(15)*np.append(2*np.ones(8), -3*np.ones(7)))
+
+
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests
     mpirun_tests()

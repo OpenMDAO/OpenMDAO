@@ -3,8 +3,8 @@ from pyxdsm.XDSM import XDSM
 #
 opt = 'Optimization'
 solver = 'MDA'
-comp = 'ImplicitAnalysis'
-group = 'Metamodel'
+comp = 'ImplicitFunction'
+group = 'Group'
 func = 'Function'
 
 x = XDSM()
