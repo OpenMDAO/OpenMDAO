@@ -74,7 +74,7 @@ class IndepVarComp(ExplicitComponent):
         Do any error checking on i/o configuration
         """
        
-        if len(self.list_outputs(out_stream=None)) == 0:
+        if len(self._static_var_rel2meta) + len(self._var_rel2meta) == 0:
             raise RuntimeError("{}: No outputs (independent variables) have been declared. "
                                "They must either be declared during "
                                "instantiation or by calling add_output or add_discrete_output "
