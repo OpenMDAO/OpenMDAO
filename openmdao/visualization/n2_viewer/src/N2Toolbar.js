@@ -148,7 +148,11 @@ class N2Toolbar {
         this.searchBar = d3.select('#awesompleteId');
 
         this.hidden = true;
-        if (!EMBEDDED) this.show();
+
+        // Display toolbar if not embedded, or if embedded doc location
+        // href include the #toolbar anchor
+        if (!EMBEDDED || (EMBEDDED && window.location.href.includes('#toolbar'))) 
+            this.show();
 
         this._setupExpandableButtons();
         this._setupButtonFunctions(n2ui);
