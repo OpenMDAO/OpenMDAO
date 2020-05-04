@@ -443,8 +443,10 @@ class Problem(object):
             if units is None:
                 if self._setup_status > 1:  # avoids double unit conversion
                     units = tunits
+                ivalue = value
             else:
                 value = self.model.convert_from_units(abs_name, value, units)
+                ivalue = value
             if units is not None and smeta['units'] is not None:
                 value = self.model.convert_from_units(src, value, units)
         elif units is not None:
@@ -485,7 +487,7 @@ class Problem(object):
                     self.model._discrete_outputs[src] = value
                 # also set the input
                 if abs_name in self.model._inputs._views:
-                    self.model._inputs.set_var(abs_name, value, indices)
+                    self.model._inputs.set_var(abs_name, ivalue, indices)
                 elif abs_name in self.model._discrete_inputs:
                     self.model._discrete_inputs[src] = value
                 else:
@@ -1640,7 +1642,7 @@ class Problem(object):
         inputs = case.inputs if case.inputs is not None else None
         if inputs:
             for name in inputs.absolute_names():
-                if name not in self.model._var_abs_names['input']:
+                if name not in self.model._var_abs2prom['input']:
                     raise KeyError("{}: Input variable, '{}', recorded in the case is not "
                                    "found in the model".format(self.msginfo, name))
                 self[name] = inputs[name]
@@ -1648,12 +1650,10 @@ class Problem(object):
         outputs = case.outputs if case.outputs is not None else None
         if outputs:
             for name in outputs.absolute_names():
-                if name not in self.model._var_abs_names['output']:
+                if name not in self.model._var_abs2prom['output']:
                     raise KeyError("{}: Output variable, '{}', recorded in the case is not "
                                    "found in the model".format(self.msginfo, name))
                 self[name] = outputs[name]
-
-        return
 
     def check_config(self, logger=None, checks=None, out_file='openmdao_checks.out'):
         """

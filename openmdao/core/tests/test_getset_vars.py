@@ -511,7 +511,6 @@ class ParTestCase(unittest.TestCase):
         p.model.connect('indep.x', 'par.C1.x', src_indices=list(range(7)))
         p.model.connect('indep.x', 'par.C2.x', src_indices=list(range(7, 10)))
         
-        #import wingdbstub
 
         p.setup()
 
