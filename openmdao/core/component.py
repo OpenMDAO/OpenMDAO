@@ -1259,6 +1259,10 @@ class Component(System):
                 meta['cols'] = cols
                 meta['shape'] = shape = (abs2meta[abs_key[0]]['size'], abs2meta[abs_key[1]]['size'])
 
+                if abs2meta[abs_key[0]]['size'] == 0:
+                    msg = '{}: Is an array of size 0'
+                    raise ValueError(msg.format(self.msginfo))
+
                 if val is None:
                     # we can only get here if rows is None  (we're not sparse list format)
                     meta['value'] = np.zeros(shape)
