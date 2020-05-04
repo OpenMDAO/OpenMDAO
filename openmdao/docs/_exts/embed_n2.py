@@ -15,29 +15,39 @@ class EmbedN2Directive(Directive):
     .. embed-n2::
         ../../examples/model.py
 
-    The 1 required argument is the model file to be diagrammed.
-    The 2 optional arguments are width and height of the embedded object.
-
     What the above will do is replace the directive and its arg with an N2 diagram.
+
+    The one required argument is the model file to be diagrammed.
+    Optional arguments are numerical width and height of the embedded object, and
+    "toolbar" if the toolbar should be visible by default.
+
+    Example with width of 1500, height of 800, and toolbar displayed:
+
+    .. embed-n2:
+        ../../examples/model.py
+        1500
+        800
+        toolbar
 
     """
 
     required_arguments = 1
-    optional_arguments = 2
+    optional_arguments = 3
     has_content = True
 
     def run(self):
         path_to_model = self.arguments[0]
+        n2_dims = [ 1200, 700 ]
+        show_toolbar = False
 
-        if len(self.arguments) >= 2 and self.arguments[1]:
-            n2_width = self.arguments[1]
-            if len(self.arguments) == 3 and self.arguments[2]:
-                n2_height = self.arguments[2]
-            else:
-                n2_height = n2_width / 2
-        else:
-            n2_width = 1300
-            n2_height = 700
+        if len(self.arguments) > 1 and self.arguments[1]:
+            n2_dim_idx = 0
+            for idx in range(1, len(self.arguments)):
+                if self.arguments[idx] == "toolbar":
+                    show_toolbar = True
+                else:
+                    n2_dims[n2_dim_idx] = self.arguments[idx]
+                    n2_dim_idx = 1
 
         np = os.path.normpath(os.path.join(os.getcwd(), path_to_model))
 
@@ -55,6 +65,8 @@ class EmbedN2Directive(Directive):
         html_base_name = os.path.basename(path_to_model).split('.')[0] + "_n2.html"
         html_name = os.path.join(target_dir, html_base_name)
         html_rel_name = os.path.join(rel_dir, html_base_name)
+        if show_toolbar:
+            html_rel_name += '#toolbar'
 
         cmd = subprocess.Popen(
             ['openmdao', 'n2', np, '--no_browser', '--embed', '-o' + html_name])
@@ -67,8 +79,13 @@ class EmbedN2Directive(Directive):
         # or errors, third argument is the line number.
         env = self.state.document.settings.env
         docname = env.doc2path(env.docname)
-        object_tag = str("<object width='{}' height='{}' type='text/html' data='{}'></object>"
-                         .format(n2_width, n2_height, html_rel_name))
+
+        object_tag = (
+            "<iframe width='" + str(n2_dims[0]) + "'"
+            " height='" + str(n2_dims[1]) + "'"
+            " style='border: 1px solid lightgray; resize: both;'"
+            " src='" + html_rel_name + "'></iframe>"
+        )
 
         rst.append(".. raw:: html", docname, self.lineno)
         rst.append("", docname, self.lineno)  # leave an empty line

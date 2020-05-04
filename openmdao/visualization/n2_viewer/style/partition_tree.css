@@ -17,52 +17,112 @@ body {
 	background-color: white;
 }
 
-#ptN2ContentDivId {
-	display: flex;
-}
-
 #all_pt_n2_content_div {
 	position: absolute;
 	width: 100vw;
 	z-index: 5;
 }
 
-.content-container {
-	display: flex;
-	flex: 1;
+#ptN2ContentDivId {
+    display: flex;
+    flex: 0 0 auto;
 }
 
 #d3_content_div {
 	display: flex;
-	flex: 1;
+	flex: auto;
 	height: 100vh;
-	align-items: center;
-	justify-content: center;
-	overflow-y: scroll;
+	align-items: flex-start;
+	justify-content: baseline;
+	overflow: auto;
 	position: relative;
-	margin-left: -75px; /* Start with toolbar hidden */
+	margin-left: -75px;
 	transition: margin-left 0.4s;
 }
 
-.path_string {
-	font-family: 'Courier New', Courier;
-	font-size: 18px;
-	margin-left: 10px;
-	margin-top: 20px;
-}
-
-.component_connectivity {
-	font-family: helvetica, Courier;
-	font-size: 18px;
-	margin-left: 10px;
-	margin-top: 20px;
-}
-
-.ptN2ChartClass {
+#svgDiv {
 	position: absolute;
 	top: 5px;
 	left: 30px;
-	z-index: 2;
+    z-index: 2;
+    display: flex;
+    /* flex: 0 0 auto; */
+    /* resize: both; */
+    overflow: visible;
+}
+
+
+#svgId {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: flex;
+    flex: 0 0 auto;
+    transform-origin: 0 0;
+}
+
+#n2-resizer-box {
+    position: absolute;
+    right: -3px;
+}
+
+.inactive-resizer-box {
+    visibility: visible;
+    left: auto;
+    border: 3px solid transparent;
+    pointer-events: none;
+}
+
+.active-resizer-box {
+    left: -3px;
+    visibility: visible;
+    border: 3px dashed #98daba;
+    pointer-events: initial;
+}
+
+.hidden-resizer-box {
+    visibility: hidden;
+}
+
+#n2-resizer-handle {
+    position: absolute;
+    right: -2px;
+    bottom: 0px;
+    margin: 0;
+    height: 18px;
+    cursor: nwse-resize;
+    pointer-events: initial;
+    overflow: hidden;
+}
+
+.inactive-resizer-handle::before {
+    content: '\25a8';
+}
+.inactive-resizer-handle {
+    background: linear-gradient(135deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0) 54%, rgba(255,255,255,1) 55%, rgba(255,255,255,1) 100%);
+    font-size: 20px;
+    border: 0;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    -moz-background-clip: text;
+    -moz-text-fill-color: transparent;
+    font-weight: bold;
+    text-align: right;
+    vertical-align: bottom;
+    width: 18px;
+    padding: 0;
+}
+
+.active-resizer-handle {
+    background: #98daba;
+    border: 1px solid #98daba;
+    border-bottom-right-radius: 0;
+    color: #006000;
+    font-size: 9pt;
+    align-items: center;
+    display: flex;
+    width: auto;
+    padding: 1px 5px 1px 5px;
 }
 
 /* The Modal (background) */

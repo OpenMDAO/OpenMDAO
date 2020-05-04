@@ -153,7 +153,7 @@ class N2Style {
             }
         }
 
-        this.svgStyle.innerHTML = newCssText;
+        this.svgStyle.html(newCssText);
     }
 
     /**
