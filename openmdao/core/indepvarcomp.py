@@ -194,7 +194,7 @@ class IndepVarComp(ExplicitComponent):
         pass
 
 
-class AutoIndepVarComp(IndepVarComp):
+class _AutoIndepVarComp(IndepVarComp):
     """
     Class to use when all output variables are independent.
 
@@ -218,7 +218,7 @@ class AutoIndepVarComp(IndepVarComp):
         **kwargs : dict
             keyword arguments.
         """
-        super(AutoIndepVarComp, self).__init__(name, val, **kwargs)
+        super(_AutoIndepVarComp, self).__init__(name, val, **kwargs)
         self._remotes = set()
 
     def _add_remote(self, name):
@@ -233,7 +233,7 @@ class AutoIndepVarComp(IndepVarComp):
         recurse : bool (ignored)
             Whether to call this method in subsystems.
         """
-        super(AutoIndepVarComp, self)._setup_var_data(recurse)
+        super(_AutoIndepVarComp, self)._setup_var_data(recurse)
         if self.comm.size > 1:
             all_abs2meta = self._var_allprocs_abs2meta
             abs2meta = self._var_abs2meta

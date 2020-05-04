@@ -564,8 +564,9 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p['G1.comp2.b'], 12.0)
 
         # use unpromoted names for the following 2 promoted inputs
+        # Since these are now connected with an auto_ivc, their values are the same
         self.assertEqual(p['G1.comp1.a'], 3.0)
-        self.assertEqual(p['G1.comp2.a'], 4.0)
+        self.assertEqual(p['G1.comp2.a'], 3.0)
 
     def test_group_nested_promoted2(self):
         import openmdao.api as om

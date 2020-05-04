@@ -73,6 +73,7 @@ class TestKSFunction(unittest.TestCase):
         model.connect('px.x', 'ks.g')
 
         prob.setup()
+        jj = prob['ks.g']
         prob.run_driver()
 
         # compute partials with the current model inputs

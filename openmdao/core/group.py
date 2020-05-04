@@ -29,7 +29,7 @@ from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import convert_neg, array_connection_compatible, \
     _flatten_src_indices
-from openmdao.utils.general_utils import ContainsAll, all_ancestors, simple_warning
+from openmdao.utils.general_utils import ContainsAll, all_ancestors, simple_warning, Undefined
 from openmdao.utils.units import is_compatible, unit_conversion
 from openmdao.utils.mpi import MPI
 from openmdao.utils.coloring import Coloring, _STD_COLORING_FNAME
@@ -38,6 +38,8 @@ import openmdao.utils.coloring as coloring_mod
 # regex to check for valid names.
 import re
 namecheck_rgx = re.compile('[a-zA-Z][_a-zA-Z0-9]*')
+
+_undefined = Undefined()
 
 
 class Group(System):
@@ -164,7 +166,7 @@ class Group(System):
         """
         pass
 
-    def add_input(self, name, src_indices=None, units=None):
+    def add_input(self, name, val=_undefined, src_indices=None, units=None):
         """
         Specify metadata for a connected promoted inputs without a source.
 
@@ -172,6 +174,8 @@ class Group(System):
         ----------
         name : str
             The name of the promoted inputs.
+        val : object
+            Value to use as default.
         src_indices : ndarray or None
             Index array used to pull entries from a source into the promoted inputs.
         units : str or None
@@ -181,7 +185,7 @@ class Group(System):
             simple_warning(f"{self.msginfo}: Adding group input '{name}' which "
                            "overrides a previous input of the same name.")
         if src_indices is not None or units is not None:
-            self._group_inputs[name] = {'src_indices': src_indices, 'units': units}
+            self._group_inputs[name] = {'val': val, 'src_indices': src_indices, 'units': units}
 
     def _get_scope(self, excl_sub=None):
         """
@@ -2366,11 +2370,11 @@ class Group(System):
         return graph
 
     def _setup_auto_ivcs(self, mode):
-        from openmdao.core.indepvarcomp import AutoIndepVarComp
+        from openmdao.core.indepvarcomp import _AutoIndepVarComp
 
         # create the IndepVarComp that will contain all auto-ivc outputs
-        auto_ivc = AutoIndepVarComp()
-        auto_ivc.name = 'auto_ivc'
+        auto_ivc = _AutoIndepVarComp()
+        auto_ivc.name = '_auto_ivc'
         auto_ivc.pathname = auto_ivc.name
 
         abs2prom = self._var_allprocs_abs2prom['input']
@@ -2386,21 +2390,24 @@ class Group(System):
                 prom = abs2prom[abs_in]
                 if prom in self._group_inputs:
                     gmeta = self._group_inputs[prom]
+                    val = gmeta['val']
                 else:
                     gmeta = None
+                    val = _undefined
 
                 if prom in prom2ivc:
                     # multiple connected inputs w/o a src. Connect them to the same IVC
                     conns[abs_in] = prom2ivc[prom]
                 else:
-                    ivc_name = f"auto_ivc.v{count}"
+                    ivc_name = f"_auto_ivc.v{count}"
                     loc_out_name = ivc_name.rsplit('.', 1)[-1]
                     count += 1
                     prom2ivc[prom] = ivc_name
                     conns[abs_in] = ivc_name
                     if abs_in in discrete_ins:
                         if abs_in in abs2meta:
-                            val = abs2meta[abs_in]['value']
+                            if val is _undefined:
+                                val = abs2meta[abs_in]['value']
                         else:
                             # TODO: fix this value (on all procs)
                             val = None
@@ -2411,7 +2418,8 @@ class Group(System):
                             if abs2meta[abs_in]['src_indices'] is not None:
                                 raise RuntimeError(f"{self.msginfo}: auto_ivcs with src_indices "
                                                    "not supported yet.")
-                            val = abs2meta[abs_in]['value']
+                            if val is _undefined:
+                                val = abs2meta[abs_in]['value']
                         else:
                             # TODO: this value has to be updated to match the val of the input
                             #       (on all procs)
@@ -2460,7 +2468,7 @@ class Group(System):
                 self._var_allprocs_abs_names_discrete[typ])
             self._var_abs_names_discrete[typ] = (auto_ivc._var_abs_names_discrete[typ] +
                                                  self._var_abs_names_discrete[typ])
-            self._var_discrete[typ].update({'auto_ivc.' + k: v for k, v in
+            self._var_discrete[typ].update({'_auto_ivc.' + k: v for k, v in
                                             auto_ivc._var_discrete[typ].items()})
 
         self._var_abs2meta.update(auto_ivc._var_abs2meta)

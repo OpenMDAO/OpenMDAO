@@ -294,8 +294,16 @@ class Problem(object):
         else:
             proms = self.model._var_allprocs_prom2abs_list
             meta = self.model._var_abs2meta
+            try:
+                conns = self.model._conn_abs_in2out
+            except AttributeError:
+                conns = {}
+
             if name in meta:
-                val = meta[name]['value']
+                if name in conns:
+                    val = meta[conns[name]]['value'].reshape(meta[name]['shape'])
+                else:
+                    val = meta[name]['value']
             elif name in proms['output']:
                 abs_name = prom_name2abs_name(self.model, name, 'output')
                 if abs_name in meta:
@@ -305,13 +313,9 @@ class Problem(object):
                 abs_name = proms['input'][name][0]
                 conn = self.model._conn_abs_in2out
                 if abs_name in meta:  # input is local
-                    if isinstance(self.model, Group) and abs_name in conn:
-                        src_name = self.model._conn_abs_in2out[abs_name]
-                        val = meta[src_name]['value']
+                    if abs_name in conns:
+                        val = meta[conns[abs_name]]['value']
                     else:
-                        # This triggers a check for unconnected non-unique inputs, and
-                        # raises the same error as vector access.
-                        abs_name = prom_name2abs_name(self.model, name, 'input')
                         val = meta[abs_name]['value']
             else:
                 raise KeyError('{}: Variable name "{}" not found.'.format(self.msginfo, name))
@@ -473,7 +477,10 @@ class Problem(object):
                                                " connected inputs with src_indices currently not"
                                                " supported.")
                     else:
-                        self.model._outputs.set_var(src, value, indices)
+                        value = np.asarray(value)
+                        if indices is _full_slice:
+                            val = value.reshape(self.model._outputs._views[src].shape)
+                        self.model._outputs.set_var(src, val, indices)
                 elif src in self.model._discrete_outputs:
                     self.model._discrete_outputs[src] = value
                 # also set the input

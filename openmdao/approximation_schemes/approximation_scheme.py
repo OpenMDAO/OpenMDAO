@@ -208,7 +208,7 @@ class ApproximationScheme(object):
 
         if len(full_wrts) != len(wrt_matches) or approx_wrt_idx:
             if is_total and system.pathname == '':  # top level approx totals
-                full_wrt_sizes = [abs2meta[wrt]['size'] for wrt in wrt_names]
+                full_wrt_sizes = [abs2meta[wrt]['size'] for wrt in full_wrts]
             else:
                 _, full_wrt_sizes = system._get_partials_var_sizes()
 

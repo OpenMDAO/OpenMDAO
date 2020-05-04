@@ -522,10 +522,10 @@ class ParTestCase(unittest.TestCase):
 
         np.testing.assert_allclose(p['indep.x'][:7], (np.arange(7) + 1.) * 2.)
         np.testing.assert_allclose(p['indep.x'][7:10], (np.arange(7,10) + 1.) * 3.)
-        np.testing.assert_allclose(p['C1.x'], (np.arange(7) + 1.) * 2.)
-        np.testing.assert_allclose(p['C2.x'], (np.arange(7,10) + 1.) * 3.)
-        np.testing.assert_allclose(p['C1.y'], (np.arange(7) + 1.) * 4.)
-        np.testing.assert_allclose(p['C2.y'], (np.arange(7,10) + 1.) * 9.)
+        np.testing.assert_allclose(p['par.C1.x'], (np.arange(7) + 1.) * 2.)
+        np.testing.assert_allclose(p['par.C2.x'], (np.arange(7,10) + 1.) * 3.)
+        np.testing.assert_allclose(p['par.C1.y'], (np.arange(7) + 1.) * 4.)
+        np.testing.assert_allclose(p['par.C2.y'], (np.arange(7,10) + 1.) * 9.)
 
 
 if __name__ == '__main__':

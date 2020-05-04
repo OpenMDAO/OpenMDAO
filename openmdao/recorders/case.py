@@ -547,7 +547,7 @@ class Case(object):
         impl_outputs = []
 
         for var_name in self.outputs.absolute_names():
-            if not list_autoivcs and var_name.startswith('auto_ivc.'):
+            if not list_autoivcs and var_name.startswith('_auto_ivc.'):
                 continue
 
             # Filter based on tags

@@ -748,7 +748,7 @@ class System(object):
                 self._subsystems_allprocs.remove(ivc)
                 del self.auto_ivc
                 to_remove = [t for t, (s, _, _) in self._manual_connections.items()
-                             if s.startswith('auto_ivc.')]
+                             if s.startswith('_auto_ivc.')]
                 for t in to_remove:
                     del self._manual_connections[t]
 
@@ -3400,7 +3400,7 @@ class System(object):
             meta = self._var_abs2meta
             var_names = self._outputs._views.keys()
             if not list_autoivcs:
-                var_names = [v for v in var_names if not v.startswith('auto_ivc.')]
+                var_names = [v for v in var_names if not v.startswith('_auto_ivc.')]
             abs2prom = self._var_abs2prom['output']
 
         allprocs_meta = self._var_allprocs_abs2meta
@@ -4161,7 +4161,8 @@ class System(object):
                             val = self.comm.recv(source=owner, tag=tag)
 
         if not flat and val is not System._undefined and not discrete:
-            val.shape = meta['global_shape'] if get_remote and distrib else meta['shape']
+            shape = meta['global_shape'] if get_remote and distrib else meta['shape']
+            val = val.reshape(shape)
 
         return val
 
@@ -4216,8 +4217,10 @@ class System(object):
             src = conns[abs_name]
             smeta = self._var_allprocs_abs2meta[src]
             val = self._abs_get_val(src, get_remote, rank, vec_name, kind, flat)
-            if src_indices is not None:
-                if src.startswith('auto_ivc.'):
+            if src_indices is None:
+                val = val.reshape(vmeta['shape'])
+            else:
+                if src.startswith('_auto_ivc.'):
                     raise RuntimeError(f"{self.msginfo}: Unconnected input '{name}' cannot "
                                        "specify src_indices.")
                 val = val.ravel()[src_indices]
