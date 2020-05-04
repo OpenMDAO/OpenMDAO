@@ -53,7 +53,6 @@ class IndepVarComp(ExplicitComponent):
 
         # A single variable is declared during instantiation
         if isinstance(name, str):
-            self._indep.append((name, val, kwargs))
             super(IndepVarComp, self).add_output(name, val, **kwargs)
 
         elif name is None:
@@ -75,7 +74,7 @@ class IndepVarComp(ExplicitComponent):
         Do any error checking on i/o configuration
         """
        
-        if len(self._indep) + len(self._indep_external) + len(self._indep_external_discrete) == 0:
+        if len(self.list_outputs(out_stream=None)) == 0:
             raise RuntimeError("{}: No outputs (independent variables) have been declared. "
                                "They must either be declared during "
                                "instantiation or by calling add_output or add_discrete_output "
@@ -141,7 +140,6 @@ class IndepVarComp(ExplicitComponent):
                   'lower': lower, 'upper': upper, 'ref': ref, 'ref0': ref0,
                   'res_ref': res_ref, 'tags': tags
                   }
-        self._indep_external.append((name, val, kwargs))
         super(IndepVarComp, self).add_output(name, val, **kwargs)
 
     def add_discrete_output(self, name, val, desc='', tags=None):
@@ -166,7 +164,6 @@ class IndepVarComp(ExplicitComponent):
             tags = make_set(tags, name='tags') | {'indep_var'}
 
         kwargs = {'desc': desc, 'tags': tags}
-        self._indep_external_discrete.append((name, val, kwargs))
         super(IndepVarComp, self).add_discrete_output(name, val, **kwargs)
 
     def _linearize(self, jac=None, sub_do_ln=False):
