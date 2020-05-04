@@ -354,9 +354,18 @@ class N2UserInterface {
     _setupWindowResizer() {
         const self = this;
         const n2Diag = self.n2Diag;
+        this.pixelRatio = window.devicePixelRatio;
 
         self.resizeTimeout = null;
         d3.select(window).on('resize', function() {
+            const newPixelRatio = window.devicePixelRatio;
+
+            // If the browser window itself is zoomed, don't do anything
+            if ( newPixelRatio != self.pixelRatio ) {
+                self.pixelRatio = newPixelRatio;
+                return;
+            }
+
             if (! n2Diag.manuallyResized) {
                 clearTimeout(self.resizeTimeout);
                 self.resizeTimeout =

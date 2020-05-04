@@ -655,23 +655,8 @@ class N2Diagram {
             this.matrix = new N2Matrix(this.model, this.layout,
                 this.dom.n2Groups, this.ui.lastClickWasLeft,
                 this.ui.findRootOfChangeFunction, this.matrix.nodeSize);
-        } /*
-        else if ( ! this.manuallyResized ) {
-            const fitDims = this.layout.calcFitDims();
+        } 
 
-            if (fitDims.height < this.dims.size.n2matrix.height) {
-                console.log("Resizing due to offscreen width");
-                this.updateSizes(fitDims.height, this.dims.size.font);
-
-                this.layout = new N2Layout(this.model, this.zoomedElement,
-                    this.showLinearSolverNames, this.dims);
-
-                this.matrix = new N2Matrix(this.model, this.layout,
-                    this.dom.n2Groups, this.ui.lastClickWasLeft,
-                    this.ui.findRootOfChangeFunction, this.matrix.nodeSize);
-            }
-        }
-*/
         this._updateScale();
         this.layout.updateTransitionInfo(this.dom, this.transitionStartDelay, this.manuallyResized);
 
