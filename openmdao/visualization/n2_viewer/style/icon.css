@@ -1,4 +1,25 @@
 /******************* Icon styling *******************/
+
+/*
+Instructions on editing the icons used for the toolbar.
+
+	1. Go to https://icomoon.io/app/#/select
+	2. In the top left corner press import icons and select all icons in
+		the openmdao/visualization/n2_viewer/assets/toolbar-graphics/icons/SVG folder
+	3. Select the icons you wish to use by pressing on them
+	4. Depending on whether you want to remove, replace, or edit an icon:
+		- If you want to remove an icon, in the top left corner there should be a trash icon.
+			Press that and then press the icon you wish to remove
+		- If you want to replace an icon make an SVG and give it the same name as the SVG file.
+			Then press on the little hamburger menu on the right side and select import to set.
+			If it is the same name it will overwrite the icon
+		- If you want to modify an icon you will need either Sketch or Adobe Illustrator, or any other SVG editing tool
+	5. Once you have made all the changes you wish to make, in the bottom right corner press generate font.
+		Then press download in the bottom right.
+	6. If you added any new icons with new names make sure to copy and paste the css code provided in the
+			zip file into the css styling for N2. I do this every time I make an edit for safety precautions.
+*/
+
 [class^='icon-'],
 [class*=' icon-'] {
 	/* use !important to prevent issues with browser extensions that change fonts */
