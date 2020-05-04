@@ -1,9 +1,12 @@
 """Base class used to define the interface for derivative approximation schemes."""
 from collections import defaultdict
+
 from scipy.sparse import coo_matrix
 import numpy as np
+
 from openmdao.utils.array_utils import sub2full_indices, get_input_idx_split
 import openmdao.utils.coloring as coloring_mod
+from openmdao.utils.mpi import MPI
 from openmdao.jacobians.jacobian import Jacobian
 
 _full_slice = slice(None)
@@ -293,8 +296,10 @@ class ApproximationScheme(object):
         is_parallel = use_parallel_fd or system.comm.size > 1
         if isinstance(system, Component):
             is_distributed = system.options['distributed']
+            distrib_group_fd = False
         else:
             is_distributed = system._has_distrib_vars and not use_parallel_fd
+            distrib_group_fd = is_distributed
 
         results = defaultdict(list)
         iproc = system.comm.rank
@@ -356,11 +361,30 @@ class ApproximationScheme(object):
             else:
                 app_data = data
 
-            for i_count, idxs in enumerate(col_idxs):
+            # For group FD across a distributed component, we have some no-ops.
+            n_global = n_local = len(col_idxs)
+            col_idxs_array = [item for item in col_idxs]
+            if distrib_group_fd:
+                n_local = np.array(n_local)
+                n_global = np.zeros(1, dtype=int)
+                system.comm.Allreduce(n_local, n_global, op=MPI.SUM)
+                n_global = n_global[0]
+
+            for i_count in range(n_global):
+                if distrib_group_fd and i_count >= n_local:
+                    # No-op. Just run the same point again.
+                    pass
+                else:
+                    idxs = col_idxs_array[i_count]
+
                 if fd_count % num_par_fd == system._par_fd_id:
                     # run the finite difference
                     result = self._run_point(system, ((idx_info[0][0], idxs),),
                                              app_data, results_array, total)
+
+                    if distrib_group_fd and i_count >= n_local:
+                        # No-op
+                        continue
 
                     if is_parallel:
                         for of, (oview, out_idxs, _, _) in J['ofs'].items():
@@ -521,7 +545,6 @@ def _get_wrt_subjacs(system, approxs):
             J[wrt] = {'ofs': set(), 'tot_rows': 0, 'directional': options['directional'],
                       'vector': options['vector']}
 
-        tmpJ = None
         if of not in ofdict and (approx_of is None or (approx_of and of in approx_of)):
             J[wrt]['ofs'].add(of)
             if of in approx_of_idx:

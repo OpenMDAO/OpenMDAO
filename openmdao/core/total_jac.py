@@ -1627,7 +1627,6 @@ def _get_subjac(jac_meta, prom_out, prom_in, of_idx, wrt_idx, dist_resp, comm):
     ndarray
         The desired subjacobian.
     """
-    print(jac_meta)
     if jac_meta['rows'] is not None:  # sparse list format
         # This is a design variable that was declared as an obj/con.
         tot = np.eye(len(jac_meta['value']))
