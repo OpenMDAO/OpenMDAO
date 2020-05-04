@@ -70,30 +70,18 @@ class IndepVarComp(ExplicitComponent):
                 raise ValueError("IndepVarComp init: '%s' is not supported "
                                  "in IndepVarComp." % illegal)
 
-    def _post_configure(self):
+    def _configure_check(self):
         """
-        Do any remaining setup that had to wait until after final user configuration.
+        Do any error checking on i/o configuration
         """
-        # set static mode to False because we are doing things that would normally be done in setup
-        # self._static_mode = False
-
-        # self._var_rel_names = {'input': [], 'output': []}
-        # self._var_rel2meta = {}
-
-        # for (name, val, kwargs) in self._indep + self._indep_external:
-        #     super(IndepVarComp, self).add_output(name, val, **kwargs)
-
-        # for (name, val, kwargs) in self._indep_external_discrete:
-        #     super(IndepVarComp, self).add_discrete_output(name, val, **kwargs)
-
+       
         if len(self._indep) + len(self._indep_external) + len(self._indep_external_discrete) == 0:
             raise RuntimeError("{}: No outputs (independent variables) have been declared. "
                                "They must either be declared during "
                                "instantiation or by calling add_output or add_discrete_output "
                                "afterwards.".format(self.msginfo))
 
-        # self._static_mode = True
-        # super(IndepVarComp, self)._post_configure()
+        super(IndepVarComp, self)._configure_check()
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, tags=None):
