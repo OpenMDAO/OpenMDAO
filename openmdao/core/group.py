@@ -428,7 +428,7 @@ class Group(System):
 
     def _configure_check(self):
         """
-        Do any error checking on i/o and connections
+        Do any error checking on i/o and connections.
         """
         for subsys in self._subsystems_myproc:
             subsys._configure_check()

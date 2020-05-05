@@ -71,9 +71,8 @@ class IndepVarComp(ExplicitComponent):
 
     def _configure_check(self):
         """
-        Do any error checking on i/o configuration
+        Do any error checking on i/o configuration.
         """
-       
         if len(self._static_var_rel2meta) + len(self._var_rel2meta) == 0:
             raise RuntimeError("{}: No outputs (independent variables) have been declared. "
                                "They must either be declared during "

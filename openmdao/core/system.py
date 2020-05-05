@@ -810,7 +810,7 @@ class System(object):
 
     def _configure_check(self):
         """
-        Do any error checking on i/o and connections
+        Do any error checking on i/o and connections.
         """
         pass
 

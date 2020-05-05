@@ -210,7 +210,7 @@ class Component(System):
 
     def _configure_check(self):
         """
-        Do any error checking on i/o configuration
+        Do any error checking on i/o configuration.
         """
         # check here if declare_coloring was called during setup but declare_partials
         # wasn't.  If declare partials wasn't called, call it with of='*' and wrt='*' so we'll
