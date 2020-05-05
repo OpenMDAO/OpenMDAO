@@ -1261,7 +1261,10 @@ class Component(System):
 
                 if shape[0] == 0 or shape[1] == 0:
                     msg = "{}: '{}' is an array of size 0"
-                    raise ValueError(msg.format(self.msginfo, abs_key[0]))
+                    if shape[0] == 0:
+                        raise ValueError(msg.format(self.msginfo, abs_key[0]))
+                    elif shape[1] == 0:
+                        raise ValueError(msg.format(self.msginfo, abs_key[1]))
 
                 if val is None:
                     # we can only get here if rows is None  (we're not sparse list format)
