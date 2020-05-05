@@ -13,18 +13,6 @@ from openmdao.utils.general_utils import make_set
 class IndepVarComp(ExplicitComponent):
     """
     Class to use when all output variables are independent.
-
-    Attributes
-    ----------
-    _indep : tuple
-        List of tuples of the form [(str, value, kwargs), ...].
-        The value can be float or ndarray, and kwargs is a dictionary
-    _indep_external : list
-        list of this component's independent variables that are declared externally
-        via the add_output method.
-    _indep_external_discrete : list
-        list of this component's discrete independent variables that are declared externally
-        via the add_discrete_output method.
     """
 
     def __init__(self, name=None, val=1.0, **kwargs):
