@@ -106,7 +106,7 @@ class AddSubtractComp(ExplicitComponent):
 
     def add_equation(self, output_name, input_names, vec_size=1, length=1, val=1.0,
                      units=None, res_units=None, desc='', lower=None, upper=None, ref=1.0,
-                     ref0=0.0, res_ref=None, scaling_factors=None, append=True):
+                     ref0=0.0, res_ref=None, scaling_factors=None):
         """
         Add an addition/subtraction relation.
 
@@ -114,7 +114,7 @@ class AddSubtractComp(ExplicitComponent):
         ----------
         output_name : str
             (required) name of the result variable in this component's namespace.
-        input_names : iterable of str
+        input_names : iterable
             (required) names of the input variables for this system
         vec_size : int
             Length of the first dimension of the input and output vectors
@@ -158,16 +158,14 @@ class AddSubtractComp(ExplicitComponent):
         res_ref : float or ndarray
             Scaling parameter. The value in the user-defined res_units of this output's residual
             when the scaled value is 1. Default is 1.
-        append : bool
-            If True, add the given equation to the list.  If False, add the appropriate I/O but
-            do not append the given equation to the internal list.
         """
         kwargs = {'units': units, 'res_units': res_units, 'desc': desc,
                   'lower': lower, 'upper': upper, 'ref': ref, 'ref0': ref0,
                   'res_ref': res_ref}
 
-        if isinstance(input_names, str):
-            input_names = input_names
+        if (not isinstance(input_names, (list, tuple))) or len(input_names) < 2: 
+            raise ValueError(self.msginfo + ': must specify more than one input name for '
+                             'an equation, but only one given')
 
         if scaling_factors is None:
             scaling_factors = np.ones(len(input_names))
@@ -182,9 +180,8 @@ class AddSubtractComp(ExplicitComponent):
 
         super(AddSubtractComp, self).add_output(output_name, val, shape=shape, **kwargs)
 
-        if append:
-            self._equations.append((output_name, input_names, vec_size, length, val,
-                                    scaling_factors, kwargs))
+        self._equations.append((output_name, input_names, vec_size, length, val,
+                                scaling_factors, kwargs))
 
         for i, input_name in enumerate(input_names):
             if input_name not in self._input_names:
