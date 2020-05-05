@@ -11,6 +11,12 @@ AddSubtractComp
 
     result = a * \textrm{scaling factor}_a + b * \textrm{scaling factor}_b + c * \textrm{scaling factor}_c + ...
 
+Method Signature
+----------------
+
+.. automethod:: openmdao.components.add_subtract_comp.AddSubtractComp.add_equation
+    :noindex:
+
 Using the AddSubtractComp
 ---------------------------------------------------
 
