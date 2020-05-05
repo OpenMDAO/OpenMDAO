@@ -163,7 +163,7 @@ class AddSubtractComp(ExplicitComponent):
                   'lower': lower, 'upper': upper, 'ref': ref, 'ref0': ref0,
                   'res_ref': res_ref}
 
-        if (not isinstance(input_names, (list, tuple))) or len(input_names) < 2: 
+        if (not isinstance(input_names, (list, tuple))) or len(input_names) < 2:
             raise ValueError(self.msginfo + ': must specify more than one input name for '
                              'an equation, but only one given')
 
