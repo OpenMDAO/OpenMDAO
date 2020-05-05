@@ -42,9 +42,6 @@ class IndepVarComp(ExplicitComponent):
             keyword arguments.
         """
         super(IndepVarComp, self).__init__()
-        self._indep = []
-        self._indep_external = []
-        self._indep_external_discrete = []
 
         if 'tags' not in kwargs:
             kwargs['tags'] = {'indep_var'}
