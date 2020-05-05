@@ -1896,9 +1896,39 @@ class Group(System):
         rel_systems : set of str
             Set of names of relevant systems based on the current linear solve.
         """
-        vec_names = [v for v in vec_names if v in self._rel_vec_names]
+        if self._owns_approx_jac:
+            # No subsolves if we are approximating our jacobian. Instead, we behave like an
+            # ExplicitComponent and pass on the values in the derivatives vectors.
+            for vec_name in vec_names:
+                if vec_name in self._rel_vec_names:
+                    d_outputs = self._vectors['output'][vec_name]
+                    d_residuals = self._vectors['residual'][vec_name]
 
-        self._linear_solver.solve(vec_names, mode, rel_systems)
+                    if mode == 'fwd':
+                        if self._has_resid_scaling:
+                            with self._unscaled_context(outputs=[d_outputs],
+                                                        residuals=[d_residuals]):
+                                d_outputs.set_vec(d_residuals)
+                        else:
+                            d_outputs.set_vec(d_residuals)
+
+                        # ExplicitComponent jacobian defined with -1 on diagonal.
+                        d_outputs *= -1.0
+
+                    else:  # rev
+                        if self._has_resid_scaling:
+                            with self._unscaled_context(outputs=[d_outputs],
+                                                        residuals=[d_residuals]):
+                                d_residuals.set_vec(d_outputs)
+                        else:
+                            d_residuals.set_vec(d_outputs)
+
+                        # ExplicitComponent jacobian defined with -1 on diagonal.
+                        d_residuals *= -1.0
+
+        else:
+            vec_names = [v for v in vec_names if v in self._rel_vec_names]
+            self._linear_solver.solve(vec_names, mode, rel_systems)
 
     def _linearize(self, jac, sub_do_ln=True):
         """
