@@ -1,4 +1,4 @@
-.. _feature_adding_subsystem_to_a_group:
+.. _adding_subsystem_to_a_group:
 
 ****************************************************
 Adding Subsystems to a Group and Promoting Variables
@@ -16,7 +16,7 @@ Add a Component to a Group
 ---------------------------
 
 .. embed-code::
-    openmdao.core.tests.test_group.TestGroup.test_group_simple
+    openmdao.core.tests.test_group.TestFeatureAddSubsystem.test_group_simple
     :layout: interleave
 
 .. note::
@@ -38,14 +38,14 @@ Because the promoted names of `indep.a` and `comp.a` are the same, `indep.a` is 
     that the unpromoted name and the full or absolute pathname are the same.
 
 .. embed-code::
-    openmdao.core.tests.test_group.TestGroup.test_group_simple_promoted
+    openmdao.core.tests.test_group.TestFeatureAddSubsystem.test_group_simple_promoted
     :layout: interleave
 
 Add two Components to a Group nested within another Group
 ---------------------------------------------------------
 
 .. embed-code::
-    openmdao.core.tests.test_group.TestGroup.test_group_nested
+    openmdao.core.tests.test_group.TestFeatureAddSubsystem.test_group_nested
     :layout: interleave
 
 Promote the input and output of Components to subgroup level
@@ -55,7 +55,7 @@ In this example, there are two inputs promoted to the same name, so
 the promoted name *G1.a* is not unique.
 
 .. embed-code::
-    openmdao.core.tests.test_group.TestGroup.test_group_nested_promoted1
+    openmdao.core.tests.test_group.TestFeatureAddSubsystem.test_group_nested_promoted1
     :layout: interleave
 
 
@@ -63,7 +63,7 @@ Promote the input and output of Components from subgroup level up to top level
 ------------------------------------------------------------------------------
 
 .. embed-code::
-    openmdao.core.tests.test_group.TestGroup.test_group_nested_promoted2
+    openmdao.core.tests.test_group.TestFeatureAddSubsystem.test_group_nested_promoted2
     :layout: interleave
 
 
@@ -71,9 +71,11 @@ Promote with an alias to connect an input to a source
 -----------------------------------------------------
 
 .. embed-code::
-    openmdao.core.tests.test_group.TestGroup.test_group_rename_connect
+    openmdao.core.tests.test_group.TestFeatureAddSubsystem.test_group_rename_connect
     :layout: interleave
 
+
+.. _group_promotes:
 
 **************************************************
 Promote Inputs and Outputs After Adding Subsystems
@@ -92,7 +94,7 @@ Promote any subsystem inputs and outputs from the configure function
 --------------------------------------------------------------------
 
 .. embed-code::
-    openmdao.core.tests.test_group.TestGroup.test_promotes_any
+    openmdao.core.tests.test_group.TestFeatureAddSubsystem.test_promotes_any
     :layout: interleave
 
 
@@ -100,5 +102,5 @@ Promote specific inputs and outputs from the configure function
 ---------------------------------------------------------------
 
 .. embed-code::
-    openmdao.core.tests.test_group.TestGroup.test_promotes_inputs_and_outputs
+    openmdao.core.tests.test_group.TestFeatureAddSubsystem.test_promotes_inputs_and_outputs
     :layout: interleave
