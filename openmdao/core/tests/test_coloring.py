@@ -319,6 +319,88 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         self.assertEqual((p.model._solve_nl_count - 2) / 22,
                          (p_color.model._solve_nl_count - 2 - 66) / 6)
 
+    def test_size_zero_array_in_component(self):
+        class DynamicPartialsComp(om.ExplicitComponent):
+            def __init__(self, size):
+                super(DynamicPartialsComp, self).__init__()
+                self.size = size
+                self.num_computes = 0
+
+            def setup(self):
+                self.add_input('y', np.ones(self.size))
+                self.add_input('x', np.ones(self.size))
+                self.add_output('g', np.ones(self.size))
+
+                self.declare_partials('*', '*', method='cs')
+
+                # turn on dynamic partial coloring
+                self.declare_coloring(wrt='*', method='cs', perturb_size=1e-5, num_full_jacs=2, tol=1e-20,
+                                    orders=20, show_summary=True, show_sparsity=True)
+
+            def compute(self, inputs, outputs):
+                outputs['g'] = np.arctan(inputs['y'] / inputs['x'])
+                self.num_computes += 1
+
+        SIZE = 0
+        p = om.Problem()
+
+        arctan_yox = p.model.add_subsystem('arctan_yox', DynamicPartialsComp(SIZE))
+
+        p.driver = om.ScipyOptimizeDriver()
+        p.driver.options['optimizer'] = 'SLSQP'
+        p.driver.options['disp'] = False
+
+        p.driver.declare_coloring(show_summary=True, show_sparsity=True)
+
+        p.setup(mode='fwd')
+
+        with self.assertRaises(Exception) as context:
+            p.run_driver()
+        self.assertEqual(str(context.exception),
+                         "DynamicPartialsComp (arctan_yox): 'arctan_yox.g' is an array of size 0")
+
+    def test_size_zero_array_declare_partials(self):
+        class DynamicPartialsComp(om.ExplicitComponent):
+            def __init__(self, size):
+                super(DynamicPartialsComp, self).__init__()
+                self.size = size
+                self.num_computes = 0
+
+            def setup(self):
+                self.add_input('y', np.ones(self.size))
+                self.add_input('x', np.ones(self.size))
+                self.add_output('g', np.ones(self.size))
+                self.add_output('r', np.ones(1))
+
+                self.declare_partials('r', 'y', method='cs')
+
+                # turn on dynamic partial coloring
+                self.declare_coloring(wrt='*', method='cs', perturb_size=1e-5, num_full_jacs=2, tol=1e-20,
+                                    orders=20, show_summary=True, show_sparsity=True)
+
+            def compute(self, inputs, outputs):
+                outputs['g'] = np.arctan(inputs['y'] / inputs['x'])
+                self.num_computes += 1
+
+        SIZE = 0
+        p = om.Problem()
+
+        arctan_yox = p.model.add_subsystem('arctan_yox', DynamicPartialsComp(SIZE))
+
+        p.driver = om.ScipyOptimizeDriver()
+        p.driver.options['optimizer'] = 'SLSQP'
+        p.driver.options['disp'] = False
+
+        p.driver.declare_coloring(show_summary=True, show_sparsity=True)
+
+        p.setup(mode='fwd')
+
+        with self.assertRaises(Exception) as context:
+            p.run_driver()
+        self.assertEqual(str(context.exception),
+                         "DynamicPartialsComp (arctan_yox): 'arctan_yox.y' is an array of size 0")
+
+
     def test_dynamic_total_coloring_pyoptsparse_slsqp_auto(self):
         try:
             from pyoptsparse import OPT

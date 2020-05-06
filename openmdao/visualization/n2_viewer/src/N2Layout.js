@@ -25,7 +25,6 @@ class N2Layout {
         this.zoomedElement = newZoomedElement;
         this.showLinearSolverNames = showLinearSolverNames;
 
-
         this.outputNamingType = "Absolute";
         this.zoomedNodes = [];
         this.visibleNodes = [];
@@ -45,7 +44,7 @@ class N2Layout {
         startTimer('N2Layout._updateSolverTextWidths');
         this._updateSolverTextWidths();
         stopTimer('N2Layout._updateSolverTextWidths');
-        delete(this.textRenderer);
+        delete (this.textRenderer);
 
         startTimer('N2Layout._computeLeaves');
         this._computeLeaves();
@@ -285,8 +284,8 @@ class N2Layout {
         this.greatestDepth = 0;
         this.leafWidthsPx = new Array(this.model.maxDepth + 1).fill(0.0);
         this.cols = Array.from({
-                length: this.model.maxDepth + 1
-            }, () =>
+            length: this.model.maxDepth + 1
+        }, () =>
             ({
                 'width': 0.0,
                 'location': 0.0
@@ -314,8 +313,8 @@ class N2Layout {
         this.greatestDepth = 0;
         this.leafSolverWidthsPx = new Array(this.model.maxDepth + 1).fill(0.0);
         this.solverCols = Array.from({
-                length: this.model.maxDepth + 1
-            }, () =>
+            length: this.model.maxDepth + 1
+        }, () =>
             ({
                 'width': 0.0,
                 'location': 0.0
@@ -511,7 +510,7 @@ class N2Layout {
      * @param {Object} dom References to HTML elements.
      * @param {number} transitionStartDelay ms to wait before performing transition
      */
-    updateTransitionInfo(dom, transitionStartDelay) {
+    updateTransitionInfo(dom, transitionStartDelay, manuallyResized) {
         sharedTransition = d3.transition()
             .duration(N2TransitionDefaults.duration)
             .delay(transitionStartDelay);
@@ -521,22 +520,36 @@ class N2Layout {
         let outerDims = this.newOuterDims();
         let innerDims = this.newInnerDims();
 
-        dom.svgDiv.transition(sharedTransition)
-            .style("width", outerDims.width + this.size.unit)
-            .style("height", outerDims.height + this.size.unit);
+        this.ratio = (window.innerWidth - 200) / outerDims.width;
+        if (this.ratio > 1 || manuallyResized) this.ratio = 1;
+        else if ( this.ratio < 1 )
+            debugInfo("Scaling diagram to " + Math.round(this.ratio * 100) + "%" );
 
-        dom.svg.transition(sharedTransition)
-            .attr("width", outerDims.width)
-            .attr("height", outerDims.height)
-            .attr("transform", "translate(0 0)");
+        dom.svgDiv
+            .style("width", (outerDims.width * this.ratio) + this.size.unit)
+            .style("height", (outerDims.height * this.ratio) + this.size.unit)
 
-        dom.pTreeGroup.transition(sharedTransition)
+        dom.svg
+            .transition(sharedTransition)
+            .style("transform", "scale(" + this.ratio + ")")
+            .attr("width", outerDims.width + this.size.unit)
+            .attr("height", outerDims.height + this.size.unit);
+
+        this.gapDist = (this.size.partitionTreeGap * this.ratio) - 3;
+        this.gapSpace = this.gapDist + this.size.unit
+        d3.select('#n2-resizer-box')
+            .transition(sharedTransition)
+            .style('bottom', this.gapSpace);
+
+        dom.pTreeGroup
+            .transition(sharedTransition)
             .attr("height", innerDims.height)
             .attr("width", this.size.partitionTree.width)
             .attr("transform", "translate(0 " + innerDims.margin + ")");
 
         // Move n2 outer group to right of partition tree, spaced by the margin.
-        dom.n2OuterGroup.transition(sharedTransition)
+        dom.n2OuterGroup
+            .transition(sharedTransition)
             .attr("height", outerDims.height)
             .attr("width", outerDims.height)
             .attr("transform", "translate(" +
@@ -555,9 +568,31 @@ class N2Layout {
         dom.pSolverTreeGroup.transition(sharedTransition)
             .attr("height", innerDims.height)
             .attr("transform", "translate(" + (this.size.partitionTree.width +
-                    innerDims.margin +
-                    innerDims.height +
-                    innerDims.margin) + " " +
+                innerDims.margin +
+                innerDims.height +
+                innerDims.margin) + " " +
                 innerDims.margin + ")");
+    }
+
+    calcWidthBasedOnNewHeight(height) {
+        return this.size.partitionTree.width + height + this.size.solverTree.width +
+            this.size.n2matrix.margin * 2;
+    }
+
+    calcHeightBasedOnNewWidth(width) {
+        return width - this.size.partitionTree.width - this.size.solverTree.width -
+            this.size.n2matrix.margin * 2;
+    }
+
+    calcFitDims() {
+        let height = window.innerHeight * 0.95;
+        let width = this.calcWidthBasedOnNewHeight(height);
+
+        if (width > window.innerWidth - 200) {
+            width = window.innerWidth - 200;
+            height = this.calcHeightBasedOnNewWidth(width);
+        }
+
+        return { 'width': width, 'height': height };
     }
 }

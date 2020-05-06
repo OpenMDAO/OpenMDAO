@@ -428,14 +428,14 @@ class Group(System):
 
         self._setup_procs_finished = True
 
-    def _post_configure(self):
+    def _configure_check(self):
         """
-        Do any remaining setup that had to wait until after final user configuration.
+        Do any error checking on i/o and connections.
         """
         for subsys in self._subsystems_myproc:
-            subsys._post_configure()
+            subsys._configure_check()
 
-        super(Group, self)._post_configure()
+        super(Group, self)._configure_check()
 
     def _check_child_reconf(self, subsys=None):
         """

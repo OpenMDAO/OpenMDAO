@@ -208,9 +208,9 @@ class Component(System):
         else:
             self._vector_class = self._local_vector_class
 
-    def _post_configure(self):
+    def _configure_check(self):
         """
-        Do any remaining setup that had to wait until after final user configuration.
+        Do any error checking on i/o configuration.
         """
         # check here if declare_coloring was called during setup but declare_partials
         # wasn't.  If declare partials wasn't called, call it with of='*' and wrt='*' so we'll
@@ -226,7 +226,7 @@ class Component(System):
                                "using default metadata and method='%s'." % (self.msginfo, method))
                 self.declare_partials('*', '*', method=method)
 
-        super(Component, self)._post_configure()
+        super(Component, self)._configure_check()
 
     def _setup_var_data(self, recurse=True):
         """
@@ -1258,6 +1258,13 @@ class Component(System):
                 meta['rows'] = rows
                 meta['cols'] = cols
                 meta['shape'] = shape = (abs2meta[abs_key[0]]['size'], abs2meta[abs_key[1]]['size'])
+
+                if shape[0] == 0 or shape[1] == 0:
+                    msg = "{}: '{}' is an array of size 0"
+                    if shape[0] == 0:
+                        raise ValueError(msg.format(self.msginfo, abs_key[0]))
+                    elif shape[1] == 0:
+                        raise ValueError(msg.format(self.msginfo, abs_key[1]))
 
                 if val is None:
                     # we can only get here if rows is None  (we're not sparse list format)

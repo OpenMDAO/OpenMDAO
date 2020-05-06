@@ -46,7 +46,7 @@ clean:
 	rm -rf tmp
 	rm -rf make_sourcedocs
 	rm -rf doc_plot_*.png
-	rm -rf *.html _n2html/*.html
+	rm -rf *.html _n2html
 
 help:
 	@echo "Please use 'make <target>' where <target> is one of"
@@ -60,19 +60,23 @@ help:
 # RULES (that comprise the commands)
 
 build:
+	mkdir -p _n2html
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
 
 buildone:
+	mkdir -p _n2html
 	@echo building $$file
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html $$file
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
 
 buildall:
+	mkdir -p _n2html
 	$(SPHINXBUILD) -a -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
 
 buildalltravis:
+	mkdir -p _n2html
 	$(SPHINXBUILD) -a -W -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
 

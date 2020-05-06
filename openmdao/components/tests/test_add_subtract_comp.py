@@ -263,9 +263,9 @@ class TestAddSubtractUnits(unittest.TestCase):
         assert_check_partials(partials)
 
 
-class TestWrongScalingFactorCount(unittest.TestCase):
+class TestForExceptions(unittest.TestCase):
 
-    def setUp(self):
+    def test_for_bad_scale_factors(self):
         self.nn = 5
         self.p = om.Problem()
 
@@ -280,15 +280,52 @@ class TestWrongScalingFactorCount(unittest.TestCase):
 
         adder=self.p.model.add_subsystem(name='add_subtract_comp',
                                    subsys=om.AddSubtractComp())
-        adder.add_equation('adder_output',['input_a','input_b','input_c'],vec_size=self.nn,length=3,scaling_factors=[1,-1])
 
-        self.p.model.connect('a', 'add_subtract_comp.input_a')
-        self.p.model.connect('b', 'add_subtract_comp.input_b')
-        self.p.model.connect('c', 'add_subtract_comp.input_c')
+        with self.assertRaises(ValueError) as err:
+            adder.add_equation('adder_output', ['input_a', 'input_b', 'input_c'], vec_size=self.nn,
+                               length=3, scaling_factors=[1, -1])
+
+        expected_msg = 'AddSubtractComp (add_subtract_comp): Scaling factors list needs to be ' \
+                       'same length as input names'
+
+        self.assertEqual(str(err.exception), expected_msg)
 
 
-    def test_for_exception(self):
-        self.assertRaises(ValueError,self.p.setup)
+    def test_for_bad_input_set(self):
+        self.nn = 5
+        self.p = om.Problem()
+
+        ivc = om.IndepVarComp()
+        ivc.add_output(name='a', shape=(self.nn, 3))
+        ivc.add_output(name='b', shape=(self.nn, 3))
+        ivc.add_output(name='c', shape=(self.nn, 3))
+
+        self.p.model.add_subsystem(name='ivc',
+                                   subsys=ivc,
+                                   promotes_outputs=['a', 'b','c'])
+
+        adder=self.p.model.add_subsystem(name='add_subtract_comp',
+                                   subsys=om.AddSubtractComp())
+
+        with self.assertRaises(ValueError) as err:
+            adder.add_equation('adder_output', ['input_a',], vec_size=self.nn,
+                               length=3, scaling_factors=[1, -1])
+
+        expected_msg = 'AddSubtractComp (add_subtract_comp): must specify more than one input ' \
+                       'name for an equation, but only one given'
+
+        self.assertEqual(str(err.exception), expected_msg)
+
+        with self.assertRaises(ValueError) as err:
+            adder.add_equation('adder_output', 'input_a', vec_size=self.nn,
+                               length=3, scaling_factors=[1, -1])
+
+        expected_msg = 'AddSubtractComp (add_subtract_comp): must specify more than one input ' \
+                       'name for an equation, but only one given'
+
+        self.assertEqual(str(err.exception), expected_msg)
+
+
 
 
 class TestFeature(unittest.TestCase):

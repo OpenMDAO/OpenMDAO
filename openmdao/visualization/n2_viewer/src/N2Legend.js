@@ -195,7 +195,12 @@ class N2Legend {
         const self = this;
 
         this._div.on('mousedown', function() {
-            let dragDiv = d3.select(this).style('cursor', 'grabbing');
+            let dragDiv = d3.select(this);
+            dragDiv.style('cursor', 'grabbing')
+                // top style needs to be set explicitly before releasing bottom:
+                .style('top', dragDiv.style('top'))   
+                .style('bottom', 'initial');
+
             self._startPos = [d3.event.clientX, d3.event.clientY]
             self._offset = [d3.event.clientX - parseInt(dragDiv.style('left')), 
                 d3.event.clientY - parseInt(dragDiv.style('top'))];

@@ -59,14 +59,14 @@ class N2ToolbarButtonClick extends N2ToolbarButtonNoClick {
      * @param {Object} tooltipBox A reference to the tool-tip element.
      * @param {String} tooptipText Content to fill the tool-tip box with.
      * @param {Function} clickFn The function to call when clicked.
-     */ 
+     */
     constructor(id, tooltipBox, tooltipText, clickFn) {
         super(id, tooltipBox, tooltipText);
         this.clickFn = clickFn;
 
         let self = this;
 
-        this.toolbarButton.on('click', function() { self.click(this); });
+        this.toolbarButton.on('click', function () { self.click(this); });
     }
 
     /**
@@ -95,7 +95,7 @@ class N2ToolbarButtonToggle extends N2ToolbarButtonClick {
      * @param {String} tooptipTextArr A pair of tooltips for alternate states.
      * @param {Function} predicateFn Function returning a boolean representing the state.
      * @param {Function} clickFn The function to call when clicked.
-     */ 
+     */
     constructor(id, tooltipBox, tooltipTextArr, predicateFn, clickFn) {
         super(id, tooltipBox, tooltipTextArr[0], clickFn);
         this.tooltips.push(tooltipTextArr[1]);
@@ -148,12 +148,11 @@ class N2Toolbar {
         this.searchBar = d3.select('#awesompleteId');
 
         this.hidden = true;
-        if (!EMBEDDED) this.show();
 
-        d3.select('#model-slider')
-            .attr('min', window.innerHeight * .5)
-            .attr('max', window.innerHeight * 2)
-            .attr('value', window.innerHeight * .95)
+        // Display toolbar if not embedded, or if embedded doc location
+        // href include the #toolbar anchor
+        if (!EMBEDDED || (EMBEDDED && window.location.href.includes('#toolbar'))) 
+            this.show();
 
         this._setupExpandableButtons();
         this._setupButtonFunctions(n2ui);
@@ -344,9 +343,27 @@ class N2Toolbar {
         });
 
         // The model height slider is a range input
-        this.toolbar.select('#model-slider').on('mouseup', function () {
-            const modelHeight = parseInt(this.value);
-            n2ui.n2Diag.verticalResize(modelHeight);
-        });
+        this.toolbar.select('#model-slider')
+            .on('input', function () {
+                d3.select('#model-slider-label').html(this.value + "%");
+            })
+            .on('mouseup', function () {
+                n2ui.n2Diag.manuallyResized = true;
+                const modelHeight = window.innerHeight * (parseInt(this.value) / 100);
+                n2ui.n2Diag.verticalResize(modelHeight);
+                const gapSpace = (n2ui.n2Diag.dims.size.partitionTreeGap - 3) +
+                    n2ui.n2Diag.dims.size.unit;
+            });
+
+        this.toolbar.select('#model-slider-fit')
+            .on('click', function () {
+                n2ui.n2Diag.manuallyResized = false;
+                d3.select('#model-slider').node().value = '95';
+                d3.select('#model-slider-label').html("95%")
+                n2ui.n2Diag.verticalResize(window.innerHeight * .95);
+
+                const gapSpace = (n2ui.n2Diag.dims.size.partitionTreeGap - 3) +
+                    n2ui.n2Diag.dims.size.unit;
+            })
     }
 }
