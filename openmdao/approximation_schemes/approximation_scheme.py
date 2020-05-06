@@ -296,10 +296,8 @@ class ApproximationScheme(object):
         is_parallel = use_parallel_fd or system.comm.size > 1
         if isinstance(system, Component):
             is_distributed = system.options['distributed']
-            distrib_group_fd = False
         else:
             is_distributed = system._has_distrib_vars and not use_parallel_fd
-            distrib_group_fd = is_distributed
 
         results = defaultdict(list)
         iproc = system.comm.rank
@@ -361,30 +359,11 @@ class ApproximationScheme(object):
             else:
                 app_data = data
 
-            # For group FD across a distributed component, we have some no-ops.
-            n_global = n_local = len(col_idxs)
-            col_idxs_array = [item for item in col_idxs]
-            if distrib_group_fd:
-                n_local = np.array(n_local)
-                n_global = np.zeros(1, dtype=int)
-                system.comm.Allreduce(n_local, n_global, op=MPI.SUM)
-                n_global = n_global[0]
-
-            for i_count in range(n_global):
-                if distrib_group_fd and i_count >= n_local:
-                    # No-op. Just run the same point again.
-                    pass
-                else:
-                    idxs = col_idxs_array[i_count]
-
+            for i_count, idxs in enumerate(col_idxs):
                 if fd_count % num_par_fd == system._par_fd_id:
                     # run the finite difference
                     result = self._run_point(system, ((idx_info[0][0], idxs),),
                                              app_data, results_array, total)
-
-                    if distrib_group_fd and i_count >= n_local:
-                        # No-op
-                        continue
 
                     if is_parallel:
                         for of, (oview, out_idxs, _, _) in J['ofs'].items():

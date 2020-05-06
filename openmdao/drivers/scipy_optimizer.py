@@ -219,8 +219,6 @@ class ScipyOptimizeDriver(Driver):
                     d['scaler'] = None
                     d['total_adder'] = None
                     d['total_scaler'] = None
-                    # TODO - Need test
-                    #d['size'] = meta['size']
                     d['size'] = meta['size']
                     d['global_size'] = meta['global_size']
                     d['distributed'] = meta['distributed']

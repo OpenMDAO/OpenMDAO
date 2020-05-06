@@ -1437,7 +1437,6 @@ class _TotalJacInfo(object):
                                                                prom_out, prom_in, of_idx, wrt_idx,
                                                                dist_con, comm)
 
-
         elif return_format in ('dict', 'array'):
             for prom_out, output_name in zip(self.prom_of, of):
                 tot = totals[prom_out]
