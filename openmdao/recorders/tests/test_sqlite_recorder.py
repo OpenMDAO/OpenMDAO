@@ -1083,7 +1083,8 @@ class TestSqliteRecorder(unittest.TestCase):
         assertSolverIterDataRecorded(self, expected_data, self.eps)
 
     def test_record_solver_nonlinear_newton(self):
-        prob = SellarProblem(linear_solver=om.LinearBlockGS, nonlinear_solver=om.NewtonSolver(solve_subsystems=False))
+        prob = SellarProblem(linear_solver=om.LinearBlockGS,
+                             nonlinear_solver=om.NewtonSolver(solve_subsystems=False))
         prob.setup()
 
         prob.model.nonlinear_solver.add_recorder(self.recorder)
@@ -1904,7 +1905,7 @@ class TestSqliteRecorder(unittest.TestCase):
         final_case = cr.get_case('final3')
         self.assertEqual(final_case.residuals, None)
 
-     def test_problem_record_solver_data(self):
+    def test_problem_record_solver_data(self):
         prob = SellarProblem()
         prob.setup()
 
