@@ -1101,11 +1101,11 @@ def record_iteration(requester, prob, case_name):
         # Record solver info
         if requester.recording_options['record_abs_error'] or \
                 requester.recording_options['record_rel_error']:
-            solver = model.nonlinear_solver
             norm = model._residuals.get_norm()
         if requester.recording_options['record_abs_error']:
             data['abs'] = norm
         if requester.recording_options['record_rel_error']:
+            solver = model.nonlinear_solver
             norm0 = solver._norm0 if solver._norm0 != 0.0 else 1.0  # runonce never sets _norm0
             data['rel'] = norm / norm0
 
