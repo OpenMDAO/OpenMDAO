@@ -1098,5 +1098,12 @@ def record_iteration(requester, prob, case_name):
             totals = requester.compute_totals(return_format='flat_dict_structured_key')
             data['totals'] = totals
 
+    # Solver info
+    solver = model.nonlinear_solver
+    norm = model._residuals.get_norm() if solver.options['maxiter'] > 0 else 1.0
+    norm0 = solver._norm0
+    data['abs'] = norm if requester.recording_options['record_abs_error'] else None
+    data['rel'] = norm / norm0 if requester.recording_options['record_rel_error'] else None
+
     requester._rec_mgr.record_iteration(requester, data,
                                         requester._get_recorder_metadata(case_name))
