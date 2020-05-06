@@ -21,13 +21,8 @@ class TestMuxCompOptions(unittest.TestCase):
 
         mux_comp = p.model.add_subsystem(name='mux_comp', subsys=om.MuxComp(vec_size=nn))
 
-        mux_comp.add_var('a', shape=(1,), axis=2)
-
-        for i in range(nn):
-            p.model.connect('a_{0}'.format(i), 'mux_comp.a_{0}'.format(i))
-
         with self.assertRaises(ValueError) as ctx:
-            p.setup()
+            mux_comp.add_var('a', shape=(1,), axis=2)
         self.assertEqual(str(ctx.exception),
                          'MuxComp (mux_comp): Cannot mux a 1D inputs for a along axis greater than 1 (2)')
 
@@ -51,16 +46,12 @@ class TestMuxCompOptions(unittest.TestCase):
         mux_comp = p.model.add_subsystem(name='mux_comp', subsys=om.MuxComp(vec_size=nn))
 
         mux_comp.add_var('a', shape=(a_size,), axis=0)
-        mux_comp.add_var('b', shape=(b_size,), axis=2)
-
-        for i in range(nn):
-            p.model.connect('a_{0}'.format(i), 'mux_comp.a_{0}'.format(i))
-            p.model.connect('b_{0}'.format(i), 'mux_comp.b_{0}'.format(i))
 
         with self.assertRaises(ValueError) as ctx:
-            p.setup()
+            mux_comp.add_var('b', shape=(b_size,), axis=2)
         self.assertEqual(str(ctx.exception),
-                         'MuxComp (mux_comp): Cannot mux a 1D inputs for b along axis greater than 1 (2)')
+                         'MuxComp (mux_comp): Cannot mux a 1D inputs for b along axis greater '
+                         'than 1 (2)')
 
 
 class TestMuxCompScalar(unittest.TestCase):
