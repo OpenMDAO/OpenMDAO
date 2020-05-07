@@ -389,10 +389,10 @@ class Solver(object):
                 # be wrapped in the with for stack purposes, so we locally assign  norm & norm0
                 # into the class.
                 rec.abs = norm
+                if norm0 == 0:
+                    norm0 = 1
                 rec.rel = norm / norm0
 
-            if norm0 == 0:
-                norm0 = 1
             self._mpi_print(self._iter_count, norm, norm / norm0)
 
         system = self._system()

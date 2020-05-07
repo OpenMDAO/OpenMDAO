@@ -109,7 +109,7 @@ class Case(object):
         self.success = data['success']
         self.msg = data['msg']
 
-        # for a solver case
+        # for a solver or problem case
         self.abs_err = data['abs_err'] if 'abs_err' in data.keys() else None
         self.rel_err = data['abs_err'] if 'rel_err' in data.keys() else None
 

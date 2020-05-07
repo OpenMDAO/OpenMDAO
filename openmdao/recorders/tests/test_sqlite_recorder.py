@@ -25,7 +25,7 @@ from openmdao.recorders.tests.sqlite_recorder_test_utils import assertMetadataRe
     assertDriverDerivDataRecorded, assertProblemDerivDataRecorded
 
 from openmdao.recorders.tests.recorder_test_utils import run_driver
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_equal_arrays
 from openmdao.utils.general_utils import determine_adder_scaler
 from openmdao.utils.testing_utils import use_tempdirs
 
@@ -1083,7 +1083,8 @@ class TestSqliteRecorder(unittest.TestCase):
         assertSolverIterDataRecorded(self, expected_data, self.eps)
 
     def test_record_solver_nonlinear_newton(self):
-        prob = SellarProblem(linear_solver=om.LinearBlockGS, nonlinear_solver=om.NewtonSolver(solve_subsystems=False))
+        prob = SellarProblem(linear_solver=om.LinearBlockGS,
+                             nonlinear_solver=om.NewtonSolver(solve_subsystems=False))
         prob.setup()
 
         prob.model.nonlinear_solver.add_recorder(self.recorder)
@@ -1904,6 +1905,49 @@ class TestSqliteRecorder(unittest.TestCase):
         final_case = cr.get_case('final3')
         self.assertEqual(final_case.residuals, None)
 
+    def test_problem_record_solver_data(self):
+        prob = SellarProblem()
+        prob.setup()
+
+        recorder = om.SqliteRecorder("cases.sql")
+        prob.add_recorder(recorder)
+        prob.recording_options['includes'] = ['*']
+        prob.recording_options['record_abs_error'] = True
+        prob.recording_options['record_rel_error'] = True
+        prob.recording_options['record_residuals'] = True
+
+        # Just for comparison, see what values you get from recording
+        #  the top level solver
+        nl = prob.model.nonlinear_solver
+        nl.options['use_apply_nonlinear'] = True
+        nl.add_recorder(recorder)
+        nl.recording_options['record_abs_error'] = True
+        nl.recording_options['record_rel_error'] = True
+        nl.recording_options['record_solver_residuals'] = True
+
+        prob.run_driver()
+
+        prob.record('final')
+        prob.cleanup()
+
+        # get the cases from the problem and solver recording
+        cr = om.CaseReader("cases.sql")
+        final_case = cr.get_case('final')
+        root_solver_cases = cr.list_cases('root.nonlinear_solver', recurse=False)
+        last_root_solver_case = cr.get_case(root_solver_cases[-1])
+
+        # Check the errors both the value from the problem recording and
+        #   make sure it is the same as the solver last case
+        self.assertAlmostEqual(final_case.abs_err, 0.0)
+        self.assertAlmostEqual(final_case.rel_err, 0.0)
+        self.assertEqual(final_case.abs_err, last_root_solver_case.abs_err)
+        self.assertEqual(final_case.rel_err, last_root_solver_case.rel_err)
+
+        # check the residuals are the same from the problem and solver recording
+        model_residuals = final_case.residuals
+        solver_residuals = last_root_solver_case.residuals
+        for key in model_residuals.keys():
+            assert_equal_arrays(model_residuals[key], solver_residuals[key] )
 
     def test_driver_record_outputs(self):
 
