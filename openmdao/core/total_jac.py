@@ -1420,7 +1420,6 @@ class _TotalJacInfo(object):
         of_idx = model._owns_approx_of_idx
         wrt_idx = model._owns_approx_wrt_idx
         wrt_meta = self.wrt_meta
-        out_meta = self.output_meta['fwd']
 
         totals = self.J_dict
         if return_format == 'flat_dict':
