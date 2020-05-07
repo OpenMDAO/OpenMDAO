@@ -1262,9 +1262,19 @@ class Component(System):
                 if shape[0] == 0 or shape[1] == 0:
                     msg = "{}: '{}' is an array of size 0"
                     if shape[0] == 0:
-                        raise ValueError(msg.format(self.msginfo, abs_key[0]))
-                    elif shape[1] == 0:
-                        raise ValueError(msg.format(self.msginfo, abs_key[1]))
+                        if not abs2meta[abs_key[0]]['distributed']:
+                            # non-distributed components are not allowed to have zero size inputs
+                            raise ValueError(msg.format(self.msginfo, abs_key[0]))
+                        else:
+                            # distributed components are allowed to have zero size inputs on some procs
+                            rows_max = -1
+                    if shape[1] == 0:
+                        if not abs2meta[abs_key[1]]['distributed']:
+                            # non-distributed components are not allowed to have zero size outputs
+                            raise ValueError(msg.format(self.msginfo, abs_key[1]))
+                        else:
+                            # distributed components are allowed to have zero size outputs on some procs
+                            cols_max = -1
 
                 if val is None:
                     # we can only get here if rows is None  (we're not sparse list format)

@@ -90,13 +90,6 @@ class Jacobian(object):
         system = self._system()
         abs2meta = system._var_allprocs_abs2meta
         of, wrt = abs_key
-        if system.comm.size > 1:
-            if wrt in system._outputs._views:
-                sz = abs2meta[wrt]['global_size']
-            else:
-                sz = abs2meta[wrt]['size']
-            return (abs2meta[of]['global_size'], sz)
-
         return (abs2meta[of]['size'], abs2meta[wrt]['size'])
 
     def __contains__(self, key):
