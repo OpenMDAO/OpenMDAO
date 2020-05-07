@@ -1507,22 +1507,22 @@ class Group(System):
             subsys._var_promotes['input'].extend(inputs)
             if src_indices is not None:
                 # handle src_indices as if specified via add_input
-                if src_indices is not None and not isinstance(src_indices, (int, list, tuple,
-                                                                            np.ndarray, Iterable)):
-                    raise TypeError('%s: The src_indices argument should be an int, list, '
-                                    'tuple, ndarray or Iterable' % self.msginfo)
                 if isinstance(src_indices, np.ndarray):
                     if not np.issubdtype(src_indices.dtype, np.integer):
                         raise TypeError(f"{self.msginfo}: src_indices must contain integers, but "
                                         f"src_indices for promotes from '{subsys_name}' are type "
                                         f"{src_indices.dtype.type}.")
+                elif not isinstance(src_indices, (int, list, tuple, Iterable)):
+                    raise TypeError(f"{self.msginfo}: The src_indices argument should be an int, "
+                                    f"list, tuple, ndarray or Iterable, but src_indices for "
+                                    f"promotes from '{subsys_name}' are {type(src_indices)}.")
                 for inp in inputs:
-                    meta = subsys._var_rel2meta[inp]
-                    _, _, src_indices = ensure_compatible(inp, meta['value'], meta['shape'],
+                    name = inp[0] if isinstance(inp, tuple) else inp
+                    meta = subsys._var_rel2meta[name]
+                    _, _, src_indices = ensure_compatible(name, meta['value'], meta['shape'],
                                                           src_indices)
-                    if src_indices is not None:
-                        meta['src_indices'] = np.asarray(src_indices, dtype=INT_DTYPE)
-                        meta['flat_src_indices'] = flat_src_indices
+                    meta['src_indices'] = np.asarray(src_indices, dtype=INT_DTYPE)
+                    meta['flat_src_indices'] = flat_src_indices
 
         if outputs:
             subsys._var_promotes['output'].extend(outputs)
