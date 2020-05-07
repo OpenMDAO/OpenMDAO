@@ -2589,11 +2589,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         prob['circuit.n1.V'] = 10.
         prob['circuit.n2.V'] = 1.
 
-        msg = ("BoundsEnforceLS in Circuit (circuit): linesearch is active but no bounds have been "
-               "set.")
-
-        with assert_no_warning(UserWarning, msg):
-            prob.run_driver()
+        prob.run_driver()
 
         prob.cleanup()
 
