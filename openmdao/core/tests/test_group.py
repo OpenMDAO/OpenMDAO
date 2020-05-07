@@ -1135,7 +1135,7 @@ class TestConnect(unittest.TestCase):
         # source and target names can't be checked until setup
         # because setup is not called until then
         self.sub.connect('src.x', 'tgt.z', src_indices=[1])
-        
+
         with self.assertRaises(NameError) as context:
             self.prob.setup()
 
@@ -1169,7 +1169,7 @@ class TestConnect(unittest.TestCase):
         self.assertEqual(str(ctx.exception), msg)
 
         prob.model._raise_connection_errors = False
-        
+
         with assert_warning(UserWarning, msg):
             prob.setup()
 
@@ -1189,7 +1189,7 @@ class TestConnect(unittest.TestCase):
             prob.setup()
 
         self.prob.model._raise_connection_errors = False
-        
+
         with assert_warning(UserWarning, msg):
             prob.setup()
 
@@ -1211,7 +1211,7 @@ class TestConnect(unittest.TestCase):
         self.assertEqual(str(context.exception), msg)
 
         prob.model._raise_connection_errors = False
-        
+
         with assert_warning(UserWarning, msg):
             prob.setup()
 
@@ -1313,7 +1313,7 @@ class TestConnect(unittest.TestCase):
         self.assertEqual(str(context.exception), msg)
 
         self.prob.model._raise_connection_errors = False
-        
+
         with assert_warning(UserWarning, msg):
             self.prob.setup()
 
@@ -1334,7 +1334,7 @@ class TestConnect(unittest.TestCase):
         self.assertEqual(str(context.exception), msg)
 
         p.model._raise_connection_errors = False
-        
+
         with assert_warning(UserWarning, msg):
             p.setup()
 
@@ -1354,7 +1354,7 @@ class TestConnect(unittest.TestCase):
             self.fail('Exception expected.')
 
         self.prob.model._raise_connection_errors = False
-        
+
         with assert_warning(UserWarning, msg):
             self.prob.setup()
 
@@ -1375,7 +1375,7 @@ class TestConnect(unittest.TestCase):
             self.fail('Exception expected.')
 
         self.prob.model._raise_connection_errors = False
-        
+
         with assert_warning(UserWarning, msg):
             self.prob.setup()
 
@@ -1576,7 +1576,7 @@ class TestFeatureAddSubsystem(unittest.TestCase):
 
         self.assertEqual(p['comp1.b'], 6.0)
         self.assertEqual(p['comp2.b'], 9.0)
-    
+
     def test_promotes_any(self):
         import openmdao.api as om
 
@@ -1804,18 +1804,18 @@ class TestFeatureSrcIndices(unittest.TestCase):
         import openmdao.api as om
 
         class MyComp1(om.ExplicitComponent):
+            """ multiplies input array by 2. """
             def setup(self):
-                # this input will connect to entries 0, 1, and 2 of its source
-                self.add_input('x', np.ones(3))  #, src_indices=[0, 1, 2])
+                self.add_input('x', np.ones(3))
                 self.add_output('y', 1.0)
 
             def compute(self, inputs, outputs):
                 outputs['y'] = np.sum(inputs['x'])*2.0
 
         class MyComp2(om.ExplicitComponent):
+            """ multiplies input array by 4. """
             def setup(self):
-                # this input will connect to entries 3 and 4 of its source
-                self.add_input('x', np.ones(2))  #, src_indices=[3, 4])
+                self.add_input('x', np.ones(2))
                 self.add_output('y', 1.0)
 
             def compute(self, inputs, outputs):
@@ -1827,6 +1827,7 @@ class TestFeatureSrcIndices(unittest.TestCase):
                 self.add_subsystem('comp2', MyComp2())
 
             def configure(self):
+                # splits input via promotes using src_indices
                 self.promotes('comp1', inputs=['x'], src_indices=[0, 1, 2])
                 self.promotes('comp2', inputs=['x'], src_indices=[3, 4])
 
