@@ -29,6 +29,8 @@ from openmdao.solvers.solver import Solver
 """
 SQL case database version history.
 ----------------------------------
+10-- OpenMDAO 3.0
+     Added abs_err and rel_err recording to Problem recording
 9 -- OpenMDAO 3.0
      Changed the character to split the derivatives from 'of,wrt' to 'of!wrt' to allow for commas
      in variable names
@@ -50,7 +52,7 @@ SQL case database version history.
 1 -- Through OpenMDAO 2.3
      Original implementation.
 """
-format_version = 9
+format_version = 10
 
 
 def array_to_blob(array):
@@ -206,7 +208,7 @@ class SqliteRecorder(CaseRecorder):
                 c.execute("CREATE TABLE problem_cases(id INTEGER PRIMARY KEY, "
                           "counter INT, case_name TEXT, timestamp REAL, "
                           "success INT, msg TEXT, inputs TEXT, outputs TEXT, residuals TEXT, "
-                          "jacobian BLOB)")
+                          "jacobian BLOB, abs_err REAL, rel_err REAL)")
                 c.execute("CREATE INDEX prob_name_ind on problem_cases(case_name)")
 
                 c.execute("CREATE TABLE system_iterations(id INTEGER PRIMARY KEY, "
@@ -465,15 +467,20 @@ class SqliteRecorder(CaseRecorder):
             inputs_text = json.dumps(inputs)
             residuals_text = json.dumps(residuals)
 
+            abs_err = data['abs']
+            rel_err = data['rel']
+
             with self.connection as c:
                 c = c.cursor()  # need a real cursor for lastrowid
 
                 c.execute("INSERT INTO problem_cases(counter, case_name, "
-                          "timestamp, success, msg, inputs, outputs, residuals, jacobian) "
-                          "VALUES(?,?,?,?,?,?,?,?,?)",
+                          "timestamp, success, msg, inputs, outputs, residuals, jacobian, "
+                          "abs_err, rel_err ) "
+                          "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                           (self._counter, metadata['name'],
                            metadata['timestamp'], metadata['success'], metadata['msg'],
-                           inputs_text, outputs_text, residuals_text, totals_blob))
+                           inputs_text, outputs_text, residuals_text, totals_blob,
+                           abs_err, rel_err))
 
     def record_iteration_system(self, recording_requester, data, metadata):
         """

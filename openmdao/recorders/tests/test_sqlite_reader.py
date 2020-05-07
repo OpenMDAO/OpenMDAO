@@ -3664,6 +3664,25 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
             if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
                 raise e
 
+    def test_problem_v9(self):
+
+        # The change from v9 to v10 was changing adding the abs_err and rel_err
+        #   data from the top level solver to the Problem recording.
+        # The case reader code should seamlessly handle reading Problem cases
+        #   that do not contain the abs_err and rel_err values. The Case will have
+        #   values of None for those two.
+        # We can re-use the v8 legacy sql file since all we need is a case recorder
+        #   file with a Problem case in it
+
+        filename = os.path.join(self.legacy_dir, 'case_problem_driver_v8.sql')
+
+        cr = om.CaseReader(filename)
+
+        case = cr.get_case('final')
+
+        self.assertIsNone(case.abs_err)
+        self.assertIsNone(case.rel_err)
+
     def test_problem_v8(self):
 
         # The change from v8 to v9 was changing the character to split the derivatives from
