@@ -908,6 +908,46 @@ class MPIFeatureTests(unittest.TestCase):
         assert_near_equal(J[('C2.outvec', 'indep.x')],
                           np.eye(15)*np.append(2*np.ones(8), -3*np.ones(7)))
 
+    def test_distributed_constraint(self):
+        import numpy as np
+        import openmdao.api as om
+
+        from openmdao.test_suite.components.paraboloid_distributed import DistParabFeature
+
+        size = 7
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', np.ones((size, )))
+        ivc.add_output('y', -1.42 * np.ones((size, )))
+        ivc.add_output('offset', -3.0 + 0.6 * np.arange(size))
+
+        model.add_subsystem('p', ivc, promotes=['*'])
+        model.add_subsystem("parab", DistParabFeature(arr_size=size),
+                            promotes=['*'])
+        model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
+                                               f_sum=np.ones(1),
+                                               f_xy=np.ones(size)),
+                            promotes=['*'])
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_constraint('f_xy', lower=0.0)
+        model.add_objective('f_sum', index=-1)
+
+        prob.driver = om.pyOptSparseDriver(optimizer='SLSQP')
+        prob.setup(force_alloc_complex=True)
+
+        prob.run_driver()
+
+        desvar = prob.get_val('p.x', get_remote=True)
+        obj = prob.get_val('f_sum', get_remote=True)
+
+        assert_near_equal(desvar, np.array([2.65752672, 2.60433212, 2.51005989, 1.91021257,
+                                            1.3100763,  0.70992863, 0.10978096]), 1e-6)
+        assert_near_equal(obj, 11.5015, 1e-6)
+
 
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests

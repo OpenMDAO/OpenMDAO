@@ -22,3 +22,11 @@ limits in the constraint definition should be specified using these units.
 .. embed-code::
     openmdao.core.tests.test_driver.TestDriverFeature.test_specify_units
     :layout: code, output
+
+
+Using the output of a distributed component as a constraint
+-----------------------------------------------------------
+
+.. embed-code::
+    openmdao.core.tests.test_distrib_derivs.MPIFeatureTests.test_distributed_constraint
+    :layout: code, output
