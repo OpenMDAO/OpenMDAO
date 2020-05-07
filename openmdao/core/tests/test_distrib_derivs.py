@@ -629,6 +629,60 @@ class ZeroLengthInputsOutputs(unittest.TestCase):
         assert_near_equal(J[('C2.outvec', 'indep.x')], 
                           np.eye(3)*np.append(2*np.ones(1), -3*np.ones(2)))
 
+class DistribCompDenseJac(om.ExplicitComponent):
+    def initialize(self):
+        self.options['distributed'] = True
+        self.options.declare('size', default=7)
+
+    def setup(self):
+        N = self.options['size']
+        rank = self.comm.rank
+        self.add_input('x', shape=1, src_indices=rank)
+        sizes, offsets = evenly_distrib_idxs(self.comm.size, N)
+        self.add_output('y', shape=sizes[rank])
+        # automatically infer dimensions without specifying rows, cols
+        self.declare_partials('y', 'x')
+
+
+    def compute(self, inputs, outputs):
+        N = self.options['size']
+        rank = self.comm.rank
+        sizes, offsets = evenly_distrib_idxs(self.comm.size, N)
+        outputs['y'] = -2.33 * inputs['x'] * np.ones((sizes[rank],))
+
+    def compute_partials(self, inputs, J):
+        N = self.options['size']
+        rank = self.comm.rank
+        sizes, offsets = evenly_distrib_idxs(self.comm.size, N)
+        # Define jacobian element by element with variable size array
+        J['y','x'] = -2.33 * np.ones((sizes[rank],))
+
+class DeclarePartialsWithoutRowCol(unittest.TestCase):
+    N_PROCS = 3
+    size = 7
+    # this case checks for specifying dense jacobians without
+    # specifying row/col indices in the declaration
+    # issue 1336
+    model = om.Group()
+    dvs = om.IndepVarComp()
+    dvs.add_output('x', val=6.0)
+    model.add_subsystem('dvs', dvs, promotes_outputs=['*'])
+    model.add_subsystem('distcomp',DistribCompDenseJac(size=size), promotes_inputs=['*'])
+    model.add_subsystem('execcomp',om.ExecComp('z = 2.2 * y', y=np.zeros((size,)), z=np.zeros((size,))))
+    model.connect('distcomp.y', 'execcomp.y')
+    model.add_design_var('x', lower=0.0, upper=10.0, scaler=1.0)
+    model.add_constraint('execcomp.z', lower=4.2, scaler=1.0)
+    model.add_objective('x')
+
+    prob = om.Problem(model)
+    prob.setup(mode='fwd')
+
+    prob['dvs.x'] = 7.5    
+    prob.run_model()
+    assert_near_equal(prob['execcomp.z'], np.ones((size,))*-38.4450, 1e-9)
+
+    data = prob.check_totals(out_stream=None)
+    assert_near_equal(data[('execcomp.z', 'dvs.x')]['abs error'][0], 0.0, 1e-6)
 
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests
