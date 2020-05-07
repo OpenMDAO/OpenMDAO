@@ -1,4 +1,4 @@
-.. _adding_subsystem_to_a_group:
+.. _feature_adding_subsystem_to_a_group:
 
 ****************************************************
 Adding Subsystems to a Group and Promoting Variables

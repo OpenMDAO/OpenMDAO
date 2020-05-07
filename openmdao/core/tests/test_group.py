@@ -319,6 +319,27 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(top['sub.a'], 3)
         self.assertEqual(top['b'], 4)
 
+    def test_multiple_promotes_src_indices(self):
+
+        class SimpleGroup(om.Group):
+
+            def setup(self):
+                self.add_subsystem('indep', om.IndepVarComp(), promotes=['*'])
+                self.add_subsystem('comp1', om.ExecComp('c=2*a*b', a=np.ones(3), b=np.ones(3), c=np.ones(3)))
+
+            def configure(self):
+                self.indep.add_output('x', np.array(range(5)))
+                self.promotes('comp1', inputs=[('a', 'x'), ('b', 'x')], src_indices=[0, 2, 4])
+
+        p = om.Problem(model=SimpleGroup())
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['x'], np.array([0, 1, 2, 3, 4]))
+        assert_near_equal(p['comp1.a'], np.array([0, 2, 4]))
+        assert_near_equal(p['comp1.b'], np.array([0, 2, 4]))
+        assert_near_equal(p['comp1.c'], np.array([0, 8, 32]))
+
     def test_promotes_src_indices_bad_type(self):
 
         class SimpleGroup(om.Group):
