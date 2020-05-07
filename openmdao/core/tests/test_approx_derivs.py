@@ -810,6 +810,86 @@ class TestGroupFiniteDifference(unittest.TestCase):
 
         assert_near_equal(p['circle.area'], np.pi, 1e-6)
 
+    def test_bug_subsolve(self):
+        # There was a bug where a group with an approximation was still performing a linear
+        # solve on its subsystems, which led to partials declared with 'val' corrupting the
+        # results.
+
+        class DistParab(om.ExplicitComponent):
+
+            def initialize(self):
+
+                self.options.declare('arr_size', types=int, default=10,
+                                     desc="Size of input and output vectors.")
+
+            def setup(self):
+                arr_size = self.options['arr_size']
+
+                self.add_input('x', val=np.ones(arr_size))
+                self.add_output('f_xy', val=np.ones(arr_size))
+
+                self.declare_partials('f_xy', 'x')
+
+            def compute(self, inputs, outputs):
+                x = inputs['x']
+                outputs['f_xy'] = x**2
+
+        class NonDistComp(om.ExplicitComponent):
+
+            def initialize(self):
+                self.options.declare('arr_size', types=int, default=10,
+                                     desc="Size of input and output vectors.")
+
+            def setup(self):
+                arr_size = self.options['arr_size']
+
+                self.add_input('f_xy', val=np.ones(arr_size))
+
+                self.add_output('g', val=np.ones(arr_size))
+
+                # Make this wrong to see if it shows up in the answer.
+                mat = np.array([7.0, 13, 27])
+
+                row_col = np.arange(arr_size)
+                self.declare_partials('g', ['f_xy'], rows=row_col, cols=row_col, val=mat)
+                #self.declare_partials('g', ['f_xy'])
+
+            def compute(self, inputs, outputs):
+                x = inputs['f_xy']
+                outputs['g'] = x * np.array([3.5, -1.0, 5.0])
+
+        size = 3
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', np.ones((size, )))
+
+        model.add_subsystem('p', ivc, promotes=['*'])
+        sub = model.add_subsystem('sub', om.Group(), promotes=['*'])
+
+        sub.add_subsystem("parab", DistParab(arr_size=size), promotes=['*'])
+        sub.add_subsystem("ndp", NonDistComp(arr_size=size), promotes=['*'])
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_constraint('g', lower=0.0)
+
+        sub.approx_totals(method='fd')
+
+        prob.setup()
+
+        prob.run_model()
+
+        of = ['sub.ndp.g']
+        totals = prob.driver._compute_totals(of=of, wrt=['p.x'], return_format='dict')
+        assert_near_equal(totals['sub.ndp.g']['p.x'], np.diag([7.0, -2.0, 10.0]), 1e-6)
+
+        totals = prob.check_totals()
+
+        for key, val in totals.items():
+            assert_near_equal(val['rel error'][0], 0.0, 1e-6)
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestGroupFiniteDifferenceMPI(unittest.TestCase):
