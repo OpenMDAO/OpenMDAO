@@ -1837,12 +1837,14 @@ class TestFeatureSrcIndices(unittest.TestCase):
         p.model.add_subsystem('G1', MyGroup(), promotes_inputs=['x'])
 
         p.setup()
+
+        p['x'] = inp = np.array(range(5))
         p.run_model()
 
-        assert_near_equal(p['C1.x'], np.ones(3))
-        assert_near_equal(p['C1.y'], 6.)
-        assert_near_equal(p['C2.x'], np.ones(2))
-        assert_near_equal(p['C2.y'], 8.)
+        assert_near_equal(p['G1.comp1.x'], inp[:3])
+        assert_near_equal(p['G1.comp2.x'], inp[3:])
+        assert_near_equal(p['G1.comp1.y'], np.sum(inp[:3]*2))
+        assert_near_equal(p['G1.comp2.y'], np.sum(inp[3:]*4))
 
 
 class TestFeatureSetOrder(unittest.TestCase):

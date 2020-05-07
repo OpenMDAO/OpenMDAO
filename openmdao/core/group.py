@@ -29,7 +29,8 @@ from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import convert_neg, array_connection_compatible, \
     _flatten_src_indices
-from openmdao.utils.general_utils import ContainsAll, all_ancestors, simple_warning
+from openmdao.utils.general_utils import ContainsAll, all_ancestors, simple_warning, \
+    ensure_compatible
 from openmdao.utils.units import is_compatible, unit_conversion
 from openmdao.utils.mpi import MPI
 from openmdao.utils.coloring import Coloring, _STD_COLORING_FNAME
@@ -840,6 +841,10 @@ class Group(System):
 
         allprocs_prom2abs_list_in = self._var_allprocs_prom2abs_list['input']
         allprocs_prom2abs_list_out = self._var_allprocs_prom2abs_list['output']
+
+        allprocs_discrete_in = self._var_allprocs_discrete['input']
+        allprocs_discrete_out = self._var_allprocs_discrete['output']
+
         abs2meta = self._var_abs2meta
         pathname = self.pathname
 
@@ -883,10 +888,8 @@ class Group(System):
 
             # throw an exception if either output or input doesn't exist
             # (not traceable to a connect statement, so provide context)
-            if (prom_out not in allprocs_prom2abs_list_out and
-                    prom_out not in self._var_allprocs_discrete['output']):
-                if (prom_out in allprocs_prom2abs_list_in or
-                        prom_out in self._var_allprocs_discrete['input']):
+            if not (prom_out in allprocs_prom2abs_list_out or prom_out in allprocs_discrete_out):
+                if (prom_out in allprocs_prom2abs_list_in or prom_out in allprocs_discrete_in):
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
                           f"'{prom_in}', but '{prom_out}' is an input. " + \
                           "All connections must be from an output to an input."
@@ -904,10 +907,8 @@ class Group(System):
                         simple_warning(msg)
                         continue
 
-            if (prom_in not in allprocs_prom2abs_list_in and
-                    prom_in not in self._var_allprocs_discrete['input']):
-                if (prom_in in allprocs_prom2abs_list_out or
-                        prom_in in self._var_allprocs_discrete['output']):
+            if not (prom_in in allprocs_prom2abs_list_in or prom_in in allprocs_discrete_in):
+                if (prom_in in allprocs_prom2abs_list_out or prom_in in allprocs_discrete_out):
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
                           f"'{prom_in}', but '{prom_in}' is an output. " + \
                           "All connections must be from an output to an input."
@@ -1504,6 +1505,23 @@ class Group(System):
             subsys._var_promotes['any'].extend(any)
         if inputs:
             subsys._var_promotes['input'].extend(inputs)
+            if src_indices is not None:
+                # handle src_indices as if specified via add_input
+                if src_indices is not None and not isinstance(src_indices, (int, list, tuple,
+                                                                            np.ndarray, Iterable)):
+                    raise TypeError('%s: The src_indices argument should be an int, list, '
+                                    'tuple, ndarray or Iterable' % self.msginfo)
+                for inp in inputs:
+                    meta = subsys._var_rel2meta[inp]
+                    from pprint import pprint
+                    print(subsys_name, inp, ":")
+                    pprint(meta)
+                    _, _, src_indices = ensure_compatible(inp, meta['value'], meta['shape'], src_indices)
+
+                    if src_indices is not None:
+                        meta['src_indices'] = np.asarray(src_indices, dtype=INT_DTYPE)
+                        meta['flat_src_indices'] = flat_src_indices
+
         if outputs:
             subsys._var_promotes['output'].extend(outputs)
 
@@ -1525,10 +1543,6 @@ class Group(System):
                 raise TypeError("%s: src_indices must contain integers, but src_indices for "
                                 "connection from '%s' to '%s' is %s." %
                                 (self.msginfo, src_name, tgt_name, src_indices.dtype.type))
-
-
-        if src_indices is not None:
-            raise NotImplementedError("src_indices not yet implemented on promotes()")
 
     def add_subsystem(self, name, subsys, promotes=None,
                       promotes_inputs=None, promotes_outputs=None,
