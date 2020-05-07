@@ -11,6 +11,7 @@ from tempfile import mkdtemp
 
 import openmdao.api as om
 from openmdao.utils.general_utils import set_pyoptsparse_opt
+from openmdao.utils.assert_utils import assert_no_warning
 
 from openmdao.test_suite.components.ae_tests import AEComp
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesGrouped, \
@@ -2633,6 +2634,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         prob['circuit.n2.V'] = 1.
 
         prob.run_driver()
+
         prob.cleanup()
 
         # create the case reader
