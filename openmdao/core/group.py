@@ -1504,6 +1504,7 @@ class Group(System):
         if any:
             subsys._var_promotes['any'].extend(any)
         if inputs:
+            # TODO: handle inputs included via 'any'?
             subsys._var_promotes['input'].extend(inputs)
             if src_indices is not None:
                 # handle src_indices as if specified via add_input
@@ -1517,6 +1518,7 @@ class Group(System):
                                     f"list, tuple, ndarray or Iterable, but src_indices for "
                                     f"promotes from '{subsys_name}' are {type(src_indices)}.")
                 for inp in inputs:
+                    # TODO: need to handle wildcards
                     name = inp[0] if isinstance(inp, tuple) else inp
                     meta = subsys._var_rel2meta[name]
                     _, _, src_indices = ensure_compatible(name, meta['value'], meta['shape'],
@@ -1639,7 +1641,7 @@ class Group(System):
 
         return subsys
 
-    def connect(self, src_name, tgt_name, src_indices=None, flat_src_indices=None):
+    def connect(self, src_name, tgt_name, src_indices=None, flat_src_indices=False):
         """
         Connect source src_name to target tgt_name in this namespace.
 

@@ -90,315 +90,6 @@ class TestSubsystemConfigError(unittest.TestCase):
 
 class TestGroup(unittest.TestCase):
 
-    def test_promotes_outputs_in_config(self):
-
-        class SimpleGroup(om.Group):
-
-            def setup(self):
-                self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
-                self.add_subsystem('comp2', om.ExecComp('b=2*a'))
-
-            def configure(self):
-                self.promotes('comp2', outputs=['b'])
-
-        top = om.Problem(model=SimpleGroup())
-        top.setup()
-
-        self.assertEqual(top['b'], 1)
-        with self.assertRaises(KeyError) as cm:
-            top['a']
-
-        self.assertEqual(str(cm.exception),
-                         "'Problem: Variable name \"a\" not found.'")
-
-    def test_promotes_inputs_in_config(self):
-
-        class SimpleGroup(om.Group):
-
-            def setup(self):
-                self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
-                self.add_subsystem('comp2', om.ExecComp('b=2*a'))
-
-            def configure(self):
-                self.promotes('comp2', inputs=['a'])
-
-        top = om.Problem(model=SimpleGroup())
-        top.setup()
-
-        self.assertEqual(top['a'], 1)
-        with self.assertRaises(KeyError) as cm:
-            top['b']
-
-        self.assertEqual(str(cm.exception),
-                         "'Problem: Variable name \"b\" not found.'")
-
-    def test_promotes_in_config(self):
-
-        class SimpleGroup(om.Group):
-            def setup(self):
-                self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
-                self.add_subsystem('comp2', om.ExecComp('b=2*a'))
-
-            def configure(self):
-                self.promotes('comp1', any=['*'])
-
-        top = om.Problem(model=SimpleGroup())
-        top.setup()
-
-        self.assertEqual(top['x'], 5)
-        with self.assertRaises(KeyError) as cm:
-            top['a']
-
-        self.assertEqual(str(cm.exception),
-                         "'Problem: Variable name \"a\" not found.'")
-
-    def test_promotes_alias(self):
-        class SubGroup(om.Group):
-
-            def setup(self):
-                self.add_subsystem('comp1', om.ExecComp('x=2.0*a+3.0*b', a=3.0, b=4.0))
-
-            def configure(self):
-                self.promotes('comp1', inputs=['a'])
-
-        class TopGroup(om.Group):
-
-            def setup(self):
-                self.add_subsystem('sub', SubGroup())
-
-            def configure(self):
-                self.sub.promotes('comp1', inputs=['b'])
-                self.promotes('sub', inputs=[('b', 'bb')])
-
-        top = om.Problem(model=TopGroup())
-        top.setup()
-
-        self.assertEqual(top['bb'], 4.0)
-
-    def test_promotes_alias_from_parent(self):
-        class SubGroup(om.Group):
-
-            def setup(self):
-                self.add_subsystem('comp1', om.ExecComp('x=2.0*a+3.0*b+c', a=3.0, b=4.0))
-
-            def configure(self):
-                self.promotes('comp1', inputs=[('b', 'bb')])
-
-        class TopGroup(om.Group):
-
-            def setup(self):
-                self.add_subsystem('sub', SubGroup())
-
-            def configure(self):
-                self.sub.promotes('comp1', inputs=['b'])
-
-        top = om.Problem(model=TopGroup())
-
-        with self.assertRaises(RuntimeError) as context:
-            top.setup()
-
-        self.assertEqual(str(context.exception),
-                         "SubGroup (sub): Trying to promote 'b' when it has been aliased to 'bb'.")
-
-    def test_promotes_alias_src_indices(self):
-
-        class SimpleGroup(om.Group):
-
-            def setup(self):
-                self.add_subsystem('indep', om.IndepVarComp(), promotes=['*'])
-                self.add_subsystem('comp1', om.ExecComp('b=2*a', a=np.ones(3), b=np.ones(3)))
-                self.add_subsystem('comp2', om.ExecComp('b=4*a', a=np.ones(2), b=np.ones(2)))
-
-            def configure(self):
-                self.indep.add_output('x', np.array(range(5)))
-                self.promotes('comp1', inputs=[('a', 'x')], src_indices=[0, 1, 2])
-                self.promotes('comp2', inputs=[('a', 'x')], src_indices=[3, 4])
-
-        p = om.Problem(model=SimpleGroup())
-
-        p.setup()
-        p.run_model()
-
-        assert_near_equal(p['comp1.b'], np.array([0, 2, 4]))
-        assert_near_equal(p['comp2.b'], np.array([12, 16]))
-
-    def test_promotes_wildcard_rename(self):
-        class SubGroup(om.Group):
-
-            def setup(self):
-                self.add_subsystem('comp1', om.ExecComp('x=2.0+bb', bb=4.0))
-
-            def configure(self):
-                self.promotes('comp1', inputs=["b*"])
-
-        class TopGroup(om.Group):
-
-            def setup(self):
-                self.add_subsystem('sub', SubGroup())
-
-            def configure(self):
-                self.sub.promotes('comp1', inputs=[('bb', 'xx')])
-
-        top = om.Problem(model=TopGroup())
-
-        with self.assertRaises(RuntimeError) as context:
-            top.setup()
-
-        self.assertEqual(str(context.exception),
-                         "ExecComp (sub.comp1): promotes_inputs 'b*' matched 'bb' but 'bb' has been "
-                         "aliased to 'xx'.")
-
-    def test_promotes_wildcard_name(self):
-        class SubGroup(om.Group):
-
-            def setup(self):
-                self.add_subsystem('comp1', om.ExecComp('x=2.0+bb', bb=4.0))
-
-            def configure(self):
-                self.promotes('comp1', inputs=["b*"])
-
-        class TopGroup(om.Group):
-
-            def setup(self):
-                self.add_subsystem('sub', SubGroup())
-
-            def configure(self):
-                self.sub.promotes('comp1', inputs=['bb'])
-
-        top = om.Problem(model=TopGroup())
-
-        top.setup()
-
-    def test_multiple_promotes(self):
-
-        class BranchGroup(om.Group):
-
-            def setup(self):
-                b1 = self.add_subsystem('Branch1', om.Group())
-                g1 = b1.add_subsystem('G1', om.Group())
-                g2 = g1.add_subsystem('G2', om.Group())
-                g2.add_subsystem('comp1', om.ExecComp('b=2.0*a', a=3.0, b=6.0))
-
-            def configure(self):
-                self.Branch1.G1.G2.promotes('comp1', inputs=['a'])
-                self.Branch1.G1.promotes('G2', any=['*'])
-
-        top = om.Problem(model=BranchGroup())
-        top.setup()
-
-        self.assertEqual(top['Branch1.G1.a'], 3)
-        self.assertEqual(top['Branch1.G1.comp1.b'], 6)
-        with self.assertRaises(KeyError) as cm:
-            top['Branch1.G1.comp1.a']
-
-        self.assertEqual(str(cm.exception),
-                         "'Problem: Variable name \"Branch1.G1.comp1.a\" not found.'")
-
-    def test_multiple_promotes_collision(self):
-
-        class SubGroup(om.Group):
-
-            def setup(self):
-                self.add_subsystem('comp1', om.ExecComp('x=2.0*a+3.0*b', a=3.0, b=4.0))
-
-            def configure(self):
-                self.promotes('comp1', inputs=['a'])
-
-        class TopGroup(om.Group):
-
-            def setup(self):
-                self.add_subsystem('sub', SubGroup())
-
-            def configure(self):
-                self.sub.promotes('comp1', inputs=['b'])
-                self.promotes('sub', inputs=['b'])
-
-        top = om.Problem(model=TopGroup())
-        top.setup()
-
-        self.assertEqual(top['sub.a'], 3)
-        self.assertEqual(top['b'], 4)
-
-    def test_multiple_promotes_src_indices(self):
-
-        class SimpleGroup(om.Group):
-
-            def setup(self):
-                self.add_subsystem('indep', om.IndepVarComp(), promotes=['*'])
-                self.add_subsystem('comp1', om.ExecComp('c=2*a*b', a=np.ones(3), b=np.ones(3), c=np.ones(3)))
-
-            def configure(self):
-                self.indep.add_output('x', np.array(range(5)))
-                self.promotes('comp1', inputs=[('a', 'x'), ('b', 'x')], src_indices=[0, 2, 4])
-
-        p = om.Problem(model=SimpleGroup())
-        p.setup()
-        p.run_model()
-
-        assert_near_equal(p['x'], np.array([0, 1, 2, 3, 4]))
-        assert_near_equal(p['comp1.a'], np.array([0, 2, 4]))
-        assert_near_equal(p['comp1.b'], np.array([0, 2, 4]))
-        assert_near_equal(p['comp1.c'], np.array([0, 8, 32]))
-
-    def test_promotes_src_indices_bad_type(self):
-
-        class SimpleGroup(om.Group):
-
-            def setup(self):
-                self.add_subsystem('comp2', om.ExecComp('b=2*a', a=np.zeros(5), b=np.zeros(5)))
-
-            def configure(self):
-                self.promotes('comp2', inputs=['a'], src_indices=1.0)
-
-        top = om.Problem(model=SimpleGroup())
-
-        with self.assertRaises(TypeError) as cm:
-            top.setup()
-
-        self.assertEqual(str(cm.exception),
-            "SimpleGroup (<model>): The src_indices argument should be an int, list, "
-            "tuple, ndarray or Iterable, but src_indices for promotes from 'comp2' are "
-            "<class 'float'>.")
-
-    def test_promotes_src_indices_bad_dtype(self):
-
-        class SimpleGroup(om.Group):
-
-            def setup(self):
-                self.add_subsystem('comp2', om.ExecComp('b=2*a', a=np.zeros(5), b=np.zeros(5)))
-
-            def configure(self):
-                self.promotes('comp2', inputs=['a'], src_indices=np.array([0], dtype=np.complex))
-
-        top = om.Problem(model=SimpleGroup())
-
-        with self.assertRaises(TypeError) as cm:
-            top.setup()
-
-        self.assertEqual(str(cm.exception),
-            "SimpleGroup (<model>): src_indices must contain integers, but src_indices "
-            "for promotes from 'comp2' are type <class 'numpy.complex128'>.")
-
-    def test_promotes_src_indices_bad_shape(self):
-
-        class SimpleGroup(om.Group):
-
-            def setup(self):
-                self.add_subsystem('indep', om.IndepVarComp(), promotes=['*'])
-                self.add_subsystem('comp1', om.ExecComp('b=2*a', a=np.ones(5), b=np.ones(5)))
-
-            def configure(self):
-                self.indep.add_output('a1', np.ones(3))
-                self.promotes('comp1', inputs=['a'], src_indices=[0, 1, 2])
-
-        p = om.Problem(model=SimpleGroup())
-
-        with self.assertRaises(ValueError) as cm:
-            p.setup()
-
-        self.assertEqual(str(cm.exception),
-            "Shape of indices does not match shape for 'a': Expected (5,) but got (3,).")
-
     def test_add_subsystem_class(self):
         p = om.Problem()
         try:
@@ -1101,6 +792,322 @@ class TestGroup(unittest.TestCase):
 
         for key, val in totals.items():
             assert_near_equal(val['rel error'][0], 0.0, 1e-15)
+
+
+class TestGroupPromotes(unittest.TestCase):
+
+    def test_promotes_outputs_in_config(self):
+
+        class SimpleGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
+                self.add_subsystem('comp2', om.ExecComp('b=2*a'))
+
+            def configure(self):
+                self.promotes('comp2', outputs=['b'])
+
+        top = om.Problem(model=SimpleGroup())
+        top.setup()
+
+        self.assertEqual(top['b'], 1)
+        with self.assertRaises(KeyError) as cm:
+            top['a']
+
+        self.assertEqual(str(cm.exception),
+                         "'Problem: Variable name \"a\" not found.'")
+
+    def test_promotes_inputs_in_config(self):
+
+        class SimpleGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
+                self.add_subsystem('comp2', om.ExecComp('b=2*a'))
+
+            def configure(self):
+                self.promotes('comp2', inputs=['a'])
+
+        top = om.Problem(model=SimpleGroup())
+        top.setup()
+
+        self.assertEqual(top['a'], 1)
+        with self.assertRaises(KeyError) as cm:
+            top['b']
+
+        self.assertEqual(str(cm.exception),
+                         "'Problem: Variable name \"b\" not found.'")
+
+    def test_promotes_any_in_config(self):
+
+        class SimpleGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
+                self.add_subsystem('comp2', om.ExecComp('b=2*a'))
+
+            def configure(self):
+                self.promotes('comp1', any=['*'])
+
+        top = om.Problem(model=SimpleGroup())
+        top.setup()
+
+        self.assertEqual(top['x'], 5)
+        with self.assertRaises(KeyError) as cm:
+            top['a']
+
+        self.assertEqual(str(cm.exception),
+                         "'Problem: Variable name \"a\" not found.'")
+
+    def test_promotes_alias(self):
+        class SubGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', om.ExecComp('x=2.0*a+3.0*b', a=3.0, b=4.0))
+
+            def configure(self):
+                self.promotes('comp1', inputs=['a'])
+
+        class TopGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('sub', SubGroup())
+
+            def configure(self):
+                self.sub.promotes('comp1', inputs=['b'])
+                self.promotes('sub', inputs=[('b', 'bb')])
+
+        top = om.Problem(model=TopGroup())
+        top.setup()
+
+        self.assertEqual(top['bb'], 4.0)
+
+    def test_promotes_alias_from_parent(self):
+        class SubGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', om.ExecComp('x=2.0*a+3.0*b+c', a=3.0, b=4.0))
+
+            def configure(self):
+                self.promotes('comp1', inputs=[('b', 'bb')])
+
+        class TopGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('sub', SubGroup())
+
+            def configure(self):
+                self.sub.promotes('comp1', inputs=['b'])
+
+        top = om.Problem(model=TopGroup())
+
+        with self.assertRaises(RuntimeError) as context:
+            top.setup()
+
+        self.assertEqual(str(context.exception),
+                         "SubGroup (sub): Trying to promote 'b' when it has been aliased to 'bb'.")
+
+    def test_promotes_alias_src_indices(self):
+
+        class SimpleGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('indep', om.IndepVarComp(), promotes=['*'])
+                self.add_subsystem('comp1', om.ExecComp('b=2*a', a=np.ones(3), b=np.ones(3)))
+                self.add_subsystem('comp2', om.ExecComp('b=4*a', a=np.ones(2), b=np.ones(2)))
+
+            def configure(self):
+                self.indep.add_output('x', np.array(range(5)))
+                self.promotes('comp1', inputs=[('a', 'x')], src_indices=[0, 1, 2])
+                self.promotes('comp2', inputs=[('a', 'x')], src_indices=[3, 4])
+
+        p = om.Problem(model=SimpleGroup())
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['comp1.b'], np.array([0, 2, 4]))
+        assert_near_equal(p['comp2.b'], np.array([12, 16]))
+
+    def test_promotes_wildcard_rename(self):
+        class SubGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', om.ExecComp('x=2.0+bb', bb=4.0))
+
+            def configure(self):
+                self.promotes('comp1', inputs=["b*"])
+
+        class TopGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('sub', SubGroup())
+
+            def configure(self):
+                self.sub.promotes('comp1', inputs=[('bb', 'xx')])
+
+        top = om.Problem(model=TopGroup())
+
+        with self.assertRaises(RuntimeError) as context:
+            top.setup()
+
+        self.assertEqual(str(context.exception),
+                         "ExecComp (sub.comp1): promotes_inputs 'b*' matched 'bb' but 'bb' has been "
+                         "aliased to 'xx'.")
+
+    def test_promotes_wildcard_name(self):
+        class SubGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', om.ExecComp('x=2.0+bb', bb=4.0))
+
+            def configure(self):
+                self.promotes('comp1', inputs=["b*"])
+
+        class TopGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('sub', SubGroup())
+
+            def configure(self):
+                self.sub.promotes('comp1', inputs=['bb'])
+
+        top = om.Problem(model=TopGroup())
+
+        top.setup()
+
+    def test_multiple_promotes(self):
+
+        class BranchGroup(om.Group):
+            def setup(self):
+                b1 = self.add_subsystem('Branch1', om.Group())
+                g1 = b1.add_subsystem('G1', om.Group())
+                g2 = g1.add_subsystem('G2', om.Group())
+                g2.add_subsystem('comp1', om.ExecComp('b=2.0*a', a=3.0, b=6.0))
+
+            def configure(self):
+                self.Branch1.G1.G2.promotes('comp1', inputs=['a'])
+                self.Branch1.G1.promotes('G2', any=['*'])
+
+        top = om.Problem(model=BranchGroup())
+        top.setup()
+
+        self.assertEqual(top['Branch1.G1.a'], 3)
+        self.assertEqual(top['Branch1.G1.comp1.b'], 6)
+        with self.assertRaises(KeyError) as cm:
+            top['Branch1.G1.comp1.a']
+
+        self.assertEqual(str(cm.exception),
+                         "'Problem: Variable name \"Branch1.G1.comp1.a\" not found.'")
+
+    def test_multiple_promotes_collision(self):
+
+        class SubGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', om.ExecComp('x=2.0*a+3.0*b', a=3.0, b=4.0))
+
+            def configure(self):
+                self.promotes('comp1', inputs=['a'])
+
+        class TopGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('sub', SubGroup())
+
+            def configure(self):
+                self.sub.promotes('comp1', inputs=['b'])
+                self.promotes('sub', inputs=['b'])
+
+        top = om.Problem(model=TopGroup())
+        top.setup()
+
+        self.assertEqual(top['sub.a'], 3)
+        self.assertEqual(top['b'], 4)
+
+    def test_multiple_promotes_src_indices(self):
+
+        class SimpleGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('indep', om.IndepVarComp(), promotes=['*'])
+                self.add_subsystem('comp1', om.ExecComp('c=2*a*b', a=np.ones(3), b=np.ones(3), c=np.ones(3)))
+
+            def configure(self):
+                self.indep.add_output('x', np.array(range(5)))
+                self.promotes('comp1', inputs=[('a', 'x'), ('b', 'x')], src_indices=[0, 2, 4])
+
+        p = om.Problem(model=SimpleGroup())
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['x'], np.array([0, 1, 2, 3, 4]))
+        assert_near_equal(p['comp1.a'], np.array([0, 2, 4]))
+        assert_near_equal(p['comp1.b'], np.array([0, 2, 4]))
+        assert_near_equal(p['comp1.c'], np.array([0, 8, 32]))
+
+    def test_promotes_src_indices_flat(self):
+
+        class SimpleGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('indep', om.IndepVarComp('a', np.array(range(9)).reshape(3, 3)), promotes=['*'])
+                self.add_subsystem('comp1', om.ExecComp('b=2*a', a=np.ones(3), b=np.ones(3)))
+
+            def configure(self):
+                self.promotes('comp1', inputs=['a'], src_indices=[0, 4, 8], flat_src_indices=True)
+
+
+        p = om.Problem(model=SimpleGroup())
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['a'], np.array([[0, 1, 2],
+                                            [3, 4, 5],
+                                            [6, 7, 8]]))
+
+        assert_near_equal(p['comp1.a'], np.array([0, 4, 8]))
+        assert_near_equal(p['comp1.b'], np.array([0, 8, 16]))
+
+    def test_promotes_src_indices_bad_type(self):
+
+        class SimpleGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('comp2', om.ExecComp('b=2*a', a=np.zeros(5), b=np.zeros(5)))
+
+            def configure(self):
+                self.promotes('comp2', inputs=['a'], src_indices=1.0)
+
+        top = om.Problem(model=SimpleGroup())
+
+        with self.assertRaises(TypeError) as cm:
+            top.setup()
+
+        self.assertEqual(str(cm.exception),
+            "SimpleGroup (<model>): The src_indices argument should be an int, list, "
+            "tuple, ndarray or Iterable, but src_indices for promotes from 'comp2' are "
+            "<class 'float'>.")
+
+    def test_promotes_src_indices_bad_dtype(self):
+
+        class SimpleGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('comp2', om.ExecComp('b=2*a', a=np.zeros(5), b=np.zeros(5)))
+
+            def configure(self):
+                self.promotes('comp2', inputs=['a'], src_indices=np.array([0], dtype=np.complex))
+
+        top = om.Problem(model=SimpleGroup())
+
+        with self.assertRaises(TypeError) as cm:
+            top.setup()
+
+        self.assertEqual(str(cm.exception),
+            "SimpleGroup (<model>): src_indices must contain integers, but src_indices "
+            "for promotes from 'comp2' are type <class 'numpy.complex128'>.")
+
+    def test_promotes_src_indices_bad_shape(self):
+
+        class SimpleGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('indep', om.IndepVarComp(), promotes=['*'])
+                self.add_subsystem('comp1', om.ExecComp('b=2*a', a=np.ones(5), b=np.ones(5)))
+
+            def configure(self):
+                self.indep.add_output('a1', np.ones(3))
+                self.promotes('comp1', inputs=['a'], src_indices=[0, 1, 2])
+
+        p = om.Problem(model=SimpleGroup())
+
+        with self.assertRaises(ValueError) as cm:
+            p.setup()
+
+        self.assertEqual(str(cm.exception),
+            "Shape of indices does not match shape for 'a': Expected (5,) but got (3,).")
 
 
 class MyComp(om.ExplicitComponent):
