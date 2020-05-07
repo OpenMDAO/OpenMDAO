@@ -241,6 +241,9 @@ class _AutoIndepVarComp(IndepVarComp):
             for remotes in self.comm.allgather(self._remotes):
                 all_remotes.update(remotes)
 
+            if all_remotes:
+                self.options['distributed'] = True
+
             for name in all_remotes:
                 if name in abs2meta:
                     abs2meta[name]['distributed'] = True

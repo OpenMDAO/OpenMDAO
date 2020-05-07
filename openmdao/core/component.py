@@ -677,12 +677,6 @@ class Component(System):
         else:
             self._has_resid_scaling |= np.any(res_ref != 1.0)
 
-        ref = format_as_float_or_array('ref', ref, flatten=True)
-        ref0 = format_as_float_or_array('ref0', ref0, flatten=True)
-        res_ref = format_as_float_or_array('res_ref', res_ref, flatten=True)
-
-        distributed = self.options['distributed']
-
         metadata = {
             'value': value,
             'shape': shape,
@@ -690,11 +684,11 @@ class Component(System):
             'units': units,
             'res_units': res_units,
             'desc': desc,
-            'distributed': distributed,
+            'distributed': self.options['distributed'],
             'tags': make_set(tags),
-            'ref': ref,
-            'ref0': ref0,
-            'res_ref': res_ref,
+            'ref': format_as_float_or_array('ref', ref, flatten=True),
+            'ref0': format_as_float_or_array('ref0', ref0, flatten=True),
+            'res_ref': format_as_float_or_array('res_ref', res_ref, flatten=True),
             'lower': lower,
             'upper': upper,
         }
@@ -772,28 +766,44 @@ class Component(System):
         ----------
         abs_in2out : dict
             Mapping of connected inputs to their source.  Names are absolute.
+
+        Returns
+        -------
+        set
+            Names of inputs where src_indices were added.
         """
-        if not self.options['distributed']:
-            return
+        if not self.options['distributed'] or self.comm.size == 1:
+            return set()
 
         iproc = self.comm.rank
         abs2meta = self._var_abs2meta
-        sizes = np.zeros(self.comm.size, dtype=INT_DTYPE)
-        tmp = np.zeros(1, dtype=INT_DTYPE)
+        sizes = np.zeros(len(abs2meta), dtype=INT_DTYPE)
 
-        for iname in self._var_allprocs_abs_names['input']:
-            if iname in abs2meta and iname in abs_in2out:
+        no_src_inds = set()
+        for i, iname in enumerate(self._var_allprocs_abs_names['input']):
+            if iname in abs2meta:
                 if abs2meta[iname]['src_indices'] is None:
-                    metadata = abs2meta[iname]
-                    tmp[0] = metadata['size']
-                    self.comm.Allgather(tmp, sizes)
-                    offset = np.sum(sizes[:iproc])
-                    end = offset + sizes[iproc]
-                    simple_warning("{}: Component is distributed but input '{}' was added without "
-                                   "src_indices. Setting "
-                                   "src_indices to range({}, {}).".format(self.msginfo, iname,
-                                                                          offset, end))
-                    metadata['src_indices'] = np.arange(offset, end, dtype=INT_DTYPE)
+                    sizes[i] = abs2meta[iname]['size']
+                    no_src_inds.add(i)
+
+        all_sizes = np.zeros((self.comm.size, len(abs2meta)), dtype=INT_DTYPE)
+        self.comm.Allgather(sizes, all_sizes)
+
+        all_abs2meta = self._var_allprocs_abs2meta
+        added_src_inds = set()
+        for i, iname in enumerate(self._var_allprocs_abs_names['input']):
+            if i not in no_src_inds:
+                continue
+            offset = np.sum(all_sizes[:iproc, i])
+            end = offset + all_sizes[iproc, i]
+            simple_warning(f"{self.msginfo}: Component is distributed but input '{iname}' was "
+                           "added without src_indices. Setting src_indices to "
+                           f"range({offset}, {end}).")
+            abs2meta[iname]['src_indices'] = np.arange(offset, end, dtype=INT_DTYPE)
+            all_abs2meta[iname]['has_src_indices'] = True
+            added_src_inds.add(iname)
+
+        return added_src_inds
 
     def _approx_partials(self, of, wrt, method='fd', **kwargs):
         """

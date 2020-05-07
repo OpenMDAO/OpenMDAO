@@ -693,10 +693,10 @@ class ProbRemoteTests(unittest.TestCase):
         p.final_setup()
 
         if C1 in p.model.par._subsystems_myproc:
-            C1._inputs['invec'] = np.array(range(C1._inputs.asarray().size, 0, -1), float)
+            p['par.C1.invec'] = np.array(range(C1._inputs.asarray().size, 0, -1), float)
 
         if C2 in p.model.par._subsystems_myproc:
-            C2._inputs['invec'] = np.array(range(C2._inputs.asarray().size, 0, -1), float) * 3
+            p['par.C2.invec'] = np.array(range(C2._inputs.asarray().size, 0, -1), float) * 3
 
         p.run_model()
 
@@ -723,12 +723,12 @@ class ProbRemoteTests(unittest.TestCase):
         p.final_setup()
 
         if C1 in p.model.par._subsystems_myproc:
-            C1._inputs['invec'] = np.array(range(C1._inputs.asarray().size, 0, -1), float)
-            C1._discrete_inputs['disc_in'] = 'C1foo'
+            p['par.C1.invec'] = np.array(range(C1._inputs.asarray().size, 0, -1), float)
+        p['par.C1.disc_in'] = 'C1foo'
 
         if C2 in p.model.par._subsystems_myproc:
-            C2._inputs['invec'] = np.array(range(C2._inputs.asarray().size, 0, -1), float) * 3
-            C2._discrete_inputs['disc_in'] = 'C2foo'
+            p['par.C2.invec'] = np.array(range(C2._inputs.asarray().size, 0, -1), float) * 3
+        p['par.C2.disc_in'] = 'C2foo'
 
         p.run_model()
 
@@ -776,8 +776,8 @@ class ProbRemoteTests(unittest.TestCase):
 
         rank = p.comm.rank
 
-        C1._inputs['invec'] = np.array(range(C1._inputs.asarray().size, 0, -1), float) * (rank + 1)
-        C1._discrete_inputs['disc_in'] = 'boo'
+        p['C1.invec'] = np.array(range(C1._inputs.asarray().size, 0, -1), float) * (rank + 1)
+        p['C1.disc_in'] = 'boo'
 
         p.run_model()
 

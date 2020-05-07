@@ -506,6 +506,34 @@ class Group(System):
         else:
             return self._list_states()
 
+    def _top_level_setup(self, setup_mode, mode):
+        self._problem_meta['connections'] = conns = self._conn_global_abs_in2out
+        if setup_mode == 'full':
+            abs2meta = self._var_abs2meta
+            all_abs2meta = self._var_allprocs_abs2meta
+            conns = self._conn_global_abs_in2out
+            auto_ivc = self._setup_auto_ivcs(mode)
+
+            if self.comm.size > 1:
+                dist_ins = [n for n in self._var_allprocs_abs_names['input']
+                            if all_abs2meta[n]['distributed']]
+                dcomp_names = set(d.rsplit('.', 1)[0] for d in dist_ins)
+                if dcomp_names:
+                    added_src_inds = set()
+                    for comp in self.system_iter(recurse=True, typ=Component):
+                        if comp.pathname in dcomp_names:
+                            added_src_inds.update(comp._update_dist_src_indices(conns))
+                    all_added = set()
+                    for a in self.comm.allgather(added_src_inds):
+                        all_added.update(a)
+
+                    for a in all_added:
+                        all_abs2meta[a]['has_src_indices'] = True
+                        if a in conns:
+                            src = conns[a]
+                            if src.startswith('_auto_ivc.'):
+                                all_abs2meta[src]['distributed'] = True
+
     def _setup_var_index_ranges(self, recurse=True):
         """
         Compute the division of variables by subsystem.
@@ -667,15 +695,16 @@ class Group(System):
                                                                   sorted(abs_list)))
 
         # If running in parallel, allgather
-        if self.comm.size > 1:
+        if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
             mysub = self._subsystems_myproc[0] if self._subsystems_myproc else False
             if (mysub and mysub.comm.rank == 0 and (mysub._full_comm is None or
                                                     mysub._full_comm.rank == 0)):
-                raw = (allprocs_abs_names, allprocs_discrete, allprocs_prom2abs_list,
-                       allprocs_abs2prom, allprocs_abs2meta, self._has_output_scaling,
-                       self._has_resid_scaling, group_inputs)
+                raw = (allprocs_abs_names, allprocs_abs_names_discrete, allprocs_discrete,
+                       allprocs_prom2abs_list, allprocs_abs2prom, allprocs_abs2meta,
+                       self._has_output_scaling, self._has_resid_scaling, group_inputs)
             else:
                 raw = (
+                    {'input': [], 'output': []},
                     {'input': [], 'output': []},
                     {'input': {}, 'output': {}},
                     {'input': {}, 'output': {}},
@@ -689,12 +718,14 @@ class Group(System):
 
             for type_ in ['input', 'output']:
                 allprocs_abs_names[type_] = []
+                allprocs_abs_names_discrete[type_] = []
                 allprocs_abs2prom[type_] = {}
                 allprocs_prom2abs_list[type_] = OrderedDict()
 
             group_inputs = []
-            for (myproc_abs_names, myproc_discrete, myproc_prom2abs_list, all_abs2prom,
-                 myproc_abs2meta, oscale, rscale, ginputs) in gathered:
+            for (myproc_abs_names, myproc_abs_names_discrete, myproc_discrete,
+                 myproc_prom2abs_list, all_abs2prom, myproc_abs2meta, oscale,
+                 rscale, ginputs) in gathered:
                 self._has_output_scaling |= oscale
                 self._has_resid_scaling |= rscale
 
@@ -709,6 +740,7 @@ class Group(System):
 
                     # Assemble in parallel allprocs_abs_names
                     allprocs_abs_names[type_].extend(myproc_abs_names[type_])
+                    allprocs_abs_names_discrete[type_].extend(myproc_abs_names_discrete[type_])
                     allprocs_discrete[type_].update(myproc_discrete[type_])
                     allprocs_abs2prom[type_].update(all_abs2prom[type_])
 
@@ -1037,7 +1069,6 @@ class Group(System):
 
         # Recursion
         if recurse:
-            distcomps = []
             for subsys in self._subsystems_myproc:
                 if isinstance(subsys, Group):
                     if subsys.name in new_conns:
@@ -1047,8 +1078,6 @@ class Group(System):
                         subsys._setup_global_connections(recurse=recurse)
                     global_abs_in2out.update(subsys._conn_global_abs_in2out)
                     conn_list.extend(subsys._conn_global_abs_in2out.items())
-                elif subsys.options['distributed'] and subsys.comm.size > 1:
-                    distcomps.append(subsys)
 
         if len(conn_list) > len(global_abs_in2out):
             dupes = [n for n, val in Counter(tgt for tgt, src in conn_list).items() if val > 1]
@@ -1083,10 +1112,6 @@ class Group(System):
 
         for inp in src_ind_inputs:
             allprocs_abs2meta[inp]['has_src_indices'] = True
-
-            if recurse:
-                for comp in distcomps:
-                    comp._update_dist_src_indices(global_abs_in2out)
 
     def _setup_connections(self, recurse=True):
         """
@@ -1285,7 +1310,7 @@ class Group(System):
                         source_dimensions = 1
 
                     # check all indices are in range of the source dimensions
-                    if flat:
+                    if flat or src_indices.ndim == 1:
                         out_size = np.prod(out_shape)
                         mx = np.max(src_indices)
                         mn = np.min(src_indices)
@@ -1308,11 +1333,6 @@ class Group(System):
                             abs2meta[abs_in]['src_indices'] = \
                                 abs2meta[abs_in]['src_indices'].ravel()
                     else:
-                        # For 1D source, we allow user to specify a flat list without setting
-                        # flat_src_indices to True.
-                        if src_indices.ndim == 1:
-                            src_indices = src_indices[:, np.newaxis]
-
                         for d in range(source_dimensions):
                             # when running under MPI, there is a value for each proc
                             d_size = out_shape[d] * self.comm.size
@@ -2381,11 +2401,35 @@ class Group(System):
         abs2meta = self._var_abs2meta
         all_abs2meta = self._var_allprocs_abs2meta
         abs_names = self._var_allprocs_abs_names['input']
-        discrete_ins = self._var_allprocs_discrete['input']
+        all_discrete_ins = self._var_allprocs_discrete['input']
+        discrete_ins = self._var_discrete['input']
         conns = self._problem_meta['connections']
         prom2ivc = {}
         count = 0
-        for abs_in in abs_names:
+
+        if self.comm.size > 1:
+            all_ins = set(self._var_allprocs_abs_names['input'])
+            all_ins.update(self._var_allprocs_discrete['input'])
+            my_remote_ins = all_ins.difference(self._var_abs_names['input'])
+            my_remote_ins = my_remote_ins.difference(self._var_abs_names_discrete['input'])
+            my_remote_ins = my_remote_ins
+            gathered = self.comm.gather(my_remote_ins, root=0)
+            if self.comm.rank == 0:
+                remote_ins = {}
+                start = all_ins
+                for rank, remotes in enumerate(gathered):
+                    if not start:
+                        break
+                    for name in start.difference(remotes):
+                        remote_ins[name] = rank
+                    start = start.difference(remote_ins)
+                self.comm.bcast(remote_ins, root=0)
+            else:
+                remote_ins = self.comm.bcast(None, root=0)
+        else:
+            remote_ins = {}
+
+        for abs_in in chain(abs_names, all_discrete_ins):
             if abs_in not in conns:
                 prom = abs2prom[abs_in]
                 if prom in self._group_inputs:
@@ -2394,6 +2438,11 @@ class Group(System):
                 else:
                     gmeta = None
                     val = _undefined
+
+                if abs_in in abs2meta and abs_in not in all_discrete_ins:
+                    if abs2meta[abs_in]['src_indices'] is not None:
+                        raise RuntimeError(f"{self.msginfo}: auto_ivcs with src_indices "
+                                           "not supported yet.")
 
                 if prom in prom2ivc:
                     # multiple connected inputs w/o a src. Connect them to the same IVC
@@ -2404,32 +2453,33 @@ class Group(System):
                     count += 1
                     prom2ivc[prom] = ivc_name
                     conns[abs_in] = ivc_name
-                    if abs_in in discrete_ins:
-                        if abs_in in abs2meta:
+                    if abs_in in all_discrete_ins:
+                        if abs_in in self._var_abs2prom['input']:
                             if val is _undefined:
-                                val = abs2meta[abs_in]['value']
+                                val = self._var_discrete['input'][abs_in]['value']
                         else:
-                            # TODO: fix this value (on all procs)
                             val = None
-                            auto_ivc._add_remote(ivc_name)
+                        if abs_in in remote_ins:
+                            val = self.comm.bcast(val, root=remote_ins[abs_in])
                         auto_ivc.add_discrete_output(loc_out_name, val=val)
                     else:
                         if abs_in in abs2meta:
-                            if abs2meta[abs_in]['src_indices'] is not None:
-                                raise RuntimeError(f"{self.msginfo}: auto_ivcs with src_indices "
-                                                   "not supported yet.")
                             if val is _undefined:
                                 val = abs2meta[abs_in]['value']
                         else:
-                            # TODO: this value has to be updated to match the val of the input
-                            #       (on all procs)
-                            val = np.ones(0)
+                            val = np.empty(all_abs2meta[abs_in]['size'])
                             auto_ivc._add_remote(ivc_name)
+                        if abs_in in remote_ins:
+                            if all_abs2meta[abs_in]['distributed']:
+                                if abs_in not in abs2meta:
+                                    val = np.zeros(0)
+                            else:
+                                self.comm.Bcast(val, root=remote_ins[abs_in])
                         units = gmeta['units'] if gmeta else None
                         auto_ivc.add_output(loc_out_name, val=val, units=units)
 
         if not prom2ivc:
-            return
+            return auto_ivc
 
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
             raise RuntimeError("The top level system must not be a ParallelGroup.")
@@ -2470,9 +2520,12 @@ class Group(System):
                                                  self._var_abs_names_discrete[typ])
             self._var_discrete[typ].update({'_auto_ivc.' + k: v for k, v in
                                             auto_ivc._var_discrete[typ].items()})
+            self._var_allprocs_discrete[typ].update(auto_ivc._var_allprocs_discrete[typ])
 
         self._var_abs2meta.update(auto_ivc._var_abs2meta)
         self._var_allprocs_abs2meta.update(auto_ivc._var_allprocs_abs2meta)
 
         self._approx_subjac_keys = None  # this will force re-initialization
         self._setup_procs_finished = True
+
+        return auto_ivc

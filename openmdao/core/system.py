@@ -780,18 +780,18 @@ class System(object):
         self._setup_var_data(recurse=recurse)
         self._setup_global_connections(recurse=recurse)
 
-        if self.pathname == '':
-            from openmdao.core.group import Group
-            if isinstance(self, Group):
-                self._problem_meta['connections'] = self._conn_global_abs_in2out
-                if setup_mode == 'full':
-                    self._setup_auto_ivcs(mode)
+        if self.pathname == '' and setup_mode == 'full':
+            self._top_level_setup(setup_mode, mode)
+
         self._setup_vec_names(mode)
 
         self._setup_relevance(mode, self._relevant)
         self._setup_var_index_ranges(recurse=recurse)
         self._setup_var_sizes(recurse=recurse)
         self._setup_connections(recurse=recurse)
+
+    def _top_level_setup(self, setup_mode, mode):
+        pass
 
     def _post_configure(self):
         """
@@ -1546,7 +1546,6 @@ class System(object):
                                                                     global_size, local_shape))
                     mymeta['global_shape'] = tuple([dim1] + list(high_dims))
                 else:
-                    high_size = 1
                     mymeta['global_shape'] = (global_size,)
 
     def _setup_global_connections(self, recurse=True, conns=None):
@@ -4207,23 +4206,29 @@ class System(object):
             raise KeyError('{}: Variable "{}" not found.'.format(self.msginfo, name))
 
         conns = self._problem_meta['connections']
-        if from_src and abs_name in conns:
+        if from_src and abs_name in conns:  # pull input from source
+            src = conns[abs_name]
+            if src in self._var_allprocs_discrete['output']:
+                return self._abs_get_val(src, get_remote, rank, vec_name, kind, flat)
+
             if abs_name in self._var_abs2meta:
                 vmeta = self._var_abs2meta[abs_name]
                 src_indices = vmeta['src_indices']
+                has_src_indices = src_indices is not None
             else:
                 vmeta = self._var_allprocs_abs2meta[abs_name]
                 src_indices = None  # FIXME: remote var could have src_indices
-            src = conns[abs_name]
+                has_src_indices = vmeta['has_src_indices']
             smeta = self._var_allprocs_abs2meta[src]
             val = self._abs_get_val(src, get_remote, rank, vec_name, kind, flat)
-            if src_indices is None:
-                val = val.reshape(vmeta['shape'])
-            else:
-                if src.startswith('_auto_ivc.'):
-                    raise RuntimeError(f"{self.msginfo}: Unconnected input '{name}' cannot "
-                                       "specify src_indices.")
-                val = val.ravel()[src_indices]
+            if has_src_indices:
+                # if src.startswith('_auto_ivc.'):
+                #     raise RuntimeError(f"{self.msginfo}: Unconnected input '{name}' cannot "
+                #                        "specify src_indices.")
+                if src_indices is None:
+                    val = np.zeros(0)
+                else:
+                    val = val.ravel()[src_indices]
                 if get_remote:
                     if rank is None and vmeta['distributed']:
                         parts = self.comm.allgather(val)
@@ -4236,10 +4241,12 @@ class System(object):
                             val = np.hstack(parts)
                         else:
                             val = None
-                if vmeta['distributed']:
+                if vmeta['distributed'] and get_remote:
                     val.shape = self._var_allprocs_abs2meta[abs_name]['global_shape']
                 else:
                     val.shape = vmeta['shape']
+            else:
+                val = val.reshape(vmeta['shape'])
 
             # TODO: get indexed value BEFORE transferring the variable (might be much smaller)
             if indices is not None:

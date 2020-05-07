@@ -523,15 +523,16 @@ class Vector(object):
             oldval = self._views[abs_name][idxs]
 
         value = np.asarray(val)
-        if value.shape != () and value.shape != (1,) and oldval.shape != value.shape:
-            raise ValueError(f"{self._system().msginfo}: Incompatible shape for '{name}': "
-                             f"Expected {oldval.shape} but got {value.shape}.")
 
         try:
             self._views[abs_name][idxs] = value
         except Exception as err:
-            raise ValueError(f"{self._system().msginfo}: Failed to set value of "
-                             f"'{name}': {str(err)}.")
+            try:
+                value = value.reshape(self._views[abs_name][idxs].shape)
+            except Exception:
+                raise ValueError(f"{self._system().msginfo}: Failed to set value of "
+                                 f"'{name}': {str(err)}.")
+            self._views[abs_name][idxs] = value
 
     def dot(self, vec):
         """

@@ -894,8 +894,8 @@ class DiscreteFeatureTestCase(unittest.TestCase):
 
         model.add_subsystem('comp', ImpWithInitial())
 
-        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
-        model.linear_solver = om.ScipyKrylov()
+        model.comp.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        model.comp.linear_solver = om.ScipyKrylov()
 
         prob.setup()
         prob.run_model()

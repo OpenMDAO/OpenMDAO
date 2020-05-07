@@ -452,7 +452,7 @@ class TestConnectionsIndices(unittest.TestCase):
 
         expected = "Group (<model>): The source indices do not specify a valid index " + \
                    "for the connection 'idvp.arrout' to 'arraycomp.inp1'. " + \
-                   "Index '100000' is out of range for source dimension of size 5."
+                   "Index '100000' is out of range for a flat source of size 5."
 
         try:
             self.prob.setup()
@@ -473,7 +473,7 @@ class TestConnectionsIndices(unittest.TestCase):
 
         expected = "Group (<model>): The source indices do not specify a valid index " + \
                    "for the connection 'idvp.arrout' to 'arraycomp.inp'. " + \
-                   "Index '100000' is out of range for source dimension of size 5."
+                   "Index '100000' is out of range for a flat source of size 5."
 
         try:
             self.prob.setup()

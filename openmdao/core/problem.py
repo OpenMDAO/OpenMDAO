@@ -424,6 +424,7 @@ class Problem(object):
         conns = self._metadata['connections']
         all_proms = self.model._var_allprocs_prom2abs_list
         all_meta = self.model._var_allprocs_abs2meta
+        all_discrete = self.model._var_allprocs_discrete['input']
         if name in all_proms['output']:
             abs_name = all_proms['output'][name][0]
         elif name in all_proms['input']:
@@ -433,22 +434,23 @@ class Problem(object):
 
         if abs_name in conns:
             src = conns[abs_name]
-            tmeta = self.model._var_allprocs_abs2meta[abs_name]
-            if abs_name in self.model._var_abs2meta:
-                tlocmeta = self.model._var_abs2meta[abs_name]
-            else:
-                tlocmeta = None
-            smeta = self.model._var_allprocs_abs2meta[src]
-            tunits = tmeta['units']
-            if units is None:
-                if self._setup_status > 1:  # avoids double unit conversion
-                    units = tunits
-                ivalue = value
-            else:
-                value = self.model.convert_from_units(abs_name, value, units)
-                ivalue = value
-            if units is not None and smeta['units'] is not None:
-                value = self.model.convert_from_units(src, value, units)
+            if abs_name not in all_discrete:
+                tmeta = self.model._var_allprocs_abs2meta[abs_name]
+                if abs_name in self.model._var_abs2meta:
+                    tlocmeta = self.model._var_abs2meta[abs_name]
+                else:
+                    tlocmeta = None
+                smeta = self.model._var_allprocs_abs2meta[src]
+                tunits = tmeta['units']
+                if units is None:
+                    if self._setup_status > 1:  # avoids double unit conversion
+                        units = tunits
+                    ivalue = value
+                else:
+                    value = self.model.convert_from_units(abs_name, value, units)
+                    ivalue = value
+                if units is not None and smeta['units'] is not None:
+                    value = self.model.convert_from_units(src, value, units)
         elif units is not None:
             value = self.model.convert_from_units(abs_name, value, units)
 
@@ -462,6 +464,8 @@ class Problem(object):
             else:
                 self._initial_condition_cache[name] = value
         else:
+            myrank = self.model.comm.rank
+
             if indices is None:
                 indices = _full_slice
             if abs_name in self.model._outputs._views:
@@ -472,31 +476,42 @@ class Problem(object):
                 if src in self.model._outputs._views:  # src is local
                     if tmeta['has_src_indices']:
                         if tlocmeta:  # target is local
-                            self.model._outputs.set_var(src, value,
-                                                        tlocmeta['src_indices'][indices])
+                            src_indices = tlocmeta['src_indices']
+                            if tmeta['distributed']:
+                                ssizes = self.model._var_sizes['nonlinear']['output']
+                                sidx = self.model._var_allprocs_abs2idx['nonlinear'][src]
+                                ssize = ssizes[myrank, sidx]
+                                start = np.sum(ssizes[:myrank, sidx])
+                                end = start + ssize
+                                if np.any(src_indices < start) or np.any(src_indices >= end):
+                                    raise RuntimeError(f"{self.model.msginfo}: Can't set {name}: "
+                                                       "src_indices refer "
+                                                       "to out-of-process array entries.")
+                                if start > 0:
+                                    src_indices = src_indices - start
+                            self.model._outputs.set_var(src, value, src_indices[indices])
                         else:
                             raise RuntimeError(f"{self.model.msginfo}: Can't set {abs_name}: remote"
                                                " connected inputs with src_indices currently not"
                                                " supported.")
                     else:
                         value = np.asarray(value)
-                        if indices is _full_slice:
-                            val = value.reshape(self.model._outputs._views[src].shape)
-                        self.model._outputs.set_var(src, val, indices)
+                        # if indices is _full_slice:
+                        #     value = value.reshape(self.model._outputs._views[src].shape)
+                        self.model._outputs.set_var(src, value, indices)
                 elif src in self.model._discrete_outputs:
                     self.model._discrete_outputs[src] = value
                 # also set the input
                 if abs_name in self.model._inputs._views:
                     self.model._inputs.set_var(abs_name, ivalue, indices)
                 elif abs_name in self.model._discrete_inputs:
-                    self.model._discrete_inputs[src] = value
+                    self.model._discrete_inputs[abs_name] = value
                 else:
-                    # might be a remote var.  If so, just do nothing on this proc
+                    # must be a remote var. so, just do nothing on this proc. We can't get here
+                    # unless abs_name is found in connections, so the variable must exist.
                     if abs_name in self.model._var_allprocs_abs2meta:
                         print(f"Variable '{name}' is remote on rank {self.comm.rank}.  "
                               "Local assignment ignored.")
-                    else:
-                        raise KeyError(f'{self.model.msginfo}: Variable "{name}" not found.')
             elif isinstance(self.model, Component):
                 if abs_name in self.model._inputs._views:
                     self.model._inputs.set_var(abs_name, value, indices)

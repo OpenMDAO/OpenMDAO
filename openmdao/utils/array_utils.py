@@ -456,3 +456,26 @@ def dv_abs_complex(x, x_deriv):
     x_deriv[idx_neg] = -x_deriv[idx_neg]
 
     return x, x_deriv
+
+
+def can_broadcast(source_shape, target_shape):
+    """
+    Return True if an array of source_shape can be broadcast to target_shape.
+
+    Parameters
+    ----------
+    source_shape : tuple
+        Shape of source array.
+    target_shape : tuple
+        Shape of target array.
+
+    Returns
+    -------
+    bool
+        If source_shape can be broadcast to target_shape.
+    """
+    if source_shape != target_shape:
+        for a, b in zip(source_shape[::-1], target_shape[::-1]):
+            if not (a == b or a == 1 or b == 1):
+                return False
+    return True
