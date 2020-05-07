@@ -146,6 +146,7 @@ class N2Toolbar {
         this.hideToolbarButton = d3.select('#hide-toolbar');
         this.hideToolbarIcon = this.hideToolbarButton.select('i');
         this.searchBar = d3.select('#awesompleteId');
+        this.searchCount = d3.select('#searchCountId');
 
         this.hidden = true;
 
@@ -162,10 +163,13 @@ class N2Toolbar {
             .on('mouseover', function () {
                 self.searchBar.style('width', '200px');
                 self.toolbarContainer.style('z-index', '5');
+                self.searchCount.attr('class', 'search-count-visible')
             })
             .on('mouseout', function () {
+                self.searchCount.attr('class', 'search-count-hidden')
                 self.searchBar.style('width', '0px');
                 self.toolbarContainer.style('z-index', '1');
+                d3.select('div.awesomplete ul').attr('hidden', true);
             })
     }
 

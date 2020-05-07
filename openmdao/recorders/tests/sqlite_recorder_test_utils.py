@@ -62,7 +62,8 @@ def assertProblemDataRecorded(test, expected, tolerance):
             test.assertTrue(row_actual, 'Problem table does not contain the requested '
                             'case name: "{}"'.format(case))
 
-            counter, global_counter, case_name, timestamp, success, msg, inputs_text, outputs_text, residuals_text, derivatives = row_actual
+            counter, global_counter, case_name, timestamp, success, msg, inputs_text, \
+                outputs_text, residuals_text, derivatives, abs_err, rel_err = row_actual
 
             if f_version >= 3:
                 outputs_actual = deserialize(outputs_text, abs2meta)
@@ -226,7 +227,8 @@ def assertProblemDerivDataRecorded(test, expected, tolerance, prefix=None):
                             'Problem case table does not contain the requested '
                             'case name: "{}"'.format(case_name))
 
-            counter, global_counter, case_name, timestamp, success, msg, inputs, outputs, residuals, totals_blob = \
+            counter, global_counter, case_name, timestamp, success, msg, inputs, outputs, \
+                residuals, totals_blob, abs_err, rel_err = \
                 row_actual
 
             totals_actual = blob_to_array(totals_blob)

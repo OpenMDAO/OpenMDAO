@@ -141,7 +141,6 @@ class LinesearchSolver(NonlinearSolver):
 
                 start = end
         else:
-            simple_warning(f"{self.msginfo}: linesearch is active but no bounds have been set.")
             self._lower_bounds = self._upper_bounds = None
 
     def _enforce_bounds(self, step, alpha):

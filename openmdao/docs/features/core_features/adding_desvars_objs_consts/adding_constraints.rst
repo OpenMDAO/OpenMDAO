@@ -27,6 +27,12 @@ limits in the constraint definition should be specified using these units.
 Using the output of a distributed component as a constraint
 -----------------------------------------------------------
 
+You can use an output of a distributed component as a constraint or an objective.  OpenMDAO
+automatically collects the values from all processors and provides them to the driver.
+
+Here is an example where we perform optimization on a model that contains a `DistParabFeature`
+component that is distributed. The output is declared as a inequality constraint.
+
 .. embed-code::
     openmdao.core.tests.test_distrib_derivs.MPIFeatureTests.test_distributed_constraint
-    :layout: code, output
+    :layout: interleave
