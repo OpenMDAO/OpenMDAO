@@ -92,6 +92,95 @@ class TestCheckConfig(unittest.TestCase):
         testlogger.find_in('info', expected_info)
         testlogger.find_in('warning', expected_warning)
 
+    def test_order_no_warning(self):
+        import openmdao.api as om
+
+        p = om.Problem()
+        root = p.model
+
+        root.add_subsystem("indep", om.IndepVarComp('x', 1.0))
+        root.add_subsystem("C1", MyComp())
+        root.add_subsystem("C2", MyComp())
+        root.add_subsystem("C3", MyComp())
+        root.add_subsystem("C4", MyComp())
+
+
+
+        # make sure no system has dangling inputs so we avoid that warning
+        root.connect("indep.x", "C1.b")
+        root.connect("indep.x", "C2.b")
+        root.connect("indep.x", "C3.b")
+        root.connect("indep.x", "C4.b")
+
+        root.connect("C1.y", "C2.a")
+        root.connect("C2.y", "C3.a")
+        root.connect("C3.y", "C4.a")
+
+        # set iterative solvers since we have cycles
+        root.linear_solver = om.LinearBlockGS()
+        root.nonlinear_solver = om.NonlinearBlockGS()
+
+        # testlogger = TestLogger()
+        p.setup(check=True)
+        p.final_setup()
+
+    def test_order_warning(self):
+        import openmdao.api as om
+        p = om.Problem()
+        root = p.model
+
+        root.add_subsystem("indep", om.IndepVarComp('x', 1.0))
+        root.add_subsystem("C1", MyComp())
+        root.add_subsystem("C2", MyComp())
+        root.add_subsystem("C3", MyComp())
+        root.add_subsystem("C4", MyComp())
+
+        root.connect("C4.y", "C2.a")
+        root.connect("C4.y", "C3.a")
+        root.connect("C2.y", "C1.a")
+        root.connect("C1.y", "C4.a")
+
+        # make sure no system has dangling inputs so we avoid that warning
+        root.connect("indep.x", "C1.b")
+        root.connect("indep.x", "C2.b")
+        root.connect("indep.x", "C3.b")
+        root.connect("indep.x", "C4.b")
+
+        # set iterative solvers since we have cycles
+        root.linear_solver = om.LinearBlockGS()
+        root.nonlinear_solver = om.NonlinearBlockGS()
+
+        # testlogger = TestLogger()
+        p.setup(check=True)
+        p.final_setup()
+
+    def test_order_multi_ben_test(self):
+        import openmdao.api as om
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 1.0))
+        model.add_subsystem('p2', om.IndepVarComp('x', 1.0))
+
+        parallel = model.add_subsystem('parallel', om.ParallelGroup())
+        parallel.add_subsystem('c1', om.ExecComp(['y=-2.0*x']))
+        parallel.add_subsystem('c2', om.ExecComp(['y=5.0*x']))
+        parallel.connect('c1.y','c2.x')
+
+        model.add_subsystem('c3', om.ExecComp(['y=3.0*x1+7.0*x2']))
+
+        model.connect("parallel.c1.y", "c3.x1")
+        model.connect("parallel.c2.y", "c3.x2")
+
+        model.connect("p1.x", "parallel.c1.x")
+        # model.connect("p2.x", "parallel.c2.x")
+
+        prob.setup(check=True, mode='fwd')
+        prob.run_model()
+
+        print(prob['c3.y'])
+
     def test_dataflow_multi_level(self):
         p = Problem()
         root = p.model
