@@ -1468,7 +1468,7 @@ class Group(System):
         if self._conn_discrete_in2out:
             self._vector_class.TRANSFER._setup_discrete_transfers(self, recurse=recurse)
 
-    def promotes(self, subsys_name, any=None, inputs=None, outputs=None, 
+    def promotes(self, subsys_name, any=None, inputs=None, outputs=None,
                  src_indices=None, flat_src_indices=False):
         """
         Promote a variable in the model tree.
@@ -1489,13 +1489,13 @@ class Group(System):
             A Sequence of output names (or tuples) to be promoted. Tuples are
             used for the "promote as" capability.
         src_indices : int or list of ints or tuple of ints or int ndarray or Iterable or None
-            This argument applies only to promoted inputs. 
+            This argument applies only to promoted inputs.
             The global indices of the source variable to transfer data from.
             A value of None implies this input depends on all entries of source.
             Default is None. The shapes of the target and src_indices must match,
             and form of the entries within is determined by the value of 'flat_src_indices'.
         flat_src_indices : bool
-            This argument applies only to promoted inputs. 
+            This argument applies only to promoted inputs.
             If True, each entry of src_indices is assumed to be an index into the
             flattened source.  Otherwise each entry must be a tuple or list of size equal
             to the number of dimensions of the source.
@@ -1511,13 +1511,15 @@ class Group(System):
                                                                             np.ndarray, Iterable)):
                     raise TypeError('%s: The src_indices argument should be an int, list, '
                                     'tuple, ndarray or Iterable' % self.msginfo)
+                if isinstance(src_indices, np.ndarray):
+                    if not np.issubdtype(src_indices.dtype, np.integer):
+                        raise TypeError(f"{self.msginfo}: src_indices must contain integers, but "
+                                        f"src_indices for promotes from '{subsys_name}' are type "
+                                        f"{src_indices.dtype.type}.")
                 for inp in inputs:
                     meta = subsys._var_rel2meta[inp]
-                    from pprint import pprint
-                    print(subsys_name, inp, ":")
-                    pprint(meta)
-                    _, _, src_indices = ensure_compatible(inp, meta['value'], meta['shape'], src_indices)
-
+                    _, _, src_indices = ensure_compatible(inp, meta['value'], meta['shape'],
+                                                          src_indices)
                     if src_indices is not None:
                         meta['src_indices'] = np.asarray(src_indices, dtype=INT_DTYPE)
                         meta['flat_src_indices'] = flat_src_indices
@@ -1533,16 +1535,6 @@ class Group(System):
                 if original == original_inside and new != new_inside:
                     raise RuntimeError("%s: Trying to promote '%s' when it has been aliased to "
                                        "'%s'." % (self.msginfo, original_inside, new))
-
-        # check for valid src_indices
-        if isinstance(src_indices, Iterable):
-            src_indices = np.atleast_1d(src_indices)
-
-        if isinstance(src_indices, np.ndarray):
-            if not np.issubdtype(src_indices.dtype, np.integer):
-                raise TypeError("%s: src_indices must contain integers, but src_indices for "
-                                "connection from '%s' to '%s' is %s." %
-                                (self.msginfo, src_name, tgt_name, src_indices.dtype.type))
 
     def add_subsystem(self, name, subsys, promotes=None,
                       promotes_inputs=None, promotes_outputs=None,
