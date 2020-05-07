@@ -597,8 +597,6 @@ class ZeroLengthInputsOutputs(unittest.TestCase):
     # issue 1350
 
     def test_distribcomp_zerolengthinputsoutputs(self):
-        import numpy as np
-        import openmdao.api as om
         from openmdao.test_suite.components.distributed_components import DistribCompDerivs, SummerDerivs
         from openmdao.utils.assert_utils import assert_check_partials
 
