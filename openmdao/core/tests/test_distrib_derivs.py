@@ -588,6 +588,49 @@ class MPIFeatureTests(unittest.TestCase):
         assert_near_equal(J[('C2.outvec', 'indep.x')], 
                           np.eye(15)*np.append(2*np.ones(8), -3*np.ones(7)))
 
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class ZeroLengthInputsOutputs(unittest.TestCase):
+
+    N_PROCS = 4
+    # this test case targets situations when zero-length inputs
+    # or outputs are located on some processors
+    # issue 1350
+
+    def test_distribcomp_zerolengthinputsoutputs(self):
+        import numpy as np
+        import openmdao.api as om
+        from openmdao.test_suite.components.distributed_components import DistribCompDerivs, SummerDerivs
+        from openmdao.utils.assert_utils import assert_check_partials
+
+        size = 3  # set to one less than number of procs, leave zero inputs/outputs on proc 3
+
+        model = om.Group()
+        model.add_subsystem("indep", om.IndepVarComp('x', np.zeros(size)))
+        model.add_subsystem("C2", DistribCompDerivs(size=size))
+        model.add_subsystem("C3", SummerDerivs(size=size))
+
+        model.connect('indep.x', 'C2.invec')
+        model.connect('C2.outvec', 'C3.invec')
+
+        prob = om.Problem(model)
+        prob.setup()
+
+        prob['indep.x'] = np.ones(size)
+        prob.run_model()
+
+        if model.comm.rank < 3:
+            assert_near_equal(prob['C2.invec'],
+                            np.ones(1) if model.comm.rank == 0 else np.ones(1))
+            assert_near_equal(prob['C2.outvec'],
+                            2*np.ones(1) if model.comm.rank == 0 else -3*np.ones(1))
+        assert_near_equal(prob['C3.sum'], -4.)
+
+        assert_check_partials(prob.check_partials())
+
+        J = prob.compute_totals(of=['C2.outvec'], wrt=['indep.x'])
+        assert_near_equal(J[('C2.outvec', 'indep.x')], 
+                          np.eye(3)*np.append(2*np.ones(1), -3*np.ones(2)))
+
 
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests
