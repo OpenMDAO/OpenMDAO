@@ -630,6 +630,98 @@ class MPITests2(unittest.TestCase):
         msg += "component whose input 'sub.parab.x' is distributed using src_indices. "
         self.assertEqual(str(context.exception), msg)
 
+    def test_distrib_voi_multiple_con(self):
+        # This test contains 2 distributed constraints and 2 global ones.
+        class NonDistComp(om.ExplicitComponent):
+
+            def initialize(self):
+                self.options.declare('arr_size', types=int, default=10,
+                                     desc="Size of input and output vectors.")
+
+            def setup(self):
+                arr_size = self.options['arr_size']
+
+                self.add_input('f_xy', val=np.ones(arr_size))
+                self.add_output('g', val=np.ones(arr_size))
+
+                self.mat = np.array([3.0, -1, 5, 7, 13, 11, -3])[:arr_size]
+
+                row_col = np.arange(arr_size)
+                self.declare_partials('g', ['f_xy'], rows=row_col, cols=row_col, val=self.mat)
+
+            def compute(self, inputs, outputs):
+                x = inputs['f_xy']
+                outputs['g'] = x * self.mat
+
+        size = 7
+        size2 = 5
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', np.ones((size, )))
+        ivc.add_output('y', np.ones((size, )))
+        ivc.add_output('a', -3.0 + 0.6 * np.arange(size))
+        ivc.add_output('x2', np.ones(size2))
+        ivc.add_output('y2', np.ones(size2))
+        ivc.add_output('a2', -4.0 + 0.4 * np.arange(size2))
+
+        model.add_subsystem('p', ivc, promotes=['*'])
+        model.add_subsystem("parab", DistParab(arr_size=size), promotes=['*'])
+        model.add_subsystem("ndp", NonDistComp(arr_size=size), promotes=['*'])
+        model.add_subsystem("parab2", DistParab(arr_size=size2))
+        model.add_subsystem("ndp2", NonDistComp(arr_size=size2))
+
+        model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
+                                               f_sum=np.ones((size, )),
+                                               f_xy=np.ones((size, ))),
+                            promotes=['*'])
+
+        model.connect('x2', 'parab2.x')
+        model.connect('y2', 'parab2.y')
+        model.connect('a2', 'parab2.a')
+        model.connect('parab2.f_xy', 'ndp2.f_xy')
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_design_var('x2', lower=-50.0, upper=50.0)
+        model.add_design_var('y2', lower=-50.0, upper=50.0)
+        model.add_constraint('f_xy', lower=0.0)
+        model.add_constraint('g', lower=0.0)
+        model.add_constraint('parab2.f_xy', lower=0.0)
+        model.add_constraint('ndp2.g', lower=0.0)
+        model.add_objective('f_sum', index=-1)
+
+        for mode in ['fwd', 'rev']:
+            prob.setup(mode=mode, force_alloc_complex=True)
+
+            prob.run_model()
+
+            J = prob.check_totals(method='fd')
+            assert_near_equal(J['parab.f_xy', 'p.x']['abs error'][0], 0.0, 1e-5)
+            assert_near_equal(J['parab.f_xy', 'p.y']['abs error'][0], 0.0, 1e-5)
+            assert_near_equal(J['ndp.g', 'p.x']['abs error'][0], 0.0, 2e-5)
+            assert_near_equal(J['ndp.g', 'p.y']['abs error'][0], 0.0, 2e-5)
+            assert_near_equal(J['parab2.f_xy', 'p.x2']['abs error'][0], 0.0, 1e-5)
+            assert_near_equal(J['parab2.f_xy', 'p.y2']['abs error'][0], 0.0, 1e-5)
+            assert_near_equal(J['ndp2.g', 'p.x2']['abs error'][0], 0.0, 2e-5)
+            assert_near_equal(J['ndp2.g', 'p.y2']['abs error'][0], 0.0, 2e-5)
+            assert_near_equal(J['sum.f_sum', 'p.x']['abs error'][0], 0.0, 1e-5)
+            assert_near_equal(J['sum.f_sum', 'p.y']['abs error'][0], 0.0, 1e-5)
+
+            J = prob.check_totals(method='cs')
+            assert_near_equal(J['parab.f_xy', 'p.x']['abs error'][0], 0.0, 1e-14)
+            assert_near_equal(J['parab.f_xy', 'p.y']['abs error'][0], 0.0, 1e-14)
+            assert_near_equal(J['ndp.g', 'p.x']['abs error'][0], 0.0, 1e-13)
+            assert_near_equal(J['ndp.g', 'p.y']['abs error'][0], 0.0, 1e-13)
+            assert_near_equal(J['parab2.f_xy', 'p.x2']['abs error'][0], 0.0, 1e-14)
+            assert_near_equal(J['parab2.f_xy', 'p.y2']['abs error'][0], 0.0, 1e-14)
+            assert_near_equal(J['ndp2.g', 'p.x2']['abs error'][0], 0.0, 1e-13)
+            assert_near_equal(J['ndp2.g', 'p.y2']['abs error'][0], 0.0, 1e-13)
+            assert_near_equal(J['sum.f_sum', 'p.x']['abs error'][0], 0.0, 1e-14)
+            assert_near_equal(J['sum.f_sum', 'p.y']['abs error'][0], 0.0, 1e-14)
+
 
 class DistribStateImplicit(om.ImplicitComponent):
     """
