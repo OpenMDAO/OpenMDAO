@@ -152,25 +152,32 @@ class N2Toolbar {
 
         // Display toolbar if not embedded, or if embedded doc location
         // href include the #toolbar anchor
-        if (!EMBEDDED || (EMBEDDED && window.location.href.includes('#toolbar'))) 
+        if (!EMBEDDED || (EMBEDDED && window.location.href.includes('#toolbar')))
             this.show();
 
         this._setupExpandableButtons();
         this._setupButtonFunctions(n2ui);
 
-        // Expand/contract the search bar
-        d3.select('#searchbar-container')
-            .on('mouseover', function () {
-                self.searchBar.style('width', '200px');
-                self.toolbarContainer.style('z-index', '5');
-                self.searchCount.attr('class', 'search-count-visible')
-            })
-            .on('mouseout', function () {
-                self.searchCount.attr('class', 'search-count-hidden')
-                self.searchBar.style('width', '0px');
-                self.toolbarContainer.style('z-index', '1');
-                d3.select('div.awesomplete ul').attr('hidden', true);
-            })
+        // Expand the search bar and set focus when search button clicked
+        d3.select('#searchbar-container').on('click', function () {
+            self.toolbarContainer.style('z-index', 10);
+            self.searchCount.html('0 matches');
+            
+            self.searchBar.node().value = '';
+            d3.select('#searchbar-and-label').attr('class', 'searchbar-visible');
+
+            // This is necessary rather than just calling focus() due to the
+            // transition animation
+            window.setTimeout(function () {
+                self.searchBar.node().focus();
+            }, 200);
+        });
+
+        // Retract search bar when focus is lost
+        this.searchBar.on('focusout', function () {
+            self.toolbarContainer.style('z-index', 1);
+            d3.select('#searchbar-and-label').attr('class', 'searchbar-hidden')
+        });
     }
 
     /** Slide everything to the left offscreen 75px, rotate the button */

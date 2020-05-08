@@ -195,7 +195,7 @@ class N2Diagram {
         this.dom.n2Groups.offgrid = offgrid;
 
 
-    }  
+    }
 
     /**
      * Make a copy of the previous transit coordinates and linear scalers before
@@ -655,7 +655,7 @@ class N2Diagram {
             this.matrix = new N2Matrix(this.model, this.layout,
                 this.dom.n2Groups, this.ui.lastClickWasLeft,
                 this.ui.findRootOfChangeFunction, this.matrix.nodeSize);
-        } 
+        }
 
         this._updateScale();
         this.layout.updateTransitionInfo(this.dom, this.transitionStartDelay, this.manuallyResized);
@@ -696,7 +696,7 @@ class N2Diagram {
      * @param {number} height The new height in pixels.
      */
     verticalResize(height) {
-        if (! this.manuallyResized ) {
+        if (!this.manuallyResized) {
             height = this.layout.calcFitDims().height;
         }
 
@@ -820,5 +820,60 @@ class N2Diagram {
         }
 
         return mf;
+    }
+
+    /**
+     * Recurse through the model, and determine whether a group/component is
+     * minimized or an input/output hidden. If it is, add it to the hiddenList
+     * array, and optionally reset its state.
+     * @param {Object[]} hiddenList The provided array to populate.
+     * @param {Boolean} reveal If true, make the node visible.
+     * @param {N2TreeNode} node The current node to operate on.
+     */
+    findAllHidden(hiddenList, reveal = false, node = this.model.root) {
+        if (!node.isVisible()) {
+            hiddenList.push({
+                'node': node,
+                'isMinimized': node.isMinimized,
+                'varIsHidden': node.varIsHidden
+            })
+
+            if (reveal) {
+                node.isMinimized = false;
+                node.varIsHidden = false;
+            }
+        }
+
+        if (node.hasChildren()) {
+            for (const child of node.children) {
+                this.findAllHidden(hiddenList, reveal, child);
+            }
+        }
+    }
+
+    /**
+     * Restore the minimized/hidden value to all the specified nodes.
+     * @param {Object[]} hiddenList The list of preserved objects
+     * @param {N2TreeNode} node The current node to operate on.
+    */
+    resetAllHidden(hiddenList, node = this.model.root) {
+        if (!hiddenList) return;
+
+        const foundEntry = hiddenList.find(item => item.node === node);
+
+        if (!foundEntry) { // Not found, reset values to default
+            node.isMinimized = false;
+            node.varIsHidden = false;
+        }
+        else { // Found, restore values
+            node.isMinimized = foundEntry.isMinimized;
+            node.varIsHidden = foundEntry.varIsHidden;
+        }
+
+        if (node.hasChildren()) {
+            for (const child of node.children) {
+                this.resetAllHidden(hiddenList, child);
+            }
+        }
     }
 }
