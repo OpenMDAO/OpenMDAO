@@ -362,7 +362,6 @@ class Driver(object):
         """
         problem = self._problem()
         model = problem.model
-        rrank = problem.comm.rank
 
         incl = recording_options['includes']
         excl = recording_options['excludes']
@@ -466,7 +465,7 @@ class Driver(object):
         indices = meta['indices']
 
         if MPI:
-            distributed = MPI.COMM_WORLD.size > 0 and name in distributed_vars
+            distributed = comm.size > 0 and name in distributed_vars
         else:
             distributed = False
 
@@ -494,7 +493,7 @@ class Driver(object):
         elif distributed:
             local_val = model._get_val(name, flat=True)
             if indices is not None:
-                val = val[indices]
+                local_val = local_val[indices]
             idx, sizes = distributed_vars[name]
             offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
             offsets[1:] = np.cumsum(sizes[:-1])
@@ -762,7 +761,7 @@ class Driver(object):
         problem = self._problem()
         total_jac = self._total_jac
         debug_print = 'totals' in self.options['debug_print'] and (not MPI or
-                                                                   MPI.COMM_WORLD.rank == 0)
+                                                                   problem.comm.rank == 0)
 
         if debug_print:
             header = 'Driver total derivatives for iteration: ' + str(self.iter_count)
@@ -995,10 +994,11 @@ class Driver(object):
         Optionally print some debugging information before the model runs.
         """
         debug_opt = self.options['debug_print']
+        rank = self._problem().comm.rank
         if not debug_opt or debug_opt == ['totals']:
             return
 
-        if not MPI or MPI.COMM_WORLD.rank == 0:
+        if not MPI or rank == 0:
             header = 'Driver debug print for iter coord: {}'.format(
                 self._recording_iter.get_formatted_iteration_coordinate())
             print(header)
@@ -1007,7 +1007,7 @@ class Driver(object):
         if 'desvars' in debug_opt:
             model = self._problem().model
             desvar_vals = {n: model._get_val(n, get_remote=True, rank=0) for n in self._designvars}
-            if not MPI or MPI.COMM_WORLD.rank == 0:
+            if not MPI or rank == 0:
                 print("Design Vars")
                 if desvar_vals:
                     pprint.pprint(desvar_vals)
@@ -1021,9 +1021,11 @@ class Driver(object):
         """
         Optionally print some debugging information after the model runs.
         """
+        rank = self._problem().comm.rank
+
         if 'nl_cons' in self.options['debug_print']:
             cons = self.get_constraint_values(lintype='nonlinear', driver_scaling=False)
-            if not MPI or MPI.COMM_WORLD.rank == 0:
+            if not MPI or rank == 0:
                 print("Nonlinear constraints")
                 if cons:
                     pprint.pprint(cons)
@@ -1033,7 +1035,7 @@ class Driver(object):
 
         if 'ln_cons' in self.options['debug_print']:
             cons = self.get_constraint_values(lintype='linear', driver_scaling=False)
-            if not MPI or MPI.COMM_WORLD.rank == 0:
+            if not MPI or rank == 0:
                 print("Linear constraints")
                 if cons:
                     pprint.pprint(cons)
@@ -1043,7 +1045,7 @@ class Driver(object):
 
         if 'objs' in self.options['debug_print']:
             objs = self.get_objective_values(driver_scaling=False)
-            if not MPI or MPI.COMM_WORLD.rank == 0:
+            if not MPI or rank == 0:
                 print("Objectives")
                 if objs:
                     pprint.pprint(objs)
