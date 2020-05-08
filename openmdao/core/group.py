@@ -29,8 +29,7 @@ from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import convert_neg, array_connection_compatible, \
     _flatten_src_indices
-from openmdao.utils.general_utils import ContainsAll, all_ancestors, simple_warning, \
-    ensure_compatible
+from openmdao.utils.general_utils import ContainsAll, all_ancestors, simple_warning
 from openmdao.utils.units import is_compatible, unit_conversion
 from openmdao.utils.mpi import MPI
 from openmdao.utils.coloring import Coloring, _STD_COLORING_FNAME
@@ -1500,34 +1499,45 @@ class Group(System):
             flattened source.  Otherwise each entry must be a tuple or list of size equal
             to the number of dimensions of the source.
         """
+        if isinstance(any, str):
+            raise RuntimeError(f"{self.msginfo}: Trying to promote any='{any}', "
+                               "but an iterator of strings and/or tuples is required.")
+        if isinstance(inputs, str):
+            raise RuntimeError(f"{self.msginfo}: Trying to promote inputs='{inputs}', "
+                               "but an iterator of strings and/or tuples is required.")
+        if isinstance(outputs, str):
+            raise RuntimeError(f"{self.msginfo}: Trying to promote outputs='{outputs}', "
+                               "but an iterator of strings and/or tuples is required.")
+
         subsys = getattr(self, subsys_name)
         if any:
             subsys._var_promotes['any'].extend(any)
         if inputs:
-            # TODO: handle inputs included via 'any'?
             subsys._var_promotes['input'].extend(inputs)
-            if src_indices is not None:
-                # handle src_indices as if specified via add_input
-                if isinstance(src_indices, np.ndarray):
-                    if not np.issubdtype(src_indices.dtype, np.integer):
-                        raise TypeError(f"{self.msginfo}: src_indices must contain integers, but "
-                                        f"src_indices for promotes from '{subsys_name}' are type "
-                                        f"{src_indices.dtype.type}.")
-                elif not isinstance(src_indices, (int, list, tuple, Iterable)):
-                    raise TypeError(f"{self.msginfo}: The src_indices argument should be an int, "
-                                    f"list, tuple, ndarray or Iterable, but src_indices for "
-                                    f"promotes from '{subsys_name}' are {type(src_indices)}.")
-                for inp in inputs:
-                    # TODO: need to handle wildcards
-                    name = inp[0] if isinstance(inp, tuple) else inp
-                    meta = subsys._var_rel2meta[name]
-                    _, _, src_indices = ensure_compatible(name, meta['value'], meta['shape'],
-                                                          src_indices)
-                    meta['src_indices'] = np.asarray(src_indices, dtype=INT_DTYPE)
-                    meta['flat_src_indices'] = flat_src_indices
-
         if outputs:
             subsys._var_promotes['output'].extend(outputs)
+
+        if src_indices is not None:
+            if outputs:
+                raise RuntimeError(f"{self.msginfo}: Trying to promote outputs {outputs} while "
+                                   f"specifying src_indices {src_indices} is not meaningful.")
+            elif isinstance(src_indices, np.ndarray):
+                if not np.issubdtype(src_indices.dtype, np.integer):
+                    raise TypeError(f"{self.msginfo}: src_indices must contain integers, but "
+                                    f"src_indices for promotes from '{subsys_name}' are type "
+                                    f"{src_indices.dtype.type}.")
+            elif not isinstance(src_indices, (int, list, tuple, Iterable)):
+                raise TypeError(f"{self.msginfo}: The src_indices argument should be an int, "
+                                f"list, tuple, ndarray or Iterable, but src_indices for "
+                                f"promotes from '{subsys_name}' are {type(src_indices)}.")
+            else:
+                # src_indices will applied when promotes are resolved
+                if inputs is not None:
+                    for inp in inputs:
+                        subsys._var_promotes_src_indices[inp] = (src_indices, flat_src_indices)
+                if any is not None:
+                    for inp in any:
+                        subsys._var_promotes_src_indices[inp] = (src_indices, flat_src_indices)
 
         # check for attempt to promote with different alias
         list_comp = [i if isinstance(i, tuple) else (i, i) for i in subsys._var_promotes['input']]

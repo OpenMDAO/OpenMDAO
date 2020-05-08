@@ -1053,6 +1053,24 @@ class TestGroupPromotes(unittest.TestCase):
         assert_near_equal(p['comp1.a'], np.array([0, 4, 8]))
         assert_near_equal(p['comp1.b'], np.array([0, 8, 16]))
 
+    def test_promotes_bad_spec(self):
+
+        class SimpleGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('comp', om.ExecComp('b=2*a', a=np.zeros(5), b=np.zeros(5)))
+
+            def configure(self):
+                self.promotes('comp', inputs='a')
+
+        top = om.Problem(model=SimpleGroup())
+
+        with self.assertRaises(RuntimeError) as cm:
+            top.setup()
+
+        self.assertEqual(str(cm.exception),
+            "SimpleGroup (<model>): Trying to promote inputs='a', "
+            "but an iterator of strings and/or tuples is required.")
+
     def test_promotes_src_indices_bad_type(self):
 
         class SimpleGroup(om.Group):
@@ -1108,6 +1126,75 @@ class TestGroupPromotes(unittest.TestCase):
 
         self.assertEqual(str(cm.exception),
             "Shape of indices does not match shape for 'a': Expected (5,) but got (3,).")
+
+    def test_promotes_src_indices_wildcard(self):
+
+        class SimpleGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('indep', om.IndepVarComp(), promotes=['*'])
+                self.add_subsystem('comp1', om.ExecComp('z=x+y', x=np.ones(3), y=np.ones(3), z=np.ones(3)))
+
+            def configure(self):
+                self.indep.add_output('x', 2*np.array(range(5)))
+                self.indep.add_output('y', 3*np.array(range(5)))
+                self.promotes('comp1', inputs=['*'], src_indices=[0, 2, 4])
+
+        p = om.Problem(model=SimpleGroup())
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['indep.x'], np.array([0, 2, 4, 6, 8]))
+        assert_near_equal(p['indep.y'], np.array([0, 3, 6, 9, 12]))
+
+        assert_near_equal(p['comp1.x'], np.array([0, 4, 8]))
+        assert_near_equal(p['comp1.y'], np.array([0, 6, 12]))
+        assert_near_equal(p['comp1.z'], np.array([0, 10, 20]))
+
+    def test_promotes_src_indices_wildcard_any(self):
+
+        class SimpleGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('indep', om.IndepVarComp(), promotes=['*'])
+                self.add_subsystem('comp1', om.ExecComp('z=x+y', x=np.ones(3), y=np.ones(3), z=np.ones(3)))
+
+            def configure(self):
+                self.indep.add_output('x', 2*np.array(range(5)))
+                self.indep.add_output('y', 3*np.array(range(5)))
+                self.promotes('comp1', any=['*'], src_indices=[0, 2, 4])
+
+        p = om.Problem(model=SimpleGroup())
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['indep.x'], np.array([0, 2, 4, 6, 8]))
+        assert_near_equal(p['indep.y'], np.array([0, 3, 6, 9, 12]))
+
+        assert_near_equal(p['comp1.x'], np.array([0, 4, 8]))
+        assert_near_equal(p['comp1.y'], np.array([0, 6, 12]))
+        assert_near_equal(p['comp1.z'], np.array([0, 10, 20]))
+
+    def test_promotes_src_indices_wildcard_output(self):
+
+        class SimpleGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('indep', om.IndepVarComp(), promotes=['*'])
+                self.add_subsystem('comp1', om.ExecComp('z=x+y', x=np.ones(3), y=np.ones(3), z=np.ones(3)))
+
+            def configure(self):
+                self.indep.add_output('x', 2*np.array(range(5)))
+                self.indep.add_output('y', 3*np.array(range(5)))
+                self.promotes('comp1', outputs=['*'], src_indices=[0, 2, 4])
+
+        p = om.Problem(model=SimpleGroup())
+
+        with self.assertRaises(RuntimeError) as cm:
+            p.setup()
+
+        self.assertEqual(str(cm.exception),
+            "SimpleGroup (<model>): Trying to promote outputs ['*'] "
+            "while specifying src_indices [0, 2, 4] is not meaningful.")
 
 
 class MyComp(om.ExplicitComponent):

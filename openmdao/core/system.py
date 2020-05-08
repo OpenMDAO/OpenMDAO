@@ -36,7 +36,7 @@ from openmdao.utils.coloring import _compute_coloring, Coloring, \
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, ContainsAll, all_ancestors, \
-    simple_warning, make_set, match_includes_excludes
+    simple_warning, make_set, match_includes_excludes, ensure_compatible
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.utils.units import unit_conversion
@@ -131,6 +131,8 @@ class System(object):
     _var_promotes : { 'any': [], 'input': [], 'output': [] }
         Dictionary of lists of variable names/wildcards specifying promotion
         (used to calculate promoted names)
+    _var_promotes_src_indices : dict
+        Dictionary mapping promoted input names/wildcards to (src_indices, flat_src_indices)
     _var_allprocs_abs_names : {'input': [str, ...], 'output': [str, ...]}
         List of absolute names of this system's variables on all procs.
     _var_abs_names : {'input': [str, ...], 'output': [str, ...]}
@@ -375,6 +377,8 @@ class System(object):
         self._subsystems_proc_range = []
 
         self._var_promotes = {'input': [], 'output': [], 'any': []}
+        self._var_promotes_src_indices = {}
+
         self._var_allprocs_abs_names = {'input': [], 'output': []}
         self._var_abs_names = {'input': [], 'output': []}
         self._var_allprocs_abs_names_discrete = {'input': [], 'output': []}
@@ -1968,6 +1972,19 @@ class System(object):
                                     (self.pathname, entry))
             return names, patterns, renames
 
+        def update_src_indices(name, key):
+            """
+            update metadata for promoted inputs that have src_indices specified
+            """
+            if key in self._var_promotes_src_indices:
+                src_indices, flat_src_indices = self._var_promotes_src_indices[key]
+
+                meta = self._var_rel2meta[name]
+                _, _, src_indices = ensure_compatible(name, meta['value'], meta['shape'],
+                                                      src_indices)
+                meta['src_indices'] = np.asarray(src_indices, dtype=INT_DTYPE)
+                meta['flat_src_indices'] = flat_src_indices
+
         def resolve(to_match, io_types, matches, proms):
             """
             Determine the mapping of promoted names to the parent scope for a promotion type.
@@ -1984,25 +2001,35 @@ class System(object):
 
             found = set()
             names, patterns, renames = split_list(to_match)
+
             for typ in io_types:
+                is_input = typ == 'input'
                 pmap = matches[typ]
                 for name in proms[typ]:
                     if name in names:
                         pmap[name] = name
                         found.add(name)
+                        if is_input:
+                            update_src_indices(name, name)
                     elif name in renames:
                         pmap[name] = renames[name]
                         found.add(name)
+                        if is_input:
+                            update_src_indices(name, (name, renames[name]))
                     else:
                         for pattern in patterns:
                             # if name matches, promote that variable to parent
                             if pattern == '*' or fnmatchcase(name, pattern):
                                 pmap[name] = name
                                 found.add(pattern)
+                                if is_input:
+                                    update_src_indices(name, pattern)
                                 break
                         else:
                             # Default: prepend the parent system's name
                             pmap[name] = gname + name if gname else name
+                            if is_input:
+                                update_src_indices(name, name)
 
             not_found = (set(names).union(renames).union(patterns)) - found
             if not_found:
