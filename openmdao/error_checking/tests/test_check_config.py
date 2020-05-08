@@ -9,6 +9,8 @@ from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitCompone
 
 from openmdao.utils.logger_utils import TestLogger
 from openmdao.error_checking.check_config import get_sccs_topo
+from openmdao.utils.assert_utils import assert_warning
+
 
 
 class MyComp(ExecComp):
@@ -92,7 +94,7 @@ class TestCheckConfig(unittest.TestCase):
         testlogger.find_in('info', expected_info)
         testlogger.find_in('warning', expected_warning)
 
-    def test_out_of_order_parallel_group(self):
+    def test_parallel_group_order(self):
         import openmdao.api as om
 
         prob = om.Problem()
@@ -106,19 +108,33 @@ class TestCheckConfig(unittest.TestCase):
         parallel.add_subsystem('c2', om.ExecComp(['y=5.0*x']))
         parallel.connect('c1.y', 'c2.x')
 
+        parallel = model.add_subsystem('parallel_copy', om.ParallelGroup())
+        parallel.add_subsystem('comp1', om.ExecComp(['y=-2.0*x']))
+        parallel.add_subsystem('comp2', om.ExecComp(['y=5.0*x']))
+        parallel.connect('comp1.y', 'comp2.x')
+
         model.add_subsystem('c3', om.ExecComp(['y=3.0*x1+7.0*x2']))
+        model.add_subsystem('c4', om.ExecComp(['y=3.0*x_copy_1+7.0*x_copy_2']))
 
         model.connect("parallel.c1.y", "c3.x1")
         model.connect("parallel.c2.y", "c3.x2")
+        model.connect("parallel_copy.comp1.y", "c4.x_copy_1")
+        model.connect("parallel_copy.comp2.y", "c4.x_copy_2")
 
         model.connect("p1.x", "parallel.c1.x")
+        model.connect("p1.x", "parallel_copy.comp1.x")
 
         testlogger = TestLogger()
         prob.setup(check=True, mode='fwd', logger=testlogger)
-        prob.run_model()
+
+        msg = "Need to attach NonlinearBlockJac to 'parallel' when connecting components inside parallel groups"
+
+        with assert_warning(UserWarning, msg):
+            prob.run_model()
 
         expected_warning = ("The following systems are executed out-of-order:\n"
-                            "   System 'c2' executes out-of-order with respect to its source systems ['c1']\n")
+                            "   System 'parallel.c2' executes out-of-order with respect to its source systems ['parallel.c1']\n"
+                            "   System 'parallel_copy.comp2' executes out-of-order with respect to its source systems ['parallel_copy.comp1']\n")
 
         testlogger.find_in('warning', expected_warning)
 

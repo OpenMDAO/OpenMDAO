@@ -14,7 +14,7 @@ from openmdao.utils.logger_utils import get_logger
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.mpi import MPI
 from openmdao.utils.hooks import _register_hook
-from openmdao.utils.general_utils import printoptions
+from openmdao.utils.general_utils import printoptions, simple_warning
 from openmdao.utils.units import convert_units
 from openmdao.utils.file_utils import _load_and_exec
 
@@ -154,14 +154,12 @@ def _get_used_before_calc_subs(group, input_srcs):
         source Systems that execute after them.
     """
     sub2i = {}
-    count = 0
-    for sub in group._subsystems_allprocs:
+    parallel_connections = {}
+    for i, sub in enumerate(group._subsystems_allprocs):
         if hasattr(sub, '_mpi_proc_allocator') and sub._mpi_proc_allocator.parallel:
-            for parallel_subg in sub._subsystems_inds:
-                sub2i.update({parallel_subg:count})
-        else:
-            sub2i.update({sub.name:count})
-            count += 1
+            parallel_connections.update({sub.name: sub.nonlinear_solver.SOLVER})
+
+        sub2i.update({sub.name:i})
 
     glen = len(group.pathname.split('.')) if group.pathname else 0
 
@@ -170,12 +168,15 @@ def _get_used_before_calc_subs(group, input_srcs):
         if src_abs is not None:
             iparts = tgt_abs.split('.')
             oparts = src_abs.split('.')
-            if iparts[glen] == oparts[glen]:
-                glen = 1
             src_sys = oparts[glen]
             tgt_sys = iparts[glen]
+            if src_sys in parallel_connections and tgt_sys in parallel_connections and \
+                parallel_connections[src_sys] != "NL: NLBJ":
+                simple_warning("Need to attach NonlinearBlockJac to '%s' when connecting "
+                               "components inside parallel groups" % (src_sys))
+                ubcs[tgt_abs.rsplit('.', 1)[0]].add(src_abs.rsplit('.', 1)[0])
             if (src_sys in sub2i and tgt_sys in sub2i and
-                    (sub2i[src_sys] >= sub2i[tgt_sys])):
+                    (sub2i[src_sys] > sub2i[tgt_sys])):
                 ubcs[tgt_sys].add(src_sys)
 
     return ubcs
