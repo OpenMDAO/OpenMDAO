@@ -12,7 +12,6 @@ from openmdao.error_checking.check_config import get_sccs_topo
 from openmdao.utils.assert_utils import assert_warning
 
 
-
 class MyComp(ExecComp):
     def __init__(self):
         super(MyComp, self).__init__(["y = 2.0*a", "z = 3.0*b"])
