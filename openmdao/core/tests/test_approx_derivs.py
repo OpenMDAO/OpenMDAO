@@ -2305,7 +2305,6 @@ class CheckTotalsParallelGroup(unittest.TestCase):
         data  = prob.check_totals(method='cs', out_stream=None)
         assert_near_equal(data[('pg.dc1.y', 'iv.x')]['abs error'][0], 0.0, 1e-6)
         assert_near_equal(data[('pg.dc3.y', 'iv.x')]['abs error'][0], 0.0, 1e-6)
-        self.assertEqual(MPI.COMM_WORLD.size, 3)
 
 if __name__ == "__main__":
     unittest.main()
