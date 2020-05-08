@@ -27,7 +27,7 @@ toolbar_script = [
     },
     {
         "desc": "Collapse Outputs in View Only button",
-        "id": "collapse-element",
+        "id": "collapse-element-2",
         "waitForTransition": True
     },
     {
