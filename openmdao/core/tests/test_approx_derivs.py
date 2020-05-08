@@ -21,6 +21,7 @@ from openmdao.test_suite.parametric_suite import parametric_suite
 from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.mpi import MPI
+import time 
 
 try:
     from openmdao.parallel_api import PETScVector
@@ -2323,6 +2324,67 @@ class ParallelFDParametricTestCase(unittest.TestCase):
             totals = param_instance.compute_totals('rev')
             assert_near_equal(totals, expected_totals, 1e-4)
 
+class CheckTotalsParallelGroup(unittest.TestCase):
+
+    N_PROCS = 3
+
+    def test_vois_in_parallelgroup(self):
+        class PassThruComp(om.ExplicitComponent):
+            def initialize(self):
+                self.options.declare('time', default=3.0)
+                self.options.declare('size', default=1)
+
+            def setup(self):
+                size = self.options['size']
+                self.add_input('x', shape=size)
+                self.add_output('y', shape=size)
+                self.declare_partials('y', 'x')
+
+            def compute(self, inputs, outputs):
+                waittime = self.options['time']
+                if not inputs._under_complex_step:
+                    print('sleeping: ')
+                    time.sleep(waittime)
+                outputs['y'] = inputs['x']
+
+            def compute_partials(self, inputs, J):
+                size = self.options['size']
+                J['y', 'x'] = np.eye(size)
+
+        model = om.Group()
+        iv = om.IndepVarComp()
+        size = 1
+        iv.add_output('x', val=3.0 * np.ones((size, )))
+        model.add_subsystem('iv', iv)
+        pg = model.add_subsystem('pg', om.ParallelGroup(), promotes=['*'])
+        pg.add_subsystem('dc1', PassThruComp(size=size, time=0.0))
+        pg.add_subsystem('dc2', PassThruComp(size=size, time=0.0))
+        pg.add_subsystem('dc3', PassThruComp(size=size, time=0.0))
+        model.connect('iv.x', ['dc1.x', 'dc2.x', 'dc3.x'])
+        model.add_subsystem('adder', om.ExecComp('z = sum(y1)+sum(y2)+sum(y3)', y1={'value': np.zeros((size, ))},
+                                                                                y2={'value': np.zeros((size, ))},
+                                                                                y3={'value': np.zeros((size, ))}))
+        model.connect('dc1.y', 'adder.y1')
+        model.connect('dc2.y', 'adder.y2')
+        model.connect('dc3.y', 'adder.y3')
+
+        model.add_design_var('iv.x', lower=-1.0, upper=1.0)
+        # this objective works fine
+        # model.add_objective('adder.z')
+
+        # this objective raises a concatenation error whether under fd or cs
+        # issue 1403
+        model.add_objective('dc1.y')
+
+        # for some reason this constraint is fine even though only lives on proc 3
+        model.add_constraint('dc3.y', lower=-1.0, upper=1.0)
+
+        prob = om.Problem(model=model)
+        prob.setup(force_alloc_complex=True)
+        prob.run_model()
+        data  = prob.check_totals(method='cs', out_stream=None)
+        assert_near_equal(data[('pg.dc1.y', 'iv.x')]['abs error'][0], 0.0, 1e-6)
+        assert_near_equal(data[('pg.dc3.y', 'iv.x')]['abs error'][0], 0.0, 1e-6)
 
 if __name__ == "__main__":
     unittest.main()

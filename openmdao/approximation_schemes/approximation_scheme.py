@@ -586,7 +586,12 @@ def _get_wrt_subjacs(system, approxs):
                         full_idxs.append(np.arange(slc.start, slc.stop)[approx_of_idx[sof]])
                     else:
                         full_idxs.append(range(slc.start, slc.stop))
-            J[wrt]['loc_outvec_idxs'] = np.hstack(full_idxs)
+            if full_idxs:
+                J[wrt]['loc_outvec_idxs'] = np.hstack(full_idxs)
+            else:
+                # guard for empty
+                # which can happen if no vois are on this processor (e.g. pargroup)
+                J[wrt]['loc_outvec_idxs'] = np.array([])
         else:
             J[wrt]['loc_outvec_idxs'] = _full_slice
 
