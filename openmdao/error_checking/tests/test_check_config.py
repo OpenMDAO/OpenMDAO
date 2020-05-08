@@ -104,7 +104,7 @@ class TestCheckConfig(unittest.TestCase):
         parallel = model.add_subsystem('parallel', om.ParallelGroup())
         parallel.add_subsystem('c1', om.ExecComp(['y=-2.0*x']))
         parallel.add_subsystem('c2', om.ExecComp(['y=5.0*x']))
-        parallel.connect('c1.y','c2.x')
+        parallel.connect('c1.y', 'c2.x')
 
         model.add_subsystem('c3', om.ExecComp(['y=3.0*x1+7.0*x2']))
 
@@ -113,10 +113,14 @@ class TestCheckConfig(unittest.TestCase):
 
         model.connect("p1.x", "parallel.c1.x")
 
-        prob.setup(check=True, mode='fwd')
+        testlogger = TestLogger()
+        prob.setup(check=True, mode='fwd', logger=testlogger)
         prob.run_model()
 
-        print(prob['c3.y'])
+        expected_warning = ("The following systems are executed out-of-order:\n"
+                            "   System 'c2' executes out-of-order with respect to its source systems ['c1']\n")
+
+        testlogger.find_in('warning', expected_warning)
 
     def test_dataflow_multi_level(self):
         p = Problem()
