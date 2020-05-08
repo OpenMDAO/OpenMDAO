@@ -104,16 +104,14 @@ class TestCheckConfig(unittest.TestCase):
         root.add_subsystem("C3", MyComp())
         root.add_subsystem("C4", MyComp())
 
-
-
         # make sure no system has dangling inputs so we avoid that warning
         root.connect("indep.x", "C1.b")
         root.connect("indep.x", "C2.b")
         root.connect("indep.x", "C3.b")
         root.connect("indep.x", "C4.b")
 
-        root.connect("C1.y", "C2.a")
-        root.connect("C2.y", "C3.a")
+        root.connect("C1.y", "C3.a")
+        root.connect("C2.y", "C1.a")
         root.connect("C3.y", "C4.a")
 
         # set iterative solvers since we have cycles

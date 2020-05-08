@@ -54,7 +54,6 @@ def _check_cycles(group, infos=None):
 
     return cycles
 
-
 def _check_ubcs(group, warnings):
     """
     Report any 'used before calculated' Systems to the logger.
@@ -135,7 +134,7 @@ def _check_ubcs_prob(prob, logger):
     if len(warnings) > 1:
         logger.warning(''.join(warnings[:1] + sorted(warnings[1:])))
 
-
+#import wingdbstub
 def _get_used_before_calc_subs(group, input_srcs):
     """
     Return Systems that are executed out of dataflow order.
@@ -155,18 +154,31 @@ def _get_used_before_calc_subs(group, input_srcs):
         A dict mapping names of target Systems to a set of names of their
         source Systems that execute after them.
     """
-    sub2i = {sub.name: i for i, sub in enumerate(group._subsystems_allprocs)}
+    sub2i = {}
+    for i, sub in enumerate(group._subsystems_allprocs):
+        if hasattr(sub, '_mpi_proc_allocator') and sub._mpi_proc_allocator.parallel:
+            for parallel_subg in sub._subsystems_inds:
+                name = '{}.{}'.format(sub.name, parallel_subg)
+                sub2i.update({name:i}) 
+        else:
+            sub2i.update({sub.name:i}) 
+        
     glen = len(group.pathname.split('.')) if group.pathname else 0
 
     ubcs = defaultdict(set)
     for tgt_abs, src_abs in input_srcs.items():
         if src_abs is not None:
-            iparts = tgt_abs.split('.')
-            oparts = src_abs.split('.')
+            if len(tgt_abs.split('.')) > 2:
+                iparts = tgt_abs.rsplit('.',1)
+            else:
+                iparts = tgt_abs.split('.')
+            if len(src_abs.split('.')) > 2:
+                oparts = src_abs.rsplit('.', 1)
+            else:
+                oparts = src_abs.split('.')
             src_sys = oparts[glen]
             tgt_sys = iparts[glen]
-            if (src_sys in sub2i and tgt_sys in sub2i and
-                    (sub2i[src_sys] > sub2i[tgt_sys])):
+            if (src_sys in sub2i and tgt_sys in sub2i and (sub2i[src_sys] >= sub2i[tgt_sys])):
                 ubcs[tgt_sys].add(src_sys)
 
     return ubcs
