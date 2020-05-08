@@ -1954,6 +1954,20 @@ class System(object):
         def split_list(lst):
             """
             Return names, patterns, and renames found in lst.
+
+            Parameters
+            ----------
+            lst : list
+                List of names, patterns and/or tuples specifying promotes.
+
+            Returns
+            -------
+            names : list
+                list of names
+            patterns : list
+                list of patterns
+            renames : dict
+                dictionary of name mappings
             """
             names = []
             patterns = []
@@ -1974,7 +1988,15 @@ class System(object):
 
         def update_src_indices(name, key):
             """
-            update metadata for promoted inputs that have src_indices specified
+            Update metadata for promoted inputs that have had src_indices specified.
+
+            Parameters
+            ----------
+            name : str
+                Name of an input variable that may have associated src_indices.
+            key : str or tuple
+                Name, pattern or tuple by which src_indices would have been specified
+                when the input variable was promoted.
             """
             if key in self._var_promotes_src_indices:
                 src_indices, flat_src_indices = self._var_promotes_src_indices[key]
