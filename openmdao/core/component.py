@@ -423,7 +423,7 @@ class Component(System):
                     # add sparsity info to existing partial info
                     self._subjacs_info[abs_key]['sparsity'] = tup
 
-    def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=False,
+    def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
                   units=None, desc='', tags=None):
         """
         Add an input variable to the component.

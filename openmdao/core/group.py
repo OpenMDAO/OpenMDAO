@@ -1468,7 +1468,7 @@ class Group(System):
             self._vector_class.TRANSFER._setup_discrete_transfers(self, recurse=recurse)
 
     def promotes(self, subsys_name, any=None, inputs=None, outputs=None,
-                 src_indices=None, flat_src_indices=False):
+                 src_indices=None, flat_src_indices=None):
         """
         Promote a variable in the model tree.
 

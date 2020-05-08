@@ -2001,9 +2001,26 @@ class System(object):
             if key in self._var_promotes_src_indices:
                 src_indices, flat_src_indices = self._var_promotes_src_indices[key]
 
-                meta = self._var_rel2meta[name]
+                abs_name = self._var_allprocs_prom2abs_list['input'][name][0]
+                meta = self._var_abs2meta[abs_name]
+
                 _, _, src_indices = ensure_compatible(name, meta['value'], meta['shape'],
                                                       src_indices)
+
+                if 'src_indices' in meta and meta['src_indices'] is not None:
+                    if not np.array_equal(meta['src_indices'], src_indices):
+                        raise RuntimeError("%s: Trying to promote input '%s' with src_indices %s,"
+                                           " but src_indices have already been specified as %s." %
+                                           (self.msginfo, name, str(src_indices),
+                                            str(meta['src_indices'])))
+                if 'flat_src_indices' in meta and meta['flat_src_indices'] is not None:
+                    if not meta['flat_src_indices'] == src_indices:
+                        raise RuntimeError("%s: Trying to promote input '%s' with flat_src_indices"
+                                           "=%s but flat_src_indices has already been specified as"
+                                           " %s." %
+                                           (self.msginfo, name, str(flat_src_indices),
+                                            str(meta['flat_src_indices'])))
+
                 meta['src_indices'] = np.asarray(src_indices, dtype=INT_DTYPE)
                 meta['flat_src_indices'] = flat_src_indices
 

@@ -1196,6 +1196,38 @@ class TestGroupPromotes(unittest.TestCase):
             "SimpleGroup (<model>): Trying to promote outputs ['*'] "
             "while specifying src_indices [0, 2, 4] is not meaningful.")
 
+    def test_promotes_src_indices_collision(self):
+
+        class SubGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('comp', om.ExecComp('x=2.0*a+3.0*b',
+                                                       a=np.ones(3),
+                                                       b=np.ones(3),
+                                                       x=np.ones(3)))
+
+            def configure(self):
+                self.promotes('comp', inputs=['a'], src_indices=[0, 2, 4])
+
+        class TopGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('ind', om.IndepVarComp())
+                self.add_subsystem('sub', SubGroup())
+
+            def configure(self):
+                self.ind.add_output('a', val=np.ones(5))
+
+                self.promotes('ind', outputs=['a'])
+                self.promotes('sub', inputs=['a'], src_indices=[0, 1, 2])
+
+        p = om.Problem(model=TopGroup())
+
+        with self.assertRaises(RuntimeError) as cm:
+            p.setup()
+
+        self.assertEqual(str(cm.exception),
+            "SubGroup (sub): Trying to promote input 'a' with src_indices [0 1 2], "
+            "but src_indices have already been specified as [0 2 4].")
+
 
 class MyComp(om.ExplicitComponent):
     def __init__(self, input_shape, src_indices=None, flat_src_indices=False):
