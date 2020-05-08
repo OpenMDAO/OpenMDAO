@@ -54,6 +54,7 @@ def _check_cycles(group, infos=None):
 
     return cycles
 
+
 def _check_ubcs(group, warnings):
     """
     Report any 'used before calculated' Systems to the logger.
@@ -134,6 +135,7 @@ def _check_ubcs_prob(prob, logger):
     if len(warnings) > 1:
         logger.warning(''.join(warnings[:1] + sorted(warnings[1:])))
 
+
 def _get_used_before_calc_subs(group, input_srcs):
     """
     Return Systems that are executed out of dataflow order.
@@ -159,7 +161,7 @@ def _get_used_before_calc_subs(group, input_srcs):
         if hasattr(sub, '_mpi_proc_allocator') and sub._mpi_proc_allocator.parallel:
             parallel_connections.update({sub.name: sub.nonlinear_solver.SOLVER})
 
-        sub2i.update({sub.name:i})
+        sub2i.update({sub.name: i})
 
     glen = len(group.pathname.split('.')) if group.pathname else 0
 
@@ -170,8 +172,8 @@ def _get_used_before_calc_subs(group, input_srcs):
             oparts = src_abs.split('.')
             src_sys = oparts[glen]
             tgt_sys = iparts[glen]
-            if src_sys in parallel_connections and tgt_sys in parallel_connections and \
-                parallel_connections[src_sys] != "NL: NLBJ":
+            if (src_sys in parallel_connections and tgt_sys in parallel_connections and
+                    (parallel_connections[src_sys] != "NL: NLBJ")):
                 simple_warning("Need to attach NonlinearBlockJac to '%s' when connecting "
                                "components inside parallel groups" % (src_sys))
                 ubcs[tgt_abs.rsplit('.', 1)[0]].add(src_abs.rsplit('.', 1)[0])
@@ -180,6 +182,7 @@ def _get_used_before_calc_subs(group, input_srcs):
                 ubcs[tgt_sys].add(src_sys)
 
     return ubcs
+
 
 def _check_dup_comp_inputs(problem, logger):
     """
