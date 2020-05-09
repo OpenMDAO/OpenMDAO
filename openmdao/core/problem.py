@@ -1363,6 +1363,7 @@ class Problem(object):
         # Assemble and Return all metrics.
         data = {}
         data[''] = {}
+        # TODO key should not be fwd when exact computed in rev mode or auto
         for key, val in Jcalc.items():
             data[''][key] = {}
             data[''][key]['J_fwd'] = val
@@ -1817,6 +1818,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             do_rev_dp = not totals and matrix_free and directional
 
             derivative_info = derivatives[of, wrt]
+            # TODO total derivs may have been computed in rev mode, not fwd
             forward = derivative_info['J_fwd']
             fd = derivative_info['J_fd']
             if do_rev:

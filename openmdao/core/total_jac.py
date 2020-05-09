@@ -460,7 +460,7 @@ class _TotalJacInfo(object):
                 if matmat or parallel_deriv_color:
                     rhsname = name
 
-                    if parallel_deriv_color and self.debug_print:
+                    if parallel_deriv_color:
                         if parallel_deriv_color not in self.par_deriv:
                             self.par_deriv[parallel_deriv_color] = []
                         self.par_deriv[parallel_deriv_color].append(name)
@@ -1336,7 +1336,13 @@ class _TotalJacInfo(object):
                             model._solve_linear(model._lin_vec_names, self.mode, rel_systems)
                             self._save_linear_solution(vec_names, cache_key, self.mode)
                         else:
-                            model._solve_linear(model._lin_vec_names, mode, rel_systems)
+                            if par_deriv and key in par_deriv:
+                                # parallel colored derivatives only need to solve
+                                # the vectors relevant to this color, not all of them
+                                vecnames_par_deriv = par_deriv[key].copy()
+                                model._solve_linear(vecnames_par_deriv, mode, rel_systems)
+                            else:
+                                model._solve_linear(model._lin_vec_names, mode, rel_systems)
 
                     if debug_print:
                         print('Elapsed Time:', time.time() - t0, '\n', flush=True)
