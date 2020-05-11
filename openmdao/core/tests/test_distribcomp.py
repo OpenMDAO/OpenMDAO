@@ -673,6 +673,9 @@ class MPITests(unittest.TestCase):
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class ProbRemoteTests(unittest.TestCase):
+    """
+    Mostly tests get_val for distributed vars.
+    """
 
     N_PROCS = 4
 

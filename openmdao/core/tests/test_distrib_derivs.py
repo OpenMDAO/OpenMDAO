@@ -1,10 +1,12 @@
 """ Test out some crucial linear GS tests in parallel with distributed comps."""
 
 import unittest
-import numpy as np
 import itertools
 
+import numpy as np
+
 import openmdao.api as om
+from openmdao.test_suite.components.paraboloid_distributed import DistParab
 from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.assert_utils import assert_near_equal
@@ -307,8 +309,418 @@ class MPITests2(unittest.TestCase):
         assert_near_equal(J['C4.y', 'P1.x'], diag1, 1e-6)
         assert_near_equal(J['C4.y', 'P2.x'], diag2, 1e-6)
 
-    def test_distrib_voi(self):
-        raise unittest.SkipTest("distrib vois no supported yet")
+    def test_distrib_voi_dense(self):
+        size = 7
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', np.ones((size, )))
+        ivc.add_output('y', np.ones((size, )))
+        ivc.add_output('a', -3.0 + 0.6 * np.arange(size))
+
+        model.add_subsystem('p', ivc, promotes=['*'])
+        model.add_subsystem("parab", DistParab(arr_size=size, deriv_type='dense'), promotes=['*'])
+        model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
+                                               f_sum=np.ones((size, )),
+                                               f_xy=np.ones((size, ))),
+                            promotes=['*'])
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_constraint('f_xy', lower=0.0)
+        model.add_objective('f_sum', index=-1)
+
+        prob.setup(mode='fwd', force_alloc_complex=True)
+
+        prob.run_model()
+
+        desvar = prob.driver.get_design_var_values()
+        con = prob.driver.get_constraint_values()
+
+        assert_near_equal(desvar['p.x'], np.ones(size), 1e-6)
+        assert_near_equal(con['parab.f_xy'],
+                          np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
+                          1e-6)
+
+        J = prob.check_totals(method='fd')
+        assert_near_equal(J['parab.f_xy', 'p.x']['abs error'][0], 0.0, 1e-5)
+        assert_near_equal(J['parab.f_xy', 'p.y']['abs error'][0], 0.0, 1e-5)
+        assert_near_equal(J['sum.f_sum', 'p.x']['abs error'][0], 0.0, 1e-5)
+        assert_near_equal(J['sum.f_sum', 'p.y']['abs error'][0], 0.0, 1e-5)
+
+        J = prob.check_totals(method='cs')
+        assert_near_equal(J['parab.f_xy', 'p.x']['abs error'][0], 0.0, 1e-14)
+        assert_near_equal(J['parab.f_xy', 'p.y']['abs error'][0], 0.0, 1e-14)
+        assert_near_equal(J['sum.f_sum', 'p.x']['abs error'][0], 0.0, 1e-14)
+        assert_near_equal(J['sum.f_sum', 'p.y']['abs error'][0], 0.0, 1e-14)
+
+        # rev mode
+
+        prob.setup(mode='rev', force_alloc_complex=True)
+
+        prob.run_model()
+
+        desvar = prob.driver.get_design_var_values()
+        con = prob.driver.get_constraint_values()
+
+        assert_near_equal(desvar['p.x'], np.ones(size), 1e-6)
+        assert_near_equal(con['parab.f_xy'],
+                          np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
+                          1e-6)
+
+        J = prob.check_totals(method='fd')
+        assert_near_equal(J['parab.f_xy', 'p.x']['abs error'][0], 0.0, 1e-5)
+        assert_near_equal(J['parab.f_xy', 'p.y']['abs error'][0], 0.0, 1e-5)
+        assert_near_equal(J['sum.f_sum', 'p.x']['abs error'][0], 0.0, 1e-5)
+        assert_near_equal(J['sum.f_sum', 'p.y']['abs error'][0], 0.0, 1e-5)
+
+        J = prob.check_totals(method='cs')
+        assert_near_equal(J['parab.f_xy', 'p.x']['abs error'][0], 0.0, 1e-14)
+        assert_near_equal(J['parab.f_xy', 'p.y']['abs error'][0], 0.0, 1e-14)
+        assert_near_equal(J['sum.f_sum', 'p.x']['abs error'][0], 0.0, 1e-14)
+        assert_near_equal(J['sum.f_sum', 'p.y']['abs error'][0], 0.0, 1e-14)
+
+    def test_distrib_voi_sparse(self):
+        size = 7
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', np.ones((size, )))
+        ivc.add_output('y', np.ones((size, )))
+        ivc.add_output('a', -3.0 + 0.6 * np.arange(size))
+
+        model.add_subsystem('p', ivc, promotes=['*'])
+        model.add_subsystem("parab", DistParab(arr_size=size, deriv_type='sparse'), promotes=['*'])
+        model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
+                                               f_sum=np.ones((size, )),
+                                               f_xy=np.ones((size, ))),
+                            promotes=['*'])
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_constraint('f_xy', lower=0.0)
+        model.add_objective('f_sum', index=-1)
+
+        prob.setup(mode='fwd', force_alloc_complex=True)
+
+        prob.run_model()
+
+        desvar = prob.driver.get_design_var_values()
+        con = prob.driver.get_constraint_values()
+
+        assert_near_equal(desvar['p.x'], np.ones(size), 1e-6)
+        assert_near_equal(con['parab.f_xy'],
+                          np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
+                          1e-6)
+
+        J = prob.check_totals(method='fd')
+        assert_near_equal(J['parab.f_xy', 'p.x']['abs error'][0], 0.0, 1e-5)
+        assert_near_equal(J['parab.f_xy', 'p.y']['abs error'][0], 0.0, 1e-5)
+        assert_near_equal(J['sum.f_sum', 'p.x']['abs error'][0], 0.0, 1e-5)
+        assert_near_equal(J['sum.f_sum', 'p.y']['abs error'][0], 0.0, 1e-5)
+
+        J = prob.check_totals(method='cs')
+        assert_near_equal(J['parab.f_xy', 'p.x']['abs error'][0], 0.0, 1e-14)
+        assert_near_equal(J['parab.f_xy', 'p.y']['abs error'][0], 0.0, 1e-14)
+        assert_near_equal(J['sum.f_sum', 'p.x']['abs error'][0], 0.0, 1e-14)
+        assert_near_equal(J['sum.f_sum', 'p.y']['abs error'][0], 0.0, 1e-14)
+
+        # rev mode
+
+        prob.setup(mode='rev', force_alloc_complex=True)
+
+        prob.run_model()
+
+        desvar = prob.driver.get_design_var_values()
+        con = prob.driver.get_constraint_values()
+
+        assert_near_equal(desvar['p.x'], np.ones(size), 1e-6)
+        assert_near_equal(con['parab.f_xy'],
+                          np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
+                          1e-6)
+
+        J = prob.check_totals(method='fd')
+        assert_near_equal(J['parab.f_xy', 'p.x']['abs error'][0], 0.0, 1e-5)
+        assert_near_equal(J['parab.f_xy', 'p.y']['abs error'][0], 0.0, 1e-5)
+        assert_near_equal(J['sum.f_sum', 'p.x']['abs error'][0], 0.0, 1e-5)
+        assert_near_equal(J['sum.f_sum', 'p.y']['abs error'][0], 0.0, 1e-5)
+
+        J = prob.check_totals(method='cs')
+        assert_near_equal(J['parab.f_xy', 'p.x']['abs error'][0], 0.0, 1e-14)
+        assert_near_equal(J['parab.f_xy', 'p.y']['abs error'][0], 0.0, 1e-14)
+        assert_near_equal(J['sum.f_sum', 'p.x']['abs error'][0], 0.0, 1e-14)
+        assert_near_equal(J['sum.f_sum', 'p.y']['abs error'][0], 0.0, 1e-14)
+
+    def test_distrib_voi_fd(self):
+        size = 7
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', np.ones((size, )))
+        ivc.add_output('y', np.ones((size, )))
+        ivc.add_output('a', -3.0 + 0.6 * np.arange(size))
+
+        model.add_subsystem('p', ivc, promotes=['*'])
+        model.add_subsystem("parab", DistParab(arr_size=size, deriv_type='fd'), promotes=['*'])
+        model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
+                                               f_sum=np.ones((size, )),
+                                               f_xy=np.ones((size, ))),
+                            promotes=['*'])
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_constraint('f_xy', lower=0.0)
+        model.add_objective('f_sum', index=-1)
+
+        prob.setup(mode='fwd', force_alloc_complex=True)
+
+        prob.run_model()
+
+        desvar = prob.driver.get_design_var_values()
+        con = prob.driver.get_constraint_values()
+
+        assert_near_equal(desvar['p.x'], np.ones(size), 1e-6)
+        assert_near_equal(con['parab.f_xy'],
+                          np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
+                          1e-6)
+
+        J = prob.check_totals(method='cs')
+        assert_near_equal(J['parab.f_xy', 'p.x']['abs error'][0], 0.0, 1e-5)
+        assert_near_equal(J['parab.f_xy', 'p.y']['abs error'][0], 0.0, 1e-5)
+        assert_near_equal(J['sum.f_sum', 'p.x']['abs error'][0], 0.0, 1e-5)
+        assert_near_equal(J['sum.f_sum', 'p.y']['abs error'][0], 0.0, 1e-5)
+
+        # rev mode
+
+        prob.setup(mode='rev', force_alloc_complex=True)
+
+        prob.run_model()
+
+        desvar = prob.driver.get_design_var_values()
+        con = prob.driver.get_constraint_values()
+
+        assert_near_equal(desvar['p.x'], np.ones(size), 1e-6)
+        assert_near_equal(con['parab.f_xy'],
+                          np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
+                          1e-6)
+
+        J = prob.check_totals(method='cs')
+        assert_near_equal(J['parab.f_xy', 'p.x']['abs error'][0], 0.0, 1e-5)
+        assert_near_equal(J['parab.f_xy', 'p.y']['abs error'][0], 0.0, 1e-5)
+        assert_near_equal(J['sum.f_sum', 'p.x']['abs error'][0], 0.0, 1e-5)
+        assert_near_equal(J['sum.f_sum', 'p.y']['abs error'][0], 0.0, 1e-5)
+
+    def test_distrib_voi_group_fd(self):
+        # Only supports groups where the inputs to the distributed component whose inputs are
+        # distributed to procs via src_indices don't cross the boundary.
+        size = 7
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', np.ones((size, )))
+        ivc.add_output('y', np.ones((size, )))
+
+        model.add_subsystem('p', ivc, promotes=['*'])
+        sub = model.add_subsystem('sub', om.Group(), promotes=['*'])
+
+        ivc2 = om.IndepVarComp()
+        ivc2.add_output('a', -3.0 + 0.6 * np.arange(size))
+
+        sub.add_subsystem('p2', ivc2, promotes=['*'])
+        sub.add_subsystem('dummy', om.ExecComp(['xd = x', "yd = y"],
+                                               x=np.ones(size), xd=np.ones(size),
+                                               y=np.ones(size), yd=np.ones(size)),
+                          promotes_inputs=['*'])
+
+        sub.add_subsystem("parab", DistParab(arr_size=size), promotes_outputs=['*'], promotes_inputs=['a'])
+        sub.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
+                                             f_sum=np.ones((size, )),
+                                             f_xy=np.ones((size, ))),
+                          promotes=['*'])
+
+        sub.connect('dummy.xd', 'parab.x')
+        sub.connect('dummy.yd', 'parab.y')
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_constraint('f_xy', lower=0.0)
+        model.add_objective('f_sum', index=-1)
+
+        sub.approx_totals(method='fd')
+
+        prob.setup(mode='fwd', force_alloc_complex=True)
+
+        prob.run_model()
+
+        desvar = prob.driver.get_design_var_values()
+        con = prob.driver.get_constraint_values()
+
+        assert_near_equal(desvar['p.x'], np.ones(size), 1e-6)
+        assert_near_equal(con['sub.parab.f_xy'],
+                          np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
+                          1e-6)
+
+        J = prob.check_totals(method='fd')
+        assert_near_equal(J['sub.parab.f_xy', 'p.x']['abs error'][0], 0.0, 1e-5)
+        assert_near_equal(J['sub.parab.f_xy', 'p.y']['abs error'][0], 0.0, 1e-5)
+        assert_near_equal(J['sub.sum.f_sum', 'p.x']['abs error'][0], 0.0, 1e-5)
+        assert_near_equal(J['sub.sum.f_sum', 'p.y']['abs error'][0], 0.0, 1e-5)
+
+        # rev mode
+
+        prob.setup(mode='rev', force_alloc_complex=True)
+
+        prob.run_model()
+
+        desvar = prob.driver.get_design_var_values()
+        con = prob.driver.get_constraint_values()
+
+        assert_near_equal(desvar['p.x'], np.ones(size), 1e-6)
+        assert_near_equal(con['sub.parab.f_xy'],
+                          np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
+                          1e-6)
+
+        J = prob.check_totals(method='fd')
+        assert_near_equal(J['sub.parab.f_xy', 'p.x']['abs error'][0], 0.0, 1e-5)
+        assert_near_equal(J['sub.parab.f_xy', 'p.y']['abs error'][0], 0.0, 1e-5)
+        assert_near_equal(J['sub.sum.f_sum', 'p.x']['abs error'][0], 0.0, 1e-5)
+        assert_near_equal(J['sub.sum.f_sum', 'p.y']['abs error'][0], 0.0, 1e-5)
+
+    def test_distrib_group_fd_unsupported_config(self):
+        size = 7
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', np.ones(size))
+        ivc.add_output('y', np.ones(size))
+        ivc.add_output('a', -3.0 + 0.6 * np.arange(size))
+
+        model.add_subsystem('p', ivc, promotes=['*'])
+        sub = model.add_subsystem('sub', om.Group(), promotes=['*'])
+
+        sub.add_subsystem("parab", DistParab(arr_size=size), promotes=['*'])
+        sub.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
+                                             f_sum=np.ones((size, )),
+                                             f_xy=np.ones((size, ))),
+                          promotes=['*'])
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_constraint('f_xy', lower=0.0)
+        model.add_objective('f_sum', index=-1)
+
+        sub.approx_totals(method='fd')
+
+        prob.setup(force_alloc_complex=True)
+
+        with self.assertRaises(RuntimeError) as context:
+            prob.run_model()
+
+        msg = "Group (sub) : Approx_totals is not supported on a group with a distributed "
+        msg += "component whose input 'sub.parab.x' is distributed using src_indices. "
+        self.assertEqual(str(context.exception), msg)
+
+    def test_distrib_voi_multiple_con(self):
+        # This test contains 2 distributed constraints and 2 global ones.
+        class NonDistComp(om.ExplicitComponent):
+
+            def initialize(self):
+                self.options.declare('arr_size', types=int, default=10,
+                                     desc="Size of input and output vectors.")
+
+            def setup(self):
+                arr_size = self.options['arr_size']
+
+                self.add_input('f_xy', val=np.ones(arr_size))
+                self.add_output('g', val=np.ones(arr_size))
+
+                self.mat = np.array([3.0, -1, 5, 7, 13, 11, -3])[:arr_size]
+
+                row_col = np.arange(arr_size)
+                self.declare_partials('g', ['f_xy'], rows=row_col, cols=row_col, val=self.mat)
+
+            def compute(self, inputs, outputs):
+                x = inputs['f_xy']
+                outputs['g'] = x * self.mat
+
+        size = 7
+        size2 = 5
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', np.ones((size, )))
+        ivc.add_output('y', np.ones((size, )))
+        ivc.add_output('a', -3.0 + 0.6 * np.arange(size))
+        ivc.add_output('x2', np.ones(size2))
+        ivc.add_output('y2', np.ones(size2))
+        ivc.add_output('a2', -4.0 + 0.4 * np.arange(size2))
+
+        model.add_subsystem('p', ivc, promotes=['*'])
+        model.add_subsystem("parab", DistParab(arr_size=size), promotes=['*'])
+        model.add_subsystem("ndp", NonDistComp(arr_size=size), promotes=['*'])
+        model.add_subsystem("parab2", DistParab(arr_size=size2))
+        model.add_subsystem("ndp2", NonDistComp(arr_size=size2))
+
+        model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
+                                               f_sum=np.ones((size, )),
+                                               f_xy=np.ones((size, ))),
+                            promotes=['*'])
+
+        model.connect('x2', 'parab2.x')
+        model.connect('y2', 'parab2.y')
+        model.connect('a2', 'parab2.a')
+        model.connect('parab2.f_xy', 'ndp2.f_xy')
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_design_var('x2', lower=-50.0, upper=50.0)
+        model.add_design_var('y2', lower=-50.0, upper=50.0)
+        model.add_constraint('f_xy', lower=0.0)
+        model.add_constraint('g', lower=0.0)
+        model.add_constraint('parab2.f_xy', lower=0.0)
+        model.add_constraint('ndp2.g', lower=0.0)
+        model.add_objective('f_sum', index=-1)
+
+        for mode in ['fwd', 'rev']:
+            prob.setup(mode=mode, force_alloc_complex=True)
+
+            prob.run_model()
+
+            J = prob.check_totals(method='fd')
+            assert_near_equal(J['parab.f_xy', 'p.x']['abs error'][0], 0.0, 1e-5)
+            assert_near_equal(J['parab.f_xy', 'p.y']['abs error'][0], 0.0, 1e-5)
+            assert_near_equal(J['ndp.g', 'p.x']['abs error'][0], 0.0, 2e-5)
+            assert_near_equal(J['ndp.g', 'p.y']['abs error'][0], 0.0, 2e-5)
+            assert_near_equal(J['parab2.f_xy', 'p.x2']['abs error'][0], 0.0, 1e-5)
+            assert_near_equal(J['parab2.f_xy', 'p.y2']['abs error'][0], 0.0, 1e-5)
+            assert_near_equal(J['ndp2.g', 'p.x2']['abs error'][0], 0.0, 2e-5)
+            assert_near_equal(J['ndp2.g', 'p.y2']['abs error'][0], 0.0, 2e-5)
+            assert_near_equal(J['sum.f_sum', 'p.x']['abs error'][0], 0.0, 1e-5)
+            assert_near_equal(J['sum.f_sum', 'p.y']['abs error'][0], 0.0, 1e-5)
+
+            J = prob.check_totals(method='cs')
+            assert_near_equal(J['parab.f_xy', 'p.x']['abs error'][0], 0.0, 1e-14)
+            assert_near_equal(J['parab.f_xy', 'p.y']['abs error'][0], 0.0, 1e-14)
+            assert_near_equal(J['ndp.g', 'p.x']['abs error'][0], 0.0, 1e-13)
+            assert_near_equal(J['ndp.g', 'p.y']['abs error'][0], 0.0, 1e-13)
+            assert_near_equal(J['parab2.f_xy', 'p.x2']['abs error'][0], 0.0, 1e-14)
+            assert_near_equal(J['parab2.f_xy', 'p.y2']['abs error'][0], 0.0, 1e-14)
+            assert_near_equal(J['ndp2.g', 'p.x2']['abs error'][0], 0.0, 1e-13)
+            assert_near_equal(J['ndp2.g', 'p.y2']['abs error'][0], 0.0, 1e-13)
+            assert_near_equal(J['sum.f_sum', 'p.x']['abs error'][0], 0.0, 1e-14)
+            assert_near_equal(J['sum.f_sum', 'p.y']['abs error'][0], 0.0, 1e-14)
 
 
 class DistribStateImplicit(om.ImplicitComponent):
@@ -416,7 +828,7 @@ class MPITests3(unittest.TestCase):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-class MPITests3(unittest.TestCase):
+class MPITestsBug(unittest.TestCase):
 
     N_PROCS = 2
 
@@ -585,8 +997,49 @@ class MPIFeatureTests(unittest.TestCase):
         assert_check_partials(prob.check_partials())
 
         J = prob.compute_totals(of=['C2.outvec'], wrt=['indep.x'])
-        assert_near_equal(J[('C2.outvec', 'indep.x')], 
+        assert_near_equal(J[('C2.outvec', 'indep.x')],
                           np.eye(15)*np.append(2*np.ones(8), -3*np.ones(7)))
+
+    def test_distributed_constraint(self):
+        import numpy as np
+        import openmdao.api as om
+
+        from openmdao.test_suite.components.paraboloid_distributed import DistParabFeature
+
+        size = 7
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', np.ones((size, )))
+        ivc.add_output('y', -1.42 * np.ones((size, )))
+        ivc.add_output('offset', -3.0 + 0.6 * np.arange(size))
+
+        model.add_subsystem('p', ivc, promotes=['*'])
+        model.add_subsystem("parab", DistParabFeature(arr_size=size),
+                            promotes=['*'])
+        model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
+                                               f_sum=np.ones(1),
+                                               f_xy=np.ones(size)),
+                            promotes=['*'])
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_constraint('f_xy', lower=0.0)
+        model.add_objective('f_sum', index=-1)
+
+        prob.driver = om.pyOptSparseDriver(optimizer='SLSQP')
+        prob.setup(force_alloc_complex=True)
+
+        prob.run_driver()
+
+        desvar = prob.get_val('p.x', get_remote=True)
+        obj = prob.get_val('f_sum', get_remote=True)
+
+        assert_near_equal(desvar, np.array([2.65752672, 2.60433212, 2.51005989, 1.91021257,
+                                            1.3100763,  0.70992863, 0.10978096]), 1e-6)
+        assert_near_equal(obj, 11.5015, 1e-6)
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class ZeroLengthInputsOutputs(unittest.TestCase):
@@ -626,7 +1079,7 @@ class ZeroLengthInputsOutputs(unittest.TestCase):
         assert_check_partials(prob.check_partials())
 
         J = prob.compute_totals(of=['C2.outvec'], wrt=['indep.x'])
-        assert_near_equal(J[('C2.outvec', 'indep.x')], 
+        assert_near_equal(J[('C2.outvec', 'indep.x')],
                           np.eye(3)*np.append(2*np.ones(1), -3*np.ones(2)))
 
 class DistribCompDenseJac(om.ExplicitComponent):
