@@ -2980,6 +2980,11 @@ class System(object):
                     else:
                         out[name]['size'] = 0  # discrete var, don't know size
 
+                if name in abs2idx:
+                    meta = self._var_allprocs_abs2meta[name]
+                    out[name]['distributed'] = meta['distributed']
+                    out[name]['global_size'] = meta['global_size']
+
         if recurse:
             for subsys in self._subsystems_myproc:
                 out.update(subsys.get_design_vars(recurse=recurse, get_sizes=get_sizes))
@@ -3024,20 +3029,6 @@ class System(object):
             msg = "{}: Output not found for response {}."
             raise RuntimeError(msg.format(self.msginfo, str(err)))
 
-        # check to make sure none of the vars are distributed
-        abs2meta = self._var_allprocs_abs2meta
-        for abs_name in out:
-            try:
-                meta = abs2meta[abs_name]
-                if meta['distributed']:
-                    msg = "{}: Output {} is from a distributed component and cannot \
-                    yet be used as an objective or constraint"
-                    raise NotImplementedError(msg.format(self.msginfo, abs_name))
-            except KeyError:
-                # Discrete outputs have separate metadata but not 'distributed' yet
-                # meta = self._var_allprocs_discrete['output'][abs_name]
-                pass
-
         if get_sizes:
             # Size them all
             sizes = self._var_sizes['nonlinear']['output']
@@ -3048,6 +3039,11 @@ class System(object):
                         out[name]['size'] = sizes[self._owning_rank[name], abs2idx[name]]
                     else:
                         out[name]['size'] = 0  # discrete var, we don't know the size
+
+                if name in abs2idx:
+                    meta = self._var_allprocs_abs2meta[name]
+                    out[name]['distributed'] = meta['distributed']
+                    out[name]['global_size'] = meta['global_size']
 
         if recurse:
             for subsys in self._subsystems_myproc:
