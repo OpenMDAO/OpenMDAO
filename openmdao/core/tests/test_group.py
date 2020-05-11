@@ -1127,6 +1127,60 @@ class TestGroupPromotes(unittest.TestCase):
         self.assertEqual(str(cm.exception),
             "Shape of indices does not match shape for 'a': Expected (5,) but got (3,).")
 
+    def test_promotes_src_indices_different(self):
+
+        class SimpleGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('indep', om.IndepVarComp(), promotes=['*'])
+                self.add_subsystem('comp1', om.ExecComp('z=x+y', x=np.ones(3), y=np.ones(3), z=np.ones(3)))
+
+            def configure(self):
+                self.indep.add_output('x', 2*np.array(range(5)))
+                self.indep.add_output('y', 3*np.array(range(5)))
+                self.promotes('comp1', inputs=['x'], src_indices=[0, 2, 4])
+                self.promotes('comp1', inputs=['y'], src_indices=[1, 2, 3])
+
+        p = om.Problem(model=SimpleGroup())
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['indep.x'], np.array([0, 2, 4, 6, 8]))
+        assert_near_equal(p['indep.y'], np.array([0, 3, 6, 9, 12]))
+
+        assert_near_equal(p['comp1.x'], np.array([0, 4, 8]))
+        assert_near_equal(p['comp1.y'], np.array([3, 6, 9]))
+        assert_near_equal(p['comp1.z'], np.array([3, 10, 17]))
+
+    def test_promotes_src_indices_mixed(self):
+
+        class SimpleGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('indep', om.IndepVarComp(), promotes=['*'])
+                self.add_subsystem('comp1', om.ExecComp('z=x+y',
+                                                        x=np.ones(3),
+                                                        y={'value': np.ones(3),
+                                                           'src_indices': [1, 2, 3]},
+                                                        z=np.ones(3)),
+                                    promotes_inputs=['y'])
+
+            def configure(self):
+                self.indep.add_output('x', 2*np.array(range(5)))
+                self.indep.add_output('y', 3*np.array(range(5)))
+                self.promotes('comp1', inputs=['x'], src_indices=[0, 2, 4])
+
+        p = om.Problem(model=SimpleGroup())
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['indep.x'], np.array([0, 2, 4, 6, 8]))
+        assert_near_equal(p['indep.y'], np.array([0, 3, 6, 9, 12]))
+
+        assert_near_equal(p['comp1.x'], np.array([0, 4, 8]))
+        assert_near_equal(p['comp1.y'], np.array([3, 6, 9]))
+        assert_near_equal(p['comp1.z'], np.array([3, 10, 17]))
+
     def test_promotes_src_indices_wildcard(self):
 
         class SimpleGroup(om.Group):
