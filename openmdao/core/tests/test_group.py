@@ -1219,7 +1219,11 @@ class TestGroupPromotes(unittest.TestCase):
 
         p = om.Problem(model=SimpleGroup())
 
-        p.setup()
+        with assert_warning(UserWarning,
+                            "SimpleGroup (<model>): src_indices have been specified with promotes 'any'. "
+                            "Note that src_indices only apply to matching inputs."):
+            p.setup()
+
         p.run_model()
 
         assert_near_equal(p['indep.x'], np.array([0, 2, 4, 6, 8]))

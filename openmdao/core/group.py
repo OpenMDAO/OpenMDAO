@@ -1531,6 +1531,10 @@ class Group(System):
                                 f"list, tuple, ndarray or Iterable, but src_indices for "
                                 f"promotes from '{subsys_name}' are {type(src_indices)}.")
             else:
+                if any:
+                    simple_warning(f"{self.msginfo}: src_indices have been specified with promotes"
+                                   " 'any'. Note that src_indices only apply to matching inputs.")
+
                 # src_indices will applied when promotes are resolved
                 if inputs is not None:
                     for inp in inputs:
