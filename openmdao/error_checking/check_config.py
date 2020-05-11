@@ -173,9 +173,10 @@ def _get_used_before_calc_subs(group, input_srcs):
             src_sys = oparts[glen]
             tgt_sys = iparts[glen]
             if (src_sys in parallel_connections and tgt_sys in parallel_connections and
-                    (parallel_connections[src_sys] != "NL: NLBJ")):
-                simple_warning("Need to attach NonlinearBlockJac to '%s' when connecting "
-                               "components inside parallel groups" % (src_sys))
+                    (parallel_connections[src_sys] not in ["NL: NLBJ", "NL: Newton", "BROYDEN"])):
+                simple_warning("Need to attach NonlinearBlockJac, NewtonSolver, or BroydenSolver "
+                               "to '%s' when connecting components inside parallel "
+                               "groups" % (src_sys))
                 ubcs[tgt_abs.rsplit('.', 1)[0]].add(src_abs.rsplit('.', 1)[0])
             if (src_sys in sub2i and tgt_sys in sub2i and
                     (sub2i[src_sys] > sub2i[tgt_sys])):
