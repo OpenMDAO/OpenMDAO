@@ -849,6 +849,10 @@ class Group(System):
 
         allprocs_prom2abs_list_in = self._var_allprocs_prom2abs_list['input']
         allprocs_prom2abs_list_out = self._var_allprocs_prom2abs_list['output']
+
+        allprocs_discrete_in = self._var_allprocs_discrete['input']
+        allprocs_discrete_out = self._var_allprocs_discrete['output']
+
         abs2meta = self._var_abs2meta
         pathname = self.pathname
 
@@ -892,10 +896,8 @@ class Group(System):
 
             # throw an exception if either output or input doesn't exist
             # (not traceable to a connect statement, so provide context)
-            if (prom_out not in allprocs_prom2abs_list_out and
-                    prom_out not in self._var_allprocs_discrete['output']):
-                if (prom_out in allprocs_prom2abs_list_in or
-                        prom_out in self._var_allprocs_discrete['input']):
+            if not (prom_out in allprocs_prom2abs_list_out or prom_out in allprocs_discrete_out):
+                if (prom_out in allprocs_prom2abs_list_in or prom_out in allprocs_discrete_in):
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
                           f"'{prom_in}', but '{prom_out}' is an input. " + \
                           "All connections must be from an output to an input."
@@ -913,10 +915,8 @@ class Group(System):
                         simple_warning(msg)
                         continue
 
-            if (prom_in not in allprocs_prom2abs_list_in and
-                    prom_in not in self._var_allprocs_discrete['input']):
-                if (prom_in in allprocs_prom2abs_list_out or
-                        prom_in in self._var_allprocs_discrete['output']):
+            if not (prom_in in allprocs_prom2abs_list_in or prom_in in allprocs_discrete_in):
+                if (prom_in in allprocs_prom2abs_list_out or prom_in in allprocs_discrete_out):
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
                           f"'{prom_in}', but '{prom_in}' is an output. " + \
                           "All connections must be from an output to an input."
@@ -1476,7 +1476,8 @@ class Group(System):
         if self._conn_discrete_in2out:
             self._vector_class.TRANSFER._setup_discrete_transfers(self, recurse=recurse)
 
-    def promotes(self, subsys_name, any=None, inputs=None, outputs=None):
+    def promotes(self, subsys_name, any=None, inputs=None, outputs=None,
+                 src_indices=None, flat_src_indices=None):
         """
         Promote a variable in the model tree.
 
@@ -1495,7 +1496,28 @@ class Group(System):
         outputs : Sequence of str or tuple
             A Sequence of output names (or tuples) to be promoted. Tuples are
             used for the "promote as" capability.
+        src_indices : int or list of ints or tuple of ints or int ndarray or Iterable or None
+            This argument applies only to promoted inputs.
+            The global indices of the source variable to transfer data from.
+            A value of None implies this input depends on all entries of source.
+            Default is None. The shapes of the target and src_indices must match,
+            and form of the entries within is determined by the value of 'flat_src_indices'.
+        flat_src_indices : bool
+            This argument applies only to promoted inputs.
+            If True, each entry of src_indices is assumed to be an index into the
+            flattened source.  Otherwise each entry must be a tuple or list of size equal
+            to the number of dimensions of the source.
         """
+        if isinstance(any, str):
+            raise RuntimeError(f"{self.msginfo}: Trying to promote any='{any}', "
+                               "but an iterator of strings and/or tuples is required.")
+        if isinstance(inputs, str):
+            raise RuntimeError(f"{self.msginfo}: Trying to promote inputs='{inputs}', "
+                               "but an iterator of strings and/or tuples is required.")
+        if isinstance(outputs, str):
+            raise RuntimeError(f"{self.msginfo}: Trying to promote outputs='{outputs}', "
+                               "but an iterator of strings and/or tuples is required.")
+
         subsys = getattr(self, subsys_name)
         if any:
             subsys._var_promotes['any'].extend(any)
@@ -1504,6 +1526,33 @@ class Group(System):
         if outputs:
             subsys._var_promotes['output'].extend(outputs)
 
+        if src_indices is not None:
+            if outputs:
+                raise RuntimeError(f"{self.msginfo}: Trying to promote outputs {outputs} while "
+                                   f"specifying src_indices {src_indices} is not meaningful.")
+            elif isinstance(src_indices, np.ndarray):
+                if not np.issubdtype(src_indices.dtype, np.integer):
+                    raise TypeError(f"{self.msginfo}: src_indices must contain integers, but "
+                                    f"src_indices for promotes from '{subsys_name}' are type "
+                                    f"{src_indices.dtype.type}.")
+            elif not isinstance(src_indices, (int, list, tuple, Iterable)):
+                raise TypeError(f"{self.msginfo}: The src_indices argument should be an int, "
+                                f"list, tuple, ndarray or Iterable, but src_indices for "
+                                f"promotes from '{subsys_name}' are {type(src_indices)}.")
+            else:
+                if any:
+                    simple_warning(f"{self.msginfo}: src_indices have been specified with promotes"
+                                   " 'any'. Note that src_indices only apply to matching inputs.")
+
+                # src_indices will applied when promotes are resolved
+                if inputs is not None:
+                    for inp in inputs:
+                        subsys._var_promotes_src_indices[inp] = (src_indices, flat_src_indices)
+                if any is not None:
+                    for inp in any:
+                        subsys._var_promotes_src_indices[inp] = (src_indices, flat_src_indices)
+
+        # check for attempt to promote with different alias
         list_comp = [i if isinstance(i, tuple) else (i, i) for i in subsys._var_promotes['input']]
 
         for original, new in list_comp:
@@ -1615,7 +1664,7 @@ class Group(System):
 
         return subsys
 
-    def connect(self, src_name, tgt_name, src_indices=None, flat_src_indices=None):
+    def connect(self, src_name, tgt_name, src_indices=None, flat_src_indices=False):
         """
         Connect source src_name to target tgt_name in this namespace.
 

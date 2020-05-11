@@ -27,5 +27,5 @@ an initial guess for the implicit state variable, :math:`x`, that makes it
 unnecessary for the solver to iterate.
 
 .. embed-code::
-    openmdao.core.tests.test_group.TestGroup.test_guess_nonlinear_feature
+    openmdao.core.tests.test_group.TestFeatureGuessNonlinear.test_guess_nonlinear
     :layout: interleave
