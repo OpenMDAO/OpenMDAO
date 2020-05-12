@@ -1822,7 +1822,7 @@ class Group(System):
         """
         # let any lower level systems do their guessing first
         if self._has_guess:
-            for isub, (sub, loc)in enumerate(self._all_subsystem_iter()):
+            for isub, (sub, loc) in enumerate(self._all_subsystem_iter()):
                 # TODO: could gather 'has_guess' information during setup and be able to
                 # skip transfer for subs that don't have guesses...
                 self._transfer('nonlinear', 'fwd', isub)
