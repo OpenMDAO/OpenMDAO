@@ -494,7 +494,7 @@ class Driver(object):
             local_val = model._get_val(name, flat=True)
             if indices is not None:
                 local_val = local_val[indices]
-            idx, sizes = distributed_vars[name]
+            _, sizes = distributed_vars[name]
             offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
             offsets[1:] = np.cumsum(sizes[:-1])
             val = np.zeros(np.sum(sizes))
