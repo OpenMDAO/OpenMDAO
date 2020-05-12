@@ -3538,14 +3538,16 @@ class System(object):
             all_var_dicts = self.comm.gather(var_dict, root=0) if not all_procs \
                 else self.comm.allgather(var_dict)
 
+            if setup:
+                meta = self.comm.gather(self._var_abs2meta, root=0) if not all_procs \
+                    else self.comm.allgather(self._var_abs2meta)
+            else:
+                meta = self.comm.gather(self._var_rel2meta, root=0) if not all_procs \
+                    else self.comm.allgather(self._var_rel2meta)
+
             # unless all_procs is requested, only the root process should print
             if not all_procs and self.comm.rank > 0:
                 return
-
-            if setup:
-                meta = self._var_abs2meta
-            else:
-                meta = self._var_rel2meta
 
             allprocs_meta = self._var_allprocs_abs2meta
 
@@ -3562,9 +3564,9 @@ class System(object):
                         # In there already, only need to deal with it if it is a distributed array
                         # Checking to see if distributed depends on if it is an input or output
                         if var_type == 'input':
-                            is_distributed = meta[name]['src_indices'] is not None
+                            is_distributed = meta[rank][name]['src_indices'] is not None
                         else:
-                            is_distributed = meta[name]['distributed']
+                            is_distributed = meta[rank][name]['distributed']
 
                         if is_distributed and name in allprocs_meta:
                             # TODO no support for > 1D arrays
@@ -3572,7 +3574,7 @@ class System(object):
 
                             global_shape = allprocs_meta[name]['global_shape']
 
-                            if meta[name]['shape'] != global_shape:
+                            if meta[rank][name]['shape'] != global_shape:
                                 # if the local shape is different than the global shape and the
                                 # global shape matches the concatenation of values from all procs,
                                 # then assume the concatenation, otherwise just use the value from
