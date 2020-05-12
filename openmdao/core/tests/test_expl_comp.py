@@ -1001,24 +1001,6 @@ class TestMPIExplComp(unittest.TestCase):
             def compute_partials(self, inputs, J):
                 J['y', 'x'] = 2 * inputs['x']
 
-
-        class TestComp2(om.ExplicitComponent):
-
-            def initialize(self):
-                self.options['distributed'] = False
-
-            def setup(self):
-                self.add_input('x', shape=1)
-                self.add_output('y', shape=1)
-                self.declare_partials('y', 'x')
-
-            def compute(self, inputs, outputs):
-                print(self.comm.rank)
-                outputs['y'] = inputs['x'] ** 2
-
-            def compute_partials(self, inputs, J):
-                J['y', 'x'] = 2 * inputs['x']
-
         prob = om.Problem()
         model = prob.model
 
@@ -1027,7 +1009,7 @@ class TestMPIExplComp(unittest.TestCase):
 
         parallel = model.add_subsystem('parallel', om.ParallelGroup())
         parallel.add_subsystem('c1', TestComp())
-        parallel.add_subsystem('c2', TestComp2())
+        parallel.add_subsystem('c2', TestComp())
 
         model.add_subsystem('c3', om.ExecComp(['y=3.0*x1+7.0*x2']))
 
