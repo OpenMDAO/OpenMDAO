@@ -5,7 +5,7 @@ from tempfile import mkdtemp
 from shutil import rmtree
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent, \
-    LinearBlockGS, NonlinearBlockGS, SqliteRecorder
+    LinearBlockGS, NonlinearBlockGS, SqliteRecorder, ParallelGroup
 
 from openmdao.utils.logger_utils import TestLogger
 from openmdao.error_checking.check_config import get_sccs_topo
@@ -94,26 +94,24 @@ class TestCheckConfig(unittest.TestCase):
         testlogger.find_in('warning', expected_warning)
 
     def test_parallel_group_order(self):
-        import openmdao.api as om
-
-        prob = om.Problem()
+        prob = Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 1.0))
-        model.add_subsystem('p2', om.IndepVarComp('x', 1.0))
+        model.add_subsystem('p1', IndepVarComp('x', 1.0))
+        model.add_subsystem('p2', IndepVarComp('x', 1.0))
 
-        parallel = model.add_subsystem('parallel', om.ParallelGroup())
-        parallel.add_subsystem('c1', om.ExecComp(['y=-2.0*x']))
-        parallel.add_subsystem('c2', om.ExecComp(['y=5.0*x']))
+        parallel = model.add_subsystem('parallel', ParallelGroup())
+        parallel.add_subsystem('c1', ExecComp(['y=-2.0*x']))
+        parallel.add_subsystem('c2', ExecComp(['y=5.0*x']))
         parallel.connect('c1.y', 'c2.x')
 
-        parallel = model.add_subsystem('parallel_copy', om.ParallelGroup())
-        parallel.add_subsystem('comp1', om.ExecComp(['y=-2.0*x']))
-        parallel.add_subsystem('comp2', om.ExecComp(['y=5.0*x']))
+        parallel = model.add_subsystem('parallel_copy', ParallelGroup())
+        parallel.add_subsystem('comp1', ExecComp(['y=-2.0*x']))
+        parallel.add_subsystem('comp2', ExecComp(['y=5.0*x']))
         parallel.connect('comp1.y', 'comp2.x')
 
-        model.add_subsystem('c3', om.ExecComp(['y=3.0*x1+7.0*x2']))
-        model.add_subsystem('c4', om.ExecComp(['y=3.0*x_copy_1+7.0*x_copy_2']))
+        model.add_subsystem('c3', ExecComp(['y=3.0*x1+7.0*x2']))
+        model.add_subsystem('c4', ExecComp(['y=3.0*x_copy_1+7.0*x_copy_2']))
 
         model.connect("parallel.c1.y", "c3.x1")
         model.connect("parallel.c2.y", "c3.x2")
@@ -138,21 +136,42 @@ class TestCheckConfig(unittest.TestCase):
 
         testlogger.find_in('warning', expected_warning)
 
-    def test_single_parallel_group_order(self):
-        import openmdao.api as om
-
-        prob = om.Problem()
+    def test_serial_in_parallel(self):
+        prob = Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 1.0))
-        model.add_subsystem('p2', om.IndepVarComp('x', 1.0))
+        model.add_subsystem('p1', IndepVarComp('x', 1.0))
 
-        parallel = model.add_subsystem('parallel', om.ParallelGroup())
-        parallel.add_subsystem('c1', om.ExecComp(['y=-2.0*x']))
-        parallel.add_subsystem('c2', om.ExecComp(['y=5.0*x']))
+        parallel = model.add_subsystem('parallel', ParallelGroup())
+        parallel.add_subsystem('c1', ExecComp(['y=-2.0*x']))
+
+        parallel2 = model.add_subsystem('parallel_copy', ParallelGroup())
+        parallel2.add_subsystem('comp1', ExecComp(['y=-2.0*x']))
+
+        model.add_subsystem('con', ExecComp('y = 3.0*x'))
+
+        model.connect("p1.x", "parallel.c1.x")
+        model.connect('parallel.c1.y', 'parallel_copy.comp1.x')
+        model.connect('parallel_copy.comp1.y', 'con.x')
+
+        prob.setup(check=True)
+
+        prob.run_model()
+        print('done')
+
+    def test_single_parallel_group_order(self):
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', IndepVarComp('x', 1.0))
+        model.add_subsystem('p2', IndepVarComp('x', 1.0))
+
+        parallel = model.add_subsystem('parallel', ParallelGroup())
+        parallel.add_subsystem('c1', ExecComp(['y=-2.0*x']))
+        parallel.add_subsystem('c2', ExecComp(['y=5.0*x']))
         parallel.connect('c1.y', 'c2.x')
 
-        model.add_subsystem('c3', om.ExecComp(['y=3.0*x1+7.0*x2']))
+        model.add_subsystem('c3', ExecComp(['y=3.0*x1+7.0*x2']))
 
         model.connect("parallel.c1.y", "c3.x1")
         model.connect("parallel.c2.y", "c3.x2")
