@@ -115,7 +115,8 @@ more limited, then the set of allowed values can be given with :code:`values`:
     openmdao.utils.tests.test_options_dictionary_feature.TestOptionsDictionaryFeature.test_simple_values
     :layout: interleave
 
-.. Note:
+.. note::
+
     It is an error to attempt to specify both a list of acceptable values and a list of acceptable types.
 
 Alternatively, the allowable values can be set using bounds and/or a validation function. 
