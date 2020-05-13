@@ -1328,23 +1328,24 @@ class Group(System):
                             out_size = np.sum(sizes_out[:, out_idxs[abs_out]])
                         else:
                             out_size = np.prod(out_shape)
-                        mx = np.max(src_indices)
-                        mn = np.min(src_indices)
-                        if mx >= out_size:
-                            bad_idx = mx
-                        elif mn < -out_size:
-                            bad_idx = mn
-                        else:
-                            bad_idx = None
-                        if bad_idx is not None:
-                            msg = f"{self.msginfo}: The source indices do not specify " + \
-                                  f"a valid index for the connection '{abs_out}' to " + \
-                                  f"'{abs_in}'. Index '{bad_idx}' is out of range for " + \
-                                  f"a flat source of size {out_size}."
-                            if self._raise_connection_errors:
-                                raise ValueError(msg)
+                        if src_indices.size > 0:
+                            mx = np.max(src_indices)
+                            mn = np.min(src_indices)
+                            if mx >= out_size:
+                                bad_idx = mx
+                            elif mn < -out_size:
+                                bad_idx = mn
                             else:
-                                simple_warning(msg)
+                                bad_idx = None
+                            if bad_idx is not None:
+                                msg = f"{self.msginfo}: The source indices do not specify " + \
+                                      f"a valid index for the connection '{abs_out}' to " + \
+                                      f"'{abs_in}'. Index '{bad_idx}' is out of range for " + \
+                                      f"a flat source of size {out_size}."
+                                if self._raise_connection_errors:
+                                    raise ValueError(msg)
+                                else:
+                                    simple_warning(msg)
                         if src_indices.ndim > 1:
                             abs2meta[abs_in]['src_indices'] = \
                                 abs2meta[abs_in]['src_indices'].ravel()

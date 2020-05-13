@@ -50,6 +50,8 @@ class TestSrcIndices(unittest.TestCase):
         model.connect('comp1.y','comp2.x')
         model.connect('comp2.y','comp1.x')
 
+        #import wingdbstub
+        
         prob.setup()
         prob.run_model()
 
