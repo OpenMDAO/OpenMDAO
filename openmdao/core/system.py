@@ -37,7 +37,7 @@ from openmdao.utils.coloring import _compute_coloring, Coloring, \
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, ContainsAll, all_ancestors, \
-    simple_warning, make_set, match_includes_excludes
+    simple_warning, make_set, match_includes_excludes, ensure_compatible
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.utils.units import unit_conversion
@@ -132,6 +132,8 @@ class System(object):
     _var_promotes : { 'any': [], 'input': [], 'output': [] }
         Dictionary of lists of variable names/wildcards specifying promotion
         (used to calculate promoted names)
+    _var_promotes_src_indices : dict
+        Dictionary mapping promoted input names/wildcards to (src_indices, flat_src_indices)
     _var_allprocs_abs_names : {'input': [str, ...], 'output': [str, ...]}
         List of absolute names of this system's variables on all procs.
     _var_abs_names : {'input': [str, ...], 'output': [str, ...]}
@@ -376,6 +378,8 @@ class System(object):
         self._subsystems_proc_range = []
 
         self._var_promotes = {'input': [], 'output': [], 'any': []}
+        self._var_promotes_src_indices = {}
+
         self._var_allprocs_abs_names = {'input': [], 'output': []}
         self._var_abs_names = {'input': [], 'output': []}
         self._var_allprocs_abs_names_discrete = {'input': [], 'output': []}
@@ -1951,6 +1955,20 @@ class System(object):
         def split_list(lst):
             """
             Return names, patterns, and renames found in lst.
+
+            Parameters
+            ----------
+            lst : list
+                List of names, patterns and/or tuples specifying promotes.
+
+            Returns
+            -------
+            names : list
+                list of names
+            patterns : list
+                list of patterns
+            renames : dict
+                dictionary of name mappings
             """
             names = []
             patterns = []
@@ -1969,6 +1987,44 @@ class System(object):
                                     (self.pathname, entry))
             return names, patterns, renames
 
+        def update_src_indices(name, key):
+            """
+            Update metadata for promoted inputs that have had src_indices specified.
+
+            Parameters
+            ----------
+            name : str
+                Name of an input variable that may have associated src_indices.
+            key : str or tuple
+                Name, pattern or tuple by which src_indices would have been specified
+                when the input variable was promoted.
+            """
+            if key in self._var_promotes_src_indices:
+                src_indices, flat_src_indices = self._var_promotes_src_indices[key]
+
+                abs_name = self._var_allprocs_prom2abs_list['input'][name][0]
+                meta = self._var_abs2meta[abs_name]
+
+                _, _, src_indices = ensure_compatible(name, meta['value'], meta['shape'],
+                                                      src_indices)
+
+                if 'src_indices' in meta and meta['src_indices'] is not None:
+                    if not np.array_equal(meta['src_indices'], src_indices):
+                        raise RuntimeError("%s: Trying to promote input '%s' with src_indices %s,"
+                                           " but src_indices have already been specified as %s." %
+                                           (self.msginfo, name, str(src_indices),
+                                            str(meta['src_indices'])))
+                if 'flat_src_indices' in meta and meta['flat_src_indices'] is not None:
+                    if not meta['flat_src_indices'] == src_indices:
+                        raise RuntimeError("%s: Trying to promote input '%s' with flat_src_indices"
+                                           "=%s but flat_src_indices has already been specified as"
+                                           " %s." %
+                                           (self.msginfo, name, str(flat_src_indices),
+                                            str(meta['flat_src_indices'])))
+
+                meta['src_indices'] = np.asarray(src_indices, dtype=INT_DTYPE)
+                meta['flat_src_indices'] = flat_src_indices
+
         def resolve(to_match, io_types, matches, proms):
             """
             Determine the mapping of promoted names to the parent scope for a promotion type.
@@ -1985,25 +2041,35 @@ class System(object):
 
             found = set()
             names, patterns, renames = split_list(to_match)
+
             for typ in io_types:
+                is_input = typ == 'input'
                 pmap = matches[typ]
                 for name in proms[typ]:
                     if name in names:
                         pmap[name] = name
                         found.add(name)
+                        if is_input:
+                            update_src_indices(name, name)
                     elif name in renames:
                         pmap[name] = renames[name]
                         found.add(name)
+                        if is_input:
+                            update_src_indices(name, (name, renames[name]))
                     else:
                         for pattern in patterns:
                             # if name matches, promote that variable to parent
                             if pattern == '*' or fnmatchcase(name, pattern):
                                 pmap[name] = name
                                 found.add(pattern)
+                                if is_input:
+                                    update_src_indices(name, pattern)
                                 break
                         else:
                             # Default: prepend the parent system's name
                             pmap[name] = gname + name if gname else name
+                            if is_input:
+                                update_src_indices(name, name)
 
             not_found = (set(names).union(renames).union(patterns)) - found
             if not_found:

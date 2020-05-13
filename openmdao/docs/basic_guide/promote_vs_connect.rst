@@ -54,8 +54,10 @@ There are a few important details to note:
 
 .. note::
 
-    For a more detailed set of examples for how to promote variables, check out the :ref:`feature doc on adding sub-systems to a group <feature_adding_subsystem_to_a_group>`.
-    There are some more advanced things you can do, such as variable name aliasing and connecting a sub-set of indices from the output array of one component to the input of another
+    For a more detailed set of examples for how to promote variables, check out the
+    :ref:`feature doc on adding sub-systems to a group <feature_adding_subsystem_to_a_group>`.
+    There are some more advanced things you can do, such as variable name aliasing and connecting
+    a sub-set of indices from the output array of one component to the input of another.
 
 
 

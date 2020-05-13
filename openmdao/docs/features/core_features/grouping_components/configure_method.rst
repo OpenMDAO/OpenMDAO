@@ -24,7 +24,7 @@ Here is a simple example where a lower system sets a solver, but we want to chan
 different one in the top-most system.
 
 .. embed-code::
-    openmdao.core.tests.test_problem.TestProblem.test_feature_system_configure
+    openmdao.core.tests.test_group.TestFeatureConfigure.test_system_configure
     :layout: code, output
 
 .. _feature_configure_IO:
@@ -39,7 +39,7 @@ The following example is a variation on the model used to illustrate use of an
 provides the vectorized data must be :code:`setup` before the shape of that data is known:
 
 .. embed-code::
-    openmdao.core.tests.test_problem.TestProblem.test_feature_configure_add_input_output
+    openmdao.core.tests.test_group.TestFeatureConfigure.test_configure_add_input_output
     :layout: code, output
 
 Uses of setup vs. configure
