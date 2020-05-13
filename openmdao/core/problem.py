@@ -432,6 +432,7 @@ class Problem(object):
         else:
             abs_name = name
 
+        # print(f"problem set_val: setting {name} ({abs_name}) to {value}")
         if abs_name in conns:
             src = conns[abs_name]
             if abs_name not in all_discrete:
@@ -463,6 +464,7 @@ class Problem(object):
                     raise RuntimeError(f"Failed to set value of '{name}': {str(err)}.")
             else:
                 self._initial_condition_cache[name] = value
+            # print(f"problem set_val: setting initial condition cache {name} {indices} to {value}")
         else:
             myrank = self.model.comm.rank
 
@@ -474,7 +476,11 @@ class Problem(object):
                 self.model._discrete_outputs[abs_name] = value
             elif abs_name in conns:  # input name given. Set value into output
                 if src in self.model._outputs._views:  # src is local
-                    if tmeta['has_src_indices']:
+                    if (self.model._outputs._views_flat[src].size == 0 and
+                            src.rsplit('.', 1)[0] == '_auto_ivc' and all_meta[src]['distributed']):
+                        # FIXME: find a better way to handle this
+                        pass  # special case, auto_ivc dist var with 0 local size
+                    elif tmeta['has_src_indices']:
                         if tlocmeta:  # target is local
                             src_indices = tlocmeta['src_indices']
                             if tmeta['distributed']:
@@ -498,11 +504,14 @@ class Problem(object):
                         value = np.asarray(value)
                         # if indices is _full_slice:
                         #     value = value.reshape(self.model._outputs._views[src].shape)
+                        # print(f"problem set_val: setting {src} to {value} with indices {indices}")
                         self.model._outputs.set_var(src, value, indices)
                 elif src in self.model._discrete_outputs:
                     self.model._discrete_outputs[src] = value
                 # also set the input
+                # TODO:remove this later after tests are passing
                 if abs_name in self.model._inputs._views:
+                    # print(f"problem set_val: setting input {abs_name} to {ivalue}")
                     self.model._inputs.set_var(abs_name, ivalue, indices)
                 elif abs_name in self.model._discrete_inputs:
                     self.model._discrete_inputs[abs_name] = value
@@ -527,6 +536,7 @@ class Problem(object):
         Set all initial conditions that have been saved in cache after setup.
         """
         for name, value in self._initial_condition_cache.items():
+            # print(f"setting initial value of {name} to {value}")
             self.set_val(name, value)
 
         # Clean up cache

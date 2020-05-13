@@ -879,6 +879,8 @@ class MatMultMultipointTestCase(unittest.TestCase):
             p.driver.opt_settings['Major optimality tolerance'] = 1.0E-6
             # p.driver.opt_settings['iSumm'] = 6
 
+        #import wingdbstub
+
         model = p.model
         for i in range(num_pts):
             model.add_subsystem('indep%d' % i, om.IndepVarComp('x', val=np.ones(size)))

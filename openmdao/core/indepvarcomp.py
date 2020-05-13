@@ -224,6 +224,19 @@ class _AutoIndepVarComp(IndepVarComp):
     def _add_remote(self, name):
         self._remotes.add(name)
 
+    def _set_vector_class(self):
+        if self.comm.size > 1:
+            all_remotes = set()
+            for remotes in self.comm.allgather(self._remotes):
+                all_remotes.update(remotes)
+
+            if all_remotes:
+                self.options['distributed'] = True
+
+            self._remotes = all_remotes
+
+        super(_AutoIndepVarComp, self)._set_vector_class()
+
     def _setup_var_data(self, recurse=True):
         """
         Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
@@ -237,14 +250,8 @@ class _AutoIndepVarComp(IndepVarComp):
         if self.comm.size > 1:
             all_abs2meta = self._var_allprocs_abs2meta
             abs2meta = self._var_abs2meta
-            all_remotes = set()
-            for remotes in self.comm.allgather(self._remotes):
-                all_remotes.update(remotes)
 
-            if all_remotes:
-                self.options['distributed'] = True
-
-            for name in all_remotes:
+            for name in self._remotes:
                 if name in abs2meta:
                     abs2meta[name]['distributed'] = True
                 all_abs2meta[name]['distributed'] = True

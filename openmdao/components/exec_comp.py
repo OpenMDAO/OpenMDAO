@@ -412,6 +412,7 @@ class ExecComp(ExplicitComponent):
         outputs : `Vector`
             `Vector` containing outputs.
         """
+        # print(f"{self.pathname} compute")
         for i, expr in enumerate(self._codes):
             try:
                 exec(expr, _expr_dict, _IODict(outputs, inputs))
@@ -526,6 +527,7 @@ class _TmpDict(object):
             return self._inner[name]
 
     def __setitem__(self, name, value):
+        # print(f"setting changed {name} to ({value})")
         self._changed[name] = value
 
     def __contains__(self, name):
@@ -567,14 +569,18 @@ class _IODict(object):
 
     def __getitem__(self, name):
         if name in self._outputs:
+            # print(f"getting output {name} ({self._outputs[name]})")
             return self._outputs[name]
         else:
+            # print(f"getting input {name} ({self._inputs[name]})")
             return self._inputs[name]
 
     def __setitem__(self, name, value):
         if name in self._outputs:
+            # print(f"setting output {name} to ({value})")
             self._outputs[name] = value
         elif name in self._inputs:
+            # print(f"setting input {name} to ({value})")
             self._inputs[name] = value
         else:
             self._outputs[name] = value  # will raise KeyError

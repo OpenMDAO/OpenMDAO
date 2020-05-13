@@ -780,7 +780,7 @@ class System(object):
         self._setup_var_data(recurse=recurse)
         self._setup_global_connections(recurse=recurse)
 
-        if self.pathname == '' and setup_mode == 'full':
+        if self.pathname == '':
             self._top_level_setup(setup_mode, mode)
 
         self._setup_vec_names(mode)
@@ -788,9 +788,16 @@ class System(object):
         self._setup_relevance(mode, self._relevant)
         self._setup_var_index_ranges(recurse=recurse)
         self._setup_var_sizes(recurse=recurse)
+
+        if self.pathname == '':
+            self._top_level_setup2(setup_mode)
+
         self._setup_connections(recurse=recurse)
 
     def _top_level_setup(self, setup_mode, mode):
+        pass
+
+    def _top_level_setup2(self, setup_mode):
         pass
 
     def _post_configure(self):
@@ -4228,7 +4235,10 @@ class System(object):
                 if src_indices is None:
                     val = np.zeros(0)
                 else:
-                    val = val.ravel()[src_indices]
+                    if not get_remote and vmeta['distributed'] and src.startswith('_auto_ivc.'):
+                        val = val.ravel()[src_indices - src_indices[0]]
+                    else:
+                        val = val.ravel()[src_indices]
                 if get_remote:
                     if rank is None and vmeta['distributed']:
                         parts = self.comm.allgather(val)

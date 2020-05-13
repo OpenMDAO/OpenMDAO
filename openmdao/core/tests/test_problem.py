@@ -342,7 +342,7 @@ class TestProblem(unittest.TestCase):
         bad_val = -10*np.ones((10))
         prob['indep.num'] = bad_val
         with self.assertRaisesRegex(ValueError, 
-                "Incompatible shape for '.*': Expected (.*) but got (.*)."):
+                "Group (.*): Failed to set value of '.*': could not broadcast input array from shape (.*) into shape (.*)."):
             prob.final_setup()
         prob._initial_condition_cache = {}
 
@@ -357,8 +357,9 @@ class TestProblem(unittest.TestCase):
         prob['indep.arr'] = new_val
         assert_near_equal(prob['indep.arr'], new_val, 1e-10)
 
+        msg = "Group (.*): Failed to set value of '.*': could not broadcast input array from shape (.*) into shape (.*)."
         # check bad array value
-        bad_val = -10*np.ones((10))
+        bad_val = -10*np.ones((9,1))
         with self.assertRaisesRegex(ValueError, msg):
             prob['indep.arr'] = bad_val
 

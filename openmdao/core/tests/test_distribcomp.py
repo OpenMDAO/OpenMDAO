@@ -354,6 +354,8 @@ class MPITests(unittest.TestCase):
         C2 = top.add_subsystem("C2", DistribCompSimple(arr_size=size))
         top.connect('C1.outvec', 'C2.invec')
 
+        #import wingdbstub
+
         p.setup()
 
         # Conclude setup but don't run model.
@@ -363,7 +365,7 @@ class MPITests(unittest.TestCase):
 
         p.run_model()
 
-        self.assertTrue(all(C2._outputs['outvec'] == np.ones(size, float)*7.5))
+        np.testing.assert_allclose(C2._outputs['outvec'], np.ones(size, float)*7.5)
 
     def test_distrib_check_partials(self):
         # will produce uneven array sizes which we need for the test
@@ -386,7 +388,7 @@ class MPITests(unittest.TestCase):
         # this used to fail (bug #1279)
         cpd = p.check_partials(out_stream=None)
         for (of, wrt) in cpd['C2']:
-            np.testing.assert_almost_equal(cpd['C2'][of, wrt]['rel error'][0], 0.0, decimal=5)
+            np.testing.assert_allclose(cpd['C2'][of, wrt]['rel error'][0], 0.0, atol=1e-9)
 
     def test_list_inputs_outputs(self):
         size = 11
@@ -542,7 +544,7 @@ class MPITests(unittest.TestCase):
         p.setup()
 
         #import wingdbstub
-        
+
         # Conclude setup but don't run model.
         p.final_setup()
 
@@ -563,6 +565,9 @@ class MPITests(unittest.TestCase):
         C3 = top.add_subsystem("C3", DistribGatherComp(arr_size=size))
         top.connect('C1.outvec', 'C2.invec')
         top.connect('C2.outvec', 'C3.invec')
+
+        #import wingdbstub
+
         p.setup()
 
         # Conclude setup but don't run model.
@@ -618,9 +623,9 @@ class MPITests(unittest.TestCase):
         C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
         C2 = top.add_subsystem("C2", DistribOverlappingInputComp(arr_size=size))
         top.connect('C1.outvec', 'C2.invec')
-        
+
         #import wingdbstub
-        
+
         p.setup()
 
         # Conclude setup but don't run model.
@@ -717,6 +722,9 @@ class ProbRemoteTests(unittest.TestCase):
         par = top.add_subsystem('par', om.ParallelGroup())
         C1 = par.add_subsystem("C1", DistribInputDistribOutputDiscreteComp(arr_size=size))
         C2 = par.add_subsystem("C2", DistribInputDistribOutputDiscreteComp(arr_size=size))
+
+        #import wingdbstub
+
         p.setup()
 
         # Conclude setup but don't run model.
@@ -769,6 +777,9 @@ class ProbRemoteTests(unittest.TestCase):
 
         top = p.model
         C1 = top.add_subsystem("C1", DistribInputDistribOutputDiscreteComp(arr_size=size))
+
+        #import wingdbstub
+
         p.setup()
 
         # Conclude setup but don't run model.

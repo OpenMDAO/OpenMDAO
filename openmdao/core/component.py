@@ -182,7 +182,10 @@ class Component(System):
 
         self._static_mode = True
 
-        if self.options['distributed'] and comm.size > 1:
+        self._set_vector_class()
+
+    def _set_vector_class(self):
+        if self.options['distributed'] and self.comm.size > 1:
             dist_vec_class = self._problem_meta['distributed_vector_class']
             if dist_vec_class is not None:
                 self._vector_class = dist_vec_class
@@ -190,7 +193,7 @@ class Component(System):
                 simple_warning("The 'distributed' option is set to True for Component %s, "
                                "but there is no distributed vector implementation (MPI/PETSc) "
                                "available. The default non-distributed vectors will be used."
-                               % pathname)
+                               % self.pathname)
                 self._vector_class = self._problem_meta['local_vector_class']
         else:
             self._vector_class = self._problem_meta['local_vector_class']
@@ -758,7 +761,7 @@ class Component(System):
 
         return metadata
 
-    def _update_dist_src_indices(self, abs_in2out):
+    def _update_dist_src_indices(self, abs_in2out, all_abs2meta, all_abs2idx, all_sizes):
         """
         Set default src_indices on distributed components for any inputs where they aren't set.
 
@@ -766,6 +769,12 @@ class Component(System):
         ----------
         abs_in2out : dict
             Mapping of connected inputs to their source.  Names are absolute.
+        all_abs2meta : dict
+            Mapping of absolute names to metadata for all variables in the model.
+        all_abs2idx : dict
+            Dictionary mapping an absolute name to its allprocs variable index.
+        all_sizes : dict
+            Mapping of vec_names and types to sizes of each variable in all procs.
 
         Returns
         -------
@@ -777,31 +786,54 @@ class Component(System):
 
         iproc = self.comm.rank
         abs2meta = self._var_abs2meta
-        sizes = np.zeros(len(abs2meta), dtype=INT_DTYPE)
 
-        no_src_inds = set()
-        for i, iname in enumerate(self._var_allprocs_abs_names['input']):
-            if iname in abs2meta:
-                if abs2meta[iname]['src_indices'] is None:
-                    sizes[i] = abs2meta[iname]['size']
-                    no_src_inds.add(i)
+        # # this isn't great.  We're basically duplicating the functionality of _setup_var_sizes
+        # # here for the inputs.
+        # sizes = np.zeros(len(abs2meta), dtype=INT_DTYPE)
 
-        all_sizes = np.zeros((self.comm.size, len(abs2meta)), dtype=INT_DTYPE)
-        self.comm.Allgather(sizes, all_sizes)
+        # no_src_inds = set()
+        # for i, iname in enumerate(self._var_allprocs_abs_names['input']):
+        #     if iname in abs2meta:
+        #         if abs2meta[iname]['src_indices'] is None:
+        #             sizes[i] = abs2meta[iname]['size']
+        #             if iname in abs_in2out:
+        #                 src = abs_in2out[iname]
+        #                 if all_abs2meta[src]['distributed']:
+        #                 no_src_inds.add(i)
 
-        all_abs2meta = self._var_allprocs_abs2meta
+        # all_sizes = np.zeros((self.comm.size, len(abs2meta)), dtype=INT_DTYPE)
+        # self.comm.Allgather(sizes, all_sizes)
+
+        sizes_in = self._var_sizes['nonlinear']['input']
+        sizes_out = all_sizes['nonlinear']['output']
         added_src_inds = set()
         for i, iname in enumerate(self._var_allprocs_abs_names['input']):
-            if i not in no_src_inds:
-                continue
-            offset = np.sum(all_sizes[:iproc, i])
-            end = offset + all_sizes[iproc, i]
-            simple_warning(f"{self.msginfo}: Component is distributed but input '{iname}' was "
-                           "added without src_indices. Setting src_indices to "
-                           f"range({offset}, {end}).")
-            abs2meta[iname]['src_indices'] = np.arange(offset, end, dtype=INT_DTYPE)
-            all_abs2meta[iname]['has_src_indices'] = True
-            added_src_inds.add(iname)
+            # if i not in no_src_inds:
+            #     continue
+            if iname in abs2meta and abs2meta[iname]['src_indices'] is None:
+                src = abs_in2out[iname]
+                out_i = all_abs2idx[src]
+                nzs = np.nonzero(sizes_out[:, out_i])[0]
+                if (all_abs2meta[src]['global_size'] == all_abs2meta[iname]['global_size'] or
+                        nzs.size == self.comm.size):
+                    # This offset assumes a 'full' distributed output
+                    offset = np.sum(sizes_in[:iproc, i])
+                    end = offset + sizes_in[iproc, i]
+                else:  # distributed output (may have some zero size entries)
+                    if nzs.size == 1:
+                        offset = 0
+                        end = sizes_out[nzs[0], out_i]
+                    else:
+                        # total sizes differ and output is distributed, so can't determine mapping
+                        raise RuntimeError(f"{self.msginfo}: Can't determine src_indices "
+                                           f"automatically for input '{iname}'. They must be "
+                                           "supplied manually.")
+                simple_warning(f"{self.msginfo}: Component is distributed but input '{iname}' was "
+                               "added without src_indices. Setting src_indices to "
+                               f"range({offset}, {end}).")
+                abs2meta[iname]['src_indices'] = np.arange(offset, end, dtype=INT_DTYPE)
+                all_abs2meta[iname]['has_src_indices'] = True
+                added_src_inds.add(iname)
 
         return added_src_inds
 

@@ -57,6 +57,7 @@ class COOMatrix(Matrix):
             rows = info['rows']
             dense = (rows is None and (val is None or isinstance(val, ndarray)))
 
+            shape = val.shape
             full_size = np.prod(shape)
             if dense:
                 if src_indices is None:
@@ -80,6 +81,7 @@ class COOMatrix(Matrix):
             info, loc, src_indices, shape, factor = submats[key]
             irow, icol = loc
             val = info['value']
+            shape = val.shape
             idxs = None
 
             col_offset = row_offset = 0

@@ -508,13 +508,18 @@ class Group(System):
 
     def _top_level_setup(self, setup_mode, mode):
         self._problem_meta['connections'] = conns = self._conn_global_abs_in2out
+
         if setup_mode == 'full':
-            abs2meta = self._var_abs2meta
-            all_abs2meta = self._var_allprocs_abs2meta
-            conns = self._conn_global_abs_in2out
             auto_ivc = self._setup_auto_ivcs(mode)
 
+    def _top_level_setup2(self, setup_mode):
+        if setup_mode == 'full':
             if self.comm.size > 1:
+                abs2meta = self._var_abs2meta
+                abs2idx = self._var_allprocs_abs2idx['nonlinear']
+                all_abs2meta = self._var_allprocs_abs2meta
+                conns = self._conn_global_abs_in2out
+
                 dist_ins = [n for n in self._var_allprocs_abs_names['input']
                             if all_abs2meta[n]['distributed']]
                 dcomp_names = set(d.rsplit('.', 1)[0] for d in dist_ins)
@@ -522,7 +527,9 @@ class Group(System):
                     added_src_inds = set()
                     for comp in self.system_iter(recurse=True, typ=Component):
                         if comp.pathname in dcomp_names:
-                            added_src_inds.update(comp._update_dist_src_indices(conns))
+                            added_src_inds.update(
+                                comp._update_dist_src_indices(conns, all_abs2meta, abs2idx,
+                                                              self._var_sizes))
                     all_added = set()
                     for a in self.comm.allgather(added_src_inds):
                         all_added.update(a)
@@ -1137,6 +1144,8 @@ class Group(System):
 
         allprocs_abs2meta = self._var_allprocs_abs2meta
         abs2meta = self._var_abs2meta
+        sizes_out = self._var_sizes['nonlinear']['output']
+        out_idxs = self._var_allprocs_abs2idx['nonlinear']
 
         nproc = self.comm.size
 
@@ -1257,11 +1266,15 @@ class Group(System):
                 out_shape = allprocs_abs2meta[abs_out]['global_shape']
                 # get input shape and src_indices from the local meta dict
                 # (input is always local)
+                if abs2meta[abs_in]['distributed']:
+                    in_full_shape = allprocs_abs2meta[abs_in]['global_shape']
+                else:
+                    in_full_shape = abs2meta[abs_in]['shape']
                 in_shape = abs2meta[abs_in]['shape']
                 src_indices = abs2meta[abs_in]['src_indices']
                 flat = abs2meta[abs_in]['flat_src_indices']
 
-                if src_indices is None and out_shape != in_shape:
+                if src_indices is None and out_shape != in_full_shape:
                     # out_shape != in_shape is allowed if
                     # there's no ambiguity in storage order
                     if not array_connection_compatible(in_shape, out_shape):
@@ -1311,7 +1324,10 @@ class Group(System):
 
                     # check all indices are in range of the source dimensions
                     if flat or src_indices.ndim == 1:
-                        out_size = np.prod(out_shape)
+                        if allprocs_abs2meta[abs_in]['distributed']:
+                            out_size = np.sum(sizes_out[:, out_idxs[abs_out]])
+                        else:
+                            out_size = np.prod(out_shape)
                         mx = np.max(src_indices)
                         mn = np.min(src_indices)
                         if mx >= out_size:
@@ -1385,6 +1401,7 @@ class Group(System):
 
         if mode == 'fwd':
             if xfer is not None:
+                # print(f"{self.msginfo}: xferring (fwd)")
                 if self._has_input_scaling:
                     vec_inputs.scale('norm')
                     xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
@@ -1396,6 +1413,7 @@ class Group(System):
 
         else:  # rev
             if xfer is not None:
+                # print(f"{self.msginfo}: xferring (rev)")
                 if self._has_input_scaling:
                     vec_inputs.scale('phys')
                     xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
@@ -2412,27 +2430,32 @@ class Group(System):
             all_ins.update(self._var_allprocs_discrete['input'])
             my_remote_ins = all_ins.difference(self._var_abs_names['input'])
             my_remote_ins = my_remote_ins.difference(self._var_abs_names_discrete['input'])
-            my_remote_ins = my_remote_ins
             gathered = self.comm.gather(my_remote_ins, root=0)
             if self.comm.rank == 0:
                 remote_ins = {}
-                start = all_ins
+                remaining_remotes = set()
+                for remotes in gathered:
+                    remaining_remotes.update(remotes)
+
                 for rank, remotes in enumerate(gathered):
-                    if not start:
+                    if not remaining_remotes:
                         break
-                    for name in start.difference(remotes):
+                    diff = remaining_remotes - remotes
+                    for name in diff:
                         remote_ins[name] = rank
-                    start = start.difference(remote_ins)
+
+                    remaining_remotes -= diff
+
                 self.comm.bcast(remote_ins, root=0)
             else:
                 remote_ins = self.comm.bcast(None, root=0)
         else:
             remote_ins = {}
 
-        for abs_in in chain(abs_names, all_discrete_ins):
+        for abs_in in chain(abs_names, sorted(all_discrete_ins)):
             if abs_in not in conns:
                 prom = abs2prom[abs_in]
-                if prom in self._group_inputs:
+                if prom in self._group_inputs and abs_in in abs2meta:
                     gmeta = self._group_inputs[prom]
                     val = gmeta['val']
                 else:
@@ -2460,22 +2483,26 @@ class Group(System):
                         else:
                             val = None
                         if abs_in in remote_ins:
-                            val = self.comm.bcast(val, root=remote_ins[abs_in])
+                            if remote_ins[abs_in] == self.comm.rank:
+                                self.comm.bcast(val, root=remote_ins[abs_in])
+                            else:
+                                val = self.comm.bcast(None, root=remote_ins[abs_in])
                         auto_ivc.add_discrete_output(loc_out_name, val=val)
                     else:
                         if abs_in in abs2meta:
-                            if val is _undefined:
+                            if val is _undefined and (abs_in not in remote_ins or
+                                                      remote_ins[abs_in] == self.comm.rank or
+                                                      all_abs2meta[abs_in]['distributed']):
                                 val = abs2meta[abs_in]['value']
                         else:
-                            val = np.empty(all_abs2meta[abs_in]['size'])
+                            val = np.zeros(0)
+
+                        if abs_in in remote_ins or all_abs2meta[abs_in]['distributed']:
                             auto_ivc._add_remote(ivc_name)
-                        if abs_in in remote_ins:
-                            if all_abs2meta[abs_in]['distributed']:
-                                if abs_in not in abs2meta:
-                                    val = np.zeros(0)
-                            else:
-                                self.comm.Bcast(val, root=remote_ins[abs_in])
+
                         units = gmeta['units'] if gmeta else None
+                        if val is _undefined:
+                            val = np.zeros(0)
                         auto_ivc.add_output(loc_out_name, val=val, units=units)
 
         if not prom2ivc:
@@ -2484,7 +2511,7 @@ class Group(System):
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
             raise RuntimeError("The top level system must not be a ParallelGroup.")
 
-        self.auto_ivc = auto_ivc
+        self._auto_ivc = auto_ivc
         auto_ivc._setup_procs(auto_ivc.pathname, self.comm, mode, self._problem_meta)
         auto_ivc._static_mode = False
         try:

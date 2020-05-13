@@ -137,10 +137,49 @@ class PETScTransfer(DefaultTransfer):
                                                            meta_out['global_size'])
 
                     # 1. Compute the output indices
+                    # NOTE: src_indices are relative to a single, possibly distributed variable,
+                    # while the output_inds that we compute are relative to the full distributed
+                    # array that contains all local variables from each rank stacked in rank order.
                     if src_indices is None:
-                        rank = myproc if abs_out in abs2meta else owner
-                        offset = offsets_out[rank, idx_out]
-                        output_inds = np.arange(offset, offset + meta_in['size'], dtype=INT_DTYPE)
+                        if meta_out['distributed']:
+                            # input in this case is non-distributed (else src_indices would be
+                            # defined by now).  The input size must match the full
+                            # distributed size of the output.
+                            for rank, sz in enumerate(sizes_out[:, idx_out]):
+                                if sz > 0:
+                                    out_offset = offsets_out[rank, idx_out]
+                                    break
+                            output_inds = np.arange(out_offset,
+                                                    out_offset + meta_out['global_size'],
+                                                    dtype=INT_DTYPE)
+                            # sz_in = sizes_in[myproc, idx_in]
+                            # idxs = []
+                            # start = end = 0
+                            # for rank, sz in enumerate(sizes_out[:, idx_out]):
+                            #     if sz == 0:
+                            #         start = end
+                            #         continue
+                            #     out_offset = offsets_out[rank, idx_out]
+                            #     end += sz
+                            #     if end >= sz_in:
+                            #         print(f"RANGE (start, sz_in): {start} to {sz_in}")
+                            #         idxs.append(np.arange(start, sz_in, dtype=INT_DTYPE))
+                            #         break
+                            #     else:
+                            #         print(f"RANGE (start, end): {start} to {end}")
+                            #         idxs.append(np.arange(start, end, dtype=INT_DTYPE))
+                            #     start = end
+                            # if idxs:
+                            #     print(f"IDXS: {idxs}")
+                            #     output_inds = np.hstack(idxs)
+                            # else:
+                            #     print("ZERO output_inds")
+                            #     output_inds = np.zeros(0, dtype=INT_DTYPE)
+                        else:
+                            rank = myproc if abs_out in abs2meta else owner
+                            offset = offsets_out[rank, idx_out]
+                            output_inds = np.arange(offset, offset + meta_in['size'],
+                                                    dtype=INT_DTYPE)
                     else:
                         output_inds = np.zeros(src_indices.size, INT_DTYPE)
                         start = end = 0
@@ -265,6 +304,7 @@ class PETScTransfer(DefaultTransfer):
             if out_vec._alloc_complex:
                 out_petsc.array = out_vec._data
 
+            # print(f"xferring:  {out_petsc.array} -> {in_petsc.array}")
             self._scatter(out_petsc, in_petsc, addv=flag, mode=flag)
 
             if in_vec._alloc_complex:
