@@ -277,10 +277,10 @@ class Driver(object):
         obj_set = set()
         dv_set = set()
 
-        self._remote_dvs = dv_dict = {}
-        self._remote_cons = con_dict = {}
+        self._remote_dvs = remote_dv_dict = {}
+        self._remote_cons = remote_con_dict = {}
         self._distributed_cons = dist_con_dict = {}
-        self._remote_objs = obj_dict = {}
+        self._remote_objs = remote_obj_dict = {}
 
         # Now determine if later we'll need to allgather cons, objs, or desvars.
         if model.comm.size > 1 and model._subsystems_allprocs:
@@ -310,16 +310,38 @@ class Driver(object):
                     sz = sizes[owner, i]
 
                 if vname in dv_set:
-                    dv_dict[vname] = (owner, sz)
-                elif distributed:
+                    remote_dv_dict[vname] = (owner, sz)
+
+                # Note that design vars are not distributed.
+                elif distributed and (vname in con_set or vname in obj_set):
+                    resp_dict = self._responses['parab.f_xy']
                     idx = model._var_allprocs_abs2idx['nonlinear'][vname]
                     dist_sizes = model._var_sizes['nonlinear']['output'][:, idx]
-                    dist_con_dict[vname] = (idx, dist_sizes)
+                    indices = resp_dict['indices']
+                    if indices is not None:
+                        # Determine which indices are on our proc.
+                        rank = model.comm.rank
+                        size = dist_sizes.size
+                        offsets = np.cumsum(dist_sizes)
+
+                        local_indices = []
+                        true_sizes = np.zeros(size, dtype=INT_DTYPE)
+                        for index in indices:
+                            irank = np.argwhere(offsets >= index)[0][0]
+                            true_sizes[irank] += 1
+                            if rank == irank:
+                                new_index = index - offsets[irank] + dist_sizes[irank]
+                                local_indices.append(new_index)
+
+                        indices = local_indices
+                        dist_sizes = true_sizes
+
+                    dist_con_dict[vname] = (indices, dist_sizes)
 
                 if vname in con_set:
-                    con_dict[vname] = (owner, sz)
+                    remote_con_dict[vname] = (owner, sz)
                 if vname in obj_set:
-                    obj_dict[vname] = (owner, sz)
+                    remote_obj_dict[vname] = (owner, sz)
 
         self._remote_responses = self._remote_cons.copy()
         self._remote_responses.update(self._remote_objs)
@@ -492,9 +514,9 @@ class Driver(object):
 
         elif distributed:
             local_val = model._get_val(name, flat=True)
-            if indices is not None:
-                local_val = local_val[indices]
-            _, sizes = distributed_vars[name]
+            local_indices, sizes = distributed_vars[name]
+            if local_indices is not None:
+                local_val = local_val[local_indices]
             offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
             offsets[1:] = np.cumsum(sizes[:-1])
             val = np.zeros(np.sum(sizes))

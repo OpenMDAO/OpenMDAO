@@ -1638,7 +1638,7 @@ def _get_subjac(jac_meta, prom_out, prom_in, of_idx, wrt_idx, dist_resp, comm):
     if dist_resp:
         n_wrt = tot.shape[1]
         tot = tot.flatten()
-        idx, sizes = dist_resp
+        _, sizes = dist_resp
         n_of_global = np.sum(sizes)
 
         # Adjust sizes to account for wrt dimension in jacobian.

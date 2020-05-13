@@ -3047,13 +3047,8 @@ class System(object):
 
                 if 'size' in response:
                     # Index defined in this response.
-                    if meta['distributed']:
-                        response['global_size'] = copy.copy(response['size'])
-                        rank = self.comm.rank
-                        response['size'] = sizes[rank, abs2idx[name]]
-
-                    else:
-                        response['global_size'] = meta['global_size']
+                    response['global_size'] = response['size'] if meta['distributed'] \
+                        else meta['global_size']
 
                 else:
                     response['size'] = sizes[self._owning_rank[name], abs2idx[name]]
