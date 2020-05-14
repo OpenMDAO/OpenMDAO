@@ -3537,23 +3537,32 @@ class System(object):
             all_var_dicts = self.comm.gather(var_dict, root=0) if not all_procs \
                     else self.comm.allgather(var_dict)
             
+            # Single gather with all_procs false
             if setup:
                 meta = self.comm.gather(self._var_abs2meta, root=0) if not all_procs \
                             else self.comm.allgather(self._var_abs2meta)
             else:
                 meta = self.comm.gather(self._var_rel2meta, root=0) if not all_procs \
-                            else self.comm.allgather(self._var_rel2meta)   
+                            else self.comm.allgather(self._var_rel2meta)              
             
             # unless all_procs is requested, only the root process should print
             if not all_procs and self.comm.rank > 0:
                 return
-        
+            
+            # all gather with all_procs true
             #if setup:
                 #meta = self._var_abs2meta
             #else:
-                #meta = self._var_rel2meta      
+                #meta = self._var_rel2meta    
             
             allprocs_meta = self._var_allprocs_abs2meta
+                        
+            for rank in range(len(meta)):
+                for key in meta[rank].keys():
+                    try:
+                        allprocs_meta[key]['src_indices'] = meta[rank][key]['src_indices']
+                    except:
+                        continue
 
             var_dict = all_var_dicts[self.comm.rank]  # start with metadata from current rank
 
@@ -3568,7 +3577,7 @@ class System(object):
                         # In there already, only need to deal with it if it is a distributed array
                         # Checking to see if distributed depends on if it is an input or output
                         if var_type == 'input':
-                            is_distributed = meta[rank][name]['src_indices'] is not None
+                            is_distributed = allprocs_meta[name]['src_indices'] is not None
                         else:
                             is_distributed = allprocs_meta[name]['distributed']
 
