@@ -4229,9 +4229,6 @@ class System(object):
             smeta = self._var_allprocs_abs2meta[src]
             val = self._abs_get_val(src, get_remote, rank, vec_name, kind, flat)
             if has_src_indices:
-                # if src.startswith('_auto_ivc.'):
-                #     raise RuntimeError(f"{self.msginfo}: Unconnected input '{name}' cannot "
-                #                        "specify src_indices.")
                 if src_indices is None:
                     val = np.zeros(0)
                 else:
@@ -4253,7 +4250,7 @@ class System(object):
                             val = None
                 if vmeta['distributed'] and get_remote:
                     val.shape = self._var_allprocs_abs2meta[abs_name]['global_shape']
-                else:
+                elif val.size > 0:
                     val.shape = vmeta['shape']
             else:
                 val = val.reshape(vmeta['shape'])

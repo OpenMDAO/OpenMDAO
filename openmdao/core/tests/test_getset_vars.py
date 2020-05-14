@@ -511,7 +511,29 @@ class ParTestCase(unittest.TestCase):
         p.model.connect('indep.x', 'par.C1.x', src_indices=list(range(7)))
         p.model.connect('indep.x', 'par.C2.x', src_indices=list(range(7, 10)))
         
+        p.setup()
 
+        p['indep.x'] = np.concatenate([(np.arange(7) + 1.) * 2., (np.arange(7, 10) + 1.) * 3.])
+
+        p.run_model()
+
+        np.testing.assert_allclose(p['indep.x'][:7], (np.arange(7) + 1.) * 2.)
+        np.testing.assert_allclose(p['indep.x'][7:10], (np.arange(7,10) + 1.) * 3.)
+        np.testing.assert_allclose(p.get_val('par.C1.x', get_remote=True), (np.arange(7) + 1.) * 2.)
+        np.testing.assert_allclose(p.get_val('par.C2.x', get_remote=True), (np.arange(7,10) + 1.) * 3.)
+        np.testing.assert_allclose(p.get_val('par.C1.y', get_remote=True), (np.arange(7) + 1.) * 4.)
+        np.testing.assert_allclose(p.get_val('par.C2.y', get_remote=True), (np.arange(7,10) + 1.) * 9.)
+
+    @unittest.expectedFailure
+    def test_par_multi_src_inds_fail(self):
+        p = Problem()
+        p.model.add_subsystem('indep', IndepVarComp('x', val=np.ones(10)))
+        par = p.model.add_subsystem('par', ParallelGroup())
+        par.add_subsystem('C1', ExecComp('y=x*2.', x=np.zeros(7), y=np.zeros(7)))
+        par.add_subsystem('C2', ExecComp('y=x*3.', x=np.zeros(3), y=np.zeros(3)))
+        p.model.connect('indep.x', 'par.C1.x', src_indices=list(range(7)))
+        p.model.connect('indep.x', 'par.C2.x', src_indices=list(range(7, 10)))
+               
         p.setup()
 
         p['par.C1.x'] = (np.arange(7) + 1.) * 2.

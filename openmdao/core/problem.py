@@ -464,7 +464,6 @@ class Problem(object):
                     raise RuntimeError(f"Failed to set value of '{name}': {str(err)}.")
             else:
                 self._initial_condition_cache[name] = value
-            # print(f"problem set_val: setting initial condition cache {name} {indices} to {value}")
         else:
             myrank = self.model.comm.rank
 
@@ -502,9 +501,6 @@ class Problem(object):
                                                " supported.")
                     else:
                         value = np.asarray(value)
-                        # if indices is _full_slice:
-                        #     value = value.reshape(self.model._outputs._views[src].shape)
-                        # print(f"problem set_val: setting {src} to {value} with indices {indices}")
                         self.model._outputs.set_var(src, value, indices)
                 elif src in self.model._discrete_outputs:
                     self.model._discrete_outputs[src] = value
