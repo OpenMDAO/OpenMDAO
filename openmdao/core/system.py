@@ -3493,11 +3493,10 @@ class System(object):
         else:
             raise RuntimeError(self.msginfo +
                                ': You have excluded both Explicit and Implicit components.')
-
+    import wingdbstub
     def _write_table(self, var_type, var_data, hierarchical, print_arrays, all_procs, out_stream):
         """
         Write table of variable names, values, residuals, and metadata to out_stream.
-
         Parameters
         ----------
         var_type : 'input', 'explicit' or 'implicit'
@@ -3536,19 +3535,29 @@ class System(object):
         if MPI and self.comm.size > 1:
             # All procs must call this. Returns a list, one per proc.
             all_var_dicts = self.comm.gather(var_dict, root=0) if not all_procs \
-                else self.comm.allgather(var_dict)
-
+                    else self.comm.allgather(var_dict)
+            
             if setup:
                 meta = self.comm.gather(self._var_abs2meta, root=0) if not all_procs \
-                    else self.comm.allgather(self._var_abs2meta)
+                            else self.comm.allgather(self._var_abs2meta)
             else:
                 meta = self.comm.gather(self._var_rel2meta, root=0) if not all_procs \
-                    else self.comm.allgather(self._var_rel2meta)
-
+                            else self.comm.allgather(self._var_rel2meta)   
+            
             # unless all_procs is requested, only the root process should print
             if not all_procs and self.comm.rank > 0:
                 return
+            #for i in meta:
+                #for val in i.values():
+                    #output = key
+                    #output1 = val
 
+                
+            #if setup:
+                #meta = self._var_abs2meta
+            #else:
+                #meta = self._var_rel2meta      
+            
             allprocs_meta = self._var_allprocs_abs2meta
 
             var_dict = all_var_dicts[self.comm.rank]  # start with metadata from current rank
@@ -3566,15 +3575,15 @@ class System(object):
                         if var_type == 'input':
                             is_distributed = meta[rank][name]['src_indices'] is not None
                         else:
-                            is_distributed = meta[rank][name]['distributed']
+                            is_distributed = allprocs_meta[name]['distributed']
 
                         if is_distributed and name in allprocs_meta:
                             # TODO no support for > 1D arrays
                             #   meta.src_indices has the info we need to piece together arrays
 
-                            global_shape = allprocs_meta[name]['global_shape']
+                            global_shape = meta[rank][name]['global_shape']
 
-                            if meta[rank][name]['shape'] != global_shape:
+                            if allprocs_meta[name]['shape'] != global_shape:
                                 # if the local shape is different than the global shape and the
                                 # global shape matches the concatenation of values from all procs,
                                 # then assume the concatenation, otherwise just use the value from
@@ -3585,7 +3594,7 @@ class System(object):
                                             distrib[key][name] = proc_vars[name][key]
                                         else:
                                             distrib[key][name] = np.append(distrib[key][name],
-                                                                           proc_vars[name][key])
+                                                                               proc_vars[name][key])
 
                                         if rank == self.comm.size - 1:
                                             if distrib[key][name].shape == global_shape:
@@ -3601,7 +3610,7 @@ class System(object):
             top_name = self.name
 
         write_var_table(self.pathname, var_list, var_type, var_dict,
-                        hierarchical, top_name, print_arrays, out_stream)
+                            hierarchical, top_name, print_arrays, out_stream)
 
     def _get_vars_exec_order(self, inputs=False, outputs=False, variables=None):
         """

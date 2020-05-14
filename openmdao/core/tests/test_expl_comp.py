@@ -982,7 +982,7 @@ class ExplCompTestCase(unittest.TestCase):
 
 @unittest.skipUnless(MPI, "MPI is required.")
 class TestMPIExplComp(unittest.TestCase):
-    N_PROCS = 4
+    N_PROCS = 3
 
     def test_list_inputs_outputs_with_parallel_comps(self):
         class TestComp(om.ExplicitComponent):
@@ -1019,64 +1019,68 @@ class TestMPIExplComp(unittest.TestCase):
         model.connect("p1.x", "parallel.c1.x")
         model.connect("p2.x", "parallel.c2.x")
 
-        prob.setup(check=False, mode='fwd')
+        prob.setup()
         prob.run_model()
 
         stream = StringIO()
-        prob.model.list_outputs(out_stream=stream)
+        prob.model.list_outputs(all_procs=True, out_stream=stream)
 
-        text = stream.getvalue().split('\n')
-        expected_text = [
-            "5 Explicit Output(s) in 'model'",
-            "-------------------------------",
-            "",
-            "varname     value",
-            "----------  -----",
-            "model",
-            "p1",
-            "    x       [1.]",
-            "p2",
-            "    x       [1.]",
-            "parallel",
-            "    c1",
-            "   y     [1.]",
-            "    c2",
-            "    y     [1.]",
-            "c3",
-            "    y       [10.]",
-            "",
-            "",
-            "0 Implicit Output(s) in 'model'",
-            "-------------------------------",
-        ]
-        for i, line in enumerate(expected_text):
-            if line and not line.startswith('-'):
-                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
+        if self.comm.rank == 0:
+            
+            text = stream.getvalue().split('\n')
+            expected_text = [
+                "5 Explicit Output(s) in 'model'",
+                "-------------------------------",
+                "",
+                "varname     value",
+                "----------  -----",
+                "model",
+                "p1",
+                "    x       [1.]",
+                "p2",
+                "    x       [1.]",
+                "parallel",
+                "    c1",
+                "   y     [1.]",
+                "    c2",
+                "    y     [1.]",
+                "c3",
+                "    y       [10.]",
+                "",
+                "",
+                "0 Implicit Output(s) in 'model'",
+                "-------------------------------",
+            ]
+            for i, line in enumerate(expected_text):
+                if line and not line.startswith('-'):
+                    self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
 
         stream = StringIO()
-        prob.model.list_inputs(out_stream=stream)
+        prob.model.list_inputs(all_procs=True, out_stream=stream)
+    
+        if self.comm.rank == 0:
 
-        text = stream.getvalue().split('\n')
-        expected_text = [
-            "4 Input(s) in 'model'",
-            "---------------------",
-            "",
-            "varname     value",
-            "----------  -----",
-            "model",
-            "parallel",
-            "    c1",
-            "    x     [1.]",
-            "    c2",
-            "    x     [1.]",
-            "c3",
-            "    x1      [1.]",
-            "    x2      [1.]",
-        ]
-
-        for i, line in enumerate(expected_text):
-            if line and not line.startswith('-'):
-                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
+            text = stream.getvalue().split('\n')
+            expected_text = [
+                "4 Input(s) in 'model'",
+                "---------------------",
+                "",
+                "varname     value",
+                "----------  -----",
+                "model",
+                "parallel",
+                "    c1",
+                "    x     [1.]",
+                "    c2",
+                "    x     [1.]",
+                "c3",
+                "    x1      [1.]",
+                "    x2      [1.]",
+            ]
+    
+            for i, line in enumerate(expected_text):
+                if line and not line.startswith('-'):
+                    self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
 
 if __name__ == '__main__':
     unittest.main()
