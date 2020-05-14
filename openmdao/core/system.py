@@ -3547,12 +3547,7 @@ class System(object):
             # unless all_procs is requested, only the root process should print
             if not all_procs and self.comm.rank > 0:
                 return
-            #for i in meta:
-                #for val in i.values():
-                    #output = key
-                    #output1 = val
-
-                
+        
             #if setup:
                 #meta = self._var_abs2meta
             #else:
