@@ -547,8 +547,8 @@ class Solver(object):
             return
 
         from openmdao.core.group import Group
-        if (isinstance(s, Group) and s._has_distrib_vars) or (isinstance(s, Component) and
-                                                              s.options['distributed']):
+        if (isinstance(s, Group) and (s._has_distrib_vars or s._contains_parallel_group)) or \
+           (isinstance(s, Component) and s.options['distributed']):
             msg = "{} linear solver in {} cannot be used in or above a ParallelGroup or a " + \
                 "distributed component."
             raise RuntimeError(msg.format(type(self).__name__, s.msginfo))
@@ -676,7 +676,7 @@ class NonlinearSolver(Solver):
         Perform a Gauss-Seidel iteration over this Solver's subsystems.
         """
         system = self._system()
-        for isub, (subsys, local)in enumerate(system._all_subsystem_iter()):
+        for isub, (subsys, local) in enumerate(system._all_subsystem_iter()):
             system._transfer('nonlinear', 'fwd', isub)
 
             if local:
