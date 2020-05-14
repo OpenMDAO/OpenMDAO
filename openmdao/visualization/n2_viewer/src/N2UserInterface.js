@@ -233,10 +233,6 @@ class N2UserInterface {
 
         this._setupCollapseDepthElement();
         this.updateClickedIndices();
-
-        d3.select('#searchButtonId')
-            .on('click', this.searchButtonClicked.bind(this));
-
         this._setupSearch();
         this._setupResizerDrag();
         this._setupWindowResizer();
@@ -357,19 +353,19 @@ class N2UserInterface {
         this.pixelRatio = window.devicePixelRatio;
 
         self.resizeTimeout = null;
-        d3.select(window).on('resize', function() {
+        d3.select(window).on('resize', function () {
             const newPixelRatio = window.devicePixelRatio;
 
             // If the browser window itself is zoomed, don't do anything
-            if ( newPixelRatio != self.pixelRatio ) {
+            if (newPixelRatio != self.pixelRatio) {
                 self.pixelRatio = newPixelRatio;
                 return;
             }
 
-            if (! n2Diag.manuallyResized) {
+            if (!n2Diag.manuallyResized) {
                 clearTimeout(self.resizeTimeout);
                 self.resizeTimeout =
-                    setTimeout(function() {
+                    setTimeout(function () {
                         n2Diag.verticalResize(window.innerHeight * .95);
                     }, 200);
             }
@@ -417,10 +413,7 @@ class N2UserInterface {
         let node = this.leftClickedNode;
         node['collapsable'] = true;
 
-        this.backButtonHistory.push({
-            node: node,
-        });
-
+        this.addBackButtonHistory();
         d3.event.preventDefault();
         d3.event.stopPropagation();
         this.collapse();
@@ -452,10 +445,7 @@ class N2UserInterface {
 
         if (!node.hasChildren() || node.isParam()) return;
         if (d3.event.button != 0) return;
-        this.backButtonHistory.push({
-            node: this.n2Diag.zoomedElement,
-        });
-        this.forwardButtonHistory = [];
+        this.addBackButtonHistory();
         this._setupLeftClick(node);
         d3.event.preventDefault();
         d3.event.stopPropagation();
@@ -482,6 +472,37 @@ class N2UserInterface {
     }
 
     /**
+     * Preserve the current zoomed element and state of all hidden elements.
+     * @param {Boolean} clearForward If true, erase the forward history.
+     */
+    addBackButtonHistory(clearForward = true) {
+        let formerHidden = [];
+        this.n2Diag.findAllHidden(formerHidden, false);
+
+        this.backButtonHistory.push({
+            'node': this.n2Diag.zoomedElement,
+            'hidden': formerHidden
+        });
+
+        if (clearForward) this.forwardButtonHistory = [];
+    }
+
+    /**
+     * Preserve the specified node as the zoomed element,
+     * and remember the state of all hidden elements.
+     * @param {N2TreeNode} node The node to preserve as the zoomed element.
+     */
+    addForwardButtonHistory(node) {
+        let formerHidden = [];
+        this.n2Diag.findAllHidden(formerHidden, true);
+
+        this.forwardButtonHistory.push({
+            'node': node,
+            'hidden': formerHidden
+        });
+    }
+
+    /**
      * When the back history button is clicked, pop the top node from that
      * history stack, and disable the button if the stack is empty. Find the
      * neared un-minimized node (if not the node itself) and zoom to that.
@@ -490,16 +511,21 @@ class N2UserInterface {
     backButtonPressed() {
         testThis(this, 'N2UserInterface', 'backButtonPressed');
 
-        if (this.backButtonHistory.length == 0) return;
+        if (this.backButtonHistory.length == 0) {
+            debugInfo("backButtonPressed(): no items in history");
+            return;
+        }
 
-        let node = this.backButtonHistory[this.backButtonHistory.length - 1].node;
+        debugInfo("backButtonPressed(): " +
+            this.backButtonHistory.length + " items in history");
+
+        const history = this.backButtonHistory.pop();
+        const node = history.node;
 
         // Check to see if the node is a collapsed node or not
         if (node.collapsable) {
             this.leftClickedNode = node;
-            this.forwardButtonHistory.push({
-                node: this.leftClickedNode,
-            });
+            this.addForwardButtonHistory(node);
             this.collapse();
         }
         else {
@@ -508,13 +534,11 @@ class N2UserInterface {
                 if (obj.isMinimized) return;
             }
 
-            this.forwardButtonHistory.push({
-                node: this.n2Diag.zoomedElement,
-            });
+            this.addForwardButtonHistory(this.n2Diag.zoomedElement);
             this._setupLeftClick(node);
         }
 
-        this.backButtonHistory.pop();
+        this.n2Diag.resetAllHidden(history.hidden);
         this.n2Diag.update();
     }
 
@@ -527,8 +551,17 @@ class N2UserInterface {
     forwardButtonPressed() {
         testThis(this, 'N2UserInterface', 'forwardButtonPressed');
 
-        if (this.forwardButtonHistory.length == 0) return;
-        let node = this.forwardButtonHistory.pop().node;
+        if (this.forwardButtonHistory.length == 0) {
+            debugInfo("forwardButtonPressed(): no items in history");
+            return;
+        }
+
+        debugInfo("forwardButtonPressed(): " +
+            this.forwardButtonHistory.length + " items in history");
+
+        const history = this.forwardButtonHistory.pop();
+        const node = history.node;
+
         d3.select('#forwardButtonId').attr('disabled',
             (this.forwardButtonHistory.length == 0));
 
@@ -536,10 +569,11 @@ class N2UserInterface {
             // make sure history item is not minimized
             if (obj.isMinimized) return;
         }
-        this.backButtonHistory.push({
-            node: this.n2Diag.zoomedElement,
-        });
+
+        this.addBackButtonHistory(false);
         this._setupLeftClick(node);
+
+        this.n2Diag.resetAllHidden(history.hidden);
         this.n2Diag.update();
     }
 
@@ -585,10 +619,7 @@ class N2UserInterface {
     homeButtonClick() {
         testThis(this, 'N2UserInterface', 'homeButtonClick');
 
-        this.backButtonHistory.push({
-            node: this.n2Diag.zoomedElement,
-        });
-        this.forwardButtonHistory = [];
+        this.addBackButtonHistory();
         this._setupLeftClick(this.n2Diag.model.root);
         this.uncollapseButtonClick(this.n2Diag.model.root);
     }
@@ -615,6 +646,7 @@ class N2UserInterface {
     collapseOutputsButtonClick(startNode) {
         testThis(this, 'N2UserInterface', 'collapseOutputsButtonClick');
 
+        this.addBackButtonHistory();
         this.findRootOfChangeFunction = this.findRootOfChangeForCollapseUncollapseOutputs;
         N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
         this.lastClickWasLeft = false;
@@ -645,6 +677,7 @@ class N2UserInterface {
     uncollapseButtonClick(startNode) {
         testThis(this, 'N2UserInterface', 'uncollapseButtonClick');
 
+        this.addBackButtonHistory();
         this.findRootOfChangeFunction = this.findRootOfChangeForCollapseUncollapseOutputs;
         N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
         this.lastClickWasLeft = false;
@@ -678,6 +711,7 @@ class N2UserInterface {
     collapseToDepthSelectChange(newChosenCollapseDepth) {
         testThis(this, 'N2UserInterface', 'collapseToDepthSelectChange');
 
+        this.addBackButtonHistory();
         this.n2Diag.chosenCollapseDepth = newChosenCollapseDepth;
         if (this.n2Diag.chosenCollapseDepth > this.n2Diag.zoomedElement.depth) {
             this._collapseToDepth(
@@ -775,7 +809,7 @@ class N2UserInterface {
     /** Called when the search button is actually or effectively clicked to start a search. */
     searchButtonClicked() {
         testThis(this, 'N2UserInterface', 'searchButtonClicked');
-
+        this.addBackButtonHistory();
         this.n2Diag.search.performSearch();
 
         this.findRootOfChangeFunction = this.n2Diag.search.findRootOfChangeForSearch;
@@ -817,4 +851,3 @@ class N2UserInterface {
         }
     }
 }
-

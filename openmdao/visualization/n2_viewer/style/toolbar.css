@@ -41,39 +41,50 @@
 }
 
 .searchbar {
-    width: 0;
+    width: 100%;
     display: flex;
-    transition: border-color 0.2s, width 0.2s, margin-left 0.2s;
-    margin-left: 0;
+    transition: border-color 0.5s, width 0.5s, margin-left 0.5s;
+    margin-left: 8px;
     display: block;
     border: 1px solid rgba(0, 0, 0, 0);
     background-color: white;
     border-top-right-radius: 25px;
     border-bottom-right-radius: 25px;
     padding: 8px 8px;
+    /* transition-delay: 0.5s; */
+    transition: border-color 0.5s, width 0.5s, margin-left 0.5s, visibility 0.5s;
 }
 
-.searchbar-container:hover>div .searchbar {
+.searchbar:focus {
+    background: lightcyan;
+}
+
+.searchbar-hidden {
+    overflow: hidden;
+    visibility: hidden;
+    width: 0px;
+    transition: border-color 0.5s, width 0.5s, margin-left 0.5s, visibility 0.5s;
+}
+
+.searchbar-visible {
+    overflow: visible;
+    visibility: visible;
+    z-index: 10;
+    width: 200px;
+    transition: border-color 0.5s, width 0.5s, margin-left 0.5s, visibility 0.5s;
+}
+
+.searchbar-visible .searchbar {
     border-color: #03793f;
-    margin-left: 8px;
-    transition: border-color 0.2s, width 0.2s, margin-left 0.2s;
 }
 
-#searchCountId {
+.searchbar-container label { 
     font-size: 10pt;
     color: black;
     margin-left: 8px;
     transition: font-size 0.2s;
-}
-
-.search-count-visible {
-    visibility: visible;
+    transition-delay: 0.5s;
     width: 200px;
-}
-
-.search-count-hidden {
-    visibility: hidden;
-    width: 0px;
 }
 
 /* Toolbar Container*/
@@ -94,7 +105,7 @@
     left: -75px;
     /* Start hidden */
     transition: left 0.5s;
-    z-index: 1;
+    z-index: 5;
 }
 
 .toolbar {
