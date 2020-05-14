@@ -15,6 +15,7 @@ from openmdao.utils.general_utils import simple_warning, warn_deprecation
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 import openmdao.utils.coloring as coloring_mod
+from openmdao.vectors.vector import INT_DTYPE
 
 
 def _check_debug_print_opts_valid(name, opts):
@@ -63,6 +64,9 @@ class Driver(object):
         Contains all design variable info.
     _designvars_discrete : list
         List of design variables that are discrete.
+    _distributed_cons : dict
+        Dict of constraints that are distributed outputs. Values are
+        (owning rank, size).
     _cons : dict
         Contains all constraint info.
     _objs : dict
@@ -275,6 +279,7 @@ class Driver(object):
 
         self._remote_dvs = dv_dict = {}
         self._remote_cons = con_dict = {}
+        self._distributed_cons = dist_con_dict = {}
         self._remote_objs = obj_dict = {}
 
         # Now determine if later we'll need to allgather cons, objs, or desvars.
@@ -283,6 +288,7 @@ class Driver(object):
             remote_dvs = set(self._designvars) - local_out_vars
             remote_cons = set(self._cons) - local_out_vars
             remote_objs = set(self._objs) - local_out_vars
+
             all_remote_vois = model.comm.allgather(
                 (remote_dvs, remote_cons, remote_objs))
             for rem_dvs, rem_cons, rem_objs in all_remote_vois:
@@ -296,13 +302,20 @@ class Driver(object):
             sizes = model._var_sizes['nonlinear']['output']
             abs2meta = model._var_allprocs_abs2meta
             for i, vname in enumerate(model._var_allprocs_abs_names['output']):
-                if abs2meta[vname]['distributed']:
+                distributed = abs2meta[vname]['distributed']
+                if distributed:
                     owner = sz = None
                 else:
                     owner = owning_ranks[vname]
                     sz = sizes[owner, i]
+
                 if vname in dv_set:
                     dv_dict[vname] = (owner, sz)
+                elif distributed:
+                    idx = model._var_allprocs_abs2idx['nonlinear'][vname]
+                    dist_sizes = model._var_sizes['nonlinear']['output'][:, idx]
+                    dist_con_dict[vname] = (idx, dist_sizes)
+
                 if vname in con_set:
                     con_dict[vname] = (owner, sz)
                 if vname in obj_set:
@@ -349,7 +362,6 @@ class Driver(object):
         """
         problem = self._problem()
         model = problem.model
-        rrank = problem.comm.rank
 
         incl = recording_options['includes']
         excl = recording_options['excludes']
@@ -417,7 +429,8 @@ class Driver(object):
         for sub in self._problem().model.system_iter(recurse=True, include_self=True):
             self._rec_mgr.record_metadata(sub)
 
-    def _get_voi_val(self, name, meta, remote_vois, driver_scaling=True, rank=None):
+    def _get_voi_val(self, name, meta, remote_vois, distributed_vars, driver_scaling=True,
+                     rank=None):
         """
         Get the value of a variable of interest (objective, constraint, or design var).
 
@@ -432,6 +445,8 @@ class Driver(object):
         remote_vois : dict
             Dict containing (owning_rank, size) for all remote vois of a particular
             type (design var, constraint, or objective).
+        distributed_vars : dict
+            Dict containing (indices, sizes) for all distributed responses.
         driver_scaling : bool
             When True, return values that are scaled according to either the adder and scaler or
             the ref and ref0 values that were specified when add_design_var, add_objective, and
@@ -449,9 +464,15 @@ class Driver(object):
         vec = model._outputs._views_flat
         indices = meta['indices']
 
+        if MPI:
+            distributed = comm.size > 0 and name in distributed_vars
+        else:
+            distributed = False
+
         if name in remote_vois:
             owner, size = remote_vois[name]
             # if var is distributed or only gathering to one rank
+            # TODO - support distributed var under a parallel group.
             if owner is None or rank is not None:
                 val = model._get_val(name, get_remote=True, rank=rank, flat=True)
                 if indices is not None:
@@ -468,6 +489,17 @@ class Driver(object):
                     val = np.empty(size)
 
                 comm.Bcast(val, root=owner)
+
+        elif distributed:
+            local_val = model._get_val(name, flat=True)
+            if indices is not None:
+                local_val = local_val[indices]
+            idx, sizes = distributed_vars[name]
+            offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
+            offsets[1:] = np.cumsum(sizes[:-1])
+            val = np.zeros(np.sum(sizes))
+            comm.Allgatherv(local_val, [val, sizes, offsets, MPI.DOUBLE])
+
         else:
             if name in self._designvars_discrete:
                 val = model._discrete_outputs[name]
@@ -509,7 +541,8 @@ class Driver(object):
         dict
            Dictionary containing values of each design variable.
         """
-        return {n: self._get_voi_val(n, dv, self._remote_dvs) for n, dv in self._designvars.items()}
+        return {n: self._get_voi_val(n, dv, self._remote_dvs, {})
+                for n, dv in self._designvars.items()}
 
     def set_design_var(self, name, value):
         """
@@ -580,7 +613,7 @@ class Driver(object):
         dict
            Dictionary containing values of each objective.
         """
-        return {n: self._get_voi_val(n, obj, self._remote_objs, driver_scaling=driver_scaling)
+        return {n: self._get_voi_val(n, obj, self._remote_objs, {}, driver_scaling=driver_scaling)
                 for n, obj in self._objs.items()}
 
     def get_constraint_values(self, ctype='all', lintype='all', driver_scaling=True):
@@ -620,6 +653,7 @@ class Driver(object):
                 continue
 
             con_dict[name] = self._get_voi_val(name, meta, self._remote_cons,
+                                               self._distributed_cons,
                                                driver_scaling=driver_scaling)
 
         return con_dict
@@ -727,7 +761,7 @@ class Driver(object):
         problem = self._problem()
         total_jac = self._total_jac
         debug_print = 'totals' in self.options['debug_print'] and (not MPI or
-                                                                   MPI.COMM_WORLD.rank == 0)
+                                                                   problem.comm.rank == 0)
 
         if debug_print:
             header = 'Driver total derivatives for iteration: ' + str(self.iter_count)
@@ -960,10 +994,11 @@ class Driver(object):
         Optionally print some debugging information before the model runs.
         """
         debug_opt = self.options['debug_print']
+        rank = self._problem().comm.rank
         if not debug_opt or debug_opt == ['totals']:
             return
 
-        if not MPI or MPI.COMM_WORLD.rank == 0:
+        if not MPI or rank == 0:
             header = 'Driver debug print for iter coord: {}'.format(
                 self._recording_iter.get_formatted_iteration_coordinate())
             print(header)
@@ -972,7 +1007,7 @@ class Driver(object):
         if 'desvars' in debug_opt:
             model = self._problem().model
             desvar_vals = {n: model._get_val(n, get_remote=True, rank=0) for n in self._designvars}
-            if not MPI or MPI.COMM_WORLD.rank == 0:
+            if not MPI or rank == 0:
                 print("Design Vars")
                 if desvar_vals:
                     pprint.pprint(desvar_vals)
@@ -986,9 +1021,11 @@ class Driver(object):
         """
         Optionally print some debugging information after the model runs.
         """
+        rank = self._problem().comm.rank
+
         if 'nl_cons' in self.options['debug_print']:
             cons = self.get_constraint_values(lintype='nonlinear', driver_scaling=False)
-            if not MPI or MPI.COMM_WORLD.rank == 0:
+            if not MPI or rank == 0:
                 print("Nonlinear constraints")
                 if cons:
                     pprint.pprint(cons)
@@ -998,7 +1035,7 @@ class Driver(object):
 
         if 'ln_cons' in self.options['debug_print']:
             cons = self.get_constraint_values(lintype='linear', driver_scaling=False)
-            if not MPI or MPI.COMM_WORLD.rank == 0:
+            if not MPI or rank == 0:
                 print("Linear constraints")
                 if cons:
                     pprint.pprint(cons)
@@ -1008,7 +1045,7 @@ class Driver(object):
 
         if 'objs' in self.options['debug_print']:
             objs = self.get_objective_values(driver_scaling=False)
-            if not MPI or MPI.COMM_WORLD.rank == 0:
+            if not MPI or rank == 0:
                 print("Objectives")
                 if objs:
                     pprint.pprint(objs)

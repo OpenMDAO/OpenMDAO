@@ -477,7 +477,7 @@ class N2UserInterface {
      */
     addBackButtonHistory(clearForward = true) {
         let formerHidden = [];
-        this.n2Diag.findAllHidden(formerHidden, true);
+        this.n2Diag.findAllHidden(formerHidden, false);
 
         this.backButtonHistory.push({
             'node': this.n2Diag.zoomedElement,

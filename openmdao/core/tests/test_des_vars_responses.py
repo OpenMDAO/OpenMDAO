@@ -353,23 +353,6 @@ class TestConstraintOnModel(unittest.TestCase):
 
         self.assertEqual(str(context.exception), "SellarDerivatives (<model>): Output not found for response 'junk'.")
 
-    def test_constraint_on_distrib_output(self):
-        # this test should be removed once distributed outputs are able to be used as constraints
-        # this tests a temporary fix for issue #1331
-        prob = Problem()
-        model = Group()
-        model.add_subsystem('dvs', IndepVarComp('x', val=1.0*np.ones((2,))))
-        model.add_subsystem('distcomp', DistribInputDistribOutputComp(arr_size=2))
-        model.add_subsystem('sum', ExecComp('y = sum(x)', x=np.ones((2,))))
-        model.connect('dvs.x', 'distcomp.invec')
-        model.connect('distcomp.outvec', 'sum.x')
-        prob.model = model
-        prob.model.add_design_var('dvs.x', lower=-100, upper=100)
-        prob.model.add_objective('sum.y')
-        prob.model.add_constraint('distcomp.outvec', lower=-10.5)
-        with self.assertRaises(NotImplementedError) as context:
-            prob.setup()
-
     def test_constraint_affine_and_scaleradder(self):
 
         prob = Problem()

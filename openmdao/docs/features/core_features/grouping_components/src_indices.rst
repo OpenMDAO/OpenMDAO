@@ -4,8 +4,11 @@ Using src_indices with Promoted Variables
 
 Inputs and outputs can be connected by promoting them both to the same name, but what
 if your output is an array and you only want to connect part of it to your
-input?  If you connect variables via promotion, you must set :code:`src_indices` when
-you call :code:`add_input` to add your input variable to its component.  Another
+input?  
+
+If you connect variables via promotion, you must set :code:`src_indices` either
+when you call :code:`add_input` to add your input variable to its component or 
+when you promote the input with the :ref:`promotes <group_promotes>` method.  Another
 argument, :code:`flat_src_indices` is a boolean that determines whether the entries
 of the :code:`src_indices` array are interpreted as indices into the flattened source
 or as tuples or lists of indices into the unflattened source.  The default
@@ -18,7 +21,7 @@ Usage
 each component gets part of the array.
 
 .. embed-code::
-    openmdao.core.tests.test_group.TestGroup.test_promote_src_indices
+    openmdao.core.tests.test_group.TestFeatureSrcIndices.test_promote_src_indices
     :layout: interleave
 
 2. A distributed component that promotes its input and receives certain
@@ -32,17 +35,16 @@ supported.
 3. The source array is shape (4,3) and the input array is shape (2,2)
 
 .. embed-code::
-    openmdao.core.tests.test_group.TestGroup.test_promote_src_indices_nonflat
+    openmdao.core.tests.test_group.TestFeatureSrcIndices.test_promote_src_indices_nonflat
     :layout: interleave
 
 4. If the source array is shape (4,3), the input is scalar, and we want to
 connect it to the (3, 1) entry of the source, then the :code:`add_input`
-call might look like the following if we use flat :code:`src_indices`:
+call might look like the following if we use :code:`flat_src_indices`:
 
 .. code::
 
     self.add_input('x', 1.0, src_indices=[10], shape=1, flat_src_indices=True)
-
 
 If we instead use the default setting of :code:`flat_src_indices=False`, we must specify
 the input shape since a scalar input value alone doesn't necessarily indicate that
@@ -60,6 +62,13 @@ call might look like this:
 .. code::
 
     self.add_input('x', src_indices=[[0, 10], [7, 4]], shape=(2,2))
+
+6. Indices can also be specified when an input is promoted via the :ref:`promotes <group_promotes>` 
+method.
+
+.. embed-code::
+    openmdao.core.tests.test_group.TestFeatureSrcIndices.test_group_promotes_src_indices
+    :layout: interleave
 
 
 .. note::
