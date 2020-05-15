@@ -1026,7 +1026,7 @@ class TestMPIExplComp(unittest.TestCase):
         prob.model.list_outputs(all_procs=True, out_stream=stream)
 
         if self.comm.rank == 0:
-            
+
             text = stream.getvalue().split('\n')
             expected_text = [
                 "5 Explicit Output(s) in 'model'",
@@ -1057,7 +1057,7 @@ class TestMPIExplComp(unittest.TestCase):
 
         stream = StringIO()
         prob.model.list_inputs(all_procs=True, out_stream=stream)
-    
+
         if self.comm.rank == 0:
 
             text = stream.getvalue().split('\n')
@@ -1077,7 +1077,7 @@ class TestMPIExplComp(unittest.TestCase):
                 "    x1      [1.]",
                 "    x2      [1.]",
             ]
-    
+
             for i, line in enumerate(expected_text):
                 if line and not line.startswith('-'):
                     self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
