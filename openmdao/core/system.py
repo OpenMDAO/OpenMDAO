@@ -3537,7 +3537,6 @@ class System(object):
             all_var_dicts = self.comm.gather(var_dict, root=0) if not all_procs \
                     else self.comm.allgather(var_dict)
             
-            # Single gather with all_procs false
             if setup:
                 meta = self.comm.gather(self._var_abs2meta, root=0) if not all_procs \
                             else self.comm.allgather(self._var_abs2meta)
@@ -3547,13 +3546,7 @@ class System(object):
             
             # unless all_procs is requested, only the root process should print
             if not all_procs and self.comm.rank > 0:
-                return
-            
-            # all gather with all_procs true
-            #if setup:
-                #meta = self._var_abs2meta
-            #else:
-                #meta = self._var_rel2meta    
+                return  
             
             allprocs_meta = self._var_allprocs_abs2meta
                         
@@ -3585,7 +3578,7 @@ class System(object):
                             # TODO no support for > 1D arrays
                             #   meta.src_indices has the info we need to piece together arrays
 
-                            global_shape = meta[rank][name]['global_shape']
+                            global_shape = allprocs_meta[name]['global_shape']
 
                             if allprocs_meta[name]['shape'] != global_shape:
                                 # if the local shape is different than the global shape and the
