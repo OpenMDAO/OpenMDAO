@@ -127,7 +127,8 @@ class N2Search {
             if (didMatch) {
                 // only params and unknowns can count as matches
                 ++this.numMatches;
-            } else if (undoList) {
+            }
+            else if (undoList) {
                 // did not match and undo list is not null
                 node.varIsHidden = true;
                 undoList.push(node);
