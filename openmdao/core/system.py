@@ -3558,8 +3558,11 @@ class System(object):
                     if name not in var_dict:     # If not in the merged dict, add it
                         var_dict[name] = proc_vars[name]
                     else:
-                        is_distributed = meta[name]['distributed']
-
+                        try:
+                            is_distributed = meta[name]['distributed']
+                        except:
+                            is_distributed = allprocs_meta[name]['distributed']
+                    
                         if is_distributed and name in allprocs_meta:
                             # TODO no support for > 1D arrays
                             #   meta.src_indices has the info we need to piece together arrays
