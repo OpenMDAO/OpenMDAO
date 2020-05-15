@@ -156,12 +156,12 @@ def _get_used_before_calc_subs(group, input_srcs):
         source Systems that execute after them.
     """
     sub2i = {}
-    parallel_connections = {}
+    parallel_solver = {}
     for i, sub in enumerate(group._subsystems_allprocs):
         if hasattr(sub, '_mpi_proc_allocator') and sub._mpi_proc_allocator.parallel:
-            parallel_connections.update({sub.name: sub.nonlinear_solver.SOLVER})
+            parallel_solver.update({sub.name: sub.nonlinear_solver.SOLVER})
 
-        sub2i.update({sub.name: i})
+        sub2i[sub.name] = i
 
     glen = len(group.pathname.split('.')) if group.pathname else 0
 
@@ -172,8 +172,8 @@ def _get_used_before_calc_subs(group, input_srcs):
             oparts = src_abs.split('.')
             src_sys = oparts[glen]
             tgt_sys = iparts[glen]
-            if (src_sys in parallel_connections and tgt_sys in parallel_connections and
-                    (parallel_connections[src_sys] not in ["NL: NLBJ", "NL: Newton", "BROYDEN"]) and
+            if (src_sys in parallel_solver and tgt_sys in parallel_solver and
+                    (parallel_solver[src_sys] not in ["NL: NLBJ", "NL: Newton", "BROYDEN"]) and
                     src_sys == tgt_sys):
                 simple_warning("Need to attach NonlinearBlockJac, NewtonSolver, or BroydenSolver "
                                "to '%s' when connecting components inside parallel "
