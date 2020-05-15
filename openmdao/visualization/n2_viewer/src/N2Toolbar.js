@@ -159,7 +159,6 @@ class N2Toolbar {
 
         // Expand the search bar and set focus when search button clicked
         d3.select('#searchbar-container').on('click', function () {
-            // self.toolbarContainer.style('z-index', 10);
             self.searchCount.html('0 matches');
             
             self.searchBar.node().value = '';
@@ -174,7 +173,6 @@ class N2Toolbar {
 
         // Retract search bar when focus is lost
         this.searchBar.on('focusout', function () {
-            // self.toolbarContainer.style('z-index', 1);
             d3.select('#searchbar-and-label').attr('class', 'searchbar-hidden')
         });
     }
