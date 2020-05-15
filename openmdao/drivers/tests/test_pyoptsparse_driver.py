@@ -1901,6 +1901,31 @@ class TestPyoptSparse(unittest.TestCase):
 
         assert_near_equal(prob['z'][0], 1.9776, 1e-3)
 
+    def test_ParOpt_basic(self):
+        _, local_opt = set_pyoptsparse_opt('ParOpt')
+        if local_opt != 'ParOpt':
+            raise unittest.SkipTest("pyoptsparse is not providing ParOpt")
+
+        prob = om.Problem()
+        model = prob.model = SellarDerivativesGrouped()
+
+        prob.driver = om.pyOptSparseDriver()
+        prob.driver.options['optimizer'] = "ParOpt"
+        # prob.driver.opt_settings['print_level'] = 0
+
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        prob.set_solver_print(level=0)
+
+        prob.setup(check=False, mode='rev')
+        prob.run_driver()
+
+        assert_near_equal(prob['z'][0], 1.9776, 1e-3)
+
 
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
 @use_tempdirs

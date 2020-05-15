@@ -27,14 +27,14 @@ from openmdao.utils.mpi import FakeComm
 
 # names of optimizers that use gradients
 grad_drivers = {'CONMIN', 'FSQP', 'IPOPT', 'NLPQLP',
-                'PSQP', 'SLSQP', 'SNOPT', 'NLPY_AUGLAG'}
+                'PSQP', 'SLSQP', 'SNOPT', 'NLPY_AUGLAG', 'ParOpt'}
 
 # names of optimizers that allow multiple objectives
 multi_obj_drivers = {'NSGA2'}
 
 # All optimizers in pyoptsparse
 optlist = ['ALPSO', 'CONMIN', 'FSQP', 'IPOPT', 'NLPQLP',
-           'NSGA2', 'PSQP', 'SLSQP', 'SNOPT', 'NLPY_AUGLAG', 'NOMAD']
+           'NSGA2', 'PSQP', 'SLSQP', 'SNOPT', 'NLPY_AUGLAG', 'NOMAD', 'ParOpt']
 
 # All optimizers that require an initial run
 run_required = ['NSGA2', 'ALPSO']
