@@ -210,6 +210,12 @@ class Problem(object):
         self.recording_options.declare('record_derivatives', types=bool, default=False,
                                        desc='Set to True to record derivatives for the problem '
                                             'level')
+        self.recording_options.declare('record_abs_error', types=bool, default=True,
+                                       desc='Set to True to record absolute error of '
+                                            'model nonlinear solver')
+        self.recording_options.declare('record_rel_error', types=bool, default=True,
+                                       desc='Set to True to record relative error of model \
+                                       nonlinear solver')
         self.recording_options.declare('includes', types=list, default=['*'],
                                        desc='Patterns for variables to include in recording. \
                                        Uses fnmatch wildcards')
@@ -693,7 +699,7 @@ class Problem(object):
         for system in self.model.system_iter(include_self=True, recurse=True):
             system.cleanup()
 
-    def record_state(self, case_name):
+    def record(self, case_name):
         """
         Record the variables at the Problem level.
 
@@ -714,7 +720,7 @@ class Problem(object):
             Name used to identify this Problem case.
         """
         warn_deprecation("'Problem.record_iteration' has been deprecated. "
-                         "Use 'Problem.record_state' instead.")
+                         "Use 'Problem.record' instead.")
 
         record_iteration(self, self, case_name)
 
@@ -1407,6 +1413,7 @@ class Problem(object):
         # Assemble and Return all metrics.
         data = {}
         data[''] = {}
+        # TODO key should not be fwd when exact computed in rev mode or auto
         for key, val in Jcalc.items():
             data[''][key] = {}
             data[''][key]['J_fwd'] = val
@@ -1859,6 +1866,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             do_rev_dp = not totals and matrix_free and directional
 
             derivative_info = derivatives[of, wrt]
+            # TODO total derivs may have been computed in rev mode, not fwd
             forward = derivative_info['J_fwd']
             fd = derivative_info['J_fd']
             if do_rev:

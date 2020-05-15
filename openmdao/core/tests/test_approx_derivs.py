@@ -21,6 +21,7 @@ from openmdao.test_suite.parametric_suite import parametric_suite
 from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.mpi import MPI
+import time 
 
 try:
     from openmdao.parallel_api import PETScVector
@@ -809,6 +810,86 @@ class TestGroupFiniteDifference(unittest.TestCase):
         p.run_driver()
 
         assert_near_equal(p['circle.area'], np.pi, 1e-6)
+
+    def test_bug_subsolve(self):
+        # There was a bug where a group with an approximation was still performing a linear
+        # solve on its subsystems, which led to partials declared with 'val' corrupting the
+        # results.
+
+        class DistParab(om.ExplicitComponent):
+
+            def initialize(self):
+
+                self.options.declare('arr_size', types=int, default=10,
+                                     desc="Size of input and output vectors.")
+
+            def setup(self):
+                arr_size = self.options['arr_size']
+
+                self.add_input('x', val=np.ones(arr_size))
+                self.add_output('f_xy', val=np.ones(arr_size))
+
+                self.declare_partials('f_xy', 'x')
+
+            def compute(self, inputs, outputs):
+                x = inputs['x']
+                outputs['f_xy'] = x**2
+
+        class NonDistComp(om.ExplicitComponent):
+
+            def initialize(self):
+                self.options.declare('arr_size', types=int, default=10,
+                                     desc="Size of input and output vectors.")
+
+            def setup(self):
+                arr_size = self.options['arr_size']
+
+                self.add_input('f_xy', val=np.ones(arr_size))
+
+                self.add_output('g', val=np.ones(arr_size))
+
+                # Make this wrong to see if it shows up in the answer.
+                mat = np.array([7.0, 13, 27])
+
+                row_col = np.arange(arr_size)
+                self.declare_partials('g', ['f_xy'], rows=row_col, cols=row_col, val=mat)
+                #self.declare_partials('g', ['f_xy'])
+
+            def compute(self, inputs, outputs):
+                x = inputs['f_xy']
+                outputs['g'] = x * np.array([3.5, -1.0, 5.0])
+
+        size = 3
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', np.ones((size, )))
+
+        model.add_subsystem('p', ivc, promotes=['*'])
+        sub = model.add_subsystem('sub', om.Group(), promotes=['*'])
+
+        sub.add_subsystem("parab", DistParab(arr_size=size), promotes=['*'])
+        sub.add_subsystem("ndp", NonDistComp(arr_size=size), promotes=['*'])
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_constraint('g', lower=0.0)
+
+        sub.approx_totals(method='fd')
+
+        prob.setup()
+
+        prob.run_model()
+
+        of = ['sub.ndp.g']
+        totals = prob.driver._compute_totals(of=of, wrt=['p.x'], return_format='dict')
+        assert_near_equal(totals['sub.ndp.g']['p.x'], np.diag([7.0, -2.0, 10.0]), 1e-6)
+
+        totals = prob.check_totals()
+
+        for key, val in totals.items():
+            assert_near_equal(val['rel error'][0], 0.0, 1e-6)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -2243,6 +2324,67 @@ class ParallelFDParametricTestCase(unittest.TestCase):
             totals = param_instance.compute_totals('rev')
             assert_near_equal(totals, expected_totals, 1e-4)
 
+class CheckTotalsParallelGroup(unittest.TestCase):
+
+    N_PROCS = 3
+
+    def test_vois_in_parallelgroup(self):
+        class PassThruComp(om.ExplicitComponent):
+            def initialize(self):
+                self.options.declare('time', default=3.0)
+                self.options.declare('size', default=1)
+
+            def setup(self):
+                size = self.options['size']
+                self.add_input('x', shape=size)
+                self.add_output('y', shape=size)
+                self.declare_partials('y', 'x')
+
+            def compute(self, inputs, outputs):
+                waittime = self.options['time']
+                if not inputs._under_complex_step:
+                    print('sleeping: ')
+                    time.sleep(waittime)
+                outputs['y'] = inputs['x']
+
+            def compute_partials(self, inputs, J):
+                size = self.options['size']
+                J['y', 'x'] = np.eye(size)
+
+        model = om.Group()
+        iv = om.IndepVarComp()
+        size = 1
+        iv.add_output('x', val=3.0 * np.ones((size, )))
+        model.add_subsystem('iv', iv)
+        pg = model.add_subsystem('pg', om.ParallelGroup(), promotes=['*'])
+        pg.add_subsystem('dc1', PassThruComp(size=size, time=0.0))
+        pg.add_subsystem('dc2', PassThruComp(size=size, time=0.0))
+        pg.add_subsystem('dc3', PassThruComp(size=size, time=0.0))
+        model.connect('iv.x', ['dc1.x', 'dc2.x', 'dc3.x'])
+        model.add_subsystem('adder', om.ExecComp('z = sum(y1)+sum(y2)+sum(y3)', y1={'value': np.zeros((size, ))},
+                                                                                y2={'value': np.zeros((size, ))},
+                                                                                y3={'value': np.zeros((size, ))}))
+        model.connect('dc1.y', 'adder.y1')
+        model.connect('dc2.y', 'adder.y2')
+        model.connect('dc3.y', 'adder.y3')
+
+        model.add_design_var('iv.x', lower=-1.0, upper=1.0)
+        # this objective works fine
+        # model.add_objective('adder.z')
+
+        # this objective raises a concatenation error whether under fd or cs
+        # issue 1403
+        model.add_objective('dc1.y')
+
+        # for some reason this constraint is fine even though only lives on proc 3
+        model.add_constraint('dc3.y', lower=-1.0, upper=1.0)
+
+        prob = om.Problem(model=model)
+        prob.setup(force_alloc_complex=True)
+        prob.run_model()
+        data  = prob.check_totals(method='cs', out_stream=None)
+        assert_near_equal(data[('pg.dc1.y', 'iv.x')]['abs error'][0], 0.0, 1e-6)
+        assert_near_equal(data[('pg.dc3.y', 'iv.x')]['abs error'][0], 0.0, 1e-6)
 
 if __name__ == "__main__":
     unittest.main()

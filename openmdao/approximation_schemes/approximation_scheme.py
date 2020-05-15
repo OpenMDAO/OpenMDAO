@@ -1,9 +1,12 @@
 """Base class used to define the interface for derivative approximation schemes."""
 from collections import defaultdict
+
 from scipy.sparse import coo_matrix
 import numpy as np
+
 from openmdao.utils.array_utils import sub2full_indices, get_input_idx_split
 import openmdao.utils.coloring as coloring_mod
+from openmdao.utils.mpi import MPI
 from openmdao.jacobians.jacobian import Jacobian
 from openmdao.vectors.vector import _full_slice
 
@@ -303,7 +306,10 @@ class ApproximationScheme(object):
         par_fd_w_serial_model = use_parallel_fd and system._num_par_fd == system._full_comm.size
         num_par_fd = system._num_par_fd if use_parallel_fd else 1
         is_parallel = use_parallel_fd or system.comm.size > 1
-        is_distributed = isinstance(system, Component) and system.options['distributed']
+        if isinstance(system, Component):
+            is_distributed = system.options['distributed']
+        else:
+            is_distributed = system._has_distrib_vars and not use_parallel_fd
 
         results = defaultdict(list)
         iproc = system.comm.rank
@@ -530,7 +536,6 @@ def _get_wrt_subjacs(system, approxs):
             J[wrt] = {'ofs': set(), 'tot_rows': 0, 'directional': options['directional'],
                       'vector': options['vector']}
 
-        tmpJ = None
         if of not in ofdict and (approx_of is None or (approx_of and of in approx_of)):
             J[wrt]['ofs'].add(of)
             if of in approx_of_idx:
@@ -593,7 +598,12 @@ def _get_wrt_subjacs(system, approxs):
                         full_idxs.append(np.arange(slc.start, slc.stop)[approx_of_idx[sof]])
                     else:
                         full_idxs.append(range(slc.start, slc.stop))
-            J[wrt]['loc_outvec_idxs'] = np.hstack(full_idxs)
+            if full_idxs:
+                J[wrt]['loc_outvec_idxs'] = np.hstack(full_idxs)
+            else:
+                # guard for empty
+                # which can happen if no vois are on this processor (e.g. pargroup)
+                J[wrt]['loc_outvec_idxs'] = np.array([])
         else:
             J[wrt]['loc_outvec_idxs'] = _full_slice
 

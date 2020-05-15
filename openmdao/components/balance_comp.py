@@ -145,50 +145,6 @@ class BalanceComp(ImplicitComponent):
             self.add_balance(name, eq_units, lhs_name, rhs_name, rhs_val,
                              use_mult, mult_name, mult_val, normalize, **kwargs)
 
-    def _post_configure(self):
-        """
-        Define the independent variables, output variables, and partials.
-        """
-        # set static mode to False because we are doing things that would normally be done in setup
-        self._static_mode = False
-
-        for name, options in self._state_vars.items():
-
-            meta = self.add_output(name, **options['kwargs'])
-
-            shape = meta['shape']
-
-            for s in ('lhs', 'rhs', 'mult'):
-                if options['{0}_name'.format(s)] is None:
-                    options['{0}_name'.format(s)] = '{0}:{1}'.format(s, name)
-
-            self.add_input(options['lhs_name'],
-                           val=np.ones(shape),
-                           units=options['eq_units'])
-
-            self.add_input(options['rhs_name'],
-                           val=options['rhs_val'] * np.ones(shape),
-                           units=options['eq_units'])
-
-            if options['use_mult']:
-                self.add_input(options['mult_name'],
-                               val=options['mult_val'] * np.ones(shape),
-                               units=None)
-
-            self._scale_factor = np.ones(shape)
-            self._dscale_drhs = np.ones(shape)
-
-            ar = np.arange(np.prod(shape))
-            self.declare_partials(of=name, wrt=options['lhs_name'], rows=ar, cols=ar, val=1.0)
-            self.declare_partials(of=name, wrt=options['rhs_name'], rows=ar, cols=ar, val=1.0)
-
-            if options['use_mult']:
-                self.declare_partials(of=name, wrt=options['mult_name'], rows=ar, cols=ar, val=1.0)
-
-        self._static_mode = True
-
-        super(BalanceComp, self)._post_configure()
-
     def apply_nonlinear(self, inputs, outputs, residuals):
         """
         Calculate the residual for each balance.
@@ -345,12 +301,45 @@ class BalanceComp(ImplicitComponent):
             Additional arguments to be passed for the creation of the implicit state variable.
             (see `add_output` method).
         """
-        self._state_vars[name] = {'kwargs': kwargs,
-                                  'eq_units': eq_units,
-                                  'lhs_name': lhs_name,
-                                  'rhs_name': rhs_name,
-                                  'rhs_val': rhs_val,
-                                  'use_mult': use_mult,
-                                  'mult_name': mult_name,
-                                  'mult_val': mult_val,
-                                  'normalize': normalize}
+        options = {'kwargs': kwargs,
+                   'eq_units': eq_units,
+                   'lhs_name': lhs_name,
+                   'rhs_name': rhs_name,
+                   'rhs_val': rhs_val,
+                   'use_mult': use_mult,
+                   'mult_name': mult_name,
+                   'mult_val': mult_val,
+                   'normalize': normalize}
+
+        self._state_vars[name] = options
+
+        meta = self.add_output(name, **options['kwargs'])
+
+        shape = meta['shape']
+
+        for s in ('lhs', 'rhs', 'mult'):
+            if options['{0}_name'.format(s)] is None:
+                options['{0}_name'.format(s)] = '{0}:{1}'.format(s, name)
+
+        self.add_input(options['lhs_name'],
+                       val=np.ones(shape),
+                       units=options['eq_units'])
+
+        self.add_input(options['rhs_name'],
+                       val=options['rhs_val'] * np.ones(shape),
+                       units=options['eq_units'])
+
+        if options['use_mult']:
+            self.add_input(options['mult_name'],
+                           val=options['mult_val'] * np.ones(shape),
+                           units=None)
+
+        self._scale_factor = np.ones(shape)
+        self._dscale_drhs = np.ones(shape)
+
+        ar = np.arange(np.prod(shape))
+        self.declare_partials(of=name, wrt=options['lhs_name'], rows=ar, cols=ar, val=1.0)
+        self.declare_partials(of=name, wrt=options['rhs_name'], rows=ar, cols=ar, val=1.0)
+
+        if options['use_mult']:
+            self.declare_partials(of=name, wrt=options['mult_name'], rows=ar, cols=ar, val=1.0)

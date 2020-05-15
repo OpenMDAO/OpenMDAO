@@ -16,19 +16,20 @@ div.awesomplete>input {}
 
 div.awesomplete>ul {
     position: absolute;
-    left: 0;
-    z-index: 1;
+    z-index: 10;
     min-width: 100%;
     box-sizing: border-box;
     list-style: none;
-    padding: 0;
-    border-radius: .3em;
-    margin: .2em 0 0;
-    background: hsla(0, 0%, 100%, .9);
-    background: linear-gradient(to bottom right, white, hsla(0, 0%, 100%, .8));
+    padding: 5px;
+    margin: 0 0 0 8px;
+    background: lightgray;
+    opacity: .85;
     border: 1px solid rgba(0, 0, 0, .3);
     box-shadow: .05em .2em .6em rgba(0, 0, 0, .2);
     text-shadow: none;
+    font-size: 10pt;
+    border-bottom-left-radius: 5px;
+    border-bottom-right-radius: 5px;
 }
 
 div.awesomplete>ul[hidden],
@@ -84,11 +85,13 @@ div.awesomplete>ul>li[aria-selected="true"] {
 }
 
 div.awesomplete mark {
-    background: hsl(65, 100%, 50%);
+    /* background: hsl(65, 100%, 50%); */
+    background: cyan;
 }
 
 div.awesomplete li:hover mark {
-    background: hsl(68, 100%, 41%);
+    /* background: hsl(68, 100%, 41%); */
+    background: cyan;
 }
 
 div.awesomplete li[aria-selected="true"] mark {

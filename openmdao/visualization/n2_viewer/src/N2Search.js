@@ -22,7 +22,7 @@ class N2Search {
         this.updateRecomputesAutoComplete = true;
 
         this.wordIndex = 0;
-        this.searchVals0 = [];
+        this.searchVals = [];
         this.inDataFunction = true;
 
         this.searchCollapsedUndo = []; // Non-matching nodes to be minimized/hidden.
@@ -68,8 +68,8 @@ class N2Search {
             "replace": function(text) {
                 let newVal = "";
                 let cursorPos = 0;
-                for (let i = 0; i < self.searchVals0.length; ++i) {
-                    newVal += ((i == self.wordIndex) ? text : self.searchVals0[i]) + " ";
+                for (let i = 0; i < self.searchVals.length; ++i) {
+                    newVal += ((i == self.wordIndex) ? text : self.searchVals[i]) + " ";
                     if (i == self.wordIndex) cursorPos = newVal.length - 1;
                 }
                 this.input.value = newVal;
@@ -127,7 +127,8 @@ class N2Search {
             if (didMatch) {
                 // only params and unknowns can count as matches
                 ++this.numMatches;
-            } else if (undoList) {
+            }
+            else if (undoList) {
                 // did not match and undo list is not null
                 node.varIsHidden = true;
                 undoList.push(node);
@@ -150,8 +151,8 @@ class N2Search {
     _countMatches() {
         this.numMatches = 0;
 
-        if (this.searchVals0.length != 0)
-            this._doSearch(this.zoomedElement, this._getSearchRegExp(this.searchVals0), null);
+        if (this.searchVals.length != 0)
+            this._doSearch(this.zoomedElement, this._getSearchRegExp(this.searchVals), null);
     }
 
     /** Undo results of the previous search, and perform a new one. */
@@ -164,8 +165,8 @@ class N2Search {
 
         this.numMatches = 0;
         this.searchCollapsedUndo = [];
-        if (this.searchVals0.length != 0)
-            this._doSearch(this.zoomedElement, this._getSearchRegExp(this.searchVals0),
+        if (this.searchVals.length != 0)
+            this._doSearch(this.zoomedElement, this._getSearchRegExp(this.searchVals),
                 this.searchCollapsedUndo);
 
     }
@@ -202,10 +203,10 @@ class N2Search {
             target.value = newVal; // won't trigger new event
         }
 
-        this.searchVals0 = target.value.split(" ");
+        this.searchVals = target.value.split(" ");
 
-        let filtered = this.searchVals0.filter(this._isValid);
-        this.searchVals0 = filtered;
+        let filtered = this.searchVals.filter(this._isValid);
+        this.searchVals = filtered;
 
         let lastLetterTypedIndex = target.selectionStart - 1;
 
@@ -220,7 +221,7 @@ class N2Search {
         this.filteredWord.value = sub.replace(/([^a-zA-Z0-9:_\.])/g, "");
 
         let i = 0;
-        for (let val of this.searchVals0) {
+        for (let val of this.searchVals) {
             if (val.replace(/([^a-zA-Z0-9:_\.])/g, "") == this.filteredWord.value) {
                 this.wordIndex = i;
                 break;
@@ -267,7 +268,7 @@ class N2Search {
         if (node === this.zoomedElement) return;
 
         let nodeName = node.name;
-        if (node.isParamOrUnknown()) nodeName += ".";
+        if (! node.isParamOrUnknown()) nodeName += ".";
         let namesToAdd = [nodeName];
 
         for (let name of namesToAdd) {

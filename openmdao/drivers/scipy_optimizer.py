@@ -132,6 +132,7 @@ class ScipyOptimizeDriver(Driver):
         self.supports['multiple_objectives'] = False
         self.supports['active_set'] = False
         self.supports['integer_design_vars'] = False
+        self.supports._read_only = True
 
         # The user places optimizer-specific settings in here.
         self.opt_settings = OrderedDict()
@@ -188,10 +189,12 @@ class ScipyOptimizeDriver(Driver):
         super(ScipyOptimizeDriver, self)._setup_driver(problem)
         opt = self.options['optimizer']
 
+        self.supports._read_only = False
         self.supports['gradients'] = opt in _gradient_optimizers
         self.supports['inequality_constraints'] = opt in _constraint_optimizers
         self.supports['two_sided_constraints'] = opt in _constraint_optimizers
         self.supports['equality_constraints'] = opt in _eq_constraint_optimizers
+        self.supports._read_only = True
 
         # Raises error if multiple objectives are not supported, but more objectives were defined.
         if not self.supports['multiple_objectives'] and len(self._objs) > 1:
@@ -217,6 +220,8 @@ class ScipyOptimizeDriver(Driver):
                     d['total_adder'] = None
                     d['total_scaler'] = None
                     d['size'] = meta['size']
+                    d['global_size'] = meta['global_size']
+                    d['distributed'] = meta['distributed']
                     d['linear'] = True
                     self._cons[name] = d
 
@@ -313,7 +318,7 @@ class ScipyOptimizeDriver(Driver):
 
         if opt in _constraint_optimizers:
             for name, meta in self._cons.items():
-                size = meta['size']
+                size = meta['global_size'] if meta['distributed'] else meta['size']
                 upper = meta['upper']
                 lower = meta['lower']
                 equals = meta['equals']

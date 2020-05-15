@@ -11,6 +11,8 @@ from openmdao.utils.mpi import MPI
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1withDerivatives, \
      SellarDis2withDerivatives
 
+from openmdao.core.tests.test_distribcomp import DistribInputDistribOutputComp
+
 try:
     from openmdao.vectors.petsc_vector import PETScVector
 except ImportError:

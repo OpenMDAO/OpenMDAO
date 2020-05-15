@@ -198,9 +198,9 @@ class Component(System):
         else:
             self._vector_class = self._problem_meta['local_vector_class']
 
-    def _post_configure(self):
+    def _configure_check(self):
         """
-        Do any remaining setup that had to wait until after final user configuration.
+        Do any error checking on i/o configuration.
         """
         # check here if declare_coloring was called during setup but declare_partials
         # wasn't.  If declare partials wasn't called, call it with of='*' and wrt='*' so we'll
@@ -216,7 +216,7 @@ class Component(System):
                                "using default metadata and method='%s'." % (self.msginfo, method))
                 self.declare_partials('*', '*', method=method)
 
-        super(Component, self)._post_configure()
+        super(Component, self)._configure_check()
 
     def _setup_var_data(self, recurse=True):
         """
@@ -551,6 +551,9 @@ class Component(System):
             'tags': make_set(tags),
         }
 
+        if metadata['type'] == np.ndarray:
+            metadata.update({'shape': val.shape})
+
         if self._static_mode:
             var_rel2meta = self._static_var_rel2meta
         else:
@@ -747,6 +750,9 @@ class Component(System):
             'desc': desc,
             'tags': make_set(tags)
         }
+
+        if metadata['type'] == np.ndarray:
+            metadata.update({'shape': val.shape})
 
         if self._static_mode:
             var_rel2meta = self._static_var_rel2meta
@@ -1284,6 +1290,23 @@ class Component(System):
                 meta['rows'] = rows
                 meta['cols'] = cols
                 meta['shape'] = shape = (abs2meta[abs_key[0]]['size'], abs2meta[abs_key[1]]['size'])
+
+                if shape[0] == 0 or shape[1] == 0:
+                    msg = "{}: '{}' is an array of size 0"
+                    if shape[0] == 0:
+                        if not abs2meta[abs_key[0]]['distributed']:
+                            # non-distributed components are not allowed to have zero size inputs
+                            raise ValueError(msg.format(self.msginfo, abs_key[0]))
+                        else:
+                            # distributed comp are allowed to have zero size inputs on some procs
+                            rows_max = -1
+                    if shape[1] == 0:
+                        if not abs2meta[abs_key[1]]['distributed']:
+                            # non-distributed components are not allowed to have zero size outputs
+                            raise ValueError(msg.format(self.msginfo, abs_key[1]))
+                        else:
+                            # distributed comp are allowed to have zero size outputs on some procs
+                            cols_max = -1
 
                 if val is None:
                     # we can only get here if rows is None  (we're not sparse list format)

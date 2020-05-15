@@ -640,6 +640,24 @@ class TestConstrainedSimpleGA(unittest.TestCase):
         self.assertGreater(prob['radius'], 1.)
         self.assertGreater(prob['height'], 1.)
 
+    def test_driver_supports(self):
+
+        prob = om.Problem()
+
+        indeps = prob.model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
+
+        # setup the optimization
+        driver = prob.driver = om.SimpleGADriver()
+
+        with self.assertRaises(KeyError) as raises_msg:
+            prob.driver.supports['equality_constraints'] = False
+
+        exception = raises_msg.exception
+
+        msg = "SimpleGADriver: Tried to set read-only option 'equality_constraints'."
+
+        self.assertEqual(exception.args[0], msg)
+
     def test_constrained_without_penalty(self):
 
         class Cylinder(om.ExplicitComponent):

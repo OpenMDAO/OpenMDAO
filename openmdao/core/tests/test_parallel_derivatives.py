@@ -776,6 +776,131 @@ class CleanupTestCase(unittest.TestCase):
                              ['inputs.x'], return_format='dict')
 
 
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class CheckParallelDerivColoringEfficiency(unittest.TestCase):
+    # these tests check that redudant calls to compute_jacvec_product
+    # are not performed when running parallel derivatives
+    # ref issue 1405
+    
+    N_PROCS = 3
+
+    def setup_model(self, size):
+        class DelayComp(om.ExplicitComponent):
+
+            def initialize(self):
+                self.counter = 0
+                self.options.declare('time', default=3.0)
+                self.options.declare('size', default=1)
+
+            def setup(self):
+                size = self.options['size']
+                self.add_input('x', shape=size)
+                self.add_output('y', shape=size)
+                self.add_output('y2', shape=size)
+                self.declare_partials('y', 'x')
+                self.declare_partials('y2', 'x')
+
+            def compute(self, inputs, outputs):
+                waittime = self.options['time']
+                size = self.options['size']
+                outputs['y'] = np.linspace(3, 10, size) * inputs['x']
+                outputs['y2'] = np.linspace(2, 4, size) * inputs['x']
+
+            def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+                waittime = self.options['time']
+                size = self.options['size']
+                if mode == 'fwd':
+                    time.sleep(waittime)
+                    if 'x' in d_inputs:
+                        self.counter += 1
+                        if 'y' in d_outputs:
+                            d_outputs['y'] += np.linspace(3, 10, size)*d_inputs['x']
+                        if 'y2' in d_outputs:
+                            d_outputs['y2'] += np.linspace(2, 4, size)*d_inputs['x']
+                elif mode == 'rev':
+                    if 'x' in d_inputs:
+                        self.counter += 1
+                        time.sleep(waittime)
+                        if 'y' in d_outputs:
+                            d_inputs['x'] += np.linspace(3, 10, size)*d_outputs['y']
+                        if 'y2' in d_outputs:
+                            d_inputs['x'] += np.linspace(2, 4, size)*d_outputs['y2']
+        model = om.Group()
+        iv = om.IndepVarComp()
+        mysize = size
+        iv.add_output('x', val=3.0 * np.ones((mysize, )))
+        model.add_subsystem('iv', iv)
+        pg = model.add_subsystem('pg', om.ParallelGroup(), promotes=['*'])
+        pg.add_subsystem('dc1', DelayComp(size=mysize, time=0.0))
+        pg.add_subsystem('dc2', DelayComp(size=mysize, time=0.0))
+        pg.add_subsystem('dc3', DelayComp(size=mysize, time=0.0))
+        model.connect('iv.x', ['dc1.x', 'dc2.x', 'dc3.x'])
+        model.linear_solver = om.LinearRunOnce()
+        model.add_design_var('iv.x', lower=-1.0, upper=1.0)
+
+        return model
+
+    def test_parallel_deriv_coloring_for_redundant_calls(self):
+        model = self.setup_model(size=6)
+        pdc = 'a'
+        model.add_constraint('dc1.y', indices=[0], lower=-1.0, upper=1.0, parallel_deriv_color=pdc)
+        model.add_constraint('dc2.y2', indices=[1], lower=-1.0, upper=1.0, parallel_deriv_color=pdc)
+        model.add_constraint('dc2.y', indices=[3], lower=-1.0, upper=1.0, parallel_deriv_color=pdc)
+        model.add_objective('dc3.y', index=2, parallel_deriv_color=pdc)
+
+        prob = om.Problem(model=model)
+        prob.setup(mode='rev', force_alloc_complex=True)
+        prob.run_model()
+        data = prob.check_totals(method='cs', out_stream=None)
+        assert_near_equal(data[('pg.dc1.y', 'iv.x')]['abs error'][0], 0.0, 1e-6)
+        assert_near_equal(data[('pg.dc2.y2', 'iv.x')]['abs error'][0], 0.0, 1e-6)
+        assert_near_equal(data[('pg.dc2.y', 'iv.x')]['abs error'][0], 0.0, 1e-6)
+        assert_near_equal(data[('pg.dc3.y', 'iv.x')]['abs error'][0], 0.0, 1e-6)
+
+        comm = MPI.COMM_WORLD
+        # should only need one jacvec product per linear solve
+        dc1count = dc2count = dc3count = 0.0
+        dc1count = comm.allreduce(prob.model.pg.dc1.counter, op=MPI.SUM)
+        dc2count = comm.allreduce(prob.model.pg.dc2.counter, op=MPI.SUM)
+        dc3count = comm.allreduce(prob.model.pg.dc3.counter, op=MPI.SUM)
+        # one linear solve on proc 0
+        self.assertEqual(dc1count, 1)
+        # two solves on proc 1
+        self.assertEqual(dc2count, 2)
+        # one solve on proc 2
+        self.assertEqual(dc3count, 1)
+
+    def test_parallel_deriv_coloring_for_redundant_calls_vector(self):
+        model = self.setup_model(size=5)
+        pdc = 'a'
+        model.add_constraint('dc1.y', lower=-1.0, upper=1.0, parallel_deriv_color=pdc)
+        model.add_constraint('dc2.y2', lower=-1.0, upper=1.0, parallel_deriv_color=pdc)
+        model.add_constraint('dc2.y', lower=-1.0, upper=1.0, parallel_deriv_color=pdc)
+        # objective is a scalar - gets its own color to avoid being called 10x
+        model.add_objective('dc3.y', index=2, parallel_deriv_color='b')
+
+        prob = om.Problem(model=model)
+        prob.setup(mode='rev', force_alloc_complex=True)
+        prob.run_model()
+        data = prob.check_totals(method='cs', out_stream=None)
+        assert_near_equal(data[('pg.dc1.y', 'iv.x')]['abs error'][0], 0.0, 1e-6)
+        assert_near_equal(data[('pg.dc2.y2', 'iv.x')]['abs error'][0], 0.0, 1e-6)
+        assert_near_equal(data[('pg.dc2.y', 'iv.x')]['abs error'][0], 0.0, 1e-6)
+        assert_near_equal(data[('pg.dc3.y', 'iv.x')]['abs error'][0], 0.0, 1e-6)
+
+        # should only need one jacvec product per linear solve
+        comm = MPI.COMM_WORLD
+        dc1count = dc2count = dc3count = 0.0
+        dc1count = comm.allreduce(prob.model.pg.dc1.counter, op=MPI.SUM)
+        dc2count = comm.allreduce(prob.model.pg.dc2.counter, op=MPI.SUM)
+        dc3count = comm.allreduce(prob.model.pg.dc3.counter, op=MPI.SUM)
+        # five linear solves on proc 0
+        self.assertEqual(dc1count, 5)
+        # ten solves on proc 1
+        self.assertEqual(dc2count, 10)
+        # one solve on proc 2
+        self.assertEqual(dc3count, 1)
+
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests
     mpirun_tests()

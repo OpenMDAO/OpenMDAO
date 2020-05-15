@@ -132,6 +132,11 @@ class N2TreeNode {
         return this.isMinimized;
     }
 
+    /** Return false if the node is minimized or hidden */
+    isVisible() {
+        return ! (this.varIsHidden || this.isMinimized);
+    }
+
     /**
      * Compare the supplied node, and recurse through children if it doesn't match.
      * @returns {Boolean} True if a match is found.

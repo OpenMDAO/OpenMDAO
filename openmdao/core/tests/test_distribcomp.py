@@ -180,6 +180,7 @@ class DistribInputDistribOutputComp(om.ExplicitComponent):
         self.add_input('invec', np.ones(sizes[rank], float))
         self.add_output('outvec', np.ones(sizes[rank], float))
 
+
 class DistribCompWithDerivs(om.ExplicitComponent):
     """Uses 2 procs and takes input var slices, but also computes partials"""
 
@@ -218,6 +219,7 @@ class DistribCompWithDerivs(om.ExplicitComponent):
         self.add_output('outvec', np.ones(sizes[rank], float))
         self.declare_partials('outvec', 'invec', rows=np.arange(0, sizes[rank]),
                                                  cols=np.arange(0, sizes[rank]))
+
 
 class DistribInputDistribOutputDiscreteComp(DistribInputDistribOutputComp):
 
@@ -681,6 +683,9 @@ class MPITests(unittest.TestCase):
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class ProbRemoteTests(unittest.TestCase):
+    """
+    Mostly tests get_val for distributed vars.
+    """
 
     N_PROCS = 4
 
@@ -855,10 +860,10 @@ class MPIFeatureTests(unittest.TestCase):
         prob.run_model()
 
         assert_near_equal(prob['C2.invec'],
-                         np.ones((8,)) if model.comm.rank == 0 else np.ones((7,)))
+                          np.ones((8,)) if model.comm.rank == 0 else np.ones((7,)))
         assert_near_equal(prob['C2.outvec'],
-                         2*np.ones((8,)) if model.comm.rank == 0 else -3*np.ones((7,)))
-        assert_near_equal(prob['C3.out'], -5.)
+                          2*np.ones((8,)) if model.comm.rank == 0 else -3*np.ones((7,)))
+        assert_near_equal(prob['C3.sum'], -5.)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")

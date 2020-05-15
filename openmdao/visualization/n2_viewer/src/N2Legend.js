@@ -183,7 +183,7 @@ class N2Legend {
 
         sysVarContainer.style('width', sysVarContainer.node().scrollWidth + 'px')
 
-        const solversLegend = d3.select('#linear-legend')
+        const solversLegend = d3.select('#solvers-legend')
         for (let item of this.linearSolvers) this._addItem(item, solversLegend);
 
         solversLegend.style('width', solversLegend.node().scrollWidth + 'px');
@@ -195,7 +195,12 @@ class N2Legend {
         const self = this;
 
         this._div.on('mousedown', function() {
-            let dragDiv = d3.select(this).style('cursor', 'grabbing');
+            let dragDiv = d3.select(this);
+            dragDiv.style('cursor', 'grabbing')
+                // top style needs to be set explicitly before releasing bottom:
+                .style('top', dragDiv.style('top'))   
+                .style('bottom', 'initial');
+
             self._startPos = [d3.event.clientX, d3.event.clientY]
             self._offset = [d3.event.clientX - parseInt(dragDiv.style('left')), 
                 d3.event.clientY - parseInt(dragDiv.style('top'))];
@@ -231,7 +236,11 @@ class N2Legend {
      * @param {Boolean} linear True to use linear solvers, false for non-linear.
      */
     toggleSolvers(linear) {
-        const solversLegend = d3.select('#linear-legend')
+
+        const solversLegendTitle = d3.select('#solvers-legend-title');
+        solversLegendTitle.text(linear ? "Linear Solvers" : "Non-Linear Solvers");
+
+        const solversLegend = d3.select('#solvers-legend');
         solversLegend.html('');
 
         const solvers = linear ? this.linearSolvers : this.nonLinearSolvers;

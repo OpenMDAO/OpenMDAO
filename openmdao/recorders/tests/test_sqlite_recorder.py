@@ -11,6 +11,7 @@ from tempfile import mkdtemp
 
 import openmdao.api as om
 from openmdao.utils.general_utils import set_pyoptsparse_opt
+from openmdao.utils.assert_utils import assert_no_warning
 
 from openmdao.test_suite.components.ae_tests import AEComp
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesGrouped, \
@@ -25,7 +26,7 @@ from openmdao.recorders.tests.sqlite_recorder_test_utils import assertMetadataRe
     assertDriverDerivDataRecorded, assertProblemDerivDataRecorded
 
 from openmdao.recorders.tests.recorder_test_utils import run_driver
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_equal_arrays
 from openmdao.utils.general_utils import determine_adder_scaler
 from openmdao.utils.testing_utils import use_tempdirs
 
@@ -205,10 +206,10 @@ class TestSqliteRecorder(unittest.TestCase):
         assertDriverIterDataRecorded(self, expected_data, self.eps)
 
         expected_derivs = {
-            "comp.f_xy,p1.x": np.array([[0.50120438]]),
-            "comp.f_xy,p2.y": np.array([[-0.49879562]]),
-            "con.c,p1.x": np.array([[-1.0]]),
-            "con.c,p2.y": np.array([[1.0]])
+            "comp.f_xy!p1.x": np.array([[0.50120438]]),
+            "comp.f_xy!p2.y": np.array([[-0.49879562]]),
+            "con.c!p1.x": np.array([[-1.0]]),
+            "con.c!p2.y": np.array([[1.0]])
         }
 
         expected_data = ((coordinate, (t0, t1), expected_derivs),)
@@ -279,10 +280,10 @@ class TestSqliteRecorder(unittest.TestCase):
         assertDriverIterDataRecorded(self, expected_data, self.eps)
 
         expected_derivs = {
-            "comp.f_xy,p1.x": np.array([[0.50120438]]),
-            "comp.f_xy,p2.y": np.array([[-0.49879562]]),
-            "con.c,p1.x": np.array([[-1.0]]),
-            "con.c,p2.y": np.array([[1.0]])
+            "comp.f_xy!p1.x": np.array([[0.50120438]]),
+            "comp.f_xy!p2.y": np.array([[-0.49879562]]),
+            "con.c!p1.x": np.array([[-1.0]]),
+            "con.c!p2.y": np.array([[1.0]])
         }
 
         expected_data = ((coordinate, (t0, t1), expected_derivs),)
@@ -334,10 +335,10 @@ class TestSqliteRecorder(unittest.TestCase):
         assertDriverIterDataRecorded(self, expected_data, self.eps, prefix='Run2')
 
         expected_derivs = {
-            "comp.f_xy,p1.x": np.array([[0.50120438]]),
-            "comp.f_xy,p2.y": np.array([[-0.49879562]]),
-            "con.c,p1.x": np.array([[-1.0]]),
-            "con.c,p2.y": np.array([[1.0]])
+            "comp.f_xy!p1.x": np.array([[0.50120438]]),
+            "comp.f_xy!p2.y": np.array([[-0.49879562]]),
+            "con.c!p1.x": np.array([[-1.0]]),
+            "con.c!p2.y": np.array([[1.0]])
         }
 
         expected_data = (
@@ -1083,7 +1084,8 @@ class TestSqliteRecorder(unittest.TestCase):
         assertSolverIterDataRecorded(self, expected_data, self.eps)
 
     def test_record_solver_nonlinear_newton(self):
-        prob = SellarProblem(linear_solver=om.LinearBlockGS, nonlinear_solver=om.NewtonSolver(solve_subsystems=False))
+        prob = SellarProblem(linear_solver=om.LinearBlockGS,
+                             nonlinear_solver=om.NewtonSolver(solve_subsystems=False))
         prob.setup()
 
         prob.model.nonlinear_solver.add_recorder(self.recorder)
@@ -1626,7 +1628,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        prob.record_state('final')
+        prob.record('final')
         prob.cleanup()
 
         cr = om.CaseReader("cases.sql")
@@ -1657,7 +1659,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        msg = "'Problem.record_iteration' has been deprecated. Use 'Problem.record_state' instead."
+        msg = "'Problem.record_iteration' has been deprecated. Use 'Problem.record' instead."
 
         with assert_warning(DeprecationWarning, msg):
             prob.record_iteration('final')
@@ -1697,7 +1699,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        prob.record_state('final')
+        prob.record('final')
         prob.cleanup()
 
         cr = om.CaseReader("cases.sql")
@@ -1738,7 +1740,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        prob.record_state('final')
+        prob.record('final')
         prob.cleanup()
 
         cr = om.CaseReader("cases.sql")
@@ -1774,7 +1776,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.setup()
         prob.set_solver_print(0)
         prob.run_driver()
-        prob.record_state('case1')
+        prob.record('case1')
         cr = om.CaseReader(self.filename)
         final_case = cr.get_case('case1')
         self.assertEqual(final_case.residuals, None)
@@ -1783,7 +1785,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.recording_options['record_inputs'] = True
         prob.setup()
         prob.run_driver()
-        prob.record_state('case2')
+        prob.record('case2')
         cr = om.CaseReader(self.filename)
         final_case = cr.get_case('case2')
         self.assertEqual(set(final_case.inputs.keys()), {'y', 'x'})
@@ -1795,7 +1797,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.recording_options['excludes'] = ['*y']
         prob.setup()
         prob.run_driver()
-        prob.record_state('case3')
+        prob.record('case3')
         cr = om.CaseReader(self.filename)
         final_case = cr.get_case('case3')
         self.assertEqual(set(final_case.inputs.keys()), {'x'})
@@ -1805,7 +1807,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.recording_options['includes'] = ['*y']
         prob.setup()
         prob.run_driver()
-        prob.record_state('case4')
+        prob.record('case4')
         cr = om.CaseReader(self.filename)
         final_case = cr.get_case('case4')
         self.assertEqual(set(final_case.inputs.keys()), {'y'})
@@ -1816,7 +1818,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.recording_options['record_residuals'] = False
         prob.setup()
         prob.run_driver()
-        prob.record_state('case5')
+        prob.record('case5')
         prob.cleanup()
         cr = om.CaseReader(self.filename)
         final_case = cr.get_case('case5')
@@ -1835,7 +1837,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.set_solver_print(0)
         prob.run_driver()
 
-        prob.record_state('final')
+        prob.record('final')
         cr = om.CaseReader(self.filename)
         final_case = cr.get_case('final')
         self.assertEqual(set(final_case.residuals.keys()), {'f_xy', 'y', 'x', 'c'})
@@ -1846,7 +1848,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.recording_options['includes'] = ['x*']
         prob.setup()
         prob.run_driver()
-        prob.record_state('final2')
+        prob.record('final2')
         cr = om.CaseReader(self.filename)
         final_case = cr.get_case('final2')
         self.assertEqual(set(final_case.residuals.keys()), {'x'})
@@ -1857,7 +1859,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.recording_options['record_residuals'] = False
         prob.setup()
         prob.run_driver()
-        prob.record_state('final3')
+        prob.record('final3')
         prob.cleanup()
         cr = om.CaseReader(self.filename)
         final_case = cr.get_case('final3')
@@ -1876,7 +1878,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.set_solver_print(0)
         prob.run_driver()
 
-        prob.record_state('final')
+        prob.record('final')
         cr = om.CaseReader(self.filename)
         final_case = cr.get_case('final')
         self.assertEqual(set(final_case.residuals.keys()), {'f_xy', 'y', 'x', 'c'})
@@ -1887,7 +1889,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.recording_options['includes'] = ['x*']
         prob.setup()
         prob.run_driver()
-        prob.record_state('final2')
+        prob.record('final2')
         cr = om.CaseReader(self.filename)
         final_case = cr.get_case('final2')
         self.assertEqual(set(final_case.residuals.keys()), {'x'})
@@ -1898,12 +1900,55 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.recording_options['record_residuals'] = False
         prob.setup()
         prob.run_driver()
-        prob.record_state('final3')
+        prob.record('final3')
         prob.cleanup()
         cr = om.CaseReader(self.filename)
         final_case = cr.get_case('final3')
         self.assertEqual(final_case.residuals, None)
 
+    def test_problem_record_solver_data(self):
+        prob = SellarProblem()
+        prob.setup()
+
+        recorder = om.SqliteRecorder("cases.sql")
+        prob.add_recorder(recorder)
+        prob.recording_options['includes'] = ['*']
+        prob.recording_options['record_abs_error'] = True
+        prob.recording_options['record_rel_error'] = True
+        prob.recording_options['record_residuals'] = True
+
+        # Just for comparison, see what values you get from recording
+        #  the top level solver
+        nl = prob.model.nonlinear_solver
+        nl.options['use_apply_nonlinear'] = True
+        nl.add_recorder(recorder)
+        nl.recording_options['record_abs_error'] = True
+        nl.recording_options['record_rel_error'] = True
+        nl.recording_options['record_solver_residuals'] = True
+
+        prob.run_driver()
+
+        prob.record('final')
+        prob.cleanup()
+
+        # get the cases from the problem and solver recording
+        cr = om.CaseReader("cases.sql")
+        final_case = cr.get_case('final')
+        root_solver_cases = cr.list_cases('root.nonlinear_solver', recurse=False)
+        last_root_solver_case = cr.get_case(root_solver_cases[-1])
+
+        # Check the errors both the value from the problem recording and
+        #   make sure it is the same as the solver last case
+        self.assertAlmostEqual(final_case.abs_err, 0.0)
+        self.assertAlmostEqual(final_case.rel_err, 0.0)
+        self.assertEqual(final_case.abs_err, last_root_solver_case.abs_err)
+        self.assertEqual(final_case.rel_err, last_root_solver_case.rel_err)
+
+        # check the residuals are the same from the problem and solver recording
+        model_residuals = final_case.residuals
+        solver_residuals = last_root_solver_case.residuals
+        for key in model_residuals.keys():
+            assert_equal_arrays(model_residuals[key], solver_residuals[key] )
 
     def test_driver_record_outputs(self):
 
@@ -2037,7 +2082,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        prob.record_state('final')
+        prob.record('final')
         prob.cleanup()
 
         cr = om.CaseReader("cases.sql")
@@ -2070,14 +2115,14 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.set_solver_print(0)
         t0, t1 = run_driver(prob)
         case_name = "state1"
-        prob.record_state(case_name)
+        prob.record(case_name)
         prob.cleanup()
 
         expected_derivs = {
-            "comp.f_xy,p1.x": np.array([[0.5]]),
-            "comp.f_xy,p2.y": np.array([[-0.5]]),
-            "con.c,p1.x": np.array([[-1.0]]),
-            "con.c,p2.y": np.array([[1.0]])
+            "comp.f_xy!p1.x": np.array([[0.5]]),
+            "comp.f_xy!p2.y": np.array([[-0.5]]),
+            "con.c!p1.x": np.array([[-1.0]]),
+            "con.c!p2.y": np.array([[1.0]])
         }
 
         expected_data = ((case_name, (t0, t1), expected_derivs),)
@@ -2095,7 +2140,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.set_solver_print(0)
         t0, t1 = run_driver(prob)
         case_name = "state1"
-        prob.record_state(case_name)
+        prob.record(case_name)
         prob.cleanup()
 
         expected_derivs = None
@@ -2114,7 +2159,7 @@ class TestSqliteRecorder(unittest.TestCase):
         t0, t1 = run_driver(prob)
 
         case_name = "state1"
-        prob.record_state(case_name)
+        prob.record(case_name)
 
         prob.cleanup()
 
@@ -2405,6 +2450,65 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         self.assertEqual(sorted(case.inputs.keys()), ['y1', 'y2', 'z'])
 
+    def test_feature_basic_case_recording(self):
+        import openmdao.api as om
+        from openmdao.test_suite.components.sellar_feature import SellarMDAWithUnits
+        import numpy as np
+
+        # build the model
+        prob = om.Problem(model=SellarMDAWithUnits())
+
+        model = prob.model
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                                upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        # setup the optimization
+        driver = prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
+
+        # Create a recorder variable
+        recorder = om.SqliteRecorder('cases.sql')
+        # Attach a recorder to the problem
+        prob.add_recorder(recorder)
+
+        prob.setup()
+        prob.set_solver_print(0)
+        prob.run_driver()
+        prob.record("after_run_driver")
+
+        # Instantiate your CaseReader
+        cr = om.CaseReader("cases.sql")
+        # Isolate "problem" as your source
+        driver_cases = cr.list_cases('problem')
+        # Get the first case from the recorder
+        case = cr.get_case('after_run_driver')
+
+        # These options will give outputs as the model sees them
+        # Gets value but will not convert units
+        const = case['con1']
+
+        # get_val can convert your result's units if desired
+        const_K = case.get_val("con1", units='K')
+
+        assert_near_equal(const, -1.68550507e-10, 1e-3)
+        assert_near_equal(const_K, 273.15, 1e-3)
+
+        # list_outputs will list your model's outputs and return a list of them too
+        print(case.list_outputs())
+
+        # This code below will find all the objectives, design variables, and constraints that the
+        # problem source contains
+        objectives = case.get_objectives()
+        design_vars = case.get_design_vars()
+        constraints = case.get_constraints()
+
+        assert_near_equal(objectives['obj'], 3.18339395, 1e-4)
+        assert_near_equal(design_vars['x'], 0., 1e-4)
+        assert_near_equal(constraints['con1'], -1.68550507e-10, 1e-4)
+
     def test_feature_driver_options(self):
         import openmdao.api as om
         from openmdao.test_suite.components.sellar import SellarDerivatives
@@ -2530,6 +2634,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         prob['circuit.n2.V'] = 1.
 
         prob.run_driver()
+
         prob.cleanup()
 
         # create the case reader
@@ -2683,7 +2788,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         prob.setup()
         prob.run_driver()
-        prob.record_state('final')
+        prob.record('final')
         prob.cleanup()
 
         cr = om.CaseReader("cases.sql")
@@ -2737,7 +2842,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         prob.setup()
         prob.run_driver()
-        prob.record_state('final')
+        prob.record('final')
         prob.cleanup()
 
         cr = om.CaseReader("cases.sql")
@@ -2827,6 +2932,164 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         assert_near_equal(y_recorded, y1)
 
+class TestFeatureAdvancedExample(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        import openmdao.api as om
+        from openmdao.test_suite.components.sellar_feature import SellarMDAWithUnits
+        import numpy as np
+        import matplotlib.pyplot as plt
+
+        # build the model
+        prob = om.Problem(model=SellarMDAWithUnits())
+
+        model = prob.model
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                                upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        # setup the optimization
+        driver = prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
+
+        # Here we show how to attach recorders to each of the four objects; problem, driver, solver, and system
+        # Create a recorder variable
+        recorder = om.SqliteRecorder('cases.sql')
+        # Attach a recorder to the problem
+        prob.add_recorder(recorder)
+        # Attach a recorder to the driver
+        driver.add_recorder(recorder)
+
+        prob.setup()
+
+        # To attach a recorder to the system, you need to call it after `setup` so the model hierarchy has been generated
+        obj_cmp = prob.model.obj_cmp
+        obj_cmp.add_recorder(recorder)
+        # Attach a recorder to the solver
+        model.cycle.add_recorder(recorder)
+
+        prob.set_solver_print(0)
+        prob.run_driver()
+        prob.record("final_state")
+        prob.cleanup()
+
+    def test_feature_system_recorder(self):
+        import openmdao.api as om
+
+        # Instantiate your CaseReader
+        cr = om.CaseReader("cases.sql")
+
+        system_cases = cr.list_cases('root.obj_cmp')
+
+        # Number of cases in the optimization
+        num_cases = len(system_cases)
+        print("Number of cases:", num_cases)
+
+        # Get the keys of all the inputs to the obj_func
+        case = cr.get_case(system_cases[0])
+        self.assertEqual(list(case.inputs.keys()), ['x', 'y1', 'y2', 'z'])
+
+        for i in range(num_cases):
+            case = cr.get_case(system_cases[i])
+            print(case['y1'])
+
+    def test_feature_solver_recorder(self):
+        import openmdao.api as om
+
+        # Instantiate your CaseReader
+        cr = om.CaseReader("cases.sql")
+
+        solver_cases = cr.list_cases('root.cycle')
+
+        num_cases = len(solver_cases)
+        print("Number of cases:", num_cases)
+
+        case = cr.get_case(solver_cases[3])
+        assert_near_equal(case['y1'], 4.17430704, 1e-8)
+        assert_near_equal(case['y2'], 4.28622419, 1e-8)
+
+    def test_feature_driver_recorder(self):
+        import openmdao.api as om
+
+        # Instantiate your CaseReader
+        cr = om.CaseReader("cases.sql")
+
+        driver_cases = cr.list_cases('driver')
+
+        last_case = cr.get_case(driver_cases[-1])
+
+        objectives = last_case.get_objectives()
+        design_vars = last_case.get_design_vars()
+        constraints = last_case.get_constraints()
+
+        assert_near_equal(objectives['obj'], 3.18339395, 1e-8)
+        assert_near_equal(design_vars['x'], 0., 1e-8)
+        assert_near_equal(design_vars['z'][0], 1.97763888, 1e-8)
+        assert_near_equal(design_vars['z'][1], 1.25035459e-15, 1e-8)
+        assert_near_equal(constraints['con1'], -1.68550507e-10, 1e-8)
+        assert_near_equal(constraints['con2'], -20.24472223, 1e-8)
+
+
+    def test_feature_problem_recorder(self):
+        import openmdao.api as om
+
+        # Instantiate your CaseReader
+        cr = om.CaseReader("cases.sql")
+
+        # get list of cases recorded on problem
+        problem_cases = cr.list_cases('problem')
+        self.assertEqual(problem_cases, ['final_state'])
+
+        # get list of output variables recorded on problem
+        problem_vars = cr.list_source_vars('problem')
+        self.assertEqual(sorted(problem_vars['outputs']),
+                         ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z'])
+
+        # get the recorded case and check values
+        case = cr.get_case('final_state')
+
+        objectives = case.get_objectives()
+        design_vars = case.get_design_vars()
+        constraints = case.get_constraints()
+
+        assert_near_equal(objectives['obj'], 3.18339395, 1e-8)
+
+    def test_feature_plot_des_vars(self):
+        import matplotlib.pyplot as plt
+        import numpy as np
+        import openmdao.api as om
+
+        # Instantiate your CaseReader
+        cr = om.CaseReader("cases.sql")
+        driver_cases = cr.list_cases('driver')
+
+        dv_x_values = []
+        dv_z_values = []
+        for i in range(len(driver_cases)):
+            last_case = cr.get_case(driver_cases[i])
+            design_vars = last_case.get_design_vars()
+            if design_vars:
+                dv_x_values.append(design_vars['x'])
+                dv_z_values.append(design_vars['z'])
+
+        # Below is a short script to see the path the design variables took to convergence
+
+        fig, (ax1, ax2) = plt.subplots(1, 2)
+        fig.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0.5, hspace=None)
+        ax1.plot(np.arange(len(dv_x_values)), np.array(dv_x_values))
+
+        ax1.set(xlabel='Iterations', ylabel='Design Var: X', title='Optimization History')
+        ax1.grid()
+
+        ax2.plot(np.arange(len(dv_z_values)), np.array(dv_z_values))
+
+        ax2.set(xlabel='Iterations', ylabel='Design Var: Z', title='Optimization History')
+        ax2.grid()
+        # There are two lines in the right plot because "Z" contains two variables that are being
+        # optimized
 
 @use_tempdirs
 class TestFeatureBasicRecording(unittest.TestCase):
@@ -2868,7 +3131,7 @@ class TestFeatureBasicRecording(unittest.TestCase):
         prob.run_driver()
 
         # record the final state of the problem
-        prob.record_state('final')
+        prob.record('final')
 
         # clean up and shut down
         prob.cleanup()

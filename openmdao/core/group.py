@@ -18,8 +18,6 @@ import numpy as np
 import networkx as nx
 
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
-from openmdao.approximation_schemes.complex_step import ComplexStep
-from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.system import System, INT_DTYPE
 from openmdao.core.component import Component, _DictValues, _full_slice
 from openmdao.proc_allocators.default_allocator import DefaultAllocator, ProcAllocationError
@@ -83,6 +81,9 @@ class Group(System):
     _has_distrib_vars : bool
         If True, this Group contains distributed variables. Only used to determine if a parallel
         group or distributed component is below a DirectSolver so that we can raise an exception.
+    _contains_parallel_group : bool
+        If True, this Group contains a ParallelGroup. Only used to determine if a parallel
+        group or distributed component is below a DirectSolver so that we can raise an exception.
     _raise_connection_errors : bool
         Flag indicating whether connection errors are raised as an Exception.
     """
@@ -114,6 +115,7 @@ class Group(System):
         self._approx_subjac_keys = None
         self._setup_procs_finished = False
         self._has_distrib_vars = False
+        self._contains_parallel_group = False
         self._raise_connection_errors = True
 
         # TODO: we cannot set the solvers with property setters at the moment
@@ -429,14 +431,14 @@ class Group(System):
 
         self._setup_procs_finished = True
 
-    def _post_configure(self):
+    def _configure_check(self):
         """
-        Do any remaining setup that had to wait until after final user configuration.
+        Do any error checking on i/o and connections.
         """
         for subsys in self._subsystems_myproc:
-            subsys._post_configure()
+            subsys._configure_check()
 
-        super(Group, self)._post_configure()
+        super(Group, self)._configure_check()
 
     def _check_child_reconf(self, subsys=None):
         """
@@ -816,6 +818,7 @@ class Group(System):
             vec_names = self._problem_meta['vec_names']
 
         n_distrib_vars = 0
+        n_parallel_sub = 0
 
         # Compute _var_sizes
         for vec_name in vec_names:
@@ -830,8 +833,10 @@ class Group(System):
                     if isinstance(subsys, Component):
                         if subsys.options['distributed']:
                             n_distrib_vars += 1
-                    elif subsys._has_distrib_vars or subsys._mpi_proc_allocator.parallel:
+                    elif subsys._has_distrib_vars:
                         n_distrib_vars += 1
+                    elif subsys._contains_parallel_group or subsys._mpi_proc_allocator.parallel:
+                        n_parallel_sub += 1
 
                     if vec_name not in subsys._rel_vec_names:
                         continue
@@ -867,11 +872,14 @@ class Group(System):
 
         if self.comm.size > 1:
             self._has_distrib_vars = self.comm.allreduce(n_distrib_vars) > 0
-            if (self._has_distrib_vars or not np.all(self._var_sizes[vec_names[0]]['output']) or
-                    not np.all(self._var_sizes[vec_names[0]]['input'])):
-                dist_vec_class = self._problem_meta['distributed_vector_class']
-                if dist_vec_class is not None:
-                    self._vector_class = dist_vec_class
+            self._contains_parallel_group = self.comm.allreduce(n_parallel_sub) > 0
+
+            if (self._has_distrib_vars or self._contains_parallel_group or
+                not np.all(self._var_sizes[vec_names[0]]['output']) or
+               not np.all(self._var_sizes[vec_names[0]]['input'])):
+
+                if self._problem_meta['distributed_vector_class'] is not None:
+                    self._vector_class = self._problem_meta['distributed_vector_class']
                 else:
                     raise RuntimeError("{}: Distributed vectors are required but no distributed "
                                        "vector type has been set.".format(self.msginfo))
@@ -930,6 +938,10 @@ class Group(System):
 
         allprocs_prom2abs_list_in = self._var_allprocs_prom2abs_list['input']
         allprocs_prom2abs_list_out = self._var_allprocs_prom2abs_list['output']
+
+        allprocs_discrete_in = self._var_allprocs_discrete['input']
+        allprocs_discrete_out = self._var_allprocs_discrete['output']
+
         abs2meta = self._var_abs2meta
         allprocs_abs2meta = self._var_allprocs_abs2meta
         pathname = self.pathname
@@ -975,10 +987,8 @@ class Group(System):
 
             # throw an exception if either output or input doesn't exist
             # (not traceable to a connect statement, so provide context)
-            if (prom_out not in allprocs_prom2abs_list_out and
-                    prom_out not in self._var_allprocs_discrete['output']):
-                if (prom_out in allprocs_prom2abs_list_in or
-                        prom_out in self._var_allprocs_discrete['input']):
+            if not (prom_out in allprocs_prom2abs_list_out or prom_out in allprocs_discrete_out):
+                if (prom_out in allprocs_prom2abs_list_in or prom_out in allprocs_discrete_in):
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
                           f"'{prom_in}', but '{prom_out}' is an input. " + \
                           "All connections must be from an output to an input."
@@ -996,10 +1006,8 @@ class Group(System):
                         simple_warning(msg)
                         continue
 
-            if (prom_in not in allprocs_prom2abs_list_in and
-                    prom_in not in self._var_allprocs_discrete['input']):
-                if (prom_in in allprocs_prom2abs_list_out or
-                        prom_in in self._var_allprocs_discrete['output']):
+            if not (prom_in in allprocs_prom2abs_list_in or prom_in in allprocs_discrete_in):
+                if (prom_in in allprocs_prom2abs_list_out or prom_in in allprocs_discrete_out):
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
                           f"'{prom_in}', but '{prom_in}' is an output. " + \
                           "All connections must be from an output to an input."
@@ -1290,6 +1298,9 @@ class Group(System):
                 elif src_indices is not None:
                     src_indices = np.atleast_1d(src_indices)
 
+                    if np.prod(src_indices.shape) == 0:
+                        continue
+
                     # initial dimensions of indices shape must be same shape as target
                     for idx_d, inp_d in zip(src_indices.shape, in_shape):
                         if idx_d != inp_d:
@@ -1351,8 +1362,11 @@ class Group(System):
                                 abs2meta[abs_in]['src_indices'].ravel()
                     else:
                         for d in range(source_dimensions):
-                            # when running under MPI, there is a value for each proc
-                            d_size = out_shape[d] * self.comm.size
+                            if allprocs_abs2meta[abs_out]['distributed'] is True or \
+                               allprocs_abs2meta[abs_in]['distributed'] is True:
+                                d_size = out_shape[d] * self.comm.size
+                            else:
+                                d_size = out_shape[d]
                             arr = src_indices[..., d]
                             if np.any(arr >= d_size) or np.any(arr <= -d_size):
                                 for i in arr.flat:
@@ -1543,7 +1557,8 @@ class Group(System):
         if self._conn_discrete_in2out:
             self._vector_class.TRANSFER._setup_discrete_transfers(self, recurse=recurse)
 
-    def promotes(self, subsys_name, any=None, inputs=None, outputs=None):
+    def promotes(self, subsys_name, any=None, inputs=None, outputs=None,
+                 src_indices=None, flat_src_indices=None):
         """
         Promote a variable in the model tree.
 
@@ -1562,7 +1577,28 @@ class Group(System):
         outputs : Sequence of str or tuple
             A Sequence of output names (or tuples) to be promoted. Tuples are
             used for the "promote as" capability.
+        src_indices : int or list of ints or tuple of ints or int ndarray or Iterable or None
+            This argument applies only to promoted inputs.
+            The global indices of the source variable to transfer data from.
+            A value of None implies this input depends on all entries of source.
+            Default is None. The shapes of the target and src_indices must match,
+            and form of the entries within is determined by the value of 'flat_src_indices'.
+        flat_src_indices : bool
+            This argument applies only to promoted inputs.
+            If True, each entry of src_indices is assumed to be an index into the
+            flattened source.  Otherwise each entry must be a tuple or list of size equal
+            to the number of dimensions of the source.
         """
+        if isinstance(any, str):
+            raise RuntimeError(f"{self.msginfo}: Trying to promote any='{any}', "
+                               "but an iterator of strings and/or tuples is required.")
+        if isinstance(inputs, str):
+            raise RuntimeError(f"{self.msginfo}: Trying to promote inputs='{inputs}', "
+                               "but an iterator of strings and/or tuples is required.")
+        if isinstance(outputs, str):
+            raise RuntimeError(f"{self.msginfo}: Trying to promote outputs='{outputs}', "
+                               "but an iterator of strings and/or tuples is required.")
+
         subsys = getattr(self, subsys_name)
         if any:
             subsys._var_promotes['any'].extend(any)
@@ -1571,6 +1607,33 @@ class Group(System):
         if outputs:
             subsys._var_promotes['output'].extend(outputs)
 
+        if src_indices is not None:
+            if outputs:
+                raise RuntimeError(f"{self.msginfo}: Trying to promote outputs {outputs} while "
+                                   f"specifying src_indices {src_indices} is not meaningful.")
+            elif isinstance(src_indices, np.ndarray):
+                if not np.issubdtype(src_indices.dtype, np.integer):
+                    raise TypeError(f"{self.msginfo}: src_indices must contain integers, but "
+                                    f"src_indices for promotes from '{subsys_name}' are type "
+                                    f"{src_indices.dtype.type}.")
+            elif not isinstance(src_indices, (int, list, tuple, Iterable)):
+                raise TypeError(f"{self.msginfo}: The src_indices argument should be an int, "
+                                f"list, tuple, ndarray or Iterable, but src_indices for "
+                                f"promotes from '{subsys_name}' are {type(src_indices)}.")
+            else:
+                if any:
+                    simple_warning(f"{self.msginfo}: src_indices have been specified with promotes"
+                                   " 'any'. Note that src_indices only apply to matching inputs.")
+
+                # src_indices will applied when promotes are resolved
+                if inputs is not None:
+                    for inp in inputs:
+                        subsys._var_promotes_src_indices[inp] = (src_indices, flat_src_indices)
+                if any is not None:
+                    for inp in any:
+                        subsys._var_promotes_src_indices[inp] = (src_indices, flat_src_indices)
+
+        # check for attempt to promote with different alias
         list_comp = [i if isinstance(i, tuple) else (i, i) for i in subsys._var_promotes['input']]
 
         for original, new in list_comp:
@@ -1682,7 +1745,7 @@ class Group(System):
 
         return subsys
 
-    def connect(self, src_name, tgt_name, src_indices=None, flat_src_indices=None):
+    def connect(self, src_name, tgt_name, src_indices=None, flat_src_indices=False):
         """
         Connect source src_name to target tgt_name in this namespace.
 
@@ -1840,7 +1903,7 @@ class Group(System):
         """
         # let any lower level systems do their guessing first
         if self._has_guess:
-            for isub, (sub, loc)in enumerate(self._all_subsystem_iter()):
+            for isub, (sub, loc) in enumerate(self._all_subsystem_iter()):
                 # TODO: could gather 'has_guess' information during setup and be able to
                 # skip transfer for subs that don't have guesses...
                 self._transfer('nonlinear', 'fwd', isub)
@@ -1972,9 +2035,39 @@ class Group(System):
         rel_systems : set of str
             Set of names of relevant systems based on the current linear solve.
         """
-        vec_names = [v for v in vec_names if v in self._rel_vec_names]
+        if self._owns_approx_jac:
+            # No subsolves if we are approximating our jacobian. Instead, we behave like an
+            # ExplicitComponent and pass on the values in the derivatives vectors.
+            for vec_name in vec_names:
+                if vec_name in self._rel_vec_names:
+                    d_outputs = self._vectors['output'][vec_name]
+                    d_residuals = self._vectors['residual'][vec_name]
 
-        self._linear_solver.solve(vec_names, mode, rel_systems)
+                    if mode == 'fwd':
+                        if self._has_resid_scaling:
+                            with self._unscaled_context(outputs=[d_outputs],
+                                                        residuals=[d_residuals]):
+                                d_outputs.set_vec(d_residuals)
+                        else:
+                            d_outputs.set_vec(d_residuals)
+
+                        # ExplicitComponent jacobian defined with -1 on diagonal.
+                        d_outputs *= -1.0
+
+                    else:  # rev
+                        if self._has_resid_scaling:
+                            with self._unscaled_context(outputs=[d_outputs],
+                                                        residuals=[d_residuals]):
+                                d_residuals.set_vec(d_outputs)
+                        else:
+                            d_residuals.set_vec(d_outputs)
+
+                        # ExplicitComponent jacobian defined with -1 on diagonal.
+                        d_residuals *= -1.0
+
+        else:
+            vec_names = [v for v in vec_names if v in self._rel_vec_names]
+            self._linear_solver.solve(vec_names, mode, rel_systems)
 
     def _linearize(self, jac, sub_do_ln=True):
         """
@@ -2091,6 +2184,18 @@ class Group(System):
             for subsys in self._subsystems_myproc:
                 subsys._setup_partials(recurse)
                 info.update(subsys._subjacs_info)
+
+        if self._has_distrib_vars and self._owns_approx_jac:
+            # We current cannot approximate across a group with a distributed component if the
+            # inputs are distributed via src_indices.
+            abs2meta = self._var_abs2meta
+            for iname in self._var_allprocs_abs_names['input']:
+                if abs2meta[iname]['src_indices'] is not None and \
+                   abs2meta[iname]['distributed'] and \
+                   iname not in self._conn_abs_in2out:
+                    msg = "{} : Approx_totals is not supported on a group with a distributed "
+                    msg += "component whose input '{}' is distributed using src_indices. "
+                    raise RuntimeError(msg.format(self.msginfo, iname))
 
     def _get_approx_subjac_keys(self):
         """
@@ -2427,6 +2532,7 @@ class Group(System):
         count = 0
 
         if self.comm.size > 1:
+            # compute the inputs that are remote in at least one proc and the owning rank for each
             all_ins = set(self._var_allprocs_abs_names['input'])
             all_ins.update(self._var_allprocs_discrete['input'])
             my_remote_ins = all_ins.difference(self._var_abs_names['input'])
@@ -2453,11 +2559,13 @@ class Group(System):
         else:
             remote_ins = {}
 
+        group_abs_inputs = {}
         for abs_in in chain(abs_names, sorted(all_discrete_ins)):
-            if abs_in not in conns:
+            if abs_in not in conns:  # unconnected, so connect the input to an _auto_ivc output
                 prom = abs2prom[abs_in]
                 if prom in self._group_inputs and abs_in in abs2meta:
                     gmeta = self._group_inputs[prom]
+                    group_abs_inputs[abs_in] = gmeta
                     val = gmeta['val']
                 else:
                     gmeta = None
@@ -2470,6 +2578,8 @@ class Group(System):
 
                 if prom in prom2ivc:
                     # multiple connected inputs w/o a src. Connect them to the same IVC
+                    # check if they have different metadata, and if they do, there must be
+                    # a group input defined that sets the default, else it's an error
                     conns[abs_in] = prom2ivc[prom]
                 else:
                     ivc_name = f"_auto_ivc.v{count}"
@@ -2517,7 +2627,7 @@ class Group(System):
         auto_ivc._static_mode = False
         try:
             auto_ivc._configure()
-            auto_ivc._post_configure()
+            auto_ivc._configure_check()
         finally:
             auto_ivc._static_mode = True
         auto_ivc._setup_var_data()
