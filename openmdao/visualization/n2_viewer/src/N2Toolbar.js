@@ -143,7 +143,7 @@ class N2Toolbar {
 
         this.toolbarContainer = d3.select('#toolbarLoc');
         this.toolbar = d3.select('#true-toolbar');
-        this.hideToolbarButton = d3.select('#hide-toolbar');
+        this.hideToolbarButton = d3.select('.toolbar-hide-container');
         this.hideToolbarIcon = this.hideToolbarButton.select('i');
         this.searchBar = d3.select('#awesompleteId');
         this.searchCount = d3.select('#searchCountId');
@@ -182,7 +182,7 @@ class N2Toolbar {
         this.toolbarContainer.style('left', '-65px');
         this.hideToolbarButton.style('left', '-20px');
         this.hideToolbarIcon.style('transform', 'rotate(-180deg)');
-        d3.select('#d3_content_div').style('margin-left', '-75px');
+        d3.select('#d3_content_div').style('margin-left', '-65px');
         this.hidden = true;
     }
 
