@@ -86,10 +86,10 @@ if MPI:
         *msg : tuple of str
             Strings to be printed.
         """
-        newmsg = ["%d: " % MPI.COMM_WORLD.rank] + list(msg)
-        for m in newmsg:
-            sys.stdout.write("%s " % m)
-        sys.stdout.write('\n')
+        sys.stdout.write(f"{MPI.COMM_WORLD.rank}: ")
+        for m in msg:
+            sys.stdout.write(f"{m} ")
+        sys.stdout.write("\n")
         sys.stdout.flush()
 else:
     def debug(*msg):  # pragma: no cover
@@ -102,8 +102,8 @@ else:
             Strings to be printed.
         """
         for m in msg:
-            sys.stdout.write("%s " % str(m))
-        sys.stdout.write('\n')
+            sys.stdout.write(f"{m} ")
+        sys.stdout.write("\n")
 
 
 class FakeComm(object):

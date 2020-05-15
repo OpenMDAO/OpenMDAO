@@ -895,3 +895,43 @@ class Undefined(object):
             A string representation.
         """
         return "<undefined>"
+
+
+def diff_dicts(dict1, dict2):
+    """
+    Compare dicts and return names of entries that are different and or missing.
+
+    Parameters
+    ----------
+    dict1 : dict
+        First dict.
+    dict2 : dict
+        Second dict.
+
+    Returns
+    -------
+    set
+        Names of entries that differ.
+    set
+        Names of entries missing from dict1.
+    set
+        Names of entries missing from dict2.
+    """
+    seen = set()
+    d1only = set()
+    diffs = set()
+
+    for name, val1 in dict1.items():
+        if name in dict2:
+            val2 = dict2[name]
+            if isinstance(val1, np.ndarray) or isinstance(val2, np.ndarray):
+                if not np.all(val1 == val2):
+                    diffs.add(name)
+            elif val1 != val2:
+                diffs.add(name)
+        else:
+            d1only.add(name)
+
+    d2only = set(dict2).difference(dict1)
+
+    return diffs, d2only, d2only

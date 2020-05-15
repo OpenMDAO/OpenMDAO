@@ -27,9 +27,10 @@ from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import convert_neg, array_connection_compatible, \
     _flatten_src_indices
-from openmdao.utils.general_utils import ContainsAll, all_ancestors, simple_warning, Undefined
+from openmdao.utils.general_utils import ContainsAll, all_ancestors, simple_warning, Undefined, \
+    diff_dicts
 from openmdao.utils.units import is_compatible, unit_conversion
-from openmdao.utils.mpi import MPI
+from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.coloring import Coloring, _STD_COLORING_FNAME
 import openmdao.utils.coloring as coloring_mod
 
@@ -38,6 +39,10 @@ import re
 namecheck_rgx = re.compile('[a-zA-Z][_a-zA-Z0-9]*')
 
 _undefined = Undefined()
+
+# these are meta dict entries that cannot differ between inputs unless a default is specified from
+# a corresponding group.add_input call
+_group_nodiff = set(['value', 'units', 'distributed'])
 
 
 class Group(System):
@@ -2517,7 +2522,7 @@ class Group(System):
         from openmdao.core.indepvarcomp import _AutoIndepVarComp
 
         # create the IndepVarComp that will contain all auto-ivc outputs
-        auto_ivc = _AutoIndepVarComp()
+        self._auto_ivc = auto_ivc = _AutoIndepVarComp()
         auto_ivc.name = '_auto_ivc'
         auto_ivc.pathname = auto_ivc.name
 
@@ -2560,6 +2565,7 @@ class Group(System):
             remote_ins = {}
 
         group_abs_inputs = {}
+
         for abs_in in chain(abs_names, sorted(all_discrete_ins)):
             if abs_in not in conns:  # unconnected, so connect the input to an _auto_ivc output
                 prom = abs2prom[abs_in]
@@ -2571,21 +2577,31 @@ class Group(System):
                     gmeta = None
                     val = _undefined
 
+                msg = None
                 if abs_in in abs2meta and abs_in not in all_discrete_ins:
                     if abs2meta[abs_in]['src_indices'] is not None:
-                        raise RuntimeError(f"{self.msginfo}: auto_ivcs with src_indices "
-                                           "not supported yet.")
+                        msg = (f"{self.msginfo}: Can't connect {abs_in} to "
+                               "_auto_ivc: _auto_ivc connections with src_indices "
+                               "are not supported yet.")
+                if msg is not None:
+                    if abs_in in remote_ins:
+                        with multi_proc_exception_check(self.comm):
+                            raise RuntimeError(msg)
+                    else:
+                        raise RuntimeError(msg)
 
                 if prom in prom2ivc:
                     # multiple connected inputs w/o a src. Connect them to the same IVC
                     # check if they have different metadata, and if they do, there must be
                     # a group input defined that sets the default, else it's an error
-                    conns[abs_in] = prom2ivc[prom]
+                    self._check_input_metas(abs_in, prom, prom2ivc)
+
+                    conns[abs_in] = prom2ivc[prom][0]
                 else:
                     ivc_name = f"_auto_ivc.v{count}"
                     loc_out_name = ivc_name.rsplit('.', 1)[-1]
                     count += 1
-                    prom2ivc[prom] = ivc_name
+                    prom2ivc[prom] = (ivc_name, abs_in)
                     conns[abs_in] = ivc_name
                     if abs_in in all_discrete_ins:
                         if abs_in in self._var_abs2prom['input']:
@@ -2602,8 +2618,8 @@ class Group(System):
                     else:
                         if abs_in in abs2meta:
                             if val is _undefined and (abs_in not in remote_ins or
-                                                      remote_ins[abs_in] == self.comm.rank or
-                                                      all_abs2meta[abs_in]['distributed']):
+                                                    remote_ins[abs_in] == self.comm.rank or
+                                                    all_abs2meta[abs_in]['distributed']):
                                 val = abs2meta[abs_in]['value']
                         else:
                             val = np.zeros(0)
@@ -2667,3 +2683,18 @@ class Group(System):
         self._setup_procs_finished = True
 
         return auto_ivc
+
+
+    def _check_input_metas(self, abs_in, prom, prom2ivc):
+        global _group_nodiff
+        ivc_name, old_abs = prom2ivc[prom]
+        auto_meta = self._auto_ivc._static_var_rel2meta[ivc_name.rsplit('.', 1)[1]]
+        if abs_in in self._var_abs2meta:  # var is local
+            abs2meta = self._var_abs2meta
+        else:
+            abs2meta = self._var_allprocs_abs2meta
+        diffs, auto_missing, new_missing = diff_dicts(auto_meta, abs2meta[abs_in])
+        errs = _group_nodiff.intersection(diffs | auto_missing | new_missing)
+        if errs:
+            raise RuntimeError(f"Inputs '{old_abs}' and '{abs_in}' are connected but the "
+                               f"the following metadata entries differ between them: {errs}")
