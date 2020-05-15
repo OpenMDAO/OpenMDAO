@@ -3522,9 +3522,9 @@ class System(object):
 
         # determine whether setup has been performed
         if self._outputs is not None:
-            setup = True
+            after_final_setup = True
         else:
-            setup = False
+            after_final_setup = False
 
         # Make a dict of variables. Makes it easier to work with in this method
         var_dict = OrderedDict()
@@ -3541,7 +3541,7 @@ class System(object):
             if not all_procs and self.comm.rank > 0:
                 return
         
-            if setup:
+            if after_final_setup:
                 meta = self._var_abs2meta
             else:
                 meta = self._var_rel2meta
@@ -3583,7 +3583,7 @@ class System(object):
                                             if distrib[key][name].shape == global_shape:
                                                 var_dict[name][key] = distrib[key][name]
 
-        if setup:
+        if after_final_setup:
             inputs = var_type == 'input'
             outputs = not inputs
             var_list = self._get_vars_exec_order(inputs=inputs, outputs=outputs, variables=var_dict)
