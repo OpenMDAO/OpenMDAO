@@ -3493,7 +3493,7 @@ class System(object):
         else:
             raise RuntimeError(self.msginfo +
                                ': You have excluded both Explicit and Implicit components.')
-    import wingdbstub
+
     def _write_table(self, var_type, var_data, hierarchical, print_arrays, all_procs, out_stream):
         """
         Write table of variable names, values, residuals, and metadata to out_stream.
@@ -3535,44 +3535,30 @@ class System(object):
         if MPI and self.comm.size > 1:
             # All procs must call this. Returns a list, one per proc.
             all_var_dicts = self.comm.gather(var_dict, root=0) if not all_procs \
-                    else self.comm.allgather(var_dict)
-            
-            if setup:
-                meta = self.comm.gather(self._var_abs2meta, root=0) if not all_procs \
-                            else self.comm.allgather(self._var_abs2meta)
-            else:
-                meta = self.comm.gather(self._var_rel2meta, root=0) if not all_procs \
-                            else self.comm.allgather(self._var_rel2meta)              
-            
+                        else self.comm.allgather(var_dict)
+        
             # unless all_procs is requested, only the root process should print
             if not all_procs and self.comm.rank > 0:
-                return  
-            
+                return
+        
+            if setup:
+                meta = self._var_abs2meta
+            else:
+                meta = self._var_rel2meta
+        
             allprocs_meta = self._var_allprocs_abs2meta
-                        
-            for rank in range(len(meta)):
-                for key in meta[rank].keys():
-                    try:
-                        allprocs_meta[key]['src_indices'] = meta[rank][key]['src_indices']
-                    except:
-                        continue
-
+        
             var_dict = all_var_dicts[self.comm.rank]  # start with metadata from current rank
-
+        
             distrib = {'value': {}, 'resids': {}}     # dictionary to collect distributed values
-
+        
             # Go through data from all procs in order by rank and collect distributed values
             for rank, proc_vars in enumerate(all_var_dicts):
                 for name in proc_vars:
                     if name not in var_dict:     # If not in the merged dict, add it
                         var_dict[name] = proc_vars[name]
                     else:
-                        # In there already, only need to deal with it if it is a distributed array
-                        # Checking to see if distributed depends on if it is an input or output
-                        if var_type == 'input':
-                            is_distributed = allprocs_meta[name]['src_indices'] is not None
-                        else:
-                            is_distributed = allprocs_meta[name]['distributed']
+                        is_distributed = meta[name]['distributed']
 
                         if is_distributed and name in allprocs_meta:
                             # TODO no support for > 1D arrays
