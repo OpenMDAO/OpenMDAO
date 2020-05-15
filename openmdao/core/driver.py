@@ -313,8 +313,8 @@ class Driver(object):
                     remote_dv_dict[vname] = (owner, sz)
 
                 # Note that design vars are not distributed.
-                elif distributed and (vname in con_set or vname in obj_set):
-                    resp_dict = self._responses['parab.f_xy']
+                elif distributed and vname in self._responses:
+                    resp_dict = self._responses[vname]
                     idx = model._var_allprocs_abs2idx['nonlinear'][vname]
                     dist_sizes = model._var_sizes['nonlinear']['output'][:, idx]
                     indices = resp_dict['indices']

@@ -1,7 +1,6 @@
 """Define the base System class."""
 import sys
 import os
-import copy
 from contextlib import contextmanager
 from collections import OrderedDict, defaultdict
 
@@ -3111,9 +3110,9 @@ class System(object):
                 meta = self._var_allprocs_abs2meta[name]
                 response['distributed'] = meta['distributed']
 
-                if 'size' in response:
+                if response['indices'] is not None:
                     # Index defined in this response.
-                    response['global_size'] = response['size'] if meta['distributed'] \
+                    response['global_size'] = len(response['indices']) if meta['distributed'] \
                         else meta['global_size']
 
                 else:

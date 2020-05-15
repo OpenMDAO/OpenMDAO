@@ -236,6 +236,7 @@ class _TotalJacInfo(object):
 
         # create scratch array for jac scatters
         self.jac_scratch = None
+
         if self.comm.size > 1:
             # need 2 scratch vectors of the same size here
             scratch = np.zeros(max(J.shape), dtype=J.dtype)
@@ -249,6 +250,7 @@ class _TotalJacInfo(object):
         if not approx:
             self.sol2jac_map = {}
             for mode in modes:
+
                 self.sol2jac_map[mode] = self._get_sol2jac_map(self.output_list[mode],
                                                                self.output_meta[mode],
                                                                abs2meta, mode)
@@ -284,9 +286,10 @@ class _TotalJacInfo(object):
     def _compute_jac_scatters(self, mode, rowcol_size):
         self.jac_scatters[mode] = jac_scatters = {}
         model = self.model
+        nproc = self.comm.size
 
-        if mode == 'fwd' and self.comm.size > 1 or (model._full_comm is not None and
-                                                    model._full_comm.size > 1):
+        if mode == 'fwd' and nproc > 1 or (model._full_comm is not None and
+                                           model._full_comm.size > 1):
             tgt_vec = PETSc.Vec().createWithArray(np.zeros(rowcol_size, dtype=float),
                                                   comm=self.comm)
             self.tgt_petsc[mode] = tgt_vec
@@ -312,8 +315,7 @@ class _TotalJacInfo(object):
                     if abs2meta[name]['distributed']:
                         srcinds = name2jinds[name]
                         myinds = srcinds + myoffset
-                        var_idx = abs2idx[name]
-                        for rank in range(self.comm.size):
+                        for rank in range(nproc):
                             if rank != myrank:
                                 offset = rowcol_size * rank   # J is same size on all procs
                                 full_j_srcs.append(myinds)
@@ -322,7 +324,7 @@ class _TotalJacInfo(object):
                         srcinds = name2jinds[name]
                         myinds = srcinds + myoffset
                         var_idx = abs2idx[name]
-                        for rank in range(self.comm.size):
+                        for rank in range(nproc):
                             if rank != myrank and sizes[rank, var_idx] == 0:
                                 offset = rowcol_size * rank   # J is same size on all procs
                                 full_j_srcs.append(myinds)
@@ -518,8 +520,7 @@ class _TotalJacInfo(object):
                         loc_i[loc] = irange[loc] - gstart
                 else:
                     loc_i[loc] = irange[loc]
-                    if not in_var_meta['distributed']:
-                        loc_i[loc] -= gstart
+                    loc_i[loc] -= gstart
 
                 loc_offset = offsets[iproc, in_var_idx] - offsets[iproc, 0]
                 loc_i[loc] += loc_offset
@@ -637,8 +638,6 @@ class _TotalJacInfo(object):
         jac_idxs = {}
         model = self.model
         fwd = mode == 'fwd'
-        missing = False
-        full_slice = slice(None)
         myproc = self.comm.rank
         name2jinds = {}  # map varname to jac row or col idxs that we must scatter to other procs
 
@@ -646,7 +645,6 @@ class _TotalJacInfo(object):
             inds = []
             jac_inds = []
             sizes = model._var_sizes[vecname]['output']
-            offsets = model._var_offsets[vecname]['output']
             ncols = model._vectors['output'][vecname]._ncol
             slices = model._vectors['output'][vecname].get_slice_dict()
             abs2idx = model._var_allprocs_abs2idx[vecname]
@@ -655,6 +653,7 @@ class _TotalJacInfo(object):
             for name in names:
                 indices = vois[name]['indices'] if name in vois else None
                 meta = allprocs_abs2meta[name]
+                distributed = MPI and meta['distributed']
 
                 if indices is not None:
                     sz = len(indices)
@@ -664,19 +663,19 @@ class _TotalJacInfo(object):
                 if name in abs2idx and name in slices:
                     var_idx = abs2idx[name]
                     slc = slices[name]
-                    if meta['distributed']:
-                        dist_offset = np.sum(sizes[:myproc, var_idx])
+                    if meta['distributed'] and distributed and model.comm.size > 1:
                         if indices is not None:
-                            dist_end = dist_offset + sizes[rank, var_idx]
-                            on_myproc = np.logical_and(dist_offset <= indices, indices < dist_end)
-                            if np.any(on_myproc):
-                                loc_inds = indices[on_myproc]
-                                inds.append(loc_inds - dist_offset)
-                                jac_inds.append(np.arange(jstart, loc_inds - jstart,
-                                                dtype=INT_DTYPE))
-                                if fwd:
-                                    name2jinds[name] = jac_inds[-1]
+                            local_idx, sizes_idx = self._distributed_cons[name]
+                            dist_offset = np.sum(sizes_idx[:myproc])
+                            full_inds = np.arange(slc.start / ncols, slc.stop / ncols,
+                                                  dtype=INT_DTYPE)
+                            inds.append(full_inds[local_idx])
+                            jac_inds.append(jstart + dist_offset +
+                                            np.arange(len(local_idx), dtype=INT_DTYPE))
+                            if fwd:
+                                name2jinds[name] = jac_inds[-1]
                         else:
+                            dist_offset = np.sum(sizes[:myproc, var_idx])
                             inds.append(np.arange(slc.start / ncols, slc.stop / ncols,
                                                   dtype=INT_DTYPE))
                             jac_inds.append(np.arange(jstart + dist_offset,

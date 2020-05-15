@@ -1345,6 +1345,8 @@ class Problem(object):
             'step_calc': step_calc,
         }
         approx = model._owns_approx_jac
+        approx_of = model._owns_approx_of
+        approx_wrt = model._owns_approx_wrt
         old_jac = model._jacobian
         old_subjacs = model._subjacs_info.copy()
 
@@ -1358,6 +1360,8 @@ class Problem(object):
         if not approx:
             model._jacobian = old_jac
             model._owns_approx_jac = False
+            model._owns_approx_of = approx_of
+            model._owns_approx_wrt = approx_wrt
             model._subjacs_info = old_subjacs
 
         # Assemble and Return all metrics.

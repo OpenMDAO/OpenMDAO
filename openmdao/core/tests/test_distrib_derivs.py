@@ -1132,7 +1132,7 @@ class DeclarePartialsWithoutRowCol(unittest.TestCase):
         prob = om.Problem(model)
         prob.setup(mode='fwd')
 
-        prob['dvs.x'] = 7.5    
+        prob['dvs.x'] = 7.5
         prob.run_model()
         assert_near_equal(prob['execcomp.z'], np.ones((size,))*-38.4450, 1e-9)
 
