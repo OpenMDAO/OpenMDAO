@@ -451,13 +451,14 @@ class Problem(object):
                 tunits = tmeta['units']
                 if units is None:
                     if self._setup_status > 1:  # avoids double unit conversion
-                        units = tunits
-                    ivalue = value
+                        ivalue = value
+                        if smeta['units'] is not None:
+                            value = self.model.convert_from_units(src, value, tunits)
                 else:
                     value = self.model.convert_from_units(abs_name, value, units)
                     ivalue = value
-                if units is not None and smeta['units'] is not None:
-                    value = self.model.convert_from_units(src, value, units)
+                # if units is not None and smeta['units'] is not None:
+                    # value = self.model.convert2units(src, value, units)
         elif units is not None:
             value = self.model.convert_from_units(abs_name, value, units)
 

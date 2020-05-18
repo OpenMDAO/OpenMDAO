@@ -3,6 +3,12 @@
 import unittest
 import numpy as np
 from openmdao.api import Problem, Group, ExecComp, IndepVarComp, DirectSolver, ParallelGroup
+from openmdao.utils.mpi import MPI
+
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
 
 class TestGetSetVariables(unittest.TestCase):
@@ -465,8 +471,8 @@ class TestGetSetVariables(unittest.TestCase):
 
         with self.assertRaises(RuntimeError) as cm:
             p.setup()
-            
-        self.assertEqual(str(cm.exception), "Group (<model>): auto_ivcs with src_indices not supported yet.")
+
+        self.assertEqual(str(cm.exception), "Group (<model>): Can't connect C1.x to _auto_ivc: _auto_ivc connections with src_indices are not supported yet.")
 
     def test_serial_multi_src_inds_units_setval_promoted(self):
         p = Problem()
@@ -501,7 +507,7 @@ class TestGetSetVariables(unittest.TestCase):
 
 class ParTestCase(unittest.TestCase):
     N_PROCS = 2
-    
+
     def test_par_multi_src_inds(self):
         p = Problem()
         p.model.add_subsystem('indep', IndepVarComp('x', val=np.ones(10)))
@@ -510,7 +516,7 @@ class ParTestCase(unittest.TestCase):
         par.add_subsystem('C2', ExecComp('y=x*3.', x=np.zeros(3), y=np.zeros(3)))
         p.model.connect('indep.x', 'par.C1.x', src_indices=list(range(7)))
         p.model.connect('indep.x', 'par.C2.x', src_indices=list(range(7, 10)))
-        
+
         p.setup()
 
         p['indep.x'] = np.concatenate([(np.arange(7) + 1.) * 2., (np.arange(7, 10) + 1.) * 3.])
@@ -524,6 +530,7 @@ class ParTestCase(unittest.TestCase):
         np.testing.assert_allclose(p.get_val('par.C1.y', get_remote=True), (np.arange(7) + 1.) * 4.)
         np.testing.assert_allclose(p.get_val('par.C2.y', get_remote=True), (np.arange(7,10) + 1.) * 9.)
 
+    @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
     @unittest.expectedFailure
     def test_par_multi_src_inds_fail(self):
         p = Problem()
@@ -533,7 +540,7 @@ class ParTestCase(unittest.TestCase):
         par.add_subsystem('C2', ExecComp('y=x*3.', x=np.zeros(3), y=np.zeros(3)))
         p.model.connect('indep.x', 'par.C1.x', src_indices=list(range(7)))
         p.model.connect('indep.x', 'par.C2.x', src_indices=list(range(7, 10)))
-               
+
         p.setup()
 
         p['par.C1.x'] = (np.arange(7) + 1.) * 2.

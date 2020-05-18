@@ -1657,7 +1657,7 @@ class TestSrcIndices(unittest.TestCase):
     def test_src_indices_shape_bad_idx_flat(self):
         msg = "Group (<model>): The source indices do not specify a valid index " + \
               "for the connection 'indeps.x' to 'C1.x'. " + \
-              "Index '9' is out of range for a flat source of size 9."
+              "Index '9' is out of range for source dimension of size 9."
 
         try:
             self.create_problem(src_shape=(3, 3), tgt_shape=(2, 2),
@@ -1677,7 +1677,7 @@ class TestSrcIndices(unittest.TestCase):
     def test_src_indices_shape_bad_idx_flat_promotes(self):
         msg = "Group (<model>): The source indices do not specify a valid index " + \
               "for the connection 'indeps.x' to 'C1.x'. " + \
-              "Index '9' is out of range for a flat source of size 9."
+              "Index '9' is out of range for source dimension of size 9."
         try:
             self.create_problem(src_shape=(3, 3), tgt_shape=(2, 2),
                                 src_indices=[[4, 5], [7, 9]],
@@ -1696,7 +1696,7 @@ class TestSrcIndices(unittest.TestCase):
     def test_src_indices_shape_bad_idx_flat_neg(self):
         msg = "Group (<model>): The source indices do not specify a valid index " + \
               "for the connection 'indeps.x' to 'C1.x'. " + \
-              "Index '-10' is out of range for a flat source of size 9."
+              "Index '-10' is out of range for source dimension of size 9."
         try:
             self.create_problem(src_shape=(3, 3), tgt_shape=(2, 2),
                                 src_indices=[[-10, 5], [7, 8]],
@@ -1770,6 +1770,7 @@ class TestFeatureAddSubsystem(unittest.TestCase):
                          promotes_inputs=['a'], promotes_outputs=['b'])
         g1.add_subsystem('comp2', om.ExecComp('b=3.0*a', a=4.0, b=12.0),
                          promotes_inputs=['a'])
+        g1.add_input('a', val=3.5)
         p.setup()
 
         # output G1.comp1.b is promoted
@@ -1778,8 +1779,8 @@ class TestFeatureAddSubsystem(unittest.TestCase):
         self.assertEqual(p['G1.comp2.b'], 12.0)
 
         # use unpromoted names for the following 2 promoted inputs
-        self.assertEqual(p['G1.comp1.a'], 3.0)
-        self.assertEqual(p['G1.comp2.a'], 4.0)
+        self.assertEqual(p['G1.comp1.a'], 3.5)
+        self.assertEqual(p['G1.comp2.a'], 3.5)
 
     def test_group_nested_promoted2(self):
         import openmdao.api as om

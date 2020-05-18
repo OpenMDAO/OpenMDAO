@@ -34,6 +34,8 @@ def _get_fan_out(size, auto):
     if not auto:
         model.connect('indeps.x', 'par.x')
 
+    #import wingdbstub
+    
     p.setup()
 
     return p

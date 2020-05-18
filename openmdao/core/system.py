@@ -4337,9 +4337,14 @@ class System(object):
 
             if units is not None:
                 if smeta['units'] is not None:
-                    val = self.convert2units(src, val, units)
-                val = self.convert2units(abs_name, val, units)
-            elif vmeta['units'] is not None and smeta['units'] is not None:
+                    try:
+                        val = self.convert2units(src, val, units)
+                    except TypeError:  # just call this to get the right error message
+                        self.convert2units(abs_name, val, units)
+                else:
+                    val = self.convert2units(abs_name, val, units)
+            elif (vmeta['units'] is not None and smeta['units'] is not None and
+                    vmeta['units'] != smeta['units']):
                 val = self.convert2units(src, val, vmeta['units'])
         else:
             val = self._abs_get_val(abs_name, get_remote, rank, vec_name, kind, flat)

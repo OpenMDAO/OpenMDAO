@@ -42,7 +42,7 @@ _undefined = Undefined()
 
 # these are meta dict entries that cannot differ between inputs unless a default is specified from
 # a corresponding group.add_input call
-_group_nodiff = set(['value', 'units', 'distributed'])
+_group_nodiff = set(['value', 'units'])
 
 
 class Group(System):
@@ -191,8 +191,15 @@ class Group(System):
         if name in self._group_inputs:
             simple_warning(f"{self.msginfo}: Adding group input '{name}' which "
                            "overrides a previous input of the same name.")
-        if src_indices is not None or units is not None:
-            self._group_inputs[name] = {'val': val, 'src_indices': src_indices, 'units': units}
+        meta = {}
+        if val is not _undefined:
+            meta['value'] = val
+        if src_indices is not None:
+            meta['src_indices'] = src_indices
+        if units is not None:
+            meta['units'] = units
+        if meta:
+            self._group_inputs[name] = meta
 
     def _get_scope(self, excl_sub=None):
         """
@@ -518,35 +525,35 @@ class Group(System):
 
         if setup_mode == 'full':
             auto_ivc = self._setup_auto_ivcs(mode)
+        self._resolve_connected_input_defaults()
 
     def _top_level_setup2(self, setup_mode):
-        if setup_mode == 'full':
-            if self.comm.size > 1:
-                abs2meta = self._var_abs2meta
-                abs2idx = self._var_allprocs_abs2idx['nonlinear']
-                all_abs2meta = self._var_allprocs_abs2meta
-                conns = self._conn_global_abs_in2out
+        if setup_mode == 'full' and self.comm.size > 1:
+            abs2meta = self._var_abs2meta
+            abs2idx = self._var_allprocs_abs2idx['nonlinear']
+            all_abs2meta = self._var_allprocs_abs2meta
+            conns = self._conn_global_abs_in2out
 
-                dist_ins = [n for n in self._var_allprocs_abs_names['input']
-                            if all_abs2meta[n]['distributed']]
-                dcomp_names = set(d.rsplit('.', 1)[0] for d in dist_ins)
-                if dcomp_names:
-                    added_src_inds = set()
-                    for comp in self.system_iter(recurse=True, typ=Component):
-                        if comp.pathname in dcomp_names:
-                            added_src_inds.update(
-                                comp._update_dist_src_indices(conns, all_abs2meta, abs2idx,
-                                                              self._var_sizes))
-                    all_added = set()
-                    for a in self.comm.allgather(added_src_inds):
-                        all_added.update(a)
+            dist_ins = [n for n in self._var_allprocs_abs_names['input']
+                        if all_abs2meta[n]['distributed']]
+            dcomp_names = set(d.rsplit('.', 1)[0] for d in dist_ins)
+            if dcomp_names:
+                added_src_inds = set()
+                for comp in self.system_iter(recurse=True, typ=Component):
+                    if comp.pathname in dcomp_names:
+                        added_src_inds.update(
+                            comp._update_dist_src_indices(conns, all_abs2meta, abs2idx,
+                                                          self._var_sizes))
+                all_added = set()
+                for a in self.comm.allgather(added_src_inds):
+                    all_added.update(a)
 
-                    for a in all_added:
-                        all_abs2meta[a]['has_src_indices'] = True
-                        if a in conns:
-                            src = conns[a]
-                            if src.startswith('_auto_ivc.'):
-                                all_abs2meta[src]['distributed'] = True
+                for a in all_added:
+                    all_abs2meta[a]['has_src_indices'] = True
+                    if a in conns:
+                        src = conns[a]
+                        if src.startswith('_auto_ivc.'):
+                            all_abs2meta[src]['distributed'] = True
 
     def _setup_var_index_ranges(self, recurse=True):
         """
@@ -647,7 +654,7 @@ class Group(System):
 
         group_inputs = []
         for n, meta in self._group_inputs.items():
-            meta['path'] = self.pathname
+            meta['path'] = self.pathname  # used for error reporting
 
         for subsys in self._subsystems_myproc:
             if recurse:
@@ -768,14 +775,22 @@ class Group(System):
         for prom, meta in group_inputs:
             if prom in ginputs:
                 # check for any conflicting src_indices, units, ...
+                old_ginputs = ginputs[prom]
+
                 for n, val in meta.items():
-                    if n == 'path':
+                    if n == 'path' or val is None:
                         continue
-                    if (val is not None and ginputs[prom][n] is not None and
-                            not np.all(val == ginputs[prom][n])):
-                        raise RuntimeError(f"Groups '{self.pathname}' and '{meta['path']}' added "
-                                           f"the input '{prom}' with conflicting {n}.")
-                    ginputs[prom][n] = val
+
+                    if old_ginputs[n] is not None:
+                        if isinstance(val, np.ndarray) or isinstance(old_ginputs[n], np.ndarray):
+                            eq = np.all(val == old_ginputs[n])
+                        else:
+                            eq = val == old_ginputs[n]
+
+                        if not eq:
+                            raise RuntimeError(f"Groups '{self.pathname}' and '{meta['path']}' "
+                                               f"added the input '{prom}' with conflicting '{n}'.")
+                    old_ginputs[n] = val
             else:
                 ginputs[prom] = meta
 
@@ -1357,7 +1372,7 @@ class Group(System):
                                 msg = f"{self.msginfo}: The source indices do not specify " + \
                                       f"a valid index for the connection '{abs_out}' to " + \
                                       f"'{abs_in}'. Index '{bad_idx}' is out of range for " + \
-                                      f"a flat source of size {out_size}."
+                                      f"source dimension of size {out_size}."
                                 if self._raise_connection_errors:
                                     raise ValueError(msg)
                                 else:
@@ -2521,6 +2536,9 @@ class Group(System):
     def _setup_auto_ivcs(self, mode):
         from openmdao.core.indepvarcomp import _AutoIndepVarComp
 
+        if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
+            raise RuntimeError("The top level system must not be a ParallelGroup.")
+
         # create the IndepVarComp that will contain all auto-ivc outputs
         self._auto_ivc = auto_ivc = _AutoIndepVarComp()
         auto_ivc.name = '_auto_ivc'
@@ -2533,12 +2551,10 @@ class Group(System):
         all_discrete_ins = self._var_allprocs_discrete['input']
         discrete_ins = self._var_discrete['input']
         conns = self._problem_meta['connections']
-        prom2ivc = {}
-        count = 0
 
         if self.comm.size > 1:
             # compute the inputs that are remote in at least one proc and the owning rank for each
-            all_ins = set(self._var_allprocs_abs_names['input'])
+            all_ins = set(abs_names)
             all_ins.update(self._var_allprocs_discrete['input'])
             my_remote_ins = all_ins.difference(self._var_abs_names['input'])
             my_remote_ins = my_remote_ins.difference(self._var_abs_names_discrete['input'])
@@ -2564,38 +2580,70 @@ class Group(System):
         else:
             remote_ins = {}
 
-        group_abs_inputs = {}
+        prom2ivc = {}
+        count = 0
 
-        for abs_in in chain(abs_names, sorted(all_discrete_ins)):
-            if abs_in not in conns:  # unconnected, so connect the input to an _auto_ivc output
-                prom = abs2prom[abs_in]
-                if prom in self._group_inputs and abs_in in abs2meta:
-                    gmeta = self._group_inputs[prom]
-                    group_abs_inputs[abs_in] = gmeta
-                    val = gmeta['val']
-                else:
-                    gmeta = None
+        # first, loop over continuous variables
+        with multi_proc_exception_check(self.comm):
+            for abs_in in abs_names:
+                if abs_in not in conns:  # unconnected, so connect the input to an _auto_ivc output
+                    prom = abs2prom[abs_in]
                     val = _undefined
 
-                msg = None
-                if abs_in in abs2meta and abs_in not in all_discrete_ins:
-                    if abs2meta[abs_in]['src_indices'] is not None:
-                        msg = (f"{self.msginfo}: Can't connect {abs_in} to "
-                               "_auto_ivc: _auto_ivc connections with src_indices "
-                               "are not supported yet.")
-                if msg is not None:
-                    if abs_in in remote_ins:
-                        with multi_proc_exception_check(self.comm):
-                            raise RuntimeError(msg)
+                    if abs_in in abs2meta:
+                        if abs2meta[abs_in]['src_indices'] is not None:
+                            raise RuntimeError(f"{self.msginfo}: Can't connect {abs_in} to "
+                                               "_auto_ivc: _auto_ivc connections with src_indices "
+                                               "are not supported yet.")
+
+                    if prom in prom2ivc:
+                        # multiple connected inputs w/o a src. Connect them to the same IVC
+                        # check if they have different metadata, and if they do, there must be
+                        # a group input defined that sets the default, else it's an error
+                        conns[abs_in] = prom2ivc[prom][0]
                     else:
-                        raise RuntimeError(msg)
+                        distrib = all_abs2meta[abs_in]['distributed']
+                        ivc_name = f"_auto_ivc.v{count}"
+                        loc_out_name = ivc_name.rsplit('.', 1)[-1]
+                        count += 1
+                        prom2ivc[prom] = (ivc_name, abs_in)
+                        conns[abs_in] = ivc_name
+                        if abs_in in abs2meta:
+                            gval = None
+                            if prom in self._group_inputs:
+                                meta = self._group_inputs[prom]
+                                if 'value' in meta:
+                                    gval = meta['value']
+                            if (abs_in not in remote_ins or remote_ins[abs_in] == self.comm.rank or
+                                    distrib):
+                                if gval is None:
+                                    val = abs2meta[abs_in]['value']
+                                elif distrib:
+                                    raise RuntimeError(f"{self.msginfo}: Group.add_input currently"
+                                                       " does not support overriding distributed "
+                                                       "input values.")
+                                else:
+                                    val = gval
+
+                        if abs_in in remote_ins or distrib:
+                            auto_ivc._add_remote(ivc_name)
+
+                        if val is _undefined:
+                            # remote var is treated as distrib with size 0 everywhere but owner
+                            val = np.zeros(0)
+
+                        auto_ivc.add_output(loc_out_name, val=val,
+                                            units=all_abs2meta[abs_in]['units'])
+
+        for abs_in in sorted(all_discrete_ins):
+            if abs_in not in conns:  # unconnected, so connect the input to an _auto_ivc output
+                prom = abs2prom[abs_in]
+                val = _undefined
 
                 if prom in prom2ivc:
                     # multiple connected inputs w/o a src. Connect them to the same IVC
                     # check if they have different metadata, and if they do, there must be
                     # a group input defined that sets the default, else it's an error
-                    self._check_input_metas(abs_in, prom, prom2ivc)
-
                     conns[abs_in] = prom2ivc[prom][0]
                 else:
                     ivc_name = f"_auto_ivc.v{count}"
@@ -2603,42 +2651,21 @@ class Group(System):
                     count += 1
                     prom2ivc[prom] = (ivc_name, abs_in)
                     conns[abs_in] = ivc_name
-                    if abs_in in all_discrete_ins:
-                        if abs_in in self._var_abs2prom['input']:
-                            if val is _undefined:
-                                val = self._var_discrete['input'][abs_in]['value']
-                        else:
-                            val = None
-                        if abs_in in remote_ins:
-                            if remote_ins[abs_in] == self.comm.rank:
-                                self.comm.bcast(val, root=remote_ins[abs_in])
-                            else:
-                                val = self.comm.bcast(None, root=remote_ins[abs_in])
-                        auto_ivc.add_discrete_output(loc_out_name, val=val)
+
+                    if abs_in in self._var_abs2prom['input']:  # var is local
+                        val = self._var_discrete['input'][abs_in]['value']
                     else:
-                        if abs_in in abs2meta:
-                            if val is _undefined and (abs_in not in remote_ins or
-                                                    remote_ins[abs_in] == self.comm.rank or
-                                                    all_abs2meta[abs_in]['distributed']):
-                                val = abs2meta[abs_in]['value']
+                        val = None
+                    if abs_in in remote_ins:
+                        if remote_ins[abs_in] == self.comm.rank:
+                            self.comm.bcast(val, root=remote_ins[abs_in])
                         else:
-                            val = np.zeros(0)
-
-                        if abs_in in remote_ins or all_abs2meta[abs_in]['distributed']:
-                            auto_ivc._add_remote(ivc_name)
-
-                        units = gmeta['units'] if gmeta else None
-                        if val is _undefined:
-                            val = np.zeros(0)
-                        auto_ivc.add_output(loc_out_name, val=val, units=units)
+                            val = self.comm.bcast(None, root=remote_ins[abs_in])
+                    auto_ivc.add_discrete_output(loc_out_name, val=val)
 
         if not prom2ivc:
             return auto_ivc
 
-        if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
-            raise RuntimeError("The top level system must not be a ParallelGroup.")
-
-        self._auto_ivc = auto_ivc
         auto_ivc._setup_procs(auto_ivc.pathname, self.comm, mode, self._problem_meta)
         auto_ivc._static_mode = False
         try:
@@ -2684,17 +2711,55 @@ class Group(System):
 
         return auto_ivc
 
-
-    def _check_input_metas(self, abs_in, prom, prom2ivc):
+    def _resolve_connected_input_defaults(self):
         global _group_nodiff
-        ivc_name, old_abs = prom2ivc[prom]
-        auto_meta = self._auto_ivc._static_var_rel2meta[ivc_name.rsplit('.', 1)[1]]
-        if abs_in in self._var_abs2meta:  # var is local
-            abs2meta = self._var_abs2meta
-        else:
-            abs2meta = self._var_allprocs_abs2meta
-        diffs, auto_missing, new_missing = diff_dicts(auto_meta, abs2meta[abs_in])
-        errs = _group_nodiff.intersection(diffs | auto_missing | new_missing)
-        if errs:
-            raise RuntimeError(f"Inputs '{old_abs}' and '{abs_in}' are connected but the "
-                               f"the following metadata entries differ between them: {errs}")
+        srcconns = defaultdict(list)
+        for tgt, src in self._problem_meta['connections'].items():
+            srcconns[src].append(tgt)
+
+        abs2prom = self._var_allprocs_abs2prom['input']
+        all_abs2meta = self._var_allprocs_abs2meta
+        abs2meta = self._var_abs2meta
+        discrete_outs = self._var_allprocs_discrete['output']
+
+        for src, tgts in srcconns.items():
+            if len(tgts) > 1 and src not in discrete_outs:
+                if not src.startswith('_auto_ivc.'):
+                    sunits = all_abs2meta[src]['units']
+                    if sunits is None:
+                        errs = []
+                        for tgt in tgts:
+                            if all_abs2meta[tgt]['units'] is not None:
+                                errs.append((tgt, all_abs2meta[tgt]['units']))
+                        if errs:
+                            raise RuntimeError(f"{self.msginfo}: Source '{src}' has units of None "
+                                               f"but the following inputs have units: {errs}.")
+                    continue
+
+                if src in abs2meta:
+                    smeta = abs2meta[src]
+                    sloc = True
+                else:
+                    smeta = all_abs2meta[tgt]
+                    sloc = False
+
+                for tgt in tgts:
+                    if tgt in abs2meta:  # var is local
+                        tmeta = abs2meta[tgt]
+                    else:
+                        tmeta = all_abs2meta[tgt]
+
+                    diffs, smissing, tmissing = diff_dicts(smeta, tmeta)
+                    if not sloc:
+                        smissing = set()
+                    errs = _group_nodiff.intersection(diffs | smissing | tmissing)
+                    if errs:
+                        prom = abs2prom[tgt]
+                        if prom in self._group_inputs:
+                            errs = errs.difference(self._group_inputs[prom])
+                    if errs:
+                        inputs = list(sorted(tgts))
+                        raise RuntimeError(f"The following inputs, {inputs} are connected but "
+                                           "the following metadata entries have not been specified "
+                                           "by Group.add_input and differ between at least "
+                                           f"two of them: {errs}.")
