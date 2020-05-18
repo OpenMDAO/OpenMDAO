@@ -112,6 +112,12 @@ install:
   fi
 
   ## install paropt
+
+  mpiCC --help
+
+  mpic++ --help
+
+  
   git clone https://github.com/gjkennedy/paropt
   cd paropt
   cp Makefile.in.info Makefile.in
@@ -120,6 +126,7 @@ install:
   make  #  install compiled paropt
   python3 setup.py install # install Python wrapper
   cd ..
+  python -c "import paropt"
   #
 
 
