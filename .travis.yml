@@ -112,12 +112,13 @@ install:
   fi
 
   ## install paropt
-
+  echo "  > try different mpi compilers";
   mpiCC --help
 
   mpic++ --help
 
-  
+  mpicxx --help
+  echo "  > end try different mpi compilers";
   git clone https://github.com/gjkennedy/paropt
   cd paropt
   cp Makefile.in.info Makefile.in
