@@ -3561,7 +3561,7 @@ class System(object):
                     else:
                         try:
                             is_distributed = meta[name]['distributed']
-                        except ValueError:
+                        except KeyError:
                             is_distributed = allprocs_meta[name]['distributed']
 
                         if is_distributed and name in allprocs_meta:
