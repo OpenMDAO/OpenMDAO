@@ -84,7 +84,7 @@ class pyOptSparseDriver(Driver):
     constrained optimization problems, with additional MPI capability.
     pypptsparse has interfaces to the following optimizers:
     ALPSO, CONMIN, FSQP, IPOPT, NLPQLP, NSGA2, PSQP, SLSQP,
-    SNOPT, NLPY_AUGLAG, NOMAD.
+    SNOPT, NLPY_AUGLAG, NOMAD, ParOpt.
     Note that some of these are not open source and therefore not included
     in the pyoptsparse source code.
 
