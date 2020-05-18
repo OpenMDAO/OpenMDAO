@@ -67,6 +67,9 @@ class Driver(object):
     _distributed_cons : dict
         Dict of constraints that are distributed outputs. Values are
         (owning rank, size).
+    _distributed_objs : dict
+        Dict of objectives that are distributed outputs. Values are
+        (owning rank, size).
     _cons : dict
         Contains all constraint info.
     _objs : dict
@@ -281,6 +284,7 @@ class Driver(object):
         self._remote_cons = remote_con_dict = {}
         self._distributed_cons = dist_con_dict = {}
         self._remote_objs = remote_obj_dict = {}
+        self._distributed_objs = dist_obj_dict = {}
 
         # Now determine if later we'll need to allgather cons, objs, or desvars.
         if model.comm.size > 1 and model._subsystems_allprocs:
@@ -313,30 +317,58 @@ class Driver(object):
                     remote_dv_dict[vname] = (owner, sz)
 
                 # Note that design vars are not distributed.
-                elif distributed and vname in self._responses:
-                    resp_dict = self._responses[vname]
+                elif distributed:
                     idx = model._var_allprocs_abs2idx['nonlinear'][vname]
                     dist_sizes = model._var_sizes['nonlinear']['output'][:, idx]
-                    indices = resp_dict['indices']
-                    if indices is not None:
-                        # Determine which indices are on our proc.
-                        rank = model.comm.rank
-                        size = dist_sizes.size
-                        offsets = np.cumsum(dist_sizes)
 
-                        local_indices = []
-                        true_sizes = np.zeros(size, dtype=INT_DTYPE)
-                        for index in indices:
-                            irank = np.argwhere(offsets >= index)[0][0]
-                            true_sizes[irank] += 1
-                            if rank == irank:
-                                new_index = index - offsets[irank] + dist_sizes[irank]
-                                local_indices.append(new_index)
+                    # Determine which indices are on our proc.
+                    rank = model.comm.rank
+                    size = dist_sizes.size
+                    offsets = np.cumsum(dist_sizes)
 
-                        indices = local_indices
-                        dist_sizes = true_sizes
+                    if vname in self._responses:
+                        resp_dict = self._responses[vname]
+                        indices = resp_dict['indices']
 
-                    dist_con_dict[vname] = (indices, dist_sizes)
+                        if indices is not None:
+                            local_indices = []
+                            true_sizes = np.zeros(size, dtype=INT_DTYPE)
+                            for index in indices:
+                                if index < 0:
+                                    # Support for negative indices. Convert to positive index.
+                                    index = index + np.sum(dist_sizes)
+                                irank = np.argwhere(offsets > index)[0][0]
+                                true_sizes[irank] += 1
+                                if rank == irank:
+                                    new_index = index - offsets[irank] + dist_sizes[irank]
+                                    local_indices.append(new_index)
+
+                            indices = local_indices
+                            dist_sizes = true_sizes
+
+                        dist_con_dict[vname] = (indices, dist_sizes)
+
+                    if vname in self._objs:
+                        resp_dict = self._objs[vname]
+                        indices = resp_dict['indices']
+
+                        if indices is not None:
+                            local_indices = []
+                            true_sizes = np.zeros(size, dtype=INT_DTYPE)
+                            for index in indices:
+                                if index < 0:
+                                    # Support for negative indices. Convert to positive index.
+                                    index = index + np.sum(dist_sizes)
+                                irank = np.argwhere(offsets > index)[0][0]
+                                true_sizes[irank] += 1
+                                if rank == irank:
+                                    new_index = index - offsets[irank] + dist_sizes[irank]
+                                    local_indices.append(new_index)
+
+                            indices = local_indices
+                            dist_sizes = true_sizes
+
+                        dist_obj_dict[vname] = (indices, dist_sizes)
 
                 if vname in con_set:
                     remote_con_dict[vname] = (owner, sz)
@@ -635,7 +667,9 @@ class Driver(object):
         dict
            Dictionary containing values of each objective.
         """
-        return {n: self._get_voi_val(n, obj, self._remote_objs, {}, driver_scaling=driver_scaling)
+        return {n: self._get_voi_val(n, obj, self._remote_objs,
+                                     self._distributed_objs,
+                                     driver_scaling=driver_scaling)
                 for n, obj in self._objs.items()}
 
     def get_constraint_values(self, ctype='all', lintype='all', driver_scaling=True):

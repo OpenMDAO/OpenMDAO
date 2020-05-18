@@ -2206,10 +2206,13 @@ def _initialize_model_approx(model, driver, of=None, wrt=None):
         if MPI and model.comm.size > 1:
             of_idx = model._owns_approx_of_idx
             driver_cons = driver._distributed_cons
+            driver_objs = driver._distributed_objs
             for key, val in driver._responses.items():
                 if val['indices'] is not None:
                     if val['distributed'] and key in driver_cons:
                         of_idx[key] = driver_cons[key][0]
+                    elif val['distributed'] and key in driver_objs:
+                        of_idx[key] = driver_objs[key][0]
                     else:
                         of_idx[key] = val['indices']
         else:

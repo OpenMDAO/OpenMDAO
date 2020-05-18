@@ -99,6 +99,12 @@ class _TotalJacInfo(object):
         driver_scaling : bool
             If True (default), scale derivative values by the quantities specified when the desvars
             and responses were added. If False, leave them unscaled.
+        _distributed_cons : dict
+            Dict of constraints that are distributed outputs. Values are
+            (owning rank, size).
+        _distributed_objs : dict
+            Dict of objectives that are distributed outputs. Values are
+            (owning rank, size).
         """
         driver = problem.driver
         prom2abs = problem.model._var_allprocs_prom2abs_list['output']
@@ -178,6 +184,7 @@ class _TotalJacInfo(object):
         self.input_vec = {'fwd': model._vectors['residual'], 'rev': model._vectors['output']}
         self.output_vec = {'fwd': model._vectors['output'], 'rev': model._vectors['residual']}
         self._distributed_cons = driver._distributed_cons
+        self._distributed_objs = driver._distributed_objs
 
         abs2meta = model._var_allprocs_abs2meta
 
@@ -665,7 +672,11 @@ class _TotalJacInfo(object):
                     slc = slices[name]
                     if meta['distributed'] and distributed and model.comm.size > 1:
                         if indices is not None:
-                            local_idx, sizes_idx = self._distributed_cons[name]
+                            if name in self._distributed_cons:
+                                local_idx, sizes_idx = self._distributed_cons[name]
+                            else:
+                                local_idx, sizes_idx = self._distributed_objs[name]
+
                             dist_offset = np.sum(sizes_idx[:myproc])
                             full_inds = np.arange(slc.start / ncols, slc.stop / ncols,
                                                   dtype=INT_DTYPE)
@@ -1429,7 +1440,12 @@ class _TotalJacInfo(object):
         totals = self.J_dict
         if return_format == 'flat_dict':
             for prom_out, output_name in zip(self.prom_of, of):
-                dist_con = self._distributed_cons.get(output_name)
+
+                if output_name in self._distributed_cons:
+                    dist_resp = self._distributed_cons.get(output_name)
+                else:
+                    dist_resp = self._distributed_objs.get(output_name)
+
                 for prom_in, input_name in zip(self.prom_wrt, wrt):
 
                     if output_name in wrt_meta and output_name != input_name:
@@ -1439,14 +1455,18 @@ class _TotalJacInfo(object):
 
                     totals[prom_out, prom_in][:] = _get_subjac(approx_jac[output_name, input_name],
                                                                prom_out, prom_in, of_idx, wrt_idx,
-                                                               dist_con, comm)
+                                                               dist_resp, comm)
 
         elif return_format in ('dict', 'array'):
             for prom_out, output_name in zip(self.prom_of, of):
                 tot = totals[prom_out]
-                for prom_in, input_name in zip(self.prom_wrt, wrt):
-                    dist_con = self._distributed_cons.get(output_name)
 
+                if output_name in self._distributed_cons:
+                    dist_resp = self._distributed_cons.get(output_name)
+                else:
+                    dist_resp = self._distributed_objs.get(output_name)
+
+                for prom_in, input_name in zip(self.prom_wrt, wrt):
                     if output_name in wrt_meta and output_name != input_name:
                         # Special case where we constrain an input, and need derivatives of that
                         # constraint wrt all other inputs.
@@ -1456,11 +1476,11 @@ class _TotalJacInfo(object):
                         rows, cols, data = tot[prom_in]['coo']
                         data[:] = _get_subjac(approx_jac[output_name, input_name],
                                               prom_out, prom_in, of_idx, wrt_idx,
-                                              dist_con, comm)[rows, cols]
+                                              dist_resp, comm)[rows, cols]
                     else:
                         tot[prom_in][:] = _get_subjac(approx_jac[output_name, input_name],
                                                       prom_out, prom_in, of_idx, wrt_idx,
-                                                      dist_con, comm)
+                                                      dist_resp, comm)
         else:
             msg = "Unsupported return format '%s." % return_format
             raise NotImplementedError(msg)
