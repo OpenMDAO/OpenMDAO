@@ -126,6 +126,7 @@ install:
   cp Makefile.in.info Makefile.in
   #  # edit Makefile.in ?
   #
+  mkdir $HOME/git
   make  #  install compiled paropt
   python3 setup.py install # install Python wrapper
   cd ..
