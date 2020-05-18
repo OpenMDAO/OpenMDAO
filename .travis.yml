@@ -91,6 +91,8 @@ install:
     echo "Installing PETSc";
     conda install -c anaconda mpi4py --yes;
     conda install -c conda-forge petsc=$PETSc petsc4py --yes;
+
+    conda install -c anaconda gxx_linux-64
   fi
 
   pip install --upgrade pip;
