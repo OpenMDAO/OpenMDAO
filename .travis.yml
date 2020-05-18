@@ -111,15 +111,6 @@ install:
     cd ../..;
   fi
 
-  ## install paropt
-  git clone https://github.com/gjkennedy/paropt
-  cd paropt
-  cp Makefile.in.info Makefile.in
-  #  # edit Makefile.in ?
-  #
-  make  #  install compiled paropt
-  python3 setup.py install # install Python wrapper
-  #
 
 
   echo "  > Install pyOptSparse";
