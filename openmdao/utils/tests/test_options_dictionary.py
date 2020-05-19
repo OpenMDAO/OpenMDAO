@@ -129,6 +129,17 @@ class TestOptionsDict(unittest.TestCase):
         self.assertEqual(str(context.exception),
                          "'types' and 'values' were both specified for option 'test3'.")
 
+    def test_check_valid_template(self):
+        # test the template 'check_valid' function
+        from openmdao.utils.options_dictionary import check_valid
+        self.dict.declare('test', check_valid=check_valid)
+
+        with self.assertRaises(ValueError) as context:
+            self.dict['test'] = 1
+
+        expected_msg = "Option 'test' with value 1 is not valid."
+        self.assertEqual(expected_msg, str(context.exception))
+
     def test_isvalid(self):
         self.dict.declare('even_test', types=int, check_valid=check_even)
         self.dict['even_test'] = 2
@@ -268,6 +279,7 @@ class TestOptionsDict(unittest.TestCase):
         # Should only generate warning first time
         with assert_no_warning(DeprecationWarning, msg):
             option = self.dict['test2']
+
 
 if __name__ == "__main__":
     unittest.main()

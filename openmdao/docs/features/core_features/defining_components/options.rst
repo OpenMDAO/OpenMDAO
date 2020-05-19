@@ -20,6 +20,11 @@ The attributes that can be specified when declaring an option are enumerated and
 .. automethod:: openmdao.utils.options_dictionary.OptionsDictionary.declare
     :noindex:
 
+When using the :code:`check_valid` argument, the expected function signature is:
+
+.. automethod:: openmdao.utils.options_dictionary.check_valid
+    :noindex:
+
 Option values are typically passed at component instantiation time as keyword arguments,
 which are automatically assigned into the option dictionary. The options are then available
 for use in the component's other methods, such as `setup` and `compute`.
@@ -27,6 +32,7 @@ for use in the component's other methods, such as `setup` and `compute`.
 Alternatively, values can be set at a later time, in another method of the component
 (except for `initialize`) or outside of the component definition after the component is
 instantiated.
+
 
 A Simple Example
 ----------------
@@ -95,14 +101,29 @@ making it optional to pass the value in during component instantiation.
 
 In this example, both 'a' and 'b' are optional, so it is valid to pass in 'a', but not 'b'.
 
+
 Specifying Values or Types
 --------------------------
 
-Another commonly-used feature of options is specifying acceptable values or types.
-If only the list of acceptable values is specified,
-the default value and the value passed in must be one of these values, or None if `allow_none` is True.
-If only the list of acceptable types is specified,
-the default value and the value passed in must be an instance one of these types, or None if `allow_none` is True.
-It is an error to attempt to specify both a list of acceptable values and a list of acceptable types.
+The parameters available when declaring an option allow a great deal of flexibility in specifying
+exactly what types and values are acceptable.
+
+As seen above, the allowed types can be specified using the :code:`types` parameter.  If an option is 
+more limited, then the set of allowed values can be given with :code:`values`:
+
+.. embed-code::
+    openmdao.utils.tests.test_options_dictionary_feature.TestOptionsDictionaryFeature.test_simple_values
+    :layout: interleave
+
+.. note::
+
+    It is an error to attempt to specify both a list of acceptable values and a list of acceptable types.
+
+Alternatively, the allowable values can be set using bounds and/or a validation function. 
+
+.. embed-code::
+    openmdao.utils.tests.test_options_dictionary_feature.TestOptionsDictionaryFeature.test_simple_bounds_valid
+    :layout: interleave
+
 
 .. tags:: Options
