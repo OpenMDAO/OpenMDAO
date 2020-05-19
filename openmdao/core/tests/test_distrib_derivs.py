@@ -894,7 +894,6 @@ class MPITests3(unittest.TestCase):
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
         model.add_constraint('f_xy', lower=0.0, indices=[3])
-        model.add_objective('f_xy', index=-1)
 
         prob.setup(force_alloc_complex=True, mode='fwd')
 
@@ -930,6 +929,44 @@ class MPITests3(unittest.TestCase):
                           1e-11)
         assert_near_equal(J['parab.f_xy']['p.y'], np.array([[-0. , -0. , -0., 8.6, -0. , -0. , -0. ]]),
                           1e-11)
+
+    def test_distrib_obj_indices(self):
+        size = 7
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', np.ones(size))
+        ivc.add_output('y', np.ones(size))
+        ivc.add_output('a', -3.0 + 0.6 * np.arange(size))
+
+        model.add_subsystem('p', ivc, promotes=['*'])
+
+        model.add_subsystem("parab", DistParab2(arr_size=size), promotes=['*'])
+
+        model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
+                                               f_sum=np.ones(1),
+                                               f_xy=np.ones(size)),
+                            promotes=['*'])
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy', index=-1)
+
+        prob.setup(force_alloc_complex=True, mode='fwd')
+
+        prob.run_model()
+
+        totals = prob.check_totals(method='cs')
+        for key, val in totals.items():
+            assert_near_equal(val['rel error'][0], 0.0, 1e-6)
+
+        prob.setup(force_alloc_complex=True, mode='rev')
+        prob.run_model()
+
+        totals = prob.check_totals(method='cs')
+        for key, val in totals.items():
+            assert_near_equal(val['rel error'][0], 0.0, 1e-6)
 
     def test_distrib_con_indices_negative(self):
         size = 7
