@@ -99,11 +99,8 @@ class _TotalJacInfo(object):
         driver_scaling : bool
             If True (default), scale derivative values by the quantities specified when the desvars
             and responses were added. If False, leave them unscaled.
-        _distributed_cons : dict
+        _distributed_resp : dict
             Dict of constraints that are distributed outputs. Key is rank, values are
-            (local indices, local sizes).
-        _distributed_objs : dict
-            Dict of objectives that are distributed outputs. Key is rank, values are
             (local indices, local sizes).
         """
         driver = problem.driver
@@ -183,8 +180,7 @@ class _TotalJacInfo(object):
         self.output_meta = {'fwd': responses, 'rev': design_vars}
         self.input_vec = {'fwd': model._vectors['residual'], 'rev': model._vectors['output']}
         self.output_vec = {'fwd': model._vectors['output'], 'rev': model._vectors['residual']}
-        self._distributed_cons = driver._distributed_cons
-        self._distributed_objs = driver._distributed_objs
+        self._distributed_resp = driver._distributed_resp
 
         abs2meta = model._var_allprocs_abs2meta
 
@@ -671,10 +667,8 @@ class _TotalJacInfo(object):
                     slc = slices[name]
                     if MPI and meta['distributed'] and model.comm.size > 1:
                         if indices is not None:
-                            if name in self._distributed_cons:
-                                local_idx, sizes_idx = self._distributed_cons[name]
-                            else:
-                                local_idx, sizes_idx = self._distributed_objs[name]
+                            if name in self._distributed_resp:
+                                local_idx, sizes_idx = self._distributed_resp[name]
 
                             dist_offset = np.sum(sizes_idx[:myproc])
                             full_inds = np.arange(slc.start / ncols, slc.stop / ncols,
@@ -1440,10 +1434,7 @@ class _TotalJacInfo(object):
         if return_format == 'flat_dict':
             for prom_out, output_name in zip(self.prom_of, of):
 
-                if output_name in self._distributed_cons:
-                    dist_resp = self._distributed_cons.get(output_name)
-                else:
-                    dist_resp = self._distributed_objs.get(output_name)
+                dist_resp = self._distributed_resp.get(output_name)
 
                 for prom_in, input_name in zip(self.prom_wrt, wrt):
 
@@ -1460,10 +1451,7 @@ class _TotalJacInfo(object):
             for prom_out, output_name in zip(self.prom_of, of):
                 tot = totals[prom_out]
 
-                if output_name in self._distributed_cons:
-                    dist_resp = self._distributed_cons.get(output_name)
-                else:
-                    dist_resp = self._distributed_objs.get(output_name)
+                dist_resp = self._distributed_resp.get(output_name)
 
                 for prom_in, input_name in zip(self.prom_wrt, wrt):
                     if output_name in wrt_meta and output_name != input_name:
