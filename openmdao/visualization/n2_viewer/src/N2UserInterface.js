@@ -562,7 +562,7 @@ class N2UserInterface {
         const history = this.forwardButtonHistory.pop();
         const node = history.node;
 
-        d3.select('#forwardButtonId').attr('disabled',
+        d3.select('#redo-graph').classed('disabled-button',
             (this.forwardButtonHistory.length == 0));
 
         for (let obj = node; obj != null; obj = obj.parent) {
@@ -798,12 +798,10 @@ class N2UserInterface {
     update() {
         testThis(this, 'N2UserInterface', 'update');
 
-        d3.select('#undo-graph').attr('disabled',
+        d3.select('#undo-graph').classed('disabled-button',
             (this.backButtonHistory.length == 0));
-        d3.select('#redo-graph').attr('disabled',
+        d3.select('#redo-graph').classed('disabled-button',
             (this.forwardButtonHistory.length == 0));
-        d3.select('#reset-graph').attr('disabled',
-            (this.n2Diag.zoomedElement === this.n2Diag.model.root));
     }
 
     /** Called when the search button is actually or effectively clicked to start a search. */

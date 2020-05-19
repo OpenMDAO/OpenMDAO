@@ -73,10 +73,6 @@ Instructions on editing the icons used for the toolbar.
 	content: '\e90b';
 }
 
-.icon-info-circle {
-	color: #42926b !important;
-}
-
 .icon-key:before {
 	content: '\e90c';
 }
