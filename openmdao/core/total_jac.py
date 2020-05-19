@@ -100,11 +100,11 @@ class _TotalJacInfo(object):
             If True (default), scale derivative values by the quantities specified when the desvars
             and responses were added. If False, leave them unscaled.
         _distributed_cons : dict
-            Dict of constraints that are distributed outputs. Values are
-            (owning rank, size).
+            Dict of constraints that are distributed outputs. Key is rank, values are
+            (local indices, local sizes).
         _distributed_objs : dict
-            Dict of objectives that are distributed outputs. Values are
-            (owning rank, size).
+            Dict of objectives that are distributed outputs. Key is rank, values are
+            (local indices, local sizes).
         """
         driver = problem.driver
         prom2abs = problem.model._var_allprocs_prom2abs_list['output']

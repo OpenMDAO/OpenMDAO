@@ -65,11 +65,11 @@ class Driver(object):
     _designvars_discrete : list
         List of design variables that are discrete.
     _distributed_cons : dict
-        Dict of constraints that are distributed outputs. Values are
-        (owning rank, size).
+        Dict of constraints that are distributed outputs. Key is rank, values are
+        (local indices, local sizes).
     _distributed_objs : dict
-        Dict of objectives that are distributed outputs. Values are
-        (owning rank, size).
+        Dict of objectives that are distributed outputs. Key is rank, values are
+        (local indices, local sizes).
     _cons : dict
         Contains all constraint info.
     _objs : dict
