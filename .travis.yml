@@ -15,8 +15,8 @@ env:
   matrix:
     # test with the latest version of Python 3.x
     - PY=3   NUMPY=1.18 SCIPY=1.4 PETSc=3.12 UPLOAD_DOCS=1
-    - PY=3.7 NUMPY=1.17 SCIPY=1.3
-    - PY=3.6 NUMPY=1.16 SCIPY=1.2 PETSc=3.10.2
+    #- PY=3.7 NUMPY=1.17 SCIPY=1.3
+    #- PY=3.6 NUMPY=1.16 SCIPY=1.2 PETSc=3.10.2
 
 git:
   depth: 99999
@@ -100,27 +100,15 @@ install:
   echo " >> Installing forked python packages";
   pip install git+https://github.com/swryan/coveralls-python@work;
 
-  echo " >> Installing pyOptSparse";
-  echo "  > Cloning pyOptSparse from mdolab";
-  git clone https://github.com/mdolab/pyoptsparse.git;
-  cd pyoptsparse;
-  git checkout tags/v1.2;
-
-  if [ "$SNOPT_LOCATION" ] && [ "${PY:0:1}" = "3" ]; then
-    cd pyoptsparse/pySNOPT;
-    echo "  > Secure copying SNOPT over SSH";
-    scp -r "$SNOPT_LOCATION" .;
-    cd ../..;
-  fi
 
   ## install paropt
-  echo "  > try different mpi compilers";
-  mpiCC --help
+  #echo "  > try different mpi compilers";
+  #mpiCC --help
 
-  mpic++ --help
+  #mpic++ --help
 
-  mpicxx --help
-  echo "  > end try different mpi compilers";
+  #mpicxx --help
+  #echo "  > end try different mpi compilers";
   git clone https://github.com/gjkennedy/paropt
   cd paropt
   cp Makefile.in.info Makefile.in
@@ -138,11 +126,34 @@ install:
   python -c "import paropt"
   #
 
+  echo "> After paropt install"
+  ls /home/travis/miniconda/envs/PY3/lib/python3.8/site-packages
+
+
+
+  echo " >> Installing pyOptSparse";
+  echo "  > Cloning pyOptSparse from mdolab";
+  git clone https://github.com/mdolab/pyoptsparse.git;
+  cd pyoptsparse;
+  git checkout tags/v1.2;
+
+  if [ "$SNOPT_LOCATION" ] && [ "${PY:0:1}" = "3" ]; then
+    cd pyoptsparse/pySNOPT;
+    echo "  > Secure copying SNOPT over SSH";
+    scp -r "$SNOPT_LOCATION" .;
+    cd ../..;
+  fi
+
+
 
   echo "  > Install pyOptSparse";
   pip install -r requirements.txt;
   pip install .;
   cd ..;
+
+  echo "> After pyoptsparse install"
+  ls /home/travis/miniconda/envs/PY3/lib/python3.8/site-packages
+
 
   echo " >> Installing optional packages for test coverage";
   pip install psutil objgraph git+https://github.com/mdolab/pyxdsm;

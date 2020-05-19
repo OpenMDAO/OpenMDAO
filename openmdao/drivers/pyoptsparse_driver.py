@@ -363,6 +363,8 @@ class pyOptSparseDriver(Driver):
         # Instantiate the requested optimizer
         try:
             _tmp = __import__('pyoptsparse', globals(), locals(), [optimizer], 0)
+            print(_tmp)
+            print(dir(_tmp))
             opt = getattr(_tmp, optimizer)()
 
         except Exception as err:
