@@ -14,7 +14,7 @@ from openmdao.utils.logger_utils import get_logger
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.mpi import MPI
 from openmdao.utils.hooks import _register_hook
-from openmdao.utils.general_utils import printoptions
+from openmdao.utils.general_utils import printoptions, simple_warning
 from openmdao.utils.units import convert_units
 from openmdao.utils.file_utils import _load_and_exec
 
@@ -155,7 +155,14 @@ def _get_used_before_calc_subs(group, input_srcs):
         A dict mapping names of target Systems to a set of names of their
         source Systems that execute after them.
     """
-    sub2i = {sub.name: i for i, sub in enumerate(group._subsystems_allprocs)}
+    sub2i = {}
+    parallel_solver = {}
+    for i, sub in enumerate(group._subsystems_allprocs):
+        if hasattr(sub, '_mpi_proc_allocator') and sub._mpi_proc_allocator.parallel:
+            parallel_solver.update({sub.name: sub.nonlinear_solver.SOLVER})
+
+        sub2i[sub.name] = i
+
     glen = len(group.pathname.split('.')) if group.pathname else 0
 
     ubcs = defaultdict(set)
@@ -165,6 +172,13 @@ def _get_used_before_calc_subs(group, input_srcs):
             oparts = src_abs.split('.')
             src_sys = oparts[glen]
             tgt_sys = iparts[glen]
+            if (src_sys in parallel_solver and tgt_sys in parallel_solver and
+                    (parallel_solver[src_sys] not in ["NL: NLBJ", "NL: Newton", "BROYDEN"]) and
+                    src_sys == tgt_sys):
+                simple_warning("Need to attach NonlinearBlockJac, NewtonSolver, or BroydenSolver "
+                               "to '%s' when connecting components inside parallel "
+                               "groups" % (src_sys))
+                ubcs[tgt_abs.rsplit('.', 1)[0]].add(src_abs.rsplit('.', 1)[0])
             if (src_sys in sub2i and tgt_sys in sub2i and
                     (sub2i[src_sys] > sub2i[tgt_sys])):
                 ubcs[tgt_sys].add(src_sys)
