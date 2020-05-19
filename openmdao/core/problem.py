@@ -457,8 +457,6 @@ class Problem(object):
                 else:
                     value = self.model.convert_from_units(abs_name, value, units)
                     ivalue = value
-                # if units is not None and smeta['units'] is not None:
-                    # value = self.model.convert2units(src, value, units)
         elif units is not None:
             value = self.model.convert_from_units(abs_name, value, units)
 

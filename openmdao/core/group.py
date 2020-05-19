@@ -40,10 +40,6 @@ namecheck_rgx = re.compile('[a-zA-Z][_a-zA-Z0-9]*')
 
 _undefined = Undefined()
 
-# these are meta dict entries that cannot differ between inputs unless a default is specified from
-# a corresponding group.add_input call
-_group_nodiff = set(['value', 'units'])
-
 
 class Group(System):
     """
@@ -525,15 +521,18 @@ class Group(System):
 
         if setup_mode == 'full':
             auto_ivc = self._setup_auto_ivcs(mode)
-        self._resolve_connected_input_defaults()
 
     def _top_level_setup2(self, setup_mode):
+        self._resolve_connected_input_defaults()
+
         if setup_mode == 'full' and self.comm.size > 1:
             abs2meta = self._var_abs2meta
             abs2idx = self._var_allprocs_abs2idx['nonlinear']
             all_abs2meta = self._var_allprocs_abs2meta
             conns = self._conn_global_abs_in2out
 
+            # the code below is to handle the case where src_indices were not specified
+            # for a distributed input. This update can't happen until sizes are known.
             dist_ins = [n for n in self._var_allprocs_abs_names['input']
                         if all_abs2meta[n]['distributed']]
             dcomp_names = set(d.rsplit('.', 1)[0] for d in dist_ins)
@@ -2692,8 +2691,11 @@ class Group(System):
             p2abs.update(old)
             self._var_allprocs_prom2abs_list[typ] = p2abs
 
-            self._var_abs2prom[typ].update(auto_ivc._var_abs2prom[typ])
-            self._var_allprocs_abs2prom[typ].update(auto_ivc._var_allprocs_abs2prom[typ])
+            # auto_ivc never promotes anything
+            self._var_abs2prom[typ].update({n: n for n in auto_ivc._var_abs2prom[typ]})
+            self._var_allprocs_abs2prom[typ].update({n: n for n in
+                                                     auto_ivc._var_allprocs_abs2prom[typ]})
+
             self._var_allprocs_abs_names_discrete[typ] = (
                 auto_ivc._var_allprocs_abs_names_discrete[typ] +
                 self._var_allprocs_abs_names_discrete[typ])
@@ -2712,7 +2714,10 @@ class Group(System):
         return auto_ivc
 
     def _resolve_connected_input_defaults(self):
-        global _group_nodiff
+        # these are meta dict entries that cannot differ between inputs unless a default
+        # is specified from a corresponding group.add_input call
+        group_nodiff = ['value', 'units']
+
         srcconns = defaultdict(list)
         for tgt, src in self._problem_meta['connections'].items():
             srcconns[src].append(tgt)
@@ -2723,19 +2728,7 @@ class Group(System):
         discrete_outs = self._var_allprocs_discrete['output']
 
         for src, tgts in srcconns.items():
-            if len(tgts) > 1 and src not in discrete_outs:
-                if not src.startswith('_auto_ivc.'):
-                    sunits = all_abs2meta[src]['units']
-                    if sunits is None:
-                        errs = []
-                        for tgt in tgts:
-                            if all_abs2meta[tgt]['units'] is not None:
-                                errs.append((tgt, all_abs2meta[tgt]['units']))
-                        if errs:
-                            raise RuntimeError(f"{self.msginfo}: Source '{src}' has units of None "
-                                               f"but the following inputs have units: {errs}.")
-                    continue
-
+            if len(tgts) > 1 and src not in discrete_outs and src.startswith('_auto_ivc.'):
                 if src in abs2meta:
                     smeta = abs2meta[src]
                     sloc = True
@@ -2743,20 +2736,30 @@ class Group(System):
                     smeta = all_abs2meta[tgt]
                     sloc = False
 
+                sunits = smeta['units'] if 'units' in smeta else None
+                sval = self._get_val(src, kind='output', get_remote=True, from_src=False)
+
                 for tgt in tgts:
+                    prom = abs2prom[tgt]
+                    if prom in self._group_inputs:
+                        gmeta = self._group_inputs[prom]
+                    else:
+                        gmeta = ()
+
                     if tgt in abs2meta:  # var is local
                         tmeta = abs2meta[tgt]
                     else:
                         tmeta = all_abs2meta[tgt]
 
-                    diffs, smissing, tmissing = diff_dicts(smeta, tmeta)
-                    if not sloc:
-                        smissing = set()
-                    errs = _group_nodiff.intersection(diffs | smissing | tmissing)
-                    if errs:
-                        prom = abs2prom[tgt]
-                        if prom in self._group_inputs:
-                            errs = errs.difference(self._group_inputs[prom])
+                    tunits = tmeta['units'] if 'units' in tmeta else None
+                    tval = self._get_val(tgt, kind='input', get_remote=True, from_src=False)
+
+                    errs = []
+                    if 'units' not in gmeta and sunits != tunits:
+                        errs.append('units')
+                    if 'value' not in gmeta and not np.all(sval == tval):
+                        errs.append('value')
+
                     if errs:
                         inputs = list(sorted(tgts))
                         raise RuntimeError(f"The following inputs, {inputs} are connected but "

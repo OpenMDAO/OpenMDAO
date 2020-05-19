@@ -4198,9 +4198,17 @@ class System(object):
             kind = typ
 
         if not discrete:
-            vec = self._vectors[kind][vec_name]
-            if abs_name in vec._views:
-                val = vec._views_flat[abs_name] if flat else vec._views[abs_name]
+            if not self._vectors[kind]:
+                # final_setup hasn't happened yet so vectors don't exist
+                if kind == 'residual':
+                    raise RuntimeError(f"{self.msginfo}: Can't retrieve residual '{abs_name}' "
+                                       "because final_setup hasn't been called yet.")
+                if abs_name in self._var_abs2meta:
+                    val = self._var_abs2meta[abs_name]['value']
+            else:
+                vec = self._vectors[kind][vec_name]
+                if abs_name in vec._views:
+                    val = vec._views_flat[abs_name] if flat else vec._views[abs_name]
 
         if get_remote and self.comm.size > 1:
             owner = self._owning_rank[abs_name]
