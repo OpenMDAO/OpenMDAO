@@ -660,7 +660,6 @@ class _TotalJacInfo(object):
             for name in names:
                 indices = vois[name]['indices'] if name in vois else None
                 meta = allprocs_abs2meta[name]
-                distributed = MPI and meta['distributed']
 
                 if indices is not None:
                     sz = len(indices)
@@ -670,7 +669,7 @@ class _TotalJacInfo(object):
                 if name in abs2idx and name in slices:
                     var_idx = abs2idx[name]
                     slc = slices[name]
-                    if meta['distributed'] and distributed and model.comm.size > 1:
+                    if MPI and meta['distributed'] and model.comm.size > 1:
                         if indices is not None:
                             if name in self._distributed_cons:
                                 local_idx, sizes_idx = self._distributed_cons[name]
