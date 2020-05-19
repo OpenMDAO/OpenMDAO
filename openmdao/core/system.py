@@ -4299,61 +4299,9 @@ class System(object):
         conns = self._problem_meta['connections']
         if from_src and abs_name in conns:  # pull input from source
             src = conns[abs_name]
-            if src in self._var_allprocs_discrete['output']:
-                return self._abs_get_val(src, get_remote, rank, vec_name, kind, flat)
-
-            if abs_name in self._var_abs2meta:
-                vmeta = self._var_abs2meta[abs_name]
-                src_indices = vmeta['src_indices']
-                has_src_indices = src_indices is not None
-            else:
-                vmeta = self._var_allprocs_abs2meta[abs_name]
-                src_indices = None  # FIXME: remote var could have src_indices
-                has_src_indices = vmeta['has_src_indices']
-            smeta = self._var_allprocs_abs2meta[src]
-            val = self._abs_get_val(src, get_remote, rank, vec_name, kind, flat)
-            if has_src_indices:
-                if src_indices is None:
-                    val = np.zeros(0)
-                else:
-                    if not get_remote and vmeta['distributed'] and src.startswith('_auto_ivc.'):
-                        val = val.ravel()[src_indices - src_indices[0]]
-                    else:
-                        val = val.ravel()[src_indices]
-                if get_remote:
-                    if rank is None and vmeta['distributed']:
-                        parts = self.comm.allgather(val)
-                        parts = [p for p in parts if p.size > 0]
-                        val = np.hstack(parts)
-                    elif vmeta['distributed']:
-                        parts = self.comm.gather(val, root=rank)
-                        if rank == self.comm.rank:
-                            parts = [p for p in parts if p.size > 0]
-                            val = np.hstack(parts)
-                        else:
-                            val = None
-                if vmeta['distributed'] and get_remote:
-                    val.shape = self._var_allprocs_abs2meta[abs_name]['global_shape']
-                elif val.size > 0:
-                    val.shape = vmeta['shape']
-            else:
-                val = val.reshape(vmeta['shape'])
-
-            # TODO: get indexed value BEFORE transferring the variable (might be much smaller)
-            if indices is not None:
-                val = val[indices]
-
-            if units is not None:
-                if smeta['units'] is not None:
-                    try:
-                        val = self.convert2units(src, val, units)
-                    except TypeError:  # just call this to get the right error message
-                        self.convert2units(abs_name, val, units)
-                else:
-                    val = self.convert2units(abs_name, val, units)
-            elif (vmeta['units'] is not None and smeta['units'] is not None and
-                    vmeta['units'] != smeta['units']):
-                val = self.convert2units(src, val, vmeta['units'])
+            return self._get_input_from_src(abs_name, src, units=units, indices=indices,
+                                            get_remote=get_remote, rank=rank, vec_name='nonlinear',
+                                            kind=None, flat=flat)
         else:
             val = self._abs_get_val(abs_name, get_remote, rank, vec_name, kind, flat)
 
@@ -4363,6 +4311,77 @@ class System(object):
 
             if units is not None:
                 val = self.convert2units(abs_name, val, units)
+
+        return val
+
+    def _get_input_from_src(self, abs_name, src, units=None, indices=None, get_remote=False,
+                            rank=None, vec_name='nonlinear', kind=None, flat=False):
+        if src in self._var_allprocs_discrete['output']:
+            return self._abs_get_val(src, get_remote, rank, vec_name, kind, flat)
+
+        if abs_name in self._var_abs2meta:  # input is local
+            vmeta = self._var_abs2meta[abs_name]
+            src_indices = vmeta['src_indices']
+            has_src_indices = src_indices is not None
+        else:
+            vmeta = self._var_allprocs_abs2meta[abs_name]
+            src_indices = None  # FIXME: remote var could have src_indices
+            has_src_indices = vmeta['has_src_indices']
+
+        distrib = vmeta['distributed']
+        smeta = self._var_allprocs_abs2meta[src]
+        val = self._abs_get_val(src, get_remote, rank, vec_name, kind, flat)
+
+        if has_src_indices:
+            if src_indices is None:  # input is remote
+                val = np.zeros(0)
+            else:
+                if not get_remote and distrib and src.startswith('_auto_ivc.'):
+                    val = val.ravel()[src_indices - src_indices[0]]
+                else:
+                    val = val.ravel()[src_indices]
+
+            if get_remote:
+                if distrib:
+                    if rank is None:
+                        parts = self.comm.allgather(val)
+                        parts = [p for p in parts if p.size > 0]
+                        val = np.hstack(parts)
+                    else:
+                        parts = self.comm.gather(val, root=rank)
+                        if rank == self.comm.rank:
+                            parts = [p for p in parts if p.size > 0]
+                            val = np.hstack(parts)
+                        else:
+                            val = None
+                else:  # non-distrib input
+                    if self.comm.rank == self._owning_rank[abs_name]:
+                        self.comm.bcast(val, root=self.comm.rank)
+                    else:
+                        val = self.comm.bcast(None, root=self._owning_rank[abs_name])
+
+            if distrib and get_remote:
+                val.shape = self._var_allprocs_abs2meta[abs_name]['global_shape']
+            elif val.size > 0:
+                val.shape = vmeta['shape']
+        else:
+            val = val.reshape(vmeta['shape'])
+
+        # TODO: get indexed value BEFORE transferring the variable (might be much smaller)
+        if indices is not None:
+            val = val[indices]
+
+        if units is not None:
+            if smeta['units'] is not None:
+                try:
+                    val = self.convert2units(src, val, units)
+                except TypeError:  # just call this to get the right error message
+                    self.convert2units(abs_name, val, units)
+            else:
+                val = self.convert2units(abs_name, val, units)
+        elif (vmeta['units'] is not None and smeta['units'] is not None and
+                vmeta['units'] != smeta['units']):
+            val = self.convert2units(src, val, vmeta['units'])
 
         return val
 
