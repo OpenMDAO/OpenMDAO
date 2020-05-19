@@ -128,6 +128,11 @@ install:
   #
   mkdir -p $HOME/git/paropt/lib
   make  #  install compiled paropt
+  echo "HOME"
+  echo $HOME
+  echo "ls $HOME/git/paropt/lib/"
+  ls $HOME/git/paropt/lib/
+  cp $HOME/git/paropt/lib/libparopt.so /home/travis/build/hschilling/OpenMDAO/pyoptsparse/paropt/lib
   python3 setup.py install # install Python wrapper
   cd ..
   python -c "import paropt"
