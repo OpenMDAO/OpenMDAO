@@ -9,7 +9,7 @@ from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitCompone
 
 from openmdao.utils.logger_utils import TestLogger
 from openmdao.error_checking.check_config import get_sccs_topo
-from openmdao.utils.assert_utils import assert_warning
+from openmdao.utils.assert_utils import assert_warning, assert_no_warning
 
 
 class MyComp(ExecComp):
@@ -156,8 +156,11 @@ class TestCheckConfig(unittest.TestCase):
 
         prob.setup(check=True)
 
-        prob.run_model()
-        print('done')
+        msg = ("The following systems are executed out-of-order:\n"
+               "   System 'parallel.c2' executes out-of-order with respect to its source systems ['parallel.c1']\n")
+
+        with assert_no_warning(UserWarning, msg):
+            prob.run_model()
 
     def test_single_parallel_group_order(self):
         prob = Problem()
