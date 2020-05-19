@@ -160,7 +160,6 @@ class TestNotInstalled(unittest.TestCase):
                          'pyOptSparseDriver is not available, pyOptsparse is not installed.')
 
 
-
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
 @unittest.skipUnless(MPI, "MPI is required.")
 class TestMPIScatter(unittest.TestCase):
