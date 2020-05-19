@@ -147,7 +147,6 @@ class DataSave(om.ExplicitComponent):
 
 @unittest.skipUnless(OPT is None, "only run if pyoptsparse is NOT installed.")
 class TestNotInstalled(unittest.TestCase):
-    N_PROCS = 2
 
     def test_pyoptsparse_not_installed(self):
         # the import should not fail
@@ -601,7 +600,6 @@ class TestPyoptSparse(unittest.TestCase):
         msg = "pyOptSparseDriver: Tried to set read-only option 'equality_constraints'."
 
         self.assertEqual(exception.args[0], msg)
-
 
     def test_fan_out(self):
         # This tests sparse-response specification.
