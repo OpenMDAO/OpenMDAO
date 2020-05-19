@@ -501,6 +501,15 @@ class SqliteCaseReader(BaseCaseReader):
             if case_coord.startswith(coord):
                 cases.append(case_coord)
 
+
+        try:
+            problem_cases = self._problem_cases.list_cases()
+            if problem_cases:
+                for case in problem_cases:
+                    cases.append(case)
+        except AttributeError:
+            pass
+
         return cases
 
     def _list_cases_recurse_nested(self, coord=None):
