@@ -145,6 +145,23 @@ class DataSave(om.ExplicitComponent):
         partials['y', 'x'] = 2.0*x - 6.0
 
 
+@unittest.skipUnless(OPT is None, "only run if pyoptsparse is NOT installed.")
+class TestNotInstalled(unittest.TestCase):
+    N_PROCS = 2
+
+    def test_pyoptsparse_not_installed(self):
+        # the import should not fail
+        from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
+
+        # but we get a RuntimeError if we try to instantiate
+        with self.assertRaises(RuntimeError) as ctx:
+            pyOptSparseDriver()
+
+        self.assertEqual(str(ctx.exception),
+                         'pyOptSparseDriver is not available, pyOptsparse is not installed.')
+
+
+
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
 @unittest.skipUnless(MPI, "MPI is required.")
 class TestMPIScatter(unittest.TestCase):
