@@ -125,7 +125,7 @@ install:
   cd ..;
 
   echo "> After pyoptsparse install"
-  ls /home/travis/miniconda/envs/PY3/lib/python3.6/site-packages
+  ls /home/travis/miniconda/envs/PY3.6/lib/python3.6/site-packages
 
 
   ## install paropt
@@ -154,7 +154,7 @@ install:
   #
 
   echo "> After paropt install"
-  ls /home/travis/miniconda/envs/PY3/lib/python3.6/site-packages
+  ls /home/travis/miniconda/envs/PY3.6/lib/python3.6/site-packages
 
 
   echo " >> Installing optional packages for test coverage";
