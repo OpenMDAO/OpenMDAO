@@ -117,15 +117,21 @@ install:
     cd ../..;
   fi
 
-  echo 'git tag -l *.*.*'
-  git tag -l *.*.*
-  echo 'end git tag -l *.*.*'
-
 
   echo "  > Install pyOptSparse";
   pip install -r requirements.txt;
   pip install .;
   cd ..;
+
+
+  echo "pwd"
+  pwd
+  echo 'git tag -l *.*.*'
+  git tag -l *.*.*
+  echo 'end git tag -l *.*.*'
+
+
+
 
   echo "> After pyoptsparse install"
   #  ls /home/travis/miniconda/envs/PY3.6/lib/python3.6/site-packages
