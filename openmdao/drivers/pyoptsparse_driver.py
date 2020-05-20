@@ -362,6 +362,7 @@ class pyOptSparseDriver(Driver):
 
         # Instantiate the requested optimizer
         try:
+            print("__import__", optimizer)
             _tmp = __import__('pyoptsparse', globals(), locals(), [optimizer], 0)
             print("_tmp", _tmp)
             print("dir(_tmp)", dir(_tmp))

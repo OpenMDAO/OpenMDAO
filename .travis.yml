@@ -175,7 +175,7 @@ install:
   ls -R /home/travis/miniconda/envs/PY3.6/lib/python3.6/site-packages/paropt*
 
   echo "import pyoptsparse"
-  python -c "import pyoptsparse"
+  python -c "import pyoptsparse; print(pyoptsparse)"
   echo "from pyoptsparse.pyParOpt.ParOpt import ParOpt; print(ParOpt)"
   python -c "from pyoptsparse.pyParOpt.ParOpt import ParOpt; print(ParOpt)"
   echo "from paropt import ParOpt as _ParOpt; print(_ParOpt)"
