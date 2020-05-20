@@ -92,7 +92,7 @@ install:
     conda install -c anaconda mpi4py --yes;
     conda install -c conda-forge petsc=$PETSc petsc4py --yes;
 
-    conda install -c anaconda gxx_linux-64 --yes;
+#    conda install -c anaconda gxx_linux-64 --yes;
   fi
 
   pip install --upgrade pip;
@@ -167,10 +167,10 @@ install:
 
   echo "import pyoptsparse"
   python -c "import pyoptsparse"
-  echo "from pyoptsparse.pyParOpt.ParOpt import ParOpt"
-  python -c "from pyoptsparse.pyParOpt.ParOpt import ParOpt"
-  echo "from paropt import ParOpt as _ParOpt"
-  python -c "from paropt import ParOpt as _ParOpt"
+  echo "from pyoptsparse.pyParOpt.ParOpt import ParOpt; print(ParOpt)"
+  python -c "from pyoptsparse.pyParOpt.ParOpt import ParOpt; print(ParOpt)"
+  echo "from paropt import ParOpt as _ParOpt; print(_ParOpt)"
+  python -c "from paropt import ParOpt as _ParOpt; print(_ParOpt)"
 
 
 
