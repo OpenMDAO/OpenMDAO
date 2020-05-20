@@ -3585,9 +3585,9 @@ class System(object):
 
         # determine whether setup has been performed
         if self._outputs is not None:
-            setup = True
+            after_final_setup = True
         else:
-            setup = False
+            after_final_setup = False
 
         # Make a dict of variables. Makes it easier to work with in this method
         var_dict = OrderedDict()
@@ -3604,7 +3604,7 @@ class System(object):
             if not all_procs and self.comm.rank > 0:
                 return
 
-            if setup:
+            if after_final_setup:
                 meta = self._var_abs2meta
             else:
                 meta = self._var_rel2meta
@@ -3621,12 +3621,10 @@ class System(object):
                     if name not in var_dict:     # If not in the merged dict, add it
                         var_dict[name] = proc_vars[name]
                     else:
-                        # In there already, only need to deal with it if it is a distributed array
-                        # Checking to see if distributed depends on if it is an input or output
-                        if var_type == 'input':
-                            is_distributed = meta[name]['src_indices'] is not None
-                        else:
+                        try:
                             is_distributed = meta[name]['distributed']
+                        except KeyError:
+                            is_distributed = allprocs_meta[name]['distributed']
 
                         if is_distributed and name in allprocs_meta:
                             # TODO no support for > 1D arrays
@@ -3634,7 +3632,7 @@ class System(object):
 
                             global_shape = allprocs_meta[name]['global_shape']
 
-                            if meta[name]['shape'] != global_shape:
+                            if allprocs_meta[name]['shape'] != global_shape:
                                 # if the local shape is different than the global shape and the
                                 # global shape matches the concatenation of values from all procs,
                                 # then assume the concatenation, otherwise just use the value from
@@ -3651,7 +3649,7 @@ class System(object):
                                             if distrib[key][name].shape == global_shape:
                                                 var_dict[name][key] = distrib[key][name]
 
-        if setup:
+        if after_final_setup:
             inputs = var_type == 'input'
             outputs = not inputs
             var_list = self._get_vars_exec_order(inputs=inputs, outputs=outputs, variables=var_dict)
