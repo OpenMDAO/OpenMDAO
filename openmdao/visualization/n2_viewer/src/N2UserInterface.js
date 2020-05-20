@@ -389,10 +389,9 @@ class N2UserInterface {
     collapse() {
         testThis(this, 'N2UserInterface', 'collapse');
 
-        let node = this.leftClickedNode;
+        let node = this.rightClickedNode;
 
         if (this.isCollapsible(node)) {
-            this.rightClickedNode = node;
 
             if (this.collapsedRightClickNode !== undefined) {
                 this.rightClickedNode = this.collapsedRightClickNode;
@@ -412,17 +411,15 @@ class N2UserInterface {
     /**
      * When a node is right-clicked, collapse it if it's allowed.
      * @param {N2TreeNode} node The node that was right-clicked.
-     * @param {Object} element The HTML element associated with the node that triggered the event.
      */
-    rightClick(node, element) {
+    rightClick(node) {
         testThis(this, 'N2UserInterface', 'rightClick');
 
         d3.event.preventDefault();
         d3.event.stopPropagation();
 
         if (this.isCollapsible(node)) {
-            this.leftClickedNode = node;
-            this.rightClickedNode = element;
+            this.rightClickedNode = node;
             node.collapsable = true;
 
             this.addBackButtonHistory();
