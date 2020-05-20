@@ -216,7 +216,7 @@ script:
 - if [ "$UPLOAD_DOCS" ]; then
     testflo -n 1 openmdao --timeout=120 --show_skipped --coverage  --coverpkg openmdao --cover-omit \*tests/\*  --cover-omit \*devtools/\* --cover-omit \*test_suite/\* --cover-omit \*docs/\* --cover-omit \*code_review/\*;
   else
-    testflo -n 1 openmdao --timeout=120 --show_skipped;
+    testflo -s -n 1 openmdao --timeout=120 --show_skipped;
   fi
 
 after_success:
