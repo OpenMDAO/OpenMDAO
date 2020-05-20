@@ -161,7 +161,31 @@ n2_gui_test_scripts = {
             "test": "click",
             "selector": "g#solver_tree rect#circuit_n1",
             "button": "right"
-        }
+        },
+        {
+            "test": "root"
+        },
+        {
+            "desc": "Check the number of cells in the N2 Matrix",
+            "test": "count",
+            "selector": "g#n2elements > g.n2cell",
+            "count": 40
+        },
+        {
+            "desc": "Perform a search on V_out",
+            "test": "search",
+            "searchString": "V_out",
+            "n2ElementCount": 11
+        },
+        {
+            "test": "root"
+        },
+        {
+            "desc": "Check that home button works after search",
+            "test": "count",
+            "selector": "g#n2elements > g.n2cell",
+            "count": 40
+        },
     ],
     "bug_arrow": [
         {
@@ -325,10 +349,10 @@ n2_gui_test_scripts = {
     ],
     "udpi_circuit": [
         {
-        "desc": "Check the number of cells in the N2 Matrix",
-        "test": "count",
-        "selector": "g#n2elements > g.n2cell",
-        "count": 29
+            "desc": "Check the number of cells in the N2 Matrix",
+            "test": "count",
+            "selector": "g#n2elements > g.n2cell",
+            "count": 29
         }
     ],
     "parabaloid": [
@@ -372,6 +396,7 @@ n2_gui_test_scripts = {
 }
 
 n2_gui_test_models = n2_gui_test_scripts.keys()
+
 
 class n2_gui_test_case(unittest.TestCase):
 
@@ -535,7 +560,7 @@ class n2_gui_test_case(unittest.TestCase):
         self.log_test("Return to root")
         hndl = await self.get_handle("#reset-graph")
         await hndl.click()
-        await self.page.waitFor(self.transition_wait)
+        await self.page.waitFor(self.transition_wait * 2)
 
     async def search_and_check_result(self, options):
         """
@@ -548,17 +573,17 @@ class n2_gui_test_case(unittest.TestCase):
                       "' and checking for " +
                       str(options['n2ElementCount']) + " N2 elements after.")
 
-        await self.page.hover(".searchbar-container")
-        await self.page.click(".searchbar")
+        # await self.page.hover(".searchbar-container")
+        await self.page.click("#searchbar-container")
         await self.page.waitFor(500)
 
         searchbar = await self.page.querySelector('#awesompleteId')
-        await self.page.evaluate('(element, searchString, page) => element.value = searchString + " "', searchbar, searchString, page)
+        await searchbar.type(searchString + "\n")
 
-        await self.page.waitFor(500)
+        # await self.page.waitFor(500)
 
-        await self.page.keyboard.press('Backspace')
-        await self.page.keyboard.press("Enter")
+        # await self.page.keyboard.press('Backspace')
+        # await self.page.keyboard.press("Enter")
         await self.page.waitFor(self.transition_wait + 500)
         await self.assert_element_count("g#n2elements > g.n2cell",
                                         options['n2ElementCount'])
