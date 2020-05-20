@@ -93,6 +93,8 @@ install:
     conda install -c conda-forge petsc=$PETSc petsc4py --yes;
 
     conda install -c anaconda gxx_linux-64 --yes;
+    conda install -c anaconda gfortran_linux-64 --yes;
+
   fi
 
   pip install --upgrade pip;
