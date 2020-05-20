@@ -3100,16 +3100,24 @@ class System(object):
             sizes = self._var_sizes['nonlinear']['output']
             abs2idx = self._var_allprocs_abs2idx['nonlinear']
             for name in out:
-                if 'size' not in out[name]:
-                    if name in abs2idx:
-                        out[name]['size'] = sizes[self._owning_rank[name], abs2idx[name]]
-                    else:
-                        out[name]['size'] = 0  # discrete var, we don't know the size
+                response = out[name]
 
-                if name in abs2idx:
-                    meta = self._var_allprocs_abs2meta[name]
-                    out[name]['distributed'] = meta['distributed']
-                    out[name]['global_size'] = meta['global_size']
+                # Discrete vars
+                if name not in abs2idx:
+                    response['size'] = 0  # discrete var, we don't know the size
+                    continue
+
+                meta = self._var_allprocs_abs2meta[name]
+                response['distributed'] = meta['distributed']
+
+                if response['indices'] is not None:
+                    # Index defined in this response.
+                    response['global_size'] = len(response['indices']) if meta['distributed'] \
+                        else meta['global_size']
+
+                else:
+                    response['size'] = sizes[self._owning_rank[name], abs2idx[name]]
+                    response['global_size'] = meta['global_size']
 
         if recurse:
             for subsys in self._subsystems_myproc:
