@@ -373,19 +373,25 @@ class N2UserInterface {
     }
 
     /**
+     * Make sure the clicked node is deeper than the zoomed node, that
+     * it's not the root node, and that it actually has children.
+     * @param {N2TreeNode} node The right-clicked node to check.
+     */
+    isCollapsible(node) {
+        return (node.depth > this.n2Diag.zoomedElement.depth &&
+            node.type !== 'root' && node.hasChildren());
+    }
+
+    /**
      * When a node is right-clicked or otherwise targeted for collapse, make sure it
-     * has children and isn't the root node. Set the node as minimized and update
-     * the diagram drawing.
+     * it's allowed, then set the node as minimized and update the diagram drawing.
      */
     collapse() {
         testThis(this, 'N2UserInterface', 'collapse');
 
         let node = this.leftClickedNode;
 
-        if (!node.hasChildren()) return;
-
-        // Don't allow minimizing of root node
-        if (node.depth > this.n2Diag.zoomedElement.depth || node.type !== 'root') {
+        if (this.isCollapsible(node)) {
             this.rightClickedNode = node;
 
             if (this.collapsedRightClickNode !== undefined) {
@@ -403,20 +409,25 @@ class N2UserInterface {
         }
     }
 
-    /* When a node is right-clicked, collapse it. */
-    rightClick(node1, node2) {
+    /**
+     * When a node is right-clicked, collapse it if it's allowed.
+     * @param {N2TreeNode} node The node that was right-clicked.
+     * @param {Object} element The HTML element associated with the node that triggered the event.
+     */
+    rightClick(node, element) {
         testThis(this, 'N2UserInterface', 'rightClick');
 
-        this.leftClickedNode = node1;
-        this.rightClickedNode = node2;
-
-        let node = this.leftClickedNode;
-        node['collapsable'] = true;
-
-        this.addBackButtonHistory();
         d3.event.preventDefault();
         d3.event.stopPropagation();
-        this.collapse();
+
+        if (this.isCollapsible(node)) {
+            this.leftClickedNode = node;
+            this.rightClickedNode = element;
+            node.collapsable = true;
+
+            this.addBackButtonHistory();
+            this.collapse();
+        }
     }
 
     /**
@@ -429,7 +440,8 @@ class N2UserInterface {
         this.lastClickWasLeft = true;
         if (this.leftClickedNode.depth > this.n2Diag.zoomedElement.depth) {
             this.leftClickIsForward = true; // forward
-        } else if (this.leftClickedNode.depth < this.n2Diag.zoomedElement.depth) {
+        }
+        else if (this.leftClickedNode.depth < this.n2Diag.zoomedElement.depth) {
             this.leftClickIsForward = false; // backwards
         }
         this.n2Diag.updateZoomedElement(node);
