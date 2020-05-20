@@ -155,6 +155,9 @@ install:
 
   echo "> After paropt install"
   ls /home/travis/miniconda/envs/PY3.6/lib/python3.6/site-packages
+  ls /home/travis/miniconda/envs/PY3.6/lib/python3.6/site-packages/paropt*
+
+
 
 
   echo " >> Installing optional packages for test coverage";
