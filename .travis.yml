@@ -125,7 +125,11 @@ install:
   cd ..;
 
   echo "> After pyoptsparse install"
-  ls /home/travis/miniconda/envs/PY3.6/lib/python3.6/site-packages
+#  ls /home/travis/miniconda/envs/PY3.6/lib/python3.6/site-packages
+  ls -R /home/travis/miniconda/envs/PY3.6/lib/python3.6/site-packages/pyoptsparse
+
+  # pyoptsparse
+  # pyoptsparse-1.2.0.dist-info
 
 
   ## install paropt
@@ -147,7 +151,11 @@ install:
   echo $HOME
   echo "ls $HOME/git/paropt/lib/"
   ls $HOME/git/paropt/lib/
-  cp $HOME/git/paropt/lib/libparopt.so /home/travis/build/hschilling/OpenMDAO/pyoptsparse/paropt/lib
+#  cp $HOME/git/paropt/lib/libparopt.so /home/travis/build/hschilling/OpenMDAO/pyoptsparse/paropt/lib
+
+  cp $HOME/git/paropt/lib/libparopt.so /home/travis/miniconda/envs/PY3.6/lib
+  cp $HOME/git/paropt/lib/libparopt.a /home/travis/miniconda/envs/PY3.6/lib
+
   python3 setup.py install # install Python wrapper
   cd ..
   python -c "import paropt"
@@ -155,7 +163,7 @@ install:
 
   echo "> After paropt install"
   ls /home/travis/miniconda/envs/PY3.6/lib/python3.6/site-packages
-  ls /home/travis/miniconda/envs/PY3.6/lib/python3.6/site-packages/paropt*
+  ls -R /home/travis/miniconda/envs/PY3.6/lib/python3.6/site-packages/paropt*
 
 
 
