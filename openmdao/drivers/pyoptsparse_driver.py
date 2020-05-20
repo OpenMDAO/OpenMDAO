@@ -366,7 +366,10 @@ class pyOptSparseDriver(Driver):
             _tmp = __import__('pyoptsparse', globals(), locals(), [optimizer], 0)
             print("_tmp", _tmp)
             print("dir(_tmp)", dir(_tmp))
-            opt = getattr(_tmp, optimizer)()
+            # opt = getattr(_tmp, optimizer)()
+            opt_mod = getattr(_tmp, optimizer)
+            print("opt_mod", opt_mod)
+            opt = opt_mod()
 
         except Exception as err:
             # Change whatever pyopt gives us to an ImportError, give it a readable message,
