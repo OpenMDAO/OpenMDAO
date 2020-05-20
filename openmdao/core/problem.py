@@ -383,7 +383,8 @@ class Problem(object):
                 val = self.model.convert2units(name, val, units)
             return val
 
-        val = self.model._get_val(name, units=units, indices=indices, get_remote=get_remote)
+        val = self.model._get_val(name, units=units, indices=indices, get_remote=get_remote,
+                                  from_src=True)
 
         if val is System._undefined:
             if get_remote:

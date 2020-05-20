@@ -34,8 +34,6 @@ def _get_fan_out(size, auto):
     if not auto:
         model.connect('indeps.x', 'par.x')
 
-    #import wingdbstub
-
     p.setup()
 
     return p
@@ -59,6 +57,7 @@ def _get_fan_in(size, auto):
     if not auto:
         model.connect('indeps1.x', 'par.C1.x')
         model.connect('indeps2.x', 'par.C2.x')
+
     model.connect('par.C1.y', 'sum.x')
     model.connect('par.C2.y', 'sum.y')
 
@@ -84,7 +83,9 @@ def _test_func_name(func, num, param):
 
 
 class SerialTests(unittest.TestCase):
-    @parameterized.expand([(3, 'par.C1.x', True), (3, 'par.C2.x', True), (3, 'indeps.x', False)],
+    @parameterized.expand([(3, 'par.C1.x', True),
+                           (3, 'par.C2.x', True),
+                           (3, 'indeps.x', False)],
                           name_func=_test_func_name)
     def test_fan_out(self, size, toset, auto):
         p = _get_fan_out(size=size, auto=auto)
@@ -102,7 +103,7 @@ class SerialTests(unittest.TestCase):
                            (3, 'indeps1.x', 'indeps2.x', False)],
                           name_func=_test_func_name)
     def test_fan_in(self, size, toset1, toset2, auto):
-        p = _get_fan_in(size=size, auto=False)
+        p = _get_fan_in(size=size, auto=auto)
 
         inval1 = np.arange(size) + 1.0
         inval2 = (np.arange(size) + 1.0)[::-1]
