@@ -333,7 +333,7 @@ class N2Diagram {
                 self.ui.leftClick(d);
             })
             .on("contextmenu", function (d) {
-                self.ui.rightClick(d);
+                self.ui.rightClick(d, this);
             })
             .on("mouseover", function (d) {
                 self.ui.nodeInfoBox.update(d3.event, d, d3.select(this).select('rect').style('fill'));

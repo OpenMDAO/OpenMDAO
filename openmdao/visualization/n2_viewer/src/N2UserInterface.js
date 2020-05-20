@@ -413,12 +413,19 @@ class N2UserInterface {
      * @param {N2TreeNode} node The node that was right-clicked.
      */
     rightClick(node) {
+        console.log("rightClick() called")
         testThis(this, 'N2UserInterface', 'rightClick');
 
         d3.event.preventDefault();
         d3.event.stopPropagation();
 
-        if (this.isCollapsible(node)) {
+        if (node.isMinimized) {
+            this.rightClickedNode = node;
+            this.addBackButtonHistory();
+            this._uncollapse(node);
+            this.n2Diag.update();
+        }
+        else if (this.isCollapsible(node)) {
             this.rightClickedNode = node;
             node.collapsable = true;
 
@@ -451,13 +458,14 @@ class N2UserInterface {
      */
     leftClick(node) {
         testThis(this, 'N2UserInterface', 'leftClick');
+        d3.event.preventDefault();
+        d3.event.stopPropagation();
 
         if (!node.hasChildren() || node.isParam()) return;
         if (d3.event.button != 0) return;
         this.addBackButtonHistory();
         this._setupLeftClick(node);
-        d3.event.preventDefault();
-        d3.event.stopPropagation();
+
         this.n2Diag.update();
     }
 
@@ -664,13 +672,12 @@ class N2UserInterface {
     }
 
     /**
-     * Mark this node and all of its children as unminimized
+     * Mark this node and all of its children as unminimized/unhidden
      * @param {N2TreeNode} node The node to operate on.
      */
     _uncollapse(node) {
-        if (!node.isParam()) {
-            node.isMinimized = false;
-        }
+        node.isMinimized = false;
+        node.varIsHidden = false;
 
         if (node.hasChildren()) {
             for (let child of node.children) {
