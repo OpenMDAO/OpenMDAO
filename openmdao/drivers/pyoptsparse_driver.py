@@ -376,6 +376,7 @@ class pyOptSparseDriver(Driver):
             else:
                 opt_class = opt_class_or_mod
             opt = opt_class()
+            print("opt being used is ", opt)
 
         except Exception as err:
             # Change whatever pyopt gives us to an ImportError, give it a readable message,
