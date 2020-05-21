@@ -171,8 +171,8 @@ install:
 
   echo "making directory and copying library"
   mkdir -p /home/travis/miniconda/envs/PY/lib
-  cp $HOME/git/paropt/lib/libparopt.a /home/travis/miniconda/envs/PY/lib
-  cp $HOME/git/paropt/lib/libparopt.so /home/travis/miniconda/envs/PY/lib
+  cp $HOME/git/paropt/lib/libparopt.a /home/travis/miniconda/envs/PY3/lib
+  cp $HOME/git/paropt/lib/libparopt.so /home/travis/miniconda/envs/PY3/lib
 
   ls /home/travis/miniconda/envs/PY3/lib
 
