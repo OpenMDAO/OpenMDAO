@@ -1616,7 +1616,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.driver = pyOptSparseDriver()
 
-        # We generally don't hae a working NOMAD install.
+        # We generally don't have a working NOMAD install.
         prob.driver.options['optimizer'] = 'NOMAD'
         prob.setup()
 

@@ -1,80 +1,59 @@
 """
-OpenMDAO Wrapper for NLOpt.
-
+OpenMDAO Wrapper for the scipy.optimize.minimize family of local optimizers.
 """
 
-from collections import OrderedDict
-import json
-import signal
+
 import sys
-import traceback
+from collections import OrderedDict
+from distutils.version import LooseVersion
 
 import numpy as np
-from scipy.sparse import coo_matrix
+from scipy import __version__ as scipy_version
+from scipy.optimize import minimize
 
-import nlopt
-
-from openmdao.core.analysis_error import AnalysisError
+import openmdao
+import openmdao.utils.coloring as coloring_mod
 from openmdao.core.driver import Driver, RecordingDebugging
-import openmdao.utils.coloring as c_mod
 from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.class_util import weak_method_wrapper
-from openmdao.utils.mpi import FakeComm
+from openmdao.utils.mpi import MPI
 
+# Optimizers in scipy.minimize
+_optimizers = {'Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B',
+               'TNC', 'COBYLA', 'SLSQP'}
+if LooseVersion(scipy_version) >= LooseVersion("1.1"):  # Only available in newer versions
+    _optimizers.add('trust-constr')
 
-# names of optimizers that use gradients
-grad_drivers = {'NLOPT_LD_MMA', 'NLOPT_LD_SLSQP', 'NLOPT_LD_LBFGS',
-                'NLOPT_LD_TNEWTON_PRECOND_RESTART', 'NLOPT_LD_TNEWTON_PRECOND',
-                'NLOPT_LD_TNEWTON_RESTART', 'NLOPT_LD_TNEWTON',
-                'NLOPT_LD_VAR2', 'NLOPT_LD_VAR1', 'NLOPT_AUGLAG',
-                'NLOPT_AUGLAG_EQ', 'NLOPT_GD_STOGO', 'NLOPT_GD_STOGO_RAND'}
+# For 'basinhopping' and 'shgo' gradients are used only in the local minimization
+_gradient_optimizers = {'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B', 'TNC', 'SLSQP', 'dogleg',
+                        'trust-ncg', 'trust-constr', 'basinhopping', 'shgo'}
+_hessian_optimizers = {'trust-constr', 'trust-ncg'}
+_bounds_optimizers = {'L-BFGS-B', 'TNC', 'SLSQP', 'trust-constr', 'dual_annealing', 'shgo',
+                      'differential_evolution', 'basinhopping'}
+_constraint_optimizers = {'COBYLA', 'SLSQP', 'trust-constr', 'shgo'}
+_constraint_grad_optimizers = _gradient_optimizers & _constraint_optimizers
+_eq_constraint_optimizers = {'SLSQP', 'trust-constr'}
+_global_optimizers = {'differential_evolution', 'basinhopping'}
+if LooseVersion(scipy_version) >= LooseVersion("1.2"):  # Only available in newer versions
+    _global_optimizers |= {'shgo', 'dual_annealing'}
 
-# names of optimizers that allow multiple objectives
-multi_obj_drivers = {}
+# Global optimizers and optimizers in minimize
+_all_optimizers = _optimizers | _global_optimizers
 
-# All optimizers in pyoptsparse
-optlist = ['NLOPT_GN_DIRECT',
-           'NLOPT_GN_DIRECT_L',
-           'NLOPT_GN_DIRECT_L_RAND',
-           'NLOPT_GNL_DIRECT_NOSCAL',
-           'NLOPT_GN_DIRECT_L_NOSCAL',
-           'NLOPT_GN_DIRECT_L_RAND_NOSCAL',
-           'NLOPT_GN_ORIG_DIRECT',
-           'NLOPT_GN_ORIG_DIRECT_L',
-           'NLOPT_GN_CRS2_LM',
-           'NLOPT_G_MLSL_LDS',
-           'NLOPT_G_MLSL',
-           'NLOPT_GD_STOGO',
-           'NLOPT_GD_STOGO_RAND',
-           'NLOPT_GN_AGS',
-           'NLOPT_GN_ISRES',
-           'NLOPT_GN_ESCH',
-           'NLOPT_LN_COBYLA',
-           'NLOPT_LN_BOBYQA',
-           'NLOPT_LN_NEWUOA',
-           'NLOPT_LN_NEWUOA_BOUND',
-           'NLOPT_LN_PRAXIS',
-           'NLOPT_LN_NELDERMEAD',
-           'NLOPT_LN_SBPLX',
-           'NLOPT_LD_MMA',
-           'NLOPT_LD_CCSAQ',
-           'NLOPT_LD_SLSQP',
-           'NLOPT_LD_TNEWTON_PRECOND_RESTART',
-           'NLOPT_LD_TNEWTON_PRECOND',
-           'NLOPT_LD_TNEWTON_RESTART',
-           'NLOPT_LD_TNEWTON',
-           'NLOPT_LD_VAR2',
-           'NLOPT_LD_VAR1',
-           'NLOPT_AUGLAG',
-           'NLOPT_AUGLAG_EQ',
-           ]
+# These require Hessian or Hessian-vector product, so they are not supported
+# right now.
+# dual-annealing and basinhopping not supported yet
+_unsupported_optimizers = {'dogleg', 'trust-ncg'}
 
-# All optimizers that require an initial run
-run_required = []
+# With "old-style" a constraint is a dictionary, with "new-style" an object
+# With "old-style" a bound is a tuple, with "new-style" a Bounds instance
+# In principle now everything can work with "old-style"
+# These settings have no effect to the optimizers implemented before SciPy 1.1
+_supports_new_style = {'trust-constr'}
+_use_new_style = True  # Recommended to set to True
 
-DEFAULT_OPT_SETTINGS = {}
-
-CITATIONS = """@article{Hwang_maud_2018
+CITATIONS = """
+@article{Hwang_maud_2018
  author = {Hwang, John T. and Martins, Joaquim R.R.A.},
  title = "{A Computational Architecture for Coupling Heterogeneous
           Numerical Models and Computing Coupled Derivatives}",
@@ -88,112 +67,86 @@ CITATIONS = """@article{Hwang_maud_2018
  numpages = {39},
  doi = {10.1145/3182393},
  publisher = {ACM},
-}
 """
 
 
-class UserRequestedException(Exception):
+class ScipyOptimizeDriver(Driver):
     """
-    User Requested Exception.
+    Driver wrapper for the scipy.optimize.minimize family of local optimizers.
 
-    This exception indicates that the user has requested that SNOPT/pyoptsparse ceases
-    model execution and reports to SNOPT that execution should be terminated.
-    """
+    Inequality constraints are supported by COBYLA and SLSQP,
+    but equality constraints are only supported by SLSQP. None of the other
+    optimizers support constraints.
 
-    pass
-
-
-class pyOptSparseDriver(Driver):
-    """
-    Driver wrapper for pyoptsparse.
-
-    Pyoptsparse is based on pyOpt, which
-    is an object-oriented framework for formulating and solving nonlinear
-    constrained optimization problems, with additional MPI capability.
-    pypptsparse has interfaces to the following optimizers:
-    ALPSO, CONMIN, FSQP, IPOPT, NLPQLP, NSGA2, PSQP, SLSQP,
-    SNOPT, NLPY_AUGLAG, NOMAD.
-    Note that some of these are not open source and therefore not included
-    in the pyoptsparse source code.
-
-    pyOptSparseDriver supports the following:
+    ScipyOptimizeDriver supports the following:
         equality_constraints
-
         inequality_constraints
-
-        two_sided_constraints
 
     Attributes
     ----------
     fail : bool
         Flag that indicates failure of most recent optimization.
-    hist_file : str or None
-        File location for saving pyopt_sparse optimization history.
-        Default is None for no output.
-    hotstart_file : str
-        Optional file to hot start the optimization.
+    iter_count : int
+        Counter for function evaluations.
+    result : OptimizeResult
+        Result returned from scipy.optimize call.
     opt_settings : dict
-        Dictionary for setting optimizer-specific options.
-    pyopt_solution : Solution
-        Pyopt_sparse solution object.
-    _in_user_function :bool
-        This is set to True at the start of a pyoptsparse callback to _objfunc and _gradfunc, and
-        restored to False at the finish of each callback.
-    _indep_list : list
-        List of design variables.
-    _quantities : list
-        Contains the objectives plus nonlinear constraints.
-    _signal_cache : <Function>
-        Cached function pointer that was assigned as handler for signal defined in option
-        user_teriminate_signal.
-    _user_termination_flag : bool
-        This is set to True when the user sends a signal to terminate the job.
+        Dictionary of solver-specific options. See the scipy.optimize.minimize documentation.
+    _con_cache : dict
+        Cached result of constraint evaluations because scipy asks for them in a separate function.
+    _con_idx : dict
+        Used for constraint bookkeeping in the presence of 2-sided constraints.
+    _grad_cache : OrderedDict
+        Cached result of nonlinear constraint derivatives because scipy asks for them in a separate
+        function.
+    _exc_info : 3 item tuple
+        Storage for exception and traceback information.
+    _obj_and_nlcons : list
+        List of objective + nonlinear constraints. Used to compute total derivatives
+        for all except linear constraints.
+    _dvlist : list
+        Copy of _designvars.
+    _lincongrad_cache : np.ndarray
+        Pre-calculated gradients of linear constraints.
     """
 
     def __init__(self, **kwargs):
         """
-        Initialize pyopt.
+        Initialize the ScipyOptimizeDriver.
 
         Parameters
         ----------
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Driver options.
         """
-        super(pyOptSparseDriver, self).__init__(**kwargs)
+        super(ScipyOptimizeDriver, self).__init__(**kwargs)
 
         # What we support
         self.supports['inequality_constraints'] = True
         self.supports['equality_constraints'] = True
-        self.supports['multiple_objectives'] = True
         self.supports['two_sided_constraints'] = True
         self.supports['linear_constraints'] = True
         self.supports['simultaneous_derivatives'] = True
-        self.supports['total_jac_sparsity'] = True
 
-        # What we don't support yet
+        # What we don't support
+        self.supports['multiple_objectives'] = False
         self.supports['active_set'] = False
         self.supports['integer_design_vars'] = False
         self.supports._read_only = True
 
         # The user places optimizer-specific settings in here.
-        self.opt_settings = {}
+        self.opt_settings = OrderedDict()
 
-        # The user can set a file name here to store history
-        self.hist_file = None
-
-        # The user can set a file here to hot start the optimization
-        # with a history file
-        self.hotstart_file = None
-
-        # We save the pyopt_solution so that it can be queried later on.
-        self.pyopt_solution = None
-
-        self._indep_list = []
-        self._quantities = []
+        self.result = None
+        self._grad_cache = None
+        self._con_cache = None
+        self._con_idx = {}
+        self._obj_and_nlcons = None
+        self._dvlist = None
+        self._lincongrad_cache = None
         self.fail = False
-        self._signal_cache = None
-        self._user_termination_flag = False
-        self._in_user_function = False
+        self.iter_count = 0
+        self._exc_info = None
 
         self.cite = CITATIONS
 
@@ -201,462 +154,15 @@ class pyOptSparseDriver(Driver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        self.options.declare('optimizer', default='SLSQP', values=optlist,
-                             desc='Name of optimizers to use')
-        self.options.declare('title', default='Optimization using pyOpt_sparse',
-                             desc='Title of this optimization run')
-        self.options.declare('print_results', types=bool, default=True,
-                             desc='Print pyOpt results if True')
-        self.options.declare('gradient method', default='openmdao',
-                             values={'openmdao', 'pyopt_fd', 'snopt_fd'},
-                             desc='Finite difference implementation to use')
-        self.options.declare('user_teriminate_signal', default=signal.SIGUSR1, allow_none=True,
-                             desc='OS signal that triggers a clean user-terimnation. Only SNOPT'
-                             'supports this option.')
-
-    def _setup_driver(self, problem):
-        """
-        Prepare the driver for execution.
-
-        This is the final thing to run during setup.
-
-        Parameters
-        ----------
-        problem : <Problem>
-            Pointer to the containing problem.
-        """
-        super(pyOptSparseDriver, self)._setup_driver(problem)
-
-        self.supports._read_only = False
-        self.supports['gradients'] = self.options['optimizer'] in grad_drivers
-        self.supports._read_only = True
-
-        if len(self._objs) > 1 and self.options['optimizer'] not in multi_obj_drivers:
-            raise RuntimeError('Multiple objectives have been added to pyOptSparseDriver'
-                               ' but the selected optimizer ({0}) does not support'
-                               ' multiple objectives.'.format(self.options['optimizer']))
-
-        self._setup_tot_jac_sparsity()
-
-    def run(self):
-        """
-        Excute pyOptsparse.
-
-        Note that pyOpt controls the execution, and the individual optimizers
-        (e.g., SNOPT) control the iteration.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        """
-        problem = self._problem()
-        model = problem.model
-        relevant = model._relevant
-        self.pyopt_solution = None
-        self._total_jac = None
-        self.iter_count = 0
-        fwd = problem._mode == 'fwd'
-        optimizer = self.options['optimizer']
-        self._quantities = []
-
-        self._check_for_missing_objective()
-
-        # Only need initial run if we have linear constraints or if we are using an optimizer that
-        # doesn't perform one initially.
-        con_meta = self._cons
-        model_ran = False
-        if optimizer in run_required or np.any([con['linear'] for con in self._cons.values()]):
-            with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
-                # Initial Run
-                model.run_solve_nonlinear()
-                rec.abs = 0.0
-                rec.rel = 0.0
-                model_ran = True
-            self.iter_count += 1
-
-        # compute dynamic simul deriv coloring or just sparsity if option is set
-        if c_mod._use_total_sparsity:
-            coloring = None
-            if self._coloring_info['coloring'] is None and self._coloring_info['dynamic']:
-                coloring = c_mod.dynamic_total_coloring(self, run_model=not model_ran,
-                                                        fname=self._get_total_coloring_fname())
-
-            if coloring is not None:
-                # if the improvement wasn't large enough, don't use coloring
-                pct = coloring._solves_info()[-1]
-                info = self._coloring_info
-                if info['min_improve_pct'] > pct:
-                    info['coloring'] = info['static'] = None
-                    simple_warning("%s: Coloring was deactivated.  Improvement of %.1f%% was less "
-                                   "than min allowed (%.1f%%)." % (self.msginfo, pct,
-                                                                   info['min_improve_pct']))
-
-        comm = None if isinstance(problem.comm, FakeComm) else problem.comm
-        opt_prob = Optimization(self.options['title'], weak_method_wrapper(self, '_objfunc'),
-                                comm=comm)
-
-        # Add all design variables
-        param_meta = self._designvars
-        self._indep_list = indep_list = list(param_meta)
-        param_vals = self.get_design_var_values()
-
-        for name, meta in param_meta.items():
-            opt_prob.addVarGroup(name, meta['size'], type='c',
-                                 value=param_vals[name],
-                                 lower=meta['lower'], upper=meta['upper'])
-
-        opt_prob.finalizeDesignVariables()
-
-        # Add all objectives
-        objs = self.get_objective_values()
-        for name in objs:
-            opt_prob.addObj(name)
-            self._quantities.append(name)
-
-        # Calculate and save derivatives for any linear constraints.
-        lcons = [key for (key, con) in con_meta.items() if con['linear']]
-        if len(lcons) > 0:
-            _lin_jacs = self._compute_totals(of=lcons, wrt=indep_list, return_format='dict')
-            # convert all of our linear constraint jacs to COO format. Otherwise pyoptsparse will
-            # do it for us and we'll end up with a fully dense COO matrix and very slow evaluation
-            # of linear constraints!
-            to_remove = []
-            for jacdct in _lin_jacs.values():
-                for n, subjac in jacdct.items():
-                    if isinstance(subjac, np.ndarray):
-                        # we can safely use coo_matrix to automatically convert the ndarray
-                        # since our linear constraint jacs are constant, so zeros won't become
-                        # nonzero during the optimization.
-                        mat = coo_matrix(subjac)
-                        if mat.row.size > 0:
-                            # convert to 'coo' format here to avoid an emphatic warning
-                            # by pyoptsparse.
-                            jacdct[n] = {'coo': [mat.row, mat.col, mat.data], 'shape': mat.shape}
-
-        # Add all equality constraints
-        for name, meta in con_meta.items():
-            if meta['equals'] is None:
-                continue
-            size = meta['global_size'] if meta['distributed'] else meta['size']
-            lower = upper = meta['equals']
-            if fwd:
-                wrt = [v for v in indep_list if name in relevant[v]]
-            else:
-                rels = relevant[name]
-                wrt = [v for v in indep_list if v in rels]
-
-            if meta['linear']:
-                jac = {w: _lin_jacs[name][w] for w in wrt}
-                opt_prob.addConGroup(name, size, lower=lower, upper=upper,
-                                     linear=True, wrt=wrt, jac=jac)
-            else:
-                if name in self._res_jacs:
-                    resjac = self._res_jacs[name]
-                    jac = {n: resjac[n] for n in wrt}
-                else:
-                    jac = None
-                opt_prob.addConGroup(name, size, lower=lower, upper=upper, wrt=wrt, jac=jac)
-                self._quantities.append(name)
-
-        # Add all inequality constraints
-        for name, meta in con_meta.items():
-            if meta['equals'] is not None:
-                continue
-            size = meta['global_size'] if meta['distributed'] else meta['size']
-
-            # Bounds - double sided is supported
-            lower = meta['lower']
-            upper = meta['upper']
-
-            if fwd:
-                wrt = [v for v in indep_list if name in relevant[v]]
-            else:
-                rels = relevant[name]
-                wrt = [v for v in indep_list if v in rels]
-
-            if meta['linear']:
-                jac = {w: _lin_jacs[name][w] for w in wrt}
-                opt_prob.addConGroup(name, size, upper=upper, lower=lower,
-                                     linear=True, wrt=wrt, jac=jac)
-            else:
-                if name in self._res_jacs:
-                    resjac = self._res_jacs[name]
-                    jac = {n: resjac[n] for n in wrt}
-                else:
-                    jac = None
-                opt_prob.addConGroup(name, size, upper=upper, lower=lower, wrt=wrt, jac=jac)
-                self._quantities.append(name)
-
-        # Instantiate the requested optimizer
-        try:
-            _tmp = __import__('pyoptsparse', globals(), locals(), [optimizer], 0)
-            opt = getattr(_tmp, optimizer)()
-
-        except Exception as err:
-            # Change whatever pyopt gives us to an ImportError, give it a readable message,
-            # but raise with the original traceback.
-            msg = "Optimizer %s is not available in this installation." % optimizer
-            raise ImportError(msg)
-
-        # Process any default optimizer-specific settings.
-        if optimizer in DEFAULT_OPT_SETTINGS:
-            for name, value in DEFAULT_OPT_SETTINGS[optimizer].items():
-                if name not in self.opt_settings:
-                    self.opt_settings[name] = value
-
-        # Set optimization options
-        for option, value in self.opt_settings.items():
-            opt.setOption(option, value)
-
-        # Execute the optimization problem
-        if self.options['gradient method'] == 'pyopt_fd':
-
-            # Use pyOpt's internal finite difference
-            # TODO: Need to get this from OpenMDAO
-            # fd_step = problem.model.deriv_options['step_size']
-            fd_step = 1e-6
-            sol = opt(opt_prob, sens='FD', sensStep=fd_step, storeHistory=self.hist_file,
-                      hotStart=self.hotstart_file)
-
-        elif self.options['gradient method'] == 'snopt_fd':
-            if self.options['optimizer'] == 'SNOPT':
-
-                # Use SNOPT's internal finite difference
-                # TODO: Need to get this from OpenMDAO
-                # fd_step = problem.model.deriv_options['step_size']
-                fd_step = 1e-6
-                sol = opt(opt_prob, sens=None, sensStep=fd_step, storeHistory=self.hist_file,
-                          hotStart=self.hotstart_file)
-
-            else:
-                raise Exception("SNOPT's internal finite difference can only be used with SNOPT")
-        else:
-
-            # Use OpenMDAO's differentiator for the gradient
-            sol = opt(opt_prob, sens=weak_method_wrapper(self, '_gradfunc'),
-                      storeHistory=self.hist_file, hotStart=self.hotstart_file)
-
-        # Print results
-        if self.options['print_results']:
-            print(sol)
-
-        # Pull optimal parameters back into framework and re-run, so that
-        # framework is left in the right final state
-        dv_dict = sol.getDVs()
-        for name in indep_list:
-            self.set_design_var(name, dv_dict[name])
-
-        with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
-            model.run_solve_nonlinear()
-            rec.abs = 0.0
-            rec.rel = 0.0
-        self.iter_count += 1
-
-        # Save the most recent solution.
-        self.pyopt_solution = sol
-
-        try:
-            exit_status = sol.optInform['value']
-            self.fail = False
-
-            # These are various failed statuses.
-            if optimizer == 'IPOPT':
-                if exit_status not in {0, 1}:
-                    self.fail = True
-            elif exit_status > 2:
-                self.fail = True
-
-        except KeyError:
-            # optimizers other than pySNOPT may not populate this dict
-            pass
-
-        # revert signal handler to cached version
-        sigusr = self.options['user_teriminate_signal']
-        if sigusr is not None:
-            signal.signal(sigusr, self._signal_cache)
-            self._signal_cache = None   # to prevent memory leak test from failing
-
-        return self.fail
-
-    def _objfunc(self, dv_dict):
-        """
-        Compute the objective function and constraints.
-
-        This function is passed to pyOpt's Optimization object and is called
-        from its optimizers.
-
-        Parameters
-        ----------
-        dv_dict : dict
-            Dictionary of design variable values.
-
-        Returns
-        -------
-        func_dict : dict
-            Dictionary of all functional variables evaluated at design point.
-
-        fail : int
-            0 for successful function evaluation
-            1 for unsuccessful function evaluation
-        """
-        model = self._problem().model
-        fail = 0
-
-        # Note: we place our handler as late as possible so that codes that run in the
-        # workflow can place their own handlers.
-        sigusr = self.options['user_teriminate_signal']
-        if sigusr is not None and self._signal_cache is None:
-            self._signal_cache = signal.getsignal(sigusr)
-            signal.signal(sigusr, self._signal_handler)
-
-        try:
-            for name in self._indep_list:
-                self.set_design_var(name, dv_dict[name])
-
-            # print("Setting DV")
-            # print(dv_dict)
-
-            # Check if we caught a termination signal while SNOPT was running.
-            if self._user_termination_flag:
-                func_dict = self.get_objective_values()
-                func_dict.update(self.get_constraint_values(lintype='nonlinear'))
-                return func_dict, 2
-
-            # Execute the model
-            with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
-                self.iter_count += 1
-                try:
-                    self._in_user_function = True
-                    model.run_solve_nonlinear()
-
-                # Let the optimizer try to handle the error
-                except AnalysisError:
-                    model._clear_iprint()
-                    fail = 1
-
-                # User requested termination
-                except UserRequestedException:
-                    model._clear_iprint()
-                    fail = 2
-
-                func_dict = self.get_objective_values()
-                func_dict.update(self.get_constraint_values(lintype='nonlinear'))
-
-                # Record after getting obj and constraint to assure they have
-                # been gathered in MPI.
-                rec.abs = 0.0
-                rec.rel = 0.0
-
-        except Exception as msg:
-            tb = traceback.format_exc()
-
-            # Exceptions seem to be swallowed by the C code, so this
-            # should give the user more info than the dreaded "segfault"
-            print("Exception: %s" % str(msg))
-            print(70 * "=", tb, 70 * "=")
-            fail = 1
-            func_dict = {}
-
-        # print("Functions calculated")
-        # print(dv_dict)
-        # print(func_dict, flush=True)
-
-        self._in_user_function = False
-        return func_dict, fail
-
-    def _gradfunc(self, dv_dict, func_dict):
-        """
-        Compute the gradient of the objective function and constraints.
-
-        This function is passed to pyOpt's Optimization object and is called
-        from its optimizers.
-
-        Parameters
-        ----------
-        dv_dict : dict
-            Dictionary of design variable values.
-        func_dict : dict
-            Dictionary of all functional variables evaluated at design point.
-
-        Returns
-        -------
-        sens_dict : dict
-            Dictionary of dictionaries for gradient of each dv/func pair
-
-        fail : int
-            0 for successful function evaluation
-            1 for unsuccessful function evaluation
-        """
-        prob = self._problem()
-        fail = 0
-
-        try:
-
-            # Check if we caught a termination signal while SNOPT was running.
-            if self._user_termination_flag:
-                return {}, 2
-
-            try:
-                self._in_user_function = True
-                sens_dict = self._compute_totals(of=self._quantities,
-                                                 wrt=self._indep_list,
-                                                 return_format='dict')
-            # Let the optimizer try to handle the error
-            except AnalysisError:
-                prob.model._clear_iprint()
-                fail = 1
-
-            # User requested termination
-            except UserRequestedException:
-                prob.model._clear_iprint()
-                fail = 2
-
-            else:
-                # if we don't convert to 'coo' here, pyoptsparse will do a
-                # conversion of our dense array into a fully dense 'coo', which is bad.
-                # TODO: look into getting rid of all of these conversions!
-                new_sens = OrderedDict()
-                res_jacs = self._res_jacs
-                for okey in func_dict:
-                    new_sens[okey] = newdv = OrderedDict()
-                    for ikey in dv_dict:
-                        if okey in res_jacs and ikey in res_jacs[okey]:
-                            arr = sens_dict[okey][ikey]
-                            coo = res_jacs[okey][ikey]
-                            row, col, data = coo['coo']
-                            coo['coo'][2] = arr[row, col].flatten()
-                            newdv[ikey] = coo
-                        elif okey in sens_dict:
-                            newdv[ikey] = sens_dict[okey][ikey]
-                sens_dict = new_sens
-
-            if fail > 0:
-                # We need to cobble together a sens_dict of the correct size.
-                # Best we can do is return zeros.
-
-                sens_dict = OrderedDict()
-                for okey, oval in func_dict.items():
-                    sens_dict[okey] = OrderedDict()
-                    osize = len(oval)
-                    for ikey, ival in dv_dict.items():
-                        isize = len(ival)
-                        sens_dict[okey][ikey] = np.zeros((osize, isize))
-
-        except Exception as msg:
-            tb = traceback.format_exc()
-
-            # Exceptions seem to be swallowed by the C code, so this
-            # should give the user more info than the dreaded "segfault"
-            print("Exception: %s" % str(msg))
-            print(70 * "=", tb, 70 * "=", flush=True)
-            sens_dict = {}
-
-        # print("Derivatives calculated")
-        # print(dv_dict)
-        # print(sens_dict, flush=True)
-        self._in_user_function = False
-        return sens_dict, fail
+        self.options.declare('optimizer', 'SLSQP', values=_all_optimizers,
+                             desc='Name of optimizer to use')
+        self.options.declare('tol', 1.0e-6, lower=0.0,
+                             desc='Tolerance for termination. For detailed '
+                             'control, use solver-specific options.')
+        self.options.declare('maxiter', 200, lower=0,
+                             desc='Maximum number of iterations.')
+        self.options.declare('disp', True, types=bool,
+                             desc='Set to False to prevent printing of Scipy convergence messages')
 
     def _get_name(self):
         """
@@ -667,78 +173,621 @@ class pyOptSparseDriver(Driver):
         str
             The name of the current optimizer.
         """
-        return "pyOptSparse_" + self.options['optimizer']
+        return "ScipyOptimize_" + self.options['optimizer']
 
-    def _get_ordered_nl_responses(self):
+    def _setup_driver(self, problem):
         """
-        Return the names of nonlinear responses in the order used by the driver.
+        Prepare the driver for execution.
 
-        Default order is objectives followed by nonlinear constraints.  This is used for
-        simultaneous derivative coloring and sparsity determination.
-
-        Returns
-        -------
-        list of str
-            The nonlinear response names in order.
-        """
-        nl_order = list(self._objs)
-        neq_order = []
-        for n, meta in self._cons.items():
-            if 'linear' not in meta or not meta['linear']:
-                if meta['equals'] is not None:
-                    nl_order.append(n)
-                else:
-                    neq_order.append(n)
-
-        nl_order.extend(neq_order)
-
-        return nl_order
-
-    def _setup_tot_jac_sparsity(self, coloring=None):
-        """
-        Set up total jacobian subjac sparsity.
+        This is the final thing to run during setup.
 
         Parameters
         ----------
-        coloring : Coloring or None
-            Current coloring.
+        problem : <Problem>
+            Pointer
         """
-        total_sparsity = None
-        self._res_jacs = {}
-        coloring = coloring if coloring is not None else self._get_static_coloring()
-        if coloring is not None:
-            total_sparsity = coloring.get_subjac_sparsity()
-            if self._total_jac_sparsity is not None:
-                raise RuntimeError("Total jac sparsity was set in both _total_coloring"
-                                   " and _total_jac_sparsity.")
-        elif self._total_jac_sparsity is not None:
-            if isinstance(self._total_jac_sparsity, str):
-                with open(self._total_jac_sparsity, 'r') as f:
-                    self._total_jac_sparsity = json.load(f)
-            total_sparsity = self._total_jac_sparsity
+        super(ScipyOptimizeDriver, self)._setup_driver(problem)
+        opt = self.options['optimizer']
 
-        if total_sparsity is None:
-            return
+        self.supports._read_only = False
+        self.supports['gradients'] = opt in _gradient_optimizers
+        self.supports['inequality_constraints'] = opt in _constraint_optimizers
+        self.supports['two_sided_constraints'] = opt in _constraint_optimizers
+        self.supports['equality_constraints'] = opt in _eq_constraint_optimizers
+        self.supports._read_only = True
 
-        for res, resdict in total_sparsity.items():
-            if res in self._objs:  # skip objectives
-                continue
-            self._res_jacs[res] = {}
-            for dv, (rows, cols, shape) in resdict.items():
-                rows = np.array(rows, dtype=int)
-                cols = np.array(cols, dtype=int)
+        # Raises error if multiple objectives are not supported, but more objectives were defined.
+        if not self.supports['multiple_objectives'] and len(self._objs) > 1:
+            msg = '{} currently does not support multiple objectives.'
+            raise RuntimeError(msg.format(self.msginfo))
 
-                self._res_jacs[res][dv] = {
-                    'coo': [rows, cols, np.zeros(rows.size)],
-                    'shape': shape,
-                }
+        # Since COBYLA does not support bounds, we
+        #   need to add to the _cons metadata for any bounds that
+        #   need to be translated into a constraint
+        if opt == 'COBYLA':
+            for name, meta in self._designvars.items():
+                lower = meta['lower']
+                upper = meta['upper']
+                if isinstance(lower, np.ndarray) or lower >= -openmdao.INF_BOUND \
+                        or isinstance(upper, np.ndarray) or upper <= openmdao.INF_BOUND:
+                    d = OrderedDict()
+                    d['lower'] = lower
+                    d['upper'] = upper
+                    d['equals'] = None
+                    d['indices'] = None
+                    d['adder'] = None
+                    d['scaler'] = None
+                    d['total_adder'] = None
+                    d['total_scaler'] = None
+                    d['size'] = meta['size']
+                    d['global_size'] = meta['global_size']
+                    d['distributed'] = meta['distributed']
+                    d['linear'] = True
+                    self._cons[name] = d
 
-    def _signal_handler(self, signum, frame):
-        # Subsystems (particularly external codes) may declare their own signal handling, so
-        # execute the cached handler first.
-        if self._signal_cache is not signal.Handlers.SIG_DFL:
-            self._signal_cache(signum, frame)
+    def run(self):
+        """
+        Optimize the problem using selected Scipy optimizer.
 
-        self._user_termination_flag = True
-        if self._in_user_function:
-            raise UserRequestedException('User requested termination.')
+        Returns
+        -------
+        boolean
+            Failure flag; True if failed to converge, False is successful.
+        """
+        problem = self._problem()
+        opt = self.options['optimizer']
+        model = problem.model
+        self.iter_count = 0
+        self._total_jac = None
+
+        self._check_for_missing_objective()
+
+        # Initial Run
+        with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
+            model.run_solve_nonlinear()
+            self.iter_count += 1
+
+        self._con_cache = self.get_constraint_values()
+        desvar_vals = self.get_design_var_values()
+        self._dvlist = list(self._designvars)
+
+        # maxiter and disp get passsed into scipy with all the other options.
+        if 'maxiter' not in self.opt_settings:  # lets you override the value in options
+            self.opt_settings['maxiter'] = self.options['maxiter']
+        self.opt_settings['disp'] = self.options['disp']
+
+        # Size Problem
+        nparam = 0
+        for param in self._designvars.values():
+            nparam += param['size']
+        x_init = np.empty(nparam)
+
+        # Initial Design Vars
+        i = 0
+        use_bounds = (opt in _bounds_optimizers)
+        if use_bounds:
+            bounds = []
+        else:
+            bounds = None
+
+        for name, meta in self._designvars.items():
+            size = meta['size']
+            x_init[i:i + size] = desvar_vals[name]
+            i += size
+
+            # Bounds if our optimizer supports them
+            if use_bounds:
+                meta_low = meta['lower']
+                meta_high = meta['upper']
+                for j in range(size):
+
+                    if isinstance(meta_low, np.ndarray):
+                        p_low = meta_low[j]
+                    else:
+                        p_low = meta_low
+
+                    if isinstance(meta_high, np.ndarray):
+                        p_high = meta_high[j]
+                    else:
+                        p_high = meta_high
+
+                    bounds.append((p_low, p_high))
+
+        if use_bounds and (opt in _supports_new_style) and _use_new_style:
+            # For 'trust-constr' it is better to use the new type bounds, because it seems to work
+            # better (for the current examples in the tests) with the "keep_feasible" option
+            try:
+                from scipy.optimize import Bounds
+                from scipy.optimize._constraints import old_bound_to_new
+            except ImportError:
+                msg = ('The "trust-constr" optimizer is supported for SciPy 1.1.0 and above. '
+                       'The installed version is {}')
+                raise ImportError(msg.format(scipy_version))
+
+            # Convert "old-style" bounds to "new_style" bounds
+            lower, upper = old_bound_to_new(bounds)  # tuple, tuple
+            keep_feasible = self.opt_settings.get('keep_feasible_bounds', True)
+            bounds = Bounds(lb=lower, ub=upper, keep_feasible=keep_feasible)
+
+        # Constraints
+        constraints = []
+        i = 1  # start at 1 since row 0 is the objective.  Constraints start at row 1.
+        lin_i = 0  # counter for linear constraint jacobian
+        lincons = []  # list of linear constraints
+        self._obj_and_nlcons = list(self._objs)
+
+        if opt in _constraint_optimizers:
+            for name, meta in self._cons.items():
+                size = meta['global_size'] if meta['distributed'] else meta['size']
+                upper = meta['upper']
+                lower = meta['lower']
+                equals = meta['equals']
+                if opt in _gradient_optimizers and 'linear' in meta and meta['linear']:
+                    lincons.append(name)
+                    self._con_idx[name] = lin_i
+                    lin_i += size
+                else:
+                    self._obj_and_nlcons.append(name)
+                    self._con_idx[name] = i
+                    i += size
+
+                # In scipy constraint optimizers take constraints in two separate formats
+
+                # Type of constraints is list of NonlinearConstraint
+                if opt in _supports_new_style and _use_new_style:
+                    try:
+                        from scipy.optimize import NonlinearConstraint
+                    except ImportError:
+                        msg = ('The "trust-constr" optimizer is supported for SciPy 1.1.0 and'
+                               'above. The installed version is {}')
+                        raise ImportError(msg.format(scipy_version))
+
+                    if equals is not None:
+                        lb = ub = equals
+                    else:
+                        lb = lower
+                        ub = upper
+                    # Loop over every index separately,
+                    # because scipy calls each constraint by index.
+                    for j in range(size):
+                        # Double-sided constraints are accepted by the algorithm
+                        args = [name, False, j]
+                        # TODO linear constraint if meta['linear']
+                        # TODO add option for Hessian
+                        con = NonlinearConstraint(
+                            fun=signature_extender(weak_method_wrapper(self, '_con_val_func'),
+                                                   args),
+                            lb=lb, ub=ub,
+                            jac=signature_extender(weak_method_wrapper(self, '_congradfunc'), args))
+                        constraints.append(con)
+                else:  # Type of constraints is list of dict
+                    # Loop over every index separately,
+                    # because scipy calls each constraint by index.
+                    for j in range(size):
+                        con_dict = {}
+                        if meta['equals'] is not None:
+                            con_dict['type'] = 'eq'
+                        else:
+                            con_dict['type'] = 'ineq'
+                        con_dict['fun'] = weak_method_wrapper(self, '_confunc')
+                        if opt in _constraint_grad_optimizers:
+                            con_dict['jac'] = weak_method_wrapper(self, '_congradfunc')
+                        con_dict['args'] = [name, False, j]
+                        constraints.append(con_dict)
+
+                        if isinstance(upper, np.ndarray):
+                            upper = upper[j]
+
+                        if isinstance(lower, np.ndarray):
+                            lower = lower[j]
+
+                        dblcon = (upper < openmdao.INF_BOUND) and (lower > -openmdao.INF_BOUND)
+
+                        # Add extra constraint if double-sided
+                        if dblcon:
+                            dcon_dict = {}
+                            dcon_dict['type'] = 'ineq'
+                            dcon_dict['fun'] = weak_method_wrapper(self, '_confunc')
+                            if opt in _constraint_grad_optimizers:
+                                dcon_dict['jac'] = weak_method_wrapper(self, '_congradfunc')
+                            dcon_dict['args'] = [name, True, j]
+                            constraints.append(dcon_dict)
+
+            # precalculate gradients of linear constraints
+            if lincons:
+                self._lincongrad_cache = self._compute_totals(of=lincons, wrt=self._dvlist,
+                                                              return_format='array')
+            else:
+                self._lincongrad_cache = None
+
+        # Provide gradients for optimizers that support it
+        if opt in _gradient_optimizers:
+            jac = self._gradfunc
+        else:
+            jac = None
+
+        # Hessian calculation method for optimizers, which require it
+        if opt in _hessian_optimizers:
+            if 'hess' in self.opt_settings:
+                hess = self.opt_settings.pop('hess')
+            else:
+                # Defaults to BFGS, if not in opt_settings
+                from scipy.optimize import BFGS
+                hess = BFGS()
+        else:
+            hess = None
+
+        # compute dynamic simul deriv coloring if option is set
+        if coloring_mod._use_total_sparsity:
+            if ((self._coloring_info['coloring'] is None and self._coloring_info['dynamic'])):
+                coloring_mod.dynamic_total_coloring(self, run_model=False,
+                                                    fname=self._get_total_coloring_fname())
+
+                # if the improvement wasn't large enough, turn coloring off
+                info = self._coloring_info
+                if info['coloring'] is not None:
+                    pct = info['coloring']._solves_info()[-1]
+                    if info['min_improve_pct'] > pct:
+                        info['coloring'] = info['static'] = None
+                        simple_warning("%s: Coloring was deactivated.  Improvement of %.1f%% was "
+                                       "less than min allowed (%.1f%%)." %
+                                       (self.msginfo, pct, info['min_improve_pct']))
+
+        # optimize
+        try:
+            if opt in _optimizers:
+                result = minimize(self._objfunc, x_init,
+                                  # args=(),
+                                  method=opt,
+                                  jac=jac,
+                                  hess=hess,
+                                  # hessp=None,
+                                  bounds=bounds,
+                                  constraints=constraints,
+                                  tol=self.options['tol'],
+                                  # callback=None,
+                                  options=self.opt_settings)
+            elif opt == 'basinhopping':
+                from scipy.optimize import basinhopping
+
+                def fun(x):
+                    return self._objfunc(x), jac(x)
+
+                if 'minimizer_kwargs' not in self.opt_settings:
+                    self.opt_settings['minimizer_kwargs'] = {"method": "L-BFGS-B", "jac": True}
+                self.opt_settings.pop('maxiter')  # It does not have this argument
+
+                def accept_test(f_new, x_new, f_old, x_old):
+                    # Used to implement bounds besides the original functionality
+                    if bounds is not None:
+                        bound_check = all([b[0] <= xi <= b[1] for xi, b in zip(x_new, bounds)])
+                        user_test = self.opt_settings.pop('accept_test', None)  # callable
+                        # has to satisfy both the bounds and the acceptance test defined by the
+                        # user
+                        if user_test is not None:
+                            test_res = user_test(f_new, x_new, f_old, x_old)
+                            if test_res == 'force accept':
+                                return test_res
+                            else:  # result is boolean
+                                return bound_check and test_res
+                        else:  # no user acceptance test, check only the bounds
+                            return bound_check
+                    else:
+                        return True
+
+                result = basinhopping(fun, x_init,
+                                      accept_test=accept_test,
+                                      **self.opt_settings)
+            elif opt == 'dual_annealing':
+                from scipy.optimize import dual_annealing
+                self.opt_settings.pop('disp')  # It does not have this argument
+                # There is no "options" param, so "opt_settings" can be used to set the (many)
+                # keyword arguments
+                result = dual_annealing(self._objfunc,
+                                        bounds=bounds,
+                                        **self.opt_settings)
+            elif opt == 'differential_evolution':
+                from scipy.optimize import differential_evolution
+                # There is no "options" param, so "opt_settings" can be used to set the (many)
+                # keyword arguments
+                result = differential_evolution(self._objfunc,
+                                                bounds=bounds,
+                                                **self.opt_settings)
+            elif opt == 'shgo':
+                from scipy.optimize import shgo
+                kwargs = dict()
+                for param in ('minimizer_kwargs', 'sampling_method ', 'n', 'iters'):
+                    if param in self.opt_settings:
+                        kwargs[param] = self.opt_settings[param]
+                # Set the Jacobian and the Hessian to the value calculated in OpenMDAO
+                if 'minimizer_kwargs' not in kwargs or kwargs['minimizer_kwargs'] is None:
+                    kwargs['minimizer_kwargs'] = {}
+                kwargs['minimizer_kwargs'].setdefault('jac', jac)
+                kwargs['minimizer_kwargs'].setdefault('hess', hess)
+                # Objective function tolerance
+                self.opt_settings['f_tol'] = self.options['tol']
+                result = shgo(self._objfunc,
+                              bounds=bounds,
+                              constraints=constraints,
+                              options=self.opt_settings,
+                              **kwargs)
+            else:
+                msg = 'Optimizer "{}" is not implemented yet. Choose from: {}'
+                raise NotImplementedError(msg.format(opt, _all_optimizers))
+
+        # If an exception was swallowed in one of our callbacks, we want to raise it
+        # rather than the cryptic message from scipy.
+        except Exception as msg:
+            if self._exc_info is not None:
+                self._reraise()
+            else:
+                raise
+
+        if self._exc_info is not None:
+            self._reraise()
+
+        self.result = result
+
+        if hasattr(result, 'success'):
+            self.fail = False if result.success else True
+            if self.fail:
+                print('Optimization FAILED.')
+                print(result.message)
+                print('-' * 35)
+
+            elif self.options['disp']:
+                print('Optimization Complete')
+                print('-' * 35)
+        else:
+            self.fail = True  # It is not known, so the worst option is assumed
+            print('Optimization Complete (success not known)')
+            print(result.message)
+            print('-' * 35)
+
+        return self.fail
+
+    def _objfunc(self, x_new):
+        """
+        Evaluate and return the objective function.
+
+        Model is executed here.
+
+        Parameters
+        ----------
+        x_new : ndarray
+            Array containing parameter values at new design point.
+
+        Returns
+        -------
+        float
+            Value of the objective function evaluated at the new design point.
+        """
+        model = self._problem().model
+
+        try:
+
+            # Pass in new parameters
+            i = 0
+            if MPI:
+                model.comm.Bcast(x_new, root=0)
+            for name, meta in self._designvars.items():
+                size = meta['size']
+                self.set_design_var(name, x_new[i:i + size])
+                i += size
+
+            with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
+                self.iter_count += 1
+                model.run_solve_nonlinear()
+
+            # Get the objective function evaluations
+            for obj in self.get_objective_values().values():
+                f_new = obj
+                break
+
+            self._con_cache = self.get_constraint_values()
+
+        except Exception as msg:
+            self._exc_info = msg
+            return 0
+
+        # print("Functions calculated")
+        # print('   xnew', x_new)
+        # print('   fnew', f_new)
+
+        return f_new
+
+    def _con_val_func(self, x_new, name, dbl, idx):
+        """
+        Return the value of the constraint function requested in args.
+
+        The lower or upper bound is **not** subtracted from the value. Used for optimizers,
+        which take the bounds of the constraints (e.g. trust-constr)
+
+        Parameters
+        ----------
+        x_new : ndarray
+            Array containing parameter values at new design point.
+        name : string
+            Name of the constraint to be evaluated.
+        dbl : bool
+            True if double sided constraint.
+        idx : float
+            Contains index into the constraint array.
+
+        Returns
+        -------
+        float
+            Value of the constraint function.
+        """
+        return self._con_cache[name][idx]
+
+    def _confunc(self, x_new, name, dbl, idx):
+        """
+        Return the value of the constraint function requested in args.
+
+        Note that this function is called for each constraint, so the model is only run when the
+        objective is evaluated.
+
+        Parameters
+        ----------
+        x_new : ndarray
+            Array containing parameter values at new design point.
+        name : string
+            Name of the constraint to be evaluated.
+        dbl : bool
+            True if double sided constraint.
+        idx : float
+            Contains index into the constraint array.
+
+        Returns
+        -------
+        float
+            Value of the constraint function.
+        """
+        if self._exc_info is not None:
+            self._reraise()
+
+        cons = self._con_cache
+        meta = self._cons[name]
+
+        # Equality constraints
+        equals = meta['equals']
+        if equals is not None:
+            if isinstance(equals, np.ndarray):
+                equals = equals[idx]
+            return cons[name][idx] - equals
+
+        # Note, scipy defines constraints to be satisfied when positive,
+        # which is the opposite of OpenMDAO.
+        upper = meta['upper']
+        if isinstance(upper, np.ndarray):
+            upper = upper[idx]
+
+        lower = meta['lower']
+        if isinstance(lower, np.ndarray):
+            lower = lower[idx]
+
+        if dbl or (lower <= -openmdao.INF_BOUND):
+            return upper - cons[name][idx]
+        else:
+            return cons[name][idx] - lower
+
+    def _gradfunc(self, x_new):
+        """
+        Evaluate and return the gradient for the objective.
+
+        Gradients for the constraints are also calculated and cached here.
+
+        Parameters
+        ----------
+        x_new : ndarray
+            Array containing parameter values at new design point.
+
+        Returns
+        -------
+        ndarray
+            Gradient of objective with respect to parameter array.
+        """
+        try:
+            grad = self._compute_totals(of=self._obj_and_nlcons, wrt=self._dvlist,
+                                        return_format='array')
+            self._grad_cache = grad
+
+        except Exception as msg:
+            self._exc_info = msg
+            return np.array([[]])
+
+        # print("Gradients calculated for objective")
+        # print('   xnew', x_new)
+        # print('   grad', grad[0, :])
+
+        return grad[0, :]
+
+    def _congradfunc(self, x_new, name, dbl, idx):
+        """
+        Return the cached gradient of the constraint function.
+
+        Note, scipy calls the constraints one at a time, so the gradient is cached when the
+        objective gradient is called.
+
+        Parameters
+        ----------
+        x_new : ndarray
+            Array containing parameter values at new design point.
+        name : string
+            Name of the constraint to be evaluated.
+        dbl : bool
+            Denotes if a constraint is double-sided or not.
+        idx : float
+            Contains index into the constraint array.
+
+        Returns
+        -------
+        float
+            Gradient of the constraint function wrt all params.
+        """
+        if self._exc_info is not None:
+            self._reraise()
+
+        meta = self._cons[name]
+
+        if meta['linear']:
+            grad = self._lincongrad_cache
+        else:
+            grad = self._grad_cache
+        grad_idx = self._con_idx[name] + idx
+
+        # print("Constraint Gradient returned")
+        # print('   xnew', x_new)
+        # print('   grad', name, 'idx', idx, grad[grad_idx, :])
+
+        # Equality constraints
+        if meta['equals'] is not None:
+            return grad[grad_idx, :]
+
+        # Note, scipy defines constraints to be satisfied when positive,
+        # which is the opposite of OpenMDAO.
+        lower = meta['lower']
+        if isinstance(lower, np.ndarray):
+            lower = lower[idx]
+
+        if dbl or (lower <= -openmdao.INF_BOUND):
+            return -grad[grad_idx, :]
+        else:
+            return grad[grad_idx, :]
+
+    def _reraise(self):
+        """
+        Reraise any exception encountered when scipy calls back into our method.
+        """
+        exc = self._exc_info
+        raise exc
+
+
+def signature_extender(fcn, extra_args):
+    """
+    Closure function, which appends extra arguments to the original function call.
+
+    The first argument is the design vector. The possible extra arguments from the callback
+    of :func:`scipy.optimize.minimize` are not passed to the function.
+
+    Some algorithms take a sequence of :class:`~scipy.optimize.NonlinearConstraint` as input
+    for the constraints. For this class it is not possible to pass additional arguments.
+    With this function the signature will be correct for both scipy and the driver.
+
+    Parameters
+    ----------
+    fcn : callable
+        Function, which takes the design vector as the first argument.
+    extra_args : tuple or list
+        Extra arguments for the function
+
+    Returns
+    -------
+    callable
+        The function with the signature expected by the driver.
+    """
+    def closure(x, *args):
+        return fcn(x, *extra_args)
+
+    return closure
