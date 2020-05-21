@@ -371,6 +371,7 @@ class pyOptSparseDriver(Driver):
             print("opt_mod", opt_class_or_mod)
             import inspect
             if inspect.ismodule(opt_class_or_mod):
+                print('was module getting class', optimizer)
                 opt_class = getattr(opt_class_or_mod, optimizer)
             else:
                 opt_class = opt_class_or_mod
