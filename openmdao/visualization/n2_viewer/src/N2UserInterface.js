@@ -413,7 +413,6 @@ class N2UserInterface {
      * @param {N2TreeNode} node The node that was right-clicked.
      */
     rightClick(node) {
-        console.log("rightClick() called")
         testThis(this, 'N2UserInterface', 'rightClick');
 
         d3.event.preventDefault();
