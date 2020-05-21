@@ -367,9 +367,14 @@ class pyOptSparseDriver(Driver):
             print("_tmp", _tmp)
             print("dir(_tmp)", dir(_tmp))
             # opt = getattr(_tmp, optimizer)()
-            opt_mod = getattr(_tmp, optimizer)
-            print("opt_mod", opt_mod)
-            opt = opt_mod()
+            opt_class_or_mod = getattr(_tmp, optimizer)
+            print("opt_mod", opt_class_or_mod)
+            import inspect
+            if inspect.ismodule(opt_class_or_mod):
+                opt_class = getattr(opt_class_or_mod, optimizer)
+            else:
+                opt_class = opt_class_or_mod
+            opt = opt_class()
 
         except Exception as err:
             # Change whatever pyopt gives us to an ImportError, give it a readable message,
