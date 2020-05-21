@@ -30,6 +30,7 @@ addons:
     - gfortran
     - gcc
     - g++
+    - liblapack-dev
     ssh_known_hosts:
     - web543.webfaction.com
 
@@ -60,7 +61,7 @@ before_install:
 
 install:
 # get key decrypted, placed, chmodded, and added for passwordless access to WebFaction
-- if [ "$encrypted_74d70a284b7d_key" ]; then
+- if [ "$$encrypted_74d70a284b7d_key" ]; then
     openssl aes-256-cbc -K $encrypted_74d70a284b7d_key -iv $encrypted_74d70a284b7d_iv -in travis_deploy_rsa.enc -out /tmp/travis_deploy_rsa -d;
     eval "$(ssh-agent -s)";
     chmod 600 /tmp/travis_deploy_rsa;
@@ -99,19 +100,21 @@ install:
   pip install git+https://github.com/swryan/coveralls-python@work;
 
   echo " >> Installing pyOptSparse";
-  echo "  > Cloning pyOptSparse from mdolab";
-  git clone https://github.com/mdolab/pyoptsparse.git;
-  cd pyoptsparse;
-  git checkout tags/v1.2;
+  git clone https://gist.github.com/b34594cc2a4468e9d215cef2f4187b71.git pyopt_ipopt_install;
+  mv pyopt_ipopt_install/* .
+  rm -rf pyopt_ipopt_install
+  chmod 755 ./build_pyoptsparse_ipopt.sh; ./build_pyoptsparse_ipopt.sh;
 
-  if [ "$SNOPT_LOCATION" ] && [ "${PY:0:1}" = "3" ]; then
-    cd pyoptsparse/pySNOPT;
+  if [ "$SNOPT_LOCATION72" ] && [ "${PY:0:1}" = "3" ]; then
+    echo " >> Installing SNOPT";
+    cd pyoptsparse/pyoptsparse/pySNOPT;
     echo "  > Secure copying SNOPT over SSH";
-    scp -r "$SNOPT_LOCATION" .;
-    cd ../..;
+    scp -r "$SNOPT_LOCATION72" .;
+    cd ../../..;
   fi
 
   echo "  > Install pyOptSparse";
+  cd pyoptsparse;
   pip install -r requirements.txt;
   pip install .;
   cd ..;
@@ -133,6 +136,8 @@ script:
 - export OMPI_MCA_btl=^openib
 # newer versions of OpenMPI require this
 - export OMPI_MCA_rmaps_base_oversubscribe=1
+# IPOPT Requires
+- export LD_LIBRARY_PATH=/home/travis/ipopt/lib
 
 # make docs first
 - cd openmdao/docs;
