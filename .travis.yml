@@ -158,7 +158,7 @@ install:
   #  # edit Makefile.in ?
   #
   mkdir -p $HOME/git/paropt/lib
-  make  #  install compiled paropt
+  make  #  install compiled paropt. Will need to put something like this at the end PAROPT_DIR=/Users/hschilli
   echo "HOME"
   echo $HOME
   echo "ls $HOME/git/paropt/lib/"
@@ -169,7 +169,7 @@ install:
   #cp $HOME/git/paropt/lib/libparopt.a /home/travis/miniconda/envs/PY3.6/lib
   #cp $HOME/git/paropt/lib/libparopt.so /home/travis/miniconda/envs/PY3.8/lib
 
-  echo "making directory and copying library
+  echo "making directory and copying library"
   mkdir -p /home/travis/miniconda/envs/PY/lib
   cp $HOME/git/paropt/lib/libparopt.a /home/travis/miniconda/envs/PY/lib
   cp $HOME/git/paropt/lib/libparopt.so /home/travis/miniconda/envs/PY/lib
