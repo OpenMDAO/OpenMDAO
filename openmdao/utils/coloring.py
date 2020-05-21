@@ -2203,10 +2203,20 @@ def _initialize_model_approx(model, driver, of=None, wrt=None):
         model._owns_approx_wrt = wrt
 
         # Support for indices defined on driver vars.
-        model._owns_approx_of_idx = {
-            key: val['indices'] for key, val in driver._responses.items()
-            if val['indices'] is not None
-        }
+        if MPI and model.comm.size > 1:
+            of_idx = model._owns_approx_of_idx
+            driver_resp = driver._distributed_resp
+            for key, val in driver._responses.items():
+                if val['indices'] is not None:
+                    if val['distributed'] and key in driver_resp:
+                        of_idx[key] = driver_resp[key][0]
+                    else:
+                        of_idx[key] = val['indices']
+        else:
+            model._owns_approx_of_idx = {
+                key: val['indices'] for key, val in driver._responses.items()
+                if val['indices'] is not None
+            }
         model._owns_approx_wrt_idx = {
             key: val['indices'] for key, val in driver._designvars.items()
             if val['indices'] is not None

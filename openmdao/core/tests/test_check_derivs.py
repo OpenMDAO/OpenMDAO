@@ -2825,6 +2825,25 @@ class TestProblemCheckTotals(unittest.TestCase):
         assert_near_equal(J['comp.y', 'p.x']['J_fwd'], [[14.0]], 1e-6)
         assert_near_equal(J['comp.y', 'p.x']['J_fd'], [[0.0]], 1e-6)
 
+    def test_response_index(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p', om.IndepVarComp('x', np.ones(2)), promotes=['*'])
+        model.add_subsystem('comp', om.ExecComp('y=2*x', x=np.ones(2), y=np.ones(2)),
+                            promotes=['*'])
+
+        model.add_design_var('x')
+        model.add_constraint('y', indices=[1], lower=0.0)
+
+        prob.setup()
+        prob.run_model()
+
+        stream = StringIO()
+        prob.check_totals(out_stream=stream)
+        lines = stream.getvalue().splitlines()
+        self.assertTrue('index size: 1' in lines[3])
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestProblemCheckTotalsMPI(unittest.TestCase):
