@@ -287,8 +287,8 @@ class NLoptDriver(Driver):
         # TODO : refactor this so the call to old_bound_to_new isn't needed
         from scipy.optimize._constraints import old_bound_to_new
         lower, upper = old_bound_to_new(bounds)  # tuple, tuple
-        # opt_prob.set_lower_bounds(lower)
-        # opt_prob.set_upper_bounds(upper)
+        opt_prob.set_lower_bounds(lower)
+        opt_prob.set_upper_bounds(upper)
 
         # Constraints
         constraints = []
@@ -318,7 +318,7 @@ class NLoptDriver(Driver):
                 for j in range(size):
                     # Double-sided constraints are accepted by the algorithm
                     args = [name, False, j]
-                    # opt_prob.add_inequality_constraint(weak_method_wrapper(self, '_confunc'))
+                    opt_prob.add_inequality_constraint(signature_extender(weak_method_wrapper(self, '_confunc'), args))
 
         # compute dynamic simul deriv coloring if option is set
         if coloring_mod._use_total_sparsity:
@@ -404,15 +404,14 @@ class NLoptDriver(Driver):
             obj = 0
             
         try:
-            grad[:]= self._compute_totals(of=self._obj_and_nlcons, wrt=self._dvlist,
-                                        return_format='array')
-            self._grad_cache = grad
+            if grad.size > 0:
+                self._grad_cache = self._compute_totals(of=self._obj_and_nlcons, wrt=self._dvlist,
+                                            return_format='array')
+                grad[:] = self._grad_cache[0, :]
 
         except Exception as msg:
             self._exc_info = msg
             
-        print(float(f_new))
-
         return float(f_new)
 
     def _confunc(self, x_new, grad, name, dbl, idx):
@@ -447,15 +446,13 @@ class NLoptDriver(Driver):
         
         grad_idx = self._con_idx[name] + idx
         
-        print('in the confunc')
-        print(meta)
-
         # Equality constraints
         equals = meta['equals']
         if equals is not None:
             if isinstance(equals, np.ndarray):
                 equals = equals[idx]
-            grad[:] = grad_cache[grad_idx, :]
+            if grad.size > 0:
+                grad[:] = grad_cache[grad_idx, :]
             return cons[name][idx] - equals
 
         # Note, scipy defines constraints to be satisfied when positive,
@@ -469,11 +466,13 @@ class NLoptDriver(Driver):
             lower = lower[idx]
 
         if dbl or (lower <= -openmdao.INF_BOUND):
-            grad[:] = -grad_cache[grad_idx, :]
-            return upper - cons[name][idx]
+            if grad.size > 0:
+                grad[:] = grad_cache[grad_idx, :]
+            return cons[name][idx] - upper
         else:
-            grad[:] = grad_cache[grad_idx, :]
-            return cons[name][idx] - lower
+            if grad.size > 0:
+                grad[:] = -grad_cache[grad_idx, :]
+            return lower - cons[name][idx]
 
     def _reraise(self):
         """
@@ -506,7 +505,7 @@ def signature_extender(fcn, extra_args):
     callable
         The function with the signature expected by the driver.
     """
-    def closure(x, *args):
-        return fcn(x, *extra_args)
+    def closure(x, grad, *args):
+        return fcn(x, grad, *extra_args)
 
     return closure
