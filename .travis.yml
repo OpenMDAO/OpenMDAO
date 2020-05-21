@@ -168,6 +168,8 @@ install:
   #cp $HOME/git/paropt/lib/libparopt.so /home/travis/miniconda/envs/PY3.6/lib
   #cp $HOME/git/paropt/lib/libparopt.a /home/travis/miniconda/envs/PY3.6/lib
   #cp $HOME/git/paropt/lib/libparopt.so /home/travis/miniconda/envs/PY3.8/lib
+
+  mkdir -p /home/travis/miniconda/envs/PY3.8/lib
   cp $HOME/git/paropt/lib/libparopt.a /home/travis/miniconda/envs/PY3.8/lib
 
   python3 setup.py install # install Python wrapper
