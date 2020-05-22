@@ -322,6 +322,13 @@ class NLoptDriver(Driver):
                     # Double-sided constraints are accepted by the algorithm
                     args = [name, False, j]
                     opt_prob.add_inequality_constraint(signature_extender(weak_method_wrapper(self, '_confunc'), args))
+                    
+                    dblcon = (upper < openmdao.INF_BOUND) and (lower > -openmdao.INF_BOUND)
+
+                    # Add extra constraint if double-sided
+                    if dblcon:
+                        args = [name, True, j]
+                        opt_prob.add_inequality_constraint(signature_extender(weak_method_wrapper(self, '_confunc'), args))
 
         # compute dynamic simul deriv coloring if option is set
         if coloring_mod._use_total_sparsity:
