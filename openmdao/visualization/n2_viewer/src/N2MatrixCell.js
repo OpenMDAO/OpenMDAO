@@ -520,4 +520,26 @@ class N2MatrixCell {
                 return new N2GroupGroupCell(this.color(), this.id);
         }
     }
+
+    /**
+     * Highlight the variable nodes *associated* with the cell, not the cell
+     * itself. The default is for cells on the diagonal to highlight the
+     * variable directly across from them.
+     * @param {String} [varType = 'self'] Either 'self', 'source', or 'target'
+     *   to indicate the variable name to highlight.
+     * @param {String} [direction = 'self'] Either 'self', 'input', or 'output'
+     *   to indicate the style of the highlighting.
+     */
+    highlight(varType = 'self', direction = 'self') {
+        let abspath = this.obj.absPathName;
+        let className = 'diagHighlight';
+
+        if (varType == 'target') abspath = this.tgtObj.absPathName;
+
+        if (direction == 'input') className = 'inputHighlight';
+        else if (direction == 'output') className = 'outputHighlight';
+
+        const treeId = abspath.replace(/[\.:]/g, '_');
+        d3.select('rect#' + treeId).classed(className, true);
+    }
 }

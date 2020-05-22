@@ -49,48 +49,60 @@ class N2Style {
         // Define as JSON first
         let newCssJson = {
             'rect': {
-                'stroke': N2Style.color.treeStroke,
+                'stroke': N2Style.color.treeStroke
             },
-            'g.unknown > rect': {
+            '#tree > g > rect': {
+                'stroke-width': 1,
+            },
+            '#tree > g.unknown > rect': {
                 'fill': N2Style.color.unknownExplicit,
+                'stroke': N2Style.color.unknownExplicit,
                 'fill-opacity': '.8',
             },
-            'g.unknown_implicit > rect': {
+            '#tree > g.unknown_implicit > rect': {
                 'fill': N2Style.color.unknownImplicit,
+                'stroke': N2Style.color.unknownImplicit,                
                 'fill-opacity': '.8',
             },
-            'g.param > rect': {
+            '#tree > g.param > rect': {
                 'fill': N2Style.color.param,
+                'stroke': N2Style.color.param,
                 'fill-opacity': '.8',
             },
-            'g.unconnected_param > rect': {
+            '#tree > g.unconnected_param > rect': {
                 'fill': N2Style.color.unconnectedParam,
+                'stroke': N2Style.color.unconnectedParam,
                 'fill-opacity': '.8',
             },
-            'g.subsystem > rect': {
+            '#tree > g.subsystem > rect': {
                 'cursor': 'pointer',
                 'fill-opacity': '.8',
                 'fill': N2Style.color.group,
+                'stroke': N2Style.color.group
             },
-            'g.component > rect': {
+            '#tree > g.component > rect': {
                 'cursor': 'pointer',
                 'fill-opacity': '.8',
                 'fill': N2Style.color.component,
+                'stroke': N2Style.color.component,
             },
-            'g.param_group > rect': {
+            '#tree > g.param_group > rect': {
                 'cursor': 'pointer',
                 'fill-opacity': '.8',
                 'fill': N2Style.color.paramGroup,
+                'stroke': N2Style.color.paramGroup,
             },
-            'g.unknown_group > rect': {
+            '#tree > g.unknown_group > rect': {
                 'cursor': 'pointer',
                 'fill-opacity': '.8',
                 'fill': N2Style.color.unknownGroup,
+                'stroke': N2Style.color.unknownGroup,
             },
-            'g.minimized > rect': {
+            '#tree > g.minimized > rect': {
                 'cursor': 'pointer',
                 'fill-opacity': '.8',
                 'fill': N2Style.color.collapsed,
+                'stroke': N2Style.color.collapsed,
             },
             'text': {
                 //'dominant-baseline: middle',

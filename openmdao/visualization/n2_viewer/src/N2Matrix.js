@@ -649,9 +649,7 @@ class N2Matrix {
 
         let leftTextWidthHovered = this.diagNodes[cell.row].nameWidthPx;
 
-        this.highlight(-leftTextWidthHovered - this.layout.size.partitionTreeGap,
-            this.nodeSize.height * cell.row, leftTextWidthHovered,
-            this.nodeSize.height, N2Style.color.highlightHovered); //highlight hovered
+        cell.highlight();
 
         this._drawOffscreenArrows(cell, lineWidth);
 
@@ -674,10 +672,7 @@ class N2Matrix {
                         'width': lineWidth
                     }, this.n2Groups, this.nodeSize);
 
-                    //highlight var name
-                    this.highlight(-leftTextWidthDependency - this.layout.size.partitionTreeGap,
-                        this.nodeSize.height * col, leftTextWidthDependency,
-                        this.nodeSize.height, N2Style.color.greenArrow);
+                    this.cell(cell.row, col).highlight('target', 'output');
                 }
 
             }
@@ -699,10 +694,7 @@ class N2Matrix {
                         'width': lineWidth
                     }, this.n2Groups, this.nodeSize);
 
-                    //highlight var name
-                    this.highlight(-leftTextWidthDependency - this.layout.size.partitionTreeGap,
-                        this.nodeSize.height * col, leftTextWidthDependency,
-                        this.nodeSize.height, N2Style.color.redArrow);
+                    this.cell(col, cell.row).highlight('source', 'input');
                 }
 
             }
@@ -822,14 +814,7 @@ class N2Matrix {
         let leftTextWidthR = this.layout.visibleNodes[cell.row].nameWidthPx,
             leftTextWidthC = this.layout.visibleNodes[cell.col].nameWidthPx;
 
-        // highlight var name
-        this.highlight(-leftTextWidthR - this.layout.size.partitionTreeGap,
-            this.nodeSize.height * cell.row, leftTextWidthR, this.nodeSize.height,
-            N2Style.color.redArrow);
-
-        // highlight var name
-        this.highlight(-leftTextWidthC - this.layout.size.partitionTreeGap,
-            this.nodeSize.height * cell.col, leftTextWidthC, this.nodeSize.height,
-            N2Style.color.greenArrow);
+        cell.highlight('source', 'input');
+        cell.highlight('target', 'output');
     }
 }

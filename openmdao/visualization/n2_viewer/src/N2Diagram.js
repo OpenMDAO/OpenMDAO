@@ -347,14 +347,16 @@ class N2Diagram {
 
         nodeEnter.append("rect")
             .attr("width", function (d) {
-                return d.prevDims.width * self.prevTransitCoords.model.x;
+                return d.prevDims.width * self.prevTransitCoords.model.x - 2;
             })
             .attr("height", function (d) {
-                return d.prevDims.height * self.prevTransitCoords.model.y;
+                return d.prevDims.height * self.prevTransitCoords.model.y - 2;
             })
             .attr("id", function (d) {
-                return d.absPathName.replace(/\./g, '_');
-            });
+                return d.absPathName.replace(/[\.:]/g, '_');
+            })
+            .attr('rx', 12)
+            .attr('ry', 12);
 
         nodeEnter.append("text")
             .attr("dy", ".35em")
@@ -395,10 +397,10 @@ class N2Diagram {
 
         nodeUpdate.select("rect")
             .attr("width", function (d) {
-                return d.dims.width * self.transitCoords.model.x;
+                return d.dims.width * self.transitCoords.model.x - 2;
             })
             .attr("height", function (d) {
-                return d.dims.height * self.transitCoords.model.y;
+                return d.dims.height * self.transitCoords.model.y - 2;
             })
             .attr('rx', 12)
             .attr('ry', 12);
@@ -430,10 +432,10 @@ class N2Diagram {
 
         nodeExit.select("rect")
             .attr("width", function (d) {
-                return d.dims.width * self.transitCoords.model.x;
+                return d.dims.width * self.transitCoords.model.x - 2;
             })
             .attr("height", function (d) {
-                return d.dims.height * self.transitCoords.model.y;
+                return d.dims.height * self.transitCoords.model.y - 2;
             });
 
         nodeExit.select("text")
@@ -614,8 +616,16 @@ class N2Diagram {
             .style("opacity", 0);
     }
 
+    clearHighlights() {
+        for (const varType of ['diag', 'input', 'output']) {
+            this.dom.pTreeGroup.selectAll('.' + varType + 'Highlight')
+                .classed(varType + 'Highlight', false)
+        }
+    }
+
     clearArrows() {
         this.dom.n2OuterGroup.selectAll("[class^=n2_hover_elements]").remove();
+        this.clearHighlights();
     }
 
     /** Reveal arrows that had been hidden */
@@ -752,9 +762,8 @@ class N2Diagram {
     /** When the mouse leaves a cell, remove all temporary arrows. */
     mouseOut() {
         this.dom.n2OuterGroup.selectAll(".n2_hover_elements").remove();
-        d3.selectAll("div.offgrid")
-            .style("visibility", "hidden")
-            .html('');
+        this.clearHighlights();
+        d3.selectAll("div.offgrid").style("visibility", "hidden").html('');
 
         this.ui.nodeInfoBox.clear();
     }
