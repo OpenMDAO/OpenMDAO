@@ -18,42 +18,42 @@ from openmdao.utils.class_util import weak_method_wrapper
 from openmdao.utils.mpi import MPI
 
 # Optimizers in NLopt
-_optimizers = { 'GN_DIRECT',
-                'GN_DIRECT_L',
-                'GN_DIRECT_L_RAND',
-                'GNL_DIRECT_NOSCAL',
-                'GN_DIRECT_L_NOSCAL',
-                'GN_DIRECT_L_RAND_NOSCAL',
-                'GN_ORIG_DIRECT',
-                'GN_ORIG_DIRECT_L',
-                'GN_CRS2_LM',
-                'G_MLSL_LDS',
-                'G_MLSL',
-                'GD_STOGO',
-                'GD_STOGO_RAND',
-                'GN_AGS',
-                'GN_ISRES',
-                'GN_ESCH',
-                'LN_COBYLA',
-                'LN_BOBYQA',
-                'LN_NEWUOA',
-                'LN_NEWUOA_BOUND',
-                'LN_PRAXIS',
-                'LN_NELDERMEAD',
-                'LN_SBPLX',
-                'LD_MMA',
-                'LD_CCSAQ',
-                'LD_SLSQP',
-                'LD_TNEWTON_PRECOND_RESTART',
-                'LD_TNEWTON_PRECOND',
-                'LD_TNEWTON_RESTART',
-                'LD_TNEWTON',
-                'LD_VAR2',
-                'LD_VAR1',
-                'AUGLAG',
-                'AUGLAG_EQ'
-                }
+optimizer_methods = { 'GN_DIRECT' : nlopt.GN_DIRECT,
+                      'GN_DIRECT_L' : nlopt.GN_DIRECT_L,
+                      'GN_DIRECT_L_RAND' : nlopt.GN_DIRECT_L_RAND,
+                      'GN_DIRECT_L_NOSCAL' : nlopt.GN_DIRECT_L_NOSCAL,
+                      'GN_DIRECT_L_RAND_NOSCAL' : nlopt.GN_DIRECT_L_RAND_NOSCAL,
+                      'GN_ORIG_DIRECT' : nlopt.GN_ORIG_DIRECT,
+                      'GN_ORIG_DIRECT_L' : nlopt.GN_ORIG_DIRECT_L,
+                      'GN_CRS2_LM' : nlopt.GN_CRS2_LM,
+                      'G_MLSL_LDS' : nlopt.G_MLSL_LDS,
+                      'G_MLSL' : nlopt.G_MLSL,
+                      'GD_STOGO' : nlopt.GD_STOGO,
+                      'GD_STOGO_RAND' : nlopt.GD_STOGO_RAND,
+                      'GN_AGS' : nlopt.GN_AGS,
+                      'GN_ISRES' : nlopt.GN_ISRES,
+                      'GN_ESCH' : nlopt.GN_ESCH,
+                      'LN_COBYLA' : nlopt.LN_COBYLA,
+                      'LN_BOBYQA' : nlopt.LN_BOBYQA,
+                      'LN_NEWUOA' : nlopt.LN_NEWUOA,
+                      'LN_NEWUOA_BOUND' : nlopt.LN_NEWUOA_BOUND,
+                      'LN_PRAXIS' : nlopt.LN_PRAXIS,
+                      'LN_NELDERMEAD' : nlopt.LN_NELDERMEAD,
+                      'LN_SBPLX' : nlopt.LN_SBPLX,
+                      'LD_MMA' : nlopt.LD_MMA,
+                      'LD_CCSAQ' : nlopt.LD_CCSAQ,
+                      'LD_SLSQP' : nlopt.LD_SLSQP,
+                      'LD_TNEWTON_PRECOND_RESTART' : nlopt.LD_TNEWTON_PRECOND_RESTART,
+                      'LD_TNEWTON_PRECOND' : nlopt.LD_TNEWTON_PRECOND,
+                      'LD_TNEWTON_RESTART' : nlopt.LD_TNEWTON_RESTART,
+                      'LD_TNEWTON' : nlopt.LD_TNEWTON,
+                      'LD_VAR2' : nlopt.LD_VAR2,
+                      'LD_VAR1' : nlopt.LD_VAR1,
+                      'AUGLAG' : nlopt.AUGLAG,
+                      'AUGLAG_EQ' : nlopt.AUGLAG_EQ,
+                      }
                 
+_optimizers = set(optimizer_methods)
 
 # For 'basinhopping' and 'shgo' gradients are used only in the local minimization
 _gradient_optimizers = {'LD_MMA', 'LD_SLSQP', 'LD_LBFGS',
@@ -61,18 +61,15 @@ _gradient_optimizers = {'LD_MMA', 'LD_SLSQP', 'LD_LBFGS',
                         'LD_TNEWTON_RESTART', 'LD_TNEWTON',
                         'LD_VAR2', 'LD_VAR1', 'AUGLAG',
                         'AUGLAG_EQ', 'GD_STOGO', 'GD_STOGO_RAND'}
-_bounds_optimizers = {'LD_SLSQP'}
-_constraint_optimizers = {'LD_SLSQP'}
+_bounds_optimizers = {'LD_SLSQP', 'LN_COBYLA', 'GN_DIRECT', 'GN_ISRES', 'GN_ESCH',
+                      'GD_STOGO', 'GN_AGS', 'LN_NELDERMEAD'}
+_constraint_optimizers = {'LD_SLSQP', 'LN_COBYLA'}
 _constraint_grad_optimizers = _gradient_optimizers & _constraint_optimizers
-_eq_constraint_optimizers = {'LD_SLSQP'}
+_eq_constraint_optimizers = {'LD_SLSQP', 'LN_COBYLA'}
 _global_optimizers = {'GN_ISRES'}
 
-# Global optimizers and optimizers in minimize
 _all_optimizers = _optimizers | _global_optimizers
 
-# These require Hessian or Hessian-vector product, so they are not supported
-# right now.
-# dual-annealing and basinhopping not supported yet
 _unsupported_optimizers = {}
 
 CITATIONS = """
@@ -233,7 +230,7 @@ class NLoptDriver(Driver):
         model = problem.model
         self.iter_count = 0
         self._total_jac = None
-
+        
         self._check_for_missing_objective()
 
         # Initial Run
@@ -252,7 +249,7 @@ class NLoptDriver(Driver):
         x_init = np.empty(nparam)
         
         # TODO : make it so this actually takes in an algo
-        opt_prob = nlopt.opt(nlopt.LD_SLSQP, int(nparam))
+        opt_prob = nlopt.opt(optimizer_methods[opt], int(nparam))
 
         # Initial Design Vars
         i = 0
@@ -298,7 +295,7 @@ class NLoptDriver(Driver):
         lin_i = 0  # counter for linear constraint jacobian
         lincons = []  # list of linear constraints
         self._obj_and_nlcons = list(self._objs)
-
+        
         if opt in _constraint_optimizers:
             for name, meta in self._cons.items():
                 size = meta['global_size'] if meta['distributed'] else meta['size']
@@ -306,10 +303,15 @@ class NLoptDriver(Driver):
                 lower = meta['lower']
                 equals = meta['equals']
                 
-                self._obj_and_nlcons.append(name)
-                self._con_idx[name] = i
-                i += size
-                    
+                if opt in _gradient_optimizers and 'linear' in meta and meta['linear']:
+                    lincons.append(name)
+                    self._con_idx[name] = lin_i
+                    lin_i += size
+                else:
+                    self._obj_and_nlcons.append(name)
+                    self._con_idx[name] = i
+                    i += size
+                
                 # Loop over every index separately,
                 # because it's easier to defined each
                 # constraint by index.
@@ -337,6 +339,13 @@ class NLoptDriver(Driver):
                         if dblcon:
                             args = [name, True, j]
                             opt_prob.add_inequality_constraint(signature_extender(weak_method_wrapper(self, '_confunc'), args))
+                            
+            # precalculate gradients of linear constraints
+            if lincons:
+                self._lincongrad_cache = self._compute_totals(of=lincons, wrt=self._dvlist,
+                                                              return_format='array')
+            else:
+                self._lincongrad_cache = None
 
         # compute dynamic simul deriv coloring if option is set
         if coloring_mod._use_total_sparsity:
@@ -358,7 +367,8 @@ class NLoptDriver(Driver):
         try:
             if opt in _optimizers:
                 opt_prob.set_min_objective(self._objfunc)
-                opt_prob.set_xtol_rel(self.options['tol'])
+                opt_prob.set_ftol_rel(self.options['tol'])
+                opt_prob.set_maxeval(self.options['maxiter'])
                 # TODO : ensure that the optimal result is the
                 # last result run by the model
                 xopt = opt_prob.optimize(x_init)
@@ -374,6 +384,9 @@ class NLoptDriver(Driver):
                 self._reraise()
             else:
                 raise
+                
+        if self._exc_info is not None:
+            self._reraise()
                 
         self.fail = False
 
@@ -460,7 +473,11 @@ class NLoptDriver(Driver):
 
         cons = self._con_cache
         meta = self._cons[name]
-        grad_cache = self._grad_cache
+        
+        if meta['linear']:
+            grad_cache = self._lincongrad_cache
+        else:
+            grad_cache = self._grad_cache
         
         grad_idx = self._con_idx[name] + idx
         
@@ -482,7 +499,7 @@ class NLoptDriver(Driver):
         lower = meta['lower']
         if isinstance(lower, np.ndarray):
             lower = lower[idx]
-
+            
         if dbl or (lower <= -openmdao.INF_BOUND):
             if grad.size > 0:
                 grad[:] = grad_cache[grad_idx, :]
