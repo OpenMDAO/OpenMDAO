@@ -1287,25 +1287,25 @@ class TestNLoptDriver(unittest.TestCase):
         assert_near_equal(prob['f'], 0.0, 1e-6)
     
     def test_LN_NELDERMEAD_rosenbrock(self):
-    #     import openmdao.api as om
-    # 
-    #     prob = om.Problem()
-    #     model = prob.model
-    # 
-    #     model.add_subsystem('indeps', om.IndepVarComp('x', np.ones(rosenbrock_size)*1.1), promotes=['*'])
-    #     model.add_subsystem('rosen', Rosenbrock(), promotes=['*'])
-    # 
-    #     prob.driver = driver = NLoptDriver()
-    #     driver.options['optimizer'] = 'LN_NELDERMEAD'
-    #     driver.options['disp'] = False
-    #     driver.options['maxiter'] = 10000
-    # 
-    #     model.add_design_var('x', lower=np.zeros(rosenbrock_size), upper=2*np.ones(rosenbrock_size))
-    #     model.add_objective('f')
-    #     prob.setup()
-    #     prob.run_driver()
-    #     assert_near_equal(prob['x'], np.ones(rosenbrock_size), 1e-2)
-    #     assert_near_equal(prob['f'], 0.0, 1e-2)
+        import openmdao.api as om
+    
+        prob = om.Problem()
+        model = prob.model
+    
+        model.add_subsystem('indeps', om.IndepVarComp('x', np.ones(rosenbrock_size)*1.1), promotes=['*'])
+        model.add_subsystem('rosen', Rosenbrock(), promotes=['*'])
+    
+        prob.driver = driver = NLoptDriver()
+        driver.options['optimizer'] = 'LN_NELDERMEAD'
+        driver.options['disp'] = False
+        driver.options['maxiter'] = 10000
+    
+        model.add_design_var('x', lower=np.zeros(rosenbrock_size), upper=2*np.ones(rosenbrock_size))
+        model.add_objective('f')
+        prob.setup()
+        prob.run_driver()
+        assert_near_equal(prob['x'], np.ones(rosenbrock_size), 1e-2)
+        assert_near_equal(prob['f'], 0.0, 1e-2)
 
     def test_simple_paraboloid_upper_LD_MMA(self):
     
