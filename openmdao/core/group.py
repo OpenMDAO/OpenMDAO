@@ -27,10 +27,9 @@ from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import convert_neg, array_connection_compatible, \
     _flatten_src_indices
-from openmdao.utils.general_utils import ContainsAll, all_ancestors, simple_warning, Undefined, \
-    diff_dicts
+from openmdao.utils.general_utils import ContainsAll, all_ancestors, simple_warning, Undefined
 from openmdao.utils.units import is_compatible, unit_conversion
-from openmdao.utils.mpi import MPI, multi_proc_exception_check
+from openmdao.utils.mpi import MPI, multi_proc_exception_check, check_mpi_exceptions
 from openmdao.utils.coloring import Coloring, _STD_COLORING_FNAME
 import openmdao.utils.coloring as coloring_mod
 
@@ -701,12 +700,7 @@ class Group(System):
                     allprocs_prom2abs_list[type_][prom_name].extend(sub_abs)
                     if type_ == 'input' and isinstance(subsys, Group):
                         if sub_prom in subsys._group_inputs:
-                            if len(sub_abs) > 1:
-                                group_inputs.append((prom_name, subsys._group_inputs[sub_prom]))
-                            else:
-                                simple_warning(f"{self.msginfo}: Group input '{sub_prom} was added "
-                                               "but is being ignored because only 1 input is "
-                                               "promoted to that name.")
+                            group_inputs.append((prom_name, subsys._group_inputs[sub_prom]))
 
         for prom_name, abs_list in allprocs_prom2abs_list['output'].items():
             if len(abs_list) > 1:
@@ -886,10 +880,6 @@ class Group(System):
                     sizes_in = sizes[type_][iproc, :].copy()
                     self.comm.Allgather(sizes_in, sizes[type_])
 
-        if self.pathname == '':  # only do at the top
-            self._problem_meta['top_sizes'] = self._var_sizes
-
-        if self.comm.size > 1:
             self._has_distrib_vars = self.comm.allreduce(n_distrib_vars) > 0
             self._contains_parallel_group = self.comm.allreduce(n_parallel_sub) > 0
 
@@ -926,6 +916,9 @@ class Group(System):
         else:
             self._owned_sizes = self._var_sizes[vec_names[0]]['output']
             self._vector_class = self._problem_meta['local_vector_class']
+
+        if self.pathname == '':  # only do at the top
+            self._problem_meta['top_sizes'] = self._var_sizes
 
         if self._problem_meta['use_derivatives']:
             self._var_sizes['nonlinear'] = self._var_sizes['linear']
@@ -1131,7 +1124,7 @@ class Group(System):
                     simple_warning(msg)
 
         # If running in parallel, allgather
-        if self.comm.size > 1:
+        if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
             if self._subsystems_myproc and self._subsystems_myproc[0].comm.rank == 0:
                 raw = (global_abs_in2out, src_ind_inputs)
             else:
@@ -1147,6 +1140,7 @@ class Group(System):
         for inp in src_ind_inputs:
             allprocs_abs2meta[inp]['has_src_indices'] = True
 
+    @check_mpi_exceptions
     def _setup_connections(self, recurse=True):
         """
         Compute dict of all connections owned by this Group.
@@ -1265,6 +1259,8 @@ class Group(System):
         abs2meta = self._var_abs2meta
 
         for abs_in, abs_out in abs_in2out.items():
+            # if abs_out.startswith('_auto_ivc.'):
+            #     continue  # auto_ivc vars were constructed based on inputs
             # check unit compatibility
             out_units = allprocs_abs2meta[abs_out]['units']
             in_units = allprocs_abs2meta[abs_in]['units']
@@ -2543,6 +2539,7 @@ class Group(System):
         auto_ivc.name = '_auto_ivc'
         auto_ivc.pathname = auto_ivc.name
 
+        myrank = self.comm.rank
         abs2prom = self._var_allprocs_abs2prom['input']
         abs2meta = self._var_abs2meta
         all_abs2meta = self._var_allprocs_abs2meta
@@ -2579,61 +2576,145 @@ class Group(System):
         else:
             remote_ins = {}
 
+        # NOTE: remote_ins does NOT include distributed inputs.
+
         prom2ivc = {}
         count = 0
+        auto2tgt = defaultdict(list)
+        ivc_tgts = [n for n in abs_names if n not in conns]
+        for tgt in ivc_tgts:
+            prom = abs2prom[tgt]
+            if prom in prom2ivc:
+                # multiple connected inputs w/o a src. Connect them to the same IVC
+                src = prom2ivc[prom][0]
+                conns[tgt] = src
+            else:
+                src = f"_auto_ivc.v{count}"
+                count += 1
+                prom2ivc[prom] = (src, tgt)
+                conns[tgt] = src
 
-        # first, loop over continuous variables
+            auto2tgt[src].append(tgt)
+
         with multi_proc_exception_check(self.comm):
-            for abs_in in abs_names:
-                if abs_in not in conns:  # unconnected, so connect the input to an _auto_ivc output
-                    prom = abs2prom[abs_in]
+            for src, tgts in auto2tgt.items():
+                val = _undefined
+
+                for t in tgts:
+                    if not (t in remote_ins or all_abs2meta[t]['distributed']):
+                        # we found a duplicated input.  Use that.
+                        tgt = t
+                        break
+                else:
+                    auto_ivc._add_remote(src)
+                    tgt = tgts[0]
+
+                distrib = all_abs2meta[tgt]['distributed']
+                if not (all_abs2meta[tgt]['has_src_indices'] and distrib):
+                    units = all_abs2meta[tgt]['units']
+                    if tgt in abs2meta:
+                        gval = None
+                        prom = abs2prom[tgt]
+                        if prom in self._group_inputs:
+                            meta = self._group_inputs[prom]
+                            gval = meta.get('value', None)
+                            units = meta.get('units', units)
+                        if tgt in remote_ins:
+                            irank = remote_ins[tgt]
+                        else:
+                            irank = 0
+                        if (tgt not in remote_ins or remote_ins[tgt] == self.comm.rank or
+                                distrib):  # and not (src in auto_ivc._remotes and myrank != irank):
+                            if gval is None:
+                                if val is _undefined:
+                                    val = abs2meta[tgt]['value']
+                            elif distrib:
+                                raise RuntimeError(f"{self.msginfo}: Group.add_input currently"
+                                                   " does not support overriding distributed "
+                                                   "input values.")
+                            else:
+                                val = gval
+
+                    if val is _undefined:
+                        # remote var is treated as distrib with size 0 everywhere but owner
+                        val = np.zeros(0)
+
+                    auto_ivc.add_output(src.rsplit('.', 1)[-1], val=val, units=units)
+
+                all_ranges = []
+                for tgt in tgts:
                     val = _undefined
 
-                    if abs_in in abs2meta:
-                        if abs2meta[abs_in]['src_indices'] is not None:
-                            raise RuntimeError(f"{self.msginfo}: Can't connect {abs_in} to "
-                                               "_auto_ivc: _auto_ivc connections with src_indices "
-                                               "are not supported yet.")
+                    if all_abs2meta[tgt]['has_src_indices'] and all_abs2meta[tgt]['distributed']:
+                        if tgt in abs2meta:
+                            src_indices = abs2meta[tgt]['src_indices']
+                            rnginfo = (np.min(src_indices), np.max(src_indices), len(src_indices))
+                            all_ranges.append((tgt, self.comm.allgather(rnginfo)))
+                        else:
+                            # no part of distrib var is local, e.g., a distrib comp under a
+                            # parallel group
+                            all_ranges.append((tgt, self.comm.allgather((0, 0, 0))))
 
-                    if prom in prom2ivc:
-                        # multiple connected inputs w/o a src. Connect them to the same IVC
-                        # check if they have different metadata, and if they do, there must be
-                        # a group input defined that sets the default, else it's an error
-                        conns[abs_in] = prom2ivc[prom][0]
-                    else:
-                        distrib = all_abs2meta[abs_in]['distributed']
-                        ivc_name = f"_auto_ivc.v{count}"
-                        loc_out_name = ivc_name.rsplit('.', 1)[-1]
-                        count += 1
-                        prom2ivc[prom] = (ivc_name, abs_in)
-                        conns[abs_in] = ivc_name
-                        if abs_in in abs2meta:
-                            gval = None
-                            if prom in self._group_inputs:
-                                meta = self._group_inputs[prom]
-                                if 'value' in meta:
-                                    gval = meta['value']
-                            if (abs_in not in remote_ins or remote_ins[abs_in] == self.comm.rank or
-                                    distrib):
-                                if gval is None:
-                                    val = abs2meta[abs_in]['value']
-                                elif distrib:
-                                    raise RuntimeError(f"{self.msginfo}: Group.add_input currently"
-                                                       " does not support overriding distributed "
-                                                       "input values.")
-                                else:
-                                    val = gval
+                if all_ranges:  # we have auto_ivc connected to distributed input
+                    minstarts = []
+                    maxends = []
+                    sizes = []
+                    fulls = []
+                    for tgt, ranges in all_ranges:
+                        minstarts.append(np.min([start for start, _, _ in ranges]))
+                        if minstarts[-1] < 0:
+                            raise RuntimeError(f"{self.msginfo}: Can't connect {tgt} to "
+                                               "_auto_ivc: _auto_ivc connections with negative "
+                                               "src_indices are not supported yet.")
+                        maxends.append(np.max([end for _, end, _ in ranges]))
+                        sizes.append(np.sum([sz for _, _, sz in ranges]))
+                        fulls.append(np.all([sz == (end - start + 1) for start, end, sz in ranges]))
 
-                        if abs_in in remote_ins or distrib:
-                            auto_ivc._add_remote(ivc_name)
+                    is_default = (np.all(fulls) and np.all([m == 0 for m in minstarts])
+                                  and np.all([m + 1 == sizes[0] or m == 0 for m in maxends]))
 
-                        if val is _undefined:
-                            # remote var is treated as distrib with size 0 everywhere but owner
+                    if is_default:  # all src_indices are non-overlapping starting at 0
+                        # just match local size of auto_ivc to local size of input(s)
+
+                        # must check that values for different distrib inputs match
+                        val = None
+                        old_tgt = None
+                        for tgt, _ in all_ranges:
+                            if tgt in abs2meta:
+                                if val is None:
+                                    val = abs2meta[tgt]['value']
+                                    old_tgt = tgt
+                                elif np.linalg.norm(val - abs2meta[tgt]['value']) > 1e-40:
+                                    raise RuntimeError(f"{self.msginfo}: Can't connect "
+                                                       "_auto_ivc to distributed variables "
+                                                       f"'{tgt}' and '{old_tgt}' because they "
+                                                       "have different values in rank "
+                                                       f"{self.comm.rank}.")
+
+                        if val is None:
                             val = np.zeros(0)
+                    elif len(all_ranges) > 1:
+                        raise RuntimeError(f"{self.msginfo}: Can't connect _auto_ivc to distributed"
+                                           f" inputs {sorted(t[0] for t in all_ranges)}.")
+                    else:
+                        # distributed size layout is undefined, so just take the total distrib
+                        # size and chop it up evenly among procs where the input size > 0.
+                        num_nz_divisions = len([t for t, rngs in all_ranges if rngs[1][2] > 0])
+                        total_size = np.max(maxends)
+                        sizes, _ = evenly_distrib_idxs(num_nz_divisions, total_size)
+                        tgt, ranges = all_ranges[0]
+                        nz_count = 0
+                        for rank, (start, end, sz) in enumerate(ranges):
+                            if rank == myrank:
+                                val = np.ones(sizes[nz_count])
+                                break
+                            if sz > 0:
+                                nz_count += 1
 
-                        auto_ivc.add_output(loc_out_name, val=val,
-                                            units=all_abs2meta[abs_in]['units'])
+                    auto_ivc.add_output(src.rsplit('.', 1)[-1], val=val,
+                                        units=all_abs2meta[tgt]['units'])
 
+        # have to sort to keep vars in sync because we may be doing bcasts
         for abs_in in sorted(all_discrete_ins):
             if abs_in not in conns:  # unconnected, so connect the input to an _auto_ivc output
                 prom = abs2prom[abs_in]
@@ -2762,7 +2843,7 @@ class Group(System):
 
                     if errs:
                         inputs = list(sorted(tgts))
-                        raise RuntimeError(f"The following inputs, {inputs} are connected but "
-                                           "the following metadata entries have not been specified "
-                                           "by Group.add_input and differ between at least "
-                                           f"two of them: {errs}.")
+                        raise RuntimeError(f"{self.msginfo}: The following inputs, {inputs} are "
+                                           "connected but the following metadata entries have not "
+                                           "been specified by Group.add_input and differ between "
+                                           f"at least two of them: {errs}.")

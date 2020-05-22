@@ -498,7 +498,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
         totals = prob.check_totals(of=['fn.y'], wrt=['p.a'], method='cs', out_stream=None)
 
         for key, val in totals.items():
-            assert_near_equal(val['rel error'][0], 0.0, 1e-9)
+            assert_near_equal(val['rel error'][0], 0.0, 3e-9)
 
     def test_guess_nonlinear_transfer(self):
         # Test that data is transfered to a component before calling guess_nonlinear.

@@ -356,8 +356,6 @@ class MPITests(unittest.TestCase):
         C2 = top.add_subsystem("C2", DistribCompSimple(arr_size=size))
         top.connect('C1.outvec', 'C2.invec')
 
-        #import wingdbstub
-
         p.setup()
 
         # Conclude setup but don't run model.
@@ -545,8 +543,6 @@ class MPITests(unittest.TestCase):
         top.connect('C2.outvec', 'C3.x')
         p.setup()
 
-        #import wingdbstub
-
         # Conclude setup but don't run model.
         p.final_setup()
 
@@ -567,8 +563,6 @@ class MPITests(unittest.TestCase):
         C3 = top.add_subsystem("C3", DistribGatherComp(arr_size=size))
         top.connect('C1.outvec', 'C2.invec')
         top.connect('C2.outvec', 'C3.invec')
-
-        #import wingdbstub
 
         p.setup()
 
@@ -625,8 +619,6 @@ class MPITests(unittest.TestCase):
         C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
         C2 = top.add_subsystem("C2", DistribOverlappingInputComp(arr_size=size))
         top.connect('C1.outvec', 'C2.invec')
-
-        #import wingdbstub
 
         p.setup()
 
@@ -728,8 +720,6 @@ class ProbRemoteTests(unittest.TestCase):
         C1 = par.add_subsystem("C1", DistribInputDistribOutputDiscreteComp(arr_size=size))
         C2 = par.add_subsystem("C2", DistribInputDistribOutputDiscreteComp(arr_size=size))
 
-        #import wingdbstub
-
         p.setup()
 
         # Conclude setup but don't run model.
@@ -782,8 +772,6 @@ class ProbRemoteTests(unittest.TestCase):
 
         top = p.model
         C1 = top.add_subsystem("C1", DistribInputDistribOutputDiscreteComp(arr_size=size))
-
-        #import wingdbstub
 
         p.setup()
 

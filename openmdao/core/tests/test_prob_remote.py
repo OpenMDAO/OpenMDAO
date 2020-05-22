@@ -41,8 +41,6 @@ class ProbRemoteTestCase(unittest.TestCase):
         comp = ExecComp('g = x*y', y=2.0)
         group.add_subsystem('comp2', comp)
 
-        #import wingdbstub
-        
         prob.setup()
 
         prob['group.comp1.x'] = 4.

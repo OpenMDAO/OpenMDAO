@@ -793,23 +793,6 @@ class Component(System):
         iproc = self.comm.rank
         abs2meta = self._var_abs2meta
 
-        # # this isn't great.  We're basically duplicating the functionality of _setup_var_sizes
-        # # here for the inputs.
-        # sizes = np.zeros(len(abs2meta), dtype=INT_DTYPE)
-
-        # no_src_inds = set()
-        # for i, iname in enumerate(self._var_allprocs_abs_names['input']):
-        #     if iname in abs2meta:
-        #         if abs2meta[iname]['src_indices'] is None:
-        #             sizes[i] = abs2meta[iname]['size']
-        #             if iname in abs_in2out:
-        #                 src = abs_in2out[iname]
-        #                 if all_abs2meta[src]['distributed']:
-        #                 no_src_inds.add(i)
-
-        # all_sizes = np.zeros((self.comm.size, len(abs2meta)), dtype=INT_DTYPE)
-        # self.comm.Allgather(sizes, all_sizes)
-
         sizes_in = self._var_sizes['nonlinear']['input']
         sizes_out = all_sizes['nonlinear']['output']
         added_src_inds = set()

@@ -745,16 +745,16 @@ class System(object):
             self._relevant = None
             try:
                 # this is a full setup, so get rid of any existing auto_ivc
-                ivc = self.auto_ivc
+                ivc = self._auto_ivc
             except AttributeError:
                 pass
             else:
-                self._subsystems_allprocs.remove(ivc)
-                del self.auto_ivc
                 to_remove = [t for t, (s, _, _) in self._manual_connections.items()
                              if s.startswith('_auto_ivc.')]
                 for t in to_remove:
                     del self._manual_connections[t]
+                del self._auto_ivc
+                self._subsystems_allprocs = [s for s in self._subsystems_allprocs if s is not ivc]
 
         # 2. Partial setup called in the system initiating the reconfiguration.
         elif setup_mode == 'reconf':

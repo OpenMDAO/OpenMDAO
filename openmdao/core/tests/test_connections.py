@@ -542,14 +542,14 @@ class TestConnectionsDistrib(unittest.TestCase):
         model.add_subsystem('c3', TestComp())
         model.connect("p1.x", "c3.x")
 
-        expected = "Group (<model>): The source indices do not specify a valid index " + \
+        expected = "ValueError: Group (<model>): The source indices do not specify a valid index " + \
                    "for the connection 'p1.x' to 'c3.x'. " + \
                    "Index '2' is out of range for source dimension of size 2."
-
+        
         try:
             prob.setup()
-        except ValueError as err:
-            self.assertEqual(str(err), expected)
+        except Exception as err:
+            self.assertEqual(str(err).splitlines()[-1], expected)
         else:
             self.fail('Exception expected.')
 
@@ -577,14 +577,16 @@ class TestConnectionsDistrib(unittest.TestCase):
         model.add_subsystem('c3', TestComp())
         model.connect("p1.x", "c3.x")
 
-        expected = "Group (<model>): The source indices do not specify a valid index " + \
+        expected = "ValueError: Group (<model>): The source indices do not specify a valid index " + \
                    "for the connection 'p1.x' to 'c3.x'. " + \
                    "Index '2' is out of range for source dimension of size 2."
 
+        import wingdbstub
+        
         try:
             prob.setup()
-        except ValueError as err:
-            self.assertEqual(str(err), expected)
+        except Exception as err:
+            self.assertEqual(str(err).splitlines()[-1], expected)
         else:
             self.fail('Exception expected.')
 

@@ -1000,8 +1000,6 @@ class TestDirectSolverMPI(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        #import wingdbstub
-        
         prob.setup()
         prob.run_model()
 

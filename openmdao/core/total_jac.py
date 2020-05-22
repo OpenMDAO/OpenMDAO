@@ -102,6 +102,7 @@ class _TotalJacInfo(object):
         """
         driver = problem.driver
         prom2abs = problem.model._var_allprocs_prom2abs_list['output']
+        prom2abs_in = problem.model._var_allprocs_prom2abs_list['input']
 
         self.model = model = problem.model
         self.comm = problem.comm
@@ -128,6 +129,7 @@ class _TotalJacInfo(object):
 
         driver_wrt = list(design_vars)
         driver_of = driver._get_ordered_nl_responses()
+        input_wrts = set()
 
         # Convert of and wrt names from promoted to absolute
         if wrt is None:
@@ -139,7 +141,17 @@ class _TotalJacInfo(object):
         else:
             prom_wrt = wrt
             if not use_abs_names:
-                wrt = [prom2abs[name][0] for name in prom_wrt]
+                conns = problem._metadata['connections']
+                wrt = []
+                for name in prom_wrt:
+                    if name in prom2abs:
+                        wrt.append(prom2abs[name][0])
+                    else:
+                        abs_in = prom2abs_in[name][0]
+                        src = conns[abs_in]
+                        if abs_in not in input_wrts:
+                            input_wrts.add(abs_in)
+                            wrt.append(src)
 
         if of is None:
             if driver_of:
