@@ -17,7 +17,7 @@ from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.class_util import weak_method_wrapper
 from openmdao.utils.mpi import MPI
 
-# Optimizers in scipy.minimize
+# Optimizers in NLopt
 _optimizers = { 'GN_DIRECT',
                 'GN_DIRECT_L',
                 'GN_DIRECT_L_RAND',
@@ -107,15 +107,15 @@ class NLoptDriver(Driver):
     iter_count : int
         Counter for function evaluations.
     result : OptimizeResult
-        Result returned from scipy.optimize call.
+        Result returned from NLopt.optimize call.
     opt_settings : dict
-        Dictionary of solver-specific options. See the scipy.optimize.minimize documentation.
+        Dictionary of solver-specific options. See the NLopt.optimize documentation.
     _con_cache : dict
-        Cached result of constraint evaluations because scipy asks for them in a separate function.
+        Cached result of constraint evaluations because NLopt asks for them in a separate function.
     _con_idx : dict
         Used for constraint bookkeeping in the presence of 2-sided constraints.
     _grad_cache : OrderedDict
-        Cached result of nonlinear constraint derivatives because scipy asks for them in a separate
+        Cached result of nonlinear constraint derivatives because NLopt asks for them in a separate
         function.
     _exc_info : 3 item tuple
         Storage for exception and traceback information.
@@ -180,7 +180,7 @@ class NLoptDriver(Driver):
         self.options.declare('maxiter', 200, lower=0,
                              desc='Maximum number of iterations.')
         self.options.declare('disp', True, types=bool,
-                             desc='Set to False to prevent printing of Scipy convergence messages')
+                             desc='Set to False to prevent printing of NLopt convergence messages')
 
     def _get_name(self):
         """
@@ -221,7 +221,7 @@ class NLoptDriver(Driver):
 
     def run(self):
         """
-        Optimize the problem using selected Scipy optimizer.
+        Optimize the problem using selected NLopt optimizer.
 
         Returns
         -------
@@ -285,10 +285,11 @@ class NLoptDriver(Driver):
                     bounds.append((p_low, p_high))
 
         # TODO : refactor this so the call to old_bound_to_new isn't needed
-        from scipy.optimize._constraints import old_bound_to_new
-        lower, upper = old_bound_to_new(bounds)  # tuple, tuple
-        opt_prob.set_lower_bounds(lower)
-        opt_prob.set_upper_bounds(upper)
+        if bounds is not None:
+            from scipy.optimize._constraints import old_bound_to_new
+            lower, upper = old_bound_to_new(bounds)  # tuple, tuple
+            opt_prob.set_lower_bounds(lower)
+            opt_prob.set_upper_bounds(upper)
 
         # Constraints
         constraints = []
@@ -308,13 +309,15 @@ class NLoptDriver(Driver):
                 self._con_idx[name] = i
                 i += size
                 
+                # Equality constraints are added as two inequality constraints
                 if equals is not None:
                     lb = ub = equals
                 else:
                     lb = lower
                     ub = upper
                 # Loop over every index separately,
-                # because scipy calls each constraint by index.
+                # because it's easier to defined each
+                # constraint by index.
                 for j in range(size):
                     # Double-sided constraints are accepted by the algorithm
                     args = [name, False, j]
@@ -340,17 +343,17 @@ class NLoptDriver(Driver):
         try:
             if opt in _optimizers:
                 opt_prob.set_min_objective(self._objfunc)
-                opt_prob.set_xtol_rel(1e-4)
+                opt_prob.set_xtol_rel(self.options['tol'])
+                # TODO : ensure that the optimal result is the
+                # last result run by the model
                 xopt = opt_prob.optimize(x_init)
                 self.result = result = opt_prob.last_optimize_result()
-                print(xopt)
                 
             else:
                 msg = 'Optimizer "{}" is not implemented yet. Choose from: {}'
                 raise NotImplementedError(msg.format(opt, _all_optimizers))
                 
         # If an exception was swallowed in one of our callbacks, we want to raise it
-        # rather than the cryptic message from scipy.
         except Exception as msg:
             if self._exc_info is not None:
                 self._reraise()
@@ -455,8 +458,8 @@ class NLoptDriver(Driver):
                 grad[:] = grad_cache[grad_idx, :]
             return cons[name][idx] - equals
 
-        # Note, scipy defines constraints to be satisfied when positive,
-        # which is the opposite of OpenMDAO.
+        # Note, NLopt defines constraints to be satisfied when negative,
+        # which is the same as OpenMDAO.
         upper = meta['upper']
         if isinstance(upper, np.ndarray):
             upper = upper[idx]
@@ -476,7 +479,7 @@ class NLoptDriver(Driver):
 
     def _reraise(self):
         """
-        Reraise any exception encountered when scipy calls back into our method.
+        Reraise any exception encountered when NLopt calls back into our method.
         """
         exc = self._exc_info
         raise exc
@@ -486,12 +489,9 @@ def signature_extender(fcn, extra_args):
     """
     Closure function, which appends extra arguments to the original function call.
 
-    The first argument is the design vector. The possible extra arguments from the callback
-    of :func:`scipy.optimize.minimize` are not passed to the function.
-
-    Some algorithms take a sequence of :class:`~scipy.optimize.NonlinearConstraint` as input
-    for the constraints. For this class it is not possible to pass additional arguments.
-    With this function the signature will be correct for both scipy and the driver.
+    The first argument is the design vector and the second is the gradient vector.
+    The possible extra arguments from the callback
+    of :func:`NLopt.optimize` are not passed to the function.
 
     Parameters
     ----------
