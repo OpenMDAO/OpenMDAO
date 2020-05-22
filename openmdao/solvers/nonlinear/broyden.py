@@ -166,7 +166,8 @@ class BroydenSolver(NonlinearSolver):
             self.linesearch._setup_solvers(system, self._depth + 1)
             self.linesearch._do_subsolve = True
 
-        self._disallow_distrib_solve()
+        # this check is incorrect (for broyden) and needs to be done differently.
+        # self._disallow_distrib_solve()
 
         states = self.options['state_vars']
         prom2abs = system._var_allprocs_prom2abs_list['output']
