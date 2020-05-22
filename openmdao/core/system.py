@@ -3,12 +3,7 @@ import sys
 import os
 from contextlib import contextmanager
 from collections import OrderedDict, defaultdict
-
-# note: this is a Python 3.3 change, clean this up for OpenMDAO 3.x
-try:
-    from collections.abc import Iterable
-except ImportError:
-    from collections import Iterable
+from collections.abc import Iterable
 
 from fnmatch import fnmatchcase
 import sys
