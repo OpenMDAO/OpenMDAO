@@ -101,23 +101,17 @@ install:
 
   echo " >> Installing pyOptSparse";
   git clone https://gist.github.com/b34594cc2a4468e9d215cef2f4187b71.git pyopt_ipopt_install;
-  mv pyopt_ipopt_install/* .
-  rm -rf pyopt_ipopt_install
-  chmod 755 ./build_pyoptsparse_ipopt.sh; ./build_pyoptsparse_ipopt.sh;
-
-  if [ "$SNOPT_LOCATION72" ] && [ "${PY:0:1}" = "3" ]; then
-    echo " >> Installing SNOPT";
-    cd pyoptsparse/pyoptsparse/pySNOPT;
+  cd pyopt_ipopt_install
+  chmod 755 ./build_pyoptsparse_ipopt.sh; 
+  if [ "$SNOPT_LOCATION" ]; then
     echo "  > Secure copying SNOPT over SSH";
-    scp -r "$SNOPT_LOCATION72" .;
-    cd ../../..;
+    mkdir SNOPT;
+    scp -r "$SNOPT_LOCATION" SNOPT;
+    ./build_pyoptsparse_ipopt.sh -s SNOPT/source;
+  else
+    ./build_pyoptsparse_ipopt.sh;
   fi
-
-  echo "  > Install pyOptSparse";
-  cd pyoptsparse;
-  pip install -r requirements.txt;
-  pip install .;
-  cd ..;
+  cd ..
 
   echo " >> Installing optional packages for test coverage";
   pip install psutil objgraph git+https://github.com/mdolab/pyxdsm;
