@@ -347,10 +347,12 @@ class N2Diagram {
 
         nodeEnter.append("rect")
             .attr("width", function (d) {
-                return d.prevDims.width * self.prevTransitCoords.model.x - 2;
+                return d.prevDims.width * self.prevTransitCoords.model.x -
+                    self.dims.size.partitionTree.strokeWidth * 2;
             })
             .attr("height", function (d) {
-                return d.prevDims.height * self.prevTransitCoords.model.y - 2;
+                return d.prevDims.height * self.prevTransitCoords.model.y - 
+                    self.dims.size.partitionTree.strokeWidth * 2;
             })
             .attr("id", function (d) {
                 return d.absPathName.replace(/[\.:]/g, '_');
@@ -362,9 +364,10 @@ class N2Diagram {
             .attr("dy", ".35em")
             .attr("transform", function (d) {
                 let anchorX = d.prevDims.width * self.prevTransitCoords.model.x -
-                    self.layout.size.rightTextMargin;
-                return "translate(" + anchorX + " " + d.prevDims.height *
-                    self.prevTransitCoords.model.y / 2 + ")";
+                    self.layout.size.rightTextMargin - self.dims.size.partitionTree.strokeWidth;
+                return "translate(" + anchorX + " " +
+                    (d.prevDims.height * self.prevTransitCoords.model.y / 2 -
+                    self.dims.size.partitionTree.strokeWidth) + ")";
             })
             .style("opacity", function (d) {
                 if (d.depth < self.zoomedElement.depth) return 0;
@@ -397,10 +400,12 @@ class N2Diagram {
 
         nodeUpdate.select("rect")
             .attr("width", function (d) {
-                return d.dims.width * self.transitCoords.model.x - 2;
+                return d.dims.width * self.transitCoords.model.x - 
+                    self.dims.size.partitionTree.strokeWidth * 2;
             })
             .attr("height", function (d) {
-                return d.dims.height * self.transitCoords.model.y - 2;
+                return d.dims.height * self.transitCoords.model.y -
+                    self.dims.size.partitionTree.strokeWidth * 2;
             })
             .attr('rx', 12)
             .attr('ry', 12);
@@ -408,9 +413,9 @@ class N2Diagram {
         nodeUpdate.select("text")
             .attr("transform", function (d) {
                 let anchorX = d.dims.width * self.transitCoords.model.x -
-                    self.layout.size.rightTextMargin;
-                return "translate(" + anchorX + " " + d.dims.height *
-                    self.transitCoords.model.y / 2 + ")";
+                    self.layout.size.rightTextMargin - self.dims.size.partitionTree.strokeWidth;
+                return "translate(" + anchorX + " " + (d.dims.height *
+                    self.transitCoords.model.y / 2 - self.dims.size.partitionTree.strokeWidth) + ")";
             })
             .style("opacity", function (d) {
                 if (d.depth < self.zoomedElement.depth) return 0;
@@ -432,18 +437,20 @@ class N2Diagram {
 
         nodeExit.select("rect")
             .attr("width", function (d) {
-                return d.dims.width * self.transitCoords.model.x - 2;
+                return d.dims.width * self.transitCoords.model.x - 
+                    self.dims.size.partitionTree.strokeWidth * 2;
             })
             .attr("height", function (d) {
-                return d.dims.height * self.transitCoords.model.y - 2;
+                return d.dims.height * self.transitCoords.model.y -
+                    self.dims.size.partitionTree.strokeWidth * 2;
             });
 
         nodeExit.select("text")
             .attr("transform", function (d) {
                 let anchorX = d.dims.width * self.transitCoords.model.x -
-                    self.layout.size.rightTextMargin;
+                    self.layout.size.rightTextMargin - self.dims.size.partitionTree.strokeWidth;
                 return "translate(" + anchorX + "," + d.dims.height *
-                    self.transitCoords.model.y / 2 + ")";
+                    self.transitCoords.model.y / 2 - self.dims.size.partitionTree.strokeWidth + ")";
             })
             .style("opacity", 0);
     }
