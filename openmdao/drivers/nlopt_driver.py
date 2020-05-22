@@ -17,6 +17,7 @@ from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.class_util import weak_method_wrapper
 from openmdao.utils.mpi import MPI
 
+
 # Optimizers in NLopt
 optimizer_methods = { 'GN_DIRECT' : nlopt.GN_DIRECT,
                       'GN_DIRECT_L' : nlopt.GN_DIRECT_L,
@@ -61,12 +62,27 @@ _gradient_optimizers = {'LD_MMA', 'LD_SLSQP', 'LD_LBFGS',
                         'LD_TNEWTON_RESTART', 'LD_TNEWTON',
                         'LD_VAR2', 'LD_VAR1', 'AUGLAG',
                         'AUGLAG_EQ', 'GD_STOGO', 'GD_STOGO_RAND'}
-_bounds_optimizers = {'LD_SLSQP', 'LN_COBYLA', 'GN_DIRECT', 'GN_ISRES', 'GN_ESCH',
-                      'GD_STOGO', 'GN_AGS', 'LN_NELDERMEAD'}
-_constraint_optimizers = {'LD_SLSQP', 'LN_COBYLA'}
+_bounds_optimizers = _optimizers
+_constraint_optimizers = {'LD_SLSQP', 'LN_COBYLA', 'LD_MMA', 'LD_CCSAQ',
+                          'GN_ORIG_DIRECT', 'GN_ISRES'}
 _constraint_grad_optimizers = _gradient_optimizers & _constraint_optimizers
-_eq_constraint_optimizers = {'LD_SLSQP', 'LN_COBYLA'}
-_global_optimizers = {'GN_ISRES'}
+_eq_constraint_optimizers = {'LD_SLSQP', 'LN_COBYLA', 'GN_ISRES'}
+
+_global_optimizers = {'GN_DIRECT',
+                      'GN_DIRECT_L',
+                      'GN_DIRECT_L_RAND',
+                      'GN_DIRECT_L_NOSCAL',
+                      'GN_DIRECT_L_RAND_NOSCAL',
+                      'GN_ORIG_DIRECT',
+                      'GN_ORIG_DIRECT_L',
+                      'GN_CRS2_LM',
+                      'G_MLSL_LDS',
+                      'G_MLSL',
+                      'GD_STOGO',
+                      'GD_STOGO_RAND',
+                      'GN_AGS',
+                      'GN_ISRES',
+                      'GN_ESCH',}
 
 _all_optimizers = _optimizers | _global_optimizers
 

@@ -85,7 +85,7 @@ class DummyComp(om.ExecComp):
 
 
 class TestNLoptDriver(unittest.TestCase):
-
+    
     def test_driver_supports(self):
         prob = om.Problem()
         model = prob.model
@@ -500,8 +500,6 @@ class TestNLoptDriver(unittest.TestCase):
         model.add_constraint('c', equals=0.0)
     
         prob.setup()
-    
-        prob['widths'][:] = 10.
     
         failed = prob.run_driver()
     
@@ -943,7 +941,6 @@ class TestNLoptDriver(unittest.TestCase):
         assert_near_equal(prob['z'][1], 0.0, 1e-3)
         assert_near_equal(prob['x'], 0.0, 1e-3)
     
-    
     def test_simple_paraboloid_lower_linear(self):
     
         prob = om.Problem()
@@ -1290,27 +1287,124 @@ class TestNLoptDriver(unittest.TestCase):
         assert_near_equal(prob['f'], 0.0, 1e-6)
     
     def test_LN_NELDERMEAD_rosenbrock(self):
-        import openmdao.api as om
+    #     import openmdao.api as om
+    # 
+    #     prob = om.Problem()
+    #     model = prob.model
+    # 
+    #     model.add_subsystem('indeps', om.IndepVarComp('x', np.ones(rosenbrock_size)*1.1), promotes=['*'])
+    #     model.add_subsystem('rosen', Rosenbrock(), promotes=['*'])
+    # 
+    #     prob.driver = driver = NLoptDriver()
+    #     driver.options['optimizer'] = 'LN_NELDERMEAD'
+    #     driver.options['disp'] = False
+    #     driver.options['maxiter'] = 10000
+    # 
+    #     model.add_design_var('x', lower=np.zeros(rosenbrock_size), upper=2*np.ones(rosenbrock_size))
+    #     model.add_objective('f')
+    #     prob.setup()
+    #     prob.run_driver()
+    #     assert_near_equal(prob['x'], np.ones(rosenbrock_size), 1e-2)
+    #     assert_near_equal(prob['f'], 0.0, 1e-2)
+
+    def test_simple_paraboloid_upper_LD_MMA(self):
     
         prob = om.Problem()
         model = prob.model
     
-        model.add_subsystem('indeps', om.IndepVarComp('x', np.ones(rosenbrock_size)*1.1), promotes=['*'])
-        model.add_subsystem('rosen', Rosenbrock(), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
     
-        prob.driver = driver = NLoptDriver()
-        driver.options['optimizer'] = 'LN_NELDERMEAD'
-        driver.options['disp'] = False
-        driver.options['maxiter'] = 10000
+        prob.set_solver_print(level=0)
     
-        model.add_design_var('x', lower=np.zeros(rosenbrock_size), upper=2*np.ones(rosenbrock_size))
-        model.add_objective('f')
+        prob.driver = NLoptDriver()
+        prob.driver.options['optimizer'] = 'LD_MMA'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+    
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+    
         prob.setup()
-        prob.run_driver()
-        assert_near_equal(prob['x'], np.ones(rosenbrock_size), 1e-2)
-        assert_near_equal(prob['f'], 0.0, 1e-2)
-
-
+    
+        failed = prob.run_driver()
+    
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
+    
+        assert_near_equal(prob['x'], 7.1666666, 1e-6)
+        assert_near_equal(prob['y'], -7.83333333, 1e-6)
+        
+    def test_simple_paraboloid_upper_LD_CCSAQ(self):
+    
+        prob = om.Problem()
+        model = prob.model
+    
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
+    
+        prob.set_solver_print(level=0)
+    
+        prob.driver = NLoptDriver()
+        prob.driver.options['optimizer'] = 'LD_CCSAQ'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+    
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+    
+        prob.setup()
+    
+        failed = prob.run_driver()
+    
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
+    
+        assert_near_equal(prob['x'], 7.1666666, 1e-6)
+        assert_near_equal(prob['y'], -7.83333333, 1e-6)
+        
+    def test_simple_paraboloid_upper_GN_ISRES(self):
+    
+        prob = om.Problem()
+        model = prob.model
+    
+        model.add_subsystem('p1', om.IndepVarComp('x', 25.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 25.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
+    
+        prob.set_solver_print(level=0)
+    
+        prob.driver = NLoptDriver()
+        prob.driver.options['optimizer'] = 'GN_ISRES'
+        prob.driver.options['tol'] = 1e-12
+        prob.driver.options['disp'] = False
+        prob.driver.options['maxiter'] = 10000
+    
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+    
+        prob.setup()
+    
+        failed = prob.run_driver()
+    
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
+    
+        # Just get pretty close to the optimum
+        assert_near_equal(prob['x'], 7.1666666, 1e-2)
+        assert_near_equal(prob['y'], -7.83333333, 1e-2)
+        
 
 if __name__ == "__main__":
     unittest.main()
