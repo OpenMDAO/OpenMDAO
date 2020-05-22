@@ -2528,29 +2528,10 @@ class Group(System):
 
         return graph
 
-    def _setup_auto_ivcs(self, mode):
-        from openmdao.core.indepvarcomp import _AutoIndepVarComp
-
-        if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
-            raise RuntimeError("The top level system must not be a ParallelGroup.")
-
-        # create the IndepVarComp that will contain all auto-ivc outputs
-        self._auto_ivc = auto_ivc = _AutoIndepVarComp()
-        auto_ivc.name = '_auto_ivc'
-        auto_ivc.pathname = auto_ivc.name
-
-        myrank = self.comm.rank
-        abs2prom = self._var_allprocs_abs2prom['input']
-        abs2meta = self._var_abs2meta
-        all_abs2meta = self._var_allprocs_abs2meta
-        abs_names = self._var_allprocs_abs_names['input']
-        all_discrete_ins = self._var_allprocs_discrete['input']
-        discrete_ins = self._var_discrete['input']
-        conns = self._problem_meta['connections']
-
+    def _find_remote_owners(self):
         if self.comm.size > 1:
             # compute the inputs that are remote in at least one proc and the owning rank for each
-            all_ins = set(abs_names)
+            all_ins = set(self._var_allprocs_abs_names['input'])
             all_ins.update(self._var_allprocs_discrete['input'])
             my_remote_ins = all_ins.difference(self._var_abs_names['input'])
             my_remote_ins = my_remote_ins.difference(self._var_abs_names_discrete['input'])
@@ -2576,26 +2557,45 @@ class Group(System):
         else:
             remote_ins = {}
 
-        # NOTE: remote_ins does NOT include distributed inputs.
+        return remote_ins
 
-        prom2ivc = {}
+    def _setup_auto_ivcs(self, mode):
+        from openmdao.core.indepvarcomp import _AutoIndepVarComp
+
+        if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
+            raise RuntimeError("The top level system must not be a ParallelGroup.")
+
+        # create the IndepVarComp that will contain all auto-ivc outputs
+        self._auto_ivc = auto_ivc = _AutoIndepVarComp()
+        auto_ivc.name = '_auto_ivc'
+        auto_ivc.pathname = auto_ivc.name
+
+        # NOTE: remote_ins does NOT include distributed inputs.
+        remote_ins = self._find_remote_owners()
+
+        prom2auto = {}
         count = 0
         auto2tgt = defaultdict(list)
-        ivc_tgts = [n for n in abs_names if n not in conns]
-        for tgt in ivc_tgts:
+        abs2prom = self._var_allprocs_abs2prom['input']
+        conns = self._problem_meta['connections']
+        auto_tgts = [n for n in self._var_allprocs_abs_names['input'] if n not in conns]
+        for tgt in auto_tgts:
             prom = abs2prom[tgt]
-            if prom in prom2ivc:
+            if prom in prom2auto:
                 # multiple connected inputs w/o a src. Connect them to the same IVC
-                src = prom2ivc[prom][0]
+                src = prom2auto[prom][0]
                 conns[tgt] = src
             else:
                 src = f"_auto_ivc.v{count}"
                 count += 1
-                prom2ivc[prom] = (src, tgt)
+                prom2auto[prom] = (src, tgt)
                 conns[tgt] = src
 
             auto2tgt[src].append(tgt)
 
+        myrank = self.comm.rank
+        abs2meta = self._var_abs2meta
+        all_abs2meta = self._var_allprocs_abs2meta
         with multi_proc_exception_check(self.comm):
             for src, tgts in auto2tgt.items():
                 val = _undefined
@@ -2624,7 +2624,7 @@ class Group(System):
                         else:
                             irank = 0
                         if (tgt not in remote_ins or remote_ins[tgt] == self.comm.rank or
-                                distrib):  # and not (src in auto_ivc._remotes and myrank != irank):
+                                distrib):
                             if gval is None:
                                 if val is _undefined:
                                     val = abs2meta[tgt]['value']
@@ -2715,21 +2715,21 @@ class Group(System):
                                         units=all_abs2meta[tgt]['units'])
 
         # have to sort to keep vars in sync because we may be doing bcasts
-        for abs_in in sorted(all_discrete_ins):
+        for abs_in in sorted(self._var_allprocs_discrete['input']):
             if abs_in not in conns:  # unconnected, so connect the input to an _auto_ivc output
                 prom = abs2prom[abs_in]
                 val = _undefined
 
-                if prom in prom2ivc:
+                if prom in prom2auto:
                     # multiple connected inputs w/o a src. Connect them to the same IVC
                     # check if they have different metadata, and if they do, there must be
                     # a group input defined that sets the default, else it's an error
-                    conns[abs_in] = prom2ivc[prom][0]
+                    conns[abs_in] = prom2auto[prom][0]
                 else:
                     ivc_name = f"_auto_ivc.v{count}"
                     loc_out_name = ivc_name.rsplit('.', 1)[-1]
                     count += 1
-                    prom2ivc[prom] = (ivc_name, abs_in)
+                    prom2auto[prom] = (ivc_name, abs_in)
                     conns[abs_in] = ivc_name
 
                     if abs_in in self._var_abs2prom['input']:  # var is local
@@ -2743,7 +2743,7 @@ class Group(System):
                             val = self.comm.bcast(None, root=remote_ins[abs_in])
                     auto_ivc.add_discrete_output(loc_out_name, val=val)
 
-        if not prom2ivc:
+        if not prom2auto:
             return auto_ivc
 
         auto_ivc._setup_procs(auto_ivc.pathname, self.comm, mode, self._problem_meta)
