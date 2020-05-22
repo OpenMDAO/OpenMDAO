@@ -347,12 +347,16 @@ class N2Diagram {
 
         nodeEnter.append("rect")
             .attr("width", function (d) {
-                return d.prevDims.width * self.prevTransitCoords.model.x -
-                    self.dims.size.partitionTree.strokeWidth * 2;
+                const w = d.prevDims.width * self.prevTransitCoords.model.x;
+                const sw2 = self.dims.size.partitionTree.strokeWidth * 2;
+
+                return (w > sw2)? w - sw2 : w;
             })
             .attr("height", function (d) {
-                return d.prevDims.height * self.prevTransitCoords.model.y - 
-                    self.dims.size.partitionTree.strokeWidth * 2;
+                const h = d.prevDims.height * self.prevTransitCoords.model.y;
+                const sw2 = self.dims.size.partitionTree.strokeWidth * 2;
+
+                return (h > sw2)? h - sw2 : h;
             })
             .attr("id", function (d) {
                 return d.absPathName.replace(/[\.:]/g, '_');
@@ -400,12 +404,14 @@ class N2Diagram {
 
         nodeUpdate.select("rect")
             .attr("width", function (d) {
-                return d.dims.width * self.transitCoords.model.x - 
-                    self.dims.size.partitionTree.strokeWidth * 2;
+                const w = d.dims.width * self.transitCoords.model.x;
+                const sw2 = self.dims.size.partitionTree.strokeWidth * 2;
+                return (w > sw2)? w - sw2 : w;
             })
             .attr("height", function (d) {
-                return d.dims.height * self.transitCoords.model.y -
-                    self.dims.size.partitionTree.strokeWidth * 2;
+                const h = d.dims.height * self.transitCoords.model.y;
+                const sw2 = self.dims.size.partitionTree.strokeWidth * 2;
+                return (h > sw2)? h - sw2 : h;
             })
             .attr('rx', 12)
             .attr('ry', 12);
@@ -437,20 +443,24 @@ class N2Diagram {
 
         nodeExit.select("rect")
             .attr("width", function (d) {
-                return d.dims.width * self.transitCoords.model.x - 
-                    self.dims.size.partitionTree.strokeWidth * 2;
+                const w = d.dims.width * self.transitCoords.model.x;
+                const sw2 = self.dims.size.partitionTree.strokeWidth * 2;
+
+                return (w > sw2)? w - sw2 : w;
             })
             .attr("height", function (d) {
-                return d.dims.height * self.transitCoords.model.y -
-                    self.dims.size.partitionTree.strokeWidth * 2;
+                const h = d.dims.height * self.transitCoords.model.y;
+                const sw2 = self.dims.size.partitionTree.strokeWidth * 2;
+
+                return (h > sw2)? h - sw2 : h;
             });
 
         nodeExit.select("text")
             .attr("transform", function (d) {
                 let anchorX = d.dims.width * self.transitCoords.model.x -
                     self.layout.size.rightTextMargin - self.dims.size.partitionTree.strokeWidth;
-                return "translate(" + anchorX + "," + d.dims.height *
-                    self.transitCoords.model.y / 2 - self.dims.size.partitionTree.strokeWidth + ")";
+                return "translate(" + anchorX + "," + (d.dims.height *
+                    self.transitCoords.model.y / 2 - self.dims.size.partitionTree.strokeWidth) + ")";
             })
             .style("opacity", 0);
     }
