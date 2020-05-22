@@ -251,6 +251,7 @@ class NLoptDriver(Driver):
             nparam += param['size']
         x_init = np.empty(nparam)
         
+        # TODO : make it so this actually takes in an algo
         opt_prob = nlopt.opt(nlopt.LD_SLSQP, int(nparam))
 
         # Initial Design Vars
@@ -308,27 +309,34 @@ class NLoptDriver(Driver):
                 self._obj_and_nlcons.append(name)
                 self._con_idx[name] = i
                 i += size
-                
-                # Equality constraints are added as two inequality constraints
-                if equals is not None:
-                    lb = ub = equals
-                else:
-                    lb = lower
-                    ub = upper
+                    
                 # Loop over every index separately,
                 # because it's easier to defined each
                 # constraint by index.
                 for j in range(size):
-                    # Double-sided constraints are accepted by the algorithm
-                    args = [name, False, j]
-                    opt_prob.add_inequality_constraint(signature_extender(weak_method_wrapper(self, '_confunc'), args))
-                    
-                    dblcon = (upper < openmdao.INF_BOUND) and (lower > -openmdao.INF_BOUND)
-
-                    # Add extra constraint if double-sided
-                    if dblcon:
-                        args = [name, True, j]
+                                    
+                    # Equality constraints are added as two inequality constraints
+                    if equals is not None:
+                        args = [name, False, j]
+                        opt_prob.add_equality_constraint(signature_extender(weak_method_wrapper(self, '_confunc'), args))
+                        
+                    else:
+                        # Double-sided constraints are accepted by the algorithm
+                        args = [name, False, j]
                         opt_prob.add_inequality_constraint(signature_extender(weak_method_wrapper(self, '_confunc'), args))
+                        
+                        if isinstance(upper, np.ndarray):
+                            upper = upper[j]
+
+                        if isinstance(lower, np.ndarray):
+                            lower = lower[j]
+                        
+                        dblcon = (upper < openmdao.INF_BOUND) and (lower > -openmdao.INF_BOUND)
+
+                        # Add extra constraint if double-sided
+                        if dblcon:
+                            args = [name, True, j]
+                            opt_prob.add_inequality_constraint(signature_extender(weak_method_wrapper(self, '_confunc'), args))
 
         # compute dynamic simul deriv coloring if option is set
         if coloring_mod._use_total_sparsity:

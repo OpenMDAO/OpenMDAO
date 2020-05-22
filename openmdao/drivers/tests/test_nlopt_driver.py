@@ -29,305 +29,305 @@ class TestNLoptDriver(unittest.TestCase):
     def test_driver_supports(self):
         prob = om.Problem()
         model = prob.model
-
+    
         model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-
+    
         prob.set_solver_print(level=0)
-
+    
         prob.driver = NLoptDriver(optimizer='LD_SLSQP', tol=1e-9, disp=False)
-
+    
         with self.assertRaises(KeyError) as raises_msg:
             prob.driver.supports['equality_constraints'] = False
-
+    
         exception = raises_msg.exception
-
+    
         msg = "NLoptDriver: Tried to set read-only option 'equality_constraints'."
-
+    
         self.assertEqual(exception.args[0], msg)
-
+    
     def test_compute_totals_basic_return_array(self):
         # Make sure 'array' return_format works.
-
+    
         prob = om.Problem()
         model = prob.model
         model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
         model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
-
+    
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
         model.add_objective('f_xy')
-
+    
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
-
+    
         failed = prob.run_driver()
-
+    
         self.assertFalse(failed, "Optimization failed.")
-
+    
         of = ['f_xy']
         wrt = ['x', 'y']
         derivs = prob.compute_totals(of=of, wrt=wrt, return_format='array')
-
+    
         assert_near_equal(derivs[0, 0], -6.0, 1e-6)
         assert_near_equal(derivs[0, 1], 8.0, 1e-6)
-
+    
         prob.setup(check=False, mode='rev')
-
+    
         prob.run_model()
-
+    
         of = ['f_xy']
         wrt = ['x', 'y']
         derivs = prob.compute_totals(of=of, wrt=wrt, return_format='array')
-
+    
         assert_near_equal(derivs[0, 0], -6.0, 1e-6)
         assert_near_equal(derivs[0, 1], 8.0, 1e-6)
-
+    
     def test_compute_totals_return_array_non_square(self):
-
+    
         prob = om.Problem()
         model = prob.model
-
+    
         model.add_subsystem('px', om.IndepVarComp(name="x", val=np.ones((2, ))))
         comp = model.add_subsystem('comp', NonSquareArrayComp())
         model.connect('px.x', 'comp.x1')
-
+    
         model.add_design_var('px.x')
         model.add_objective('px.x')
         model.add_constraint('comp.y1')
         model.add_constraint('comp.y2')
-
+    
         prob.setup(check=False, mode='auto')
-
+    
         failed = prob.run_driver()
-
+    
         self.assertFalse(failed, "Optimization failed.")
-
+    
         derivs = prob.compute_totals(of=['comp.y1'], wrt=['px.x'], return_format='array')
-
+    
         J = comp.JJ[0:3, 0:2]
         assert_near_equal(J, derivs, 1.0e-3)
-
+    
         # Support for a name to be in 'of' and 'wrt'
-
+    
         derivs = prob.compute_totals(of=['comp.y2', 'px.x', 'comp.y1'],
                                      wrt=['px.x'],
                                      return_format='array')
-
+    
         assert_near_equal(J, derivs[3:, :], 1.0e-3)
         assert_near_equal(comp.JJ[3:4, 0:2], derivs[0:1, :], 1.0e-3)
         assert_near_equal(np.eye(2), derivs[1:3, :], 1.0e-3)
-
+    
     def test_deriv_wrt_self(self):
-
+    
         prob = om.Problem()
         model = prob.model
-
+    
         model.add_subsystem('px', om.IndepVarComp(name="x", val=np.ones((2, ))))
-
+    
         model.add_design_var('px.x')
         model.add_objective('px.x')
-
+    
         prob.setup()
-
+    
         failed = prob.run_driver()
-
+    
         self.assertFalse(failed, "Optimization failed.")
-
+    
         # Support for a name to be in 'of' and 'wrt'
-
+    
         J = prob.driver._compute_totals(of=['px.x'], wrt=['px.x'],
                                         return_format='array')
-
+    
         assert_near_equal(J, np.eye(2), 1.0e-3)
-
+    
     def test_scipy_optimizer_simple_paraboloid_unconstrained(self):
-
+    
         prob = om.Problem()
         model = prob.model
-
+    
         model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-
+    
         prob.set_solver_print(level=0)
-
+    
         prob.driver = NLoptDriver(optimizer='LD_SLSQP', tol=1e-9, disp=False)
-
+    
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
         model.add_objective('f_xy')
-
+    
         prob.setup()
-
+    
         failed = prob.run_driver()
-
+    
         self.assertFalse(failed, "Optimization failed, result =\n" +
                                  str(prob.driver.result))
-
+    
         assert_near_equal(prob['x'], 6.66666667, 1e-6)
         assert_near_equal(prob['y'], -7.3333333, 1e-6)
-
+    
     def test_simple_paraboloid_unconstrained(self):
-
+    
         prob = om.Problem()
         model = prob.model
-
+    
         model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-
+    
         prob.set_solver_print(level=0)
-
+    
         prob.driver = NLoptDriver()
         prob.driver.options['optimizer'] = 'LD_SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
-
+    
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
         model.add_objective('f_xy')
-
+    
         prob.setup()
-
+    
         failed = prob.run_driver()
-
+    
         self.assertFalse(failed, "Optimization failed, result =\n" +
                                  str(prob.driver.result))
-
+    
         assert_near_equal(prob['x'], 6.66666667, 1e-6)
         assert_near_equal(prob['y'], -7.3333333, 1e-6)
-
+    
     def test_simple_paraboloid_unconstrained_LN_COBYLA(self):
         prob = om.Problem()
         model = prob.model
-
+    
         model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-
+    
         prob.set_solver_print(level=0)
-
+    
         prob.driver = NLoptDriver()
         prob.driver.options['optimizer'] = 'LN_COBYLA'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
-
+    
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
         model.add_objective('f_xy')
-
+    
         prob.setup()
-
+    
         failed = prob.run_driver()
-
+    
         self.assertFalse(failed, "Optimization failed, result =\n" +
                                  str(prob.driver.result))
-
+    
         assert_near_equal(prob['x'], 6.66666667, 1e-6)
         assert_near_equal(prob['y'], -7.3333333, 1e-6)
-
+    
     def test_simple_paraboloid_upper(self):
-
+    
         prob = om.Problem()
         model = prob.model
-
+    
         model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
-
+    
         prob.set_solver_print(level=0)
-
+    
         prob.driver = NLoptDriver()
         prob.driver.options['optimizer'] = 'LD_SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
-
+    
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
         model.add_objective('f_xy')
         model.add_constraint('c', upper=-15.0)
-
+    
         prob.setup()
-
+    
         failed = prob.run_driver()
-
+    
         self.assertFalse(failed, "Optimization failed, result =\n" +
                                  str(prob.driver.result))
-
+    
         # Minimum should be at (7.166667, -7.833334)
         assert_near_equal(prob['x'], 7.16667, 1e-6)
         assert_near_equal(prob['y'], -7.833334, 1e-6)
-
+    
     def test_simple_paraboloid_lower(self):
-
+    
         prob = om.Problem()
         model = prob.model
-
+    
         model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
-
+    
         prob.set_solver_print(level=0)
-
+    
         prob.driver = NLoptDriver()
         prob.driver.options['optimizer'] = 'LD_SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
-
+    
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
-
+    
         model.add_objective('f_xy')
         model.add_constraint('c', lower=15.0)
-
+    
         prob.setup()
-
+    
         failed = prob.run_driver()
-
+    
         self.assertFalse(failed, "Optimization failed, result =\n" +
                                  str(prob.driver.result))
-
+    
         # Minimum should be at (7.166667, -7.833334)
         assert_near_equal(prob['x'], 7.16667, 1e-6)
         assert_near_equal(prob['y'], -7.833334, 1e-6)
-
+    
     def test_simple_paraboloid_equality(self):
-
+    
         prob = om.Problem()
         model = prob.model
-
+    
         model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
-
+    
         prob.set_solver_print(level=0)
-
+    
         prob.driver = NLoptDriver()
         prob.driver.options['optimizer'] = 'LD_SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
-
+    
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
         model.add_objective('f_xy')
         model.add_constraint('c', equals=-15.0)
-
+    
         prob.setup()
-
+    
         failed = prob.run_driver()
-
+    
         self.assertFalse(failed, "Optimization failed, result =\n" +
                                  str(prob.driver.result))
-
+    
         # Minimum should be at (7.166667, -7.833334)
         # (Note, loose tol because of appveyor py3.4 machine.)
         assert_near_equal(prob['x'], 7.16667, 1e-4)
         assert_near_equal(prob['y'], -7.833334, 1e-4)
-
+    
     def test_scipy_missing_objective(self):
     
         prob = om.Problem()
@@ -415,325 +415,329 @@ class TestNLoptDriver(unittest.TestCase):
     
         assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
     
-    # def test_simple_array_comp2D(self):
-    # 
-    #     prob = om.Problem()
-    #     model = prob.model
-    # 
-    #     model.add_subsystem('p1', om.IndepVarComp('widths', np.zeros((2, 2))), promotes=['*'])
-    #     model.add_subsystem('comp', TestExplCompArrayDense(), promotes=['*'])
-    #     model.add_subsystem('con', om.ExecComp('c = areas - 20.0', c=np.zeros((2, 2)),
-    #                                            areas=np.zeros((2, 2))),
-    #                         promotes=['*'])
-    #     model.add_subsystem('obj', om.ExecComp('o = areas[0, 0]', areas=np.zeros((2, 2))),
-    #                         promotes=['*'])
-    # 
-    #     prob.set_solver_print(level=0)
-    # 
-    #     prob.driver = NLoptDriver()
-    #     prob.driver.options['optimizer'] = 'LD_SLSQP'
-    #     prob.driver.options['tol'] = 1e-9
-    #     prob.driver.options['disp'] = False
-    # 
-    #     model.add_design_var('widths', lower=-50.0, upper=50.0)
-    #     model.add_objective('o')
-    #     model.add_constraint('c', equals=0.0)
-    # 
-    #     prob.setup()
-    # 
-    #     failed = prob.run_driver()
-    # 
-    #     self.assertFalse(failed, "Optimization failed, result =\n" +
-    #                              str(prob.driver.result))
-    # 
-    #     obj = prob['o']
-    #     assert_near_equal(obj, 20.0, 1e-6)
-    # 
-    # def test_simple_array_comp2D_eq_con(self):
-    # 
-    #     prob = om.Problem()
-    #     model = prob.model
-    # 
-    #     model.add_subsystem('p1', om.IndepVarComp('widths', np.zeros((2, 2))), promotes=['*'])
-    #     model.add_subsystem('comp', TestExplCompArrayDense(), promotes=['*'])
-    #     model.add_subsystem('obj', om.ExecComp('o = areas[0, 0] + areas[1, 1]', areas=np.zeros((2, 2))),
-    #                         promotes=['*'])
-    # 
-    #     prob.set_solver_print(level=0)
-    # 
-    #     prob.driver = NLoptDriver()
-    #     prob.driver.options['optimizer'] = 'LD_SLSQP'
-    #     prob.driver.options['tol'] = 1e-9
-    #     prob.driver.options['disp'] = False
-    # 
-    #     model.add_design_var('widths', lower=-50.0, upper=50.0)
-    #     model.add_objective('o')
-    #     model.add_constraint('areas', equals=np.array([24.0, 21.0, 3.5, 17.5]))
-    # 
-    #     prob.setup()
-    # 
-    #     failed = prob.run_driver()
-    # 
-    #     self.assertFalse(failed, "Optimization failed, result =\n" +
-    #                              str(prob.driver.result))
-    # 
-    #     obj = prob['o']
-    #     assert_near_equal(obj, 41.5, 1e-6)
-    # 
-    # def test_simple_array_comp2D_dbl_sided_con(self):
-    # 
-    #     prob = om.Problem()
-    #     model = prob.model
-    # 
-    #     model.add_subsystem('p1', om.IndepVarComp('widths', np.zeros((2, 2))), promotes=['*'])
-    #     model.add_subsystem('comp', TestExplCompArrayDense(), promotes=['*'])
-    #     model.add_subsystem('obj', om.ExecComp('o = areas[0, 0]', areas=np.zeros((2, 2))),
-    #                         promotes=['*'])
-    # 
-    #     prob.set_solver_print(level=0)
-    # 
-    #     prob.driver = NLoptDriver()
-    #     prob.driver.options['optimizer'] = 'LD_SLSQP'
-    #     prob.driver.options['tol'] = 1e-9
-    #     prob.driver.options['disp'] = False
-    # 
-    #     model.add_design_var('widths', lower=-50.0, upper=50.0)
-    #     model.add_objective('o')
-    #     model.add_constraint('areas', lower=np.array([24.0, 21.0, 3.5, 17.5]), upper=np.array([24.0, 21.0, 3.5, 17.5]))
-    # 
-    #     prob.setup()
-    # 
-    #     failed = prob.run_driver()
-    # 
-    #     self.assertFalse(failed, "Optimization failed, result =\n" +
-    #                              str(prob.driver.result))
-    # 
-    #     con = prob['areas']
-    #     assert_near_equal(con, np.array([[24.0, 21.0], [3.5, 17.5]]), 1e-6)
-    # 
-    # def test_simple_array_comp2D_dbl_sided_con_array(self):
-    # 
-    #     prob = om.Problem()
-    #     model = prob.model
-    # 
-    #     model.add_subsystem('p1', om.IndepVarComp('widths', np.zeros((2, 2))), promotes=['*'])
-    #     model.add_subsystem('comp', TestExplCompArrayDense(), promotes=['*'])
-    #     model.add_subsystem('obj', om.ExecComp('o = areas[0, 0]', areas=np.zeros((2, 2))),
-    #                         promotes=['*'])
-    # 
-    #     prob.set_solver_print(level=0)
-    # 
-    #     prob.driver = NLoptDriver()
-    #     prob.driver.options['optimizer'] = 'LD_SLSQP'
-    #     prob.driver.options['tol'] = 1e-9
-    #     prob.driver.options['disp'] = False
-    # 
-    #     model.add_design_var('widths', lower=-50.0, upper=50.0)
-    #     model.add_objective('o')
-    #     model.add_constraint('areas', lower=20.0, upper=20.0)
-    # 
-    #     prob.setup()
-    # 
-    #     failed = prob.run_driver()
-    # 
-    #     self.assertFalse(failed, "Optimization failed, result =\n" +
-    #                              str(prob.driver.result))
-    # 
-    #     obj = prob['o']
-    #     assert_near_equal(obj, 20.0, 1e-6)
-    # 
-    # def test_simple_array_comp2D_array_lo_hi(self):
-    # 
-    #     prob = om.Problem()
-    #     model = prob.model
-    # 
-    #     model.add_subsystem('p1', om.IndepVarComp('widths', np.zeros((2, 2))), promotes=['*'])
-    #     model.add_subsystem('comp', TestExplCompArrayDense(), promotes=['*'])
-    #     model.add_subsystem('con', om.ExecComp('c = areas - 20.0', c=np.zeros((2, 2)), areas=np.zeros((2, 2))),
-    #                         promotes=['*'])
-    #     model.add_subsystem('obj', om.ExecComp('o = areas[0, 0]', areas=np.zeros((2, 2))),
-    #                         promotes=['*'])
-    # 
-    #     prob.set_solver_print(level=0)
-    # 
-    #     prob.driver = NLoptDriver()
-    #     prob.driver.options['optimizer'] = 'LD_SLSQP'
-    #     prob.driver.options['tol'] = 1e-9
-    #     prob.driver.options['disp'] = False
-    # 
-    #     model.add_design_var('widths', lower=-50.0*np.ones((2, 2)), upper=50.0*np.ones((2, 2)))
-    #     model.add_objective('o')
-    #     model.add_constraint('c', equals=0.0)
-    # 
-    #     prob.setup()
-    # 
-    #     failed = prob.run_driver()
-    # 
-    #     self.assertFalse(failed, "Optimization failed, result =\n" +
-    #                              str(prob.driver.result))
-    # 
-    #     obj = prob['o']
-    #     assert_near_equal(obj, 20.0, 1e-6)
-    # 
-    # def test_simple_paraboloid_scaled_desvars_fwd(self):
-    # 
-    #     prob = om.Problem()
-    #     model = prob.model
-    # 
-    #     model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-    #     model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
-    #     model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-    #     model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
-    # 
-    #     prob.set_solver_print(level=0)
-    # 
-    #     prob.driver = NLoptDriver()
-    #     prob.driver.options['optimizer'] = 'LD_SLSQP'
-    #     prob.driver.options['tol'] = 1e-9
-    #     prob.driver.options['disp'] = False
-    # 
-    #     model.add_design_var('x', lower=-50.0, upper=50.0, ref=.02)
-    #     model.add_design_var('y', lower=-50.0, upper=50.0, ref=.02)
-    #     model.add_objective('f_xy')
-    #     model.add_constraint('c', lower=10.0, upper=11.0)
-    # 
-    #     prob.setup(check=False, mode='fwd')
-    # 
-    #     failed = prob.run_driver()
-    # 
-    #     self.assertFalse(failed, "Optimization failed, result =\n" +
-    #                              str(prob.driver.result))
-    # 
-    #     assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
-    # 
-    # def test_simple_paraboloid_scaled_desvars_rev(self):
-    # 
-    #     prob = om.Problem()
-    #     model = prob.model
-    # 
-    #     model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-    #     model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
-    #     model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-    #     model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
-    # 
-    #     prob.set_solver_print(level=0)
-    # 
-    #     prob.driver = NLoptDriver()
-    #     prob.driver.options['optimizer'] = 'LD_SLSQP'
-    #     prob.driver.options['tol'] = 1e-9
-    #     prob.driver.options['disp'] = False
-    # 
-    #     model.add_design_var('x', lower=-50.0, upper=50.0, ref=.02)
-    #     model.add_design_var('y', lower=-50.0, upper=50.0, ref=.02)
-    #     model.add_objective('f_xy')
-    #     model.add_constraint('c', lower=10.0, upper=11.0)
-    # 
-    #     prob.setup(check=False, mode='rev')
-    # 
-    #     failed = prob.run_driver()
-    # 
-    #     self.assertFalse(failed, "Optimization failed, result =\n" +
-    #                              str(prob.driver.result))
-    # 
-    #     assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
-    # 
-    # def test_simple_paraboloid_scaled_constraint_fwd(self):
-    # 
-    #     prob = om.Problem()
-    #     model = prob.model
-    # 
-    #     model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-    #     model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
-    #     model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-    #     model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
-    # 
-    #     prob.set_solver_print(level=0)
-    # 
-    #     prob.driver = NLoptDriver()
-    #     prob.driver.options['optimizer'] = 'LD_SLSQP'
-    #     prob.driver.options['tol'] = 1e-9
-    #     prob.driver.options['disp'] = False
-    # 
-    #     model.add_design_var('x', lower=-50.0, upper=50.0)
-    #     model.add_design_var('y', lower=-50.0, upper=50.0)
-    #     model.add_objective('f_xy')
-    #     model.add_constraint('c', lower=10.0, upper=11.0, ref=10.)
-    # 
-    #     prob.setup(check=False, mode='fwd')
-    # 
-    #     failed = prob.run_driver()
-    # 
-    #     self.assertFalse(failed, "Optimization failed, result =\n" +
-    #                              str(prob.driver.result))
-    # 
-    #     assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
-    # 
-    # def test_simple_paraboloid_scaled_objective_fwd(self):
-    # 
-    #     prob = om.Problem()
-    #     model = prob.model
-    # 
-    #     prob.set_solver_print(level=0)
-    # 
-    #     model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-    #     model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
-    #     model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-    #     model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
-    # 
-    #     prob.driver = NLoptDriver()
-    #     prob.driver.options['optimizer'] = 'LD_SLSQP'
-    #     prob.driver.options['tol'] = 1e-9
-    #     prob.driver.options['disp'] = False
-    # 
-    #     model.add_design_var('x', lower=-50.0, upper=50.0)
-    #     model.add_design_var('y', lower=-50.0, upper=50.0)
-    #     model.add_objective('f_xy', ref=10.)
-    #     model.add_constraint('c', lower=10.0, upper=11.0)
-    # 
-    #     prob.setup(check=False, mode='fwd')
-    # 
-    #     failed = prob.run_driver()
-    # 
-    #     self.assertFalse(failed, "Optimization failed, result =\n" +
-    #                              str(prob.driver.result))
-    # 
-    #     assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
-    # 
-    # def test_simple_paraboloid_scaled_objective_rev(self):
-    # 
-    #     prob = om.Problem()
-    #     model = prob.model
-    # 
-    #     prob.set_solver_print(level=0)
-    # 
-    #     model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-    #     model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
-    #     model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-    #     model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
-    # 
-    #     prob.driver = NLoptDriver()
-    #     prob.driver.options['optimizer'] = 'LD_SLSQP'
-    #     prob.driver.options['tol'] = 1e-9
-    #     prob.driver.options['disp'] = False
-    # 
-    #     model.add_design_var('x', lower=-50.0, upper=50.0)
-    #     model.add_design_var('y', lower=-50.0, upper=50.0)
-    #     model.add_objective('f_xy', ref=10.)
-    #     model.add_constraint('c', lower=10.0, upper=11.0)
-    # 
-    #     prob.setup(check=False, mode='rev')
-    # 
-    #     failed = prob.run_driver()
-    # 
-    #     self.assertFalse(failed, "Optimization failed, result =\n" +
-    #                              str(prob.driver.result))
-    # 
-    #     assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
-    # 
+    def test_simple_array_comp2D(self):
+    
+        prob = om.Problem()
+        model = prob.model
+    
+        model.add_subsystem('p1', om.IndepVarComp('widths', np.zeros((2, 2))), promotes=['*'])
+        model.add_subsystem('comp', TestExplCompArrayDense(), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = areas - 20.0', c=np.zeros((2, 2)),
+                                               areas=np.zeros((2, 2))),
+                            promotes=['*'])
+        model.add_subsystem('obj', om.ExecComp('o = areas[0, 0]', areas=np.zeros((2, 2))),
+                            promotes=['*'])
+    
+        prob.set_solver_print(level=0)
+    
+        prob.driver = NLoptDriver()
+        prob.driver.options['optimizer'] = 'LD_SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+    
+        model.add_design_var('widths', lower=-50.0, upper=50.0)
+        model.add_objective('o')
+        model.add_constraint('c', equals=0.0)
+    
+        prob.setup()
+    
+        prob['widths'][:] = 10.
+    
+        failed = prob.run_driver()
+    
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
+    
+        obj = prob['o']
+        assert_near_equal(obj, 20.0, 1e-6)
+    
+    def test_simple_array_comp2D_eq_con(self):
+    
+        prob = om.Problem()
+        model = prob.model
+    
+        model.add_subsystem('p1', om.IndepVarComp('widths', np.zeros((2, 2))), promotes=['*'])
+        model.add_subsystem('comp', TestExplCompArrayDense(), promotes=['*'])
+        model.add_subsystem('obj', om.ExecComp('o = areas[0, 0] + areas[1, 1]', areas=np.zeros((2, 2))),
+                            promotes=['*'])
+    
+        prob.set_solver_print(level=0)
+    
+        prob.driver = NLoptDriver()
+        prob.driver.options['optimizer'] = 'LD_SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+    
+        model.add_design_var('widths', lower=-50.0, upper=50.0)
+        model.add_objective('o')
+        model.add_constraint('areas', equals=np.array([24.0, 21.0, 3.5, 17.5]))
+    
+        prob.setup()
+    
+        failed = prob.run_driver()
+    
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
+    
+        obj = prob['o']
+        assert_near_equal(obj, 41.5, 1e-6)
+    
+    def test_simple_array_comp2D_dbl_sided_con(self):
+    
+        prob = om.Problem()
+        model = prob.model
+    
+        model.add_subsystem('p1', om.IndepVarComp('widths', np.zeros((2, 2))), promotes=['*'])
+        model.add_subsystem('comp', TestExplCompArrayDense(), promotes=['*'])
+        model.add_subsystem('obj', om.ExecComp('o = areas[0, 0]', areas=np.zeros((2, 2))),
+                            promotes=['*'])
+    
+        prob.set_solver_print(level=0)
+    
+        prob.driver = NLoptDriver()
+        prob.driver.options['optimizer'] = 'LD_SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+    
+        model.add_design_var('widths', lower=-50.0, upper=50.0)
+        model.add_objective('o')
+        model.add_constraint('areas', lower=np.array([24.0, 21.0, 3.5, 17.5]), upper=np.array([24.0, 21.0, 3.5, 17.5]))
+    
+        prob.setup()
+    
+        failed = prob.run_driver()
+    
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
+    
+        con = prob['areas']
+        assert_near_equal(con, np.array([[24.0, 21.0], [3.5, 17.5]]), 1e-6)
+    
+    def test_simple_array_comp2D_dbl_sided_con_array(self):
+    
+        prob = om.Problem()
+        model = prob.model
+    
+        model.add_subsystem('p1', om.IndepVarComp('widths', np.zeros((2, 2))), promotes=['*'])
+        model.add_subsystem('comp', TestExplCompArrayDense(), promotes=['*'])
+        model.add_subsystem('obj', om.ExecComp('o = areas[0, 0]', areas=np.zeros((2, 2))),
+                            promotes=['*'])
+    
+        prob.set_solver_print(level=0)
+    
+        prob.driver = NLoptDriver()
+        prob.driver.options['optimizer'] = 'LD_SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+    
+        model.add_design_var('widths', lower=-50.0, upper=50.0)
+        model.add_objective('o')
+        model.add_constraint('areas', lower=20.0, upper=20.0)
+    
+        prob.setup()
+    
+        failed = prob.run_driver()
+    
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
+    
+        obj = prob['o']
+        assert_near_equal(obj, 20.0, 1e-6)
+    
+    def test_simple_array_comp2D_array_lo_hi(self):
+    
+        prob = om.Problem()
+        model = prob.model
+    
+        model.add_subsystem('p1', om.IndepVarComp('widths', np.zeros((2, 2))), promotes=['*'])
+        model.add_subsystem('comp', TestExplCompArrayDense(), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = areas - 20.0', c=np.zeros((2, 2)), areas=np.zeros((2, 2))),
+                            promotes=['*'])
+        model.add_subsystem('obj', om.ExecComp('o = areas[0, 0]', areas=np.zeros((2, 2))),
+                            promotes=['*'])
+    
+        prob.set_solver_print(level=0)
+    
+        prob.driver = NLoptDriver()
+        prob.driver.options['optimizer'] = 'LD_SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+    
+        model.add_design_var('widths', lower=-50.0*np.ones((2, 2)), upper=50.0*np.ones((2, 2)))
+        model.add_objective('o')
+        model.add_constraint('c', equals=0.0)
+    
+        prob.setup()
+    
+        failed = prob.run_driver()
+    
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
+    
+        obj = prob['o']
+        assert_near_equal(obj, 20.0, 1e-6)
+    
+    def test_simple_paraboloid_scaled_desvars_fwd(self):
+    
+        prob = om.Problem()
+        model = prob.model
+    
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
+    
+        prob.set_solver_print(level=0)
+    
+        prob.driver = NLoptDriver()
+        prob.driver.options['optimizer'] = 'LD_SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+    
+        model.add_design_var('x', lower=-50.0, upper=50.0, ref=.02)
+        model.add_design_var('y', lower=-50.0, upper=50.0, ref=.02)
+        model.add_objective('f_xy')
+        model.add_constraint('c', lower=10.0, upper=11.0)
+    
+        prob.setup(check=False, mode='fwd')
+    
+        failed = prob.run_driver()
+    
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
+    
+        assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
+    
+    def test_simple_paraboloid_scaled_desvars_rev(self):
+    
+        prob = om.Problem()
+        model = prob.model
+    
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
+    
+        prob.set_solver_print(level=0)
+    
+        prob.driver = NLoptDriver()
+        prob.driver.options['optimizer'] = 'LD_SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+    
+        model.add_design_var('x', lower=-50.0, upper=50.0, ref=.02)
+        model.add_design_var('y', lower=-50.0, upper=50.0, ref=.02)
+        model.add_objective('f_xy')
+        model.add_constraint('c', lower=10.0, upper=11.0)
+    
+        prob.setup(check=False, mode='rev')
+    
+        failed = prob.run_driver()
+    
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
+    
+        assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
+    
+    def test_simple_paraboloid_scaled_constraint_fwd(self):
+    
+        prob = om.Problem()
+        model = prob.model
+    
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
+    
+        prob.set_solver_print(level=0)
+    
+        prob.driver = NLoptDriver()
+        prob.driver.options['optimizer'] = 'LD_SLSQP'
+        prob.driver.options['tol'] = 1e-8
+        prob.driver.options['disp'] = False
+    
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', lower=10.0, upper=11.0, ref=10.)
+    
+        prob.setup(check=False, mode='fwd')
+    
+        failed = prob.run_driver()
+    
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
+    
+        assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
+    
+    def test_simple_paraboloid_scaled_objective_fwd(self):
+    
+        prob = om.Problem()
+        model = prob.model
+    
+        prob.set_solver_print(level=0)
+    
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
+    
+        prob.driver = NLoptDriver()
+        prob.driver.options['optimizer'] = 'LD_SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+    
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy', ref=10.)
+        model.add_constraint('c', lower=10.0, upper=11.0)
+    
+        prob.setup(check=False, mode='fwd')
+    
+        failed = prob.run_driver()
+    
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
+    
+        assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
+    
+    def test_simple_paraboloid_scaled_objective_rev(self):
+    
+        prob = om.Problem()
+        model = prob.model
+    
+        prob.set_solver_print(level=0)
+    
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
+    
+        prob.driver = NLoptDriver()
+        prob.driver.options['optimizer'] = 'LD_SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+    
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy', ref=10.)
+        model.add_constraint('c', lower=10.0, upper=11.0)
+    
+        prob.setup(check=False, mode='rev')
+    
+        failed = prob.run_driver()
+    
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
+    
+        assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
+    
     # def test_sellar_mdf(self):
     # 
     #     prob = om.Problem()
     #     model = prob.model = SellarDerivativesGrouped()
+    # 
+    #     prob.set_solver_print(level=0)
     # 
     #     prob.driver = NLoptDriver()
     #     prob.driver.options['optimizer'] = 'LD_SLSQP'
@@ -756,7 +760,7 @@ class TestNLoptDriver(unittest.TestCase):
     #     assert_near_equal(prob['z'][0], 1.9776, 1e-3)
     #     assert_near_equal(prob['z'][1], 0.0, 1e-3)
     #     assert_near_equal(prob['x'], 0.0, 1e-3)
-    # 
+    
     # def test_bug_in_eq_constraints(self):
     #     # We were getting extra constraints created because lower and upper are maxfloat instead of
     #     # None when unused.
