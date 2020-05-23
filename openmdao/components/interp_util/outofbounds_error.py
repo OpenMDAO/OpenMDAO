@@ -1,4 +1,4 @@
-"""Exception rasied by grid interpolators when they go out of bounds."""
+"""Exception raised by grid interpolators when they go out of bounds."""
 
 
 class OutOfBoundsError(Exception):
