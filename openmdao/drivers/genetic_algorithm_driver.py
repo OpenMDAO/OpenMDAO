@@ -785,7 +785,7 @@ class GeneticAlgorithm(object):
             Lower bound array.
         vub : ndarray
             Upper bound array.
-        bits : ndarray
+        bits : ndarray(dtype=np.int)
             Number of bits for decoding.
 
         Returns
@@ -824,7 +824,7 @@ class GeneticAlgorithm(object):
             Lower bound array.
         vub : ndarray
             Upper bound array.
-        bits : int
+        bits : ndarray(dtype=np.int)
             Number of bits for decoding.
 
         Returns
@@ -842,7 +842,8 @@ class GeneticAlgorithm(object):
             result = self.to_gray(result)
         return result
 
-    def to_gray(self, g):
+    @staticmethod
+    def to_gray(g):
         """
         Convert a binary array representing a single population member to Gray code.
 
@@ -862,7 +863,8 @@ class GeneticAlgorithm(object):
         gs = np.binary_repr(gi, len(g))                      # convert to binary string: '0011'
         return np.array([0 if q == '0' else 1 for q in gs])  # convert to np.array: [0, 0, 1, 1]
 
-    def from_gray(self, g):
+    @staticmethod
+    def from_gray(g):
         """
         Convert a Gray coded binary array to normal binary coding.
 

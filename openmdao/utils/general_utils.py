@@ -363,7 +363,7 @@ def format_as_float_or_array(name, values, val_if_none=0.0, flatten=False):
     Format array option values.
 
     Checks that the given array values are either None, float, or an iterable
-    of numeric values. On output all interables of numeric values are
+    of numeric values. On output all iterables of numeric values are
     converted to a flat np.ndarray. If values is scalar, it is converted
     to float.
 
