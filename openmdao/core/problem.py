@@ -443,6 +443,7 @@ class Problem(object):
         if abs_name in conns:
             src = conns[abs_name]
             if abs_name not in all_discrete:
+                value = np.asarray(value)
                 tmeta = self.model._var_allprocs_abs2meta[abs_name]
                 if abs_name in self.model._var_abs2meta:
                     tlocmeta = self.model._var_abs2meta[abs_name]
@@ -483,7 +484,6 @@ class Problem(object):
                 if src in self.model._outputs._views:  # src is local
                     if (self.model._outputs._views_flat[src].size == 0 and
                             src.rsplit('.', 1)[0] == '_auto_ivc' and all_meta[src]['distributed']):
-                        # FIXME: find a better way to handle this
                         pass  # special case, auto_ivc dist var with 0 local size
                     elif tmeta['has_src_indices']:
                         if tlocmeta:  # target is local
