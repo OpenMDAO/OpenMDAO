@@ -511,7 +511,7 @@ class Problem(object):
                 elif src in self.model._discrete_outputs:
                     self.model._discrete_outputs[src] = value
                 # also set the input
-                # TODO:remove this later after tests are passing
+                # TODO: maybe remove this if inputs are removed from case recording
                 if abs_name in self.model._inputs._views:
                     # print(f"problem set_val: setting input {abs_name} to {ivalue}")
                     self.model._inputs.set_var(abs_name, ivalue, indices)
