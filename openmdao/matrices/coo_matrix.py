@@ -248,7 +248,7 @@ class COOMatrix(Matrix):
             for key, val in self._key_ranges.items():
                 if key[1] in input_names:
                     if mask is None:
-                        mask = np.ones(self._coo.data.size, dtype=np.bool)
+                        mask = np.ones(self._matrix.data.size, dtype=np.bool)
                     ind1, ind2, _, _ = val
                     mask[ind1:ind2] = False
 
