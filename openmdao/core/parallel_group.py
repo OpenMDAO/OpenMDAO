@@ -20,5 +20,4 @@ class ParallelGroup(Group):
             Group.
         """
         super(ParallelGroup, self).__init__(**kwargs)
-        if MPI:
-            self._mpi_proc_allocator.parallel = True
+        self._mpi_proc_allocator.parallel = True

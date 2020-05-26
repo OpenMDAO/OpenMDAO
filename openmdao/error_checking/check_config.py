@@ -172,9 +172,8 @@ def _get_used_before_calc_subs(group, input_srcs):
             oparts = src_abs.split('.')
             src_sys = oparts[glen]
             tgt_sys = iparts[glen]
-            if (src_sys in parallel_solver and tgt_sys in parallel_solver and
-                    (parallel_solver[src_sys] not in ["NL: NLBJ", "NL: Newton", "BROYDEN"]) and
-                    src_sys == tgt_sys):
+            if (src_sys == tgt_sys and src_sys in parallel_solver and tgt_sys in parallel_solver and
+                    (parallel_solver[src_sys] not in ["NL: NLBJ", "NL: Newton", "BROYDEN"])):
                 simple_warning("Need to attach NonlinearBlockJac, NewtonSolver, or BroydenSolver "
                                "to '%s' when connecting components inside parallel "
                                "groups" % (src_sys))
