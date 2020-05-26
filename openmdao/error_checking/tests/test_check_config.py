@@ -5,10 +5,11 @@ from tempfile import mkdtemp
 from shutil import rmtree
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent, \
-    LinearBlockGS, NonlinearBlockGS, SqliteRecorder
+    LinearBlockGS, NonlinearBlockGS, SqliteRecorder, ParallelGroup
 
 from openmdao.utils.logger_utils import TestLogger
 from openmdao.error_checking.check_config import get_sccs_topo
+from openmdao.utils.assert_utils import assert_warning, assert_no_warning
 
 
 class MyComp(ExecComp):
@@ -58,6 +59,108 @@ class TestCheckConfig(unittest.TestCase):
         )
 
         testlogger.find_in('info', expected_info)
+        testlogger.find_in('warning', expected_warning)
+
+    def test_parallel_group_order(self):
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', IndepVarComp('x', 1.0))
+        model.add_subsystem('p2', IndepVarComp('x', 1.0))
+
+        parallel = model.add_subsystem('parallel', ParallelGroup())
+        parallel.add_subsystem('c1', ExecComp(['y=-2.0*x']))
+        parallel.add_subsystem('c2', ExecComp(['y=5.0*x']))
+        parallel.connect('c1.y', 'c2.x')
+
+        parallel = model.add_subsystem('parallel_copy', ParallelGroup())
+        parallel.add_subsystem('comp1', ExecComp(['y=-2.0*x']))
+        parallel.add_subsystem('comp2', ExecComp(['y=5.0*x']))
+        parallel.connect('comp1.y', 'comp2.x')
+
+        model.add_subsystem('c3', ExecComp(['y=3.0*x1+7.0*x2']))
+        model.add_subsystem('c4', ExecComp(['y=3.0*x_copy_1+7.0*x_copy_2']))
+
+        model.connect("parallel.c1.y", "c3.x1")
+        model.connect("parallel.c2.y", "c3.x2")
+        model.connect("parallel_copy.comp1.y", "c4.x_copy_1")
+        model.connect("parallel_copy.comp2.y", "c4.x_copy_2")
+
+        model.connect("p1.x", "parallel.c1.x")
+        model.connect("p1.x", "parallel_copy.comp1.x")
+
+        testlogger = TestLogger()
+        prob.setup(check=True, mode='fwd', logger=testlogger)
+
+        msg = "Need to attach NonlinearBlockJac, NewtonSolver, or BroydenSolver to 'parallel' when " \
+              "connecting components inside parallel groups"
+
+        with assert_warning(UserWarning, msg):
+            prob.run_model()
+
+        expected_warning = ("The following systems are executed out-of-order:\n"
+                            "   System 'parallel.c2' executes out-of-order with respect to its source systems ['parallel.c1']\n"
+                            "   System 'parallel_copy.comp2' executes out-of-order with respect to its source systems ['parallel_copy.comp1']\n")
+
+        testlogger.find_in('warning', expected_warning)
+
+    def test_serial_in_parallel(self):
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', IndepVarComp('x', 1.0))
+
+        parallel = model.add_subsystem('parallel', ParallelGroup())
+        parallel.add_subsystem('c1', ExecComp(['y=-2.0*x']))
+
+        parallel2 = model.add_subsystem('parallel_copy', ParallelGroup())
+        parallel2.add_subsystem('comp1', ExecComp(['y=-2.0*x']))
+
+        model.add_subsystem('con', ExecComp('y = 3.0*x'))
+
+        model.connect("p1.x", "parallel.c1.x")
+        model.connect('parallel.c1.y', 'parallel_copy.comp1.x')
+        model.connect('parallel_copy.comp1.y', 'con.x')
+
+        prob.setup(check=True)
+
+        msg = ("The following systems are executed out-of-order:\n"
+               "   System 'parallel.c2' executes out-of-order with respect to its source systems ['parallel.c1']\n")
+
+        with assert_no_warning(UserWarning, msg):
+            prob.run_model()
+
+    def test_single_parallel_group_order(self):
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', IndepVarComp('x', 1.0))
+        model.add_subsystem('p2', IndepVarComp('x', 1.0))
+
+        parallel = model.add_subsystem('parallel', ParallelGroup())
+        parallel.add_subsystem('c1', ExecComp(['y=-2.0*x']))
+        parallel.add_subsystem('c2', ExecComp(['y=5.0*x']))
+        parallel.connect('c1.y', 'c2.x')
+
+        model.add_subsystem('c3', ExecComp(['y=3.0*x1+7.0*x2']))
+
+        model.connect("parallel.c1.y", "c3.x1")
+        model.connect("parallel.c2.y", "c3.x2")
+
+        model.connect("p1.x", "parallel.c1.x")
+
+        testlogger = TestLogger()
+        prob.setup(check=True, mode='fwd', logger=testlogger)
+
+        msg = "Need to attach NonlinearBlockJac, NewtonSolver, or BroydenSolver to 'parallel' when " \
+              "connecting components inside parallel groups"
+
+        with assert_warning(UserWarning, msg):
+            prob.run_model()
+
+        expected_warning = ("The following systems are executed out-of-order:\n"
+                            "   System 'parallel.c2' executes out-of-order with respect to its source systems ['parallel.c1']\n")
+
         testlogger.find_in('warning', expected_warning)
 
     def test_dataflow_multi_level(self):

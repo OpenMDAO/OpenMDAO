@@ -11,7 +11,7 @@ from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimple, 
     TestExplCompSimpleDense
 from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.general_utils import printoptions, remove_whitespace
-
+from openmdao.utils.mpi import MPI
 
 # Note: The following class definitions are used in feature docs
 
@@ -979,6 +979,107 @@ class ExplCompTestCase(unittest.TestCase):
         # verify read_only status is reset after AnalysisError
         prob['length'] = 111.
 
+@unittest.skipUnless(MPI, "MPI is required.")
+class TestMPIExplComp(unittest.TestCase):
+    N_PROCS = 3
+
+    def test_list_inputs_outputs_with_parallel_comps(self):
+        class TestComp(om.ExplicitComponent):
+
+            def initialize(self):
+                self.options['distributed'] = False
+
+            def setup(self):
+                self.add_input('x', shape=1)
+                self.add_output('y', shape=1)
+                self.declare_partials('y', 'x')
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = inputs['x'] ** 2
+
+            def compute_partials(self, inputs, J):
+                J['y', 'x'] = 2 * inputs['x']
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 1.0))
+        model.add_subsystem('p2', om.IndepVarComp('x', 1.0))
+
+        parallel = model.add_subsystem('parallel', om.ParallelGroup())
+        parallel.add_subsystem('c1', TestComp())
+        parallel.add_subsystem('c2', TestComp())
+
+        model.add_subsystem('c3', om.ExecComp(['y=3.0*x1+7.0*x2']))
+
+        model.connect("parallel.c1.y", "c3.x1")
+        model.connect("parallel.c2.y", "c3.x2")
+
+        model.connect("p1.x", "parallel.c1.x")
+        model.connect("p2.x", "parallel.c2.x")
+
+        prob.setup()
+        prob.run_model()
+
+        stream = StringIO()
+        prob.model.list_outputs(all_procs=True, out_stream=stream)
+
+        if self.comm.rank == 0:
+
+            text = stream.getvalue().split('\n')
+            expected_text = [
+                "5 Explicit Output(s) in 'model'",
+                "-------------------------------",
+                "",
+                "varname     value",
+                "----------  -----",
+                "model",
+                "p1",
+                "    x       [1.]",
+                "p2",
+                "    x       [1.]",
+                "parallel",
+                "    c1",
+                "   y     [1.]",
+                "    c2",
+                "    y     [1.]",
+                "c3",
+                "    y       [10.]",
+                "",
+                "",
+                "0 Implicit Output(s) in 'model'",
+                "-------------------------------",
+            ]
+            for i, line in enumerate(expected_text):
+                if line and not line.startswith('-'):
+                    self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
+
+        stream = StringIO()
+        prob.model.list_inputs(all_procs=True, out_stream=stream)
+
+        if self.comm.rank == 0:
+
+            text = stream.getvalue().split('\n')
+            expected_text = [
+                "4 Input(s) in 'model'",
+                "---------------------",
+                "",
+                "varname     value",
+                "----------  -----",
+                "model",
+                "parallel",
+                "    c1",
+                "    x     [1.]",
+                "    c2",
+                "    x     [1.]",
+                "c3",
+                "    x1      [1.]",
+                "    x2      [1.]",
+            ]
+
+            for i, line in enumerate(expected_text):
+                if line and not line.startswith('-'):
+                    self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
 
 if __name__ == '__main__':
     unittest.main()
