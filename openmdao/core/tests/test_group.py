@@ -419,11 +419,11 @@ class TestGroup(unittest.TestCase):
                                                    x={'value': np.zeros(5), 'units': 'ft'},
                                                    y={'units': 'inch'}), promotes=['x'])
 
-        p.model.add_input('x', units='ft')
-
         p.setup()
         p['comp2.x'] = np.ones(5)
         p.run_model()
+        np.testing.assert_allclose(p['comp1.y'], 5.)
+        np.testing.assert_allclose(p['comp2.y'], 5.)
 
     def test_unconnected_input_units_mismatch(self):
         p = om.Problem()
