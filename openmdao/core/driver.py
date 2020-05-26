@@ -64,9 +64,9 @@ class Driver(object):
         Contains all design variable info.
     _designvars_discrete : list
         List of design variables that are discrete.
-    _distributed_cons : dict
-        Dict of constraints that are distributed outputs. Values are
-        (owning rank, size).
+    _distributed_resp : dict
+        Dict of constraints that are distributed outputs. Key is rank, values are
+        (local indices, local sizes).
     _cons : dict
         Contains all constraint info.
     _objs : dict
@@ -277,10 +277,10 @@ class Driver(object):
         obj_set = set()
         dv_set = set()
 
-        self._remote_dvs = dv_dict = {}
-        self._remote_cons = con_dict = {}
-        self._distributed_cons = dist_con_dict = {}
-        self._remote_objs = obj_dict = {}
+        self._remote_dvs = remote_dv_dict = {}
+        self._remote_cons = remote_con_dict = {}
+        self._distributed_resp = dist_resp_dict = {}
+        self._remote_objs = remote_obj_dict = {}
 
         # Now determine if later we'll need to allgather cons, objs, or desvars.
         if model.comm.size > 1 and model._subsystems_allprocs:
@@ -310,16 +310,43 @@ class Driver(object):
                     sz = sizes[owner, i]
 
                 if vname in dv_set:
-                    dv_dict[vname] = (owner, sz)
-                elif distributed:
+                    remote_dv_dict[vname] = (owner, sz)
+
+                # Note that design vars are not distributed.
+                elif distributed and vname in self._responses:
                     idx = model._var_allprocs_abs2idx['nonlinear'][vname]
                     dist_sizes = model._var_sizes['nonlinear']['output'][:, idx]
-                    dist_con_dict[vname] = (idx, dist_sizes)
+
+                    # Determine which indices are on our proc.
+                    rank = model.comm.rank
+                    size = dist_sizes.size
+                    offsets = np.cumsum(dist_sizes)
+
+                    resp_dict = self._responses[vname]
+                    indices = resp_dict['indices']
+
+                    if indices is not None:
+                        local_indices = []
+                        true_sizes = np.zeros(size, dtype=INT_DTYPE)
+                        for index in indices:
+                            if index < 0:
+                                # Support for negative indices. Convert to positive index.
+                                index = index + np.sum(dist_sizes)
+                            irank = np.argwhere(offsets > index)[0][0]
+                            true_sizes[irank] += 1
+                            if rank == irank:
+                                new_index = index - offsets[irank] + dist_sizes[irank]
+                                local_indices.append(new_index)
+
+                        indices = local_indices
+                        dist_sizes = true_sizes
+
+                    dist_resp_dict[vname] = (indices, dist_sizes)
 
                 if vname in con_set:
-                    con_dict[vname] = (owner, sz)
+                    remote_con_dict[vname] = (owner, sz)
                 if vname in obj_set:
-                    obj_dict[vname] = (owner, sz)
+                    remote_obj_dict[vname] = (owner, sz)
 
         self._remote_responses = self._remote_cons.copy()
         self._remote_responses.update(self._remote_objs)
@@ -429,8 +456,7 @@ class Driver(object):
         for sub in self._problem().model.system_iter(recurse=True, include_self=True):
             self._rec_mgr.record_metadata(sub)
 
-    def _get_voi_val(self, name, meta, remote_vois, distributed_vars, driver_scaling=True,
-                     rank=None):
+    def _get_voi_val(self, name, meta, remote_vois, driver_scaling=True, rank=None):
         """
         Get the value of a variable of interest (objective, constraint, or design var).
 
@@ -445,8 +471,6 @@ class Driver(object):
         remote_vois : dict
             Dict containing (owning_rank, size) for all remote vois of a particular
             type (design var, constraint, or objective).
-        distributed_vars : dict
-            Dict containing (indices, sizes) for all distributed responses.
         driver_scaling : bool
             When True, return values that are scaled according to either the adder and scaler or
             the ref and ref0 values that were specified when add_design_var, add_objective, and
@@ -462,6 +486,7 @@ class Driver(object):
         model = self._problem().model
         comm = model.comm
         vec = model._outputs._views_flat
+        distributed_vars = self._distributed_resp
         indices = meta['indices']
 
         if MPI:
@@ -492,9 +517,9 @@ class Driver(object):
 
         elif distributed:
             local_val = model._get_val(name, flat=True)
-            if indices is not None:
-                local_val = local_val[indices]
-            idx, sizes = distributed_vars[name]
+            local_indices, sizes = distributed_vars[name]
+            if local_indices is not None:
+                local_val = local_val[local_indices]
             offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
             offsets[1:] = np.cumsum(sizes[:-1])
             val = np.zeros(np.sum(sizes))
@@ -541,7 +566,7 @@ class Driver(object):
         dict
            Dictionary containing values of each design variable.
         """
-        return {n: self._get_voi_val(n, dv, self._remote_dvs, {})
+        return {n: self._get_voi_val(n, dv, self._remote_dvs)
                 for n, dv in self._designvars.items()}
 
     def set_design_var(self, name, value):
@@ -613,7 +638,8 @@ class Driver(object):
         dict
            Dictionary containing values of each objective.
         """
-        return {n: self._get_voi_val(n, obj, self._remote_objs, {}, driver_scaling=driver_scaling)
+        return {n: self._get_voi_val(n, obj, self._remote_objs,
+                                     driver_scaling=driver_scaling)
                 for n, obj in self._objs.items()}
 
     def get_constraint_values(self, ctype='all', lintype='all', driver_scaling=True):
@@ -653,7 +679,6 @@ class Driver(object):
                 continue
 
             con_dict[name] = self._get_voi_val(name, meta, self._remote_cons,
-                                               self._distributed_cons,
                                                driver_scaling=driver_scaling)
 
         return con_dict

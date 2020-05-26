@@ -91,7 +91,7 @@ class InterpND(object):
             The data on the regular grid in n dimensions.
         method : str
             Name of interpolation method(s).
-        x_interp : ndarry or None
+        x_interp : ndarray or None
             If we are always interpolating at a fixed set of locations, then they can be
             specified here.
         extrapolate : bool

@@ -1345,6 +1345,8 @@ class Problem(object):
             'step_calc': step_calc,
         }
         approx = model._owns_approx_jac
+        approx_of = model._owns_approx_of
+        approx_wrt = model._owns_approx_wrt
         old_jac = model._jacobian
         old_subjacs = model._subjacs_info.copy()
 
@@ -1358,16 +1360,25 @@ class Problem(object):
         if not approx:
             model._jacobian = old_jac
             model._owns_approx_jac = False
+            model._owns_approx_of = approx_of
+            model._owns_approx_wrt = approx_wrt
             model._subjacs_info = old_subjacs
 
         # Assemble and Return all metrics.
         data = {}
         data[''] = {}
+        resp = self.driver._responses
         # TODO key should not be fwd when exact computed in rev mode or auto
         for key, val in Jcalc.items():
             data[''][key] = {}
             data[''][key]['J_fwd'] = val
             data[''][key]['J_fd'] = Jfd[key]
+
+            # Display whether indices were declared when response was added.
+            of = key[0]
+            if of in resp and resp[of]['indices'] is not None:
+                data[''][key]['indices'] = len(resp[of]['indices'])
+
         fd_args['method'] = method
 
         if out_stream == _DEFAULT_OUT_STREAM:
@@ -1877,6 +1888,11 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                 if rel_key in indep_key[sys_name] and fd_norm < abs_error_tol:
                     del derivative_data[sys_name][rel_key]
                     continue
+
+            # Informative output for responses that were declared with an index.
+            indices = derivative_info.get('indices')
+            if indices is not None:
+                of = '{} (index size: {})'.format(of, indices)
 
             if not suppress_output:
 

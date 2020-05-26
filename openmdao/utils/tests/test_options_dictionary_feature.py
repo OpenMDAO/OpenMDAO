@@ -93,6 +93,69 @@ class TestOptionsDictionaryFeature(unittest.TestCase):
 
         assert_near_equal(prob['f_comp.y'], 10.)
 
+    def test_simple_values(self):
+        import numpy as np
+        import openmdao.api as om
+
+        class VectorDoublingComp(om.ExplicitComponent):
+
+            def initialize(self):
+                self.options.declare('size', values=[2, 4, 6, 8])
+
+            def setup(self):
+                size = self.options['size']
+
+                self.add_input('x', shape=size)
+                self.add_output('y', shape=size)
+                self.declare_partials('y', 'x', val=2.,
+                                      rows=np.arange(size),
+                                      cols=np.arange(size))
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = 2 * inputs['x']
+
+        prob = om.Problem()
+        prob.model.add_subsystem('inputs', om.IndepVarComp('x', shape=4))
+        prob.model.add_subsystem('double', VectorDoublingComp(size=4))
+        prob.model.connect('inputs.x', 'double.x')
+
+        prob.setup()
+
+        prob['inputs.x'] = [1., 2., 3., 4.]
+
+        prob.run_model()
+        assert_near_equal(prob['double.y'], [2., 4., 6., 8.])
+
+    def test_simple_bounds_valid(self):
+        import numpy as np
+        import openmdao.api as om
+
+        def check_even(name, value):
+            if value % 2 != 0:
+                raise ValueError(f"Option '{name}' with value {value} must be an even number.")
+
+        class VectorDoublingComp(om.ExplicitComponent):
+
+            def initialize(self):
+                self.options.declare('size', types=int, lower=2, upper=8, check_valid=check_even)
+
+            def setup(self):
+                size = self.options['size']
+
+                self.add_input('x', shape=size)
+                self.add_output('y', shape=size)
+                self.declare_partials('y', 'x', val=2.,
+                                      rows=np.arange(size),
+                                      cols=np.arange(size))
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = 2 * inputs['x']
+
+        try:
+            comp = VectorDoublingComp(size=5)
+        except Exception as err:
+            self.assertEqual(str(err), "Option 'size' with value 5 must be an even number.")
+
 
 if __name__ == "__main__":
     unittest.main()
