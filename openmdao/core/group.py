@@ -163,7 +163,7 @@ class Group(System):
         """
         pass
 
-    def add_input(self, name, val=_undefined, src_indices=None, units=None):
+    def add_input(self, name, val=_undefined, units=None):
         """
         Specify metadata for a connected promoted inputs without a source.
 
@@ -173,8 +173,6 @@ class Group(System):
             The name of the promoted inputs.
         val : object
             Value to use as default.
-        src_indices : ndarray or None
-            Index array used to pull entries from a source into the promoted inputs.
         units : str or None
             Specifies units to be assumed for the source.
         """
@@ -184,8 +182,6 @@ class Group(System):
         meta = {}
         if val is not _undefined:
             meta['value'] = val
-        if src_indices is not None:
-            meta['src_indices'] = src_indices
         if units is not None:
             meta['units'] = units
         if meta:
@@ -763,22 +759,22 @@ class Group(System):
         for prom, meta in group_inputs:
             if prom in ginputs:
                 # check for any conflicting src_indices, units, ...
-                old_ginputs = ginputs[prom]
+                old = ginputs[prom]
 
                 for n, val in meta.items():
                     if n == 'path' or val is None:
                         continue
 
-                    if old_ginputs[n] is not None:
-                        if isinstance(val, np.ndarray) or isinstance(old_ginputs[n], np.ndarray):
-                            eq = np.all(val == old_ginputs[n])
+                    if n in old and old[n] is not None:
+                        if isinstance(val, np.ndarray) or isinstance(old[n], np.ndarray):
+                            eq = np.all(val == old[n])
                         else:
-                            eq = val == old_ginputs[n]
+                            eq = val == old[n]
 
                         if not eq:
-                            raise RuntimeError(f"Groups '{self.pathname}' and '{meta['path']}' "
+                            raise RuntimeError(f"Groups '{old['path']}' and '{meta['path']}' "
                                                f"added the input '{prom}' with conflicting '{n}'.")
-                    old_ginputs[n] = val
+                    old[n] = val
             else:
                 ginputs[prom] = meta
 
@@ -2839,6 +2835,5 @@ class Group(System):
                     if errs:
                         inputs = list(sorted(tgts))
                         raise RuntimeError(f"{self.msginfo}: The following inputs, {inputs} are "
-                                           "connected but the following metadata entries have not "
-                                           "been specified by Group.add_input and differ between "
-                                           f"at least two of them: {errs}.")
+                                           f"connected but the metadata entries {errs} differ and "
+                                           "have not been specified by Group.add_input.")

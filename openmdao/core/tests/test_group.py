@@ -14,8 +14,14 @@ except ImportError:
 
 import openmdao.api as om
 from openmdao.test_suite.components.sellar import SellarDis2
+from openmdao.utils.mpi import MPI
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.logger_utils import TestLogger
+
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
 
 class SimpleGroup(om.Group):
@@ -1711,6 +1717,220 @@ class TestSrcIndices(unittest.TestCase):
                                 src_indices=[[-10, 5], [7, 8]],
                                 flat_src_indices=True,
                                 raise_connection_errors=False)
+
+class TestGroupAddInput(unittest.TestCase):
+
+    def _make_tree_model(self, diff_units=False, diff_vals=False):
+        p = om.Problem()
+        model = p.model
+
+        if diff_units:
+            units1 = 'ft'
+            units2 = 'inch'
+        else:
+            units1 = units2 = 'ft'
+
+        val = 1.0
+
+        g1 = model.add_subsystem("G1", om.Group(), promotes_inputs=['x'])
+
+        g2 = g1.add_subsystem("G2", om.Group(), promotes_inputs=['x'])
+        g2.add_subsystem("C1", om.ExecComp("y = 2. * x",
+                                            x={'value': val, 'units': units2},
+                                            y={'value': 1.0, 'units': units2}),
+                                            promotes_inputs=['x'])
+        g2.add_subsystem("C2", om.ExecComp("y = 3. * x",
+                                            x={'value': val, 'units': units1},
+                                            y={'value': 1.0, 'units': units1}),
+                                            promotes_inputs=['x'])
+
+        g3 = g1.add_subsystem("G3", om.Group(), promotes_inputs=['x'])
+        if diff_vals: val = 2.0
+        g3.add_subsystem("C3", om.ExecComp("y = 4. * x",
+                                            x={'value': val, 'units': units1},
+                                            y={'value': 1.0, 'units': units1}),
+                                            promotes_inputs=['x'])
+        g3.add_subsystem("C4", om.ExecComp("y = 5. * x",
+                                            x={'value': val, 'units': units2},
+                                            y={'value': 1.0, 'units': units2}),
+                                            promotes_inputs=['x'])
+
+        par = model.add_subsystem("par", om.ParallelGroup(), promotes_inputs=['x'])
+
+        g4 = par.add_subsystem("G4", om.Group(), promotes_inputs=['x'])
+        if diff_vals: val = 3.0
+        g4.add_subsystem("C5", om.ExecComp("y = 6. * x",
+                                            x={'value': val, 'units': units2},
+                                            y={'value': 1.0, 'units': units2}),
+                                            promotes_inputs=['x'])
+        g4.add_subsystem("C6", om.ExecComp("y = 7. * x",
+                                            x={'value': val, 'units': units1},
+                                            y={'value': 1.0, 'units': units1}),
+                                            promotes_inputs=['x'])
+
+        g5 = par.add_subsystem("G5", om.Group(), promotes_inputs=['x'])
+        if diff_vals: val = 4.0
+        g5.add_subsystem("C7", om.ExecComp("y = 8. * x",
+                                            x={'value': val, 'units': units1},
+                                            y={'value': 1.0, 'units': units1}),
+                                            promotes_inputs=['x'])
+        g5.add_subsystem("C8", om.ExecComp("y = 9. * x",
+                                            x={'value': val, 'units': units2},
+                                            y={'value': 1.0, 'units': units2}),
+                                            promotes_inputs=['x'])
+
+        return p
+
+    def test_missing_diff_units(self):
+        p = om.Problem()
+        model = p.model
+
+        par = model.add_subsystem('par', om.ParallelGroup(), promotes_inputs=['x'])
+        par.add_subsystem('C1', om.ExecComp('y = 3. * x',
+                                            x={'value': 1.0, 'units': 'ft'},
+                                            y={'value': 1.0, 'units': 'ft'}),
+                                            promotes_inputs=['x'])
+        par.add_subsystem('C2', om.ExecComp('y = 5. * x',
+                                            x={'value': 1.0, 'units': 'inch'},
+                                            y={'value': 1.0, 'units': 'inch'}),
+                                            promotes_inputs=['x'])
+
+        with self.assertRaises(Exception) as cm:
+           p.setup()
+
+        self.assertEqual(cm.exception.args[0],
+                         "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'] are connected but the metadata entries ['units'] differ and have not been specified by Group.add_input.")
+
+    def test_missing_diff_vals(self):
+        p = om.Problem()
+        model = p.model
+
+        par = model.add_subsystem('par', om.ParallelGroup(), promotes_inputs=['x'])
+        par.add_subsystem('C1', om.ExecComp('y = 3. * x', x=1.0), promotes_inputs=['x'])
+        par.add_subsystem('C2', om.ExecComp('y = 5. * x', x=1.1), promotes_inputs=['x'])
+
+        with self.assertRaises(Exception) as cm:
+           p.setup()
+
+        self.assertEqual(cm.exception.args[0],
+                         "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'] are connected but the metadata entries ['value'] differ and have not been specified by Group.add_input.")
+
+    def test_conflicting_units(self):
+        # multiple Group.add_input calls at same tree level with conflicting units args
+        p = self._make_tree_model(diff_units=True)
+        model = p.model
+        g2 = model._get_subsystem('G1.G2')
+        g2.add_input('x', units='ft')
+
+        g3 = model._get_subsystem('G1.G3')
+        g3.add_input('x', units='ft')
+
+        g4 = model._get_subsystem('par.G4')
+        g4.add_input('x', units='inch')
+
+        g5 = model._get_subsystem('par.G5')
+        g5.add_input('x', units='ft')
+
+        with self.assertRaises(Exception) as cm:
+            p.setup()
+
+        self.assertEqual(cm.exception.args[0], "Groups 'par.G4' and 'par.G5' added the input 'x' with conflicting 'units'.")
+
+    def test_conflicting_units_multi_level(self):
+        # multiple Group.add_input calls at different tree levels with conflicting units args
+        p = self._make_tree_model(diff_units=True)
+        model = p.model
+        g2 = model._get_subsystem('G1.G2')
+        g2.add_input('x', units='ft')
+
+        g3 = model._get_subsystem('G1.G3')
+        g3.add_input('x', units='ft')
+
+        g4 = model._get_subsystem('par.G4')
+        g4.add_input('x', units='ft')
+
+        g5 = model._get_subsystem('par.G5')
+        g5.add_input('x', units='ft')
+
+        g1 = model._get_subsystem('G1')
+        g1.add_input('x', units='inch')
+
+        with self.assertRaises(Exception) as cm:
+            p.setup()
+
+        self.assertEqual(cm.exception.args[0], "Groups 'G1' and 'G1.G2' added the input 'x' with conflicting 'units'.")
+
+    def test_conflicting_units_multi_level_par(self):
+        # multiple Group.add_input calls at different tree levels with conflicting units args
+        p = self._make_tree_model(diff_units=True)
+        model = p.model
+        g2 = model._get_subsystem('G1.G2')
+        g2.add_input('x', units='ft')
+
+        g3 = model._get_subsystem('G1.G3')
+        g3.add_input('x', units='ft')
+
+        g4 = model._get_subsystem('par.G4')
+        g4.add_input('x', units='ft')
+
+        g5 = model._get_subsystem('par.G5')
+        g5.add_input('x', units='ft')
+
+        par = model._get_subsystem('par')
+        par.add_input('x', units='inch')
+
+        with self.assertRaises(Exception) as cm:
+            p.setup()
+
+        self.assertEqual(cm.exception.args[0], "Groups 'par' and 'par.G4' added the input 'x' with conflicting 'units'.")
+
+    def test_group_input_not_found(self):
+        p = self._make_tree_model(diff_units=True)
+        model = p.model
+        g2 = model._get_subsystem('G1.G2')
+        g2.add_input('xx', units='ft')
+
+        g3 = model._get_subsystem('G1.G3')
+        g3.add_input('x', units='ft')
+
+        g4 = model._get_subsystem('par.G4')
+        g4.add_input('x', units='ft')
+
+        g5 = model._get_subsystem('par.G5')
+        g5.add_input('x', units='ft')
+
+        with self.assertRaises(Exception) as cm:
+            p.setup()
+
+        self.assertEqual(cm.exception.args[0], "Group (G1.G2): The following group inputs could not be found: ['xx'].")
+
+    def test_conflicting_val(self):
+        p = self._make_tree_model(diff_vals=True)
+        model = p.model
+        g2 = model._get_subsystem('G1.G2')
+        g2.add_input('x', val=3.0)
+
+        g3 = model._get_subsystem('G1.G3')
+        g3.add_input('x', val=3.0)
+
+        g4 = model._get_subsystem('par.G4')
+        g4.add_input('x', val=3.0)
+
+        g5 = model._get_subsystem('par.G5')
+        g5.add_input('x', val=3.0)
+
+        g1 = model._get_subsystem('G1')
+        g1.add_input('x', val=4.0)
+
+        with self.assertRaises(Exception) as cm:
+            p.setup()
+
+        self.assertEqual(cm.exception.args[0], "Groups 'G1' and 'G1.G2' added the input 'x' with conflicting 'value'.")
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestGroupAddInputMPI(TestGroupAddInput):
+    N_PROCS = 2
 
 
 #

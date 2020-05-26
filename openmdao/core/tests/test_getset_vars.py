@@ -357,7 +357,7 @@ class TestGetSetVariables(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             p.setup()
 
-        self.assertEqual(str(cm.exception), "Group (<model>): The following inputs, ['C1.x', 'C2.x'] are connected but the following metadata entries have not been specified by Group.add_input and differ between at least two of them: ['units', 'value'].")
+        self.assertEqual(str(cm.exception), "Group (<model>): The following inputs, ['C1.x', 'C2.x'] are connected but the metadata entries ['units', 'value'] differ and have not been specified by Group.add_input.")
 
     def test_serial_multi_src_inds_units_setval_promoted(self):
         p = Problem()
