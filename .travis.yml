@@ -118,7 +118,7 @@ install:
       echo "  > Secure copying SNOPT 7.2 over SSH";
       mkdir SNOPT;
       scp -r "$SNOPT_LOCATION_72" SNOPT;
-      ./build_pyoptsparse.sh -s SNOPT -b "$PYOPTSPARSE_VERSION";
+      ./build_pyoptsparse.sh -s SNOPT/source -b "$PYOPTSPARSE_VERSION";
 
     else
       ./build_pyoptsparse.sh -b "$PYOPTSPARSE_VERSION";
