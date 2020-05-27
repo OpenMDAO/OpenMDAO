@@ -803,6 +803,10 @@ class System(object):
         self._setup_relevance(mode, self._relevant)
         self._setup_var_index_ranges(recurse=recurse)
         self._setup_var_sizes(recurse=recurse)
+
+        if self.pathname == '':
+            self._resolve_connected_input_defaults()
+
         self._setup_connections(recurse=recurse)
 
     def _configure_check(self):
@@ -4370,6 +4374,9 @@ class System(object):
             return meta[abs_name]
 
         raise KeyError('{}: Metadata for variable "{}" not found.'.format(self.msginfo, name))
+
+    def _resolve_connected_input_defaults(self):
+        pass
 
 
 def get_relevant_vars(connections, desvars, responses, mode):

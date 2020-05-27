@@ -2501,3 +2501,56 @@ class Group(System):
                 graph.add_edge(src_sys, tgt_sys, conns=edge_data[key])
 
         return graph
+
+    def _resolve_connected_input_defaults(self):
+        # these are meta dict entries that cannot differ between inputs unless a default
+        # is specified from a corresponding group.add_input call
+        group_nodiff = ['value', 'units']
+
+        srcconns = defaultdict(list)
+        for tgt, src in self._conn_global_abs_in2out.items():
+            srcconns[src].append(tgt)
+
+        abs2prom = self._var_allprocs_abs2prom['input']
+        all_abs2meta = self._var_allprocs_abs2meta
+        abs2meta = self._var_abs2meta
+        discrete_outs = self._var_allprocs_discrete['output']
+
+        for src, tgts in srcconns.items():
+            if len(tgts) > 1 and src not in discrete_outs:
+                if src in abs2meta:
+                    smeta = abs2meta[src]
+                    sloc = True
+                else:
+                    smeta = all_abs2meta[tgt]
+                    sloc = False
+
+                sunits = smeta['units'] if 'units' in smeta else None
+                sval = self._get_val(src, kind='output', get_remote=True, from_src=False)
+
+                for tgt in tgts:
+                    prom = abs2prom[tgt]
+                    if prom in self._group_inputs:
+                        gmeta = self._group_inputs[prom]
+                    else:
+                        gmeta = ()
+
+                    if tgt in abs2meta:  # var is local
+                        tmeta = abs2meta[tgt]
+                    else:
+                        tmeta = all_abs2meta[tgt]
+
+                    tunits = tmeta['units'] if 'units' in tmeta else None
+                    tval = self._get_val(tgt, kind='input', get_remote=True, from_src=False)
+
+                    errs = []
+                    if 'units' not in gmeta and sunits != tunits:
+                        errs.append('units')
+                    if 'value' not in gmeta and not np.all(sval == tval):
+                        errs.append('value')
+
+                    if errs:
+                        inputs = list(sorted(tgts))
+                        raise RuntimeError(f"{self.msginfo}: The following inputs, {inputs} are "
+                                           f"connected but the metadata entries {errs} differ and "
+                                           "have not been specified by Group.add_input.")
