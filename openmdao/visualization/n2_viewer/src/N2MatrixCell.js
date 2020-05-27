@@ -421,10 +421,10 @@ class N2MatrixCell {
             n2MouseFuncs.overOffDiag);
     }
 
-     /**
-     * Select the mousemove callback depending on whether we"re on the diagonal.
-     * TODO: Remove these globals
-     */
+    /**
+    * Select the mousemove callback depending on whether we"re on the diagonal.
+    * TODO: Remove these globals
+    */
     mousemove() {
         return (this.onDiagonal() ? n2MouseFuncs.moveOnDiag : null);
     }
@@ -531,15 +531,27 @@ class N2MatrixCell {
      *   to indicate the style of the highlighting.
      */
     highlight(varType = 'self', direction = 'self') {
-        let abspath = this.obj.absPathName;
-        let className = 'diagHighlight';
 
-        if (varType == 'target') abspath = this.tgtObj.absPathName;
+        const obj = (varType == 'target') ? this.tgtObj : this.srcObj;
+        const treeId = obj.absPathName.replace(/[\.:]/g, '_');
+        const treeNode = d3.select('rect#' + treeId);
 
-        if (direction == 'input') className = 'inputHighlight';
-        else if (direction == 'output') className = 'outputHighlight';
+        /*        let className = 'diagHighlight';
+                if (direction == 'input') className = 'inputHighlight';
+                else if (direction == 'output') className = 'outputHighlight';
+                */
+        let fill = treeNode.style('fill');
+        if (direction == 'input') fill = N2Style.color.input;
+        else if (direction == 'output') fill = N2Style.color.output;
 
-        const treeId = abspath.replace(/[\.:]/g, '_');
-        d3.select('rect#' + treeId).classed(className, true);
+        d3.select('#highlight-bar').append('rect')
+            .attr('x', 0)
+            .attr('y', treeNode.node().parentNode.transform.baseVal[0].matrix.f)
+            .attr('rx', 4)
+            .attr('ry', 4)
+            .attr('width', 8)
+            .attr('height', treeNode.attr('height'))
+            .attr('stroke', N2Style.color.treeStroke)
+            .attr('fill', fill);
     }
 }

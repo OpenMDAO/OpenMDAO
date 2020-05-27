@@ -168,6 +168,7 @@ class N2Diagram {
             'n2OuterGroup': d3.select('g#n2outer'),
             'n2InnerGroup': d3.select('g#n2inner'),
             'pTreeGroup': d3.select('g#tree'),
+            'highlightBar': d3.select('g#highlight-bar'),
             'pSolverTreeGroup': d3.select('g#solver_tree'),
             'n2BackgroundRect': d3.select('g#n2inner rect'),
             'clips': {
@@ -274,6 +275,11 @@ class N2Diagram {
                 .attr("width", this.dims.size.partitionTree.width)
                 .attr("transform", "translate(0 " + innerDims.margin + ")");
 
+            this.dom.highlightBar
+                .attr("height", innerDims.height)
+                .attr("width", "8")
+                .attr("transform", "translate(" + this.dims.size.partitionTree.width + 1 + " " + innerDims.margin + ")");
+
             this.dom.n2OuterGroup
                 .attr("height", outerDims.height)
                 .attr("width", outerDims.height)
@@ -311,7 +317,7 @@ class N2Diagram {
         }
     }
 
-    _createPartitionCells() {
+     _createPartitionCells() {
         let self = this; // For callbacks that change "this". Alternative to using .bind().
 
         let selection = this.dom.pTreeGroup.selectAll(".partition_group")
@@ -347,16 +353,10 @@ class N2Diagram {
 
         nodeEnter.append("rect")
             .attr("width", function (d) {
-                const w = d.prevDims.width * self.prevTransitCoords.model.x;
-                const sw2 = self.dims.size.partitionTree.strokeWidth * 2;
-
-                return (w > sw2)? w - sw2 : w;
+                return d.prevDims.width * self.prevTransitCoords.model.x;
             })
             .attr("height", function (d) {
-                const h = d.prevDims.height * self.prevTransitCoords.model.y;
-                const sw2 = self.dims.size.partitionTree.strokeWidth * 2;
-
-                return (h > sw2)? h - sw2 : h;
+                return d.prevDims.height * self.prevTransitCoords.model.y;
             })
             .attr("id", function (d) {
                 return d.absPathName.replace(/[\.:]/g, '_');
@@ -368,10 +368,9 @@ class N2Diagram {
             .attr("dy", ".35em")
             .attr("transform", function (d) {
                 let anchorX = d.prevDims.width * self.prevTransitCoords.model.x -
-                    self.layout.size.rightTextMargin - self.dims.size.partitionTree.strokeWidth;
+                    self.layout.size.rightTextMargin;
                 return "translate(" + anchorX + " " +
-                    (d.prevDims.height * self.prevTransitCoords.model.y / 2 -
-                    self.dims.size.partitionTree.strokeWidth) + ")";
+                    (d.prevDims.height * self.prevTransitCoords.model.y / 2) + ")";
             })
             .style("opacity", function (d) {
                 if (d.depth < self.zoomedElement.depth) return 0;
@@ -404,14 +403,10 @@ class N2Diagram {
 
         nodeUpdate.select("rect")
             .attr("width", function (d) {
-                const w = d.dims.width * self.transitCoords.model.x;
-                const sw2 = self.dims.size.partitionTree.strokeWidth * 2;
-                return (w > sw2)? w - sw2 : w;
+                return d.dims.width * self.transitCoords.model.x;
             })
             .attr("height", function (d) {
-                const h = d.dims.height * self.transitCoords.model.y;
-                const sw2 = self.dims.size.partitionTree.strokeWidth * 2;
-                return (h > sw2)? h - sw2 : h;
+                return d.dims.height * self.transitCoords.model.y;
             })
             .attr('rx', 12)
             .attr('ry', 12);
@@ -419,9 +414,9 @@ class N2Diagram {
         nodeUpdate.select("text")
             .attr("transform", function (d) {
                 let anchorX = d.dims.width * self.transitCoords.model.x -
-                    self.layout.size.rightTextMargin - self.dims.size.partitionTree.strokeWidth;
+                    self.layout.size.rightTextMargin;
                 return "translate(" + anchorX + " " + (d.dims.height *
-                    self.transitCoords.model.y / 2 - self.dims.size.partitionTree.strokeWidth) + ")";
+                    self.transitCoords.model.y / 2) + ")";
             })
             .style("opacity", function (d) {
                 if (d.depth < self.zoomedElement.depth) return 0;
@@ -443,24 +438,18 @@ class N2Diagram {
 
         nodeExit.select("rect")
             .attr("width", function (d) {
-                const w = d.dims.width * self.transitCoords.model.x;
-                const sw2 = self.dims.size.partitionTree.strokeWidth * 2;
-
-                return (w > sw2)? w - sw2 : w;
+                return d.dims.width * self.transitCoords.model.x;
             })
             .attr("height", function (d) {
-                const h = d.dims.height * self.transitCoords.model.y;
-                const sw2 = self.dims.size.partitionTree.strokeWidth * 2;
-
-                return (h > sw2)? h - sw2 : h;
+                return d.dims.height * self.transitCoords.model.y;
             });
 
         nodeExit.select("text")
             .attr("transform", function (d) {
                 let anchorX = d.dims.width * self.transitCoords.model.x -
-                    self.layout.size.rightTextMargin - self.dims.size.partitionTree.strokeWidth;
+                    self.layout.size.rightTextMargin;
                 return "translate(" + anchorX + "," + (d.dims.height *
-                    self.transitCoords.model.y / 2 - self.dims.size.partitionTree.strokeWidth) + ")";
+                    self.transitCoords.model.y / 2 ) + ")";
             })
             .style("opacity", 0);
     }
@@ -634,10 +623,7 @@ class N2Diagram {
     }
 
     clearHighlights() {
-        for (const varType of ['diag', 'input', 'output']) {
-            this.dom.pTreeGroup.selectAll('.' + varType + 'Highlight')
-                .classed(varType + 'Highlight', false)
-        }
+       this.dom.highlightBar.selectAll('rect').remove();
     }
 
     clearArrows() {

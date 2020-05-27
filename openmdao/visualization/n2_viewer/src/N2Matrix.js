@@ -696,7 +696,6 @@ class N2Matrix {
 
                     this.cell(col, cell.row).highlight('source', 'input');
                 }
-
             }
         }
     }

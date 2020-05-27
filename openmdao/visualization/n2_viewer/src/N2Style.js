@@ -49,60 +49,48 @@ class N2Style {
         // Define as JSON first
         let newCssJson = {
             'rect': {
-                'stroke': N2Style.color.treeStroke
-            },
-            '#tree > g > rect': {
-                'stroke-width': 1,
+                'stroke': N2Style.color.treeStroke,
             },
             '#tree > g.unknown > rect': {
                 'fill': N2Style.color.unknownExplicit,
-                'stroke': N2Style.color.unknownExplicit,
                 'fill-opacity': '.8',
             },
             '#tree > g.unknown_implicit > rect': {
                 'fill': N2Style.color.unknownImplicit,
-                'stroke': N2Style.color.unknownImplicit,                
                 'fill-opacity': '.8',
             },
             '#tree > g.param > rect': {
                 'fill': N2Style.color.param,
-                'stroke': N2Style.color.param,
                 'fill-opacity': '.8',
             },
             '#tree > g.unconnected_param > rect': {
                 'fill': N2Style.color.unconnectedParam,
-                'stroke': N2Style.color.unconnectedParam,
                 'fill-opacity': '.8',
             },
             '#tree > g.subsystem > rect': {
                 'cursor': 'pointer',
                 'fill-opacity': '.8',
                 'fill': N2Style.color.group,
-                'stroke': N2Style.color.group
             },
             '#tree > g.component > rect': {
                 'cursor': 'pointer',
                 'fill-opacity': '.8',
                 'fill': N2Style.color.component,
-                'stroke': N2Style.color.component,
             },
             '#tree > g.param_group > rect': {
                 'cursor': 'pointer',
                 'fill-opacity': '.8',
                 'fill': N2Style.color.paramGroup,
-                'stroke': N2Style.color.paramGroup,
             },
             '#tree > g.unknown_group > rect': {
                 'cursor': 'pointer',
                 'fill-opacity': '.8',
                 'fill': N2Style.color.unknownGroup,
-                'stroke': N2Style.color.unknownGroup,
             },
             '#tree > g.minimized > rect': {
                 'cursor': 'pointer',
                 'fill-opacity': '.8',
                 'fill': N2Style.color.collapsed,
-                'stroke': N2Style.color.collapsed,
             },
             'text': {
                 //'dominant-baseline: middle',
@@ -238,7 +226,9 @@ N2Style.color = {
     'unconnectedParam': '#F42F0D',
     'highlightHovered': 'blue',
     'redArrow': 'salmon',
+    'input': 'salmon',
     'greenArrow': 'seagreen',
+    'output': 'seagreen'
 };
 
 Object.freeze(N2Style.color); // Make it the equivalent of a constant

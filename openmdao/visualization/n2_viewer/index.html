@@ -116,6 +116,9 @@
                             <rect id="solver-clip-rect" x="0" y="0" width="1200" height="600" />
                         </clipPath>
                     </defs>
+                    <g id='tree' clip-path='url(#partitionTreeClip)'></g>
+                    <g id='highlight-bar'></g>
+                    <g id='solver_tree' clip-path='url(#solverTreeClip)'></g>
                     <g id='n2outer'>
                         <g id='n2inner'>
                             <rect id='backgroundRect' class='background'></rect>
@@ -123,7 +126,6 @@
                             <g id='n2gridlines' clip-path='url(#n2MatrixClip)'></g>
                             <g id='n2componentBoxes' clip-path='url(#n2MatrixClip)'></g>
                             <g id='n2dots' clip-path='url(#n2MatrixClip)'></g>
-                            <g id='n2highlights'></g>
                             <g id='n2arrows'></g>
                         </g>
                         <g id='n2top' class='offgridLabel'></g>
@@ -131,8 +133,9 @@
                         <g id='n2right' class='offgridLabel'></g>
                         <g id='n2bottom' class='offgridLabel'></g>
                     </g>
-                    <g id='tree' clip-path='url(#partitionTreeClip)'></g>
-                    <g id='solver_tree' clip-path='url(#solverTreeClip)'></g>
+                    <g id='text-width-renderer' class='partition_group'>
+                        <text x='-200'></text>
+                    </g>
                 </svg>
                 <div id='n2-resizer-box' class='inactive-resizer-box'>
                     <p id='n2-resizer-handle' class='inactive-resizer-handle'></p>

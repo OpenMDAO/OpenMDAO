@@ -16,7 +16,6 @@ defaultDims = {
         'partitionTree': { // Dimensions of the tree on the left side of the diagram
             'width': 0,
             'height': _DEFAULT_N2_DIAGRAM_HEIGHT,
-            'strokeWidth': 1 // The stroke width around each of the nodes
         },
         'solverTree': { // Dimensions of the tree on the right side of the diagram
             'width': 0,

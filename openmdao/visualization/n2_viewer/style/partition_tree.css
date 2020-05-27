@@ -312,16 +312,13 @@ div.offgrid {
 }
 
 rect.diagHighlight {
-    fill: yellow !important;
-    stroke: brown !important;
+    fill: black !important;
 }
 
 rect.inputHighlight {
     fill: salmon !important;
-    stroke: red !important;
 }
 
 rect.outputHighlight {
     fill: seagreen !important;
-    stroke: lightgreen !important;
 }
