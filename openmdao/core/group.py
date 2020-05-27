@@ -27,6 +27,7 @@ from openmdao.utils.units import is_compatible, unit_conversion
 from openmdao.utils.mpi import MPI
 from openmdao.utils.coloring import Coloring, _STD_COLORING_FNAME
 import openmdao.utils.coloring as coloring_mod
+from openmdao.utils.options_dictionary import _undefined
 
 # regex to check for valid names.
 import re
@@ -50,6 +51,8 @@ class Group(System):
         List of local subgroups.
     _manual_connections : dict
         Dictionary of input_name: (output_name, src_indices) connections.
+    _group_inputs : dict
+        Mapping of promoted names to certain metadata (src_indices, units).
     _static_manual_connections : dict
         Dictionary that stores all explicit connections added outside of setup.
     _conn_abs_in2out : {'abs_in': 'abs_out'}
@@ -98,6 +101,7 @@ class Group(System):
         self._local_system_set = None
         self._subgroups_myproc = None
         self._manual_connections = {}
+        self._group_inputs = {}
         self._static_manual_connections = {}
         self._conn_abs_in2out = {}
         self._conn_discrete_in2out = {}
@@ -158,6 +162,30 @@ class Group(System):
             system hieararchy with attribute access
         """
         pass
+
+    def add_input(self, name, val=_undefined, units=None):
+        """
+        Specify metadata for a connected promoted inputs without a source.
+
+        Parameters
+        ----------
+        name : str
+            The name of the promoted inputs.
+        val : object
+            Value to use as default.
+        units : str or None
+            Specifies units to be assumed for the source.
+        """
+        if name in self._group_inputs:
+            simple_warning(f"{self.msginfo}: Adding group input '{name}' which "
+                           "overrides a previous input of the same name.")
+        meta = {}
+        if val is not _undefined:
+            meta['value'] = val
+        if units is not None:
+            meta['units'] = units
+        if meta:
+            self._group_inputs[name] = meta
 
     def _get_scope(self, excl_sub=None):
         """
@@ -593,6 +621,10 @@ class Group(System):
 
         allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
 
+        group_inputs = []
+        for n, meta in self._group_inputs.items():
+            meta['path'] = self.pathname  # used for error reporting
+
         for subsys in self._subsystems_myproc:
             if recurse:
                 subsys._setup_var_data(recurse)
@@ -638,6 +670,9 @@ class Group(System):
                     if prom_name not in allprocs_prom2abs_list[type_]:
                         allprocs_prom2abs_list[type_][prom_name] = []
                     allprocs_prom2abs_list[type_][prom_name].extend(sub_abs)
+                    if type_ == 'input' and isinstance(subsys, Group):
+                        if sub_prom in subsys._group_inputs:
+                            group_inputs.append((prom_name, subsys._group_inputs[sub_prom]))
 
         for prom_name, abs_list in allprocs_prom2abs_list['output'].items():
             if len(abs_list) > 1:
@@ -652,7 +687,7 @@ class Group(System):
                                                     mysub._full_comm.rank == 0)):
                 raw = (allprocs_abs_names, allprocs_discrete, allprocs_prom2abs_list,
                        allprocs_abs2prom, allprocs_abs2meta, self._has_output_scaling,
-                       self._has_resid_scaling)
+                       self._has_resid_scaling, group_inputs)
             else:
                 raw = (
                     {'input': [], 'output': []},
@@ -661,7 +696,8 @@ class Group(System):
                     {'input': {}, 'output': {}},
                     {},
                     False,
-                    False
+                    False,
+                    []
                 )
             gathered = self.comm.allgather(raw)
 
@@ -670,10 +706,13 @@ class Group(System):
                 allprocs_abs2prom[type_] = {}
                 allprocs_prom2abs_list[type_] = OrderedDict()
 
+            group_inputs = []
             for (myproc_abs_names, myproc_discrete, myproc_prom2abs_list, all_abs2prom,
-                 myproc_abs2meta, oscale, rscale) in gathered:
+                 myproc_abs2meta, oscale, rscale, ginputs) in gathered:
                 self._has_output_scaling |= oscale
                 self._has_resid_scaling |= rscale
+
+                group_inputs.extend(ginputs)
 
                 # Assemble in parallel allprocs_abs2meta
                 for n in myproc_abs2meta:
@@ -692,6 +731,35 @@ class Group(System):
                         if prom_name not in allprocs_prom2abs_list[type_]:
                             allprocs_prom2abs_list[type_][prom_name] = []
                         allprocs_prom2abs_list[type_][prom_name].extend(abs_names_list)
+
+        ginputs = self._group_inputs
+        for prom, meta in group_inputs:
+            if prom in ginputs:
+                # check for any conflicting src_indices, units, ...
+                old = ginputs[prom]
+
+                for n, val in meta.items():
+                    if n == 'path' or val is None:
+                        continue
+
+                    if n in old and old[n] is not None:
+                        if isinstance(val, np.ndarray) or isinstance(old[n], np.ndarray):
+                            eq = np.all(val == old[n])
+                        else:
+                            eq = val == old[n]
+
+                        if not eq:
+                            raise RuntimeError(f"Groups '{old['path']}' and '{meta['path']}' "
+                                               f"added the input '{prom}' with conflicting '{n}'.")
+                    old[n] = val
+            else:
+                ginputs[prom] = meta
+
+        if ginputs:
+            extra = set(ginputs).difference(self._var_allprocs_prom2abs_list['input'])
+            if extra:
+                raise RuntimeError(f"{self.msginfo}: The following group inputs could not be "
+                                   f"found: {sorted(extra)}.")
 
         if self._var_discrete['input'] or self._var_discrete['output']:
             self._discrete_inputs = _DictValues(self._var_discrete['input'])

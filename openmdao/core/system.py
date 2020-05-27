@@ -19,7 +19,7 @@ from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.vectors.vector import INT_DTYPE
 from openmdao.utils.mpi import MPI
-from openmdao.utils.options_dictionary import OptionsDictionary
+from openmdao.utils.options_dictionary import OptionsDictionary, _undefined
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.units import is_compatible, unit_conversion
 from openmdao.utils.variable_table import write_var_table
@@ -302,8 +302,6 @@ class System(object):
     _first_call_to_linearize : bool
         If True, this is the first call to _linearize.
     """
-
-    _undefined = object()
 
     def __init__(self, num_par_fd=1, **kwargs):
         """
@@ -4122,7 +4120,7 @@ class System(object):
             The value of the requested output/input/resid variable.  None if variable is not found.
         """
         discrete = distrib = False
-        val = System._undefined
+        val = _undefined
         typ = 'output' if abs_name in self._var_allprocs_abs2prom['output'] else 'input'
 
         try:
@@ -4143,7 +4141,7 @@ class System(object):
             elif abs_name in self._var_allprocs_discrete['input']:
                 pass  # non-local discrete input
             else:
-                return System._undefined
+                return _undefined
 
         if kind is None:
             kind = typ
@@ -4155,7 +4153,7 @@ class System(object):
 
         if get_remote and self.comm.size > 1:
             owner = self._owning_rank[abs_name]
-            loc_val = val if val is not System._undefined else np.zeros(0)
+            loc_val = val if val is not _undefined else np.zeros(0)
             if rank is None:   # bcast
                 if distrib:
                     idx = self._var_allprocs_abs2idx['nonlinear'][abs_name]
@@ -4193,7 +4191,7 @@ class System(object):
                         elif self.comm.rank == rank:
                             val = self.comm.recv(source=owner, tag=tag)
 
-        if not flat and val is not System._undefined and not discrete:
+        if not flat and val is not _undefined and not discrete:
             val.shape = meta['global_shape'] if get_remote and distrib else meta['shape']
 
         return val
