@@ -165,16 +165,16 @@ class Group(System):
 
     def add_input(self, name, val=_undefined, units=None):
         """
-        Specify metadata for a connected promoted inputs without a source.
+        Specify metadata for connected promoted inputs without a source.
 
         Parameters
         ----------
         name : str
             The name of the promoted inputs.
         val : object
-            Value to use as default.
+            Value for the auto_ivc source.
         units : str or None
-            Specifies units to be assumed for the source.
+            Units for the auto_ivc source.
         """
         if name in self._group_inputs:
             simple_warning(f"{self.msginfo}: Adding group input '{name}' which "
@@ -735,7 +735,7 @@ class Group(System):
         ginputs = self._group_inputs
         for prom, meta in group_inputs:
             if prom in ginputs:
-                # check for any conflicting src_indices, units, ...
+                # check for any conflicting units or values
                 old = ginputs[prom]
 
                 for n, val in meta.items():

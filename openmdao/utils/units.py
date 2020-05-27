@@ -1055,6 +1055,20 @@ def convert_units(val, old_units, new_units=None):
 
 
 def _has_val_mismatch(units1, val1, units2, val2):
+    """
+    Return True if values differ after unit conversion or if values differ when units are None.
+
+    Parameters
+    ----------
+    units1 : str or None
+        Units for first value.
+    val1 : float or ndarray
+        First value.
+    units2 : str or None
+        Units for second value.
+    val2 : float or ndarray
+        Second value.
+    """
     if units1 != units2:
         if units1 is None or units2 is None:
             return True
