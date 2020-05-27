@@ -875,3 +875,40 @@ def env_truthy(env_var):
         True if the specified environment variable is 'truthy'.
     """
     return os.environ.get(env_var, '0').lower() not in ('0', 'false', 'no', '')
+
+
+def common_subpath(pathnames):
+    """
+    Return the common dotted subpath found in all of the given dotted pathnames.
+
+    Parameters
+    ----------
+    pathnames : iter of str
+        Dotted pathnames of systems.
+
+    Returns
+    -------
+    str
+        Common dotted subpath.  Returns '' if no common subpath is found.
+    """
+    if len(pathnames) == 1:
+        return pathnames[0]
+
+    if pathnames:
+        npaths = len(pathnames)
+        splits = [p.split('.') for p in pathnames]
+        minlen = np.min([len(s) for s in splits])
+        for common_loc in range(minlen):
+            p0 = splits[0][common_loc]
+            for i in range(1, npaths):
+                if p0 != splits[i][common_loc]:
+                    break
+            else:
+                continue
+            break
+        else:
+            common_loc += 1
+
+        return '.'.join(splits[0][:common_loc])
+
+    return ''

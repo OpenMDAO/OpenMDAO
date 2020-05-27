@@ -22,7 +22,7 @@ from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import convert_neg, array_connection_compatible, \
     _flatten_src_indices
-from openmdao.utils.general_utils import ContainsAll, all_ancestors, simple_warning
+from openmdao.utils.general_utils import ContainsAll, all_ancestors, simple_warning, common_subpath
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch
 from openmdao.utils.mpi import MPI
 from openmdao.utils.coloring import Coloring, _STD_COLORING_FNAME
@@ -2503,13 +2503,12 @@ class Group(System):
         return graph
 
     def _resolve_connected_input_defaults(self):
-        # these are meta dict entries that cannot differ between inputs unless a default
-        # is specified from a corresponding group.add_input call
-        group_nodiff = ['value', 'units']
-
         conns = self._conn_global_abs_in2out
         abs2prom = self._var_allprocs_abs2prom['input']
 
+        # inproms is a dict where the keys are promoted input names, and the values
+        # are all of the absolute input names with that promoted name, which indicates
+        # that the inputs will be connected to a common auto_ivc source in a future version.
         inproms = defaultdict(list)
         for n in self._var_allprocs_abs_names['input']:
             if n not in conns:
@@ -2552,6 +2551,10 @@ class Group(System):
 
                     if errs:
                         inputs = list(sorted(tgts))
+                        grpname = common_subpath(inputs)
                         simple_warning(f"{self.msginfo}: The following inputs, {inputs} are "
                                        f"connected but the metadata entries {errs} differ and "
-                                       "have not been specified by Group.add_input.")
+                                       "have not been specified by Group.add_input.  This warning "
+                                       "will become an error in a future version.  To remove the "
+                                       f"abiguity, call {grpname}.add_input() and specify the "
+                                       f"{errs} arg(s).")

@@ -1827,7 +1827,7 @@ class TestGroupAddInput(unittest.TestCase):
                                             y={'value': 1.0, 'units': 'inch'}),
                                             promotes_inputs=['x'])
 
-        msg = "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'] are connected but the metadata entries ['units', 'value'] differ and have not been specified by Group.add_input."
+        msg = "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'] are connected but the metadata entries ['units', 'value'] differ and have not been specified by Group.add_input.  This warning will become an error in a future version.  To remove the abiguity, call par.add_input() and specify the ['units', 'value'] arg(s)."
         with assert_warning(UserWarning, msg):
            p.setup()
 
@@ -1839,7 +1839,7 @@ class TestGroupAddInput(unittest.TestCase):
         par.add_subsystem('C1', om.ExecComp('y = 3. * x', x=1.0), promotes_inputs=['x'])
         par.add_subsystem('C2', om.ExecComp('y = 5. * x', x=1.1), promotes_inputs=['x'])
 
-        msg = "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'] are connected but the metadata entries ['value'] differ and have not been specified by Group.add_input."
+        msg = "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'] are connected but the metadata entries ['value'] differ and have not been specified by Group.add_input.  This warning will become an error in a future version.  To remove the abiguity, call par.add_input() and specify the ['value'] arg(s)."
 
         with assert_warning(UserWarning, msg):
            p.setup()
