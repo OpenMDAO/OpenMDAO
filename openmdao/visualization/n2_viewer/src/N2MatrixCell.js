@@ -175,12 +175,56 @@ class N2VectorBase extends N2CellRenderer {
      * @param {Object} dims The cell spec to use while rendering.
      */
     render(svgGroup, dims) {
-        let d3Elem = d3.select(svgGroup)
-            .append("rect")
+        let d3Elem = d3.select(svgGroup).append('rect')
             .attr("class", this.className)
             .attr("id", this.id)
             .style("fill", this.color);
-        return this.update(svgGroup, dims, d3Elem)
+
+        return this.update(svgGroup, dims, d3Elem);
+    }
+}
+
+class N2Connector extends N2CellRenderer {
+    /**
+     * Invoke the superclass constructor with these values and "vMid" as a CSS class.
+     * @param {Object} dims Layout and dimensions for the current cell spec.
+     * @param {Object} prevDims Layout and dimensions for the previous cell spec.
+     * @param {string} color The color to render all shapes in.
+     */
+    constructor(color, id) {
+        super(color, "vMid", id);
+    }
+
+    genPath() { throw ("ERROR: N2Connector.genPath() called.") }
+
+    /**
+     * Select the element with D3 if not already done, attach a transition
+     * and resize the shape.
+     * @param svgGroup Reference to SVG <g> element associated with data.
+     * @param {Object} dims The cell spec to use while resizing/repositioning.
+     * @param {selection} [d3Elem = null ] The selection created in render().
+     */
+    update(svgGroup, dims, d3Elem = null) {
+        if (!d3Elem) d3Elem = d3.select(svgGroup).select("." + this.className)
+            .transition(sharedTransition);
+
+        let ret = d3Elem.attr('d', this.genPath());
+
+        return ret;
+    }
+
+    /** 
+     * Get the D3 selection for the appropriate group and append a filled rectangle.
+     * @param {Object} svgGroup Reference to SVG <g> element associated with data.
+     * @param {Object} dims The cell spec to use while rendering.
+     */
+    render(svgGroup, dims) {
+        let d3Elem = d3.select(svgGroup).append('path')
+            .attr("class", this.className)
+            .attr("id", this.id)
+            .style("fill", this.color);
+
+        return this.update(svgGroup, dims, d3Elem);
     }
 }
 
@@ -329,6 +373,39 @@ class N2VectorVectorCell extends N2VectorBase {
     }
 }
 
+class N2ConnectorUpper extends N2Connector {
+    constructor(color, id) {
+        super(color, id);
+    }
+
+    genPath() {
+        /*
+        const s = this.dims.size.width / 5;        
+        const p = `M${-s/2} ${-s*1.5} h${s} v${s} h${s} v${s} h-${s} v${s} h-${s} v-${s} h-${s} v-${s} h${s} z`;
+        */
+        const s = this.dims.size.width / 10;
+        // const p = `M${-5*s} ${-3*s} q${8*s} 0 ${8*s} ${8*s} h${-6*s} q0 ${-2*s} ${-2*s} ${-2*s} z`;
+        const p = `M${-5*s} ${-2*s} q${7*s} 0 ${7*s} ${7*s} h${-4*s} q0 ${-3*s} ${-3*s} ${-3*s} z`;
+        return p;
+    }
+}
+
+class N2ConnectorLower extends N2Connector {
+    constructor(color, id) {
+        super(color, id);
+    }
+
+    genPath() {
+        /*
+        const s = this.dims.size.width / 5;        
+        const p = `M${-s/2} ${-s*1.5} h${s} v${s} h${s} v${s} h-${s} v${s} h-${s} v-${s} h-${s} v-${s} h${s} z`;
+        */
+        const s = this.dims.size.width / 10;
+        const p = `M${-2*s} ${-5*s} q0 ${7*s} ${7*s} ${7*s} v${-4*s} q${-3*s} 0 ${-3*s} ${-3*s} z`;
+        return p;    
+    }
+}
+
 class N2ScalarGroupCell extends N2GroupBase {
     constructor(color, id) {
         super(color, id);
@@ -413,6 +490,22 @@ class N2MatrixCell {
     }
 
     /**
+     * Determine if this node is in the upper-right triangle of the matrix.
+     * @return {Boolean} True if column is greater than row.
+     */
+    inUpperTriangle() {
+        return (this.col > this.row);
+    }
+
+    /**
+     * Determine if this node is in the lower-left triangle of the matrix.
+     * @return {Boolean} True if row is greater than column.
+     */
+    inLowerTriangle() {
+        return (this.row > this.col);
+    }
+
+    /**
      * Select the mouseover callback depending on whether we"re on the diagonal.
      * TODO: Remove these globals
      */
@@ -488,11 +581,14 @@ class N2MatrixCell {
         // debugInfo("Total offscreen connections found: " + this.offScreen.total);
     }
 
-    /** Choose a renderer based on our SymbolType.
-     * @param {Object} dims Layout and dimensions for the current cell spec.
-     * @param {Object} prevDims Layout and dimensions for the previous cell spec.
-     */
+    /** Choose a renderer based on our SymbolType. */
     _newRenderer() {
+        if (this.color() == N2Style.color.connection) {
+            if (this.inUpperTriangle()) return new N2ConnectorUpper(this.color(), this.id);
+            
+            return new N2ConnectorLower(this.color(), this.id)
+        }
+
         switch (this.symbolType.name) {
             case "scalar":
                 return new N2ScalarCell(this.color(), this.id);
@@ -536,10 +632,6 @@ class N2MatrixCell {
         const treeId = obj.absPathName.replace(/[\.:]/g, '_');
         const treeNode = d3.select('rect#' + treeId);
 
-        /*        let className = 'diagHighlight';
-                if (direction == 'input') className = 'inputHighlight';
-                else if (direction == 'output') className = 'outputHighlight';
-                */
         let fill = treeNode.style('fill');
         if (direction == 'input') fill = N2Style.color.input;
         else if (direction == 'output') fill = N2Style.color.output;

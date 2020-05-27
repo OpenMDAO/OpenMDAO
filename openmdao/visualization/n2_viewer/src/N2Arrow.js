@@ -70,9 +70,10 @@ class N2BentArrow extends N2Arrow {
         let offsetAbsX = this.offsetAbsX;
         let offsetAbsY = this.offsetAbsY;
 
-        let offsetX = (this.start.col < this.end.col) ? offsetAbsX : -offsetAbsX; // Left-to-Right : Right-to-Left
-        this.pts.start.x = this.nodeSize.width * this.start.col + this.nodeSize.width * .5 + offsetX;
-        this.pts.mid.x = this.nodeSize.width * this.middle.col + this.nodeSize.width * .5;
+        this.offsetX = (this.start.col < this.end.col) ? offsetAbsX : -offsetAbsX; // Left-to-Right : Right-to-Left
+        this.pts.start.x = this.nodeSize.width * this.start.col + this.nodeSize.width * .5 + this.offsetX;
+        // this.pts.mid.x = this.nodeSize.width * this.middle.col + this.nodeSize.width * .5;
+        this.pts.mid.x = (this.offsetX > 0)? this.nodeSize.width * this.middle.col : this.nodeSize.width * (this.middle.col + 1);
         this.pts.end.x = this.nodeSize.width * this.end.col + this.nodeSize.width * .5;
 
         let offsetY = (this.start.row < this.end.row) ? -offsetAbsY : offsetAbsY; // Down : Up
@@ -86,19 +87,23 @@ class N2BentArrow extends N2Arrow {
      * and an arrow at the end-point.
      */
     draw() {
+        const dir = (this.offsetX > 0)? 1 : -1;
+        const s = this.nodeSize.width * .5 * dir;
+
         this.path = this.arrowsGrp.insert("path")
             .attr("class", "n2_hover_elements")
             .attr("d", "M" + this.pts.start.x + " " + this.pts.start.y +
                 " L" + this.pts.mid.x + " " + this.pts.mid.y +
+                ` q${s} 0 ${s} ${s}` +
                 " L" + this.pts.end.x + " " + this.pts.end.y)
             .attr("fill", "none")
             .style("stroke-width", this.width)
             .style("stroke", this.color);
-
+/*
         this.dotsGrp.append("circle")
             .attr("class", "n2_hover_elements")
-            .attr("cx", this.pts.mid.x)
-            .attr("cy", this.pts.mid.y)
+            .attr("cx", this.pts.mid.x + (this.nodeSize.width * .394 * dir))
+            .attr("cy", this.pts.mid.y + (this.nodeSize.height * .144 * dir))
             .attr("r", this.width * 1.0)
             .style("stroke-width", 0)
             .style("fill-opacity", 1)
@@ -106,13 +111,13 @@ class N2BentArrow extends N2Arrow {
 
         this.dotsGrp.append("circle")
             .attr("class", "n2_hover_elements")
-            .attr("cx", this.pts.mid.x)
-            .attr("cy", this.pts.mid.y)
+            .attr("cx", this.pts.mid.x + (this.nodeSize.width * .394 * dir))
+            .attr("cy", this.pts.mid.y + (this.nodeSize.height * .144 * dir))
             .attr("r", this.width * 1.0)
             .style("stroke-width", 0)
             .style("fill-opacity", .75)
             .style("fill", this.color);
-
+*/
         this.path.attr("marker-end", "url(#arrow)");
     }
 }
