@@ -4151,9 +4151,14 @@ class System(object):
             kind = typ
 
         if not discrete:
-            vec = self._vectors[kind][vec_name]
-            if abs_name in vec._views:
-                val = vec._views_flat[abs_name] if flat else vec._views[abs_name]
+            try:
+                vec = self._vectors[kind][vec_name]
+            except KeyError:
+                if abs_name in self._var_abs2meta:
+                    val = self._var_abs2meta[abs_name]['value']
+            else:
+                if abs_name in vec._views:
+                    val = vec._views_flat[abs_name] if flat else vec._views[abs_name]
 
         if get_remote and self.comm.size > 1:
             owner = self._owning_rank[abs_name]

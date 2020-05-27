@@ -21,6 +21,8 @@ from openmdao.utils.general_utils import warn_deprecation
 # pylint: disable=E0611, F0401
 from math import floor, pi
 
+import numpy as np
+
 
 ####################################
 # Class Definitions
@@ -1050,6 +1052,17 @@ def convert_units(val, old_units, new_units=None):
 
     (factor, offset) = old_unit.conversion_tuple_to(new_unit)
     return (val + offset) * factor
+
+
+def _has_val_mismatch(units1, val1, units2, val2):
+    if units1 != units2:
+        if units1 is None or units2 is None:
+            return True
+
+        # convert units
+        val1 = convert_units(val1, units1, new_units=units2)
+
+    return np.linalg.norm(val1 - val2) > 1e-10
 
 
 # Load in the default unit library

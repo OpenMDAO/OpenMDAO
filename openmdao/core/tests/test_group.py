@@ -1827,11 +1827,9 @@ class TestGroupAddInput(unittest.TestCase):
                                             y={'value': 1.0, 'units': 'inch'}),
                                             promotes_inputs=['x'])
 
-        with self.assertRaises(Exception) as cm:
+        msg = "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'] are connected but the metadata entries ['units', 'value'] differ and have not been specified by Group.add_input."
+        with assert_warning(UserWarning, msg):
            p.setup()
-
-        self.assertEqual(cm.exception.args[0],
-                         "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'] are connected but the metadata entries ['units'] differ and have not been specified by Group.add_input.")
 
     def test_missing_diff_vals(self):
         p = om.Problem()
@@ -1841,11 +1839,10 @@ class TestGroupAddInput(unittest.TestCase):
         par.add_subsystem('C1', om.ExecComp('y = 3. * x', x=1.0), promotes_inputs=['x'])
         par.add_subsystem('C2', om.ExecComp('y = 5. * x', x=1.1), promotes_inputs=['x'])
 
-        with self.assertRaises(Exception) as cm:
-           p.setup()
+        msg = "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'] are connected but the metadata entries ['value'] differ and have not been specified by Group.add_input."
 
-        self.assertEqual(cm.exception.args[0],
-                         "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'] are connected but the metadata entries ['value'] differ and have not been specified by Group.add_input.")
+        with assert_warning(UserWarning, msg):
+           p.setup()
 
     def test_conflicting_units(self):
         # multiple Group.add_input calls at same tree level with conflicting units args

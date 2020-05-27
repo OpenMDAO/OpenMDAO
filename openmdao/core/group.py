@@ -23,7 +23,7 @@ from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import convert_neg, array_connection_compatible, \
     _flatten_src_indices
 from openmdao.utils.general_utils import ContainsAll, all_ancestors, simple_warning
-from openmdao.utils.units import is_compatible, unit_conversion
+from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch
 from openmdao.utils.mpi import MPI
 from openmdao.utils.coloring import Coloring, _STD_COLORING_FNAME
 import openmdao.utils.coloring as coloring_mod
@@ -2507,33 +2507,33 @@ class Group(System):
         # is specified from a corresponding group.add_input call
         group_nodiff = ['value', 'units']
 
-        srcconns = defaultdict(list)
-        for tgt, src in self._conn_global_abs_in2out.items():
-            srcconns[src].append(tgt)
-
+        conns = self._conn_global_abs_in2out
         abs2prom = self._var_allprocs_abs2prom['input']
+
+        inproms = defaultdict(list)
+        for n in self._var_allprocs_abs_names['input']:
+            if n not in conns:
+                inproms[abs2prom[n]].append(n)
+
         all_abs2meta = self._var_allprocs_abs2meta
         abs2meta = self._var_abs2meta
-        discrete_outs = self._var_allprocs_discrete['output']
 
-        for src, tgts in srcconns.items():
-            if len(tgts) > 1 and src not in discrete_outs:
-                if src in abs2meta:
-                    smeta = abs2meta[src]
-                    sloc = True
+        for prom, tgts in inproms.items():
+            if len(tgts) > 1:
+                if prom in self._group_inputs:
+                    gmeta = self._group_inputs[prom]
                 else:
-                    smeta = all_abs2meta[tgt]
-                    sloc = False
+                    gmeta = ()
 
-                sunits = smeta['units'] if 'units' in smeta else None
-                sval = self._get_val(src, kind='output', get_remote=True, from_src=False)
+                tgt0 = tgts[0]
+                if tgt0 in abs2meta:  # var is local
+                    t0meta = abs2meta[tgt0]
+                else:
+                    t0meta = all_abs2meta[tgt0]
+                t0units = t0meta['units']
+                t0val = self._get_val(tgt0, kind='input', get_remote=True)
 
-                for tgt in tgts:
-                    prom = abs2prom[tgt]
-                    if prom in self._group_inputs:
-                        gmeta = self._group_inputs[prom]
-                    else:
-                        gmeta = ()
+                for tgt in tgts[1:]:
 
                     if tgt in abs2meta:  # var is local
                         tmeta = abs2meta[tgt]
@@ -2541,16 +2541,17 @@ class Group(System):
                         tmeta = all_abs2meta[tgt]
 
                     tunits = tmeta['units'] if 'units' in tmeta else None
-                    tval = self._get_val(tgt, kind='input', get_remote=True, from_src=False)
+                    tval = self._get_val(tgt, kind='input', get_remote=True)
 
                     errs = []
-                    if 'units' not in gmeta and sunits != tunits:
-                        errs.append('units')
-                    if 'value' not in gmeta and not np.all(sval == tval):
-                        errs.append('value')
+                    if _has_val_mismatch(tunits, tval, t0units, t0val):
+                        if 'units' not in gmeta and t0units != tunits:
+                            errs.append('units')
+                        if 'value' not in gmeta:
+                            errs.append('value')
 
                     if errs:
                         inputs = list(sorted(tgts))
-                        raise RuntimeError(f"{self.msginfo}: The following inputs, {inputs} are "
-                                           f"connected but the metadata entries {errs} differ and "
-                                           "have not been specified by Group.add_input.")
+                        simple_warning(f"{self.msginfo}: The following inputs, {inputs} are "
+                                       f"connected but the metadata entries {errs} differ and "
+                                       "have not been specified by Group.add_input.")
