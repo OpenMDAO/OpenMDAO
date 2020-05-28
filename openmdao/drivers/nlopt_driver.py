@@ -1,5 +1,6 @@
 """
 OpenMDAO Wrapper for the NLopt package of optimizers.
+
 """
 
 
@@ -18,7 +19,7 @@ from openmdao.utils.class_util import weak_method_wrapper
 from openmdao.utils.mpi import MPI
 
 
-# Optimizers in NLopt
+# All optimizers in NLopt and their corresponding package name
 optimizer_methods = { 'GN_DIRECT' : nlopt.GN_DIRECT,
                       'GN_DIRECT_L' : nlopt.GN_DIRECT_L,
                       'GN_DIRECT_L_RAND' : nlopt.GN_DIRECT_L_RAND,
@@ -56,7 +57,7 @@ optimizer_methods = { 'GN_DIRECT' : nlopt.GN_DIRECT,
                 
 _optimizers = set(optimizer_methods)
 
-# For 'basinhopping' and 'shgo' gradients are used only in the local minimization
+# Define subsets of optimizers that support different functions
 _gradient_optimizers = {'LD_MMA', 'LD_SLSQP', 'LD_LBFGS',
                         'LD_TNEWTON_PRECOND_RESTART', 'LD_TNEWTON_PRECOND',
                         'LD_TNEWTON_RESTART', 'LD_TNEWTON',
@@ -64,10 +65,9 @@ _gradient_optimizers = {'LD_MMA', 'LD_SLSQP', 'LD_LBFGS',
                         'AUGLAG_EQ', 'GD_STOGO', 'GD_STOGO_RAND'}
 _bounds_optimizers = _optimizers
 _constraint_optimizers = {'LD_SLSQP', 'LN_COBYLA', 'LD_MMA', 'LD_CCSAQ',
-                          'GN_ORIG_DIRECT', 'GN_ISRES'}
+                          'GN_ORIG_DIRECT', 'GN_ISRES'}  # These are all tested
 _constraint_grad_optimizers = _gradient_optimizers & _constraint_optimizers
 _eq_constraint_optimizers = {'LD_SLSQP', 'LN_COBYLA', 'GN_ISRES'}
-
 _global_optimizers = {'GN_DIRECT',
                       'GN_DIRECT_L',
                       'GN_DIRECT_L_RAND',
@@ -84,25 +84,12 @@ _global_optimizers = {'GN_DIRECT',
                       'GN_ISRES',
                       'GN_ESCH',}
 
-_all_optimizers = _optimizers | _global_optimizers
-
-_unsupported_optimizers = {}
-
 CITATIONS = """
-@article{Hwang_maud_2018
- author = {Hwang, John T. and Martins, Joaquim R.R.A.},
- title = "{A Computational Architecture for Coupling Heterogeneous
-          Numerical Models and Computing Coupled Derivatives}",
- journal = "{ACM Trans. Math. Softw.}",
- volume = {44},
- number = {4},
- month = jun,
- year = {2018},
- pages = {37:1--37:39},
- articleno = {37},
- numpages = {39},
- doi = {10.1145/3182393},
- publisher = {ACM},
+@article{johnson_nlopt
+ author = {Johnson, Steven G.},
+ title = "{The NLopt nonlinear-optimization package}",
+ url = {http://github.com/stevengj/nlopt},
+ }
 """
 
 
@@ -162,11 +149,11 @@ class NLoptDriver(Driver):
         # What we don't support
         self.supports['multiple_objectives'] = False
         self.supports['active_set'] = False
-        self.supports['integer_design_vars'] = False
+        self.supports['integer_design_vars'] = False  # TODO : add support for integer variables
         self.supports._read_only = True
 
         # The user places optimizer-specific settings in here.
-        self.opt_settings = OrderedDict()
+        self.opt_settings = OrderedDict()  # TODO : add opt_settings for each optimizer
 
         self.result = None
         self._grad_cache = None
@@ -175,7 +162,7 @@ class NLoptDriver(Driver):
         self._obj_and_nlcons = None
         self._dvlist = None
         self._lincongrad_cache = None
-        self.fail = False
+        self.fail = False  # TODO : add actual failure testing for the driver
         self.iter_count = 0
         self._exc_info = None
 
@@ -185,15 +172,13 @@ class NLoptDriver(Driver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        self.options.declare('optimizer', 'LD_SLSQP', values=_all_optimizers,
+        self.options.declare('optimizer', 'LD_SLSQP', values=_optimizers,
                              desc='Name of optimizer to use')
         self.options.declare('tol', 1.0e-6, lower=0.0,
                              desc='Tolerance for termination. For detailed '
                              'control, use solver-specific options.')
         self.options.declare('maxiter', 200, lower=0,
                              desc='Maximum number of iterations.')
-        self.options.declare('disp', True, types=bool,
-                             desc='Set to False to prevent printing of NLopt convergence messages')
 
     def _get_name(self):
         """
@@ -264,7 +249,7 @@ class NLoptDriver(Driver):
             nparam += param['size']
         x_init = np.empty(nparam)
         
-        # TODO : make it so this actually takes in an algo
+        # Initialize the NLopt problem with the method and number of design vars
         opt_prob = nlopt.opt(optimizer_methods[opt], int(nparam))
 
         # Initial Design Vars
@@ -275,6 +260,7 @@ class NLoptDriver(Driver):
         else:
             bounds = None
 
+        # Loop through all OpenMDAO design variables and process their bounds
         for name, meta in self._designvars.items():
             size = meta['size']
             x_init[i:i + size] = desvar_vals[name]
@@ -298,7 +284,8 @@ class NLoptDriver(Driver):
 
                     bounds.append((p_low, p_high))
 
-        # TODO : refactor this so the call to old_bound_to_new isn't needed
+        # TODO : refactor this so the call to old_bound_to_new isn't needed.
+        # Actually add the bounds to the optimization problem.
         if bounds is not None:
             from scipy.optimize._constraints import old_bound_to_new
             lower, upper = old_bound_to_new(bounds)  # tuple, tuple
@@ -312,6 +299,7 @@ class NLoptDriver(Driver):
         lincons = []  # list of linear constraints
         self._obj_and_nlcons = list(self._objs)
         
+        # Process and add constraints to the optimization problem.
         if opt in _constraint_optimizers:
             for name, meta in self._cons.items():
                 size = meta['global_size'] if meta['distributed'] else meta['size']
@@ -379,20 +367,21 @@ class NLoptDriver(Driver):
                                        "less than min allowed (%.1f%%)." %
                                        (self.msginfo, pct, info['min_improve_pct']))
 
-        # optimize
+        # Finalize the optimization problem setup and actually perform optimization
         try:
             if opt in _optimizers:
                 opt_prob.set_min_objective(self._objfunc)
                 opt_prob.set_ftol_rel(self.options['tol'])
                 opt_prob.set_maxeval(self.options['maxiter'])
-                # TODO : ensure that the optimal result is the
-                # last result run by the model
                 xopt = opt_prob.optimize(x_init)
+                # TODO : ensure that the optimal result is the
+                # last result run by the model. Unclear if this is always
+                # the case for all algos in NLopt
                 self.result = result = opt_prob.last_optimize_result()
                 
             else:
                 msg = 'Optimizer "{}" is not implemented yet. Choose from: {}'
-                raise NotImplementedError(msg.format(opt, _all_optimizers))
+                raise NotImplementedError(msg.format(opt, _optimizers))
                 
         # If an exception was swallowed in one of our callbacks, we want to raise it
         except Exception as msg:
