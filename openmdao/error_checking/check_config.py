@@ -296,8 +296,12 @@ def _has_val_mismatch(discretes, names, units, vals):
                 # convert units
                 v = convert_units(v, u, new_units=u0)
 
-            if np.linalg.norm(v - v0) > 1e-10:
-                return True
+            rtol = 1e-10
+            normv0 = np.linalg.norm(v0)
+            if normv0 == 0.:
+                return np.linalg.norm(v) > rtol
+            else:
+                return np.linalg.norm(v - v0) / normv0 > rtol
 
     return False
 
