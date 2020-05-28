@@ -195,7 +195,7 @@ class N2Connector extends N2CellRenderer {
         super(color, "vMid", id);
     }
 
-    genPath() { throw ("ERROR: N2Connector.genPath() called.") }
+    _transform(scale) { throw ("ERROR: N2Connector._transform() called.") }
 
     /**
      * Select the element with D3 if not already done, attach a transition
@@ -208,21 +208,24 @@ class N2Connector extends N2CellRenderer {
         if (!d3Elem) d3Elem = d3.select(svgGroup).select("." + this.className)
             .transition(sharedTransition);
 
-        let ret = d3Elem.attr('d', this.genPath());
+        let ret = d3Elem.attr("transform", this._transform(dims.size.width/10.0));
 
         return ret;
     }
 
     /** 
-     * Get the D3 selection for the appropriate group and append a filled rectangle.
+     * Get the D3 selection for the appropriate group and append a filled arrow.
      * @param {Object} svgGroup Reference to SVG <g> element associated with data.
      * @param {Object} dims The cell spec to use while rendering.
      */
     render(svgGroup, dims) {
-        let d3Elem = d3.select(svgGroup).append('path')
+        let d3Elem = d3.select(svgGroup).append('use')
             .attr("class", this.className)
             .attr("id", this.id)
-            .style("fill", this.color);
+            .style("fill", this.color)
+            .attr("x", -5)
+            .attr("y", -5)
+            .attr("xlink:href", "#matrix-connector")
 
         return this.update(svgGroup, dims, d3Elem);
     }
@@ -378,16 +381,8 @@ class N2ConnectorUpper extends N2Connector {
         super(color, id);
     }
 
-    genPath() {
-        /*
-        const s = this.dims.size.width / 5;        
-        const p = `M${-s/2} ${-s*1.5} h${s} v${s} h${s} v${s} h-${s} v${s} h-${s} v-${s} h-${s} v-${s} h${s} z`;
-        */
-        const s = this.dims.size.width / 10;
-        // const p = `M${-5*s} ${-3*s} q${8*s} 0 ${8*s} ${8*s} h${-6*s} q0 ${-2*s} ${-2*s} ${-2*s} z`;
-        const p = `M${-5*s} ${-2*s} q${7*s} 0 ${7*s} ${7*s} h${-4*s} q0 ${-3*s} ${-3*s} ${-3*s} z`;
-        return p;
-    }
+    /** Generate a string to use for the transform attribute */
+    _transform(scale) { return('scale(' + scale + ')'); }
 }
 
 class N2ConnectorLower extends N2Connector {
@@ -395,15 +390,8 @@ class N2ConnectorLower extends N2Connector {
         super(color, id);
     }
 
-    genPath() {
-        /*
-        const s = this.dims.size.width / 5;        
-        const p = `M${-s/2} ${-s*1.5} h${s} v${s} h${s} v${s} h-${s} v${s} h-${s} v-${s} h-${s} v-${s} h${s} z`;
-        */
-        const s = this.dims.size.width / 10;
-        const p = `M${-2*s} ${-5*s} q0 ${7*s} ${7*s} ${7*s} v${-4*s} q${-3*s} 0 ${-3*s} ${-3*s} z`;
-        return p;    
-    }
+    /** Generate a string to use for the transform attribute */
+    _transform(scale) { return('scale(' + scale + ') rotate(180)'); }
 }
 
 class N2ScalarGroupCell extends N2GroupBase {
@@ -585,7 +573,7 @@ class N2MatrixCell {
     _newRenderer() {
         if (this.color() == N2Style.color.connection) {
             if (this.inUpperTriangle()) return new N2ConnectorUpper(this.color(), this.id);
-            
+
             return new N2ConnectorLower(this.color(), this.id)
         }
 
