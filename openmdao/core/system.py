@@ -744,10 +744,6 @@ class System(object):
             except AttributeError:
                 pass
             else:
-                to_remove = [t for t, (s, _, _) in self._manual_connections.items()
-                             if s.startswith('_auto_ivc.')]
-                for t in to_remove:
-                    del self._manual_connections[t]
                 del self._auto_ivc
                 self._subsystems_allprocs = [s for s in self._subsystems_allprocs if s is not ivc]
 
