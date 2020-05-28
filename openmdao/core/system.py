@@ -539,7 +539,7 @@ class System(object):
 
     def _get_initial_global(self, initial):
         """
-        Get initial values for _ext_num_vars, _ext_sizes.
+        Get initial values for our global starting variable index and vector offsets.
 
         Parameters
         ----------
