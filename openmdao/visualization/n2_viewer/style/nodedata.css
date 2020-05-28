@@ -94,3 +94,9 @@
     /* box-shadow: 1px 1px 1px 1px rgba(0, 0, 0, 0.2); */
     border-radius: 3px;
 }
+
+#node-info-pin:hover {
+    top: 4px;
+    right: 9px;
+    box-shadow: 1px 1px 1px 1px rgba(0, 0, 0, 0.2);
+}
