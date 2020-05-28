@@ -153,13 +153,17 @@ class _DiscreteVal(object):
             val = val.getval()
         self._val *= val
         return self
-
+    
+    def __eq__(self, val):
+        if isinstance(val, _DiscreteVal):
+            return self._val == val.getval()
+        return False
 
 class PathCompEx(om.ExplicitComponent):
 
     def setup(self):
-        self.add_discrete_input('x', val=self.pathname)
-        self.add_discrete_output('y', val=self.pathname + '/')
+        self.add_discrete_input('x', val='')
+        self.add_discrete_output('y', val='')
 
     def compute(self, inputs, outputs, discrete_inputs, discrete_outputs):
         discrete_outputs['y'] = discrete_inputs['x'] + self.pathname + '/'
@@ -191,6 +195,7 @@ class DiscreteTestCase(unittest.TestCase):
         model.connect('indep.x', 'comp.x')
 
         prob.setup()
+
         prob.run_model()
 
         assert_near_equal(prob['comp.y'], 2)
@@ -329,16 +334,14 @@ class DiscreteTestCase(unittest.TestCase):
     def test_list_inputs_outputs_promoted(self):
         model = om.Group()
 
-        indep = om.IndepVarComp()
-        indep.add_discrete_output('x', 11)
-
-        model.add_subsystem('indep', indep, promotes_outputs=['x'])
-
         model.add_subsystem('expl', ModCompEx(3), promotes_inputs=['x'])
         model.add_subsystem('impl', ModCompIm(3), promotes_inputs=['x'])
 
         prob = om.Problem(model)
         prob.setup()
+
+        prob['x'] = 11
+
         prob.run_model()
 
         #
@@ -381,8 +384,8 @@ class DiscreteTestCase(unittest.TestCase):
             "varname  value  prom_name",
             "-------  -----  ---------",
             "model",
-            "  indep",
-            "    x    11     x",
+            "  _auto_ivc",
+            "    v1    11     _auto_ivc.v1",
             "  expl",
             "    b    [20.]  expl.b",
             "    y    2      expl.y",
@@ -562,18 +565,19 @@ class DiscreteTestCase(unittest.TestCase):
 
         indep = model.add_subsystem('indep', om.IndepVarComp())
         indep.add_output('x', 1.0, ref=10.)
-        indep.add_discrete_output('N', 1)
 
-        comp = model.add_subsystem('comp', CompDiscWDerivsImplicit())
+        comp = model.add_subsystem('comp', CompDiscWDerivsImplicit(), promotes=['N'])
         sink = model.add_subsystem('sink', MixedCompDiscIn(1.0))
         model.connect('indep.x', 'comp.y2_actual')
-        model.connect('indep.N', 'comp.N')
         model.connect('comp.Nout', 'sink.x')
 
         model.add_design_var('indep.x')
         model.add_objective('comp.y2_command')
 
         prob.setup()
+
+        prob['N'] = 1
+
         prob.run_model()
 
         J = prob.compute_totals(return_format='array')
@@ -713,9 +717,6 @@ class DiscretePromTestCase(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        indep = model.add_subsystem('indep', om.IndepVarComp(), promotes_outputs=['x'])
-        indep.add_discrete_output('x', 'indep/')
-
         G = model.add_subsystem('G', om.ParallelGroup(), promotes_inputs=['x'])
 
         G1 = G.add_subsystem('G1', om.Group(), promotes_inputs=['x'], promotes_outputs=['y'])
@@ -735,12 +736,15 @@ class DiscretePromTestCase(unittest.TestCase):
         model.connect('G.G2.y', 'C4.x')
 
         prob.setup()
+
+        prob['x'] = 'indep/'
+
         prob.run_model()
 
         self.assertEqual(prob['C3.y'], 'indep/G.G1.C1_1/G.G1.C1_2/C3/')
         self.assertEqual(prob['C4.y'], 'indep/G.G2.C2_1/G.G2.C2_2/C4/')
 
-        prob['indep.x'] = 'foobar/'
+        prob['x'] = 'foobar/'
         prob.run_model()
 
         self.assertEqual(prob['C3.y'], 'foobar/G.G1.C1_1/G.G1.C1_2/C3/')
@@ -750,9 +754,6 @@ class DiscretePromTestCase(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        indep = model.add_subsystem('indep', om.IndepVarComp(), promotes_outputs=['x'])
-        indep.add_discrete_output('x', _DiscreteVal(19))
-
         G = model.add_subsystem('G', om.ParallelGroup(), promotes_inputs=['x'])
 
         G1 = G.add_subsystem('G1', om.Group(), promotes_inputs=['x'], promotes_outputs=['y'])
@@ -761,7 +762,7 @@ class DiscretePromTestCase(unittest.TestCase):
         G1.connect('C1_1.y', 'C1_2.x')
 
         G2 = G.add_subsystem('G2', om.Group(), promotes_inputs=['x'])
-        G2.add_subsystem('C2_1', ObjAdderCompEx(_DiscreteVal(1)), promotes_inputs=['x'])
+        G2.add_subsystem('C2_1', ObjAdderCompEx(_DiscreteVal(5)), promotes_inputs=['x'])
         G2.add_subsystem('C2_2', ObjAdderCompEx(_DiscreteVal(11)), promotes_outputs=['y'])
         G2.connect('C2_1.y', 'C2_2.x')
 
@@ -772,10 +773,13 @@ class DiscretePromTestCase(unittest.TestCase):
         model.connect('G.G2.y', 'C4.x')
 
         prob.setup()
+
+        prob['x'] =  _DiscreteVal(19)
+
         prob.run_model()
 
         self.assertEqual(prob['C3.y'].getval(), 40)
-        self.assertEqual(prob['C4.y'].getval(), 52)
+        self.assertEqual(prob['C4.y'].getval(), 56)
 
         def _var_iter(obj):
             name = obj['name']
@@ -792,7 +796,7 @@ class DiscretePromTestCase(unittest.TestCase):
         # add a test to see if discrete vars show up in n2
         data = _get_viewer_data(prob)
         findvars = [
-            'indep.x',
+            '_auto_ivc.v0',
             'G.G1.C1_1.x',
             'G.G1.C1_1.y',
             'G.G1.C1_2.x',
@@ -841,12 +845,14 @@ class DiscreteFeatureTestCase(unittest.TestCase):
         indeps = prob.model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
         indeps.add_output('r_m', 3.2, units="ft")
         indeps.add_output('chord', .3, units='ft')
-        indeps.add_discrete_output('num_blades', 2)
 
         prob.model.add_subsystem('SolidityComp', BladeSolidity(),
                                  promotes_inputs=['r_m', 'chord', 'num_blades'])
 
         prob.setup()
+
+        prob['num_blades'] = 2
+
         prob.run_model()
 
         # minimum value

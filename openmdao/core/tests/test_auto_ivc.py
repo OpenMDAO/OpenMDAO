@@ -36,6 +36,19 @@ def _test_func_name(func, num, param):
     return func.__name__ + '_' + '_'.join(args)
 
 
+class PathCompEx(om.ExplicitComponent):
+    def __init__(self, s=''):
+        super(PathCompEx, self).__init__()
+        self.s = s
+
+    def setup(self):
+        self.add_discrete_input('x', val=self.s)
+        self.add_discrete_output('y', val=self.s)
+
+    def compute(self, inputs, outputs, discrete_inputs, discrete_outputs):
+        discrete_outputs['y'] = discrete_inputs['x'] + self.pathname + '/'
+
+
 class SerialTests(unittest.TestCase):
     @parameterized.expand([(3, 'par.C1.x', True),
                            (3, 'par.C2.x', True),
@@ -171,6 +184,31 @@ class SerialTests(unittest.TestCase):
 
         p.run_model()
         np.testing.assert_allclose(p['sum.z'], inval1 * 3. + inval2 * 5.)
+
+    def test_discrete_fan_out(self):
+        p = om.Problem()
+        model = p.model
+        par = model.add_subsystem('par', om.ParallelGroup(), promotes=['x'])
+        par.add_subsystem('C1', PathCompEx(), promotes=['x'])
+        par.add_subsystem('C2', PathCompEx(), promotes=['x'])
+        p.setup()
+        p.run_model()
+        self.assertEqual(p.get_val('par.C1.y', get_remote=True), 'par.C1/')
+        self.assertEqual(p.get_val('par.C2.y', get_remote=True), 'par.C2/')
+
+    def test_discrete_fan_out(self):
+        p = om.Problem()
+        model = p.model
+        par = model.add_subsystem('par', om.ParallelGroup(), promotes=['x'])
+        par.add_subsystem('C1', PathCompEx('foo'), promotes=['x'])
+        par.add_subsystem('C2', PathCompEx('bar'), promotes=['x'])
+        
+        try:
+            p.setup()
+        except Exception as err:
+            self.assertEqual(str(err), "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'] are connected but the metadata entries ['value'] differ and have not been specified by Group.add_input.")
+        else:
+            self.fail("Exception expected.")
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
