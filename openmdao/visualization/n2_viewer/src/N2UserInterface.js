@@ -81,6 +81,10 @@ class NodeInfo {
         this.toolbarButton = d3.select('#info-button');
         this.hidden = true;
         this.pinned = false;
+
+        const self = this;
+        this.pinButton = d3.select('#node-info-pin')
+            .on('click', e => { self.unpin(); })
     }
 
     /** Make the info box visible if it's hidden */
@@ -103,9 +107,20 @@ class NodeInfo {
         else this.hide();
     }
 
-    pin() { this.pinned = true; }
-    unpin() { this.pinned = false; }
-    togglePin() { this.pinned = !this.pinned; }
+    pin() { 
+        this.pinned = true;
+        this.pinButton.attr('class', 'info-visible');
+    }
+    
+    unpin() {
+        this.pinned = false;
+        this.pinButton.attr('class', 'info-hidden');
+    }
+
+    togglePin() {
+        if (this.pinned) this.unpin();
+        else this.pin();
+    }
 
     _addPropertyRow(label, val, capitalize = false) {
         const newRow = this.tbody.append('tr');
