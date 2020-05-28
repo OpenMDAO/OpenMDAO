@@ -317,7 +317,7 @@ class N2Diagram {
         }
     }
 
-     _createPartitionCells() {
+    _createPartitionCells() {
         let self = this; // For callbacks that change "this". Alternative to using .bind().
 
         let selection = this.dom.pTreeGroup.selectAll(".partition_group")
@@ -336,7 +336,11 @@ class N2Diagram {
                     self.prevScales.model.y(d.prevDims.y) + ")";
             })
             .on("click", function (d) {
-                self.ui.leftClick(d);
+                if (self.ui.nodeInfoBox.hidden) { self.ui.leftClick(d); } // Zoom if not in info panel mode
+                else { // Pin/unpin the info panel
+                    self.ui.nodeInfoBox.togglePin();
+                    self.ui.nodeInfoBox.update(d3.event, d, d3.select(this).select('rect').style('fill'));
+                }
             })
             .on("contextmenu", function (d) {
                 self.ui.rightClick(d, this);
@@ -449,7 +453,7 @@ class N2Diagram {
                 let anchorX = d.dims.width * self.transitCoords.model.x -
                     self.layout.size.rightTextMargin;
                 return "translate(" + anchorX + "," + (d.dims.height *
-                    self.transitCoords.model.y / 2 ) + ")";
+                    self.transitCoords.model.y / 2) + ")";
             })
             .style("opacity", 0);
     }
@@ -478,7 +482,11 @@ class N2Diagram {
                     self.prevScales.solver.y(d.prevSolverDims.y) + ")";
             })
             .on("click", function (d) {
-                self.ui.leftClick(d);
+                if (self.ui.nodeInfoBox.hidden) { self.ui.leftClick(d); } // Zoom if not in info panel mode
+                else { // Pin/unpin the info panel
+                    self.ui.nodeInfoBox.togglePin();
+                    self.ui.nodeInfoBox.update(d3.event, d, d3.select(this).select('rect').style('fill'));
+                }
             })
             .on("contextmenu", function (d) {
                 self.ui.rightClick(d, this);
@@ -505,6 +513,8 @@ class N2Diagram {
                 }
             })
             .on("mousemove", function () {
+                self.ui.nodeInfoBox.move(d3.event);
+
                 if (self.model.abs2prom != undefined) {
                     self.dom.toolTip.style("top", (d3.event.pageY - 30) + "px")
                         .style("left", (d3.event.pageX + 5) + "px");
@@ -623,7 +633,7 @@ class N2Diagram {
     }
 
     clearHighlights() {
-       this.dom.highlightBar.selectAll('rect').remove();
+        this.dom.highlightBar.selectAll('rect').remove();
     }
 
     clearArrows() {
@@ -772,30 +782,36 @@ class N2Diagram {
     }
 
     /**
-     * When the mouse if left-clicked on a cell, change their CSS class
+     * When the mouse is left-clicked on a cell, change their CSS class
      * so they're not removed when the mouse moves out.
      * @param {N2MatrixCell} cell The cell the event occured on.
      */
     mouseClick(cell) {
-        let newClassName = "n2_hover_elements_" + cell.row + "_" + cell.col;
-        let selection = this.dom.n2OuterGroup.selectAll("." + newClassName);
-        if (selection.size() > 0) {
-            selection.remove();
-            const arrow = this.arrowCache.find(o => o.cell.row === cell.row && o.cell.col === cell.col);
-            const arrowIndex = this.arrowCache.indexOf(arrow);
-            this.arrowCache.splice(arrowIndex, 1);
-        }
-        else {
-            const arrow = {
-                'cell': cell,
-                'element': this.dom.n2OuterGroup
-                    .selectAll("path.n2_hover_elements, circle.n2_hover_elements"),
-                'className': newClassName
+        if (this.ui.nodeInfoBox.hidden) { // If not in info panel mode
+            let newClassName = "n2_hover_elements_" + cell.row + "_" + cell.col;
+            let selection = this.dom.n2OuterGroup.selectAll("." + newClassName);
+            if (selection.size() > 0) {
+                selection.remove();
+                const arrow = this.arrowCache.find(o => o.cell.row === cell.row && o.cell.col === cell.col);
+                const arrowIndex = this.arrowCache.indexOf(arrow);
+                this.arrowCache.splice(arrowIndex, 1);
             }
-            this.arrowCache.push(arrow);
-            this.dom.n2OuterGroup
-                .selectAll("path.n2_hover_elements, circle.n2_hover_elements")
-                .attr("class", newClassName);
+            else {
+                const arrow = {
+                    'cell': cell,
+                    'element': this.dom.n2OuterGroup
+                        .selectAll("path.n2_hover_elements, circle.n2_hover_elements"),
+                    'className': newClassName
+                }
+                this.arrowCache.push(arrow);
+                this.dom.n2OuterGroup
+                    .selectAll("path.n2_hover_elements, circle.n2_hover_elements")
+                    .attr("class", newClassName);
+            }
+        }
+        else { // Pin/unpin the info panel
+            this.ui.nodeInfoBox.togglePin();
+            this.ui.nodeInfoBox.update(d3.event, cell.obj, cell.color());
         }
     }
 

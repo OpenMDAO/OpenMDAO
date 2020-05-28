@@ -82,16 +82,14 @@ class N2BentArrow extends N2Arrow {
         this.pts.end.y = this.nodeSize.height * this.end.row + this.nodeSize.height * .5 + offsetY;
     }
 
-    /**
-     * Use SVG to draw the line segments, add a circle at the "middle",
-     * and an arrow at the end-point.
-     */
+    /** Use SVG to draw the line segments and an arrow at the end-point. */
     draw() {
         const dir = (this.offsetX > 0)? 1 : -1;
         const s = this.nodeSize.width * .5 * dir;
 
         this.path = this.arrowsGrp.insert("path")
             .attr("class", "n2_hover_elements")
+            .attr("marker-end", "url(#arrow)")
             .attr("d", "M" + this.pts.start.x + " " + this.pts.start.y +
                 " L" + this.pts.mid.x + " " + this.pts.mid.y +
                 ` q${s} 0 ${s} ${s}` +
@@ -99,26 +97,6 @@ class N2BentArrow extends N2Arrow {
             .attr("fill", "none")
             .style("stroke-width", this.width)
             .style("stroke", this.color);
-/*
-        this.dotsGrp.append("circle")
-            .attr("class", "n2_hover_elements")
-            .attr("cx", this.pts.mid.x + (this.nodeSize.width * .394 * dir))
-            .attr("cy", this.pts.mid.y + (this.nodeSize.height * .144 * dir))
-            .attr("r", this.width * 1.0)
-            .style("stroke-width", 0)
-            .style("fill-opacity", 1)
-            .style("fill", "black");
-
-        this.dotsGrp.append("circle")
-            .attr("class", "n2_hover_elements")
-            .attr("cx", this.pts.mid.x + (this.nodeSize.width * .394 * dir))
-            .attr("cy", this.pts.mid.y + (this.nodeSize.height * .144 * dir))
-            .attr("r", this.width * 1.0)
-            .style("stroke-width", 0)
-            .style("fill-opacity", .75)
-            .style("fill", this.color);
-*/
-        this.path.attr("marker-end", "url(#arrow)");
     }
 }
 
@@ -185,14 +163,13 @@ class N2OffGridArrow extends N2Arrow {
         return true;
     }
 
-    /**
-     * Put the SVG arrow on the screen and position the tooltip.
-     */
+    /** Put the SVG arrow on the screen and position the tooltip. */
     draw() {
         debugInfo('Adding offscreen ' + this.attribs.direction +
             ' arrow connected to ' + this.label.text);
 
         this.path = this.arrowsGrp.insert('path')
+            .attr('marker-end', 'url(#arrow)')
             .attr('class', 'n2_hover_elements')
             .attr('stroke-dasharray', '5,5')
             .attr('d', 'M' + this.pts.start.x + ' ' + this.pts.start.y +
@@ -200,8 +177,6 @@ class N2OffGridArrow extends N2Arrow {
             .attr('fill', 'none')
             .style('stroke-width', this.width)
             .style('stroke', this.color);
-
-        this.path.attr('marker-end', 'url(#arrow)');
 
         for (let pos in this.label.pts) {
             this.label.ref.style(pos, this.label.pts[pos] + 'px');

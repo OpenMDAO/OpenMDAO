@@ -79,6 +79,7 @@ class NodeInfo {
         this.tbody = this.table.select('tbody');
         this.toolbarButton = d3.select('#info-button');
         this.hidden = true;
+        this.pinned = false;
     }
 
     /** Make the info box visible if it's hidden */
@@ -101,6 +102,10 @@ class NodeInfo {
         else this.hide();
     }
 
+    pin() { this.pinned = true; }
+    unpin() { this.pinned = false; }
+    togglePin() { this.pinned = !this.pinned; }
+
     _addPropertyRow(label, val, capitalize = false) {
         const newRow = this.tbody.append('tr');
 
@@ -122,7 +127,9 @@ class NodeInfo {
      * @param {N2TreeNode} color The color to make the title bar.
      */
     update(event, obj, color = '#42926b') {
-        if (this.hidden) return;
+        if (this.hidden || this.pinned) return;
+
+        this.clear();
         // Put the name in the title
         this.table.select('thead th')
             .style('background-color', color)
@@ -158,7 +165,7 @@ class NodeInfo {
 
     /** Wipe the contents of the table body */
     clear() {
-        if (this.hidden) return;
+        if (this.hidden || this.pinned) return;
         this.table
             .attr('class', 'info-hidden')
             .style('width', 'auto')
@@ -172,7 +179,7 @@ class NodeInfo {
      * @param {Object} event The triggering event containing the position.
      */
     move(event) {
-        if (this.hidden) return;
+        if (this.hidden || this.pinned) return;
         const offset = 30;
 
         // Mouse is in left half of window, put box to right of mouse
