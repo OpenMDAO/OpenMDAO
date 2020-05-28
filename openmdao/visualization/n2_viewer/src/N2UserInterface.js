@@ -74,7 +74,8 @@ class NodeInfo {
         ];
 
         this.abs2prom = abs2prom;
-        this.table = d3.select('#node-info-container');
+        this.table = d3.select('#node-info-table');
+        this.container = d3.select('#node-info-container');
         this.thead = this.table.select('thead');
         this.tbody = this.table.select('tbody');
         this.toolbarButton = d3.select('#info-button');
@@ -160,16 +161,20 @@ class NodeInfo {
             .style('height', this.table.node().scrollHeight + 'px')
 
         this.move(event);
-        this.table.attr('class', 'info-visible');
+        this.container.attr('class', 'info-visible');
     }
 
     /** Wipe the contents of the table body */
     clear() {
         if (this.hidden || this.pinned) return;
-        this.table
+        this.container
             .attr('class', 'info-hidden')
             .style('width', 'auto')
-            .style('height', 'auto')
+            .style('height', 'auto');
+
+        this.table
+            .style('width', 'auto')
+            .style('height', 'auto');
 
         this.tbody.html('');
     }
@@ -184,24 +189,24 @@ class NodeInfo {
 
         // Mouse is in left half of window, put box to right of mouse
         if (event.clientX < window.innerWidth / 2) {
-            this.table.style('right', 'auto');
-            this.table.style('left', (event.clientX + offset) + 'px')
+            this.container.style('right', 'auto');
+            this.container.style('left', (event.clientX + offset) + 'px')
         }
         // Mouse is in right half of window, put box to left of mouse
         else {
-            this.table.style('left', 'auto');
-            this.table.style('right', (window.innerWidth - event.clientX + offset) + 'px')
+            this.container.style('left', 'auto');
+            this.container.style('right', (window.innerWidth - event.clientX + offset) + 'px')
         }
 
         // Mouse is in top half of window, put box below mouse
         if (event.clientY < window.innerHeight / 2) {
-            this.table.style('bottom', 'auto');
-            this.table.style('top', (event.clientY - offset) + 'px')
+            this.container.style('bottom', 'auto');
+            this.container.style('top', (event.clientY - offset) + 'px')
         }
         // Mouse is in bottom half of window, put box above mouse
         else {
-            this.table.style('top', 'auto');
-            this.table.style('bottom', (window.innerHeight - event.clientY - offset) + 'px')
+            this.container.style('top', 'auto');
+            this.container.style('bottom', (window.innerHeight - event.clientY - offset) + 'px')
         }
     }
 }
@@ -786,7 +791,7 @@ class N2UserInterface {
         testThis(this, 'N2UserInterface', 'toggleNodeData');
 
         const infoButton = d3.select('#info-button');
-        const nodeData = d3.select('#node-info-container');
+        const nodeData = d3.select('#node-info-table');
 
         if (nodeData.classed('info-hidden')) {
             nodeData.attr('class', 'info-visible');

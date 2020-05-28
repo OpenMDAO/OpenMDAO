@@ -164,7 +164,6 @@ class N2Diagram {
             'svgStyle': d3.select("#svgId style"),
             'toolTip': d3.select(".tool-tip"),
             'arrowMarker': d3.select("#arrow"),
-            'nodeInfo': d3.select('#node-data'),
             'n2OuterGroup': d3.select('g#n2outer'),
             'n2InnerGroup': d3.select('g#n2inner'),
             'pTreeGroup': d3.select('g#tree'),
@@ -813,10 +812,6 @@ class N2Diagram {
             this.ui.nodeInfoBox.togglePin();
             this.ui.nodeInfoBox.update(d3.event, cell.obj, cell.color());
         }
-    }
-
-    clearActiveNode() {
-        this.dom.nodeInfo.html('');
     }
 
     mouseClickAll(cell) {
