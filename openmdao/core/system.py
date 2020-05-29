@@ -633,8 +633,6 @@ class System(object):
         if self._coloring_info['dynamic'] or self._coloring_info['static'] is not None:
             self._coloring_info['coloring'] = None
 
-        recurse = True
-
         self.pathname = ''
         self.comm = comm
         self._relevant = None
@@ -658,17 +656,17 @@ class System(object):
         # For updating variable and connection data, setup needs to be performed only
         # in the current system, by gathering data from immediate subsystems,
         # and no recursion is necessary.
-        self._setup_var_data(recurse=recurse)
+        self._setup_var_data()
         self._setup_vec_names(mode, self._vec_names, self._vois)
-        self._setup_global_connections(recurse=recurse)
+        self._setup_global_connections()
         self._setup_relevance(mode, self._relevant)
-        self._setup_var_index_ranges(recurse=recurse)
-        self._setup_var_sizes(recurse=recurse)
+        self._setup_var_index_ranges()
+        self._setup_var_sizes()
 
         if self.pathname == '':
             self._resolve_connected_input_defaults()
 
-        self._setup_connections(recurse=recurse)
+        self._setup_connections()
 
     def _configure_check(self):
         """
@@ -691,23 +689,21 @@ class System(object):
             detect when you need to do this, but in some cases (e.g., complex step is used
             after a reconfiguration) you may need to set this to True.
         """
-        recurse = True
-
         root_vectors = self._get_root_vectors(force_alloc_complex=force_alloc_complex)
         self._setup_vectors(root_vectors)
 
         # Transfers do not require recursion, but they have to be set up after the vector setup.
-        self._setup_transfers(recurse=recurse)
+        self._setup_transfers()
 
         # Same situation with solvers, partials, and Jacobians.
         # If we're updating, we just need to re-run setup on these, but no recursion necessary.
-        self._setup_solvers(recurse=recurse)
-        self._setup_solver_print(recurse=recurse)
+        self._setup_solvers()
+        self._setup_solver_print()
         if self._use_derivatives:
-            self._setup_partials(recurse=recurse)
-            self._setup_jacobians(recurse=recurse)
+            self._setup_partials()
+            self._setup_jacobians()
 
-        self._setup_recording(recurse=recurse)
+        self._setup_recording()
 
         self.set_initial_values()
 
@@ -898,7 +894,7 @@ class System(object):
                     from openmdao.core.component import Component
                     for s in self.system_iter(recurse=True, typ=Component):
                         s.declare_partials('*', '*', method=self._coloring_info['method'])
-                self._setup_partials(recurse=True)
+                self._setup_partials()
 
         approx_scheme = self._get_approx_scheme(self._coloring_info['method'])
 
@@ -1220,7 +1216,7 @@ class System(object):
 
         return comm
 
-    def _setup_recording(self, recurse=True):
+    def _setup_recording(self):
         if self._rec_mgr._recorders:
             myinputs = myoutputs = myresiduals = []
 
@@ -1262,30 +1258,18 @@ class System(object):
 
             self._rec_mgr.startup(self)
 
-        # Recursion
-        if recurse:
-            for subsys in self._subsystems_myproc:
-                subsys._setup_recording(recurse)
+        for subsys in self._subsystems_myproc:
+            subsys._setup_recording()
 
-    def _setup_var_index_ranges(self, recurse=True):
+    def _setup_var_index_ranges(self):
         """
         Compute the division of variables by subsystem.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems (ignored).
         """
-        self._setup_var_index_maps(recurse=recurse)
+        self._setup_var_index_maps()
 
-    def _setup_var_data(self, recurse=True):
+    def _setup_var_data(self):
         """
         Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         self._var_allprocs_abs_names = {'input': [], 'output': []}
         self._var_abs_names = {'input': [], 'output': []}
@@ -1294,14 +1278,9 @@ class System(object):
         self._var_allprocs_abs2meta = {}
         self._var_abs2meta = {}
 
-    def _setup_var_index_maps(self, recurse=True):
+    def _setup_var_index_maps(self):
         """
         Compute maps from abs var names to their index among allprocs variables in this system.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         self._var_allprocs_abs2idx = abs2idx = {}
 
@@ -1316,19 +1295,12 @@ class System(object):
         if self._use_derivatives:
             abs2idx['nonlinear'] = abs2idx['linear']
 
-        # Recursion
-        if recurse:
-            for subsys in self._subsystems_myproc:
-                subsys._setup_var_index_maps(recurse)
+        for subsys in self._subsystems_myproc:
+            subsys._setup_var_index_maps()
 
-    def _setup_var_sizes(self, recurse=True):
+    def _setup_var_sizes(self):
         """
         Compute the arrays of local variable sizes for all variables/procs on this system.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         self._var_sizes = {}
         self._owned_sizes = None
@@ -1371,7 +1343,7 @@ class System(object):
                     global_shape = (global_size,)
                 mymeta['global_shape'] = global_shape
 
-    def _setup_global_connections(self, recurse=True, conns=None):
+    def _setup_global_connections(self, conns=None):
         """
         Compute dict of all connections between this system's inputs and outputs.
 
@@ -1383,8 +1355,6 @@ class System(object):
 
         Parameters
         ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         conns : dict
             Dictionary of connections passed down from parent group.
         """
@@ -1563,14 +1533,9 @@ class System(object):
         for s in self._subsystems_myproc:
             s._setup_relevance(mode, relevant)
 
-    def _setup_connections(self, recurse=True):
+    def _setup_connections(self):
         """
         Compute dict of all connections owned by this system.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         pass
 
@@ -1654,25 +1619,15 @@ class System(object):
             }
         return scale_factors
 
-    def _setup_transfers(self, recurse=True):
+    def _setup_transfers(self):
         """
         Compute all transfers that are owned by this system.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         pass
 
-    def _setup_solvers(self, recurse=True):
+    def _setup_solvers(self):
         """
         Perform setup in all solvers.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         # remove old solver error files if they exist
         if self.pathname == '':
@@ -1687,9 +1642,8 @@ class System(object):
         if self._linear_solver is not None:
             self._linear_solver._setup_solvers(self, 0)
 
-        if recurse:
-            for subsys in self._subsystems_myproc:
-                subsys._setup_solvers(recurse=recurse)
+        for subsys in self._subsystems_myproc:
+            subsys._setup_solvers()
 
     def _setup_jacobians(self, recurse=True):
         """

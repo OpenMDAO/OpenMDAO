@@ -102,14 +102,9 @@ class ExplicitComponent(Component):
                 yield wrt, offset, end, _full_slice
                 offset = end
 
-    def _setup_partials(self, recurse=True):
+    def _setup_partials(self):
         """
         Call setup_partials in components.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         super(ExplicitComponent, self)._setup_partials()
 
