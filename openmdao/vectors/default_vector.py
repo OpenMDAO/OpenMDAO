@@ -44,6 +44,7 @@ class DefaultVector(Vector):
         system = self._system()
         type_ = self._typ
         iproc = self._iproc
+        ncol = self._ncol
         root_vec = self._root_vector
 
         cplx_data = None
@@ -52,24 +53,29 @@ class DefaultVector(Vector):
             scaling['phys'] = {}
             scaling['norm'] = {}
 
-        sizes = system._var_sizes[self._name][type_]
-        ind1 = system._ext_sizes[self._name][type_][0]
-        ind2 = ind1 + np.sum(sizes[iproc, :])
+        slices = root_vec.get_slice_dict()
 
-        data = root_vec._data[ind1:ind2]
+        sizes = system._var_sizes[self._name][type_]
+        mynames = system._var_relevant_names[self._name][type_]
+        if mynames:
+            myslice = slice(slices[mynames[0]].start // ncol, slices[mynames[-1]].stop // ncol)
+        else:
+            myslice = slice(0, 0)
+
+        data = root_vec._data[myslice]
 
         # Extract view for complex storage too.
         if self._alloc_complex:
-            cplx_data = root_vec._cplx_data[ind1:ind2]
+            cplx_data = root_vec._cplx_data[myslice]
 
         if self._do_scaling:
             for typ in ('phys', 'norm'):
                 root_scale = root_vec._scaling[typ]
                 rs0 = root_scale[0]
                 if rs0 is None:
-                    scaling[typ] = (rs0, root_scale[1][ind1:ind2])
+                    scaling[typ] = (rs0, root_scale[1][myslice])
                 else:
-                    scaling[typ] = (rs0[ind1:ind2], root_scale[1][ind1:ind2])
+                    scaling[typ] = (rs0[myslice], root_scale[1][myslice])
 
         return data, cplx_data, scaling
 

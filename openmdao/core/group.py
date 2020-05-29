@@ -1441,56 +1441,6 @@ class Group(System):
                                 src_val = self._loc_subsys_map[src_sys_name]._discrete_outputs[src]
                             tgt_sys._discrete_inputs[tgt] = src_val
 
-    def _setup_global(self, ext_num_vars, ext_sizes):
-        """
-        Compute total number and total size of variables in systems before / after this system.
-
-        Parameters
-        ----------
-        ext_num_vars : {'input': (int, int), 'output': (int, int)}
-            Total number of allprocs variables in system before/after this one.
-        ext_sizes : {'input': (int, int), 'output': (int, int)}
-            Total size of local variables in system before/after this one.
-        """
-        super(Group, self)._setup_global(ext_num_vars, ext_sizes)
-
-        iproc = self.comm.rank
-        relnames = self._var_allprocs_relevant_names
-
-        for subsys in self._subsystems_myproc:
-            sub_ext_num_vars = {}
-            sub_ext_sizes = {}
-
-            if subsys._use_derivatives:
-                vec_names = subsys._lin_rel_vec_name_list
-            else:
-                vec_names = subsys._vec_names
-
-            for vec_name in vec_names:
-                subsystems_var_range = self._subsystems_var_range[vec_name]
-                sizes = self._var_sizes[vec_name]
-
-                sub_ext_num_vars[vec_name] = {}
-                sub_ext_sizes[vec_name] = {}
-
-                for type_ in ['input', 'output']:
-                    idx1, idx2 = subsystems_var_range[type_][subsys.name]
-
-                    sub_ext_num_vars[vec_name][type_] = (
-                        ext_num_vars[vec_name][type_][0] + idx1,
-                        ext_num_vars[vec_name][type_][1] + len(relnames[vec_name][type_]) - idx2,
-                    )
-                    sub_ext_sizes[vec_name][type_] = (
-                        ext_sizes[vec_name][type_][0] + np.sum(sizes[type_][iproc, :idx1]),
-                        ext_sizes[vec_name][type_][1] + np.sum(sizes[type_][iproc, idx2:]),
-                    )
-
-            if subsys._use_derivatives:
-                sub_ext_num_vars['nonlinear'] = sub_ext_num_vars['linear']
-                sub_ext_sizes['nonlinear'] = sub_ext_sizes['linear']
-
-            subsys._setup_global(sub_ext_num_vars, sub_ext_sizes)
-
     def _setup_transfers(self, recurse=True):
         """
         Compute all transfers that are owned by this system.
