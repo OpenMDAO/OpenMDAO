@@ -332,7 +332,6 @@ def set_pyoptsparse_opt(optname, fallback=True):
         try:
             opt = OPT(optname)
             OPTIMIZER = optname
-            print('optname, opt', optname, opt)
         except Exception:
             if fallback and optname != 'SLSQP':
                 try:

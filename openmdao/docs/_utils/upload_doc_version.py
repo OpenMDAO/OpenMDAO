@@ -9,15 +9,11 @@ def get_tag_info():
     """
     # using a pattern to only grab tags that are in version format "X.Y.Z"
     git_versions = subprocess.Popen(['git', 'tag', '-l', '*.*.*'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    print("git_versions", git_versions)
     cmd_out, cmd_err = git_versions.communicate()
-    print("cmd_out, cmd_err",cmd_out, cmd_err)
     cmd_out = cmd_out.decode('utf8')
-    print("cmd_out after decode", cmd_out)
     # take the output of git tag -l *.*.*, and split it from one string into a list.
     version_tags = cmd_out.split()
 
-    print("version_tags", version_tags)
     if not version_tags:
         raise Exception('No tags found in repository')
 
