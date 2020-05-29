@@ -460,41 +460,6 @@ class Group(System):
 
         super(Group, self)._configure_check()
 
-    def _check_child_reconf(self, subsys=None):
-        """
-        Check if any subsystem has reconfigured and if so, perform the necessary update setup.
-
-        Parameters
-        ----------
-        subsys : System or None
-            If not None, check only if the given subsystem has reconfigured.
-        """
-        if subsys is None:
-            # See if any local subsystem has reconfigured
-            for subsys in self._subgroups_myproc:
-                if subsys._reconfigured:
-                    reconf = 1
-                    break
-            else:
-                reconf = 0
-        else:
-            reconf = int(subsys._reconfigured) if subsys.name in self._loc_subsys_map else 0
-
-        # See if any subsystem on this or any other processor has configured
-        if self.comm.size > 1:
-            reconf = self.comm.allreduce(reconf) > 0
-
-        if reconf:
-            # Perform an update setup
-            with self._unscaled_context_all():
-                self.resetup('update')
-
-            # Reset the _reconfigured attribute to False
-            for subsys in self._subsystems_myproc:
-                subsys._reconfigured = False
-
-            self._reconfigured = True
-
     def _list_states(self):
         """
         Return list of all local states at and below this system.
@@ -1872,8 +1837,6 @@ class Group(System):
         """
         Compute outputs. The model is assumed to be in a scaled state.
         """
-        super(Group, self)._solve_nonlinear()
-
         name = self.pathname if self.pathname else 'root'
 
         with Recording(name + '._solve_nonlinear', self.iter_count, self):

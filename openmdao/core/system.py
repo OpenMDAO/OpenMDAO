@@ -238,15 +238,13 @@ class System(object):
         If true, we are outside of setup.
         In this case, add_input, add_output, and add_subsystem all add to the
         '_static' versions of the respective data structures.
-        These data structures are never reset during reconfiguration.
+        These data structures are never reset during setup.
     _static_subsystems_allprocs : [<System>, ...]
         List of subsystems that stores all subsystems added outside of setup.
     _static_design_vars : dict of dict
         Driver design variables added outside of setup.
     _static_responses : dict of dict
         Driver responses added outside of setup.
-    _reconfigured : bool
-        If True, this system has reconfigured, and the immediate parent should update.
     supports_multivecs : bool
         If True, this system overrides compute_multi_jacvec_product (if an ExplicitComponent),
         or solve_multi_linear/apply_multi_linear (if an ImplicitComponent).
@@ -432,7 +430,6 @@ class System(object):
         self._static_design_vars = OrderedDict()
         self._static_responses = OrderedDict()
 
-        self._reconfigured = False
         self.supports_multivecs = False
 
         self._relevant = None
@@ -500,55 +497,6 @@ class System(object):
         """
         pass
 
-    def _check_self_reconf(self):
-        """
-        Check if this systems wants to reconfigure and if so, perform the reconfiguration.
-        """
-        if self.reconfigure():
-            with self._unscaled_context_all():
-                # Backup input values
-                old_in = self._inputs
-                old_out = self._outputs
-
-                # Perform reconfiguration
-                self.resetup('reconf')
-
-                new_in = self._inputs
-                new_out = self._outputs
-
-                # Reload input and output values where possible
-                for vold, vnew in [(old_in, new_in), (old_out, new_out)]:
-                    for abs_name, old_view in vold._views_flat.items():
-                        if abs_name in vnew._views_flat:
-                            new_view = vnew._views_flat[abs_name]
-
-                            if len(old_view) == len(new_view):
-                                new_view[:] = old_view
-
-            self._reconfigured = True
-
-    def _check_child_reconf(self, subsys=None):
-        """
-        Check if any subsystem has reconfigured and if so, perform the necessary update setup.
-
-        Parameters
-        ----------
-        subsys : System or None
-            ignored
-        """
-        self._reconfigured = False
-
-    def reconfigure(self):
-        """
-        Perform reconfiguration.
-
-        Returns
-        -------
-        bool
-            If True, reconfiguration is to be performed.
-        """
-        return False
-
     def initialize(self):
         """
         Perform any one-time initialization run at instantiation.
@@ -561,14 +509,9 @@ class System(object):
         """
         pass
 
-    def _get_initial_global(self, initial):
+    def _get_initial_global(self):
         """
         Get initial values for _ext_num_vars, _ext_sizes.
-
-        Parameters
-        ----------
-        initial : bool
-            Whether we are reconfiguring - i.e., the model has been previously setup.
 
         Returns
         -------
@@ -577,35 +520,30 @@ class System(object):
         _ext_sizes : {'input': (int, int), 'output': (int, int)}
             Total size of allprocs variables in system before/after this one.
         """
-        if not initial:
-            return (self._ext_num_vars, self._ext_sizes)
-        else:
-            ext_num_vars = {}
-            ext_sizes = {}
+        ext_num_vars = {}
+        ext_sizes = {}
 
-            vec_names = self._lin_rel_vec_name_list if self._use_derivatives else self._vec_names
+        vec_names = self._lin_rel_vec_name_list if self._use_derivatives else self._vec_names
 
-            for vec_name in vec_names:
-                ext_num_vars[vec_name] = {}
-                ext_sizes[vec_name] = {}
-                for type_ in ['input', 'output']:
-                    ext_num_vars[vec_name][type_] = (0, 0)
-                    ext_sizes[vec_name][type_] = (0, 0)
+        for vec_name in vec_names:
+            ext_num_vars[vec_name] = {}
+            ext_sizes[vec_name] = {}
+            for type_ in ['input', 'output']:
+                ext_num_vars[vec_name][type_] = (0, 0)
+                ext_sizes[vec_name][type_] = (0, 0)
 
-            if self._use_derivatives:
-                ext_num_vars['nonlinear'] = ext_num_vars['linear']
-                ext_sizes['nonlinear'] = ext_sizes['linear']
+        if self._use_derivatives:
+            ext_num_vars['nonlinear'] = ext_num_vars['linear']
+            ext_sizes['nonlinear'] = ext_sizes['linear']
 
-            return ext_num_vars, ext_sizes
+        return ext_num_vars, ext_sizes
 
-    def _get_root_vectors(self, initial, force_alloc_complex=False):
+    def _get_root_vectors(self, force_alloc_complex=False):
         """
         Get the root vectors for the nonlinear and linear vectors for the model.
 
         Parameters
         ----------
-        initial : bool
-            Whether we are reconfiguring - i.e., whether the model has been previously setup.
         force_alloc_complex : bool
             Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
             detect when you need to do this, but in some cases (e.g., complex step is used
@@ -622,67 +560,60 @@ class System(object):
                                           'output': OrderedDict(),
                                           'residual': OrderedDict()}
 
-        if initial:
-            relevant = self._relevant
-            vec_names = self._rel_vec_name_list if self._use_derivatives else self._vec_names
-            vois = self._vois
-            abs2idx = self._var_allprocs_abs2idx
+        relevant = self._relevant
+        vec_names = self._rel_vec_name_list if self._use_derivatives else self._vec_names
+        vois = self._vois
+        abs2idx = self._var_allprocs_abs2idx
 
-            # Check for complex step to set vectors up appropriately.
-            # If any subsystem needs complex step, then we need to allocate it everywhere.
-            nl_alloc_complex = force_alloc_complex
-            for sub in self.system_iter(include_self=True, recurse=True):
-                nl_alloc_complex |= 'cs' in sub._approx_schemes
-                if nl_alloc_complex:
-                    break
-
-            # Linear vectors allocated complex only if subsolvers require derivatives.
+        # Check for complex step to set vectors up appropriately.
+        # If any subsystem needs complex step, then we need to allocate it everywhere.
+        nl_alloc_complex = force_alloc_complex
+        for sub in self.system_iter(include_self=True, recurse=True):
+            nl_alloc_complex |= 'cs' in sub._approx_schemes
             if nl_alloc_complex:
-                from openmdao.error_checking.check_config import check_allocate_complex_ln
-                ln_alloc_complex = check_allocate_complex_ln(self, force_alloc_complex)
-            else:
-                ln_alloc_complex = False
+                break
 
-            if self._has_input_scaling or self._has_output_scaling or self._has_resid_scaling:
-                self._scale_factors = self._compute_root_scale_factors()
-            else:
-                self._scale_factors = {}
-
-            if self._vector_class is None:
-                self._vector_class = self._local_vector_class
-
-            vector_class = self._vector_class
-
-            for vec_name in vec_names:
-                sizes = self._var_sizes[vec_name]['output']
-                ncol = 1
-                rel = None
-                if vec_name == 'nonlinear':
-                    alloc_complex = nl_alloc_complex
-                else:
-                    alloc_complex = ln_alloc_complex
-
-                    if vec_name != 'linear':
-                        voi = vois[vec_name]
-                        if voi['vectorize_derivs']:
-                            if 'size' in voi:
-                                ncol = voi['size']
-                            else:
-                                owner = self._owning_rank[vec_name]
-                                ncol = sizes[owner, abs2idx[vec_name][vec_name]]
-                        rdct, _ = relevant[vec_name]['@all']
-                        rel = rdct['output']
-
-                for key in ['input', 'output', 'residual']:
-                    root_vectors[key][vec_name] = vector_class(vec_name, key, self,
-                                                               alloc_complex=alloc_complex,
-                                                               ncol=ncol, relevant=rel)
+        # Linear vectors allocated complex only if subsolvers require derivatives.
+        if nl_alloc_complex:
+            from openmdao.error_checking.check_config import check_allocate_complex_ln
+            ln_alloc_complex = check_allocate_complex_ln(self, force_alloc_complex)
         else:
+            ln_alloc_complex = False
 
-            for key, vardict in self._vectors.items():
-                for vec_name, vec in vardict.items():
-                    root_vectors[key][vec_name] = vec._root_vector
+        if self._has_input_scaling or self._has_output_scaling or self._has_resid_scaling:
+            self._scale_factors = self._compute_root_scale_factors()
+        else:
+            self._scale_factors = {}
 
+        if self._vector_class is None:
+            self._vector_class = self._local_vector_class
+
+        vector_class = self._vector_class
+
+        for vec_name in vec_names:
+            sizes = self._var_sizes[vec_name]['output']
+            ncol = 1
+            rel = None
+            if vec_name == 'nonlinear':
+                alloc_complex = nl_alloc_complex
+            else:
+                alloc_complex = ln_alloc_complex
+
+                if vec_name != 'linear':
+                    voi = vois[vec_name]
+                    if voi['vectorize_derivs']:
+                        if 'size' in voi:
+                            ncol = voi['size']
+                        else:
+                            owner = self._owning_rank[vec_name]
+                            ncol = sizes[owner, abs2idx[vec_name][vec_name]]
+                    rdct, _ = relevant[vec_name]['@all']
+                    rel = rdct['output']
+
+            for key in ['input', 'output', 'residual']:
+                root_vectors[key][vec_name] = vector_class(vec_name, key, self,
+                                                           alloc_complex=alloc_complex,
+                                                           ncol=ncol, relevant=rel)
         return root_vectors
 
     def _get_approx_scheme(self, method):
@@ -709,39 +640,15 @@ class System(object):
             self._approx_schemes[method] = _supported_methods[method]()
         return self._approx_schemes[method]
 
-    def resetup(self, setup_mode='full'):
-        """
-        Public wrapper for _setup that reconfigures after an initial setup has been performed.
-
-        Parameters
-        ----------
-        setup_mode : str
-            Must be one of 'full', 'reconf', or 'update'.
-        """
-        self._setup(self.comm, setup_mode=setup_mode, mode=self._mode,
-                    distributed_vector_class=self._distributed_vector_class,
-                    local_vector_class=self._local_vector_class,
-                    use_derivatives=self._use_derivatives,
-                    prob_options=self._problem_options)
-        self._final_setup(self.comm, setup_mode=setup_mode,
-                          force_alloc_complex=self._outputs._alloc_complex)
-
-    def _setup(self, comm, setup_mode, mode, distributed_vector_class, local_vector_class,
+    def _setup(self, comm, mode, distributed_vector_class, local_vector_class,
                use_derivatives, prob_options=None):
         """
         Perform setup for this system and its descendant systems.
-
-        There are three modes of setup:
-        1. 'full': wipe everything and setup this and all descendant systems from scratch
-        2. 'reconf': don't wipe everything, but reconfigure this and all descendant systems
-        3. 'update': update after one or more immediate systems has done a 'reconf' or 'update'
 
         Parameters
         ----------
         comm : MPI.Comm or <FakeComm> or None
             The global communicator.
-        setup_mode : str
-            Must be one of 'full', 'reconf', or 'update'.
         mode : str
             Derivative direction, either 'fwd', or 'rev', or 'auto'
         distributed_vector_class : type
@@ -762,29 +669,19 @@ class System(object):
         if self._coloring_info['dynamic'] or self._coloring_info['static'] is not None:
             self._coloring_info['coloring'] = None
 
-        # 1. Full setup that must be called in the root system.
-        if setup_mode == 'full':
-            recurse = True
+        recurse = True
 
-            self.pathname = ''
-            self.comm = comm
-            self._relevant = None
-            self._distributed_vector_class = distributed_vector_class
-            self._local_vector_class = local_vector_class
-            self._use_derivatives = use_derivatives
-        # 2. Partial setup called in the system initiating the reconfiguration.
-        elif setup_mode == 'reconf':
-            recurse = True
-        # 3. Update-mode setup called in all ancestors of the system initiating the reconf.
-        elif setup_mode == 'update':
-            recurse = False
+        self.pathname = ''
+        self.comm = comm
+        self._relevant = None
+        self._distributed_vector_class = distributed_vector_class
+        self._local_vector_class = local_vector_class
+        self._use_derivatives = use_derivatives
 
         self._mode = mode
 
-        # If we're only updating and not recursing, processors don't need to be redistributed.
-        if recurse:
-            # Besides setting up the processors, this method also builds the model hierarchy.
-            self._setup_procs(self.pathname, comm, mode, self._problem_options)
+        # Besides setting up the processors, this method also builds the model hierarchy.
+        self._setup_procs(self.pathname, comm, mode, self._problem_options)
 
         # Recurse model from the bottom to the top for configuring.
         # Set static_mode to False in all subsystems because inputs & outputs may be created.
@@ -815,50 +712,28 @@ class System(object):
         """
         pass
 
-    def _final_setup(self, comm, setup_mode, force_alloc_complex=False):
+    def _final_setup(self, comm, force_alloc_complex=False):
         """
         Perform final setup for this system and its descendant systems.
 
         This part of setup is called automatically at the start of run_model or run_driver.
 
-        There are three modes of setup:
-        1. 'full': wipe everything and setup this and all descendant systems from scratch
-        2. 'reconf': don't wipe everything, but reconfigure this and all descendant systems
-        3. 'update': update after one or more immediate systems has done a 'reconf' or 'update'
-
         Parameters
         ----------
         comm : MPI.Comm or <FakeComm> or None
             The global communicator.
-        setup_mode : str
-            Must be one of 'full', 'reconf', or 'update'.
         force_alloc_complex : bool
             Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
             detect when you need to do this, but in some cases (e.g., complex step is used
             after a reconfiguration) you may need to set this to True.
         """
-        # 1. Full setup that must be called in the root system.
-        if setup_mode == 'full':
-            initial = True
-            recurse = True
-            resize = False
-        # 2. Partial setup called in the system initiating the reconfiguration.
-        elif setup_mode == 'reconf':
-            initial = False
-            recurse = True
-            resize = True
-        # 3. Update-mode setup called in all ancestors of the system initiating the reconf.
-        elif setup_mode == 'update':
-            initial = False
-            recurse = False
-            resize = False
+        recurse = True
 
         # For vector-related, setup, recursion is always necessary, even for updating.
-        # For reconfiguration setup, we resize the vectors once, only in the current system.
-        ext_num_vars, ext_sizes = self._get_initial_global(initial)
+        ext_num_vars, ext_sizes = self._get_initial_global()
         self._setup_global(ext_num_vars, ext_sizes)
-        root_vectors = self._get_root_vectors(initial, force_alloc_complex=force_alloc_complex)
-        self._setup_vectors(root_vectors, resize=resize)
+        root_vectors = self._get_root_vectors(force_alloc_complex=force_alloc_complex)
+        self._setup_vectors(root_vectors)
 
         # Transfers do not require recursion, but they have to be set up after the vector setup.
         self._setup_transfers(recurse=recurse)
@@ -873,9 +748,7 @@ class System(object):
 
         self._setup_recording(recurse=recurse)
 
-        # If full or reconf setup, reset this system's variables to initial values.
-        if setup_mode in ('full', 'reconf'):
-            self.set_initial_values()
+        self.set_initial_values()
 
         # Tell all subsystems to record their metadata if they have recorders attached
         for sub in self.system_iter(recurse=True, include_self=True):
@@ -1754,7 +1627,7 @@ class System(object):
         self._ext_num_vars = ext_num_vars
         self._ext_sizes = ext_sizes
 
-    def _setup_vectors(self, root_vectors, resize=False, alloc_complex=False):
+    def _setup_vectors(self, root_vectors, alloc_complex=False):
         """
         Compute all vectors for all vec names and assign excluded variables lists.
 
@@ -1762,8 +1635,6 @@ class System(object):
         ----------
         root_vectors : dict of dict of Vector
             Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
-        resize : bool
-            Whether to resize the root vectors - i.e, because this system is initiating a reconf.
         alloc_complex : bool
             Whether to allocate any imaginary storage to perform complex step. Default is False.
         """
@@ -1794,7 +1665,7 @@ class System(object):
             for kind in ['input', 'output', 'residual']:
                 rootvec = root_vectors[kind][vec_name]
                 vectors[kind][vec_name] = vector_class(
-                    vec_name, kind, self, rootvec, resize=resize,
+                    vec_name, kind, self, rootvec,
                     alloc_complex=vec_alloc_complex, ncol=rootvec._ncol)
 
         self._inputs = vectors['input']['nonlinear']
@@ -3791,14 +3662,6 @@ class System(object):
         Compute residuals. The model is assumed to be in a scaled state.
         """
         pass
-
-    def _solve_nonlinear(self):
-        """
-        Compute outputs. The model is assumed to be in a scaled state.
-
-        """
-        # Reconfigure if needed.
-        self._check_self_reconf()
 
     def check_config(self, logger):
         """

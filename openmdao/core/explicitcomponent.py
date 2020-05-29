@@ -253,8 +253,6 @@ class ExplicitComponent(Component):
         """
         Compute outputs. The model is assumed to be in a scaled state.
         """
-        super(ExplicitComponent, self)._solve_nonlinear()
-
         with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
             with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
                 self._residuals.set_const(0.0)

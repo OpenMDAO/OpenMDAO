@@ -32,30 +32,6 @@ class DefaultVector(Vector):
         size = np.sum(self._system()._var_sizes[self._name][self._typ][self._iproc, :])
         return np.zeros(size) if ncol == 1 else np.zeros((size, ncol))
 
-    def _update_root_data(self):
-        """
-        Resize the root data if necesary (i.e., due to reconfiguration).
-        """
-        system = self._system()
-        type_ = self._typ
-        vec_name = self._name
-        root_vec = self._root_vector
-
-        sys_offset, size_after_sys = system._ext_sizes[vec_name][type_]
-        sys_size = np.sum(system._var_sizes[vec_name][type_][self._iproc, :])
-        old_sizes_total = root_vec._data.size
-
-        root_vec._data = np.concatenate([
-            root_vec._data[:sys_offset],
-            np.zeros(sys_size),
-            root_vec._data[old_sizes_total - size_after_sys:],
-        ])
-
-        if self._alloc_complex and root_vec._cplx_data.size != root_vec._data.size:
-            root_vec._cplx_data = np.zeros(root_vec._data.size, dtype=complex)
-
-        root_vec._initialize_views()
-
     def _extract_root_data(self):
         """
         Extract views of arrays from root_vector.
