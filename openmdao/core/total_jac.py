@@ -53,10 +53,10 @@ class _TotalJacInfo(object):
     model : <System>
         The top level System of the System tree.
     of_meta : dict
-        Map of absoute output 'of' var name to tuples of the form
+        Map of absolute output 'of' var name to tuples of the form
         (row/column slice, indices, distrib).
     wrt_meta : dict
-        Map of absoute output 'wrt' var name to tuples of the form
+        Map of absolute output 'wrt' var name to tuples of the form
         (row/column slice, indices, distrib).
     output_list : list of str
         List of names of output variables for this total jacobian.  In fwd mode, outputs
@@ -99,6 +99,9 @@ class _TotalJacInfo(object):
         driver_scaling : bool
             If True (default), scale derivative values by the quantities specified when the desvars
             and responses were added. If False, leave them unscaled.
+        _distributed_resp : dict
+            Dict of constraints that are distributed outputs. Key is rank, values are
+            (local indices, local sizes).
         """
         driver = problem.driver
         prom2abs = problem.model._var_allprocs_prom2abs_list['output']
@@ -177,7 +180,7 @@ class _TotalJacInfo(object):
         self.output_meta = {'fwd': responses, 'rev': design_vars}
         self.input_vec = {'fwd': model._vectors['residual'], 'rev': model._vectors['output']}
         self.output_vec = {'fwd': model._vectors['output'], 'rev': model._vectors['residual']}
-        self._distributed_cons = driver._distributed_cons
+        self._distributed_resp = driver._distributed_resp
 
         abs2meta = model._var_allprocs_abs2meta
 
@@ -236,6 +239,7 @@ class _TotalJacInfo(object):
 
         # create scratch array for jac scatters
         self.jac_scratch = None
+
         if self.comm.size > 1:
             # need 2 scratch vectors of the same size here
             scratch = np.zeros(max(J.shape), dtype=J.dtype)
@@ -249,6 +253,7 @@ class _TotalJacInfo(object):
         if not approx:
             self.sol2jac_map = {}
             for mode in modes:
+
                 self.sol2jac_map[mode] = self._get_sol2jac_map(self.output_list[mode],
                                                                self.output_meta[mode],
                                                                abs2meta, mode)
@@ -284,9 +289,10 @@ class _TotalJacInfo(object):
     def _compute_jac_scatters(self, mode, rowcol_size):
         self.jac_scatters[mode] = jac_scatters = {}
         model = self.model
+        nproc = self.comm.size
 
-        if mode == 'fwd' and self.comm.size > 1 or (model._full_comm is not None and
-                                                    model._full_comm.size > 1):
+        if mode == 'fwd' and nproc > 1 or (model._full_comm is not None and
+                                           model._full_comm.size > 1):
             tgt_vec = PETSc.Vec().createWithArray(np.zeros(rowcol_size, dtype=float),
                                                   comm=self.comm)
             self.tgt_petsc[mode] = tgt_vec
@@ -312,8 +318,7 @@ class _TotalJacInfo(object):
                     if abs2meta[name]['distributed']:
                         srcinds = name2jinds[name]
                         myinds = srcinds + myoffset
-                        var_idx = abs2idx[name]
-                        for rank in range(self.comm.size):
+                        for rank in range(nproc):
                             if rank != myrank:
                                 offset = rowcol_size * rank   # J is same size on all procs
                                 full_j_srcs.append(myinds)
@@ -322,7 +327,7 @@ class _TotalJacInfo(object):
                         srcinds = name2jinds[name]
                         myinds = srcinds + myoffset
                         var_idx = abs2idx[name]
-                        for rank in range(self.comm.size):
+                        for rank in range(nproc):
                             if rank != myrank and sizes[rank, var_idx] == 0:
                                 offset = rowcol_size * rank   # J is same size on all procs
                                 full_j_srcs.append(myinds)
@@ -518,8 +523,7 @@ class _TotalJacInfo(object):
                         loc_i[loc] = irange[loc] - gstart
                 else:
                     loc_i[loc] = irange[loc]
-                    if not in_var_meta['distributed']:
-                        loc_i[loc] -= gstart
+                    loc_i[loc] -= gstart
 
                 loc_offset = offsets[iproc, in_var_idx] - offsets[iproc, 0]
                 loc_i[loc] += loc_offset
@@ -637,8 +641,6 @@ class _TotalJacInfo(object):
         jac_idxs = {}
         model = self.model
         fwd = mode == 'fwd'
-        missing = False
-        full_slice = slice(None)
         myproc = self.comm.rank
         name2jinds = {}  # map varname to jac row or col idxs that we must scatter to other procs
 
@@ -646,7 +648,6 @@ class _TotalJacInfo(object):
             inds = []
             jac_inds = []
             sizes = model._var_sizes[vecname]['output']
-            offsets = model._var_offsets[vecname]['output']
             ncols = model._vectors['output'][vecname]._ncol
             slices = model._vectors['output'][vecname].get_slice_dict()
             abs2idx = model._var_allprocs_abs2idx[vecname]
@@ -664,19 +665,21 @@ class _TotalJacInfo(object):
                 if name in abs2idx and name in slices:
                     var_idx = abs2idx[name]
                     slc = slices[name]
-                    if meta['distributed']:
-                        dist_offset = np.sum(sizes[:myproc, var_idx])
+                    if MPI and meta['distributed'] and model.comm.size > 1:
                         if indices is not None:
-                            dist_end = dist_offset + sizes[rank, var_idx]
-                            on_myproc = np.logical_and(dist_offset <= indices, indices < dist_end)
-                            if np.any(on_myproc):
-                                loc_inds = indices[on_myproc]
-                                inds.append(loc_inds - dist_offset)
-                                jac_inds.append(np.arange(jstart, loc_inds - jstart,
-                                                dtype=INT_DTYPE))
-                                if fwd:
-                                    name2jinds[name] = jac_inds[-1]
+                            if name in self._distributed_resp:
+                                local_idx, sizes_idx = self._distributed_resp[name]
+
+                            dist_offset = np.sum(sizes_idx[:myproc])
+                            full_inds = np.arange(slc.start / ncols, slc.stop / ncols,
+                                                  dtype=INT_DTYPE)
+                            inds.append(full_inds[local_idx])
+                            jac_inds.append(jstart + dist_offset +
+                                            np.arange(len(local_idx), dtype=INT_DTYPE))
+                            if fwd:
+                                name2jinds[name] = jac_inds[-1]
                         else:
+                            dist_offset = np.sum(sizes[:myproc, var_idx])
                             inds.append(np.arange(slc.start / ncols, slc.stop / ncols,
                                                   dtype=INT_DTYPE))
                             jac_inds.append(np.arange(jstart + dist_offset,
@@ -1430,7 +1433,9 @@ class _TotalJacInfo(object):
         totals = self.J_dict
         if return_format == 'flat_dict':
             for prom_out, output_name in zip(self.prom_of, of):
-                dist_con = self._distributed_cons.get(output_name)
+
+                dist_resp = self._distributed_resp.get(output_name)
+
                 for prom_in, input_name in zip(self.prom_wrt, wrt):
 
                     if output_name in wrt_meta and output_name != input_name:
@@ -1440,14 +1445,15 @@ class _TotalJacInfo(object):
 
                     totals[prom_out, prom_in][:] = _get_subjac(approx_jac[output_name, input_name],
                                                                prom_out, prom_in, of_idx, wrt_idx,
-                                                               dist_con, comm)
+                                                               dist_resp, comm)
 
         elif return_format in ('dict', 'array'):
             for prom_out, output_name in zip(self.prom_of, of):
                 tot = totals[prom_out]
-                for prom_in, input_name in zip(self.prom_wrt, wrt):
-                    dist_con = self._distributed_cons.get(output_name)
 
+                dist_resp = self._distributed_resp.get(output_name)
+
+                for prom_in, input_name in zip(self.prom_wrt, wrt):
                     if output_name in wrt_meta and output_name != input_name:
                         # Special case where we constrain an input, and need derivatives of that
                         # constraint wrt all other inputs.
@@ -1457,11 +1463,11 @@ class _TotalJacInfo(object):
                         rows, cols, data = tot[prom_in]['coo']
                         data[:] = _get_subjac(approx_jac[output_name, input_name],
                                               prom_out, prom_in, of_idx, wrt_idx,
-                                              dist_con, comm)[rows, cols]
+                                              dist_resp, comm)[rows, cols]
                     else:
                         tot[prom_in][:] = _get_subjac(approx_jac[output_name, input_name],
                                                       prom_out, prom_in, of_idx, wrt_idx,
-                                                      dist_con, comm)
+                                                      dist_resp, comm)
         else:
             msg = "Unsupported return format '%s." % return_format
             raise NotImplementedError(msg)
@@ -1644,7 +1650,7 @@ def _get_subjac(jac_meta, prom_out, prom_in, of_idx, wrt_idx, dist_resp, comm):
     if dist_resp:
         n_wrt = tot.shape[1]
         tot = tot.flatten()
-        idx, sizes = dist_resp
+        _, sizes = dist_resp
         n_of_global = np.sum(sizes)
 
         # Adjust sizes to account for wrt dimension in jacobian.

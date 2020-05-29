@@ -286,3 +286,27 @@ div.offgrid {
  	height: auto;
 	padding: 0px 20px;
 }
+
+#logo-container {
+    position: absolute;
+    width: 70px;
+    height: 60px;
+    border-radius: 35px;
+    background-color: white;
+    opacity: 30%;
+    bottom: 15px;
+    right: 15px;
+    z-index: 15;
+    pointer-events: none;
+}
+
+#company-logo {
+    position: absolute;
+    max-width: 50px;
+    height: 30px;
+    left: 50%;
+    margin-left: -25px;
+    top: 50%;
+    margin-top: -15px;
+    pointer-events: none;
+}

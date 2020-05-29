@@ -32,7 +32,7 @@ from openmdao.utils.general_utils import ContainsAll, pad_name, simple_warning, 
 from openmdao.utils.mpi import FakeComm
 from openmdao.utils.mpi import MPI
 from openmdao.utils.name_maps import prom_name2abs_name
-from openmdao.utils.options_dictionary import OptionsDictionary
+from openmdao.utils.options_dictionary import OptionsDictionary, _undefined
 from openmdao.utils.units import unit_conversion
 from openmdao.utils import coloring as coloring_mod
 from openmdao.utils.name_maps import abs_key2rel_key
@@ -57,7 +57,6 @@ ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
 MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])
 
 _contains_all = ContainsAll()
-_undefined = object()
 
 
 CITATION = """@article{openmdao_2019,
@@ -397,7 +396,7 @@ class Problem(object):
 
         val = self.model._get_val(name, units=units, indices=indices, get_remote=get_remote)
 
-        if val is System._undefined:
+        if val is _undefined:
             if get_remote:
                 raise KeyError('{}: Variable name "{}" not found.'.format(self.msginfo, name))
             else:
@@ -1345,6 +1344,8 @@ class Problem(object):
             'step_calc': step_calc,
         }
         approx = model._owns_approx_jac
+        approx_of = model._owns_approx_of
+        approx_wrt = model._owns_approx_wrt
         old_jac = model._jacobian
         old_subjacs = model._subjacs_info.copy()
 
@@ -1358,16 +1359,25 @@ class Problem(object):
         if not approx:
             model._jacobian = old_jac
             model._owns_approx_jac = False
+            model._owns_approx_of = approx_of
+            model._owns_approx_wrt = approx_wrt
             model._subjacs_info = old_subjacs
 
         # Assemble and Return all metrics.
         data = {}
         data[''] = {}
+        resp = self.driver._responses
         # TODO key should not be fwd when exact computed in rev mode or auto
         for key, val in Jcalc.items():
             data[''][key] = {}
             data[''][key]['J_fwd'] = val
             data[''][key]['J_fd'] = Jfd[key]
+
+            # Display whether indices were declared when response was added.
+            of = key[0]
+            if of in resp and resp[of]['indices'] is not None:
+                data[''][key]['indices'] = len(resp[of]['indices'])
+
         fd_args['method'] = method
 
         if out_stream == _DEFAULT_OUT_STREAM:
@@ -1877,6 +1887,11 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                 if rel_key in indep_key[sys_name] and fd_norm < abs_error_tol:
                     del derivative_data[sys_name][rel_key]
                     continue
+
+            # Informative output for responses that were declared with an index.
+            indices = derivative_info.get('indices')
+            if indices is not None:
+                of = '{} (index size: {})'.format(of, indices)
 
             if not suppress_output:
 

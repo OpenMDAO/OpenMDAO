@@ -3,12 +3,7 @@ import sys
 import os
 from contextlib import contextmanager
 from collections import OrderedDict, defaultdict
-
-# note: this is a Python 3.3 change, clean this up for OpenMDAO 3.x
-try:
-    from collections.abc import Iterable
-except ImportError:
-    from collections import Iterable
+from collections.abc import Iterable
 
 from fnmatch import fnmatchcase
 import sys
@@ -24,7 +19,7 @@ from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.vectors.vector import INT_DTYPE
 from openmdao.utils.mpi import MPI
-from openmdao.utils.options_dictionary import OptionsDictionary
+from openmdao.utils.options_dictionary import OptionsDictionary, _undefined
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.units import is_compatible, unit_conversion
 from openmdao.utils.variable_table import write_var_table
@@ -307,8 +302,6 @@ class System(object):
     _first_call_to_linearize : bool
         If True, this is the first call to _linearize.
     """
-
-    _undefined = object()
 
     def __init__(self, num_par_fd=1, **kwargs):
         """
@@ -810,6 +803,10 @@ class System(object):
         self._setup_relevance(mode, self._relevant)
         self._setup_var_index_ranges(recurse=recurse)
         self._setup_var_sizes(recurse=recurse)
+
+        if self.pathname == '':
+            self._resolve_connected_input_defaults()
+
         self._setup_connections(recurse=recurse)
 
     def _configure_check(self):
@@ -3100,16 +3097,24 @@ class System(object):
             sizes = self._var_sizes['nonlinear']['output']
             abs2idx = self._var_allprocs_abs2idx['nonlinear']
             for name in out:
-                if 'size' not in out[name]:
-                    if name in abs2idx:
-                        out[name]['size'] = sizes[self._owning_rank[name], abs2idx[name]]
-                    else:
-                        out[name]['size'] = 0  # discrete var, we don't know the size
+                response = out[name]
 
-                if name in abs2idx:
-                    meta = self._var_allprocs_abs2meta[name]
-                    out[name]['distributed'] = meta['distributed']
-                    out[name]['global_size'] = meta['global_size']
+                # Discrete vars
+                if name not in abs2idx:
+                    response['size'] = 0  # discrete var, we don't know the size
+                    continue
+
+                meta = self._var_allprocs_abs2meta[name]
+                response['distributed'] = meta['distributed']
+
+                if response['indices'] is not None:
+                    # Index defined in this response.
+                    response['global_size'] = len(response['indices']) if meta['distributed'] \
+                        else meta['global_size']
+
+                else:
+                    response['size'] = sizes[self._owning_rank[name], abs2idx[name]]
+                    response['global_size'] = meta['global_size']
 
         if recurse:
             for subsys in self._subsystems_myproc:
@@ -3585,9 +3590,9 @@ class System(object):
 
         # determine whether setup has been performed
         if self._outputs is not None:
-            setup = True
+            after_final_setup = True
         else:
-            setup = False
+            after_final_setup = False
 
         # Make a dict of variables. Makes it easier to work with in this method
         var_dict = OrderedDict()
@@ -3604,7 +3609,7 @@ class System(object):
             if not all_procs and self.comm.rank > 0:
                 return
 
-            if setup:
+            if after_final_setup:
                 meta = self._var_abs2meta
             else:
                 meta = self._var_rel2meta
@@ -3621,12 +3626,10 @@ class System(object):
                     if name not in var_dict:     # If not in the merged dict, add it
                         var_dict[name] = proc_vars[name]
                     else:
-                        # In there already, only need to deal with it if it is a distributed array
-                        # Checking to see if distributed depends on if it is an input or output
-                        if var_type == 'input':
-                            is_distributed = meta[name]['src_indices'] is not None
-                        else:
+                        try:
                             is_distributed = meta[name]['distributed']
+                        except KeyError:
+                            is_distributed = allprocs_meta[name]['distributed']
 
                         if is_distributed and name in allprocs_meta:
                             # TODO no support for > 1D arrays
@@ -3634,7 +3637,7 @@ class System(object):
 
                             global_shape = allprocs_meta[name]['global_shape']
 
-                            if meta[name]['shape'] != global_shape:
+                            if allprocs_meta[name]['shape'] != global_shape:
                                 # if the local shape is different than the global shape and the
                                 # global shape matches the concatenation of values from all procs,
                                 # then assume the concatenation, otherwise just use the value from
@@ -3651,7 +3654,7 @@ class System(object):
                                             if distrib[key][name].shape == global_shape:
                                                 var_dict[name][key] = distrib[key][name]
 
-        if setup:
+        if after_final_setup:
             inputs = var_type == 'input'
             outputs = not inputs
             var_list = self._get_vars_exec_order(inputs=inputs, outputs=outputs, variables=var_dict)
@@ -4121,7 +4124,7 @@ class System(object):
             The value of the requested output/input/resid variable.  None if variable is not found.
         """
         discrete = distrib = False
-        val = System._undefined
+        val = _undefined
         typ = 'output' if abs_name in self._var_allprocs_abs2prom['output'] else 'input'
 
         try:
@@ -4142,19 +4145,24 @@ class System(object):
             elif abs_name in self._var_allprocs_discrete['input']:
                 pass  # non-local discrete input
             else:
-                return System._undefined
+                return _undefined
 
         if kind is None:
             kind = typ
 
         if not discrete:
-            vec = self._vectors[kind][vec_name]
-            if abs_name in vec._views:
-                val = vec._views_flat[abs_name] if flat else vec._views[abs_name]
+            try:
+                vec = self._vectors[kind][vec_name]
+            except KeyError:
+                if abs_name in self._var_abs2meta:
+                    val = self._var_abs2meta[abs_name]['value']
+            else:
+                if abs_name in vec._views:
+                    val = vec._views_flat[abs_name] if flat else vec._views[abs_name]
 
         if get_remote and self.comm.size > 1:
             owner = self._owning_rank[abs_name]
-            loc_val = val if val is not System._undefined else np.zeros(0)
+            loc_val = val if val is not _undefined else np.zeros(0)
             if rank is None:   # bcast
                 if distrib:
                     idx = self._var_allprocs_abs2idx['nonlinear'][abs_name]
@@ -4192,7 +4200,7 @@ class System(object):
                         elif self.comm.rank == rank:
                             val = self.comm.recv(source=owner, tag=tag)
 
-        if not flat and val is not System._undefined and not discrete:
+        if not flat and val is not _undefined and not discrete:
             val.shape = meta['global_shape'] if get_remote and distrib else meta['shape']
 
         return val
@@ -4371,6 +4379,9 @@ class System(object):
             return meta[abs_name]
 
         raise KeyError('{}: Metadata for variable "{}" not found.'.format(self.msginfo, name))
+
+    def _resolve_connected_input_defaults(self):
+        pass
 
 
 def get_relevant_vars(connections, desvars, responses, mode):
