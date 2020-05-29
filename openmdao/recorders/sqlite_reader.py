@@ -467,6 +467,8 @@ class SqliteCaseReader(BaseCaseReader):
         solver_cases = self._solver_cases.list_cases()
         system_cases = self._system_cases.list_cases()
         driver_cases = self._driver_cases.list_cases()
+        if self._format_version >= 2:
+            problem_cases = self._problem_cases.list_cases()
         global_iters = self._global_iterations
 
         if not coord:
@@ -479,6 +481,8 @@ class SqliteCaseReader(BaseCaseReader):
             parent_case_counter = self._system_cases.get_case(coord).counter
         elif coord in solver_cases:
             parent_case_counter = self._solver_cases.get_case(coord).counter
+        elif coord in problem_cases:
+            parent_case_counter = self._problem_cases.get_case(coord).counter
         else:
             raise RuntimeError('Case not found for coordinate:', coord)
 
@@ -495,20 +499,13 @@ class SqliteCaseReader(BaseCaseReader):
                 case_coord = system_cases[row - 1]
             elif table == 'driver':
                 case_coord = driver_cases[row - 1]
+            elif table == 'problem':
+                case_coord = problem_cases[row - 1]
             else:
                 raise RuntimeError('Unexpected table name in global iterations:', table)
 
             if case_coord.startswith(coord):
                 cases.append(case_coord)
-
-        if not coord:
-            try:
-                problem_cases = self._problem_cases.list_cases()
-                if problem_cases:
-                    for case in problem_cases:
-                        cases.append(case)
-            except AttributeError:
-                pass
 
         return cases
 
