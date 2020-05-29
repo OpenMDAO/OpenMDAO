@@ -15,7 +15,10 @@ import traceback
 import numpy as np
 from scipy.sparse import coo_matrix
 
-from pyoptsparse import Optimization
+try:
+    from pyoptsparse import Optimization
+except ImportError:
+    Optimization = None
 
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.driver import Driver, RecordingDebugging
@@ -131,6 +134,9 @@ class pyOptSparseDriver(Driver):
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Driver options.
         """
+        if Optimization is None:
+            raise RuntimeError('pyOptSparseDriver is not available, pyOptsparse is not installed.')
+
         super(pyOptSparseDriver, self).__init__(**kwargs)
 
         # What we support
