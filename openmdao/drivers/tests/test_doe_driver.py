@@ -14,6 +14,7 @@ import numpy as np
 import openmdao.api as om
 
 from openmdao.test_suite.components.paraboloid import Paraboloid
+from openmdao.test_suite.components.paraboloid_distributed import DistParab
 from openmdao.test_suite.groups.parallel_groups import FanInGrouped
 
 from openmdao.utils.assert_utils import assert_near_equal
@@ -1803,6 +1804,74 @@ class TestParallelDOEFeature2(unittest.TestCase):
             cases = cr.list_cases('driver')
 
             values = []
+            for case in cases:
+                outputs = cr.get_case(case).outputs
+                values.append((outputs['iv.x1'], outputs['iv.x2'], outputs['c3.y']))
+
+            self.assertEqual("\n"+"\n".join(["iv.x1: %5.2f, iv.x2: %5.2f, c3.y: %6.2f" % (x1, x2, y) for x1, x2, y in values]),
+                self.expect_text)
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestParallelDistribDOE(unittest.TestCase):
+
+    N_PROCS = 4
+
+    def setUp(self):
+        self.startdir = os.getcwd()
+        self.tempdir = tempfile.mkdtemp(prefix='TestParallelDistribDOE-')
+        os.chdir(self.tempdir)
+
+    def tearDown(self):
+        os.chdir(self.startdir)
+        try:
+            shutil.rmtree(self.tempdir)
+        except OSError:
+            pass
+
+    def test_doe_distributed_var(self):
+        size = 7
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', np.ones((size, )))
+        ivc.add_output('y', np.ones((size, )))
+        ivc.add_output('a', -3.0 + 0.6 * np.arange(size))
+
+        model.add_subsystem('p', ivc, promotes=['*'])
+        model.add_subsystem("parab", DistParab(arr_size=size, deriv_type='dense'), promotes=['*'])
+        model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
+                                               f_sum=np.ones((size, )),
+                                               f_xy=np.ones((size, ))),
+                            promotes=['*'])
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_objective('f_sum', index=-1)
+
+        prob.driver = om.DOEDriver(om.FullFactorialGenerator(levels=3))
+        prob.driver.options['run_parallel'] = True
+        prob.driver.options['procs_per_model'] = 2
+
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        # check recorded cases from each case file
+        rank = prob.comm.rank
+        if rank == 0:
+            filename0 = "cases.sql_0" % rank
+            filename1 = "cases.sql_1" % rank
+            values = []
+
+            cr = om.CaseReader(filename0)
+            cases = cr.list_cases('driver')
+
             for case in cases:
                 outputs = cr.get_case(case).outputs
                 values.append((outputs['iv.x1'], outputs['iv.x2'], outputs['c3.y']))
