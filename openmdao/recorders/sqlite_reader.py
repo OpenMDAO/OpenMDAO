@@ -4,6 +4,8 @@ Definition of the SqliteCaseReader.
 import sqlite3
 from collections import OrderedDict
 
+from io import StringIO
+
 import sys
 import numpy as np
 
@@ -20,6 +22,7 @@ import pickle
 from json import loads as json_loads
 
 _DEFAULT_OUT_STREAM = object()
+
 
 class SqliteCaseReader(BaseCaseReader):
     """
@@ -306,9 +309,9 @@ class SqliteCaseReader(BaseCaseReader):
         if self._driver_cases.count() > 0:
             sources.extend(self._driver_cases.list_sources())
         if self._solver_cases.count() > 0:
-            sources.extend(self._solver_cases.list_sources())
+            sources.extend(self._solver_cases.list_sources(out_stream=None))
         if self._system_cases.count() > 0:
-            sources.extend(self._system_cases.list_sources())
+            sources.extend(self._system_cases.list_sources(out_stream=None))
         if self._format_version >= 2 and self._problem_cases.count() > 0:
             sources.extend(self._problem_cases.list_sources())
 
@@ -342,10 +345,10 @@ class SqliteCaseReader(BaseCaseReader):
         elif source == 'driver':
             if self._driver_cases.count() > 0:
                 case = self._driver_cases.get_case(0)
-        elif source in self._system_cases.list_sources():
+        elif source in self._system_cases.list_sources(out_stream=None):
             source_cases = self._system_cases.list_cases(source)
             case = self._system_cases.get_case(source_cases[0])
-        elif source in self._solver_cases.list_sources():
+        elif source in self._solver_cases.list_sources(out_stream=None):
             source_cases = self._solver_cases.list_cases(source)
             case = self._solver_cases.get_case(source_cases[0])
         else:
@@ -377,6 +380,9 @@ class SqliteCaseReader(BaseCaseReader):
         flat : bool, optional
             If False and there are child cases, then a nested ordered dictionary
             is returned rather than an iterator.
+        out_stream : file-like object
+            Where to send human readable output. Default is sys.stdout.
+            Set to None to suppress.
 
         Returns
         -------
@@ -390,7 +396,7 @@ class SqliteCaseReader(BaseCaseReader):
             else:
                 if self._driver_cases.count() > 0:
                     source = 'driver'
-                elif 'root' in self._system_cases.list_sources():
+                elif 'root' in self._system_cases.list_sources(out_stream=None):
                     source = 'root'
                 else:
                     # if there are no driver or model cases, then we need
@@ -426,9 +432,9 @@ class SqliteCaseReader(BaseCaseReader):
             # figure out which table has cases from the source
             if source == 'driver':
                 case_table = self._driver_cases
-            elif source in self._system_cases.list_sources():
+            elif source in self._system_cases.list_sources(out_stream=None):
                 case_table = self._system_cases
-            elif source in self._solver_cases.list_sources():
+            elif source in self._solver_cases.list_sources(out_stream=None):
                 case_table = self._solver_cases
             else:
                 case_table = None
@@ -970,9 +976,15 @@ class CaseTable(object):
         for case in self.cases(cache=True):
             pass
 
-    def list_sources(self):
+    def list_sources(self, out_stream=_DEFAULT_OUT_STREAM):
         """
         Get the list of sources that recorded data in this table.
+
+        Parameters
+        ----------
+        out_stream : file-like object
+            Where to send human readable output.
+            Set to None to suppress.
 
         Returns
         -------
@@ -994,7 +1006,17 @@ class CaseTable(object):
             else:
                 self._sources = set([self._get_source(case) for case in self.list_cases()])
 
-        return self._sources
+        if not out_stream:
+            return self._sources
+        else:
+            sources = self._sources
+            out_buffer = StringIO()
+            if out_stream is _DEFAULT_OUT_STREAM:
+                out_stream = sys.stdout
+
+            if out_stream:
+                for source in sources:
+                    out_buffer.write(source)
 
     def _get_source(self, iteration_coordinate):
         """
