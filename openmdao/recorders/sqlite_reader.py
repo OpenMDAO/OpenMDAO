@@ -4,12 +4,14 @@ Definition of the SqliteCaseReader.
 import sqlite3
 from collections import OrderedDict
 
+import sys
 import numpy as np
 
 from openmdao.recorders.base_case_reader import BaseCaseReader
 from openmdao.recorders.case import Case, PromAbsDict
 
 from openmdao.utils.general_utils import simple_warning
+from openmdao.utils.variable_table import write_source_table
 from openmdao.utils.record_util import check_valid_sqlite3_db, get_source_system
 
 from openmdao.recorders.sqlite_recorder import format_version
@@ -17,6 +19,7 @@ from openmdao.recorders.sqlite_recorder import format_version
 import pickle
 from json import loads as json_loads
 
+_DEFAULT_OUT_STREAM = object()
 
 class SqliteCaseReader(BaseCaseReader):
     """
@@ -360,7 +363,7 @@ class SqliteCaseReader(BaseCaseReader):
 
         return dct
 
-    def list_cases(self, source=None, recurse=True, flat=True):
+    def list_cases(self, source=None, recurse=True, flat=True, out_stream=_DEFAULT_OUT_STREAM):
         """
         Iterate over Driver, Solver and System cases in order.
 
@@ -402,7 +405,15 @@ class SqliteCaseReader(BaseCaseReader):
                             (source, type(source).__name__))
 
         if not source:
-            return self._list_cases_recurse_flat()
+            if not out_stream:
+                return self._list_cases_recurse_flat()
+            else:
+                cases = self._list_cases_recurse_flat()
+                if out_stream is _DEFAULT_OUT_STREAM:
+                    out_stream = sys.stdout
+
+                if out_stream:
+                    return write_source_table(self.source_cases_table, out_stream)
 
         elif source == 'problem':
             if self._format_version >= 2:
@@ -488,6 +499,8 @@ class SqliteCaseReader(BaseCaseReader):
 
         cases = []
 
+        self.source_cases_table = {'solver': [], 'system': [], 'driver': [], 'problem': []}
+
         # return all cases in the global iteration table that precede the given case
         # and whose coordinate is prefixed by the given coordinate
         for i in range(0, parent_case_counter):
@@ -503,6 +516,8 @@ class SqliteCaseReader(BaseCaseReader):
                 case_coord = problem_cases[row - 1]
             else:
                 raise RuntimeError('Unexpected table name in global iterations:', table)
+
+            self.source_cases_table[table].append(case_coord)
 
             if case_coord.startswith(coord):
                 cases.append(case_coord)
@@ -580,7 +595,7 @@ class SqliteCaseReader(BaseCaseReader):
         list or dict
             The cases identified by source
         """
-        case_ids = self.list_cases(source, recurse, flat)
+        case_ids = self.list_cases(source, recurse, flat, out_stream=None)
         if isinstance(case_ids, list):
             return [self.get_case(case_id) for case_id in case_ids]
         else:

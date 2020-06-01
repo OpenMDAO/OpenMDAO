@@ -162,6 +162,14 @@ def write_var_table(pathname, var_list, var_type, var_dict,
                             print_arrays)
     out_stream.write(2 * '\n')
 
+def write_source_table(source_dict, out_stream):
+
+    for key, value in source_dict.items():
+        if value:
+            out_stream.write('{}\n'.format(key))
+            for i in value:
+                out_stream.write('    {}\n'.format(i))
+
 
 def _write_variable(out_stream, row, column_names, var_dict, print_arrays):
     """
