@@ -3094,8 +3094,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         cases = cr.list_source_vars('driver', out_stream=stream)
         text = sorted(stream.getvalue().split('\n'), reverse=True)
         for i, line in enumerate(expected_cases):
-            if line:
-                self.assertEqual(text[i], line)
+            self.assertEqual(text[i], line)
 
 @use_tempdirs
 class TestFeatureSqliteReader(unittest.TestCase):
