@@ -81,7 +81,8 @@ class COOMatrix(Matrix):
             info, loc, src_indices, shape, factor = submats[key]
             irow, icol = loc
             val = info['value']
-            shape = val.shape
+            # _shape = val.shape
+            # assert _shape == shape
             idxs = None
 
             col_offset = row_offset = 0

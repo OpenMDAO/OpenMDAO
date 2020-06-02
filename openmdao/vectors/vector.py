@@ -580,9 +580,9 @@ class Vector(object):
             need to do this when temporarily disabling complex step for guess_nonlinear.
         """
         if active:
-            arr = self.asarray()
+            arr = self._data
         elif keep_real:
-            arr = self.asarray().real
+            arr = self._data.real
         else:
             arr = None
 
@@ -592,4 +592,4 @@ class Vector(object):
         self._under_complex_step = active
 
         if arr is not None:
-            self.set_val(arr)
+            self.set_const(arr)

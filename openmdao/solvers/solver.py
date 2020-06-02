@@ -54,15 +54,11 @@ class SolverInfo(object):
         nchar = len(last_string)
         self.prefix = self.prefix[:-nchar]
 
-    def append_solver(self, new_str='+  '):
+    def append_solver(self):
         """
         Add a new level for the main solver in a group.
-
-        Parameters
-        ----------
-        new_str : str
-            String to add to the stack.
         """
+        new_str = '+  '
         self.prefix += new_str
         self.stack.append(new_str)
 
@@ -70,13 +66,17 @@ class SolverInfo(object):
         """
         Add a new level for any sub-solver for your solver.
         """
-        self.append_solver('|  ')
+        new_str = '|  '
+        self.prefix += new_str
+        self.stack.append(new_str)
 
     def append_precon(self):
         """
         Add a new level for any preconditioner to a linear solver.
         """
-        self.append_solver('| precon:')
+        new_str = '| precon:'
+        self.prefix += new_str
+        self.stack.append(new_str)
 
     def save_cache(self):
         """
@@ -232,13 +232,15 @@ class Solver(object):
             return type(self).__name__
         return '{} in {}'.format(type(self).__name__, self._system().msginfo)
 
-    def _get_recording_iter(self):
+    @property
+    def _recording_iter(self):
         if self._problem_meta is None:
             raise RuntimeError(f"{self.msginfo}: Can't access recording_iter because "
                                "_setup_solvers has not been called.")
         return self._problem_meta['recording_iter']
 
-    def _get_solver_info(self):
+    @property
+    def _solver_info(self):
         if self._problem_meta is None:
             raise RuntimeError(f"{self.msginfo}: Can't access solver_info because _setup_solvers "
                                "has not been called.")
@@ -248,7 +250,7 @@ class Solver(object):
         """
         Return an empty generator of lin solvers using assembled jacs.
         """
-        for _ in ():
+        for i in ():
             yield
 
     def add_recorder(self, recorder):
@@ -294,7 +296,7 @@ class Solver(object):
             self.recording_options._parent_name = parent_name
             self.supports._parent_name = parent_name
 
-        if isinstance(self, LinearSolver) and not system._problem_meta['use_derivatives']:
+        if isinstance(self, LinearSolver) and not system._use_derivatives:
             return
 
         self._rec_mgr.startup(self)
@@ -356,7 +358,7 @@ class Solver(object):
         """
         if (self.options['iprint'] == 2 and self._system().comm.rank == 0):
 
-            prefix = self._get_solver_info().prefix
+            prefix = self._solver_info.prefix
             solver_name = self.SOLVER
 
             if prefix.endswith('precon:'):
@@ -408,7 +410,7 @@ class Solver(object):
 
         system = self._system()
         if system.comm.rank == 0 or os.environ.get('USE_PROC_FILES'):
-            prefix = self._get_solver_info().prefix + self.SOLVER
+            prefix = self._solver_info.prefix + self.SOLVER
 
             # Solver terminated early because a Nan in the norm doesn't satisfy the while-loop
             # conditionals.
@@ -635,11 +637,11 @@ class NonlinearSolver(Solver):
         """
         Run the apply_nonlinear method on the system.
         """
-        self._get_recording_iter().push(('_run_apply', 0))
+        self._recording_iter.push(('_run_apply', 0))
         try:
             self._system()._apply_nonlinear()
         finally:
-            self._get_recording_iter().pop()
+            self._recording_iter.pop()
 
     def _iter_get_norm(self):
         """
@@ -662,7 +664,7 @@ class NonlinearSolver(Solver):
                                 sorted(self._system()._var_allprocs_discrete['output'])))
 
     def _print_exc_debug_info(self):
-        coord = self._get_recording_iter().get_formatted_iteration_coordinate()
+        coord = self._recording_iter.get_formatted_iteration_coordinate()
 
         out_strs = ["\n# Inputs and outputs at start of iteration '%s':\n" % coord]
         for vec_type, views in self._err_cache.items():
@@ -789,7 +791,7 @@ class LinearSolver(Solver):
         """
         Run the apply_linear method on the system.
         """
-        self._get_recording_iter().push(('_run_apply', 0))
+        self._recording_iter.push(('_run_apply', 0))
 
         system = self._system()
         scope_out, scope_in = system._get_scope()
@@ -798,7 +800,7 @@ class LinearSolver(Solver):
             system._apply_linear(self._assembled_jac, self._vec_names, self._rel_systems,
                                  self._mode, scope_out, scope_in)
         finally:
-            self._get_recording_iter().pop()
+            self._recording_iter.pop()
 
 
 class BlockLinearSolver(LinearSolver):
@@ -825,7 +827,7 @@ class BlockLinearSolver(LinearSolver):
             depth of the current system (already incremented).
         """
         super(BlockLinearSolver, self)._setup_solvers(system, depth)
-        if system._problem_meta['use_derivatives']:
+        if system._use_derivatives:
             self._create_rhs_vecs()
 
     def _create_rhs_vecs(self):
@@ -833,17 +835,17 @@ class BlockLinearSolver(LinearSolver):
         system = self._system()
         for vec_name in system._lin_rel_vec_name_list:
             if self._mode == 'fwd':
-                rhs[vec_name] = system._vectors['residual'][vec_name].asarray().copy()
+                rhs[vec_name] = system._vectors['residual'][vec_name]._data.copy()
             else:
-                rhs[vec_name] = system._vectors['output'][vec_name].asarray().copy()
+                rhs[vec_name] = system._vectors['output'][vec_name]._data.copy()
 
     def _update_rhs_vecs(self):
         system = self._system()
         for vec_name in system._lin_rel_vec_name_list:
             if self._mode == 'fwd':
-                self._rhs_vecs[vec_name][:] = system._vectors['residual'][vec_name].asarray()
+                self._rhs_vecs[vec_name][:] = system._vectors['residual'][vec_name]._data
             else:
-                self._rhs_vecs[vec_name][:] = system._vectors['output'][vec_name].asarray()
+                self._rhs_vecs[vec_name][:] = system._vectors['output'][vec_name]._data
 
     def _set_complex_step_mode(self, active):
         """
@@ -903,7 +905,7 @@ class BlockLinearSolver(LinearSolver):
 
         norm = 0
         for vec_name in system._lin_rel_vec_name_list:
-            b_vecs[vec_name] -= self._rhs_vecs[vec_name]
+            b_vecs[vec_name]._data -= self._rhs_vecs[vec_name]
             norm += b_vecs[vec_name].get_norm()**2
 
         return norm ** 0.5

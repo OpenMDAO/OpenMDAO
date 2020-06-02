@@ -125,7 +125,7 @@ class NewtonSolver(NonlinearSolver):
         """
         Run the apply_nonlinear method on the system.
         """
-        self._get_recording_iter().push(('_run_apply', 0))
+        self._recording_iter.push(('_run_apply', 0))
 
         system = self._system()
 
@@ -136,7 +136,7 @@ class NewtonSolver(NonlinearSolver):
         try:
             system._apply_nonlinear()
         finally:
-            self._get_recording_iter().pop()
+            self._recording_iter.pop()
 
         # Enable local fd
         system._owns_approx_jac = approx_status
@@ -184,7 +184,7 @@ class NewtonSolver(NonlinearSolver):
         # to trigger reconvergence, so nudge the outputs slightly so that we always get at least
         # one iteration of Newton.
         if system.under_complex_step and self.options['cs_reconverge']:
-            system._outputs += np.linalg.norm(system._outputs.asarray()) * 1e-10
+            system._outputs._data += np.linalg.norm(system._outputs._data) * 1e-10
 
         # Execute guess_nonlinear if specified.
         system._guess_nonlinear()
@@ -193,12 +193,12 @@ class NewtonSolver(NonlinearSolver):
             if self.options['solve_subsystems'] and \
                (self._iter_count <= self.options['max_sub_solves']):
 
-                self._get_solver_info().append_solver()
+                self._solver_info.append_solver()
 
                 # should call the subsystems solve before computing the first residual
                 self._gs_iter()
 
-                self._get_solver_info().pop()
+                self._solver_info.pop()
 
         self._run_apply()
         norm = self._iter_get_norm()
@@ -211,7 +211,7 @@ class NewtonSolver(NonlinearSolver):
         Perform the operations in the iteration loop.
         """
         system = self._system()
-        self._get_solver_info().append_subsolver()
+        self._solver_info.append_subsolver()
         do_subsolve = self.options['solve_subsystems'] and \
             (self._iter_count < self.options['max_sub_solves'])
         do_sub_ln = self.linear_solver._linearize_children()
@@ -237,14 +237,14 @@ class NewtonSolver(NonlinearSolver):
         else:
             system._outputs += system._vectors['output']['linear']
 
-        self._get_solver_info().pop()
+        self._solver_info.pop()
 
         # Hybrid newton support.
         if do_subsolve:
             with Recording('Newton_subsolve', 0, self):
-                self._get_solver_info().append_solver()
+                self._solver_info.append_solver()
                 self._gs_iter()
-                self._get_solver_info().pop()
+                self._solver_info.pop()
 
         # Enable local fd
         system._owns_approx_jac = approx_status
@@ -274,7 +274,7 @@ class NewtonSolver(NonlinearSolver):
             pathname = self._system().pathname
             if pathname:
                 nchar = len(pathname)
-                prefix = self._get_solver_info().prefix
+                prefix = self._solver_info.prefix
                 header = prefix + "\n"
                 header += prefix + nchar * "=" + "\n"
                 header += prefix + pathname + "\n"

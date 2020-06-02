@@ -155,7 +155,7 @@ class Recording(object):
         self : object
             self
         """
-        self.recording_requester()._get_recording_iter().push((self.name, self.iter_count))
+        self.recording_requester()._recording_iter.push((self.name, self.iter_count))
         return self
 
     def __exit__(self, *args):
@@ -168,7 +168,7 @@ class Recording(object):
             Solver recording requires extra args.
         """
         requester = self.recording_requester()
-        if requester._get_recording_iter()._norec_refcount == 0:
+        if requester._recording_iter._norec_refcount == 0:
             if self._is_solver:
                 requester.record_iteration(abs=self.abs, rel=self.rel)
             else:
@@ -177,4 +177,4 @@ class Recording(object):
         # Enable the following line for stack debugging.
         # print_recording_iteration_stack()
 
-        requester._get_recording_iter().pop()
+        requester._recording_iter.pop()

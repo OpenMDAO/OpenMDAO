@@ -269,6 +269,8 @@ class AssembledJacobian(Jacobian):
             int_mtx = self._int_mtx
             ext_mtx = self._ext_mtx[system.pathname]
             subjacs = system._subjacs_info
+            sys_inputs = system._var_allprocs_abs2prom['input']
+            sys_outputs = system._var_allprocs_abs2prom['output']
 
             if isinstance(system, Component):
                 global_conns = _empty_dict
@@ -278,7 +280,9 @@ class AssembledJacobian(Jacobian):
             output_names = set(system._var_abs_names['output'])
             input_names = set(system._var_abs_names['input'])
 
-            rev_conns = None
+            rev_conns = defaultdict(list)
+            for tgt, src in global_conns.items():
+                rev_conns[src].append(tgt)
 
             # This is the level where the AssembledJacobian is slotted.
             # The of and wrt are the inputs and outputs that it sees, if they are in the subjacs.
@@ -288,28 +292,28 @@ class AssembledJacobian(Jacobian):
             iters_in_ext = []
 
             for abs_key in subjacs:
-                ofname, wrtname = abs_key
-                if wrtname in output_names:
-                    if abs_key in int_mtx._submats:
-                        iters.append(abs_key)
-                    else:
-                        # This happens when the src is an indepvarcomp that is
-                        # contained in the system.
-                        of, wrt = abs_key
-                        if rev_conns is None:
-                            rev_conns = defaultdict(list)
-                            for tgt, src in global_conns.items():
-                                rev_conns[src].append(tgt)
-                        if wrt in rev_conns:
-                            for tgt in rev_conns[wrt]:
-                                if (of, tgt) in int_mtx._submats:
-                                    iters.append(abs_key)
-                                    break
-                elif wrtname in input_names:
-                    if wrtname in global_conns:
-                        iters.append(abs_key)
-                    elif ext_mtx is not None:
-                        iters_in_ext.append(abs_key)
+                _, wrtname = abs_key
+                if wrtname in sys_outputs:
+                    if wrtname in output_names:
+                        if abs_key in int_mtx._submats:
+                            iters.append(abs_key)
+                        else:
+                            # This happens when the src is an indepvarcomp that is
+                            # contained in the system.
+                            of, wrt = abs_key
+                            if wrt in rev_conns:
+                                for tgt in rev_conns[wrt]:
+                                    if (of, tgt) in int_mtx._submats:
+                                        iters.append(abs_key)
+                                        break
+                elif wrtname in sys_inputs:
+                    if wrtname in input_names:  # wrt is an input
+                        if wrtname in global_conns:
+                            iters.append(abs_key)
+                        elif ext_mtx is not None:
+                            iters_in_ext.append(abs_key)
+                elif ext_mtx is not None and wrtname in sys_inputs:
+                    iters_in_ext.append(abs_key)
 
             self._subjac_iters[system.pathname] = subjac_iters = (iters, iters_in_ext)
 
@@ -394,16 +398,16 @@ class AssembledJacobian(Jacobian):
 
             if mode == 'fwd':
                 if d_outputs._names:
-                    d_residuals.iadd(int_mtx._prod(d_outputs.asarray(), mode))
+                    d_residuals._data += int_mtx._prod(d_outputs._data, mode)
                 if do_mask:
-                    d_residuals.iadd(ext_mtx._prod(d_inputs.asarray(), mode, mask=mask))
+                    d_residuals._data += ext_mtx._prod(d_inputs._data, mode, mask=mask)
 
             else:  # rev
-                dresids = d_residuals.asarray()
+                dresids = d_residuals._data
                 if d_outputs._names:
-                    d_outputs += int_mtx._prod(dresids, mode)
+                    d_outputs._data += int_mtx._prod(dresids, mode)
                 if do_mask:
-                    d_inputs.iadd(ext_mtx._prod(dresids, mode, mask=mask))
+                    d_inputs._data += ext_mtx._prod(dresids, mode, mask=mask)
 
     def set_complex_step_mode(self, active):
         """

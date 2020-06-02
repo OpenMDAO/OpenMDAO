@@ -315,18 +315,18 @@ class BroydenSolver(NonlinearSolver):
         # to trigger reconvergence, so nudge the outputs slightly so that we always get at least
         # one iteration of Broyden.
         if system.under_complex_step and self.options['cs_reconverge']:
-            system._outputs += np.linalg.norm(system._outputs.asarray()) * 1e-10
+            system._outputs._data += np.linalg.norm(system._outputs._data) * 1e-10
 
         # Start with initial states.
         self.xm = self.get_vector(system._outputs)
 
         with Recording('Broyden', 0, self):
-            self._get_solver_info().append_solver()
+            self._solver_info.append_solver()
 
             # should call the subsystems solve before computing the first residual
             self._gs_iter()
 
-            self._get_solver_info().pop()
+            self._solver_info.pop()
 
         self._run_apply()
         norm = self._iter_get_norm()
@@ -347,7 +347,7 @@ class BroydenSolver(NonlinearSolver):
         self.fxm = fxm = self.get_vector(self._system()._residuals)
         if not self._full_inverse:
             # Use full model residual for driving the main loop convergence.
-            fxm = self._system()._residuals.asarray()
+            fxm = self._system()._residuals._data
 
         return self.compute_norm(fxm)
 
@@ -381,14 +381,14 @@ class BroydenSolver(NonlinearSolver):
         delta_xm = -Gm.dot(fxm)
 
         if self.linesearch:
-            self._get_solver_info().append_subsolver()
+            self._solver_info.append_subsolver()
 
             self.set_states(self.xm)
             self.set_linear_vector(delta_xm)
             self.linesearch.solve()
             xm = self.get_vector(system._outputs)
 
-            self._get_solver_info().pop()
+            self._solver_info.pop()
 
         else:
             # Update the new states in the model.
@@ -397,9 +397,9 @@ class BroydenSolver(NonlinearSolver):
 
         # Run the model.
         with Recording('Broyden', 0, self):
-            self._get_solver_info().append_solver()
+            self._solver_info.append_solver()
             self._gs_iter()
-            self._get_solver_info().pop()
+            self._solver_info.pop()
 
         self._run_apply()
 
@@ -490,7 +490,7 @@ class BroydenSolver(NonlinearSolver):
             Array containing values of vector at desired states.
         """
         if self._full_inverse:
-            xm = vec.asarray().copy()
+            xm = vec._data.copy()
         else:
             states = self.options['state_vars']
             xm = self.xm.copy()
@@ -512,7 +512,7 @@ class BroydenSolver(NonlinearSolver):
         outputs = self._system()._outputs
 
         if self._full_inverse:
-            outputs.set_val(new_val)
+            outputs._data[:] = new_val
         else:
             states = self.options['state_vars']
             for name in states:
@@ -531,9 +531,9 @@ class BroydenSolver(NonlinearSolver):
         linear = self._system()._vectors['output']['linear']
 
         if self._full_inverse:
-            linear.set_val(dx)
+            linear._data[:] = dx
         else:
-            linear.set_val(0.0)
+            linear.set_const(0.0)
             for name in self.options['state_vars']:
                 i, j = self._idx[name]
                 linear[name] = dx[i:j]
@@ -556,7 +556,7 @@ class BroydenSolver(NonlinearSolver):
         d_out = system._vectors['output']['linear']
 
         inv_jac = self.Gm
-        d_res.set_val(0.0)
+        d_res.set_const(0.0)
 
         # Disable local fd
         approx_status = system._owns_approx_jac
@@ -639,7 +639,7 @@ class BroydenSolver(NonlinearSolver):
             pathname = self._system().pathname
             if pathname:
                 nchar = len(pathname)
-                prefix = self._get_solver_info().prefix
+                prefix = self._solver_info.prefix
                 header = prefix + "\n"
                 header += prefix + nchar * "=" + "\n"
                 header += prefix + pathname + "\n"

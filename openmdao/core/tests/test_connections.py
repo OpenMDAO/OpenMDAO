@@ -581,8 +581,6 @@ class TestConnectionsDistrib(unittest.TestCase):
                    "for the connection 'p1.x' to 'c3.x'. " + \
                    "Index '2' is out of range for source dimension of size 2."
 
-        import wingdbstub
-        
         try:
             prob.setup()
         except Exception as err:

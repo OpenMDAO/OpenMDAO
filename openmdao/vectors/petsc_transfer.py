@@ -78,10 +78,7 @@ class PETScTransfer(DefaultTransfer):
         vectors = group._vectors
         offsets = group._get_var_offsets()
 
-        if group._problem_meta['use_derivatives']:
-            vec_names = group._lin_rel_vec_name_list
-        else:
-            vec_names = group._problem_meta['vec_names']
+        vec_names = group._lin_rel_vec_name_list if group._use_derivatives else group._vec_names
 
         mypathlen = len(group.pathname + '.' if group.pathname else '')
         sub_inds = group._subsystems_inds
@@ -152,29 +149,6 @@ class PETScTransfer(DefaultTransfer):
                             output_inds = np.arange(out_offset,
                                                     out_offset + meta_out['global_size'],
                                                     dtype=INT_DTYPE)
-                            # sz_in = sizes_in[myproc, idx_in]
-                            # idxs = []
-                            # start = end = 0
-                            # for rank, sz in enumerate(sizes_out[:, idx_out]):
-                            #     if sz == 0:
-                            #         start = end
-                            #         continue
-                            #     out_offset = offsets_out[rank, idx_out]
-                            #     end += sz
-                            #     if end >= sz_in:
-                            #         print(f"RANGE (start, sz_in): {start} to {sz_in}")
-                            #         idxs.append(np.arange(start, sz_in, dtype=INT_DTYPE))
-                            #         break
-                            #     else:
-                            #         print(f"RANGE (start, end): {start} to {end}")
-                            #         idxs.append(np.arange(start, end, dtype=INT_DTYPE))
-                            #     start = end
-                            # if idxs:
-                            #     print(f"IDXS: {idxs}")
-                            #     output_inds = np.hstack(idxs)
-                            # else:
-                            #     print("ZERO output_inds")
-                            #     output_inds = np.zeros(0, dtype=INT_DTYPE)
                         else:
                             rank = myproc if abs_out in abs2meta else owner
                             offset = offsets_out[rank, idx_out]
@@ -251,7 +225,7 @@ class PETScTransfer(DefaultTransfer):
                         vectors['input'][vec_name], vectors['output'][vec_name],
                         rev_xfer_in[isub], rev_xfer_out[isub], group.comm)
 
-        if group._problem_meta['use_derivatives']:
+        if group._use_derivatives:
             transfers['nonlinear'] = transfers['linear']
 
     def _transfer(self, in_vec, out_vec, mode='fwd'):
@@ -304,7 +278,6 @@ class PETScTransfer(DefaultTransfer):
             if out_vec._alloc_complex:
                 out_petsc.array = out_vec._data
 
-            # print(f"xferring:  {out_petsc.array} -> {in_petsc.array}")
             self._scatter(out_petsc, in_petsc, addv=flag, mode=flag)
 
             if in_vec._alloc_complex:

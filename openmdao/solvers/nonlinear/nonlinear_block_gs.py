@@ -92,14 +92,14 @@ class NonlinearBlockGS(NonlinearSolver):
         system = self._system()
 
         if self.options['use_aitken']:
-            self._delta_outputs_n_1 = system._outputs.asarray().copy()
+            self._delta_outputs_n_1 = system._outputs._data.copy()
             self._theta_n_1 = 1.
 
         # When under a complex step from higher in the hierarchy, sometimes the step is too small
         # to trigger reconvergence, so nudge the outputs slightly so that we always get at least
         # one iteration.
         if system.under_complex_step and self.options['cs_reconverge']:
-            system._outputs += np.linalg.norm(system._outputs.asarray()) * 1e-10
+            system._outputs._data += np.linalg.norm(system._outputs._data) * 1e-10
 
         return super(NonlinearBlockGS, self)._iter_initialize()
 
@@ -122,23 +122,23 @@ class NonlinearBlockGS(NonlinearSolver):
             theta_n_1 = self._theta_n_1
 
             # store a copy of the outputs, used to compute the change in outputs later
-            delta_outputs_n = outputs.asarray().copy()
+            delta_outputs_n = outputs._data.copy()
 
         if use_aitken or not self.options['use_apply_nonlinear']:
             # store a copy of the outputs
             if not self.options['use_apply_nonlinear']:
                 with system._unscaled_context(outputs=[outputs]):
-                    outputs_n = outputs.asarray().copy()
+                    outputs_n = outputs._data.copy()
             else:
-                outputs_n = outputs.asarray().copy()
+                outputs_n = outputs._data.copy()
 
-        self._get_solver_info().append_subsolver()
+        self._solver_info.append_subsolver()
         self._gs_iter()
-        self._get_solver_info().pop()
+        self._solver_info.pop()
 
         if use_aitken:
             # compute the change in the outputs after the NLBGS iteration
-            delta_outputs_n -= outputs.asarray()
+            delta_outputs_n -= outputs._data
             delta_outputs_n *= -1
 
             if self._iter_count >= 2:
@@ -151,8 +151,8 @@ class NonlinearBlockGS(NonlinearSolver):
 
                 # If MPI, piggyback on the residual vector to perform a distributed norm.
                 if system.comm.size > 1:
-                    backup_r = residuals.asarray().copy()
-                    residuals.set_val(temp)
+                    backup_r = residuals._data.copy()
+                    residuals._data[:] = temp
                     temp_norm = residuals.get_norm()
                 else:
                     temp_norm = np.linalg.norm(temp)
@@ -163,11 +163,11 @@ class NonlinearBlockGS(NonlinearSolver):
                 # If MPI, piggyback on the output and residual vectors to perform a distributed
                 # dot product.
                 if system.comm.size > 1:
-                    backup_o = outputs.asarray().copy()
-                    outputs.set_val(delta_outputs_n)
+                    backup_o = outputs._data.copy()
+                    outputs._data[:] = delta_outputs_n
                     tddo = residuals.dot(outputs)
-                    residuals.set_val(backup_r)
-                    outputs.set_val(backup_o)
+                    residuals._data[:] = backup_r
+                    outputs._data[:] = backup_o
                 else:
                     tddo = temp.dot(delta_outputs_n)
 
@@ -183,12 +183,12 @@ class NonlinearBlockGS(NonlinearSolver):
 
             if not self.options['use_apply_nonlinear']:
                 with system._unscaled_context(outputs=[outputs]):
-                    outputs.set_val(outputs_n)
+                    outputs._data[:] = outputs_n
             else:
-                outputs.set_val(outputs_n)
+                outputs._data[:] = outputs_n
 
             # compute relaxed outputs
-            outputs += theta_n * delta_outputs_n
+            outputs._data += theta_n * delta_outputs_n
 
             # save update to use in next iteration
             delta_outputs_n_1[:] = delta_outputs_n
@@ -196,7 +196,7 @@ class NonlinearBlockGS(NonlinearSolver):
         if not self.options['use_apply_nonlinear']:
             # Residual is the change in the outputs vector.
             with system._unscaled_context(outputs=[outputs], residuals=[residuals]):
-                residuals.set_val(outputs.asarray() - outputs_n)
+                residuals._data[:] = outputs._data - outputs_n
 
     def _run_apply(self):
         """
@@ -211,11 +211,11 @@ class NonlinearBlockGS(NonlinearSolver):
             # This option runs apply_nonlinear to calculate the residuals, and thus ends up
             # executing ExplicitComponents twice per iteration.
 
-            self._get_recording_iter().push(('_run_apply', 0))
+            self._recording_iter.push(('_run_apply', 0))
             try:
                 system._apply_nonlinear()
             finally:
-                self._get_recording_iter().pop()
+                self._recording_iter.pop()
 
         elif itercount < 1:
             # Run instead of calling apply, so that we don't "waste" the extra run. This also
@@ -225,18 +225,18 @@ class NonlinearBlockGS(NonlinearSolver):
             residuals = system._residuals
 
             with system._unscaled_context(outputs=[outputs]):
-                outputs_n = outputs.asarray().copy()
+                outputs_n = outputs._data.copy()
 
-            self._get_solver_info().append_subsolver()
-            for isub, (subsys, local)in enumerate(system._all_subsystem_iter()):
+            self._solver_info.append_subsolver()
+            for isub, (subsys, local) in enumerate(system._all_subsystem_iter()):
                 system._transfer('nonlinear', 'fwd', isub)
                 if local:
                     subsys._solve_nonlinear()
                     system._check_child_reconf()
 
-            self._get_solver_info().pop()
+            self._solver_info.pop()
             with system._unscaled_context(residuals=[residuals]):
-                residuals.set_val(outputs.asarray() - outputs_n)
+                residuals._data[:] = outputs._data - outputs_n
 
     def _mpi_print_header(self):
         """
@@ -247,7 +247,7 @@ class NonlinearBlockGS(NonlinearSolver):
             pathname = self._system().pathname
             if pathname:
                 nchar = len(pathname)
-                prefix = self._get_solver_info().prefix
+                prefix = self._solver_info.prefix
                 header = prefix + "\n"
                 header += prefix + nchar * "=" + "\n"
                 header += prefix + pathname + "\n"

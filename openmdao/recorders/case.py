@@ -792,6 +792,17 @@ class PromAbsDict(dict):
                     abs_keys, prom_key = self._deriv_keys(key)
                     super(PromAbsDict, self).__setitem__(prom_key, self._values[key])
 
+    def __str__(self):
+        """
+        Get string representation of the dictionary.
+
+        Returns
+        -------
+        str
+            String representation of the dictionary.
+        """
+        return super(PromAbsDict, self).__str__()
+
     def _deriv_keys(self, key):
         """
         Get the absolute and promoted name versions of the provided derivative key.

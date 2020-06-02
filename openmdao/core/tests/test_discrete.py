@@ -195,7 +195,6 @@ class DiscreteTestCase(unittest.TestCase):
         model.connect('indep.x', 'comp.x')
 
         prob.setup()
-
         prob.run_model()
 
         assert_near_equal(prob['comp.y'], 2)

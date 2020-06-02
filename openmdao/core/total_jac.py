@@ -126,7 +126,7 @@ class _TotalJacInfo(object):
         design_vars = driver._designvars
         responses = driver._responses
 
-        if not model._problem_meta['use_derivatives']:
+        if not model._use_derivatives:
             raise RuntimeError("Derivative support has been turned off but compute_totals "
                                "was called.")
 
@@ -316,7 +316,7 @@ class _TotalJacInfo(object):
             myoffset = rowcol_size * myrank
             owns = self.model._owning_rank
 
-            for vecname in model._problem_meta['lin_vec_names']:
+            for vecname in model._lin_vec_names:
                 sizes = self.model._var_sizes[vecname]['output']
                 abs2idx = self.model._var_allprocs_abs2idx[vecname]
                 abs2meta = self.model._var_allprocs_abs2meta
@@ -356,7 +356,7 @@ class _TotalJacInfo(object):
                 jac_scatters[vecname] = PETSc.Scatter().create(src_vec, src_indexset,
                                                                tgt_vec, tgt_indexset)
         else:
-            for vecname in model._problem_meta['lin_vec_names']:
+            for vecname in model._lin_vec_names:
                 jac_scatters[vecname] = None
 
     def _get_dict_J(self, J, wrt, prom_wrt, of, prom_of, wrt_meta, of_meta, return_format):
@@ -655,7 +655,7 @@ class _TotalJacInfo(object):
         myproc = self.comm.rank
         name2jinds = {}  # map varname to jac row or col idxs that we must scatter to other procs
 
-        for vecname in model._problem_meta['lin_vec_names']:
+        for vecname in model._lin_vec_names:
             inds = []
             jac_inds = []
             sizes = model._var_sizes[vecname]['output']
@@ -904,10 +904,10 @@ class _TotalJacInfo(object):
         vecs = self.model._vectors
 
         # clean out vectors from last solve
-        vecs['output'][vecname].set_val(0.0)
-        vecs['residual'][vecname].set_val(0.0)
+        vecs['output'][vecname]._data[:] = 0.0
+        vecs['residual'][vecname]._data[:] = 0.0
         if mode == 'rev':
-            vecs['input'][vecname].set_val(0.0)
+            vecs['input'][vecname]._data[:] = 0.0
 
     #
     # input setter functions
@@ -940,7 +940,7 @@ class _TotalJacInfo(object):
 
         loc_idx = self.in_loc_idxs[mode][idx]
         if loc_idx >= 0:
-            self.input_vec[mode][vecname].set_val(self.seeds[mode][idx], loc_idx)
+            self.input_vec[mode][vecname]._data[loc_idx] = self.seeds[mode][idx]
 
         if cache_lin_sol:
             return rel_systems, (vecname,), (idx, mode)
@@ -974,7 +974,7 @@ class _TotalJacInfo(object):
 
         self._zero_vecs('linear', mode)
 
-        self.input_vec[mode]['linear'].set_val(itermeta['seeds'], itermeta['local_in_idxs'])
+        self.input_vec[mode]['linear']._data[itermeta['local_in_idxs']] = itermeta['seeds']
 
         if itermeta['cache_lin_solve']:
             return itermeta['relevant'], ('linear',), (inds[0], mode)
@@ -1054,7 +1054,7 @@ class _TotalJacInfo(object):
             if loc_idx != -1:
                 # We apply a -1 here because the derivative of the output is minus the derivative
                 # of the residual in openmdao.
-                dinputs.set_val(self.seeds[mode][i], (loc_idx, col))
+                dinputs._data[loc_idx, col] = self.seeds[mode][i]
 
         if cache_lin_sol:
             return rel_systems, (vec_name,), (inds[0], mode)
@@ -1107,9 +1107,9 @@ class _TotalJacInfo(object):
                 loc_idx = in_loc_idxs[i]
                 if loc_idx != -1:
                     if ncol > 1:
-                        dinputs.set_val(self.seeds[mode][i], (loc_idx, col))
+                        dinputs._data[loc_idx, col] = self.seeds[mode][i]
                     else:
-                        dinputs.set_val(self.seeds[mode][i], loc_idx)
+                        dinputs._data[loc_idx] = self.seeds[mode][i]
 
         if cache:
             return all_rel_systems, sorted(vec_names), (inds[0][0], mode)
@@ -1132,7 +1132,7 @@ class _TotalJacInfo(object):
         """
         vecname, _, _ = self.in_idx_map[mode][i]
         deriv_idxs, jac_idxs, _ = self.sol2jac_map[mode]
-        deriv_val = self.output_vec[mode][vecname].asarray()
+        deriv_val = self.output_vec[mode][vecname]._data
         if mode == 'fwd':
             self.J[jac_idxs[vecname], i] = deriv_val[deriv_idxs[vecname]]
         else:  # rev
@@ -1216,7 +1216,7 @@ class _TotalJacInfo(object):
         # because simul_coloring cannot be used with vectorized derivs (matmat) or parallel
         # deriv coloring, vecname will always be 'linear', and we don't need to check
         # vecname for each index.
-        deriv_val = self.output_vec[mode]['linear'].asarray()
+        deriv_val = self.output_vec[mode]['linear']._data
         if self.jac_scratch is None:
             reduced_derivs = deriv_val[deriv_idxs['linear']]
         else:
@@ -1256,7 +1256,7 @@ class _TotalJacInfo(object):
 
         deriv_idxs, jac_idxs, _ = self.sol2jac_map[mode]
         jac_inds = jac_idxs[vecname]
-        outvec = self.output_vec[mode][vecname].asarray()
+        outvec = self.output_vec[mode][vecname]._data
         ilen = len(inds)
         if fwd:
             for col, i in enumerate(inds):
@@ -1312,10 +1312,10 @@ class _TotalJacInfo(object):
 
         # Prepare model for calculation by cleaning out the derivatives
         # vectors.
-        for vec_name in model._problem_meta['lin_vec_names']:
-            vec_dinput[vec_name].set_val(0.0)
-            vec_doutput[vec_name].set_val(0.0)
-            vec_dresid[vec_name].set_val(0.0)
+        for vec_name in model._lin_vec_names:
+            vec_dinput[vec_name]._data[:] = 0.0
+            vec_doutput[vec_name]._data[:] = 0.0
+            vec_dresid[vec_name]._data[:] = 0.0
 
         # Linearize Model
         with model._scaled_context_all():
@@ -1323,8 +1323,6 @@ class _TotalJacInfo(object):
                              sub_do_ln=model._linear_solver._linearize_children())
         model._linear_solver._linearize()
         self.J[:] = 0.0
-
-        lin_vec_names = model._problem_meta['lin_vec_names']
 
         # Main loop over columns (fwd) or rows (rev) of the jacobian
         for mode in self.idx_iter_dict:
@@ -1354,8 +1352,7 @@ class _TotalJacInfo(object):
                     with model._scaled_context_all():
                         if cache_key is not None and not has_lin_cons and self.mode == mode:
                             self._restore_linear_solution(vec_names, cache_key, self.mode)
-                            model._solve_linear(model._problem_meta['lin_vec_names'], self.mode,
-                                                rel_systems)
+                            model._solve_linear(model._lin_vec_names, self.mode, rel_systems)
                             self._save_linear_solution(vec_names, cache_key, self.mode)
                         else:
                             if par_deriv and key in par_deriv:
@@ -1364,7 +1361,7 @@ class _TotalJacInfo(object):
                                 vecnames_par_deriv = par_deriv[key].copy()
                                 model._solve_linear(vecnames_par_deriv, mode, rel_systems)
                             else:
-                                model._solve_linear(lin_vec_names, mode, rel_systems)
+                                model._solve_linear(model._lin_vec_names, mode, rel_systems)
 
                     if debug_print:
                         print('Elapsed Time:', time.time() - t0, '\n', flush=True)
@@ -1408,10 +1405,10 @@ class _TotalJacInfo(object):
 
         # Prepare model for calculation by cleaning out the derivatives
         # vectors.
-        for vec_name in model._problem_meta['lin_vec_names']:
-            model._vectors['input'][vec_name].set_val(0.0)
-            model._vectors['output'][vec_name].set_val(0.0)
-            model._vectors['residual'][vec_name].set_val(0.0)
+        for vec_name in model._lin_vec_names:
+            model._vectors['input'][vec_name].set_const(0.0)
+            model._vectors['output'][vec_name].set_const(0.0)
+            model._vectors['residual'][vec_name].set_const(0.0)
 
         # Solve for derivs with the approximation_scheme.
         # This cuts out the middleman by grabbing the Jacobian directly after linearization.
@@ -1514,11 +1511,11 @@ class _TotalJacInfo(object):
             for i, vec_name in enumerate(vec_names):
                 save_vec = lin_sol[i]
                 doutputs = self.output_vec[mode][vec_name]
-                doutputs.set_val(save_vec)
+                doutputs._data[:] = save_vec
         else:
             lin_sol_cache[key] = lin_sol = []
             for vec_name in vec_names:
-                lin_sol.append(deepcopy(self.output_vec[mode][vec_name].asarray()))
+                lin_sol.append(deepcopy(self.output_vec[mode][vec_name]._data))
 
     def _save_linear_solution(self, vec_names, key, mode):
         """
@@ -1537,7 +1534,7 @@ class _TotalJacInfo(object):
         for i, vec_name in enumerate(vec_names):
             save_vec = lin_sol[i]
             doutputs = self.output_vec[mode][vec_name]
-            save_vec[:] = doutputs.asarray()
+            save_vec[:] = doutputs._data
 
     def _do_driver_scaling(self, J):
         """
@@ -1614,7 +1611,7 @@ class _TotalJacInfo(object):
         metadata : dict
             Dictionary containing execution metadata.
         """
-        self.model._get_recording_iter().push((requester._get_name(), requester.iter_count))
+        self.model._recording_iter.push((requester._get_name(), requester.iter_count))
 
         try:
             totals = self._get_dict_J(self.J, self.wrt, self.prom_wrt, self.of, self.prom_of,
@@ -1622,7 +1619,7 @@ class _TotalJacInfo(object):
             requester._rec_mgr.record_derivatives(requester, totals, metadata)
 
         finally:
-            self.model._get_recording_iter().pop()
+            self.model._recording_iter.pop()
 
 
 def _get_subjac(jac_meta, prom_out, prom_in, of_idx, wrt_idx, dist_resp, comm):

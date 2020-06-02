@@ -28,18 +28,19 @@ from openmdao.recorders.recording_iteration_stack import _RecIteration
 from openmdao.recorders.recording_manager import RecordingManager, record_viewer_data
 from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.general_utils import ContainsAll, pad_name, simple_warning, warn_deprecation
+
 from openmdao.utils.mpi import FakeComm
 from openmdao.utils.mpi import MPI
 from openmdao.utils.name_maps import prom_name2abs_name
-from openmdao.utils.options_dictionary import OptionsDictionary
+from openmdao.utils.options_dictionary import OptionsDictionary, _undefined
 from openmdao.utils.units import unit_conversion
 from openmdao.utils import coloring as coloring_mod
 from openmdao.utils.name_maps import abs_key2rel_key
 from openmdao.vectors.vector import _full_slice, INT_DTYPE
 from openmdao.vectors.default_vector import DefaultVector
 from openmdao.utils.logger_utils import get_logger, TestLogger
-from openmdao.utils.hooks import _setup_hooks
 import openmdao.utils.coloring as coloring_mod
+from openmdao.utils.hooks import _setup_hooks
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -56,7 +57,6 @@ ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
 MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])
 
 _contains_all = ContainsAll()
-_undefined = object()
 
 
 CITATION = """@article{openmdao_2019,
@@ -167,7 +167,7 @@ class Problem(object):
 
         self._mode = None  # mode is assigned in setup()
 
-        self._initial_condition_cache = OrderedDict()
+        self._initial_condition_cache = {}
 
         # Status of the setup of _model.
         # 0 -- Newly initialized problem or newly added model.
@@ -332,7 +332,8 @@ class Problem(object):
 
             return val
 
-    def _get_recording_iter(self):
+    @property
+    def _recording_iter(self):
         return self._metadata['recording_iter']
 
     def __getitem__(self, name):
@@ -386,7 +387,7 @@ class Problem(object):
         val = self.model._get_val(name, units=units, indices=indices, get_remote=get_remote,
                                   from_src=True)
 
-        if val is System._undefined:
+        if val is _undefined:
             if get_remote:
                 raise KeyError('{}: Variable name "{}" not found.'.format(self.msginfo, name))
             else:
@@ -439,7 +440,6 @@ class Problem(object):
         else:
             abs_name = name
 
-        # print(f"problem set_val: setting {name} ({abs_name}) to {value}")
         if abs_name in conns:
             src = conns[abs_name]
             if abs_name not in all_discrete:
@@ -538,7 +538,6 @@ class Problem(object):
         Set all initial conditions that have been saved in cache after setup.
         """
         for name, value in self._initial_condition_cache.items():
-            # print(f"setting initial value of {name} to {value}")
             self.set_val(name, value)
 
         # Clean up cache
@@ -563,9 +562,9 @@ class Problem(object):
         if case_prefix:
             if not isinstance(case_prefix, str):
                 raise TypeError(self.msginfo + ": The 'case_prefix' argument should be a string.")
-            self._get_recording_iter().prefix = case_prefix
+            self._recording_iter.prefix = case_prefix
         else:
-            self._get_recording_iter().prefix = None
+            self._recording_iter.prefix = None
 
         if self.model.iter_count > 0 and reset_iter_counts:
             self.driver.iter_count = 0
@@ -599,9 +598,9 @@ class Problem(object):
         if case_prefix:
             if not isinstance(case_prefix, str):
                 raise TypeError(self.msginfo + ": The 'case_prefix' argument should be a string.")
-            self._get_recording_iter().prefix = case_prefix
+            self._recording_iter.prefix = case_prefix
         else:
-            self._get_recording_iter().prefix = None
+            self._recording_iter.prefix = None
 
         if self.model.iter_count > 0 and reset_iter_counts:
             self.driver.iter_count = 0
@@ -649,7 +648,7 @@ class Problem(object):
         rvec = self.model._vectors[rkind]['linear']
         lvec = self.model._vectors[lkind]['linear']
 
-        rvec.set_val(0.)
+        rvec._data[:] = 0.
 
         # set seed values into dresids (fwd) or doutputs (rev)
         try:
@@ -663,7 +662,7 @@ class Problem(object):
 
         # We apply a -1 here because the derivative of the output is minus the derivative of
         # the residual in openmdao.
-        rvec *= -1.
+        rvec._data *= -1.
 
         self.model.run_solve_linear(['linear'], mode)
 
@@ -955,7 +954,7 @@ class Problem(object):
 
         model = self.model
 
-        if not model._problem_meta['use_derivatives']:
+        if not model._use_derivatives:
             raise RuntimeError(self.msginfo +
                                ": Can't check partials.  Derivative support has been turned off.")
 
@@ -997,8 +996,8 @@ class Problem(object):
         partials_data = defaultdict(lambda: defaultdict(dict))
 
         # Caching current point to restore after setups.
-        input_cache = model._inputs.asarray().copy()
-        output_cache = model._outputs.asarray().copy()
+        input_cache = model._inputs._data.copy()
+        output_cache = model._outputs._data.copy()
 
         # Keep track of derivative keys that are declared dependent so that we don't print them
         # unless they are in error.
@@ -1010,8 +1009,8 @@ class Problem(object):
         # Analytic Jacobians
         print_reverse = False
         for mode in ('fwd', 'rev'):
-            model._inputs.set_val(input_cache)
-            model._outputs.set_val(output_cache)
+            model._inputs.set_const(input_cache)
+            model._outputs.set_const(output_cache)
             # Make sure we're in a valid state
             model.run_apply_nonlinear()
 
@@ -1078,8 +1077,8 @@ class Problem(object):
 
                             for idx in range(n_in):
 
-                                dinputs.set_val(0.0)
-                                dstate.set_val(0.0)
+                                dinputs.set_const(0.0)
+                                dstate.set_const(0.0)
 
                                 # Dictionary access returns a scalar for 1d input, and we
                                 # need a vector for clean code, so use _views_flat.
@@ -1188,8 +1187,8 @@ class Problem(object):
 
                             partials_data[c_name][rel_key][jac_key] = deriv_value.copy()
 
-        model._inputs.set_val(input_cache)
-        model._outputs.set_val(output_cache)
+        model._inputs.set_const(input_cache)
+        model._outputs.set_const(output_cache)
         model.run_apply_nonlinear()
 
         # Finite Difference to calculate Jacobian

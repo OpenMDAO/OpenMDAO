@@ -206,7 +206,7 @@ class DefaultVector(Vector):
             self + vec
         """
         if isinstance(vec, Vector):
-            self.iadd(vec.asarray())
+            self.iadd(vec._data)
         else:
             self._data += vec
         return self
@@ -226,7 +226,7 @@ class DefaultVector(Vector):
             self - vec
         """
         if isinstance(vec, Vector):
-            self.isub(vec.asarray())
+            self.isub(vec._data)
         else:
             self._data -= vec
         return self
@@ -246,7 +246,7 @@ class DefaultVector(Vector):
             self * vec
         """
         if isinstance(vec, Vector):
-            self.imul(vec.asarray())
+            self.imul(vec._data)
         else:
             self._data *= vec
         return self
@@ -262,7 +262,7 @@ class DefaultVector(Vector):
         vec : <Vector>
             this vector times val is added to self.
         """
-        self._data += (val * vec.asarray())
+        self._data += (val * vec._data)
 
     def set_vec(self, vec):
         """
@@ -273,7 +273,7 @@ class DefaultVector(Vector):
         vec : <Vector>
             the vector whose values self is set to.
         """
-        self._data[:] = vec.asarray()
+        self._data[:] = vec._data
 
     def set_val(self, val, idxs=_full_slice):
         """
@@ -287,6 +287,8 @@ class DefaultVector(Vector):
             The locations where the data array should be updated.
         """
         self._data[idxs] = val
+
+    set_const = set_val  # for backward compat
 
     def asarray(self, idxs=_full_slice):
         """
@@ -357,7 +359,7 @@ class DefaultVector(Vector):
         float
             The computed dot product value.
         """
-        return np.dot(self._data, vec.asarray())
+        return np.dot(self._data, vec._data)
 
     def get_norm(self):
         """

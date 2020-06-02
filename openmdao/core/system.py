@@ -19,7 +19,7 @@ from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.vectors.vector import INT_DTYPE, _full_slice
 from openmdao.utils.mpi import MPI
-from openmdao.utils.options_dictionary import OptionsDictionary
+from openmdao.utils.options_dictionary import OptionsDictionary, _undefined
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.units import is_compatible, unit_conversion
 from openmdao.utils.variable_table import write_var_table
@@ -284,8 +284,6 @@ class System(object):
     _first_call_to_linearize : bool
         If True, this is the first call to _linearize.
     """
-
-    _undefined = object()
 
     def __init__(self, num_par_fd=1, **kwargs):
         """
@@ -559,10 +557,7 @@ class System(object):
             ext_num_vars = {}
             ext_sizes = {}
 
-            if self._problem_meta['use_derivatives']:
-                vec_names = self._lin_rel_vec_name_list
-            else:
-                vec_names = self._problem_meta['vec_names']
+            vec_names = self._lin_rel_vec_name_list if self._use_derivatives else self._vec_names
 
             for vec_name in vec_names:
                 ext_num_vars[vec_name] = {}
@@ -571,7 +566,7 @@ class System(object):
                     ext_num_vars[vec_name][type_] = (0, 0)
                     ext_sizes[vec_name][type_] = (0, 0)
 
-            if self._problem_meta['use_derivatives']:
+            if self._use_derivatives:
                 ext_num_vars['nonlinear'] = ext_num_vars['linear']
                 ext_sizes['nonlinear'] = ext_sizes['linear']
 
@@ -603,11 +598,7 @@ class System(object):
 
         if initial:
             relevant = self._relevant
-            if self._problem_meta['use_derivatives']:
-                vec_names = self._rel_vec_name_list
-            else:
-                vec_names = self._problem_meta['vec_names']
-
+            vec_names = self._rel_vec_name_list if self._use_derivatives else self._vec_names
             vectorized_vois = self._problem_meta['vectorized_vois']
             abs2idx = self._var_allprocs_abs2idx
 
@@ -632,7 +623,7 @@ class System(object):
                 self._scale_factors = {}
 
             if self._vector_class is None:
-                self._vector_class = self._problem_meta['local_vector_class']
+                self._vector_class = self._local_vector_class
 
             vector_class = self._vector_class
 
@@ -835,13 +826,12 @@ class System(object):
             recurse = False
             resize = False
 
-        force_alloc_complex = self._problem_meta['force_alloc_complex']
-
         # For vector-related, setup, recursion is always necessary, even for updating.
         # For reconfiguration setup, we resize the vectors once, only in the current system.
         ext_num_vars, ext_sizes = self._get_initial_global(initial)
         self._setup_global(ext_num_vars, ext_sizes)
-        root_vectors = self._get_root_vectors(initial, force_alloc_complex=force_alloc_complex)
+        root_vectors = self._get_root_vectors(initial,
+                                              force_alloc_complex=self._force_alloc_complex)
         self._setup_vectors(root_vectors, resize=resize)
 
         # Transfers do not require recursion, but they have to be set up after the vector setup.
@@ -851,7 +841,7 @@ class System(object):
         # If we're updating, we just need to re-run setup on these, but no recursion necessary.
         self._setup_solvers(recurse=recurse)
         self._setup_solver_print(recurse=recurse)
-        if self._problem_meta['use_derivatives']:
+        if self._use_derivatives:
             self._setup_partials(recurse=recurse)
             self._setup_jacobians(recurse=recurse)
 
@@ -1077,17 +1067,17 @@ class System(object):
         is_total = isinstance(self, Group)
 
         # compute perturbations
-        starting_inputs = self._inputs.asarray().copy()
+        starting_inputs = self._inputs._data.copy()
         in_offsets = starting_inputs.copy()
         in_offsets[in_offsets == 0.0] = 1.0
         in_offsets *= info['perturb_size']
 
-        starting_outputs = self._outputs.asarray().copy()
+        starting_outputs = self._outputs._data.copy()
         out_offsets = starting_outputs.copy()
         out_offsets[out_offsets == 0.0] = 1.0
         out_offsets *= info['perturb_size']
 
-        starting_resids = self._residuals.asarray().copy()
+        starting_resids = self._residuals._data.copy()
 
         # for groups, this does some setup of approximations
         self._setup_approx_coloring()
@@ -1099,10 +1089,10 @@ class System(object):
         for i in range(info['num_full_jacs']):
             # randomize inputs (and outputs if implicit)
             if i > 0:
-                self._inputs.set_val(
-                    starting_inputs + in_offsets * np.random.random(in_offsets.size))
-                self._outputs.set_val(
-                    starting_outputs + out_offsets * np.random.random(out_offsets.size))
+                self._inputs._data[:] = \
+                    starting_inputs + in_offsets * np.random.random(in_offsets.size)
+                self._outputs._data[:] = \
+                    starting_outputs + out_offsets * np.random.random(out_offsets.size)
 
                 if is_total:
                     self._solve_nonlinear()
@@ -1179,9 +1169,9 @@ class System(object):
             coloring_mod._CLASS_COLORINGS[coloring_fname] = coloring
 
         # restore original inputs/outputs
-        self._inputs.set_val(starting_inputs)
-        self._outputs.set_val(starting_outputs)
-        self._residuals.set_val(starting_resids)
+        self._inputs._data[:] = starting_inputs
+        self._outputs._data[:] = starting_outputs
+        self._residuals._data[:] = starting_resids
 
         self._first_call_to_linearize = save_first_call
 
@@ -1212,16 +1202,18 @@ class System(object):
             the actual offsets are, i.e. the offsets will be into a reduced jacobian
             containing only the matching columns.
         """
+        if wrt_matches is None:
+            wrt_matches = ContainsAll()
+        abs2meta = self._var_allprocs_abs2meta
         offset = end = 0
         for of, _offset, _end, sub_of_idx in self._jacobian_of_iter():
-            if wrt_matches is None or of in wrt_matches:
+            if of in wrt_matches:
                 end += (_end - _offset)
                 yield of, offset, end, sub_of_idx
                 offset = end
 
-        abs2meta = self._var_allprocs_abs2meta
         for wrt in self._var_allprocs_abs_names['input']:
-            if wrt_matches is None or wrt in wrt_matches:
+            if wrt in wrt_matches:
                 end += abs2meta[wrt]['size']
                 yield wrt, offset, end, _full_slice
                 offset = end
@@ -1483,10 +1475,7 @@ class System(object):
         """
         self._var_allprocs_abs2idx = abs2idx = {}
 
-        if self._problem_meta['use_derivatives']:
-            vec_names = self._lin_rel_vec_name_list
-        else:
-            vec_names = self._problem_meta['vec_names']
+        vec_names = self._lin_rel_vec_name_list if self._use_derivatives else self._vec_names
 
         for vec_name in vec_names:
             abs2idx[vec_name] = abs2idx_t = {}
@@ -1494,7 +1483,7 @@ class System(object):
                 for i, abs_name in enumerate(self._var_allprocs_relevant_names[vec_name][type_]):
                     abs2idx_t[abs_name] = i
 
-        if self._problem_meta['use_derivatives']:
+        if self._use_derivatives:
             abs2idx['nonlinear'] = abs2idx['linear']
 
         # Recursion
@@ -1580,7 +1569,7 @@ class System(object):
         mode : str
             Derivative direction, either 'fwd' or 'rev'.
         """
-        if self._problem_meta['use_derivatives']:
+        if self._use_derivatives:
             vec_names = ['nonlinear', 'linear']
             vois = {}
             for system in self.system_iter(include_self=True, recurse=True):
@@ -1636,7 +1625,7 @@ class System(object):
         dict
             The relevance dictionary.
         """
-        if self._problem_meta['use_derivatives']:
+        if self._use_derivatives:
             desvars = self.get_design_vars(recurse=True, get_sizes=False)
             responses = self.get_responses(recurse=True, get_sizes=False)
             return get_relevant_vars(self._conn_global_abs_in2out, desvars, responses,
@@ -1742,7 +1731,7 @@ class System(object):
         self._var_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
 
         self._rel_vec_name_list = []
-        for vec_name in self._problem_meta['vec_names']:
+        for vec_name in self._vec_names:
             rel, relsys = relevant[vec_name]['@all']
             if self.pathname in relsys:
                 self._rel_vec_name_list.append(vec_name)
@@ -1809,7 +1798,7 @@ class System(object):
                                "'problem.setup(force_alloc_complex=True)'".format(self.msginfo))
 
         if self._vector_class is None:
-            self._vector_class = self._problem_meta['local_vector_class']
+            self._vector_class = self._local_vector_class
 
         vector_class = self._vector_class
 
@@ -2309,10 +2298,10 @@ class System(object):
 
         if clear:
             if mode == 'fwd':
-                d_residuals.set_val(0.0)
+                d_residuals.set_const(0.0)
             else:  # rev
-                d_inputs.set_val(0.0)
-                d_outputs.set_val(0.0)
+                d_inputs.set_const(0.0)
+                d_outputs.set_const(0.0)
 
         if scope_out is None and scope_in is None:
             yield d_inputs, d_outputs, d_residuals
@@ -2382,10 +2371,7 @@ class System(object):
         """
         if self._var_offsets is None:
             offsets = self._var_offsets = {}
-            if self._problem_meta['use_derivatives']:
-                vec_names = self._lin_rel_vec_name_list
-            else:
-                vec_names = self._problem_meta['vec_names']
+            vec_names = self._lin_rel_vec_name_list if self._use_derivatives else self._vec_names
 
             for vec_name in vec_names:
                 offsets[vec_name] = off_vn = {}
@@ -2399,7 +2385,7 @@ class System(object):
                     else:
                         off_vn[type_] = np.zeros(0, dtype=int).reshape((1, 0))
 
-            if self._problem_meta['use_derivatives']:
+            if self._use_derivatives:
                 offsets['nonlinear'] = offsets['linear']
 
         return self._var_offsets
@@ -2431,6 +2417,34 @@ class System(object):
         Set this system's linear solver.
         """
         self._linear_solver = solver
+
+    @property
+    def _force_alloc_complex(self):
+        return self._problem_meta['force_alloc_complex']
+
+    @property
+    def _use_derivatives(self):
+        return self._problem_meta['use_derivatives']
+
+    @property
+    def _local_vector_class(self):
+        return self._problem_meta['local_vector_class']
+
+    @property
+    def _distributed_vector_class(self):
+        return self._problem_meta['distributed_vector_class']
+
+    @property
+    def _vec_names(self):
+        return self._problem_meta['vec_names']
+
+    @property
+    def _lin_vec_names(self):
+        return self._problem_meta['lin_vec_names']
+
+    @property
+    def _recording_iter(self):
+        return self._problem_meta['recording_iter']
 
     def _set_solver_print(self, level=2, depth=1e99, type_='all'):
         """
@@ -3961,7 +3975,7 @@ class System(object):
             metadata = create_local_meta(self.pathname)
 
             # Get the data to record
-            stack_top = self._get_recording_iter().stack[-1][0]
+            stack_top = self._recording_iter.stack[-1][0]
             method = stack_top.rsplit('.', 1)[-1]
 
             if method not in _recordable_funcs:
@@ -4010,7 +4024,7 @@ class System(object):
         """
         Clear out the iprint stack from the solvers.
         """
-        self.nonlinear_solver._get_solver_info().clear()
+        self.nonlinear_solver._solver_info.clear()
 
     def _reset_iter_counts(self):
         """
@@ -4168,7 +4182,7 @@ class System(object):
             The value of the requested output/input/resid variable.  None if variable is not found.
         """
         discrete = distrib = False
-        val = System._undefined
+        val = _undefined
         typ = 'output' if abs_name in self._var_allprocs_abs2prom['output'] else 'input'
 
         try:
@@ -4189,7 +4203,7 @@ class System(object):
             elif abs_name in self._var_allprocs_discrete['input']:
                 pass  # non-local discrete input
             else:
-                return System._undefined
+                return _undefined
 
         if kind is None:
             kind = typ
@@ -4209,7 +4223,7 @@ class System(object):
 
         if get_remote and self.comm.size > 1:
             owner = self._owning_rank[abs_name]
-            loc_val = val if val is not System._undefined else np.zeros(0)
+            loc_val = val if val is not _undefined else np.zeros(0)
             if rank is None:   # bcast
                 if distrib:
                     idx = self._var_allprocs_abs2idx[vec_name][abs_name]
@@ -4247,7 +4261,7 @@ class System(object):
                         elif self.comm.rank == rank:
                             val = self.comm.recv(source=owner, tag=tag)
 
-        if not flat and val is not System._undefined and not discrete:
+        if not flat and val is not _undefined and not discrete:
             shape = meta['global_shape'] if get_remote and distrib else meta['shape']
             val = val.reshape(shape)
 
@@ -4468,7 +4482,9 @@ class System(object):
         float or ndarray of float
             The value converted to the specified units.
         """
-        base_units = self._get_var_meta(name)['units']
+        meta = self._get_var_meta(name)
+
+        base_units = meta['units']
 
         if base_units is None:
             msg = "{}: Can't express variable '{}' with units of 'None' in units of '{}'."

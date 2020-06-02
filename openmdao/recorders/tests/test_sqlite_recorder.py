@@ -1009,7 +1009,7 @@ class TestSqliteRecorder(unittest.TestCase):
         except om.AnalysisError:
             pass
 
-        self.assertTrue(len(prob._get_recording_iter().stack) == 0)
+        self.assertTrue(len(prob._recording_iter.stack) == 0)
 
     def test_record_solver_nonlinear_block_gs(self):
         prob = SellarProblem(linear_solver=om.LinearBlockGS,

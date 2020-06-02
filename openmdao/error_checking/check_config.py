@@ -15,7 +15,7 @@ from openmdao.utils.class_util import overrides_method
 from openmdao.utils.mpi import MPI
 from openmdao.utils.hooks import _register_hook
 from openmdao.utils.general_utils import printoptions, simple_warning
-from openmdao.utils.units import convert_units
+from openmdao.utils.units import convert_units, _has_val_mismatch
 from openmdao.utils.file_utils import _load_and_exec
 
 
@@ -172,8 +172,9 @@ def _get_used_before_calc_subs(group, input_srcs):
             oparts = src_abs.split('.')
             src_sys = oparts[glen]
             tgt_sys = iparts[glen]
-            if (src_sys == tgt_sys and src_sys in parallel_solver and tgt_sys in parallel_solver and
-                    (parallel_solver[src_sys] not in ["NL: NLBJ", "NL: Newton", "BROYDEN"])):
+            if (src_sys in parallel_solver and tgt_sys in parallel_solver and
+                    (parallel_solver[src_sys] not in ["NL: NLBJ", "NL: Newton", "BROYDEN"]) and
+                    src_sys == tgt_sys):
                 simple_warning("Need to attach NonlinearBlockJac, NewtonSolver, or BroydenSolver "
                                "to '%s' when connecting components inside parallel "
                                "groups" % (src_sys))
@@ -256,7 +257,7 @@ def _trim_str(obj, size):
     return s
 
 
-def _has_val_mismatch(discretes, names, units, vals):
+def _list_has_val_mismatch(discretes, names, units, vals):
     """
     Return True if any of the given values don't match, subject to unit conversion.
 
@@ -291,17 +292,8 @@ def _has_val_mismatch(discretes, names, units, vals):
         if u0 is _UNSET:
             u0 = u
             v0 = v
-        else:
-            if u != u0:
-                # convert units
-                v = convert_units(v, u, new_units=u0)
-
-            rtol = 1e-10
-            normv0 = np.linalg.norm(v0)
-            if normv0 == 0.:
-                return np.linalg.norm(v) > rtol
-            else:
-                return np.linalg.norm(v - v0) / normv0 > rtol
+        elif _has_val_mismatch(u0, v0, u, v):
+            return True
 
     return False
 
@@ -355,8 +347,8 @@ def _check_hanging_inputs(problem, logger):
                 msg.append(template_abs.format(a, units[0], valstr, nwid=nwid + 3, uwid=uwid))
             else:  # promoted
                 vals = [problem.get_val(a, get_remote=True) for a in absnames]
-                mismatch = _has_val_mismatch(problem.model._var_allprocs_discrete['input'],
-                                             absnames, units, vals)
+                mismatch = _list_has_val_mismatch(problem.model._var_allprocs_discrete['input'],
+                                                  absnames, units, vals)
                 if mismatch:
                     msg.append("\n   ----- WARNING: connected input values don't match when "
                                "converted to consistent units. -----\n")

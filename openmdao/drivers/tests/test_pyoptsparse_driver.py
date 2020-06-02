@@ -145,6 +145,21 @@ class DataSave(om.ExplicitComponent):
         partials['y', 'x'] = 2.0*x - 6.0
 
 
+@unittest.skipUnless(OPT is None, "only run if pyoptsparse is NOT installed.")
+class TestNotInstalled(unittest.TestCase):
+
+    def test_pyoptsparse_not_installed(self):
+        # the import should not fail
+        from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
+
+        # but we get a RuntimeError if we try to instantiate
+        with self.assertRaises(RuntimeError) as ctx:
+            pyOptSparseDriver()
+
+        self.assertEqual(str(ctx.exception),
+                         'pyOptSparseDriver is not available, pyOptsparse is not installed.')
+
+
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
 @unittest.skipUnless(MPI, "MPI is required.")
 class TestMPIScatter(unittest.TestCase):
@@ -584,7 +599,6 @@ class TestPyoptSparse(unittest.TestCase):
         msg = "pyOptSparseDriver: Tried to set read-only option 'equality_constraints'."
 
         self.assertEqual(exception.args[0], msg)
-
 
     def test_fan_out(self):
         # This tests sparse-response specification.

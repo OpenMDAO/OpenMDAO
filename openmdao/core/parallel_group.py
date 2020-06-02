@@ -1,7 +1,6 @@
 """Define the ParallelGroup class."""
 
 from openmdao.core.group import Group
-from openmdao.utils.mpi import MPI
 
 
 class ParallelGroup(Group):

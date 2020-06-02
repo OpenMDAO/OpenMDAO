@@ -341,7 +341,7 @@ class TestProblem(unittest.TestCase):
         # check bad scalar value
         bad_val = -10*np.ones((10))
         prob['indep.num'] = bad_val
-        with self.assertRaisesRegex(ValueError, 
+        with self.assertRaisesRegex(ValueError,
                 "Group (.*): Failed to set value of '.*': could not broadcast input array from shape (.*) into shape (.*)."):
             prob.final_setup()
         prob._initial_condition_cache = {}
@@ -766,13 +766,13 @@ class TestProblem(unittest.TestCase):
 
                 self.declare_partials(of='y', wrt='x')
 
-                if not self._problem_meta['force_alloc_complex']:
+                if not self._force_alloc_complex:
                     raise RuntimeError('force_alloc_complex not set in component.')
 
             def compute(self, inputs, outputs):
                 outputs['y'] = 3.0*inputs['x']
 
-                if np.iscomplex(inputs.asarray()) and not self.under_complex_step:
+                if np.iscomplex(inputs._data[0]) and not self.under_complex_step:
                     raise RuntimeError('under_complex_step not set in component.')
 
             def compute_partials(self, inputs, partials):
@@ -806,7 +806,7 @@ class TestProblem(unittest.TestCase):
 
                 self.declare_partials(of='y', wrt='x')
 
-                if self._problem_meta['force_alloc_complex']:
+                if self._force_alloc_complex:
                     print("Vectors allocated for complex step.")
 
             def compute(self, inputs, outputs):

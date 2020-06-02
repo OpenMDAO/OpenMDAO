@@ -897,41 +897,38 @@ class Undefined(object):
         return "<undefined>"
 
 
-def diff_dicts(dict1, dict2):
+def common_subpath(pathnames):
     """
-    Compare dicts and return names of entries that are different and or missing.
+    Return the common dotted subpath found in all of the given dotted pathnames.
 
     Parameters
     ----------
-    dict1 : dict
-        First dict.
-    dict2 : dict
-        Second dict.
+    pathnames : iter of str
+        Dotted pathnames of systems.
 
     Returns
     -------
-    set
-        Names of entries that differ.
-    set
-        Names of entries missing from dict1.
-    set
-        Names of entries missing from dict2.
+    str
+        Common dotted subpath.  Returns '' if no common subpath is found.
     """
-    seen = set()
-    d1only = set()
-    diffs = set()
+    if len(pathnames) == 1:
+        return pathnames[0]
 
-    for name, val1 in dict1.items():
-        if name in dict2:
-            val2 = dict2[name]
-            if isinstance(val1, np.ndarray) or isinstance(val2, np.ndarray):
-                if not np.all(val1 == val2):
-                    diffs.add(name)
-            elif val1 != val2:
-                diffs.add(name)
+    if pathnames:
+        npaths = len(pathnames)
+        splits = [p.split('.') for p in pathnames]
+        minlen = np.min([len(s) for s in splits])
+        for common_loc in range(minlen):
+            p0 = splits[0][common_loc]
+            for i in range(1, npaths):
+                if p0 != splits[i][common_loc]:
+                    break
+            else:
+                continue
+            break
         else:
-            d1only.add(name)
+            common_loc += 1
 
-    d2only = set(dict2).difference(dict1)
+        return '.'.join(splits[0][:common_loc])
 
-    return diffs, d2only, d2only
+    return ''
