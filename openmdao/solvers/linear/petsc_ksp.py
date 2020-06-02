@@ -3,6 +3,8 @@
 import numpy as np
 import os
 
+from openmdao.solvers.solver import LinearSolver
+
 if 'OPENMDAO_REQUIRE_MPI' in os.environ:
     if os.environ['OPENMDAO_REQUIRE_MPI'].lower() in ['always', '1', 'true', 'yes']:
         try:
@@ -23,7 +25,6 @@ else:
         sys.stdout.write("Unable to import petsc4py. Parallel processing unavailable.\n")
         sys.stdout.flush()
 
-from openmdao.solvers.solver import LinearSolver
 
 KSP_TYPES = [
     "richardson",
