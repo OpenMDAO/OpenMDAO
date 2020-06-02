@@ -154,18 +154,18 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(cr.list_sources(out_stream=None), ['driver'])
 
         # check source vars
-        source_vars = cr.list_source_vars('driver')
+        source_vars = cr.list_source_vars('driver', out_stream=None)
         self.assertEqual(sorted(source_vars['inputs']), [])
         self.assertEqual(sorted(source_vars['outputs']), [])
 
         with self.assertRaisesRegex(RuntimeError, "No cases recorded for problem"):
-            cr.list_source_vars('problem')
+            cr.list_source_vars('problem', out_stream=None)
 
         with self.assertRaisesRegex(RuntimeError, "Source not found: root"):
-            cr.list_source_vars('root')
+            cr.list_source_vars('root', out_stream=None)
 
         with self.assertRaisesRegex(RuntimeError, "Source not found: root.nonlinear_solver"):
-            cr.list_source_vars('root.nonlinear_solver')
+            cr.list_source_vars('root.nonlinear_solver', out_stream=None)
 
         # check list cases
         with self.assertRaisesRegex(RuntimeError, "Source not found: foo"):
@@ -198,7 +198,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(cr.list_sources(out_stream=None), ['driver'])
 
         # check source vars
-        source_vars = cr.list_source_vars('driver',)
+        source_vars = cr.list_source_vars('driver', out_stream=None)
         self.assertEqual(sorted(source_vars['inputs']), ['x', 'y1', 'y2', 'z'])
         self.assertEqual(sorted(source_vars['outputs']), ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z'])
 
@@ -260,7 +260,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(cr.list_sources(out_stream=None), ['driver'])
 
         # check source vars
-        source_vars = cr.list_source_vars('driver')
+        source_vars = cr.list_source_vars('driver', out_stream=None)
         self.assertEqual(sorted(source_vars['inputs']), [])
         self.assertEqual(sorted(source_vars['outputs']), ['c', 'f_xy', 'x', 'y'])
 
@@ -293,7 +293,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(cr.list_sources(out_stream=None), ['driver'])
 
         # check source vars
-        source_vars = cr.list_source_vars('driver')
+        source_vars = cr.list_source_vars('driver', out_stream=None)
         self.assertEqual(sorted(source_vars['inputs']), [])
         self.assertEqual(sorted(source_vars['residuals']), ['c', 'f_xy', 'x', 'y'])
 
@@ -329,15 +329,15 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(sorted(cr.list_sources(out_stream=None)), ['root', 'root.d1', 'root.obj_cmp'])
 
         # check source vars
-        source_vars = cr.list_source_vars('root')
+        source_vars = cr.list_source_vars('root', out_stream=None)
         self.assertEqual(sorted(source_vars['inputs']), ['x', 'y1', 'y2', 'z'])
         self.assertEqual(sorted(source_vars['outputs']), ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z'])
 
-        source_vars = cr.list_source_vars('root.d1')
+        source_vars = cr.list_source_vars('root.d1', out_stream=None)
         self.assertEqual(sorted(source_vars['inputs']), ['x', 'y2', 'z'])
         self.assertEqual(sorted(source_vars['outputs']), ['y1'])
 
-        source_vars = cr.list_source_vars('root.obj_cmp')
+        source_vars = cr.list_source_vars('root.obj_cmp', out_stream=None)
         self.assertEqual(sorted(source_vars['inputs']), ['x', 'y1', 'y2', 'z'])
         self.assertEqual(sorted(source_vars['outputs']), ['obj'])
 
@@ -383,7 +383,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(sorted(cr.list_sources(out_stream=None)), ['root.nonlinear_solver'])
 
         # check source vars
-        source_vars = cr.list_source_vars('root.nonlinear_solver')
+        source_vars = cr.list_source_vars('root.nonlinear_solver', out_stream=None)
         self.assertEqual(sorted(source_vars['inputs']), ['x', 'y1', 'y2', 'z'])
         self.assertEqual(sorted(source_vars['outputs']), ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z'])
 
@@ -3066,6 +3066,37 @@ class TestSqliteCaseReader(unittest.TestCase):
         for i, line in enumerate(expected_cases):
             self.assertEqual(text[i], line)
 
+    def test_list_source_vars_format(self):
+        prob = SellarProblem()
+        prob.setup()
+
+        prob.add_recorder(self.recorder)
+        prob.driver.add_recorder(self.recorder)
+        prob.model.d1.add_recorder(self.recorder)
+
+        prob.run_driver()
+
+        prob.record('final')
+        prob.cleanup()
+
+        cr = om.CaseReader(self.filename)
+
+        expected_cases = [
+            'outputs',
+            '    z',
+            '    x',
+            '    obj',
+            '    con2',
+            '    con1'
+        ]
+
+        stream = StringIO()
+        cases = cr.list_source_vars('driver', out_stream=stream)
+        text = sorted(stream.getvalue().split('\n'), reverse=True)
+        for i, line in enumerate(expected_cases):
+            if line:
+                self.assertEqual(text[i], line)
+
 @use_tempdirs
 class TestFeatureSqliteReader(unittest.TestCase):
 
@@ -3224,15 +3255,15 @@ class TestFeatureSqliteReader(unittest.TestCase):
 
         self.assertEqual(sorted(cr.list_sources(out_stream=None)), ['driver', 'root', 'root.nonlinear_solver'])
 
-        driver_vars = cr.list_source_vars('driver')
+        driver_vars = cr.list_source_vars('driver', out_stream=None)
         self.assertEqual(('inputs:', sorted(driver_vars['inputs']), 'outputs:', sorted(driver_vars['outputs'])),
                          ('inputs:', [], 'outputs:', ['con1', 'con2', 'obj', 'x', 'z']))
 
-        model_vars = cr.list_source_vars('root')
+        model_vars = cr.list_source_vars('root', out_stream=None)
         self.assertEqual(('inputs:', sorted(model_vars['inputs']), 'outputs:', sorted(model_vars['outputs'])),
                          ('inputs:', ['x', 'y1', 'y2', 'z'], 'outputs:', ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z']))
 
-        solver_vars = cr.list_source_vars('root')
+        solver_vars = cr.list_source_vars('root', out_stream=None)
         self.assertEqual(('inputs:', sorted(solver_vars['inputs']), 'outputs:', sorted(solver_vars['outputs'])),
                          ('inputs:', ['x', 'y1', 'y2', 'z'], 'outputs:', ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z']))
 
@@ -3989,15 +4020,15 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
             'driver', 'problem', 'root.mda.nonlinear_solver', 'root.nonlinear_solver', 'root.pz'
         ])
 
-        driver_vars = cr.list_source_vars('driver')
+        driver_vars = cr.list_source_vars('driver', out_stream=None)
         self.assertEqual(('inputs:', sorted(driver_vars['inputs']), 'outputs:', sorted(driver_vars['outputs'])),
                          ('inputs:', [], 'outputs:', ['con1', 'con2', 'obj', 'x', 'z']))
 
-        model_vars = cr.list_source_vars('root.pz')
+        model_vars = cr.list_source_vars('root.pz', out_stream=None)
         self.assertEqual(('inputs:', sorted(model_vars['inputs']), 'outputs:', sorted(model_vars['outputs'])),
                          ('inputs:', [], 'outputs:', ['z']))
 
-        solver_vars = cr.list_source_vars('root.mda.nonlinear_solver')
+        solver_vars = cr.list_source_vars('root.mda.nonlinear_solver', out_stream=None)
         self.assertEqual(('inputs:', sorted(solver_vars['inputs']), 'outputs:', sorted(solver_vars['outputs'])),
                          ('inputs:', ['x', 'y1', 'y2', 'z'], 'outputs:', ['y1', 'y2']))
 

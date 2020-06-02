@@ -331,7 +331,7 @@ class SqliteCaseReader(BaseCaseReader):
                 for source in sources:
                     out_stream.write('{}\n'.format(source))
 
-    def list_source_vars(self, source):
+    def list_source_vars(self, source, out_stream=_DEFAULT_OUT_STREAM):
         """
         List of all inputs and outputs recorded by the specified source.
 
@@ -339,6 +339,9 @@ class SqliteCaseReader(BaseCaseReader):
         ----------
         source : {'problem', 'driver', <system hierarchy location>, <solver hierarchy location>}
             Identifies the source for which to return information.
+        out_stream : file-like object
+            Where to send human readable output. Default is sys.stdout.
+            Set to None to suppress.
 
         Returns
         -------
@@ -378,7 +381,14 @@ class SqliteCaseReader(BaseCaseReader):
         if case.residuals:
             dct['residuals'] = list(case.residuals)
 
-        return dct
+        if not out_stream:
+            return dct
+        else:
+            if out_stream is _DEFAULT_OUT_STREAM:
+                out_stream = sys.stdout
+
+            if out_stream:
+                return write_source_table(dct, out_stream)
 
     def list_cases(self, source=None, recurse=True, flat=True, out_stream=_DEFAULT_OUT_STREAM):
         """
