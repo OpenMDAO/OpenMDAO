@@ -202,11 +202,11 @@ class SerialTests(unittest.TestCase):
         par = model.add_subsystem('par', om.ParallelGroup(), promotes=['x'])
         par.add_subsystem('C1', PathCompEx('foo'), promotes=['x'])
         par.add_subsystem('C2', PathCompEx('bar'), promotes=['x'])
-        
+
         try:
             p.setup()
         except Exception as err:
-            self.assertEqual(str(err), "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'] are connected but the metadata entries ['value'] differ and have not been specified by Group.add_input.")
+            self.assertEqual(str(err), "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but the metadata entries ['value'] differ and have not been specified by Group.add_input.")
         else:
             self.fail("Exception expected.")
 

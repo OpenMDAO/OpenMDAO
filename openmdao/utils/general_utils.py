@@ -23,6 +23,50 @@ import numpy as np
 import openmdao
 
 
+# Certain command line tools can make use of this to allow visualization of models when errors
+# are present that would normally cause setup to abort.
+_ignore_errors = False
+
+
+def ignore_errors(flag=None):
+    """
+    Disable certain errors that will prevent setup from completing.
+
+    Parameters
+    ----------
+    flag : bool or None
+        If not None, set the value of _ignore_errors to this value.
+
+    Returns
+    -------
+    bool
+        The current value of _ignore_errors
+    """
+    global _ignore_errors
+    if flag is not None:
+        _ignore_errors = True
+    return _ignore_errors
+
+
+def conditional_error(msg, exc=RuntimeError, category=UserWarning):
+    """
+    Raise an exception or issue a warning, depending on the value of _ignore_errors.
+
+    Parameters
+    ----------
+    msg : str
+        The error/warning message.
+    exc : exception class
+        This exception class is used to create the exception to be raised.
+    category : warning class
+        This category is the class of warning to be issued.
+    """
+    if ignore_errors():
+        simple_warning(msg, category=category)
+    else:
+        raise exc(msg)
+
+
 def warn_deprecation(msg):
     """
     Raise a warning and prints a deprecation message to stdout.

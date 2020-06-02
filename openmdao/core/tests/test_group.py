@@ -1799,7 +1799,7 @@ class TestGroupAddInput(unittest.TestCase):
            p.setup()
 
         self.assertEqual(cm.exception.args[0],
-                         "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'] are connected but the metadata entries ['units'] differ and have not been specified by Group.add_input.")
+                         "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but the metadata entries ['units', 'value'] differ and have not been specified by Group.add_input.")
 
     def test_missing_diff_vals(self):
         p = om.Problem()
@@ -1813,7 +1813,7 @@ class TestGroupAddInput(unittest.TestCase):
            p.setup()
 
         self.assertEqual(cm.exception.args[0],
-                         "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'] are connected but the metadata entries ['value'] differ and have not been specified by Group.add_input.")
+                         "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but the metadata entries ['value'] differ and have not been specified by Group.add_input.")
 
     def test_conflicting_units(self):
         # multiple Group.add_input calls at same tree level with conflicting units args

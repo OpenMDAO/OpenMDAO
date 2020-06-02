@@ -44,6 +44,7 @@ from openmdao.utils.entry_points import _list_installed_setup_parser, _list_inst
     split_ep, _compute_entry_points_setup_parser, _compute_entry_points_exec, \
         _find_plugins_setup_parser, _find_plugins_exec
 from openmdao.core.component import Component
+from openmdao.utils.general_utils import ignore_errors
 
 
 def _n2_setup_parser(parser):
@@ -152,6 +153,7 @@ def _view_connections_cmd(options, user_args):
         funcname = 'setup'
     hooks._register_hook(funcname, class_name='Problem', inst_id=options.problem, post=_viewconns)
 
+    ignore_errors(True)
     _load_and_exec(options.file[0], user_args)
 
 

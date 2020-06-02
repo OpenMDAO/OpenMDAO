@@ -22,7 +22,8 @@ from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import convert_neg, array_connection_compatible, \
     _flatten_src_indices
-from openmdao.utils.general_utils import ContainsAll, all_ancestors, simple_warning, common_subpath
+from openmdao.utils.general_utils import ContainsAll, all_ancestors, simple_warning, \
+    common_subpath, conditional_error
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 from openmdao.utils.coloring import Coloring, _STD_COLORING_FNAME
@@ -2813,31 +2814,32 @@ class Group(System):
                 sunits = smeta['units'] if 'units' in smeta else None
 
             sval = self._get_val(src, kind='output', get_remote=True, from_src=False)
+            errs = set()
+
+            prom = abs2prom[tgts[0]]
+            if prom in self._group_inputs:
+                gmeta = self._group_inputs[prom]
+            else:
+                gmeta = ()
 
             for tgt in tgts:
                 tval = self._get_val(tgt, kind='input', get_remote=True, from_src=False)
 
-                prom = abs2prom[tgt]
-                if prom in self._group_inputs:
-                    gmeta = self._group_inputs[prom]
-                else:
-                    gmeta = ()
-
-                errs = []
-
                 if tgt in all_discrete_ins:
                     if 'value' not in gmeta and sval != tval:
-                        errs.append('value')
+                        errs.add('value')
                 else:
                     tmeta = abs2meta[tgt] if tgt in abs2meta else all_abs2meta[tgt]
                     tunits = tmeta['units'] if 'units' in tmeta else None
                     if 'units' not in gmeta and sunits != tunits:
-                        errs.append('units')
-                    if 'value' not in gmeta and not np.all(sval == tval):
-                        errs.append('value')
+                        errs.add('units')
+                    if _has_val_mismatch(tunits, tval, sunits, sval):
+                        if 'value' not in gmeta:
+                            errs.add('value')
 
-                if errs:
-                    inputs = list(sorted(tgts))
-                    raise RuntimeError(f"{self.msginfo}: The following inputs, {inputs} are "
-                                       f"connected but the metadata entries {errs} differ and "
-                                       "have not been specified by Group.add_input.")
+            if errs:
+                errs = sorted(errs)
+                inputs = sorted(tgts)
+                conditional_error(f"{self.msginfo}: The following inputs, {inputs}, promoted "
+                                  f"to '{prom}', are connected but the metadata entries {errs}"
+                                  " differ and have not been specified by Group.add_input.")
