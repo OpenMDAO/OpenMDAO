@@ -1896,5 +1896,27 @@ class NestedProblemTestCase(unittest.TestCase):
         p.run_model()
 
 
+class SystemInTwoProblemsTestCase(unittest.TestCase):
+    def test_2problems(self):
+        prob = om.Problem()
+        G1 = prob.model.add_subsystem("G1", om.Group())
+        G2 = G1.add_subsystem('G2', om.Group(), promotes_inputs=['x'])
+        G2.add_subsystem('C1', om.ExecComp('y = 2 * x'), promotes_inputs=['x'])
+        G2.add_subsystem('C2', om.ExecComp('y = 3 * x'), promotes_inputs=['x'])
+
+        prob.setup()
+        prob.run_model()
+
+        # 2nd problem
+        prob = om.Problem()
+        prob.model = G2
+
+        prob.setup()
+        prob.run_model()
+
+        np.testing.assert_allclose(prob['C1.y'], 2.0)
+        np.testing.assert_allclose(prob['C2.y'], 3.0)
+
+
 if __name__ == "__main__":
     unittest.main()

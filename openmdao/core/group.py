@@ -324,7 +324,7 @@ class Group(System):
 
         self.configure()
 
-    def _setup_procs(self, pathname, comm, mode, prob_meta):
+    def _setup_procs(self, pathname, comm, mode, setup_mode, prob_meta):
         """
         Execute first phase of the setup process.
 
@@ -340,11 +340,17 @@ class Group(System):
         mode : string
             Derivatives calculation mode, 'fwd' for forward, and 'rev' for
             reverse (adjoint). Default is 'rev'.
+        setup_mode : str
+            What type of setup this is, one of ['full', 'reconf', 'update'].
         prob_meta : dict
             Problem level metadata.
         """
-        super(Group, self)._setup_procs(pathname, comm, mode, prob_meta)
+        super(Group, self)._setup_procs(pathname, comm, mode, setup_mode, prob_meta)
         self._setup_procs_finished = False
+
+        # TODO: get rid of this after we remove reconfig.
+        if setup_mode == 'full':
+            self._vectors = {}
 
         if self._num_par_fd > 1:
             info = self._coloring_info
@@ -423,7 +429,7 @@ class Group(System):
 
         # Perform recursion
         for subsys in self._subsystems_myproc:
-            subsys._setup_procs(subsys.pathname, sub_comm, mode, prob_meta)
+            subsys._setup_procs(subsys.pathname, sub_comm, mode, setup_mode, prob_meta)
 
         # build a list of local subgroups to speed up later loops
         self._subgroups_myproc = [s for s in self._subsystems_myproc if isinstance(s, Group)]
@@ -2742,7 +2748,7 @@ class Group(System):
         if not prom2auto:
             return auto_ivc
 
-        auto_ivc._setup_procs(auto_ivc.pathname, self.comm, mode, self._problem_meta)
+        auto_ivc._setup_procs(auto_ivc.pathname, self.comm, mode, 'full', self._problem_meta)
         auto_ivc._static_mode = False
         try:
             auto_ivc._configure()

@@ -23,6 +23,11 @@ try:
 except ImportError:
     PETScVector = None
 
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
+
 
 class SimpleGroup(om.Group):
 

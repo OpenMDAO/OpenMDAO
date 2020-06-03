@@ -750,7 +750,7 @@ class System(object):
         # If we're only updating and not recursing, processors don't need to be redistributed.
         if recurse:
             # Besides setting up the processors, this method also builds the model hierarchy.
-            self._setup_procs(self.pathname, comm, mode, self._problem_meta)
+            self._setup_procs(self.pathname, comm, mode, setup_mode, self._problem_meta)
 
         # Recurse model from the bottom to the top for configuring.
         # Set static_mode to False in all subsystems because inputs & outputs may be created.
@@ -1407,7 +1407,7 @@ class System(object):
             for subsys in self._subsystems_myproc:
                 subsys._setup_recording(recurse)
 
-    def _setup_procs(self, pathname, comm, mode, prob_meta):
+    def _setup_procs(self, pathname, comm, mode, setup_mode, prob_meta):
         """
         Execute first phase of the setup process.
 
@@ -1422,6 +1422,8 @@ class System(object):
         mode : string
             Derivatives calculation mode, 'fwd' for forward, and 'rev' for
             reverse (adjoint). Default is 'rev'.
+        setup_mode : str
+            What type of setup this is, one of ['full', 'reconf', 'update'].
         prob_meta : dict
             Problem level options.
         """
@@ -1461,8 +1463,10 @@ class System(object):
         self._var_abs_names = {'input': [], 'output': []}
         self._var_allprocs_prom2abs_list = {'input': OrderedDict(), 'output': OrderedDict()}
         self._var_abs2prom = {'input': {}, 'output': {}}
+        self._var_allprocs_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2meta = {}
         self._var_abs2meta = {}
+        self._var_allprocs_abs2idx = {}
 
     def _setup_var_index_maps(self, recurse=True):
         """
@@ -4202,6 +4206,8 @@ class System(object):
                 pass  # non-local discrete output
             elif abs_name in self._var_allprocs_discrete['input']:
                 pass  # non-local discrete input
+            elif get_remote:
+                raise ValueError(f"{self.msginfo}: Can't find variable named '{abs_name}'.")
             else:
                 return _undefined
 
@@ -4209,15 +4215,12 @@ class System(object):
             kind = typ
 
         if not discrete:
-            if not self._vectors[kind]:
-                # final_setup hasn't happened yet so vectors don't exist
-                if kind == 'residual':
-                    raise RuntimeError(f"{self.msginfo}: Can't retrieve residual '{abs_name}' "
-                                       "because final_setup hasn't been called yet.")
+            try:
+                vec = self._vectors[kind][vec_name]
+            except KeyError:
                 if abs_name in self._var_abs2meta:
                     val = self._var_abs2meta[abs_name]['value']
             else:
-                vec = self._vectors[kind][vec_name]
                 if abs_name in vec._views:
                     val = vec._views_flat[abs_name] if flat else vec._views[abs_name]
 
@@ -4262,8 +4265,7 @@ class System(object):
                             val = self.comm.recv(source=owner, tag=tag)
 
         if not flat and val is not _undefined and not discrete:
-            shape = meta['global_shape'] if get_remote and distrib else meta['shape']
-            val = val.reshape(shape)
+            val.shape = meta['global_shape'] if get_remote and distrib else meta['shape']
 
         return val
 
@@ -4553,6 +4555,9 @@ class System(object):
             return meta[abs_name]
 
         raise KeyError('{}: Metadata for variable "{}" not found.'.format(self.msginfo, name))
+
+    def _resolve_connected_input_defaults(self):
+        pass
 
 
 def get_relevant_vars(connections, desvars, responses, mode):

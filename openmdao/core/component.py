@@ -124,7 +124,7 @@ class Component(System):
         """
         pass
 
-    def _setup_procs(self, pathname, comm, mode, prob_meta):
+    def _setup_procs(self, pathname, comm, mode, setup_mode, prob_meta):
         """
         Execute first phase of the setup process.
 
@@ -136,13 +136,19 @@ class Component(System):
             Global name of the system, including the path.
         comm : MPI.Comm or <FakeComm>
             MPI communicator object.
-        mode : string
+        mode : str
             Derivatives calculation mode, 'fwd' for forward, and 'rev' for
             reverse (adjoint). Default is 'rev'.
+        setup_mode : str
+            What type of setup this is, one of ['full', 'reconf', 'update'].
         prob_meta : dict
-            Problem level options.
+            Problem level metadata.
         """
-        super(Component, self)._setup_procs(pathname, comm, mode, prob_meta)
+        super(Component, self)._setup_procs(pathname, comm, mode, setup_mode, prob_meta)
+
+        # TODO: get rid of this after we remove reconfig.
+        if setup_mode == 'full':
+            self._vectors = {}
 
         orig_comm = comm
         if self._num_par_fd > 1:

@@ -921,26 +921,6 @@ def env_truthy(env_var):
     return os.environ.get(env_var, '0').lower() not in ('0', 'false', 'no', '')
 
 
-class Undefined(object):
-    """
-    An instance of this class can be used as a default arg.
-
-    The __repr__ will cause the auto-generate docs to show the arg as <undefined>
-    instead of the default <Undefined object at 0x?????>.
-    """
-
-    def __repr__(self):
-        """
-        Return a string representation.
-
-        Returns
-        -------
-        str
-            A string representation.
-        """
-        return "<undefined>"
-
-
 def common_subpath(pathnames):
     """
     Return the common dotted subpath found in all of the given dotted pathnames.
