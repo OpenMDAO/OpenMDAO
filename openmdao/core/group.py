@@ -324,7 +324,7 @@ class Group(System):
 
         self.configure()
 
-    def _setup_procs(self, pathname, comm, mode, prob_options):
+    def _setup_procs(self, pathname, comm, mode, setup_mode, prob_options):
         """
         Execute first phase of the setup process.
 
@@ -340,6 +340,8 @@ class Group(System):
         mode : string
             Derivatives calculation mode, 'fwd' for forward, and 'rev' for
             reverse (adjoint). Default is 'rev'.
+        setup_mode : string
+            What type of setup this is, one of ['full', 'reconf', 'update'].
         prob_options : OptionsDictionary
             Problem level options.
         """
@@ -350,6 +352,10 @@ class Group(System):
         self.recording_options._parent_name = self.msginfo
 
         self._setup_procs_finished = False
+
+        # TODO: get rid of this after we remove reconfig.
+        if setup_mode == 'full':
+            self._vectors = {}
 
         if self._num_par_fd > 1:
             info = self._coloring_info
@@ -442,7 +448,7 @@ class Group(System):
             subsys._use_derivatives = self._use_derivatives
             subsys._solver_info = self._solver_info
             subsys._recording_iter = self._recording_iter
-            subsys._setup_procs(subsys.pathname, sub_comm, mode, prob_options)
+            subsys._setup_procs(subsys.pathname, sub_comm, mode, setup_mode, prob_options)
 
         # build a list of local subgroups to speed up later loops
         self._subgroups_myproc = [s for s in self._subsystems_myproc if isinstance(s, Group)]
