@@ -17,7 +17,7 @@ class SubSellar(om.Group):
                            promotes=['z', 'y1', 'y2'])
         if units:
              # auto_ivc update requires this since two 'z' inputs have different units
-            self.add_input('z', units='ft')
+            self.set_input_defaults('z', units='ft')
 
 
 class DoubleSellar(om.Group):

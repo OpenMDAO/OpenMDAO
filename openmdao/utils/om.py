@@ -97,6 +97,7 @@ def _n2_cmd(options, user_args):
         hooks._register_hook('setup', 'Problem', pre=_noraise)
         hooks._register_hook('final_setup', 'Problem', post=_viewmod)
 
+        ignore_errors(True)
         _load_and_exec(options.file[0], user_args)
     else:
         # assume the file is a recording, run standalone
@@ -270,6 +271,7 @@ def _config_summary_cmd(options, user_args):
 
     hooks._register_hook('final_setup', 'Problem', post=summary)
 
+    ignore_errors(True)
     _load_and_exec(options.file[0], user_args)
 
 
@@ -380,6 +382,7 @@ def _tree_cmd(options, user_args):
         funcname = 'setup'
     hooks._register_hook(funcname, class_name='Problem', inst_id=options.problem, post=_tree)
 
+    ignore_errors(True)
     _load_and_exec(options.file[0], user_args)
 
 
@@ -425,6 +428,7 @@ def _cite_cmd(options, user_args):
 
     hooks._register_hook('setup', 'Problem', post=_cite)
 
+    ignore_errors(True)
     _load_and_exec(options.file[0], user_args)
 
 

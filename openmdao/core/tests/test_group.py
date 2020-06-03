@@ -400,7 +400,7 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(c2_2.name, 'comp2')
 
         s = p.model._get_subsystem('')
-        self.assertEqual(s, None)
+        self.assertEqual(s, p.model)
 
         p.set_solver_print(level=0)
         p.run_model()
@@ -446,7 +446,7 @@ class TestGroup(unittest.TestCase):
                                                    x={'value': np.zeros(5), 'units': 'ft'},
                                                    y={'units': 'inch'}), promotes=['x'])
 
-        p.model.add_input('x', units='ft')
+        p.model.set_input_defaults('x', units='ft')
 
         p.setup()
         p['comp2.x'] = np.ones(5)
@@ -1804,7 +1804,7 @@ class TestGroupAddInput(unittest.TestCase):
            p.setup()
 
         self.assertEqual(cm.exception.args[0],
-                         "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but the metadata entries ['units', 'value'] differ and have not been specified by Group.add_input.")
+                         "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but the metadata entries ['units', 'value'] differ. Call <group>.set_input_defaults('x', units=?, value=?), where <group> is the Group named 'par' to remove the ambiguity.")
 
     def test_missing_diff_vals(self):
         p = om.Problem()
@@ -1818,23 +1818,23 @@ class TestGroupAddInput(unittest.TestCase):
            p.setup()
 
         self.assertEqual(cm.exception.args[0],
-                         "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but the metadata entries ['value'] differ and have not been specified by Group.add_input.")
+                         "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but the metadata entries ['value'] differ. Call <group>.set_input_defaults('x', value=?), where <group> is the Group named 'par' to remove the ambiguity.")
 
     def test_conflicting_units(self):
-        # multiple Group.add_input calls at same tree level with conflicting units args
+        # multiple Group.set_input_defaults calls at same tree level with conflicting units args
         p = self._make_tree_model(diff_units=True)
         model = p.model
         g2 = model._get_subsystem('G1.G2')
-        g2.add_input('x', units='ft')
+        g2.set_input_defaults('x', units='ft')
 
         g3 = model._get_subsystem('G1.G3')
-        g3.add_input('x', units='ft')
+        g3.set_input_defaults('x', units='ft')
 
         g4 = model._get_subsystem('par.G4')
-        g4.add_input('x', units='inch')
+        g4.set_input_defaults('x', units='inch')
 
         g5 = model._get_subsystem('par.G5')
-        g5.add_input('x', units='ft')
+        g5.set_input_defaults('x', units='ft')
 
         with self.assertRaises(Exception) as cm:
             p.setup()
@@ -1842,23 +1842,23 @@ class TestGroupAddInput(unittest.TestCase):
         self.assertEqual(cm.exception.args[0], "Groups 'par.G4' and 'par.G5' added the input 'x' with conflicting 'units'.")
 
     def test_conflicting_units_multi_level(self):
-        # multiple Group.add_input calls at different tree levels with conflicting units args
+        # multiple Group.set_input_defaults calls at different tree levels with conflicting units args
         p = self._make_tree_model(diff_units=True)
         model = p.model
         g2 = model._get_subsystem('G1.G2')
-        g2.add_input('x', units='ft')
+        g2.set_input_defaults('x', units='ft')
 
         g3 = model._get_subsystem('G1.G3')
-        g3.add_input('x', units='ft')
+        g3.set_input_defaults('x', units='ft')
 
         g4 = model._get_subsystem('par.G4')
-        g4.add_input('x', units='ft')
+        g4.set_input_defaults('x', units='ft')
 
         g5 = model._get_subsystem('par.G5')
-        g5.add_input('x', units='ft')
+        g5.set_input_defaults('x', units='ft')
 
         g1 = model._get_subsystem('G1')
-        g1.add_input('x', units='inch')
+        g1.set_input_defaults('x', units='inch')
 
         with self.assertRaises(Exception) as cm:
             p.setup()
@@ -1866,23 +1866,23 @@ class TestGroupAddInput(unittest.TestCase):
         self.assertEqual(cm.exception.args[0], "Groups 'G1' and 'G1.G2' added the input 'x' with conflicting 'units'.")
 
     def test_conflicting_units_multi_level_par(self):
-        # multiple Group.add_input calls at different tree levels with conflicting units args
+        # multiple Group.set_input_defaults calls at different tree levels with conflicting units args
         p = self._make_tree_model(diff_units=True)
         model = p.model
         g2 = model._get_subsystem('G1.G2')
-        g2.add_input('x', units='ft')
+        g2.set_input_defaults('x', units='ft')
 
         g3 = model._get_subsystem('G1.G3')
-        g3.add_input('x', units='ft')
+        g3.set_input_defaults('x', units='ft')
 
         g4 = model._get_subsystem('par.G4')
-        g4.add_input('x', units='ft')
+        g4.set_input_defaults('x', units='ft')
 
         g5 = model._get_subsystem('par.G5')
-        g5.add_input('x', units='ft')
+        g5.set_input_defaults('x', units='ft')
 
         par = model._get_subsystem('par')
-        par.add_input('x', units='inch')
+        par.set_input_defaults('x', units='inch')
 
         with self.assertRaises(Exception) as cm:
             p.setup()
@@ -1893,16 +1893,16 @@ class TestGroupAddInput(unittest.TestCase):
         p = self._make_tree_model(diff_units=True)
         model = p.model
         g2 = model._get_subsystem('G1.G2')
-        g2.add_input('xx', units='ft')
+        g2.set_input_defaults('xx', units='ft')
 
         g3 = model._get_subsystem('G1.G3')
-        g3.add_input('x', units='ft')
+        g3.set_input_defaults('x', units='ft')
 
         g4 = model._get_subsystem('par.G4')
-        g4.add_input('x', units='ft')
+        g4.set_input_defaults('x', units='ft')
 
         g5 = model._get_subsystem('par.G5')
-        g5.add_input('x', units='ft')
+        g5.set_input_defaults('x', units='ft')
 
         with self.assertRaises(Exception) as cm:
             p.setup()
@@ -1913,19 +1913,19 @@ class TestGroupAddInput(unittest.TestCase):
         p = self._make_tree_model(diff_vals=True)
         model = p.model
         g2 = model._get_subsystem('G1.G2')
-        g2.add_input('x', val=3.0)
+        g2.set_input_defaults('x', val=3.0)
 
         g3 = model._get_subsystem('G1.G3')
-        g3.add_input('x', val=3.0)
+        g3.set_input_defaults('x', val=3.0)
 
         g4 = model._get_subsystem('par.G4')
-        g4.add_input('x', val=3.0)
+        g4.set_input_defaults('x', val=3.0)
 
         g5 = model._get_subsystem('par.G5')
-        g5.add_input('x', val=3.0)
+        g5.set_input_defaults('x', val=3.0)
 
         g1 = model._get_subsystem('G1')
-        g1.add_input('x', val=4.0)
+        g1.set_input_defaults('x', val=4.0)
 
         with self.assertRaises(Exception) as cm:
             p.setup()
@@ -1995,7 +1995,7 @@ class TestFeatureAddSubsystem(unittest.TestCase):
                          promotes_inputs=['a'], promotes_outputs=['b'])
         g1.add_subsystem('comp2', om.ExecComp('b=3.0*a', a=4.0, b=12.0),
                          promotes_inputs=['a'])
-        g1.add_input('a', val=3.5)
+        g1.set_input_defaults('a', val=3.5)
         p.setup()
 
         # output G1.comp1.b is promoted

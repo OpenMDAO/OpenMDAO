@@ -163,7 +163,7 @@ class Group(System):
         """
         pass
 
-    def add_input(self, name, val=_undefined, units=None):
+    def set_input_defaults(self, name, val=_undefined, units=None):
         """
         Specify metadata for connected promoted inputs without a source.
 
@@ -1874,6 +1874,9 @@ class Group(System):
         System or None
             System if found else None.
         """
+        if name == '':
+            return self
+
         system = self
         for subname in name.split('.'):
             for sub in chain(system._static_subsystems_allprocs,
@@ -2631,9 +2634,9 @@ class Group(System):
                                 if val is _undefined:
                                     val = abs2meta[tgt]['value']
                             elif distrib:
-                                raise RuntimeError(f"{self.msginfo}: Group.add_input currently"
-                                                   " does not support overriding distributed "
-                                                   "input values.")
+                                raise RuntimeError(f"{self.msginfo}: Group.set_input_defaults "
+                                                   "currently does not support overriding "
+                                                   "distributed input values.")
                             else:
                                 val = gval
 
@@ -2797,8 +2800,10 @@ class Group(System):
         return auto_ivc
 
     def _resolve_connected_input_defaults(self):
+        # This should only be called on the top level Group.
+
         # these are meta dict entries that cannot differ between inputs unless a default
-        # is specified from a corresponding group.add_input call
+        # is specified from a corresponding group.set_input_defaults call
         group_nodiff = ['value', 'units']
 
         srcconns = defaultdict(list)
@@ -2846,6 +2851,29 @@ class Group(System):
             if errs:
                 errs = sorted(errs)
                 inputs = sorted(tgts)
+                gpath = common_subpath(tgts)
+                g = self._get_subsystem(gpath)
+                gprom = None
+
+                # get promoted name relative to g
+                if MPI is not None and self.comm.size > 1:
+                    if not (g is not None and g.comm is not None):  # g is not a local system
+                        g = None
+                    if self.comm.allreduce(int(g is not None)) < self.comm.size:
+                        # some procs have remote g
+                        if g is not None:
+                            gprom = g._var_allprocs_abs2prom['input'][inputs[0]]
+                        proms = self.comm.allgather(gprom)
+                        for p in proms:
+                            if p is not None:
+                                gprom = p
+                                break
+                if gprom is None:
+                    gprom = g._var_allprocs_abs2prom['input'][inputs[0]]
+
+                args = ', '.join([f'{n}=?' for n in errs])
                 conditional_error(f"{self.msginfo}: The following inputs, {inputs}, promoted "
                                   f"to '{prom}', are connected but the metadata entries {errs}"
-                                  " differ and have not been specified by Group.add_input.")
+                                  f" differ. Call <group>.set_input_defaults('{gprom}', {args}), "
+                                  f"where <group> is the Group named '{gpath}' to remove the "
+                                  "ambiguity.")
