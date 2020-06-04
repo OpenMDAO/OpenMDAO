@@ -465,13 +465,13 @@ class Problem(object):
                                 if name in ginputs and 'units' in ginputs[name]:
                                     tunits = ginputs[name]['units']
                                 else:
-                                    tunit_list = [tmeta[n]['units'] for n in abs_names]
+                                    tunit_list = [all_meta[n]['units'] for n in abs_names]
                                     tu0 = tunit_list[0]
                                     for tu in tunit_list:
                                         if tu != tu0:
                                             self.model._show_abiguity_msg(name, ('units'),
                                                                           abs_names)
-                                    tunits = tmeta[abs_name]
+                                    tunits = tmeta['units']
                             else:
                                 tunits = tmeta['units']
                             value = self.model.convert_from_units(src, value, tunits)
