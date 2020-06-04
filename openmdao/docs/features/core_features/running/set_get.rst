@@ -104,7 +104,7 @@ input is connected to an output because the input and output are promoted to the
 the promoted name will be interpreted as that of the output, and the units will be assumed to be
 those of the output as well.  If the input has not been connected to an output then the framework
 will connect it automatically to an output of `_auto_ivc`.  In this case, setting or getting using
-the absolute input name will cause the framework to assume the units are those of the input.
+the input name will cause the framework to assume the units are those of the input.
 
 
 Connected Inputs Without a Source
@@ -140,11 +140,11 @@ In this case, the framework will not raise an exception during setup if `set_inp
 called as it does in the case of multiple promoted inputs that connected to `_auto_ivc`.  However,
 if the user attempts to set or get the input using the promoted name, the framework *will* raise an
 exception if `set_input_defaults` has not been called to disambiguate the units of the promoted
-input.  The reason for this difference is that in the unconnected case, the user will not
-generally know the name of the `_auto_ivc` output that their inputs are connected to and so will
-be forced to do all of their sets and gets using the promoted input name.  In the manually connected case,
-the user will know the name of the connected output and can simply set and/or get using the
-promoted output name.
+input.  The reason for this difference is that in the unconnected case, the framework won't know
+what value and units to assign to the `_auto_ivc` output if they're ambiguous.  In the manually
+connected case, the value and units of the output have already been supplied by the user, and
+the only time that there's an ambiguity is if the user tries to access the inputs using their
+promoted name.
 
 Specifying Units
 ----------------
