@@ -2605,11 +2605,16 @@ class Group(System):
             for src, tgts in auto2tgt.items():
                 val = _undefined
 
-                for t in tgts:
-                    if not (t in remote_ins or all_abs2meta[t]['distributed']):
-                        # we found a duplicated input.  Use that.
-                        tgt = t
-                        break
+                dup_ts = [t for t in tgts if not
+                          (t in remote_ins or all_abs2meta[t]['distributed'])]
+                if dup_ts:
+                    # allow for mix of inputs, some with (nondistributed) src_indices, some not.
+                    for t in dup_ts:
+                        if not all_abs2meta[t]['has_src_indices']:
+                            tgt = t
+                            break
+                    else:
+                        tgt = dup_ts[0]
                 else:
                     auto_ivc._add_remote(src)
                     tgt = tgts[0]
@@ -2849,31 +2854,33 @@ class Group(System):
                             errs.add('value')
 
             if errs:
-                errs = sorted(errs)
-                inputs = sorted(tgts)
-                gpath = common_subpath(tgts)
-                g = self._get_subsystem(gpath)
-                gprom = None
+                self._show_ambiguity_msg(prom, errs, tgts)
 
-                # get promoted name relative to g
-                if MPI is not None and self.comm.size > 1:
-                    if not (g is not None and g.comm is not None):  # g is not a local system
-                        g = None
-                    if self.comm.allreduce(int(g is not None)) < self.comm.size:
-                        # some procs have remote g
-                        if g is not None:
-                            gprom = g._var_allprocs_abs2prom['input'][inputs[0]]
-                        proms = self.comm.allgather(gprom)
-                        for p in proms:
-                            if p is not None:
-                                gprom = p
-                                break
-                if gprom is None:
+    def _show_ambiguity_msg(self, prom, metavars, tgts):
+        errs = sorted(metavars)
+        inputs = sorted(tgts)
+        gpath = common_subpath(tgts)
+        g = self._get_subsystem(gpath)
+        gprom = None
+
+        # get promoted name relative to g
+        if MPI is not None and self.comm.size > 1:
+            if not (g is not None and g.comm is not None):  # g is not a local system
+                g = None
+            if self.comm.allreduce(int(g is not None)) < self.comm.size:
+                # some procs have remote g
+                if g is not None:
                     gprom = g._var_allprocs_abs2prom['input'][inputs[0]]
+                proms = self.comm.allgather(gprom)
+                for p in proms:
+                    if p is not None:
+                        gprom = p
+                        break
+        if gprom is None:
+            gprom = g._var_allprocs_abs2prom['input'][inputs[0]]
 
-                args = ', '.join([f'{n}=?' for n in errs])
-                conditional_error(f"{self.msginfo}: The following inputs, {inputs}, promoted "
-                                  f"to '{prom}', are connected but the metadata entries {errs}"
-                                  f" differ. Call <group>.set_input_defaults('{gprom}', {args}), "
-                                  f"where <group> is the Group named '{gpath}' to remove the "
-                                  "ambiguity.")
+        args = ', '.join([f'{n}=?' for n in errs])
+        conditional_error(f"{self.msginfo}: The following inputs, {inputs}, promoted "
+                          f"to '{prom}', are connected but the metadata entries {errs}"
+                          f" differ. Call <group>.set_input_defaults('{gprom}', {args}), "
+                          f"where <group> is the Group named '{gpath}' to remove the ambiguity.")

@@ -576,6 +576,22 @@ class TestProblem(unittest.TestCase):
         prob.run_model()
         assert_near_equal(prob['f_xy'], 214.0, 1e-6)
 
+    def test_feature_set_indeps_auto(self):
+        import openmdao.api as om
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        prob = om.Problem()
+
+        model = prob.model
+        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+
+        prob.setup()
+
+        prob['x'] = 2.
+        prob['y'] = 10.
+        prob.run_model()
+        assert_near_equal(prob['f_xy'], 214.0, 1e-6)
+
     def test_feature_basic_setup(self):
         import openmdao.api as om
         from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -1026,6 +1042,134 @@ class TestProblem(unittest.TestCase):
         prob.set_val('axx', 35.0, 'degC', indices=0)
         assert_near_equal(prob['axx'][0], 95.0, 1e-6)
         assert_near_equal(prob.get_val('axx', 'degC', indices=np.array([0])), 35.0, 1e-6)
+
+    @unittest.expectedFailure
+    def test_feature_get_set_with_units_diff_err(self):
+        import openmdao.api as om
+
+        prob = om.Problem()
+        prob.model.add_subsystem('C1', om.ExecComp('y=x*2.',
+                                                     x={'value': 1.0, 'units': 'ft'},
+                                                     y={'value': 0.0, 'units': 'ft'}),
+                                 promotes=['x'])
+        prob.model.add_subsystem('C2', om.ExecComp('y=x*3.',
+                                                     x={'value': 1.0, 'units': 'inch'},
+                                                     y={'value': 0.0, 'units': 'inch'}),
+                                 promotes=['x'])
+
+        prob.setup()
+
+    def test_feature_get_set_with_units_diff(self):
+        import openmdao.api as om
+
+        prob = om.Problem()
+        G1 = prob.model.add_subsystem('G1', om.Group())
+        G1.add_subsystem('C1', om.ExecComp('y=x*2.',
+                                            x={'value': 1.0, 'units': 'cm'},
+                                            y={'value': 0.0, 'units': 'cm'}),
+                         promotes=['x'])
+        G1.add_subsystem('C2', om.ExecComp('y=x*3.',
+                                            x={'value': 1.0, 'units': 'mm'},
+                                            y={'value': 0.0, 'units': 'mm'}),
+                         promotes=['x'])
+
+        # units and value to use for the _auto_ivc output are ambiguous.  This fixes that.
+        G1.set_input_defaults('x', units='m', val=1.0)
+
+        prob.setup()
+
+        # set G1.x to 2.0 m, based on the units we gave in the set_input_defaults call
+        prob['G1.x'] = 2.0
+
+        prob.run_model()
+
+        # we gave 'G1.x' units of 'm' in the set_input_defaults call
+        assert_near_equal(prob['G1.x'], 2.0, 1e-6)
+
+        # using absolute value will give us the value of the input C1.x, in its units of 'cm'
+        assert_near_equal(prob['G1.C1.x'], 200.0, 1e-6)
+
+        # using absolute value will give us the value of the input C2.x, in its units of 'mm'
+        assert_near_equal(prob['G1.C2.x'], 2000.0, 1e-6)
+
+    def test_feature_get_set_with_units_prom_plus_explicit(self):
+        import openmdao.api as om
+
+        prob = om.Problem()
+        prob.model.add_subsystem('indeps', om.IndepVarComp('x', val=1.0, units='m'))
+        G1 = prob.model.add_subsystem('G1', om.Group())
+        G1.add_subsystem('C1', om.ExecComp('y=x*2.',
+                                            x={'value': 1.0, 'units': 'cm'},
+                                            y={'value': 0.0, 'units': 'cm'}),
+                         promotes=['x'])
+        G1.add_subsystem('C2', om.ExecComp('y=x*3.',
+                                            x={'value': 1.0, 'units': 'mm'},
+                                            y={'value': 0.0, 'units': 'mm'}),
+                         promotes=['x'])
+
+        # connect IVC to promoted inputs
+        prob.model.connect('indeps.x', 'G1.x')
+
+        # units and value to use for the _auto_ivc output are ambiguous.  This fixes that.
+        G1.set_input_defaults('x', units='dm', val=1.0)
+
+        prob.setup()
+
+        prob['indeps.x'] = 2.0
+
+        prob.run_model()
+
+        assert_near_equal(prob['indeps.x'], 2.0, 1e-6)
+
+        # using the promoted name of the inputs will give the value in the units set in set_input_defaults,
+        # which is 'dm'
+        assert_near_equal(prob['G1.x'], 20.0, 1e-6)
+
+        # using absolute value will give us the value of the input C1.x, in its units of 'inch'
+        assert_near_equal(prob['G1.C1.x'], 200.0, 1e-6)
+
+        # using absolute value will give us the value of the input C2.x, in its units of 'ft'
+        assert_near_equal(prob['G1.C2.x'], 2000.0, 1e-6)
+
+    def test_feature_get_set_with_units_prom_plus_explicit_err(self):
+        import openmdao.api as om
+
+        prob = om.Problem()
+        prob.model.add_subsystem('indeps', om.IndepVarComp('x', val=1.0, units='m'))
+        G1 = prob.model.add_subsystem('G1', om.Group())
+        G1.add_subsystem('C1', om.ExecComp('y=x*2.',
+                                            x={'value': 1.0, 'units': 'cm'},
+                                            y={'value': 0.0, 'units': 'cm'}),
+                         promotes=['x'])
+        G1.add_subsystem('C2', om.ExecComp('y=x*3.',
+                                            x={'value': 1.0, 'units': 'mm'},
+                                            y={'value': 0.0, 'units': 'mm'}),
+                         promotes=['x'])
+
+        # connect IVC to promoted inputs
+        prob.model.connect('indeps.x', 'G1.x')
+
+        prob.setup()
+
+        prob['indeps.x'] = 2.0
+
+        prob.run_model()
+
+        assert_near_equal(prob['indeps.x'], 2.0, 1e-6)
+
+        # using absolute value will give us the value of the input C1.x, in its units of 'inch'
+        assert_near_equal(prob['G1.C1.x'], 200.0, 1e-6)
+
+        # using absolute value will give us the value of the input C2.x, in its units of 'ft'
+        assert_near_equal(prob['G1.C2.x'], 2000.0, 1e-6)
+
+        # using the promoted name of the inputs will raise an exception because the two promoted
+        # inputs have different units and set_input_defaults was not called to disambiguate.
+        with self.assertRaises(RuntimeError) as cm:
+            x = prob['G1.x']
+
+        msg = "Group (<model>): The following inputs, ['G1.C1.x', 'G1.C2.x'], promoted to 'G1.x', are connected but the metadata entries ['units'] differ. Call <group>.set_input_defaults('x', units=?), where <group> is the Group named 'G1' to remove the ambiguity."
+        self.assertEqual(cm.exception.args[0], msg)
 
     def test_get_set_with_units_error_messages(self):
         import openmdao.api as om

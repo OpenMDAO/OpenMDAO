@@ -267,11 +267,13 @@ class Vector(object):
             Absolute variable name if unique abs_name found or None otherwise.
         """
         system = self._system()
-        abs_name = prom_name2abs_name(system, name, self._typ)
+
+        # try relative name first
+        abs_name = name if system.pathname == '' else '.'.join((system.pathname, name))
         if abs_name in self._names:
             return abs_name
 
-        abs_name = rel_name2abs_name(system, name)
+        abs_name = prom_name2abs_name(system, name, self._typ)
         if abs_name in self._names:
             return abs_name
 

@@ -25,7 +25,7 @@ from openmdao.utils.units import is_compatible, unit_conversion
 from openmdao.utils.variable_table import write_var_table
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.graph_utils import all_connected_nodes
-from openmdao.utils.name_maps import name2abs_name
+from openmdao.utils.name_maps import name2abs_name, name2abs_names
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
     _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS
 import openmdao.utils.coloring as coloring_mod
@@ -4305,30 +4305,41 @@ class System(object):
         object
             The value of the requested output/input variable.
         """
-        abs_name, typ = name2abs_name(self, name, check_unique=False)
-        if abs_name is None:
+        abs_names = name2abs_names(self, name)
+        if not abs_names:
             raise KeyError('{}: Variable "{}" not found.'.format(self.msginfo, name))
 
         conns = self._problem_meta['connections']
-        if from_src and abs_name in conns:  # pull input from source
-            src = conns[abs_name]
-            return self._get_input_from_src(abs_name, src, units=units, indices=indices,
+        if from_src and abs_names[0] in conns:  # pull input from source
+            return self._get_input_from_src(name, abs_names, conns, units=units, indices=indices,
                                             get_remote=get_remote, rank=rank, vec_name='nonlinear',
                                             kind=None, flat=flat)
         else:
-            val = self._abs_get_val(abs_name, get_remote, rank, vec_name, kind, flat)
+            val = self._abs_get_val(abs_names[0], get_remote, rank, vec_name, kind, flat)
 
             # TODO: get indexed value BEFORE transferring the variable (might be much smaller)
             if indices is not None:
                 val = val[indices]
 
             if units is not None:
-                val = self.convert2units(abs_name, val, units)
+                val = self.convert2units(abs_names[0], val, units)
 
         return val
 
-    def _get_input_from_src(self, abs_name, src, units=None, indices=None, get_remote=False,
-                            rank=None, vec_name='nonlinear', kind=None, flat=False):
+    def _get_input_from_src(self, name, abs_names, conns, units=None, indices=None,
+                            get_remote=False, rank=None, vec_name='nonlinear', kind=None,
+                            flat=False):
+        abs_name = abs_names[0]
+        src = conns[abs_name]
+        # if we have multiple promoted inputs that are explicitly connected to an output and units
+        # have not been specified, look for group input to disambiguate
+        if units is None and len(abs_names) > 1 and name != abs_name:
+            # we can't get here unless self is a Group because len(abs_names) always == 1 for comp
+            try:
+                units = self._group_inputs[name]['units']
+            except KeyError:
+                self._show_ambiguity_msg(name, ('units',), abs_names)
+
         if src in self._var_allprocs_discrete['output']:
             return self._abs_get_val(src, get_remote, rank, vec_name, kind, flat)
 
@@ -4550,7 +4561,7 @@ class System(object):
         if name in meta:
             return meta[name]
 
-        abs_name, _ = name2abs_name(self, name)
+        abs_name = name2abs_name(self, name)
         if abs_name is not None:
             return meta[abs_name]
 

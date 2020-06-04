@@ -77,7 +77,7 @@ def abs_key2rel_key(system, abs_key):
     return (abs_name2rel_name(system, abs_key[0]), abs_name2rel_name(system, abs_key[1]))
 
 
-def prom_name2abs_name(system, prom_name, type_, check_unique=True):
+def prom_name2abs_name(system, prom_name, type_):
     """
     Map the given promoted name to the absolute name.
 
@@ -91,8 +91,6 @@ def prom_name2abs_name(system, prom_name, type_, check_unique=True):
         Promoted variable name in the owning system's namespace.
     type_ : str
         Either 'input' or 'output'.
-    check_unique : bool
-        If True, check promoted name for uniqueness and raise exception if it isn't.
 
     Returns
     -------
@@ -103,7 +101,7 @@ def prom_name2abs_name(system, prom_name, type_, check_unique=True):
 
     if prom_name in prom2abs_lists:
         abs_list = prom2abs_lists[prom_name]
-        if len(abs_list) == 1 or not check_unique:
+        if len(abs_list) == 1:
             return abs_list[0]
         else:
             # looks like an aliased input, which must be set via the connected output
@@ -123,7 +121,7 @@ def prom_name2abs_name(system, prom_name, type_, check_unique=True):
         return None
 
 
-def name2abs_name(system, name, check_unique=True):
+def name2abs_name(system, name):
     """
     Map the given promoted or relative name to the absolute name.
 
@@ -135,8 +133,6 @@ def name2abs_name(system, name, check_unique=True):
         System to which name is relative.
     name : str
         Promoted or relative variable name in the owning system's namespace.
-    check_unique : bool
-        If True, check promoted name for uniqueness and raise exception if it isn't.
 
     Returns
     -------
@@ -146,26 +142,64 @@ def name2abs_name(system, name, check_unique=True):
         The type ('input' or 'output') of the corresponding variable.
     """
     if name in system._var_allprocs_abs2prom['output']:
-        return (name, 'output')
+        return name
     if name in system._var_allprocs_abs2prom['input']:
-        return (name, 'input')
+        return name
 
     if name in system._var_allprocs_prom2abs_list['output']:
         abs_name = system._var_allprocs_prom2abs_list['output'][name][0]
-        return (abs_name, 'output')
+        return abs_name
 
     # This may raise an exception if name is not unique
-    abs_name = prom_name2abs_name(system, name, 'input', check_unique)
+    abs_name = prom_name2abs_name(system, name, 'input')
     if abs_name is not None:
-        return (abs_name, 'input')
+        return abs_name
 
     abs_name = rel_name2abs_name(system, name)
     if abs_name in system._var_allprocs_abs2prom['output']:
-        return (abs_name, 'output')
+        return abs_name
     elif abs_name in system._var_allprocs_abs2prom['input']:
-        return (abs_name, 'input')
+        return abs_name
 
-    return None, None
+
+def name2abs_names(system, name):
+    """
+    Map the given promoted, relative, or absolute name to any matching absolute names.
+
+    Parameters
+    ----------
+    system : <System>
+        System to which name is relative.
+    name : str
+        Promoted or relative variable name in the owning system's namespace.
+
+    Returns
+    -------
+    tuple or list of str
+        Tuple or list of absolute variable names found.
+    """
+    if name in system._var_allprocs_abs2prom['output']:
+        return (name,)
+    if name in system._var_allprocs_abs2prom['input']:
+        return (name,)
+
+    if name in system._var_allprocs_prom2abs_list['output']:
+        return system._var_allprocs_prom2abs_list['output'][name]
+
+    if name in system._var_allprocs_prom2abs_list['input']:
+        return system._var_allprocs_prom2abs_list['input'][name]
+
+    if system.pathname:
+        abs_name = f"{system.pathname}.{name}"
+    else:
+        abs_name = name
+
+    if abs_name in system._var_allprocs_abs2prom['output']:
+        return (abs_name,)
+    elif abs_name in system._var_allprocs_abs2prom['input']:
+        return (abs_name,)
+
+    return ()
 
 
 def prom_key2abs_key(system, prom_key):

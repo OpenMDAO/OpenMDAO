@@ -217,3 +217,33 @@ class MPITests(SerialTests):
     N_PROCS = 2
 
 
+class C1(om.ExplicitComponent):
+    def setup(self):
+        self.add_input('diameter', 0.0, units='m', src_indices=[0])
+        self.add_output('z_start', 0.0, units='m')
+
+    def compute(self, inputs, outputs):
+        pass
+
+
+class C2(om.ExplicitComponent):
+
+    def setup(self):
+        self.add_input('diameter', np.zeros(3), units='m')
+
+    def compute(self, inputs, outputs):
+        pass
+
+
+class SrcIndicesTests(unittest.TestCase):
+
+    def test_mixed_src_indices_no_src_indices(self):
+        # this test passes if setup doesn't raise an exception.
+        # C1 has src_indices and C2 doesn't.
+        prob = om.Problem()
+        prob.model.add_subsystem('C1', C1(), promotes=['diameter'])
+        prob.model.add_subsystem('C2', C2(), promotes=['diameter'])
+
+        prob.setup()
+
+        prob.run_model()

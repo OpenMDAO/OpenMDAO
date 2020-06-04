@@ -433,10 +433,14 @@ class Problem(object):
         all_proms = self.model._var_allprocs_prom2abs_list
         all_meta = self.model._var_allprocs_abs2meta
         all_discrete = self.model._var_allprocs_discrete['input']
+        n_prom_ins = 0  # if nonzero, name given was promoted input name w/o a matching prom output
+
         if name in all_proms['output']:
             abs_name = all_proms['output'][name][0]
         elif name in all_proms['input']:
-            abs_name = all_proms['input'][name][0]
+            abs_names = all_proms['input'][name]
+            n_prom_ins = len(abs_names)
+            abs_name = abs_names[0]
         else:
             abs_name = name
 
@@ -444,17 +448,32 @@ class Problem(object):
             src = conns[abs_name]
             if abs_name not in all_discrete:
                 value = np.asarray(value)
-                tmeta = self.model._var_allprocs_abs2meta[abs_name]
+                tmeta = all_meta[abs_name]
                 if abs_name in self.model._var_abs2meta:
                     tlocmeta = self.model._var_abs2meta[abs_name]
                 else:
                     tlocmeta = None
-                smeta = self.model._var_allprocs_abs2meta[src]
-                tunits = tmeta['units']
                 if units is None:
                     if self._setup_status > 1:  # avoids double unit conversion
                         ivalue = value
-                        if smeta['units'] is not None:
+                        if all_meta[src]['units'] is not None:
+                            if n_prom_ins > 1:  # promoted input name was used
+                                try:
+                                    ginputs = self.model._group_inputs
+                                except AttributeError:
+                                    ginputs = {}  # could happen if top level system is not a Group
+                                if name in ginputs and 'units' in ginputs[name]:
+                                    tunits = ginputs[name]['units']
+                                else:
+                                    tunit_list = [tmeta[n]['units'] for n in abs_names]
+                                    tu0 = tunit_list[0]
+                                    for tu in tunit_list:
+                                        if tu != tu0:
+                                            self.model._show_abiguity_msg(name, ('units'),
+                                                                          abs_names)
+                                    tunits = tmeta[abs_name]
+                            else:
+                                tunits = tmeta['units']
                             value = self.model.convert_from_units(src, value, tunits)
                 else:
                     value = self.model.convert_from_units(abs_name, value, units)
