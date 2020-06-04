@@ -135,7 +135,6 @@ def _check_ubcs_prob(prob, logger):
     if len(warnings) > 1:
         logger.warning(''.join(warnings[:1] + sorted(warnings[1:])))
 
-
 def _get_used_before_calc_subs(group, input_srcs):
     """
     Return Systems that are executed out of dataflow order.
@@ -157,9 +156,13 @@ def _get_used_before_calc_subs(group, input_srcs):
     """
     sub2i = {}
     parallel_solver = {}
+    top_level_hierarchy = []
     for i, sub in enumerate(group._subsystems_allprocs):
         if hasattr(sub, '_mpi_proc_allocator') and sub._mpi_proc_allocator.parallel:
-            parallel_solver.update({sub.name: sub.nonlinear_solver.SOLVER})
+            parallel_solver[sub.name] = sub.nonlinear_solver.SOLVER
+            for parallel_sub in sub._subsystems_allprocs:
+                if isinstance(parallel_sub, Group):
+                    top_level_hierarchy.append(parallel_sub.pathname)
 
         sub2i[sub.name] = i
 
@@ -172,9 +175,16 @@ def _get_used_before_calc_subs(group, input_srcs):
             oparts = src_abs.split('.')
             src_sys = oparts[glen]
             tgt_sys = iparts[glen]
+
+            hierarchy_check = True
+            for i in top_level_hierarchy:
+                if i in tgt_abs:
+                    hierarchy_check = False
+
             if (src_sys in parallel_solver and tgt_sys in parallel_solver and
                     (parallel_solver[src_sys] not in ["NL: NLBJ", "NL: Newton", "BROYDEN"]) and
-                    src_sys == tgt_sys):
+                    src_sys == tgt_sys and
+                    hierarchy_check):
                 simple_warning("Need to attach NonlinearBlockJac, NewtonSolver, or BroydenSolver "
                                "to '%s' when connecting components inside parallel "
                                "groups" % (src_sys))
