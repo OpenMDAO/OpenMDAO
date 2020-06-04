@@ -376,7 +376,6 @@ class TestNLoptDriver(unittest.TestCase):
         prob.driver.options['optimizer'] = 'LD_SLSQP'
 
         prob.model.add_design_var('x', lower=0)
-        # prob.model.add_constraint('x', lower=0)
 
         prob.setup()
 

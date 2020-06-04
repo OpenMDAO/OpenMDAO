@@ -426,8 +426,11 @@ class NLoptDriver(Driver):
 
             with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
                 self.iter_count += 1
+                
+                # This is the actual model evaluation for OpenMDAO
                 model.run_solve_nonlinear()
 
+            # TODO : remove obfuscation caused by this; not needed
             # Get the objective function evaluations
             for obj in self.get_objective_values().values():
                 f_new = obj
