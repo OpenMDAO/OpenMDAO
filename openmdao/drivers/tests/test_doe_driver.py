@@ -1819,18 +1819,24 @@ class TestParallelDistribDOE(unittest.TestCase):
 
     def setUp(self):
         self.startdir = os.getcwd()
-        self.tempdir = tempfile.mkdtemp(prefix='TestParallelDistribDOE-')
+        # Have to hard code the tempdir so that all procs run in the same place.
+        self.tempdir = 'TestParallelDistribDOE_one_dir_only'
+        try:
+            os.mkdir(self.tempdir)
+        except OSError:
+            pass
         os.chdir(self.tempdir)
 
     def tearDown(self):
         os.chdir(self.startdir)
-        try:
-            shutil.rmtree(self.tempdir)
-        except OSError:
-            pass
+        if MPI.COMM_WORLD.rank == 0:
+            try:
+                shutil.rmtree(self.tempdir)
+            except OSError:
+                pass
 
     def test_doe_distributed_var(self):
-        size = 7
+        size = 3
 
         prob = om.Problem()
         model = prob.model
@@ -1852,7 +1858,7 @@ class TestParallelDistribDOE(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_objective('f_sum', index=-1)
 
-        prob.driver = om.DOEDriver(om.FullFactorialGenerator(levels=3))
+        prob.driver = om.DOEDriver(om.FullFactorialGenerator(levels=2))
         prob.driver.options['run_parallel'] = True
         prob.driver.options['procs_per_model'] = 2
 
@@ -1865,19 +1871,30 @@ class TestParallelDistribDOE(unittest.TestCase):
         # check recorded cases from each case file
         rank = prob.comm.rank
         if rank == 0:
-            filename0 = "cases.sql_0" % rank
-            filename1 = "cases.sql_1" % rank
+            filename0 = "cases.sql_0"
+            filename1 = "cases.sql_1"
             values = []
 
             cr = om.CaseReader(filename0)
             cases = cr.list_cases('driver')
-
             for case in cases:
                 outputs = cr.get_case(case).outputs
-                values.append((outputs['iv.x1'], outputs['iv.x2'], outputs['c3.y']))
+                values.append(outputs)
+                print('0', outputs)
 
-            self.assertEqual("\n"+"\n".join(["iv.x1: %5.2f, iv.x2: %5.2f, c3.y: %6.2f" % (x1, x2, y) for x1, x2, y in values]),
-                self.expect_text)
+            cr = om.CaseReader(filename1)
+            cases = cr.list_cases('driver')
+            for case in cases:
+                outputs = cr.get_case(case).outputs
+                values.append(outputs)
+
+            # 2**6 cases
+            self.assertEqual(len(values), 64)
+            x_inputs = [list(val['x']) for val in values]
+            for n1 in [-50., 50.]:
+                for n2 in [-50., 50.]:
+                    for n3 in [-50., 50.]:
+                        self.assertEqual(x_inputs.count([n1, n2, n3]), 8)
 
 
 if __name__ == "__main__":
