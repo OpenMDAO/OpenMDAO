@@ -36,7 +36,7 @@ class LinearUserDefined(LinearSolver):
 
     def solve(self, vec_names, mode, rel_systems=None):
         """
-        Solve the linear system for the problem in self._system.
+        Solve the linear system for the problem in self._system().
 
         The full solution vector is returned.
 
@@ -53,7 +53,7 @@ class LinearUserDefined(LinearSolver):
         self._rel_systems = rel_systems
         self._mode = mode
 
-        system = self._system
+        system = self._system()
         solve = self.solve_function
 
         if solve is None:

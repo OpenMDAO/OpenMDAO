@@ -3,20 +3,16 @@ This is a multipoint implementation of the beam optimization problem.
 
 
 """
-from __future__ import division
-from six.moves import range
-
 import numpy as np
 
-from openmdao.api import Group, IndepVarComp, ParallelGroup, ExecComp
-from openmdao.components.bsplines_comp import BsplinesComp
+import openmdao.api as om
 
-from openmdao.test_suite.test_examples.beam_optimization.components.compliance_comp import MultiComplianceComp
-from openmdao.test_suite.test_examples.beam_optimization.components.displacements_comp import MultiDisplacementsComp
 from openmdao.test_suite.test_examples.beam_optimization.components.local_stiffness_matrix_comp import LocalStiffnessMatrixComp
 from openmdao.test_suite.test_examples.beam_optimization.components.moment_comp import MomentOfInertiaComp
-from openmdao.test_suite.test_examples.beam_optimization.components.states_comp import MultiStatesComp
+from openmdao.test_suite.test_examples.beam_optimization.components.multi_compliance_comp import MultiComplianceComp
+from openmdao.test_suite.test_examples.beam_optimization.components.multi_states_comp import MultiStatesComp
 from openmdao.test_suite.test_examples.beam_optimization.components.volume_comp import VolumeComp
+from openmdao.utils.spline_distributions import sine_distribution
 
 
 def divide_cases(ncases, nprocs):
@@ -51,7 +47,7 @@ def divide_cases(ncases, nprocs):
     return data
 
 
-class MultipointBeamGroup(Group):
+class MultipointBeamGroup(om.Group):
 
     def initialize(self):
         self.options.declare('E')
@@ -72,12 +68,13 @@ class MultipointBeamGroup(Group):
         num_cp = self.options['num_cp']
         num_load_cases = self.options['num_load_cases']
 
-        inputs_comp = IndepVarComp()
+        inputs_comp = om.IndepVarComp()
         inputs_comp.add_output('h_cp', shape=num_cp)
         self.add_subsystem('inputs_comp', inputs_comp)
 
-        comp = BsplinesComp(num_control_points=num_cp, num_points=num_elements, in_name='h_cp',
-                            out_name='h')
+        x_interp = sine_distribution(num_elements)
+        comp = om.SplineComp(method='bsplines', num_cp=num_cp, x_interp_val=x_interp)
+        comp.add_spline(y_cp_name='h_cp', y_interp_name='h')
         self.add_subsystem('interp', comp)
 
         I_comp = MomentOfInertiaComp(num_elements=num_elements, b=b)
@@ -87,7 +84,7 @@ class MultipointBeamGroup(Group):
         self.add_subsystem('local_stiffness_matrix_comp', comp)
 
         # Parallel Subsystem for load cases.
-        par = self.add_subsystem('parallel', ParallelGroup())
+        par = self.add_subsystem('parallel', om.ParallelGroup())
 
         # Determine how to split cases up over the available procs.
         nprocs = self.comm.size
@@ -98,7 +95,7 @@ class MultipointBeamGroup(Group):
             num_rhs = len(this_proc)
 
             name = 'sub_%d' % j
-            sub = par.add_subsystem(name, Group())
+            sub = par.add_subsystem(name, om.Group())
 
             # Load is a sinusoidal distributed force of varying spatial frequency.
             force_vector = np.zeros((2 * num_nodes, num_rhs))
@@ -115,9 +112,6 @@ class MultipointBeamGroup(Group):
             comp = MultiStatesComp(num_elements=num_elements, force_vector=force_vector, num_rhs=num_rhs)
             sub.add_subsystem('states_comp', comp)
 
-            comp = MultiDisplacementsComp(num_elements=num_elements, num_rhs=num_rhs)
-            sub.add_subsystem('displacements_comp', comp)
-
             comp = MultiComplianceComp(num_elements=num_elements, force_vector=force_vector,
                                        num_rhs=num_rhs)
             sub.add_subsystem('compliance_comp', comp)
@@ -127,19 +121,16 @@ class MultipointBeamGroup(Group):
                 'parallel.%s.states_comp.K_local' % name)
 
             for k in range(num_rhs):
-                sub.connect(
-                    'states_comp.d_%d' % k,
-                    'displacements_comp.d_%d' % k)
-                sub.connect(
-                    'displacements_comp.displacements_%d' % k,
-                    'compliance_comp.displacements_%d' % k)
+                sub.connect('states_comp.d_%d' % k,
+                            'compliance_comp.displacements_%d' % k,
+                            src_indices=np.arange(2 *num_nodes))
 
                 obj_srcs.append('parallel.%s.compliance_comp.compliance_%d' % (name, k))
 
         comp = VolumeComp(num_elements=num_elements, b=b, L=L)
         self.add_subsystem('volume_comp', comp)
 
-        comp = ExecComp(['obj = ' + ' + '.join(['compliance_%d' % i for i in range(num_load_cases)])])
+        comp = om.ExecComp(['obj = ' + ' + '.join(['compliance_%d' % i for i in range(num_load_cases)])])
         self.add_subsystem('obj_sum', comp)
 
         for j, src in enumerate(obj_srcs):

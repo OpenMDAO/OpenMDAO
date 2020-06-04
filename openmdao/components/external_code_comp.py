@@ -1,8 +1,7 @@
 """Define the ExternalCodeComp and ExternalCodeImplicitComp classes."""
-from __future__ import print_function
-
 import os
 import sys
+import re
 
 import numpy.distutils
 from numpy.distutils.exec_command import find_executable
@@ -11,7 +10,6 @@ from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.utils.shell_proc import STDOUT, DEV_NULL, ShellProc
-from openmdao.utils.general_utils import warn_deprecation
 
 
 class ExternalCodeDelegate(object):
@@ -41,7 +39,9 @@ class ExternalCodeDelegate(object):
         """
         comp = self._comp
 
-        comp.options.declare('command', [], desc='Command to be executed.')
+        comp.options.declare('command', [], types=(list, str),
+                             desc="Command to be executed. If command is a list, shell=True, "
+                                  "otherwise shell=False")
         comp.options.declare('env_vars', {}, desc='Environment variables required by the command.')
         comp.options.declare('poll_delay', 0.0, lower=0.0,
                              desc='Delay between polling for command completion. '
@@ -194,7 +194,7 @@ class ExternalCodeDelegate(object):
         comp = self._comp
 
         if isinstance(command, str):
-            program_to_execute = command
+            program_to_execute = re.findall(r"^([\w\-]+)", command)[0]
         else:
             program_to_execute = command[0]
 
@@ -207,7 +207,11 @@ class ExternalCodeDelegate(object):
                 if missing:
                     raise ValueError("The command to be executed, '%s', "
                                      "cannot be found" % program_to_execute)
-            command_for_shell_proc = ['cmd.exe', '/c'] + command
+            if isinstance(command, list):
+                command_for_shell_proc = ['cmd.exe', '/c'] + command
+            else:
+                command_for_shell_proc = 'cmd.exe /c ' + str(command)
+
         else:
             if not find_executable(program_to_execute):
                 raise ValueError("The command to be executed, '%s', "
@@ -303,27 +307,6 @@ class ExternalCodeComp(ExplicitComponent):
             Unscaled, dimensional output variables read via outputs[key].
         """
         self._external_code_runner.run_component()
-
-
-class ExternalCode(ExternalCodeComp):
-    """
-    Deprecated.
-    """
-
-    def __init__(self, *args, **kwargs):
-        """
-        Capture Initialize to throw warning.
-
-        Parameters
-        ----------
-        *args : list
-            Deprecated arguments.
-        **kwargs : dict
-            Deprecated arguments.
-        """
-        warn_deprecation("'ExternalCode' has been deprecated. Use "
-                         "'ExternalCodeComp' instead.")
-        super(ExternalCode, self).__init__(*args, **kwargs)
 
 
 class ExternalCodeImplicitComp(ImplicitComponent):

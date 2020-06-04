@@ -1,7 +1,6 @@
 """Test getting/setting variables and subjacs with promoted/relative/absolute names."""
 
 import unittest
-from six import assertRaisesRegex
 
 from openmdao.api import Problem, Group, ExecComp, IndepVarComp, DirectSolver
 
@@ -21,7 +20,7 @@ class TestGetSetVariables(unittest.TestCase):
         model.add_subsystem('g', g)
 
         p = Problem(model)
-        p.setup(check=False)
+        p.setup()
 
         # -------------------------------------------------------------------
 
@@ -66,7 +65,7 @@ class TestGetSetVariables(unittest.TestCase):
         model.add_subsystem('g', g, promotes=['*'])
 
         p = Problem(model)
-        p.setup(check=False)
+        p.setup()
 
         # -------------------------------------------------------------------
 
@@ -109,76 +108,81 @@ class TestGetSetVariables(unittest.TestCase):
         p = Problem()
         model = p.model
         model.add_subsystem('g', g)
-        p.setup(check=False)
+        p.setup()
 
         # -------------------------------------------------------------------
 
-        msg = 'Variable name "{}" not found.'
+        msg = '\'Group (<model>): Variable "{}" not found.\''
 
         # inputs
-        with assertRaisesRegex(self, KeyError, msg.format('x')):
+        with self.assertRaises(KeyError) as ctx:
             p['x'] = 5.0
             p.final_setup()
+        self.assertEqual(str(ctx.exception), msg.format('x'))
         p._initial_condition_cache = {}
 
-        with assertRaisesRegex(self, KeyError, msg.format('x')):
+        with self.assertRaises(KeyError) as ctx:
             p['x']
+        self.assertEqual(str(ctx.exception), msg.format('x'))
 
         # outputs
-        with assertRaisesRegex(self, KeyError, msg.format('y')):
+        with self.assertRaises(KeyError) as ctx:
             p['y'] = 5.0
             p.final_setup()
+        self.assertEqual(str(ctx.exception), msg.format('y'))
         p._initial_condition_cache = {}
 
-        with assertRaisesRegex(self, KeyError, msg.format('y')):
+        with self.assertRaises(KeyError) as ctx:
             p['y']
+        self.assertEqual(str(ctx.exception), msg.format('y'))
 
-        msg = 'Variable name "{}" not found.'
+
+        msg = '\'Variable name "{}" not found.\''
         inputs, outputs, residuals = g.get_nonlinear_vectors()
 
         # inputs
-        with assertRaisesRegex(self, KeyError, msg.format('x')):
+        with self.assertRaisesRegex(KeyError, msg.format('x')):
             inputs['x'] = 5.0
-        with assertRaisesRegex(self, KeyError, msg.format('x')):
+        with self.assertRaisesRegex(KeyError, msg.format('x')):
             inputs['x']
-        with assertRaisesRegex(self, KeyError, msg.format('g.c.x')):
+        with self.assertRaisesRegex(KeyError, msg.format('g.c.x')):
             inputs['g.c.x'] = 5.0
-        with assertRaisesRegex(self, KeyError, msg.format('g.c.x')):
+        with self.assertRaisesRegex(KeyError, msg.format('g.c.x')):
             inputs['g.c.x']
 
         # outputs
-        with assertRaisesRegex(self, KeyError, msg.format('y')):
+        with self.assertRaisesRegex(KeyError, msg.format('y')):
             outputs['y'] = 5.0
-        with assertRaisesRegex(self, KeyError, msg.format('y')):
+        with self.assertRaisesRegex(KeyError, msg.format('y')):
             outputs['y']
-        with assertRaisesRegex(self, KeyError, msg.format('g.c.y')):
+        with self.assertRaisesRegex(KeyError, msg.format('g.c.y')):
             outputs['g.c.y'] = 5.0
-        with assertRaisesRegex(self, KeyError, msg.format('g.c.y')):
+        with self.assertRaisesRegex(KeyError, msg.format('g.c.y')):
             outputs['g.c.y']
 
         msg = r'Variable name pair \("{}", "{}"\) not found.'
         jac = g.linear_solver._assembled_jac
 
         # d(output)/d(input)
-        with assertRaisesRegex(self, KeyError, msg.format('y', 'x')):
+        with self.assertRaisesRegex(KeyError, msg.format('y', 'x')):
             jac['y', 'x'] = 5.0
-        with assertRaisesRegex(self, KeyError, msg.format('y', 'x')):
+        with self.assertRaisesRegex(KeyError, msg.format('y', 'x')):
             jac['y', 'x']
         # allow absolute keys now
-        # with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.x')):
+        # with self.assertRaisesRegex(KeyError, msg.format('g.c.y', 'g.c.x')):
         #     jac['g.c.y', 'g.c.x'] = 5.0
-        # with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.x')):
+        # with self.assertRaisesRegex(KeyError, msg.format('g.c.y', 'g.c.x')):
         #     deriv = jac['g.c.y', 'g.c.x']
 
         # d(output)/d(output)
-        with assertRaisesRegex(self, KeyError, msg.format('y', 'y')):
+        with self.assertRaisesRegex(KeyError, msg.format('y', 'y')):
             jac['y', 'y'] = 5.0
-        with assertRaisesRegex(self, KeyError, msg.format('y', 'y')):
+        with self.assertRaisesRegex(KeyError, msg.format('y', 'y')):
             jac['y', 'y']
         # allow absoute keys now
-        # with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.y')):
+        # with self.assertRaisesRegex(KeyError, msg.format('g.c.y', 'g.c.y')):
         #     jac['g.c.y', 'g.c.y'] = 5.0
-        # with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.y')):
+        # with self.assertRaisesRegex(KeyError, msg.format('g.c.y', 'g.c.y')):
         #     deriv = jac['g.c.y', 'g.c.y']
 
     def test_with_promotion_errors(self):
@@ -199,7 +203,7 @@ class TestGetSetVariables(unittest.TestCase):
         model.add_subsystem('g', g, promotes=['*'])
 
         p = Problem(model)
-        p.setup(check=False)
+        p.setup()
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -220,15 +224,15 @@ class TestGetSetVariables(unittest.TestCase):
             self.assertEqual(inputs['x'], 5.0)
         self.assertEqual(str(context.exception), msg2)
 
-        with assertRaisesRegex(self, KeyError, msg1.format('g.c2.x')):
+        with self.assertRaisesRegex(KeyError, msg1.format('g.c2.x')):
             inputs['g.c2.x'] = 5.0
-        with assertRaisesRegex(self, KeyError, msg1.format('g.c2.x')):
+        with self.assertRaisesRegex(KeyError, msg1.format('g.c2.x')):
             self.assertEqual(inputs['g.c2.x'], 5.0)
 
         # outputs
-        with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y')):
+        with self.assertRaisesRegex(KeyError, msg1.format('g.c2.y')):
             outputs['g.c2.y'] = 5.0
-        with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y')):
+        with self.assertRaisesRegex(KeyError, msg1.format('g.c2.y')):
             self.assertEqual(outputs['g.c2.y'], 5.0)
 
         msg1 = r'Variable name pair \("{}", "{}"\) not found.'
@@ -245,15 +249,15 @@ class TestGetSetVariables(unittest.TestCase):
         self.assertEqual(str(context.exception), msg2)
 
         # absolute keys now allowed
-        # with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.x')):
+        # with self.assertRaisesRegex(KeyError, msg1.format('g.c2.y', 'g.c2.x')):
         #     jac['g.c2.y', 'g.c2.x'] = 5.0
-        # with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.x')):
+        # with self.assertRaisesRegex(KeyError, msg1.format('g.c2.y', 'g.c2.x')):
         #     deriv = jac['g.c2.y', 'g.c2.x']
 
         # d(outputs)/d(outputs)
-        # with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.y')):
+        # with self.assertRaisesRegex(KeyError, msg1.format('g.c2.y', 'g.c2.y')):
         #     jac['g.c2.y', 'g.c2.y'] = 5.0
-        # with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.y')):
+        # with self.assertRaisesRegex(KeyError, msg1.format('g.c2.y', 'g.c2.y')):
         #     deriv = jac['g.c2.y', 'g.c2.y']
 
     def test_nested_promotion_errors(self):
@@ -274,7 +278,7 @@ class TestGetSetVariables(unittest.TestCase):
         model.add_subsystem('g', g)
 
         p = Problem(model)
-        p.setup(check=False)
+        p.setup()
 
         # -------------------------------------------------------------------
 
@@ -282,7 +286,7 @@ class TestGetSetVariables(unittest.TestCase):
                "[g.c2.x, g.c3.x] that are not connected to an output variable."
 
         # inputs (g.x is not connected)
-        # with assertRaisesRegex(self, RuntimeError, msg1.format('g.x')):
+        # with self.assertRaisesRegex(RuntimeError, msg1.format('g.x')):
         with self.assertRaises(Exception) as context:
             p['g.x'] = 5.0
             p.final_setup()
@@ -291,7 +295,7 @@ class TestGetSetVariables(unittest.TestCase):
 
         # Repeat test for post final_setup when vectors are allocated.
         p = Problem(model)
-        p.setup(check=False)
+        p.setup()
         p.final_setup()
 
         # -------------------------------------------------------------------
@@ -304,7 +308,7 @@ class TestGetSetVariables(unittest.TestCase):
 
         # Start from a clean state again
         p = Problem(model)
-        p.setup(check=False)
+        p.setup()
 
         with self.assertRaises(Exception) as context:
             self.assertEqual(p['g.x'], 5.0)
@@ -327,7 +331,7 @@ class TestGetSetVariables(unittest.TestCase):
 
         # Repeat test for post final_setup when vectors are allocated.
         p = Problem(model)
-        p.setup(check=False)
+        p.setup()
         p.final_setup()
 
         with self.assertRaises(Exception) as context:
@@ -352,7 +356,7 @@ class TestGetSetVariables(unittest.TestCase):
         model.connect('x', 'g.x')
 
         p = Problem(model)
-        p.setup(check=False)
+        p.setup()
 
         # inputs (g.x is connected to x)
         p['g.x'] = 5.0
@@ -362,7 +366,7 @@ class TestGetSetVariables(unittest.TestCase):
 
         # Repeat test for post final_setup when vectors are allocated.
         p = Problem(model)
-        p.setup(check=False)
+        p.setup()
         p.final_setup()
 
         # inputs (g.x is connected to x)
@@ -372,7 +376,7 @@ class TestGetSetVariables(unittest.TestCase):
 
         # Final test, the getitem
         p = Problem(model)
-        p.setup(check=False)
+        p.setup()
 
         with self.assertRaises(Exception) as context:
             self.assertEqual(p['g.x'], 5.0)
@@ -389,7 +393,7 @@ class TestGetSetVariables(unittest.TestCase):
 
         # Repeat test for post final_setup when vectors are allocated.
         p = Problem(model)
-        p.setup(check=False)
+        p.setup()
         p.final_setup()
 
         with self.assertRaises(Exception) as context:

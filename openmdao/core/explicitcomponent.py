@@ -1,13 +1,10 @@
 """Define the ExplicitComponent class."""
 
-from __future__ import division
-
 import numpy as np
-from six import itervalues, iteritems
-from six.moves import range
 
-from openmdao.core.component import Component
+from openmdao.core.component import Component, _full_slice
 from openmdao.utils.class_util import overrides_method
+from openmdao.utils.general_utils import ContainsAll
 from openmdao.recorders.recording_iteration_stack import Recording
 
 _inst_functs = ['compute_jacvec_product', 'compute_multi_jacvec_product']
@@ -57,6 +54,54 @@ class ExplicitComponent(Component):
             (new_jacvec_prod is not None and
              new_jacvec_prod != self._inst_functs['compute_jacvec_product']))
 
+    def _get_partials_varlists(self):
+        """
+        Get lists of 'of' and 'wrt' variables that form the partial jacobian.
+
+        Returns
+        -------
+        tuple(list, list)
+            'of' and 'wrt' variable lists.
+        """
+        of = list(self._var_allprocs_prom2abs_list['output'])
+        wrt = list(self._var_allprocs_prom2abs_list['input'])
+        return of, wrt
+
+    def _get_partials_var_sizes(self):
+        """
+        Get sizes of 'of' and 'wrt' variables that form the partial jacobian.
+
+        Returns
+        -------
+        tuple(ndarray, ndarray)
+            'of' and 'wrt' variable sizes.
+        """
+        iproc = self.comm.rank
+        out_sizes = self._var_sizes['nonlinear']['output'][iproc]
+        in_sizes = self._var_sizes['nonlinear']['input'][iproc]
+        return out_sizes, in_sizes
+
+    def _jacobian_wrt_iter(self, wrt_matches=None):
+        """
+        Iterate over (name, offset, end, idxs) for each column var in the systems's jacobian.
+
+        Parameters
+        ----------
+        wrt_matches : set or None
+            Only include row vars that are contained in this set.  This will determine what
+            the actual offsets are, i.e. the offsets will be into a reduced jacobian
+            containing only the matching columns.
+        """
+        if wrt_matches is None:
+            wrt_matches = ContainsAll()
+        abs2meta = self._var_allprocs_abs2meta
+        offset = end = 0
+        for wrt in self._var_allprocs_abs_names['input']:
+            if wrt in wrt_matches:
+                end += abs2meta[wrt]['size']
+                yield wrt, offset, end, _full_slice
+                offset = end
+
     def _setup_partials(self, recurse=True):
         """
         Call setup_partials in components.
@@ -84,10 +129,16 @@ class ExplicitComponent(Component):
                 if 'method' in self._subjacs_info[abs_key]:
                     del self._subjacs_info[abs_key]['method']
 
+            dct = {
+                'rows': arange,
+                'cols': arange,
+                'value': np.full(meta['size'], -1.),
+                'dependent': True,
+            }
+
             # ExplicitComponent jacobians have -1 on the diagonal.
             if arange.size > 0:
-                self._declare_partials(out_name, out_name, rows=arange, cols=arange,
-                                       val=np.full(meta['size'], -1.))
+                self._declare_partials(out_name, out_name, dct)
 
     def _setup_jacobians(self, recurse=True):
         """
@@ -98,11 +149,11 @@ class ExplicitComponent(Component):
         recurse : bool
             If True, setup jacobians in all descendants. (ignored)
         """
-        if self._use_derivatives:
-            self._set_partials_meta()
+        if self._has_approx and self._use_derivatives:
+            self._set_approx_partials_meta()
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None):
+                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, tags=None):
         """
         Add an output variable to the component.
 
@@ -145,6 +196,9 @@ class ExplicitComponent(Component):
             Scaling parameter. The value in the user-defined res_units of this output's residual
             when the scaled value is 1. Default is None, which means residual scaling matches
             output scaling.
+        tags : str or list of strs
+            User defined tags that can be used to filter what gets listed when calling
+            list_inputs and list_outputs and also when listing results from case recorders.
 
         Returns
         -------
@@ -158,24 +212,16 @@ class ExplicitComponent(Component):
                                                          val=val, shape=shape, units=units,
                                                          res_units=res_units, desc=desc,
                                                          lower=lower, upper=upper,
-                                                         ref=ref, ref0=ref0, res_ref=res_ref)
+                                                         ref=ref, ref0=ref0, res_ref=res_ref,
+                                                         tags=tags)
 
-    def _set_partials_meta(self):
-        """
-        Set subjacobian info into our jacobian.
-        """
-        for abs_key, meta in iteritems(self._subjacs_info):
-
-            # if there isn't a declared partial value, set it to a dense matrix
-            if meta['value'] is None:
-                meta['value'] = np.zeros(meta['shape'])
-
+    def _approx_subjac_keys_iter(self):
+        for abs_key, meta in self._subjacs_info.items():
             if 'method' in meta:
                 method = meta['method']
-                # Don't approximate output wrt output.``
                 if (method is not None and method in self._approx_schemes and abs_key[1]
                         not in self._outputs._views_flat):
-                    self._approx_schemes[method].add_approximation(abs_key, meta)
+                    yield abs_key
 
     def _apply_nonlinear(self):
         """
@@ -347,13 +393,15 @@ class ExplicitComponent(Component):
         sub_do_ln : boolean
             Flag indicating if the children should call linearize on their linear solvers.
         """
-        if not self._has_compute_partials and not self._approx_schemes:
+        if not (self._has_compute_partials or self._approx_schemes):
             return
+
+        self._check_first_linearize()
 
         with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
             # Computing the approximation before the call to compute_partials allows users to
             # override FD'd values.
-            for approximation in itervalues(self._approx_schemes):
+            for approximation in self._approx_schemes.values():
                 approximation.compute_approximations(self, jac=self._jacobian)
 
             if self._has_compute_partials:

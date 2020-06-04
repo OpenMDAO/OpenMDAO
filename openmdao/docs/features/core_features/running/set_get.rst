@@ -90,16 +90,57 @@ Hence you need a specific path to reference each of the two different inputs sep
 Specifying Units
 ----------------
 
-You can also set an input or request the valuable of any variable in a different unit than the one it is declared in, and OpenMDAO will
-peform the conversion for you. This is done with the `Problem` methods `get_val` and `set_val`.
+You can also set an input or request the value of any variable in a different unit than its declared unit, and OpenMDAO will
+perform the conversion for you. This is done with the `Problem` methods `get_val` and `set_val`.
 
 .. embed-code:: openmdao.core.tests.test_problem.TestProblem.test_feature_get_set_with_units
     :layout: interleave
 
-When dealing with arrays, you can set or get specific indices or index ranges by adding the "index" argument to the calls:
+When dealing with arrays, you can set or get specific indices or index ranges by adding the "indices" argument to the calls:
 
 .. embed-code:: openmdao.core.tests.test_problem.TestProblem.test_feature_get_set_array_with_units
     :layout: interleave
+
+An alternate method of specifying the indices is by making use of the :code:`slicer` object. This object serves as a
+helper function allowing the user to specify the indices value using the same syntax as you would when
+accessing a numpy array. This example shows that usage.
+
+.. embed-code:: openmdao.core.tests.test_problem.TestProblem.test_feature_get_set_array_with_slicer
+    :layout: interleave
+
+
+Retrieving Remote Variables
+---------------------------
+
+If you're running under MPI, the `Problem.get_val` method also has a *get_remote* arg that allows
+you to get the value of a variable even if it's not local to the current MPI process.  For example,
+the code below will retrieve the value of `foo.bar.x` in all processes, whether the variable is
+local or not.
+
+
+.. code-block:: python
+
+    val = prob.get_val('foo.bar.x', get_remote=True)
+
+
+.. warning::
+
+    If `get_remote` is True, `get_val` makes a collective MPI call, so make sure to call it
+    in *all* ranks of the Problem's MPI communicator.  Otherwise, collective calls made
+    in different ranks will get out of sync and result in cryptic MPI errors.
+
+
+
+Testing if a Variable or System is Local
+----------------------------------------
+
+If you want to know if a given variable or system is local to the current process, the
+`Problem.is_local` method will tell you.  For example:
+
+.. code-block:: python
+
+    if prob.is_local('foo.bar.x'):
+        print("foo.bar.x is local!")
 
 
 .. tags:: SetGet

@@ -1,12 +1,12 @@
 """Define the NewtonSolver class."""
 
-from __future__ import print_function
 
 import numpy as np
 
+from openmdao.solvers.linesearch.backtracking import BoundsEnforceLS
 from openmdao.solvers.solver import NonlinearSolver
 from openmdao.recorders.recording_iteration_stack import Recording
-from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.mpi import MPI
 
 
 class NewtonSolver(NonlinearSolver):
@@ -41,25 +41,7 @@ class NewtonSolver(NonlinearSolver):
         self.linear_solver = None
 
         # Slot for linesearch
-        self.linesearch = None
-
-    @property
-    def line_search(self):
-        """
-        Return the current linesearch object.
-        """
-        warn_deprecation("The 'line_search' attribute provides backwards compatibility "
-                         "with OpenMDAO 1.x ; use 'linesearch' instead.")
-        return self.linesearch
-
-    @line_search.setter
-    def line_search(self, solver):
-        """
-        Set the linesearch solver.
-        """
-        warn_deprecation("The 'line_search' attribute provides backwards compatibility "
-                         "with OpenMDAO 1.x ; use 'linesearch' instead.")
-        self.linesearch = solver
+        self.linesearch = BoundsEnforceLS()
 
     def _declare_options(self):
         """
@@ -67,13 +49,17 @@ class NewtonSolver(NonlinearSolver):
         """
         super(NewtonSolver, self)._declare_options()
 
-        self.options.declare('solve_subsystems', types=bool, default=False,
+        self.options.declare('solve_subsystems', types=bool,
                              desc='Set to True to turn on sub-solvers (Hybrid Newton).')
         self.options.declare('max_sub_solves', types=int, default=10,
                              desc='Maximum number of subsystem solves.')
         self.options.declare('cs_reconverge', types=bool, default=True,
                              desc='When True, when this driver solves under a complex step, nudge '
                              'the Solution vector by a small amount so that it reconverges.')
+        self.options.declare('reraise_child_analysiserror', types=bool, default=False,
+                             desc='When the option is true, a solver will reraise any '
+                             'AnalysisError that arises during subsolve; when false, it will '
+                             'continue solving.')
 
         self.supports['gradients'] = True
         self.supports['implicit_components'] = True
@@ -90,16 +76,21 @@ class NewtonSolver(NonlinearSolver):
             depth of the current system (already incremented).
         """
         super(NewtonSolver, self)._setup_solvers(system, depth)
+        rank = MPI.COMM_WORLD.rank if MPI is not None else 0
 
         self._disallow_discrete_outputs()
 
+        if not isinstance(self.options._dict['solve_subsystems']['value'], bool):
+            msg = '{}: solve_subsystems must be set by the user.'
+            raise ValueError(msg.format(self.msginfo))
+
         if self.linear_solver is not None:
-            self.linear_solver._setup_solvers(self._system, self._depth + 1)
+            self.linear_solver._setup_solvers(system, self._depth + 1)
         else:
             self.linear_solver = system.linear_solver
 
         if self.linesearch is not None:
-            self.linesearch._setup_solvers(self._system, self._depth + 1)
+            self.linesearch._setup_solvers(system, self._depth + 1)
 
     def _assembled_jac_solver_iter(self):
         """
@@ -134,9 +125,9 @@ class NewtonSolver(NonlinearSolver):
         """
         Run the apply_nonlinear method on the system.
         """
-        self._recording_iter.stack.append(('_run_apply', 0))
+        self._recording_iter.push(('_run_apply', 0))
 
-        system = self._system
+        system = self._system()
 
         # Disable local fd
         approx_status = system._owns_approx_jac
@@ -145,7 +136,7 @@ class NewtonSolver(NonlinearSolver):
         try:
             system._apply_nonlinear()
         finally:
-            self._recording_iter.stack.pop()
+            self._recording_iter.pop()
 
         # Enable local fd
         system._owns_approx_jac = approx_status
@@ -183,17 +174,17 @@ class NewtonSolver(NonlinearSolver):
         float
             error at the first iteration.
         """
-        if self.options['debug_print']:
-            self._err_cache['inputs'] = self._system._inputs._copy_views()
-            self._err_cache['outputs'] = self._system._outputs._copy_views()
+        system = self._system()
 
-        system = self._system
+        if self.options['debug_print']:
+            self._err_cache['inputs'] = system._inputs._copy_views()
+            self._err_cache['outputs'] = system._outputs._copy_views()
 
         # When under a complex step from higher in the hierarchy, sometimes the step is too small
         # to trigger reconvergence, so nudge the outputs slightly so that we always get at least
         # one iteration of Newton.
         if system.under_complex_step and self.options['cs_reconverge']:
-            system._outputs._data += np.linalg.norm(self._system._outputs._data) * 1e-10
+            system._outputs._data += np.linalg.norm(system._outputs._data) * 1e-10
 
         # Execute guess_nonlinear if specified.
         system._guess_nonlinear()
@@ -219,7 +210,7 @@ class NewtonSolver(NonlinearSolver):
         """
         Perform the operations in the iteration loop.
         """
-        system = self._system
+        system = self._system()
         self._solver_info.append_subsolver()
         do_subsolve = self.options['solve_subsystems'] and \
             (self._iter_count < self.options['max_sub_solves'])
@@ -278,9 +269,9 @@ class NewtonSolver(NonlinearSolver):
         """
         Print header text before solving.
         """
-        if (self.options['iprint'] > 0 and self._system.comm.rank == 0):
+        if (self.options['iprint'] > 0 and self._system().comm.rank == 0):
 
-            pathname = self._system.pathname
+            pathname = self._system().pathname
             if pathname:
                 nchar = len(pathname)
                 prefix = self._solver_info.prefix

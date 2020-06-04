@@ -42,6 +42,20 @@ Source Docs
    :maxdepth: 1
 """
 
+    ref_sheet_bottom_noinherit = """
+   :members:
+   :undoc-members:
+   :special-members: __init__, __contains__, __iter__, __setitem__, __getitem__
+
+.. toctree::
+   :maxdepth: 1
+"""
+
+    # file_wrap inherits from pyparsing, which has some formatting issues when
+    # generating src docs, so this just turns off the generation of inherited stuff
+    no_inherit = set([
+        'file_wrap.py',
+    ])
     docs_dir = os.path.dirname(dir)
 
     doc_dir = os.path.join(docs_dir, "_srcdocs")
@@ -135,7 +149,10 @@ Source Docs
                     ref_sheet.write(".. automodule:: " + package_name + "." + sub_package)
 
                     # finish and close each reference sheet.
-                    ref_sheet.write(ref_sheet_bottom)
+                    if filename in no_inherit:
+                        ref_sheet.write(ref_sheet_bottom_noinherit)
+                    else:
+                        ref_sheet.write(ref_sheet_bottom)
                     ref_sheet.close()
 
             # finish and close each package file

@@ -69,7 +69,7 @@ change in inclination due to the impulse (:math:`\Delta i`), the :math:`\Delta V
 is then computed from the law of cosines:
 
 .. math::
-    \Delta V_1 = v_c^2 + v_p^2 - 2 v_c v_p \cos{\Delta i}
+    \Delta V_1 = \sqrt{v_c^2 + v_p^2 - 2 v_c v_p \cos{\Delta i}}
 
 In the first impulse, :math:`v_1` is the circular velocity in LEO.  In
 this case :math:`v_c` refers to the circular velocity in geostationary

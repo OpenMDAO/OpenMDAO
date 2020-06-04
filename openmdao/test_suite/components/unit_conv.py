@@ -2,10 +2,10 @@
 
 import numpy as np
 
-from openmdao.api import ExplicitComponent, Group, IndepVarComp
+import openmdao.api as om
 
 
-class SrcComp(ExplicitComponent):
+class SrcComp(om.ExplicitComponent):
     """Source provides degrees Celsius."""
 
     def setup(self):
@@ -37,7 +37,7 @@ class SrcCompFD(SrcComp):
         pass
 
 
-class TgtCompF(ExplicitComponent):
+class TgtCompF(om.ExplicitComponent):
     """Target expressed in degrees F."""
 
     def setup(self):
@@ -69,7 +69,7 @@ class TgtCompFFD(TgtCompF):
         pass
 
 
-class TgtCompC(ExplicitComponent):
+class TgtCompC(om.ExplicitComponent):
     """Target expressed in degrees Celsius."""
 
     def setup(self):
@@ -101,7 +101,7 @@ class TgtCompCFD(TgtCompC):
         pass
 
 
-class TgtCompK(ExplicitComponent):
+class TgtCompK(om.ExplicitComponent):
     """Target expressed in degrees Kelvin."""
 
     def setup(self):
@@ -133,7 +133,7 @@ class TgtCompKFD(TgtCompK):
         pass
 
 
-class TgtCompFMulti(ExplicitComponent):
+class TgtCompFMulti(om.ExplicitComponent):
     """Contains some extra inputs that might trip things up."""
 
     def setup(self):
@@ -163,7 +163,7 @@ class TgtCompFMulti(ExplicitComponent):
         J['x3_', 'x2_'] = 0.0
 
 
-class UnitConvGroup(Group):
+class UnitConvGroup(om.Group):
     """Group containing a degC source that feeds into three targets with
     units degF, degC, and degK respectively. Good for testing unit
     conversion."""
@@ -171,7 +171,7 @@ class UnitConvGroup(Group):
     def __init__(self, **kwargs):
         super(UnitConvGroup, self).__init__(**kwargs)
 
-        self.add_subsystem('px1', IndepVarComp('x1', 100.0))
+        self.add_subsystem('px1', om.IndepVarComp('x1', 100.0))
         self.add_subsystem('src', SrcComp())
         self.add_subsystem('tgtF', TgtCompF())
         self.add_subsystem('tgtC', TgtCompC())
@@ -183,7 +183,7 @@ class UnitConvGroup(Group):
         self.connect('src.x2', 'tgtK.x2')
 
 
-class UnitConvGroupImplicitConns(Group):
+class UnitConvGroupImplicitConns(om.Group):
     """ Group containing a defF source that feeds into three targets with
     units degF, degC, and degK respectively. Good for testing unit
     conversion.
@@ -194,7 +194,7 @@ class UnitConvGroupImplicitConns(Group):
     def __init__(self):
         super(UnitConvGroupImplicitConns, self).__init__()
 
-        self.add_subsystem('px1', IndepVarComp('x1', 100.0), promotes_outputs=['x1'])
+        self.add_subsystem('px1', om.IndepVarComp('x1', 100.0), promotes_outputs=['x1'])
         self.add_subsystem('src', SrcComp(), promotes_inputs=['x1'], promotes_outputs=['x2'])
         self.add_subsystem('tgtF', TgtCompF(), promotes_inputs=['x2'])
         self.add_subsystem('tgtC', TgtCompC(), promotes_inputs=['x2'])

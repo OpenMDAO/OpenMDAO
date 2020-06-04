@@ -22,26 +22,42 @@ All three will give the exact same answer, but the way you address the variables
 Variable Promotion
 ******************
 
+Input and output variables can be promoted when a subsystem is added:
+
 .. embed-code::
     openmdao.test_suite.test_examples.test_sellar_mda_promote_connect.TestSellarMDAPromoteConnect.test_sellar_mda_promote
     :layout: interleave
 
+
+Alternatively, variables can be promoted when a group is configured:
+
+.. embed-code::
+    openmdao.test_suite.test_examples.test_sellar_mda_promote_connect.TestSellarMDAPromoteConnect.test_sellar_mda_promote_in_configure
+    :layout: interleave
+
+
 There are a few important details to note:
 
-    * The promoted name of an output has to be unique within that level of the hierarchy (i.e. you can't have two outputs with the same name)
-    * You are allowed to have multiple inputs promoted to the same name, but in order for a connection to be made there must also be an output with the same name. Otherwise, no connection is made.
-    * You can use `glob <https://en.wikipedia.org/wiki/Glob_(programming)>`_ patterns to promote lots of variables without specifying them all, but try to limit your usage of :code:`promotes=['*']`.
-      Though it may seem like a convenient way to do things, it can make it difficult for other people who are reading your code to understand which variables are connected to each other.
-      It is allowable to use :code:`promotes=['*']` in cases where it won't cause confusion,
-      for example, with :code:`cycle`, which only exists to allow for the nonlinear solver to converge the two components.
-      Another example of when it would be safe to use :code:`promotes=['*']` would be if you have :code:`ExecComps` that
-      make it clear what the I/O of that component is anyway.
+    * The promoted name of an output has to be unique within that level of the hierarchy 
+      (i.e. you can't have two outputs with the same name)
+    * You are allowed to have multiple inputs promoted to the same name, but in order for a connection
+      to be made there must also be an output with the same name. Otherwise, no connection is made.
+    * You can use `glob <https://en.wikipedia.org/wiki/Glob_(programming)>`_ patterns to promote lots of
+      variables without specifying them all, but try to limit your usage of :code:`promotes=['*']`.
+      Though it may seem like a convenient way to do things, it can make it difficult for other people who 
+      are reading your code to understand which variables are connected to each other.
+      It is acceptable to use :code:`promotes=['*']` in cases where it won't cause confusion, for example
+      with :code:`cycle`, which only exists to allow for the nonlinear solver to converge the two components.
+      Another example of when it would be safe to use :code:`promotes=['*']` would be if you have
+      :code:`ExecComps` that make it clear what the I/O of that component is anyway.
 
 
 .. note::
 
-    For a more detailed set of examples for how to promote variables, check out the :ref:`feature doc on adding sub-systems to a group <feature_adding_subsystem_to_a_group>`.
-    There are some more advanced things you can do, such as variable name aliasing and connecting a sub-set of indices from the output array of one component to the input of another
+    For a more detailed set of examples for how to promote variables, check out the
+    :ref:`feature doc on adding sub-systems to a group <feature_adding_subsystem_to_a_group>`.
+    There are some more advanced things you can do, such as variable name aliasing and connecting
+    a sub-set of indices from the output array of one component to the input of another.
 
 
 

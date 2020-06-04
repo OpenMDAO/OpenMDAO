@@ -1,4 +1,3 @@
-from __future__ import print_function
 
 import os
 import sys
@@ -9,11 +8,9 @@ import atexit
 from collections import defaultdict
 from itertools import chain
 
-from six import iteritems, string_types
-
 from openmdao.utils.mpi import MPI
 
-from openmdao.devtools.webview import webview
+from openmdao.utils.webview import webview
 from openmdao.devtools.iprof_utils import func_group, find_qualified_name, _collect_methods, \
      _setup_func_group, _get_methods, _Options
 
@@ -173,7 +170,7 @@ def _finalize_profile():
     _obj_map = {}
     cache = {}
     idents = defaultdict(dict)  # map idents to a smaller number
-    for funcpath, data in iteritems(_inst_data):
+    for funcpath, data in _inst_data.items():
         _inst_data[funcpath] = data = _prof_node(funcpath, data)
         parts = funcpath.rsplit('|', 1)
         fname = parts[-1]
@@ -203,7 +200,7 @@ def _finalize_profile():
 
     fname = os.path.basename(_profile_prefix)
     with open("%s.%d" % (fname, rank), 'w') as f:
-        for name, data in iteritems(_inst_data):
+        for name, data in _inst_data.items():
             new_name = '|'.join([_obj_map[s] for s in name.split('|')])
             f.write("%s %d %f\n" % (new_name, data['count'], data['time']))
 
@@ -235,8 +232,6 @@ def _process_1_profile(fname):
     totals = {}
     tree_nodes = {}
     tree_parts = []
-
-    empty = [None, 0., 0]
 
     for funcpath, count, t in _iter_raw_prof_file(fname):
         parts = funcpath.split('|')
@@ -305,7 +300,7 @@ def _process_profile(flist):
         grand_total['tot_time'] += nodes['$total']['tot_time']
         grand_total['time'] += nodes['$total']['time']
 
-        for name, node in iteritems(nodes):
+        for name, node in nodes.items():
             newname = _fix_name(name, i)
             node['id'] = newname
             node['depth'] += 1
@@ -317,7 +312,7 @@ def _process_profile(flist):
     tot_names = []
     for i, tot in enumerate(top_totals):
         tot_names.append('$total.%d' % i)
-        for name, tots in iteritems(tot):
+        for name, tots in tot.items():
             if name == '$total':
                 totals[tot_names[-1]] = tots
             else:
@@ -351,7 +346,7 @@ def _iprof_totals_setup_parser(parser):
                         help='Raw profile data files or a python file.')
 
 
-def _iprof_totals_exec(options):
+def _iprof_totals_exec(options, user_args):
     """
     Called from the command line (openmdao prof_totals command) to create a file containing total
     elapsed times and number of calls for all profiled functions.
@@ -370,7 +365,7 @@ def _iprof_totals_exec(options):
         if len(options.file) > 1:
             print("iprofview can only process a single python file.", file=sys.stderr)
             sys.exit(-1)
-        _iprof_py_file(options)
+        _iprof_py_file(options, user_args)
         if MPI:
             options.file = ['iprof.%d' % i for i in range(MPI.COMM_WORLD.size)]
         else:
@@ -398,7 +393,7 @@ def _iprof_totals_exec(options):
             out_stream.close()
 
 
-def _iprof_py_file(options):
+def _iprof_py_file(options, user_args):
     """
     Run instance-based profiling on the given python script.
 
@@ -406,12 +401,17 @@ def _iprof_py_file(options):
     ----------
     options : argparse Namespace
         Command line options.
+    user_args : list of str
+        Command line options after '--' (if any).  Passed to user script.
     """
     if not func_group:
         _setup_func_group()
 
     progname = options.file[0]
     sys.path.insert(0, os.path.dirname(progname))
+
+    # update sys.argv in case python script takes cmd line args
+    sys.argv[:] = [progname] + user_args
 
     with open(progname, 'rb') as fp:
         code = compile(fp.read(), progname, 'exec')

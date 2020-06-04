@@ -1,4 +1,3 @@
-from __future__ import print_function
 
 import os
 import sys
@@ -6,7 +5,6 @@ import time
 import webbrowser
 import threading
 import json
-from six import iteritems, itervalues
 
 try:
     import tornado
@@ -75,7 +73,7 @@ def _stratify(call_data, sortby='time'):
         y0 = delta_y * depth
         y1 = y0 + delta_y
 
-        for parent, children in iteritems(pardict):
+        for parent, children in pardict.items():
             if not parent:
                 end_x = 0
             else:
@@ -118,7 +116,7 @@ def _iprof_setup_parser(parser):
 
 
 if tornado is None:
-    def _iprof_exec(options):
+    def _iprof_exec(options, user_args):
         """
         Called from a command line to instance based profile data in a web page.
         """
@@ -136,7 +134,7 @@ else:
             # entry contains that node's call data and a dict containing each
             # child keyed by call path.
             self.call_tree = tree = defaultdict(lambda : [None, {}])
-            for path, data in iteritems(self.call_data):
+            for path, data in self.call_data.items():
                 data['id'] = path
                 parts = path.rsplit('|', 1)
                 # add our node to our parent
@@ -177,7 +175,7 @@ else:
                 if not stop_adding:
                     callcount += len(children)
                     if callcount <= maxcalls:
-                        for child in itervalues(children):
+                        for child in children.values():
                             stack.appendleft(self.call_tree[child['id']])
                     else:
                         stop_adding = True
@@ -202,7 +200,8 @@ else:
             self.set_header('Content-Type', 'application/json')
             self.write(dump)
 
-    def _iprof_exec(options):
+
+    def _iprof_exec(options, user_args):
         """
         Called from a command line to instance based profile data in a web page.
         """
@@ -210,7 +209,8 @@ else:
             if len(options.file) > 1:
                 print("iprofview can only process a single python file.", file=sys.stderr)
                 sys.exit(-1)
-            _iprof_py_file(options)
+
+            _iprof_py_file(options, user_args)
             if MPI:
                 options.file = ['iprof.%d' % i for i in range(MPI.COMM_WORLD.size)]
             else:

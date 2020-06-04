@@ -5,10 +5,6 @@ from collections import OrderedDict
 import inspect
 import sys
 
-from six import iteritems
-
-from openmdao.utils.logger_utils import get_logger
-
 # Use this as a special value to be able to tell if the caller set a value for the optional
 #   out_stream argument. We run into problems running testflo if we use a default of sys.stdout.
 _DEFAULT_OUT_STREAM = object()
@@ -86,7 +82,7 @@ def _filter_citations(citations, classes):
         return citations
 
     cits = OrderedDict()
-    for klass, cit in iteritems(citations):
+    for klass, cit in citations.items():
         if klass.__name__ in classes or '.'.join((klass.__module__, klass.__name__)) in classes:
             cits[klass] = cit
     return cits

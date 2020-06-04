@@ -54,6 +54,15 @@ for each element of the array.
     openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_directional
     :layout: interleave
 
+If your component is matrix-free and you request directional derivatives, then your reverse mode derivatives will be verified using the
+dot product test described `here`_.
+
+.. _here: http://www.reproducibility.org/RSF/book/gee/ajt/paper_html/node20.html
+
+.. embed-code::
+    openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_directional_matrix_free
+    :layout: interleave
+
 ----------------------------------------
 Changing Global Settings For Whole Model
 ----------------------------------------

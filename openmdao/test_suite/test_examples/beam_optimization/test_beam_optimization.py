@@ -1,12 +1,10 @@
-from __future__ import print_function, division, absolute_import
-
 import unittest
 
-from openmdao.utils.assert_utils import assert_rel_error
-
-from openmdao.api import Problem, ScipyOptimizeDriver
+import openmdao.api as om
 from openmdao.test_suite.test_examples.beam_optimization.beam_group import BeamGroup
 from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group import MultipointBeamGroup
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
+from openmdao.utils.mpi import MPI
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -19,8 +17,7 @@ class TestCase(unittest.TestCase):
     def test(self):
         import numpy as np
 
-        from openmdao.api import Problem, ScipyOptimizeDriver
-
+        import openmdao.api as om
         from openmdao.test_suite.test_examples.beam_optimization.beam_group import BeamGroup
 
         E = 1.
@@ -30,9 +27,9 @@ class TestCase(unittest.TestCase):
 
         num_elements = 50
 
-        prob = Problem(model=BeamGroup(E=E, L=L, b=b, volume=volume, num_elements=num_elements))
+        prob = om.Problem(model=BeamGroup(E=E, L=L, b=b, volume=volume, num_elements=num_elements))
 
-        prob.driver = ScipyOptimizeDriver()
+        prob.driver = om.ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = True
@@ -41,7 +38,7 @@ class TestCase(unittest.TestCase):
 
         prob.run_driver()
 
-        assert_rel_error(self, prob['inputs_comp.h'],
+        assert_near_equal(prob['inputs_comp.h'],
                          [0.14915754,  0.14764328,  0.14611321,  0.14456715,  0.14300421,  0.14142417,
                           0.13982611,  0.13820976,  0.13657406,  0.13491866,  0.13324268,  0.13154528,
                           0.12982575,  0.12808305,  0.12631658,  0.12452477,  0.12270701,  0.12086183,
@@ -55,8 +52,7 @@ class TestCase(unittest.TestCase):
     def test_multipoint(self):
         import numpy as np
 
-        from openmdao.api import Problem, ScipyOptimizeDriver
-
+        import openmdao.api as om
         from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group import MultipointBeamGroup
 
         E = 1.
@@ -68,11 +64,13 @@ class TestCase(unittest.TestCase):
         num_elements = 50
         num_load_cases = 2
 
-        prob = Problem(model=MultipointBeamGroup(E=E, L=L, b=b, volume=volume,
-                                                 num_elements=num_elements, num_cp=num_cp,
-                                                 num_load_cases=num_load_cases))
+        model = MultipointBeamGroup(E=E, L=L, b=b, volume=volume,
+                                    num_elements=num_elements, num_cp=num_cp,
+                                    num_load_cases=num_load_cases)
 
-        prob.driver = ScipyOptimizeDriver()
+        prob = om.Problem(model=model)
+
+        prob.driver = om.ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = True
@@ -81,7 +79,7 @@ class TestCase(unittest.TestCase):
 
         prob.run_driver()
 
-        assert_rel_error(self, prob['interp.h'][0],
+        assert_near_equal(prob['interp.h'][0],
                          [ 0.14122705,  0.14130706,  0.14154096,  0.1419107,   0.14238706,  0.14293095,
                            0.14349514,  0.14402636,  0.1444677,   0.14476123,  0.14485062,  0.14468388,
                            0.14421589,  0.1434107,   0.14224356,  0.14070252,  0.13878952,  0.13652104,
@@ -95,8 +93,7 @@ class TestCase(unittest.TestCase):
     def test_multipoint_stress(self):
         import numpy as np
 
-        from openmdao.api import Problem, ScipyOptimizeDriver
-
+        import openmdao.api as om
         from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_stress import MultipointBeamGroup
 
         E = 1.
@@ -109,11 +106,13 @@ class TestCase(unittest.TestCase):
         num_elements = 25
         num_load_cases = 2
 
-        prob = Problem(model=MultipointBeamGroup(E=E, L=L, b=b, volume=volume, max_bending = max_bending,
-                                                 num_elements=num_elements, num_cp=num_cp,
-                                                 num_load_cases=num_load_cases))
+        model = MultipointBeamGroup(E=E, L=L, b=b, volume=volume, max_bending = max_bending,
+                                    num_elements=num_elements, num_cp=num_cp,
+                                    num_load_cases=num_load_cases)
 
-        prob.driver = ScipyOptimizeDriver()
+        prob = om.Problem(model=model)
+
+        prob.driver = om.ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = True
@@ -122,15 +121,77 @@ class TestCase(unittest.TestCase):
 
         prob.run_driver()
 
-        assert_rel_error(self, prob['interp.h'][0],
+        assert_near_equal(prob['interp.h'][0],
                          [ 0.45632323,  0.45612552,  0.45543324,  0.45397058,  0.45134629,  0.44714397,
                            0.4410258,   0.43283139,  0.42265378,  0.41087801,  0.3981731,   0.3854358,
                            0.37369202,  0.36342186,  0.35289066,  0.34008777,  0.32362887,  0.30300358,
                            0.27867837,  0.25204063,  0.22519409,  0.20063906,  0.18088818,  0.16807856,
                            0.16364104], 1e-4)
 
+    def test_complex_step(self):
+        E = 1.
+        L = 1.
+        b = 0.1
+        volume = 0.01
 
-@unittest.skipUnless(PETScVector, "PETSc is required.")
+        num_elements = 50
+
+        prob = om.Problem(model=BeamGroup(E=E, L=L, b=b, volume=volume, num_elements=num_elements))
+
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = True
+
+        prob.setup(force_alloc_complex=True)
+
+        prob.run_model()
+
+        derivs = prob.check_totals(method='cs', out_stream=None)
+        assert_near_equal(derivs[('compliance_comp.compliance', 'inputs_comp.h')]['rel error'][0],
+                         0.0, 1e-8)
+        assert_near_equal(derivs[('volume_comp.volume', 'inputs_comp.h')]['rel error'][0],
+                         0.0, 1e-8)
+
+        derivs = prob.check_partials(method='cs', out_stream=None)
+        assert_check_partials(derivs, rtol=1e-15)
+
+    def test_complex_step_multipoint(self):
+        E = 1.
+        L = 1.
+        b = 0.1
+        volume = 0.01
+
+        num_cp = 5
+        num_elements = 50
+        num_load_cases = 2
+
+        model = MultipointBeamGroup(E=E, L=L, b=b, volume=volume,
+                                        num_elements=num_elements, num_cp=num_cp,
+                                        num_load_cases=num_load_cases)
+
+        prob = om.Problem(model=model)
+
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = True
+
+        prob.setup(force_alloc_complex=True)
+
+        prob.run_model()
+
+        derivs = prob.check_totals(method='cs', out_stream=None)
+        assert_near_equal(derivs[('obj_sum.obj', 'inputs_comp.h_cp')]['rel error'][0],
+                         0.0, 1e-8)
+        assert_near_equal(derivs[('volume_comp.volume', 'inputs_comp.h_cp')]['rel error'][0],
+                         0.0, 1e-8)
+
+        derivs = prob.check_partials(method='cs', out_stream=None)
+        assert_check_partials(derivs, rtol=1e-15)
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestParallelGroups(unittest.TestCase):
 
     N_PROCS = 2
@@ -138,8 +199,7 @@ class TestParallelGroups(unittest.TestCase):
     def test_multipoint(self):
         import numpy as np
 
-        from openmdao.api import Problem, ScipyOptimizeDriver
-
+        import openmdao.api as om
         from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group import MultipointBeamGroup
 
         E = 1.
@@ -151,11 +211,13 @@ class TestParallelGroups(unittest.TestCase):
         num_elements = 50
         num_load_cases = 2
 
-        prob = Problem(model=MultipointBeamGroup(E=E, L=L, b=b, volume=volume,
-                                                 num_elements=num_elements, num_cp=num_cp,
-                                                 num_load_cases=num_load_cases))
+        model = MultipointBeamGroup(E=E, L=L, b=b, volume=volume,
+                                    num_elements=num_elements, num_cp=num_cp,
+                                    num_load_cases=num_load_cases)
 
-        prob.driver = ScipyOptimizeDriver()
+        prob = om.Problem(model=model)
+
+        prob.driver = om.ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = True
@@ -164,7 +226,7 @@ class TestParallelGroups(unittest.TestCase):
 
         prob.run_driver()
 
-        assert_rel_error(self, prob['interp.h'][0],
+        assert_near_equal(prob['interp.h'][0],
                          [ 0.14122705,  0.14130706,  0.14154096,  0.1419107,   0.14238706,  0.14293095,
                            0.14349514,  0.14402636,  0.1444677,   0.14476123,  0.14485062,  0.14468388,
                            0.14421589,  0.1434107,   0.14224356,  0.14070252,  0.13878952,  0.13652104,

@@ -1,7 +1,9 @@
 import numpy as np
-from openmdao.api import ExplicitComponent
 
-class ArrayComp(ExplicitComponent):
+import openmdao.api as om
+
+
+class ArrayComp(om.ExplicitComponent):
 
     def setup(self):
 

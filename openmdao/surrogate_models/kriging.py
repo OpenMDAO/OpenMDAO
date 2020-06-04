@@ -1,12 +1,9 @@
 """Surrogate model based on Kriging."""
-from six.moves import zip, range
-
 import numpy as np
 import scipy.linalg as linalg
 from scipy.optimize import minimize
 
 from openmdao.surrogate_models.surrogate_model import SurrogateModel
-from openmdao.utils.general_utils import warn_deprecation
 
 MACHINE_EPSILON = np.finfo(np.double).eps
 
@@ -88,6 +85,12 @@ class KrigingSurrogate(SurrogateModel):
                                   "must be of the same length as the number of training points. "
                                   "Default: 10. * Machine Epsilon")
 
+        self.options.declare('lapack_driver', types=str, default='gesvd',
+                             desc="Which lapack driver should be used for scipy's linalg.svd."
+                                  "Options are 'gesdd' which is faster but not as robust,"
+                                  "or 'gesvd' which is slower but more reliable."
+                                  "'gesvd' is the default.")
+
     def train(self, x, y):
         """
         Train the surrogate model with the given set of inputs and outputs.
@@ -106,7 +109,8 @@ class KrigingSurrogate(SurrogateModel):
         self.n_samples, self.n_dims = x.shape
 
         if self.n_samples <= 1:
-            raise ValueError('KrigingSurrogate require at least 2 training points.')
+            self._raise('KrigingSurrogate requires at least 2 training points.',
+                        exc_type=ValueError)
 
         # Normalize the data
         X_mean = np.mean(x, axis=0)
@@ -137,8 +141,8 @@ class KrigingSurrogate(SurrogateModel):
                              bounds=bounds)
 
         if not optResult.success:
-            raise ValueError(
-                'Kriging Hyper-parameter optimization failed: {0}'.format(optResult.message))
+            msg = 'Kriging Hyper-parameter optimization failed: {0}'.format(optResult.message)
+            self._raise(msg, exc_type=ValueError)
 
         self.thetas = np.exp(optResult.x)
         _, params = self._calculate_reduced_likelihood_params()
@@ -157,6 +161,7 @@ class KrigingSurrogate(SurrogateModel):
         thetas : ndarray, optional
             Given input correlation coefficients. If none given, uses self.thetas
             from training.
+
 
         Returns
         -------
@@ -180,7 +185,7 @@ class KrigingSurrogate(SurrogateModel):
         R = np.exp(-thetas.dot(np.square(distances)))
         R[np.diag_indices_from(R)] = 1. + self.options['nugget']
 
-        [U, S, Vh] = linalg.svd(R)
+        [U, S, Vh] = linalg.svd(R, lapack_driver=self.options['lapack_driver'])
 
         # Penrose-Moore Pseudo-Inverse:
         # Given A = USV^* and Ax=b, the least-squares solution is
@@ -279,22 +284,3 @@ class KrigingSurrogate(SurrogateModel):
         jac = np.einsum('i,j,ij->ij', self.Y_std, 1. /
                         self.X_std, gradr.dot(self.alpha).T)
         return jac
-
-
-class FloatKrigingSurrogate(KrigingSurrogate):
-    """
-    Deprecated.
-    """
-
-    def __init__(self, **kwargs):
-        """
-        Capture Initialize to throw warning.
-
-        Parameters
-        ----------
-        **kwargs : dict
-            Deprecated arguments.
-        """
-        warn_deprecation("'FloatKrigingSurrogate' has been deprecated. Use "
-                         "'KrigingSurrogate' instead.")
-        super(FloatKrigingSurrogate, self).__init__(**kwargs)

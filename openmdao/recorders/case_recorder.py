@@ -1,8 +1,6 @@
 """
 Class definition for CaseRecorder, the base class for all recorders.
 """
-from six import iteritems
-
 from openmdao.core.system import System
 from openmdao.core.driver import Driver
 from openmdao.solvers.solver import Solver
@@ -55,7 +53,6 @@ class CaseRecorder(object):
         # For Systems
         self._inputs = None
         self._outputs = None
-        self._resids = None
 
         # For Solvers
         self._abs_error = 0.0
@@ -102,20 +99,25 @@ class CaseRecorder(object):
 
         # collect scaling arrays
         scaling_vecs = {}
-        for kind, odict in iteritems(recording_requester._vectors):
+        for kind, odict in recording_requester._vectors.items():
             scaling_vecs[kind] = scaling = {}
-            for vecname, vec in iteritems(odict):
+            for vecname, vec in odict.items():
                 scaling[vecname] = vec._scaling
 
         # create a copy of the system's metadata excluding what is in 'options_excludes'
-        user_options = OptionsDictionary()
         excludes = recording_requester.recording_options['options_excludes']
-        for key in recording_requester.options._dict:
-            if check_path(key, [], excludes, True):
-                user_options._dict[key] = recording_requester.options._dict[key]
-        user_options._read_only = recording_requester.options._read_only
 
-        return scaling_vecs, user_options
+        if excludes:
+            user_options = OptionsDictionary()
+            user_options._all_recordable = recording_requester.options._all_recordable
+            for key in recording_requester.options._dict:
+                if check_path(key, [], excludes, True):
+                    user_options._dict[key] = recording_requester.options._dict[key]
+            user_options._read_only = recording_requester.options._read_only
+
+            return scaling_vecs, user_options
+        else:
+            return scaling_vecs, recording_requester.options
 
     def record_metadata_system(self, recording_requester):
         """

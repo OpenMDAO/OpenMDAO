@@ -12,7 +12,7 @@ The following process is a one-time setup for the owner of a project to complete
 transparent to other developers and users. The process outlined here is to get a project's docs to build on Travis CI, and then
 transfer the built docs off to a web server. (This example illustrates OpenMDAO's process.)
 The reason you'd use this method instead of just setting up readthedocs.org, is because on Travis, you can very specifically
-customize the installation of your project.  Certain advanced items in OpenMDAO 2.0 just can't be installed on readthedocs, but can be on Travis.
+customize the installation of your project.  Certain advanced items in OpenMDAO just can't be installed on readthedocs, but can be on Travis.
 Having a full install means that the docs will be more complete, because embedded tests that rely on, for instance, MPI, will actually work on Travis CI,
 whereas they currently do not on readthedocs.org.
 
@@ -116,7 +116,7 @@ The commands to do the above look something like this:
                         -in travis deploy.rsa.enc -out /tmp/travis_deploy.rsa -d;
                   fi
 
-    C. Finally, the command is supposed to create and assign two environment variables in the the Travis CI settings for the repository in question.  This was a big stumbling block for me, and it is why I added the `—debug` arg to the `travis encrypt-file` command.
+    C. Finally, the command is supposed to create and assign two environment variables in the Travis CI settings for the repository in question.  This was a big stumbling block for me, and it is why I added the `—debug` arg to the `travis encrypt-file` command.
        I was executing the correct command, but the identity I was signed in as (me) and the identity of the repo (OpenMDAO) didn’t match and so those env vars were never created.  Going to the travis-ci.org webpage for OpenMDAO and going into Settings and using
        the web interface to add two new env vars is the way around this problem.  But what are the env vars called, and what will their values be?  That’s where —debug comes in (actual values redacted):
 

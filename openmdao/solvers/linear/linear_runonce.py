@@ -47,4 +47,4 @@ class LinearRunOnce(LinearBlockGS):
 
         # this solver does not iterate
         self.options.undeclare("maxiter")
-        self.options.undeclare("err_on_maxiter")
+        self.options.undeclare("err_on_non_converge")

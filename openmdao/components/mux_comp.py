@@ -1,8 +1,6 @@
 """Definition of the Mux Component."""
 
 
-from six import iteritems
-
 import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent
@@ -66,56 +64,53 @@ class MuxComp(ExplicitComponent):
         """
         self._vars[name] = {'val': val, 'shape': shape, 'units': units, 'desc': desc, 'axis': axis}
 
-    def setup(self):
-        """
-        Declare inputs, outputs, and derivatives for the demux component.
-        """
         opts = self.options
         vec_size = opts['vec_size']
 
-        for var, options in iteritems(self._vars):
-            kwgs = dict(options)
-            in_shape = np.asarray(options['val']).shape \
-                if options['shape'] is None else options['shape']
-            in_size = np.prod(in_shape)
-            out_shape = list(in_shape)
-            out_shape.insert(options['axis'], vec_size)
-            kwgs.pop('shape')
-            ax = kwgs.pop('axis')
+        options = self._vars[name]
 
-            in_dimension = len(in_shape)
+        kwgs = dict(options)
+        in_shape = np.asarray(options['val']).shape \
+            if options['shape'] is None else options['shape']
+        in_size = np.prod(in_shape)
+        out_shape = list(in_shape)
+        out_shape.insert(options['axis'], vec_size)
+        kwgs.pop('shape')
+        ax = kwgs.pop('axis')
 
-            if ax > in_dimension:
-                raise ValueError('Cannot mux a {0}D inputs for {2} along axis greater '
-                                 'than {0} ({1})'.format(in_dimension, ax, var))
+        in_dimension = len(in_shape)
 
-            self.add_output(name=var,
-                            val=options['val'],
-                            shape=out_shape,
-                            units=options['units'],
-                            desc=options['desc'])
+        if ax > in_dimension:
+            raise ValueError('{3}: Cannot mux a {0}D inputs for {2} along axis greater '
+                             'than {0} ({1})'.format(in_dimension, ax, name, self.msginfo))
 
-            self._input_names[var] = []
+        self.add_output(name=name,
+                        val=options['val'],
+                        shape=out_shape,
+                        units=options['units'],
+                        desc=options['desc'])
 
-            for i in range(vec_size):
-                in_name = '{0}_{1}'.format(var, i)
-                self._input_names[var].append(in_name)
+        self._input_names[name] = []
 
-                self.add_input(name=in_name, shape=in_shape, **kwgs)
+        for i in range(vec_size):
+            in_name = '{0}_{1}'.format(name, i)
+            self._input_names[name].append(in_name)
 
-                in_templates = [np.zeros(in_shape, dtype=int) for _ in range(vec_size)]
+            self.add_input(name=in_name, shape=in_shape, **kwgs)
 
-                rs = []
-                cs = []
+            in_templates = [np.zeros(in_shape, dtype=int) for _ in range(vec_size)]
 
-                for j in range(in_size):
-                    in_templates[i].flat[:] = 0
-                    in_templates[i].flat[j] = 1
-                    temp_out = np.stack(in_templates, axis=ax)
-                    cs.append(j)
-                    rs.append(int(np.nonzero(temp_out.ravel())[0]))
+            rs = []
+            cs = []
 
-                self.declare_partials(of=var, wrt=in_name, rows=rs, cols=cs, val=1.0)
+            for j in range(in_size):
+                in_templates[i].flat[:] = 0
+                in_templates[i].flat[j] = 1
+                temp_out = np.stack(in_templates, axis=ax)
+                cs.append(j)
+                rs.append(int(np.nonzero(temp_out.ravel())[0]))
+
+            self.declare_partials(of=name, wrt=in_name, rows=rs, cols=cs, val=1.0)
 
     def compute(self, inputs, outputs):
         """
@@ -133,5 +128,6 @@ class MuxComp(ExplicitComponent):
 
         for var in self._vars:
             ax = self._vars[var]['axis']
-            vals = [inputs[self._input_names[var][i]] for i in range(vec_size)]
+            invar = self._input_names[var]
+            vals = [inputs[invar[i]] for i in range(vec_size)]
             outputs[var][...] = np.stack(vals, axis=ax)

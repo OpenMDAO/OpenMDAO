@@ -2,6 +2,8 @@
 Base class for all CaseReaders.
 """
 
+from openmdao.utils.assert_utils import warn_deprecation
+
 
 class BaseCaseReader(object):
     """
@@ -15,7 +17,7 @@ class BaseCaseReader(object):
         Metadata about the problem, including the system hierachy and connections.
     solver_metadata : dict
         The solver options for each solver in the recorded model.
-    system_metadata : dict
+    system_options : dict
         Metadata about each system in the recorded model, including options and scaling factors.
     """
 
@@ -33,7 +35,21 @@ class BaseCaseReader(object):
         self._format_version = None
         self.problem_metadata = {}
         self.solver_metadata = {}
-        self.system_metadata = {}
+        self.system_options = {}
+
+    @property
+    def system_metadata(self):
+        """
+        Provide 'system_metadata' property for backwards compatibility.
+
+        Returns
+        -------
+        dict
+            reference to the 'system_options' attribute.
+        """
+        warn_deprecation("The BaseCaseReader.system_metadata attribute is deprecated. "
+                         "Use the BaseCaseReader.system_option attribute instead.")
+        return self.system_options
 
     def get_cases(self, source, recurse=True, flat=False):
         """
@@ -41,7 +57,8 @@ class BaseCaseReader(object):
 
         Parameters
         ----------
-        source : {'problem', 'driver', component pathname, solver pathname, iteration_coordinate}
+        source : {'problem', 'driver', <system hierarchy location>, <solver hierarchy location>,
+            case name}
             Identifies which cases to return.
         recurse : bool, optional
             If True, will enable iterating over all successors in case hierarchy
@@ -81,8 +98,8 @@ class BaseCaseReader(object):
         Returns
         -------
         list
-            One or more of: `problem`, `driver`, `<component hierarchy location>`,
-            `<solver hierarchy location>`
+            One or more of: 'problem', 'driver', <system hierarchy location>,
+                            <solver hierarchy location>
         """
         pass
 
@@ -92,12 +109,34 @@ class BaseCaseReader(object):
 
         Parameters
         ----------
-        source : {'problem', 'driver', component pathname, solver pathname}
+        source : {'problem', 'driver', <system hierarchy location>, <solver hierarchy location>}
             Identifies the source for which to return information.
 
         Returns
         -------
         dict
             {'inputs':[list of keys], 'outputs':[list of keys]}. Does not recurse.
+        """
+        pass
+
+    def list_cases(self, source=None, recurse=True, flat=True):
+        """
+        Iterate over Driver, Solver and System cases in order.
+
+        Parameters
+        ----------
+        source : {'problem', 'driver', <system hierarchy location>, <solver hierarchy location>,
+            case name}
+            If not None, only cases originating from the specified source or case are returned.
+        recurse : bool, optional
+            If True, will enable iterating over all successors in case hierarchy.
+        flat : bool, optional
+            If False and there are child cases, then a nested ordered dictionary
+            is returned rather than an iterator.
+
+        Returns
+        -------
+        iterator or dict
+            An iterator or a nested dictionary of identified cases.
         """
         pass

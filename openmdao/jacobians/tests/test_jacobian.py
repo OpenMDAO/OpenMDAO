@@ -1,10 +1,8 @@
 """ Test the Jacobian objects."""
 
 import itertools
+import sys
 import unittest
-
-from six import assertRaisesRegex
-from six.moves import range
 
 import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix
@@ -13,10 +11,9 @@ from openmdao.api import IndepVarComp, Group, Problem, \
                          ExplicitComponent, ImplicitComponent, ExecComp, \
                          NewtonSolver, ScipyKrylov, \
                          LinearBlockGS, DirectSolver
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.test_suite.components.paraboloid import Paraboloid
-from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
-     SellarDis2withDerivatives
+from openmdao.api import ScipyOptimizeDriver
 
 try:
     from parameterized import parameterized
@@ -149,6 +146,41 @@ class ExplicitSetItemComp(ExplicitComponent):
         partials['out', 'in'] = self._constructor(self._value)
 
 
+class SimpleCompWithPrintPartials(ExplicitComponent):
+
+    def setup(self):
+        self.add_input('x', val=0.0)
+        self.add_input('y', val=0.0)
+
+        self.add_output('f_xy', val=0.0, upper=1.0)
+
+        self.declare_partials(of='*', wrt='*')
+
+        self.count = 0
+        self.partials_name_pairs = []
+        self.partials_values = []
+
+    def compute(self, inputs, outputs):
+        x = inputs['x']
+        y = inputs['y']
+        outputs['f_xy'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
+
+    def compute_partials(self, inputs, partials):
+        x = inputs['x']
+        y = inputs['y']
+
+        partials['f_xy', 'x'] = 2.0*x - 6.0 + y
+        partials['f_xy', 'y'] = 2.0*y + 8.0 + x
+
+        if self.count < 1:  # Only want to save these this once for the test
+            for k in partials:
+                self.partials_name_pairs.append(k)
+
+            for k, v in partials.items():
+                self.partials_values.append((k,v))
+
+        self.count += 1
+
 def arr2list(arr):
     """Convert a numpy array to a 'sparse' list."""
     data = []
@@ -223,7 +255,7 @@ class TestJacobian(unittest.TestCase):
         self._check_rev(self.prob, rev_check)
 
     def _setup_model(self, assembled_jac, comp_jac_class, nested, lincalls):
-        self.prob = prob = Problem(model=Group())
+        self.prob = prob = Problem()
         if nested:
             top = prob.model.add_subsystem('G1', Group())
         else:
@@ -240,7 +272,7 @@ class TestJacobian(unittest.TestCase):
         top.connect('indep.a', 'C2.w', src_indices=[0,2,1])
         top.connect('C1.f', 'C2.z', src_indices=[1])
 
-        top.nonlinear_solver = NewtonSolver()
+        top.nonlinear_solver = NewtonSolver(solve_subsystems=False)
         top.nonlinear_solver.linear_solver = ScipyKrylov(maxiter=100)
         top.linear_solver = ScipyKrylov(
             maxiter=200, atol=1e-10, rtol=1e-10, assemble_jac=True)
@@ -248,7 +280,7 @@ class TestJacobian(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         prob.run_model()
 
@@ -312,10 +344,10 @@ class TestJacobian(unittest.TestCase):
         shape, constructor, expected_shape = shapes
         dtype, value = dtypes
 
-        prob = Problem(model=Group())
+        prob = Problem()
         comp = ExplicitSetItemComp(dtype, value, shape, constructor)
         prob.model.add_subsystem('C1', comp)
-        prob.setup(check=False)
+        prob.setup()
 
         prob.set_solver_print(level=0)
         prob.run_model()
@@ -329,7 +361,7 @@ class TestJacobian(unittest.TestCase):
         self.assertEqual(len(jac_out.shape), 2)
         expected_dtype = np.promote_types(dtype, float)
         self.assertEqual(jac_out.dtype, expected_dtype)
-        assert_rel_error(self, jac_out, np.atleast_2d(expected).reshape(expected_shape), 1e-15)
+        assert_near_equal(jac_out, np.atleast_2d(expected).reshape(expected_shape), 1e-15)
 
     def test_group_assembled_jac_with_ext_mat(self):
 
@@ -400,7 +432,7 @@ class TestJacobian(unittest.TestCase):
 
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', np.array([1.0, 1.0])), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -442,7 +474,7 @@ class TestJacobian(unittest.TestCase):
         c2 = prob.model.add_subsystem('C2', ExecComp('d=a*2.0+b+c', a=0., b=0., c=0., d=0.))
         c3 = prob.model.add_subsystem('C3', ExecComp('ee=a*2.0', a=0., ee=0.))
 
-        prob.model.nonlinear_solver = NewtonSolver()
+        prob.model.nonlinear_solver = NewtonSolver(solve_subsystems=False)
         prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
         prob.model.connect('indep.x', 'C1.a')
@@ -450,9 +482,9 @@ class TestJacobian(unittest.TestCase):
         prob.model.connect('C1.c', 'C2.b')
         prob.model.connect('C2.d', 'C3.a')
         prob.set_solver_print(level=0)
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
-        assert_rel_error(self, prob['C3.ee'], 8.0, 0000.1)
+        assert_near_equal(prob['C3.ee'], 8.0, 0000.1)
 
     def test_assembled_jacobian_submat_indexing_dense(self):
         prob = Problem(model=Group(assembled_jac_type='dense'))
@@ -465,7 +497,7 @@ class TestJacobian(unittest.TestCase):
         G1.add_subsystem('C1', ExecComp('y=2.0*x*x'))
         G1.add_subsystem('C2', ExecComp('y=3.0*x*x'))
 
-        prob.model.nonlinear_solver = NewtonSolver()
+        prob.model.nonlinear_solver = NewtonSolver(solve_subsystems=False)
         G1.linear_solver = DirectSolver(assemble_jac=True)
 
         # before the fix, we got bad offsets into the _ext_mtx matrix.
@@ -476,11 +508,11 @@ class TestJacobian(unittest.TestCase):
         prob.model.connect('indeps.y', 'G1.C1.x')
         prob.model.connect('indeps.z', 'G1.C2.x')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['G1.C1.y'], 50.0)
-        assert_rel_error(self, prob['G1.C2.y'], 243.0)
+        assert_near_equal(prob['G1.C1.y'], 50.0)
+        assert_near_equal(prob['G1.C2.y'], 243.0)
 
     def test_assembled_jacobian_submat_indexing_csc(self):
         prob = Problem(model=Group(assembled_jac_type='dense'))
@@ -493,11 +525,11 @@ class TestJacobian(unittest.TestCase):
         G1.add_subsystem('C1', ExecComp('y=2.0*x*x'))
         G1.add_subsystem('C2', ExecComp('y=3.0*x*x'))
 
-        # prob.model.nonlinear_solver = NewtonSolver()
+        # prob.model.nonlinear_solver = NewtonSolver(solve_subsystems=False)
         prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
         G1.linear_solver = DirectSolver(assemble_jac=True)
-        G1.nonlinear_solver = NewtonSolver()
+        G1.nonlinear_solver = NewtonSolver(solve_subsystems=False)
 
         # before the fix, we got bad offsets into the _ext_mtx matrix.
         # to get entries in _ext_mtx, there must be at least one connection
@@ -507,11 +539,11 @@ class TestJacobian(unittest.TestCase):
         prob.model.connect('indeps.y', 'G1.C1.x')
         prob.model.connect('indeps.z', 'G1.C2.x')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['G1.C1.y'], 50.0)
-        assert_rel_error(self, prob['G1.C2.y'], 243.0)
+        assert_near_equal(prob['G1.C1.y'], 50.0)
+        assert_near_equal(prob['G1.C2.y'], 243.0)
 
     def test_declare_partial_reference(self):
         # Test for a bug where declare_partials is given an array reference
@@ -537,7 +569,7 @@ class TestJacobian(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['y'], 2 * np.ones(2))
+        assert_near_equal(prob['y'], 2 * np.ones(2))
 
     def test_declare_partials_row_col_size_mismatch(self):
         # Make sure we have clear error messages.
@@ -566,20 +598,20 @@ class TestJacobian(unittest.TestCase):
         model = prob.model
         model.add_subsystem('comp', Comp1())
 
-        msg = "comp: declare_partials has been called with rows and cols, which" + \
+        msg = "Comp1 \(comp\): d\(y\)/d\(x\): declare_partials has been called with rows and cols, which" + \
               " should be arrays of equal length, but rows is length 2 while " + \
               "cols is length 1."
-        with assertRaisesRegex(self, RuntimeError, msg):
+        with self.assertRaisesRegex(RuntimeError, msg):
             prob.setup()
 
         prob = Problem()
         model = prob.model
         model.add_subsystem('comp', Comp2())
 
-        msg = "comp: declare_partials has been called with rows and cols, which" + \
+        msg = "Comp2 \(comp\): d\(y\)/d\(x\): declare_partials has been called with rows and cols, which" + \
             " should be arrays of equal length, but rows is length 1 while " + \
             "cols is length 2."
-        with assertRaisesRegex(self, RuntimeError, msg):
+        with self.assertRaisesRegex(RuntimeError, msg):
             prob.setup()
 
     def test_assembled_jacobian_unsupported_cases(self):
@@ -616,7 +648,7 @@ class TestJacobian(unittest.TestCase):
         prob.setup()
 
         msg = "AssembledJacobian not supported for matrix-free subcomponent."
-        with assertRaisesRegex(self, Exception, msg):
+        with self.assertRaisesRegex(Exception, msg):
             prob.run_model()
 
         # Nested
@@ -637,7 +669,7 @@ class TestJacobian(unittest.TestCase):
         prob.setup()
 
         msg = "AssembledJacobian not supported for matrix-free subcomponent."
-        with assertRaisesRegex(self, Exception, msg):
+        with self.assertRaisesRegex(Exception, msg):
             prob.run_model()
 
         # Try a component that is derived from a matrix-free one
@@ -660,7 +692,7 @@ class TestJacobian(unittest.TestCase):
         prob.setup()
 
         msg = "AssembledJacobian not supported for matrix-free subcomponent."
-        with assertRaisesRegex(self, Exception, msg):
+        with self.assertRaisesRegex(Exception, msg):
             prob.run_model()
 
         # Make sure regular comps don't give an error.
@@ -704,7 +736,7 @@ class TestJacobian(unittest.TestCase):
         prob.setup()
 
         msg = "AssembledJacobian not supported for matrix-free subcomponent."
-        with assertRaisesRegex(self, Exception, msg):
+        with self.assertRaisesRegex(Exception, msg):
             prob.run_model()
 
     def test_access_undeclared_subjac(self):
@@ -723,7 +755,7 @@ class TestJacobian(unittest.TestCase):
 
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', val=1.0))
         model.add_subsystem('comp', Undeclared())
@@ -734,7 +766,7 @@ class TestJacobian(unittest.TestCase):
         prob.run_model()
 
         msg = 'Variable name pair \("{}", "{}"\) must first be declared.'
-        with assertRaisesRegex(self, KeyError, msg.format('y', 'x')):
+        with self.assertRaisesRegex(KeyError, msg.format('y', 'x')):
             J = prob.compute_totals(of=['comp.y'], wrt=['p1.x'])
 
     def test_one_src_2_tgts_with_src_indices_densejac(self):
@@ -754,11 +786,11 @@ class TestJacobian(unittest.TestCase):
         prob.model.connect('indeps.x', 'G1.C1.x', src_indices=[0,1])
         prob.model.connect('indeps.x', 'G1.C1.y', src_indices=[2,3])
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         J = prob.compute_totals(of=['G1.C1.z'], wrt=['indeps.x'])
-        assert_rel_error(self, J['G1.C1.z', 'indeps.x'], np.array([[ 3.,  0.,  2.,  0.],
+        assert_near_equal(J['G1.C1.z', 'indeps.x'], np.array([[ 3.,  0.,  2.,  0.],
                                                                    [-0.,  3.,  0.,  2.]]), .0001)
 
     def test_one_src_2_tgts_csc_error(self):
@@ -782,8 +814,42 @@ class TestJacobian(unittest.TestCase):
         prob.run_model()
 
         J = prob.compute_totals(of=['G1.C1.z'], wrt=['indeps.x'])
-        assert_rel_error(self, J['G1.C1.z', 'indeps.x'], np.eye(10)*5.0, .0001)
+        assert_near_equal(J['G1.C1.z', 'indeps.x'], np.eye(10)*5.0, .0001)
 
+    def test_dict_properties(self):
+        # Make sure you can use the partials variable passed to compute_partials as a dict
+        prob = Problem()
+
+        indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
+        indeps.add_output('x', .5)
+        indeps.add_output('y', 10.0)
+        comp = SimpleCompWithPrintPartials()
+        prob.model.add_subsystem('paraboloid', comp, promotes_inputs=['x', 'y'])
+
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+
+        prob.model.add_design_var('x', lower=-50, upper=50)
+        prob.model.add_design_var('y', lower=-50, upper=50)
+        prob.model.add_objective('paraboloid.f_xy')
+
+        prob.setup()
+        prob.run_driver()
+
+        expected = [
+            (('paraboloid.f_xy', 'paraboloid.f_xy'),[-1.]),
+            (('paraboloid.f_xy', 'paraboloid.x'),[[0.]]),
+            (('paraboloid.f_xy', 'paraboloid.y'),[[0.]]),
+        ]
+        self.assertEqual(sorted(comp.partials_name_pairs), sorted(e[0] for e in sorted(expected)))
+
+        self.assertEqual(sorted(comp.partials_name_pairs),
+                         sorted(e[0] for e in sorted(expected)))
+        for act, exp in zip(
+                [e[1] for e in sorted(comp.partials_values)],
+                [e[1] for e in sorted(expected)],
+                ):
+            assert_near_equal(act,exp, 1e-5)
 
 class MySparseComp(ExplicitComponent):
     def setup(self):
@@ -901,6 +967,72 @@ class OverlappingPartialsTestCase(unittest.TestCase):
                                                  [ 0., -1.,  0.,  0.],
                                                  [ 9.,  8., -1.,  0.],
                                                  [ 5.,  10.,  0., -1.]]))
+
+
+class MaskingTestCase(unittest.TestCase):
+    def test_csc_masking(self):
+        class CCBladeResidualComp(ImplicitComponent):
+
+            def initialize(self):
+                self.options.declare('num_nodes', types=int)
+                self.options.declare('num_radial', types=int)
+
+            def setup(self):
+                num_nodes = self.options['num_nodes']
+                num_radial = self.options['num_radial']
+
+                self.add_input('chord', shape=(1, num_radial))
+                self.add_input('theta', shape=(1, num_radial))
+
+                self.add_output('phi', lower=-0.5*np.pi, upper=0.0,
+                                shape=(num_nodes, num_radial))
+                self.add_output('Tp', shape=(num_nodes, num_radial))
+
+                of_names = ('phi', 'Tp')
+                row_col = np.arange(num_radial)
+
+                for name in of_names:
+                    self.declare_partials(name, 'chord', rows=row_col, cols=row_col)
+                    self.declare_partials(name, 'theta', rows=row_col, cols=row_col, val=0.0)
+                    self.declare_partials(name, 'phi', rows=row_col, cols=row_col)
+
+                self.declare_partials('Tp', 'Tp', rows=row_col, cols=row_col, val=1.)
+
+            def linearize(self, inputs, outputs, partials):
+
+                partials['phi', 'chord'] = np.array([1., 2, 3, 4])
+                partials['phi', 'phi'] = np.array([5., 6, 7, 8])
+
+                partials['Tp', 'chord'] = np.array([9., 10, 11, 12])
+                partials['Tp', 'phi'] = np.array([13., 14, 15, 16])
+
+
+        prob = Problem()
+        model = prob.model
+
+        comp = IndepVarComp()
+        comp.add_output('chord', val=np.ones((4, )))
+        model.add_subsystem('indep_var_comp', comp, promotes=['*'])
+
+        comp = CCBladeResidualComp(num_nodes=1, num_radial=4, assembled_jac_type='csc')
+
+        comp.linear_solver = DirectSolver(assemble_jac=True)
+        model.add_subsystem('ccblade_comp', comp, promotes_inputs=['chord'], promotes_outputs=['Tp'])
+
+
+        prob.setup(mode='fwd')
+        prob.run_model()
+        totals = prob.compute_totals(of=['Tp'], wrt=['chord'], return_format='array')
+
+        expected = np.array([
+        [-6.4,0.,0.,0.],
+        [ 0.,-5.33333333,0.,0.],
+        [ 0.,0.,-4.57142857,0.],
+        [ 0.,0.,0.,-4.]]
+        )
+
+        np.testing.assert_allclose(totals, expected)
+
 
 if __name__ == '__main__':
     unittest.main()

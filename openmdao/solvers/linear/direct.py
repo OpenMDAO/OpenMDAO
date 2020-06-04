@@ -1,75 +1,75 @@
 """LinearSolver that uses linalg.solve or LU factor/solve."""
 
-from __future__ import division, print_function
-
-import sys
 import warnings
-from six import reraise, PY2
-from six.moves import range
 
 import numpy as np
 import scipy.linalg
 import scipy.sparse.linalg
+from scipy.sparse import csc_matrix
 
 from openmdao.solvers.solver import LinearSolver
-from openmdao.matrices.coo_matrix import COOMatrix
-from openmdao.matrices.csr_matrix import CSRMatrix
-from openmdao.matrices.csc_matrix import CSCMatrix
 from openmdao.matrices.dense_matrix import DenseMatrix
 
 
-def format_singular_error(err, system, mtx):
+def index_to_varname(system, loc):
     """
-    Format a coherent error message when the matrix is singular.
+    Given a matrix location, return the name of the variable associated with that index.
 
     Parameters
     ----------
-    err : Exception
-        Exception object
     system : <System>
         System containing the Directsolver.
-    mtx : ndarray
-        Matrix of interest.
+    loc : int
+        Index of row or column.
+
+    Returns
+    -------
+    str
+        String containing variable absolute name (and promoted name if there is one) and index.
+    """
+    start = end = 0
+    varsizes = np.sum(system._owned_sizes, axis=0)
+    for i, name in enumerate(system._var_allprocs_abs_names['output']):
+        end += varsizes[i]
+        if loc < end:
+            varname = system._var_allprocs_abs2prom['output'][name]
+            break
+        start = end
+
+    if varname == name:
+        name_string = "'{}' index {}.".format(varname, loc - start)
+    else:
+        name_string = "'{}' ('{}') index {}.".format(varname, name, loc - start)
+
+    return name_string
+
+
+def loc_to_error_msg(system, loc_txt, loc):
+    """
+    Given a matrix location, format a coherent error message when matrix is singular.
+
+    Parameters
+    ----------
+    system : <System>
+        System containing the Directsolver.
+    loc_txt : str
+        Either 'row' or 'col'.
+    loc : int
+        Index of row or column.
 
     Returns
     -------
     str
         New error string.
     """
-    if PY2:
-        err_msg = err.message
-    else:
-        err_msg = err.args[0]
-
-    loc = int(err_msg.split('number ')[1].split(' is exactly')[0])
-
-    # Lapack:DGETRF outputs INFO, which uses fortran numbering.
-    loc -= 1
-
-    col_norm = np.linalg.norm(mtx[:, loc - 1])
-    row_norm = np.linalg.norm(mtx[loc - 1, :])
-
-    if row_norm <= col_norm:
-        loc_txt = "row"
-    else:
-        loc_txt = "column"
-
-    n = 0
-    varname = "Unknown"
-    varsizes = system._var_sizes['nonlinear']['output']
-    for j, name in enumerate(system._var_allprocs_abs_names['output']):
-        n += varsizes[system._owning_rank[name]][j]
-        if loc < n:
-            varname = system._var_abs2prom['output'][name]
-            break
-
-    msg = "Singular entry found in '{}' for {} associated with state/residual '{}'."
-    return msg.format(system.pathname, loc_txt, varname)
+    names = index_to_varname(system, loc)
+    msg = "Singular entry found in {} for {} associated with state/residual " + names
+    return msg.format(system.msginfo, loc_txt)
 
 
-def format_singular_csc_error(system, matrix):
+def format_singular_error(system, matrix):
     """
-    Format a coherent error message when the CSC matrix is singular.
+    Format a coherent error message for any ill-conditioned mmatrix.
 
     Parameters
     ----------
@@ -83,18 +83,40 @@ def format_singular_csc_error(system, matrix):
     str
         New error string.
     """
-    dense = matrix.toarray()
-    zero_rows = np.where(~dense.any(axis=1))[0]
-    zero_cols = np.where(~dense.any(axis=0))[0]
-    if np.any(np.isnan(dense)):
+    if scipy.sparse.issparse(matrix):
+        matrix = matrix.toarray()
+
+    if np.any(np.isnan(matrix)):
         # There is a nan in the matrix.
-        return(format_nan_error(system, dense))
-    elif zero_cols.size <= zero_rows.size:
+        return(format_nan_error(system, matrix))
+
+    zero_rows = np.where(~matrix.any(axis=1))[0]
+    zero_cols = np.where(~matrix.any(axis=0))[0]
+    if zero_cols.size <= zero_rows.size:
 
         if zero_rows.size == 0:
-            # Underdetermined: duplicate columns or rows.
-            msg = "Identical rows or columns found in jacobian in '{}'. Problem is " + \
-                  "underdetermined."
+            # In this case, some row is a linear combination of the other rows.
+
+            # SVD gives us some information that may help locate the source of the problem.
+            u, _, _ = np.linalg.svd(matrix)
+
+            # Nonzero elements in the left singular vector show the rows that contribute strongly to
+            # the singular subspace. Note that sometimes extra rows/cols are included in the set,
+            # currently don't have a good way to pare them down.
+            tol = 1e-15
+            u_sing = np.abs(u[:, -1])
+            left_idx = np.where(u_sing > tol)[0]
+
+            msg = "Jacobian in '{}' is not full rank. The following set of states/residuals " + \
+                  "contains one or more equations that is a linear combination of the others: \n"
+
+            for loc in left_idx:
+                name = index_to_varname(system, loc)
+                msg += ' ' + name + '\n'
+
+            if len(left_idx) > 2:
+                msg += "Note that the problem may be in a single Component."
+
             return msg.format(system.pathname)
 
         loc_txt = "row"
@@ -103,17 +125,7 @@ def format_singular_csc_error(system, matrix):
         loc_txt = "column"
         loc = zero_cols[0]
 
-    n = 0
-    varname = "Unknown"
-    varsizes = system._var_sizes['nonlinear']['output']
-    for j, name in enumerate(system._var_allprocs_abs_names['output']):
-        n += varsizes[system._owning_rank[name]][j]
-        if loc < n:
-            varname = system._var_abs2prom['output'][name]
-            break
-
-    msg = "Singular entry found in '{}' for {} associated with state/residual '{}'."
-    return msg.format(system.pathname, loc_txt, varname)
+    return loc_to_error_msg(system, loc_txt, loc)
 
 
 def format_nan_error(system, matrix):
@@ -132,24 +144,23 @@ def format_nan_error(system, matrix):
     str
         New error string.
     """
-    rows = set(np.where(np.isnan(matrix))[0])
-
     # Because of how we built the matrix, a NaN in a comp cause the whole row to be NaN, so we
     # need to associate each index with a variable.
-    varname = []
-    all_vars = system._var_allprocs_abs_names['output']
-    varsizes = system._var_sizes['nonlinear']['output']
-    for row in rows:
-        n = 0
-        for j, name in enumerate(all_vars):
-            n += varsizes[system._owning_rank[name]][j]
-            if row < n:
-                relname = system._var_abs2prom['output'][name]
-                varname.append("'%s'" % relname)
-                break
+    varsizes = np.sum(system._owned_sizes, axis=0)
 
-    msg = "NaN entries found in '{}' for rows associated with states/residuals [{}]."
-    return msg.format(system.pathname, ', '.join(varname))
+    nanrows = np.zeros(matrix.shape[0], dtype=np.bool)
+    nanrows[np.where(np.isnan(matrix))[0]] = True
+
+    varnames = []
+    start = end = 0
+    for i, name in enumerate(system._var_allprocs_abs_names['output']):
+        end += varsizes[i]
+        if np.any(nanrows[start:end]):
+            varnames.append("'%s'" % system._var_allprocs_abs2prom['output'][name])
+        start = end
+
+    msg = "NaN entries found in {} for rows associated with states/residuals [{}]."
+    return msg.format(system.msginfo, ', '.join(varnames))
 
 
 class DirectSolver(LinearSolver):
@@ -170,13 +181,27 @@ class DirectSolver(LinearSolver):
 
         # this solver does not iterate
         self.options.undeclare("maxiter")
-        self.options.undeclare("err_on_maxiter")
+        self.options.undeclare("err_on_non_converge")
 
         self.options.undeclare("atol")
         self.options.undeclare("rtol")
 
         # Use an assembled jacobian by default.
         self.options['assemble_jac'] = True
+
+    def _setup_solvers(self, system, depth):
+        """
+        Assign system instance, set depth, and optionally perform setup.
+
+        Parameters
+        ----------
+        system : <System>
+            pointer to the owning system.
+        depth : int
+            depth of the current system (already incremented).
+        """
+        super(DirectSolver, self)._setup_solvers(system, depth)
+        self._disallow_distrib_solve()
 
     def _linearize_children(self):
         """
@@ -198,7 +223,7 @@ class DirectSolver(LinearSolver):
         ndarray
             Jacobian matrix.
         """
-        system = self._system
+        system = self._system()
         bvec = system._vectors['residual']['linear']
         xvec = system._vectors['output']['linear']
 
@@ -234,16 +259,27 @@ class DirectSolver(LinearSolver):
         """
         Perform factorization.
         """
-        system = self._system
+        system = self._system()
+        nproc = system.comm.size
 
         if self._assembled_jac is not None:
+            matrix = self._assembled_jac._int_mtx._matrix
 
-            mtx = self._assembled_jac._int_mtx
-            ranges = self._assembled_jac._view_ranges[system.pathname]
-            matrix = mtx._matrix[ranges[0]:ranges[1], ranges[0]:ranges[1]]
+            if matrix is None:
+                # this happens if we're not rank 0 when using owned_sizes
+                self._lu = self._lup = None
 
             # Perform dense or sparse lu factorization.
-            if isinstance(mtx, DenseMatrix):
+            elif isinstance(matrix, csc_matrix):
+                try:
+                    self._lu = scipy.sparse.linalg.splu(matrix)
+                except RuntimeError as err:
+                    if 'exactly singular' in str(err):
+                        raise RuntimeError(format_singular_error(system, matrix))
+                    else:
+                        raise err
+
+            elif isinstance(matrix, np.ndarray):  # dense
                 # During LU decomposition, detect singularities and warn user.
                 with warnings.catch_warnings():
                     if self.options['err_on_singular']:
@@ -251,31 +287,23 @@ class DirectSolver(LinearSolver):
                     try:
                         self._lup = scipy.linalg.lu_factor(matrix)
                     except RuntimeWarning as err:
-                        raise RuntimeError(format_singular_error(err, system, matrix))
+                        raise RuntimeError(format_singular_error(system, matrix))
 
                     # NaN in matrix.
                     except ValueError as err:
                         raise RuntimeError(format_nan_error(system, matrix))
 
-            elif isinstance(mtx, (CSRMatrix, CSCMatrix)):
-                try:
-                    self._lu = scipy.sparse.linalg.splu(matrix)
-                except RuntimeError as err:
-                    if 'exactly singular' in str(err):
-                        raise RuntimeError(format_singular_csc_error(system, matrix))
-                    else:
-                        reraise(*sys.exc_info())
-
-            elif isinstance(mtx, COOMatrix):
-                # calling scipy.sparse.linalg.splu on a COO actually transposes
-                # the matrix during conversion to csc prior to LU decomp
-                raise RuntimeError("Direct solver is not compatible with matrix type "
-                                   "COOMatrix in system '%s'." % system.pathname)
+            # Note: calling scipy.sparse.linalg.splu on a COO actually transposes
+            # the matrix during conversion to csc prior to LU decomp, so we can't use COO.
             else:
                 raise RuntimeError("Direct solver not implemented for matrix type %s"
-                                   " in system '%s'." % (type(mtx), system.pathname))
-
+                                   " in %s." % (type(self._assembled_jac._int_mtx),
+                                                system.msginfo))
         else:
+            if nproc > 1:
+                raise RuntimeError("DirectSolvers without an assembled jacobian are not supported "
+                                   "when running under MPI if comm.size > 1.")
+
             mtx = self._build_mtx()
 
             # During LU decomposition, detect singularities and warn user.
@@ -288,7 +316,7 @@ class DirectSolver(LinearSolver):
                     self._lup = scipy.linalg.lu_factor(mtx)
 
                 except RuntimeWarning as err:
-                    raise RuntimeError(format_singular_error(err, system, mtx))
+                    raise RuntimeError(format_singular_error(system, mtx))
 
                 # NaN in matrix.
                 except ValueError as err:
@@ -306,16 +334,21 @@ class DirectSolver(LinearSolver):
         ndarray
             Inverse Jacobian.
         """
-        system = self._system
+        system = self._system()
+        iproc = system.comm.rank
+        nproc = system.comm.size
 
         if self._assembled_jac is not None:
 
-            mtx = self._assembled_jac._int_mtx
-            ranges = self._assembled_jac._view_ranges[system.pathname]
-            matrix = mtx._matrix[ranges[0]:ranges[1], ranges[0]:ranges[1]]
+            matrix = self._assembled_jac._int_mtx._matrix
+
+            if matrix is None:
+                # This happens if we're not rank 0 and owned_sizes are being used
+                sz = np.sum(system._owned_sizes)
+                inv_jac = np.zeros((sz, sz))
 
             # Dense and Sparse matrices have their own inverse method.
-            if isinstance(mtx, DenseMatrix):
+            elif isinstance(matrix, np.ndarray):
                 # Detect singularities and warn user.
                 with warnings.catch_warnings():
                     if self.options['err_on_singular']:
@@ -323,25 +356,33 @@ class DirectSolver(LinearSolver):
                     try:
                         inv_jac = scipy.linalg.inv(matrix)
                     except RuntimeWarning as err:
-                        raise RuntimeError(format_singular_error(err, system, matrix))
+                        raise RuntimeError(format_singular_error(system, matrix))
 
                     # NaN in matrix.
                     except ValueError as err:
                         raise RuntimeError(format_nan_error(system, matrix))
 
-            elif isinstance(mtx, (CSRMatrix, CSCMatrix)):
+            elif isinstance(matrix, csc_matrix):
                 try:
                     inv_jac = scipy.sparse.linalg.inv(matrix)
                 except RuntimeError as err:
                     if 'exactly singular' in str(err):
-                        raise RuntimeError(format_singular_csc_error(system, matrix))
+                        raise RuntimeError(format_singular_error(system, matrix))
                     else:
-                        reraise(*sys.exc_info())
+                        raise err
+
+                # to prevent broadcasting errors later, make sure inv_jac is 2D
+                # scipy.sparse.linalg.inv returns a shape (1,) array if matrix is shape (1,1)
+                if inv_jac.size == 1:
+                    inv_jac = inv_jac.reshape((1, 1))
             else:
                 raise RuntimeError("Direct solver not implemented for matrix type %s"
-                                   " in system '%s'." % (type(mtx), system.pathname))
+                                   " in %s." % (type(matrix), system.msginfo))
 
         else:
+            if nproc > 1:
+                raise RuntimeError("BroydenSolvers without an assembled jacobian are not supported "
+                                   "when running under MPI if comm.size > 1.")
             mtx = self._build_mtx()
 
             # During inversion detect singularities and warn user.
@@ -354,7 +395,7 @@ class DirectSolver(LinearSolver):
                     inv_jac = scipy.linalg.inv(mtx)
 
                 except RuntimeWarning as err:
-                    raise RuntimeError(format_singular_error(err, system, mtx))
+                    raise RuntimeError(format_singular_error(system, mtx))
 
                 # NaN in matrix.
                 except ValueError as err:
@@ -375,41 +416,42 @@ class DirectSolver(LinearSolver):
         rel_systems : set of str
             Names of systems relevant to the current solve.
         """
-        if len(vec_names) > 1:
+        if len(vec_names) > 1 or vec_names[0] != 'linear':
             raise RuntimeError("DirectSolvers with multiple right-hand-sides are not supported.")
 
         self._vec_names = vec_names
 
-        system = self._system
+        system = self._system()
+        iproc = system.comm.rank
+        nproc = system.comm.size
 
-        for vec_name in vec_names:
-            if vec_name not in system._rel_vec_names:
-                continue
-            self._vec_name = vec_name
-            d_residuals = system._vectors['residual'][vec_name]
-            d_outputs = system._vectors['output'][vec_name]
+        d_residuals = system._vectors['residual']['linear']
+        d_outputs = system._vectors['output']['linear']
 
-            # assign x and b vectors based on mode
-            if mode == 'fwd':
-                x_vec = d_outputs
-                b_vec = d_residuals
-                trans_lu = 0
-                trans_splu = 'N'
-            else:  # rev
-                x_vec = d_residuals
-                b_vec = d_outputs
-                trans_lu = 1
-                trans_splu = 'T'
+        # assign x and b vectors based on mode
+        if mode == 'fwd':
+            x_vec = d_outputs._data
+            b_vec = d_residuals._data
+            trans_lu = 0
+            trans_splu = 'N'
+        else:  # rev
+            x_vec = d_residuals._data
+            b_vec = d_outputs._data
+            trans_lu = 1
+            trans_splu = 'T'
 
-            # AssembledJacobians are unscaled.
-            if self._assembled_jac is not None:
-                with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
-                    if isinstance(self._assembled_jac._int_mtx, DenseMatrix):
-                        x_vec._data[:] = scipy.linalg.lu_solve(self._lup, b_vec._data,
-                                                               trans=trans_lu)
-                    else:
-                        x_vec._data[:] = self._lu.solve(b_vec._data, trans_splu)
+        # AssembledJacobians are unscaled.
+        if self._assembled_jac is not None:
+            full_b = tmp = b_vec
 
-            # MVP-generated jacobians are scaled.
-            else:
-                x_vec._data[:] = scipy.linalg.lu_solve(self._lup, b_vec._data, trans=trans_lu)
+            with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
+                if isinstance(self._assembled_jac._int_mtx, DenseMatrix):
+                    arr = scipy.linalg.lu_solve(self._lup, full_b, trans=trans_lu)
+                else:
+                    arr = self._lu.solve(full_b, trans_splu)
+
+                x_vec[:] = arr
+
+        # matrix-vector-product generated jacobians are scaled.
+        else:
+            x_vec[:] = scipy.linalg.lu_solve(self._lup, b_vec, trans=trans_lu)

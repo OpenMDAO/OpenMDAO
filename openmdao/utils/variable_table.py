@@ -1,0 +1,216 @@
+"""
+Utility functions and constants related to writing a table of variable metadata.
+"""
+import pprint
+
+import numpy as np
+
+column_widths = {
+    'value': 20,
+    'resids': 20,
+    'units': 10,
+    'shape': 10,
+    'lower': 20,
+    'upper': 20,
+    'ref': 20,
+    'ref0': 20,
+    'res_ref': 20,
+}
+align = ''
+column_spacing = 2
+indent_inc = 2
+
+
+def write_var_table(pathname, var_list, var_type, var_dict,
+                    hierarchical=True, top_name='model', print_arrays=False, out_stream=None):
+    """
+    Write table of variable names, values, residuals, and metadata to out_stream.
+
+    Parameters
+    ----------
+    pathname : str
+        pathname to be printed. If None, defaults to 'model'
+    var_list : list of str
+        List of variable names in the order they are to be written.
+    var_type : 'input', 'explicit' or 'implicit'
+        Indicates type of variables, input or explicit/implicit output.
+    var_dict : dict
+        dict storing vals and metadata for each var name
+    hierarchical : bool
+        When True, human readable output shows variables in hierarchical format.
+    top_name : str
+        the name of the top level group when using hierarchical format.
+    print_arrays : bool
+        When False, in the columnar display, just display norm of any ndarrays with size > 1.
+        The norm is surrounded by vertical bars to indicate that it is a norm.
+        When True, also display full values of the ndarray below the row. Format  is affected
+        by the values set with numpy.set_printoptions
+        Default is False.
+    out_stream : file-like object
+        Where to send human readable output.
+        Set to None to suppress.
+    """
+    count = len(var_dict)
+
+    # Write header
+    pathname = pathname if pathname else 'model'
+
+    if var_type == 'input':
+        header = "%d Input(s) in '%s'" % (count, pathname)
+    else:
+        header = "%d %s Output(s) in '%s'" % (count, var_type.capitalize(), pathname)
+
+    out_stream.write(header + '\n')
+    out_stream.write('-' * len(header) + '\n' + '\n')
+
+    if not count:
+        return
+
+    # Need an ordered list of possible output values for the two cases: inputs and outputs
+    #  so that we do the column output in the correct order
+    if var_type == 'input':
+        out_types = ('value', 'units', 'shape', 'global_shape', 'prom_name', 'desc')
+    else:
+        out_types = ('value', 'resids', 'units', 'shape', 'global_shape',
+                     'lower', 'upper', 'ref', 'ref0', 'res_ref', 'prom_name', 'desc')
+
+    # Figure out which columns will be displayed
+    # Look at any one of the outputs, they should all be the same
+    outputs = var_dict[list(var_dict)[0]]
+
+    column_names = []
+    for out_type in out_types:
+        if out_type in outputs:
+            column_names.append(out_type)
+
+    # Find with width of the first column in the table
+    #    Need to look through all the possible varnames to find the max width
+    max_varname_len = max(len(top_name), len('varname'))
+    if hierarchical:
+        for name, outs in var_dict.items():
+            for i, name_part in enumerate(name.split('.')):
+                total_len = (i + 1) * indent_inc + len(name_part)
+                max_varname_len = max(max_varname_len, total_len)
+    else:
+        for name, outs in var_dict.items():
+            max_varname_len = max(max_varname_len, len(name))
+
+    # Determine the column widths of the data fields by finding the max width for all rows
+    for column_name in column_names:
+        column_widths[column_name] = len(column_name)  # has to be able to display name!
+
+    for name in var_list:
+        for column_name in column_names:
+            column_value = var_dict[name][column_name]
+            if isinstance(column_value, np.ndarray) and column_value.size > 1:
+                out = '|{}|'.format(str(np.linalg.norm(column_value)))
+            else:
+                out = str(column_value)
+            column_widths[column_name] = max(column_widths[column_name], len(str(out)))
+
+    # Write out the column headers
+    column_header = '{:{align}{width}}'.format('varname', align=align,
+                                               width=max_varname_len)
+    column_dashes = max_varname_len * '-'
+    for column_name in column_names:
+        column_header += column_spacing * ' '
+        column_header += '{:{align}{width}}'.format(column_name, align=align,
+                                                    width=column_widths[column_name])
+        column_dashes += column_spacing * ' ' + column_widths[column_name] * '-'
+    out_stream.write(column_header + '\n')
+    out_stream.write(column_dashes + '\n')
+
+    # Write out the variable names and optional values and metadata
+    if hierarchical:
+        out_stream.write(top_name + '\n')
+
+        cur_sys_names = []
+
+        for varname in var_list:
+
+            # For hierarchical, need to display system levels in the rows above the
+            #   actual row containing the var name and values. Want to make use
+            #   of the hierarchies that have been written about this.
+            existing_sys_names = []
+            varname_sys_names = varname.split('.')[:-1]
+            for i, sys_name in enumerate(varname_sys_names):
+                if varname_sys_names[:i + 1] != cur_sys_names[:i + 1]:
+                    break
+                else:
+                    existing_sys_names = cur_sys_names[:i + 1]
+
+            # What parts of the hierarchy for this varname need to be written that
+            #   were not already written above this
+            remaining_sys_path_parts = varname_sys_names[len(existing_sys_names):]
+
+            # Write the Systems in the var name path
+            indent = len(existing_sys_names) * indent_inc
+            for i, sys_name in enumerate(remaining_sys_path_parts):
+                indent += indent_inc
+                out_stream.write(indent * ' ' + sys_name + '\n')
+            cur_sys_names = varname_sys_names
+
+            indent += indent_inc
+            row = '{:{align}{width}}'.format(indent * ' ' + varname.split('.')[-1],
+                                             align=align, width=max_varname_len)
+            _write_variable(out_stream, row, column_names, var_dict[varname],
+                            print_arrays)
+    else:
+        for name in var_list:
+            row = '{:{align}{width}}'.format(name, align=align, width=max_varname_len)
+            _write_variable(out_stream, row, column_names, var_dict[name],
+                            print_arrays)
+    out_stream.write(2 * '\n')
+
+
+def _write_variable(out_stream, row, column_names, var_dict, print_arrays):
+    """
+    For one variable, write name, values, residuals, and metadata to out_stream.
+
+    Parameters
+    ----------
+    out_stream : file-like object
+        Where to send human readable output.
+        Set to None to suppress.
+    row : str
+        The string containing the contents of the beginning of this row output.
+        Contains the name of the System or varname, possibley indented to show hierarchy.
+
+    column_names : list of str
+        Indicates which columns will be written in this row.
+
+    var_dict : dict
+        Contains the values to be written in this row. Keys are columns names.
+
+    print_arrays : bool
+        When False, in the columnar display, just display norm of any ndarrays with size > 1.
+        The norm is surrounded by vertical bars to indicate that it is a norm.
+        When True, also display full values of the ndarray below the row. Format  is affected
+        by the values set with numpy.set_printoptions
+        Default is False.
+
+    """
+    if out_stream is None:
+        return
+    left_column_width = len(row)
+    have_array_values = []  # keep track of which values are arrays
+    for column_name in column_names:
+        row += column_spacing * ' '
+        if isinstance(var_dict[column_name], np.ndarray) and \
+                var_dict[column_name].size > 1:
+            have_array_values.append(column_name)
+            out = '|{}|'.format(
+                str(np.linalg.norm(var_dict[column_name])))
+        else:
+            out = str(var_dict[column_name])
+        row += '{:{align}{width}}'.format(out, align=align,
+                                          width=column_widths[column_name])
+    out_stream.write(row + '\n')
+    if print_arrays:
+        for column_name in have_array_values:
+            out_stream.write("{}  {}:\n".format(
+                left_column_width * ' ', column_name))
+            out_str = pprint.pformat(var_dict[column_name])
+            indented_lines = [(left_column_width + indent_inc) * ' ' +
+                              s for s in out_str.splitlines()]
+            out_stream.write('\n'.join(indented_lines) + '\n')

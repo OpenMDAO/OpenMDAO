@@ -1,5 +1,5 @@
 #!wing
-#!version=6.0
+#!version=7.0
 [project attributes]
 proj.directory-list = [{'dirloc': loc('../..'),
 	'excludes': [
@@ -218,8 +218,8 @@ guimgr.overall-gui-state = {'windowing-policy': 'combined-window',
 	'user_data': {}},
 	'window-alloc': (192,
 	54,
-	1423,
-	958)}]}
+	2000,
+	1100)}]}
 guimgr.recent-documents = []
 proj.env-vars = {None: ('default',
 	[''])}

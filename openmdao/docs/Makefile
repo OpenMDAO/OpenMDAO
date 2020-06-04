@@ -31,13 +31,13 @@ ALLSPHINXOPTS   = -d $(BUILDDIR)/doctrees $(SPHINXOPTS) .
 html-update: mock redbaron matplotlib build
 
 # to force the rebuild a file when its dependecy (e.g. code-embed) changes, not its rst file
-single: mock redbaron matplotlib touch build
+single: touch buildone
 
 # build it all over again (note: make all == make html)
-all html: make_srcdocs mock redbaron matplotlib tagg buildall post_remove
+all html: make_srcdocs n2html mock redbaron matplotlib tagg buildall post_remove
 
 # build it all on CI machines; all warnings are raised as errors.
-travis: make_srcdocs mock redbaron matplotlib tagg buildalltravis post_remove
+travis: make_srcdocs n2html mock redbaron matplotlib tagg buildalltravis post_remove
 
 clean:
 	rm -rf $(BUILDDIR)/*
@@ -46,7 +46,7 @@ clean:
 	rm -rf tmp
 	rm -rf make_sourcedocs
 	rm -rf doc_plot_*.png
-	rm -rf *.html
+	rm -rf *.html _n2html
 
 help:
 	@echo "Please use 'make <target>' where <target> is one of"
@@ -60,14 +60,23 @@ help:
 # RULES (that comprise the commands)
 
 build:
+	mkdir -p _n2html
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
 
+buildone:
+	mkdir -p _n2html
+	@echo building $$file
+	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html $$file
+	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
+
 buildall:
+	mkdir -p _n2html
 	$(SPHINXBUILD) -a -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
 
 buildalltravis:
+	mkdir -p _n2html
 	$(SPHINXBUILD) -a -W -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
 
@@ -77,6 +86,9 @@ touch:
 # source doc build indicator, to trigger conf.py
 make_srcdocs:
 	touch make_sourcedocs
+
+n2html:
+	mkdir -p _n2html
 
 #clean up the sourcedocs indicator
 post_remove:

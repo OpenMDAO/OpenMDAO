@@ -1,0 +1,122 @@
+
+from openmdao.recorders.base_case_reader import BaseCaseReader
+
+class {class_name}(BaseCaseReader):
+    """
+    Describe CaseReader here...
+    """
+
+    def __init__(self, filename, pre_load=False):
+        """
+        Initialize.
+
+        Parameters
+        ----------
+        filename : str
+            The path to the filename containing the recorded data.
+        pre_load : bool
+            If True, load all the data into memory during initialization.
+        """
+        super({class_name}, self).__init__(filename, pre_load)
+
+        # initialize attributes here...
+
+    def list_sources(self):
+        """
+        List of all the different recording sources for which there is recorded data.
+
+        Returns
+        -------
+        list
+            One or more of: `problem`, `driver`, `<system hierarchy location>`,
+                            `<solver hierarchy location>`
+        """
+        pass
+
+        # return a list of sources...
+
+    def list_source_vars(self, source):
+        """
+        List of all inputs and outputs recorded by the specified source.
+
+        Parameters
+        ----------
+        source : str
+            One of ['problem', 'driver', <system hierarchy location>, <solver hierarchy location>].
+            Identifies the source for which to return information.
+
+        Returns
+        -------
+        dict
+            dict(inputs=[list of keys], outputs=[list of keys]). Does not recurse.
+        """
+        pass
+
+        # reuturn inputs/outputs for the given source.
+
+    def list_cases(self, source=None, recurse=True, flat=True):
+        """
+        Iterate over Driver, Solver and System cases in order.
+
+        Parameters
+        ----------
+        source : ['problem', 'driver', <system hierarchy location>, <solver hierarchy location>,
+                  case name]
+            If not None, only cases originating from the specified source or case are returned.
+        recurse : bool, optional
+            If True, will enable iterating over all successors in case hierarchy.
+        flat : bool, optional
+            If False and there are child cases, then a nested ordered dictionary
+            is returned rather than an iterator.
+
+        Returns
+        -------
+        iterator or dict
+            An iterator or a nested dictionary of identified cases.
+        """
+        pass
+
+        # return specified case identifiers
+
+    def get_cases(self, source=None, recurse=True, flat=True):
+        """
+        Iterate over the cases.
+
+        Parameters
+        ----------
+        source : ['problem', 'driver', component pathname, solver pathname, case_name]
+            Identifies which cases to return.
+        recurse : bool, optional
+            If True, will enable iterating over all successors in case hierarchy
+        flat : bool, optional
+            If False and there are child cases, then a nested ordered dictionary
+            is returned rather than an iterator.
+
+        Returns
+        -------
+        list or dict
+            The cases identified by source
+        """
+        pass
+
+        # iterate over cases (includes case data)
+
+    def get_case(self, case_id, recurse=False):
+        """
+        Get case identified by case_id.
+
+        Parameters
+        ----------
+        case_id : str or int
+            The unique identifier of the case to return or an index into all cases.
+        recurse : bool, optional
+            If True, will return all successors to the case as well.
+
+        Returns
+        -------
+        dict
+            The case identified by case_id
+        """
+        pass
+
+        # return the specified case

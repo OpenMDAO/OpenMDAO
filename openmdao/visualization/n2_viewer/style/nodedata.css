@@ -1,0 +1,94 @@
+/******************* Node Data styling *******************/
+#node-info-container {
+	position: absolute;
+	overflow: hidden;
+	background-color: white;
+	border-radius: 10px;
+	border: 1px solid #a0a0a0;
+	z-index: 10;
+    transition: opacity 0.25s;
+    box-shadow: 3px 3px 3px 1px rgba(0, 0, 0, 0.2);
+    min-width: 200px;
+    border-collapse: separate;
+    opacity: .95;
+}
+
+.info-hidden {
+    visibility: hidden;
+}
+
+.info-visible {
+    visibility: visible;
+}
+
+#node-info-container thead th {
+    background-color: #42926b;
+    color: black;
+    padding: 5px;
+    font-size: 11pt;
+}
+
+#node-info-container tbody th {
+    text-align: right;
+    font-size: 9pt;
+    margin-top: 0;
+    border-top: 0;
+    border-bottom: 1px solid #a0a0a0;
+    border-right: 1px solid #a0a0a0;
+    padding: 3px;
+    white-space: nowrap;
+}
+
+#node-info-container tbody td {
+    text-align: left;
+    font-size: 9pt;
+    margin-top: 0;
+    margin-left: 0;
+    border-top: 0;
+    border-left: 0;
+    border-bottom: 1px solid #a0a0a0;
+    padding: 3px;
+    white-space: nowrap;
+}
+
+#node-info-container tfoot th {
+    background-color: #42926b;
+    padding: 2px;
+    font-size: 11pt;
+}
+
+.caps {
+    text-transform: capitalize;
+}
+
+.info-header {
+	background-color: #42926b;
+}
+
+.info-header p {
+	color: white;
+	text-align: center;
+}
+
+.node-data-container {
+	width: 100%;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+
+.node-data {
+	display: flex;
+	justify-content: space-between;
+	font-size: 13px;
+	align-self: center;
+}
+
+.node-data p:first-child {
+	font-weight: 600;
+}
+
+.node-data-cursor {
+    cursor: context-menu;
+}
+

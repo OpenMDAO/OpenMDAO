@@ -14,6 +14,7 @@ import subprocess
 import sphinx
 from docutils.parsers.rst import Directive
 from sphinx.writers.html import HTMLTranslator
+from sphinx.writers.html5 import HTML5Translator
 from sphinx.errors import SphinxError
 
 
@@ -32,7 +33,7 @@ def visit_failed_node(self, node):
 
 
 def depart_failed_node(self, node):
-    if not isinstance(self, HTMLTranslator):
+    if not isinstance(self, (HTMLTranslator, HTML5Translator)):
         self.body.append("output only available for HTML\n")
         return
 
@@ -60,7 +61,7 @@ def depart_cmd_node(self, node):
     This function creates the formatting that sets up the look of the blocks.
     The look of the formatting is controlled by _theme/static/style.css
     """
-    if not isinstance(self, HTMLTranslator):
+    if not isinstance(self, (HTMLTranslator, HTML5Translator)):
         self.body.append("output only available for HTML\n")
         return
 

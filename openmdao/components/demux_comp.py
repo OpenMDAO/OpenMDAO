@@ -1,8 +1,6 @@
 """Definition of the Demux Component."""
 
 
-from six import iteritems
-
 import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent
@@ -65,52 +63,49 @@ class DemuxComp(ExplicitComponent):
         """
         self._vars[name] = {'val': val, 'shape': shape, 'units': units, 'desc': desc, 'axis': axis}
 
-    def setup(self):
-        """
-        Declare inputs, outputs, and derivatives for the demux component.
-        """
         opts = self.options
         vec_size = opts['vec_size']
 
-        for var, options in iteritems(self._vars):
-            kwgs = dict(options)
-            shape = options['shape']
-            size = np.prod(shape)
-            axis = kwgs.pop('axis')
+        # for var, options in self._vars.items():
+        options = self._vars[name]
+        kwgs = dict(options)
+        shape = options['shape']
+        size = np.prod(shape)
+        axis = kwgs.pop('axis')
 
-            if axis >= len(shape):
-                raise RuntimeError("Invalid axis ({0}) for variable '{2}' of "
-                                   "shape {1}".format(axis, shape, var))
+        if axis >= len(shape):
+            raise RuntimeError("{}: Invalid axis ({}) for variable '{}' of "
+                               "shape {}".format(self.msginfo, axis, name, shape))
 
-            if options['shape'][axis] != vec_size:
-                raise RuntimeError("Variable '{0}' cannot be demuxed along axis {1}. Axis size is "
-                                   "{2} but vec_size is {3}.".format(var, axis, shape[axis],
-                                                                     vec_size))
+        if shape[axis] != vec_size:
+            raise RuntimeError("{}: Variable '{}' cannot be demuxed along axis {}. Axis size "
+                               "is {} but vec_size is {}.".format(self.msginfo, name, axis,
+                                                                  shape[axis], vec_size))
 
-            self.add_input(var, **kwgs)
+        self.add_input(name, **kwgs)
 
-            template = np.reshape(np.arange(size), shape)
+        template = np.reshape(np.arange(size), shape)
 
-            self._output_names[var] = []
+        self._output_names[name] = []
 
-            out_shape = list(shape)
-            out_shape.pop(axis)
-            if len(out_shape) == 0:
-                out_shape = [1]
+        out_shape = list(shape)
+        out_shape.pop(axis)
+        if len(out_shape) == 0:
+            out_shape = [1]
 
-            for i in range(vec_size):
-                out_name = '{0}_{1}'.format(var, i)
-                self._output_names[var].append(out_name)
-                self.add_output(name=out_name,
-                                val=options['val'],
-                                shape=out_shape,
-                                units=options['units'],
-                                desc=options['desc'])
+        for i in range(vec_size):
+            out_name = '{0}_{1}'.format(name, i)
+            self._output_names[name].append(out_name)
+            self.add_output(name=out_name,
+                            val=options['val'],
+                            shape=out_shape,
+                            units=options['units'],
+                            desc=options['desc'])
 
-                rs = np.arange(np.prod(out_shape))
-                cs = np.atleast_1d(np.take(template, indices=i, axis=axis))
+            rs = np.arange(np.prod(out_shape))
+            cs = np.atleast_1d(np.take(template, indices=i, axis=axis))
 
-                self.declare_partials(of=out_name, wrt=var, rows=rs, cols=cs, val=1.0)
+            self.declare_partials(of=out_name, wrt=name, rows=rs, cols=cs, val=1.0)
 
     def compute(self, inputs, outputs):
         """

@@ -1,16 +1,12 @@
 """Define the default Vector class."""
-from __future__ import division
-
 from copy import deepcopy
 import numbers
-
-from six import iteritems, itervalues
-from six.moves import zip
 
 import numpy as np
 
 from openmdao.vectors.vector import Vector, INT_DTYPE
 from openmdao.vectors.default_transfer import DefaultTransfer
+from openmdao.utils.mpi import MPI, multi_proc_exception_check
 
 
 class DefaultVector(Vector):
@@ -33,40 +29,26 @@ class DefaultVector(Vector):
             zeros array of correct size to hold all of this vector's variables.
         """
         ncol = self._ncol
-        size = np.sum(self._system._var_sizes[self._name][self._typ][self._iproc, :])
+        size = np.sum(self._system()._var_sizes[self._name][self._typ][self._iproc, :])
         return np.zeros(size) if ncol == 1 else np.zeros((size, ncol))
 
     def _update_root_data(self):
         """
         Resize the root data if necesary (i.e., due to reconfiguration).
         """
-        system = self._system
+        system = self._system()
         type_ = self._typ
         vec_name = self._name
-        iproc = self._iproc
         root_vec = self._root_vector
 
-        self._create_data()
-
-        ext_sizes_t = system._ext_sizes[vec_name][type_]
-        int_sizes_t = np.sum(system._var_sizes[vec_name][type_][iproc, :])
-        old_sizes_total = len(root_vec._data)
-
-        old_sizes = (
-            ext_sizes_t[0],
-            old_sizes_total - ext_sizes_t[0] - ext_sizes_t[1],
-            ext_sizes_t[1],
-        )
-        new_sizes = (
-            ext_sizes_t[0],
-            int_sizes_t,
-            ext_sizes_t[1],
-        )
+        sys_offset, size_after_sys = system._ext_sizes[vec_name][type_]
+        sys_size = np.sum(system._var_sizes[vec_name][type_][self._iproc, :])
+        old_sizes_total = root_vec._data.size
 
         root_vec._data = np.concatenate([
-            root_vec._data[:old_sizes[0]],
-            np.zeros(new_sizes[1]),
-            root_vec._data[old_sizes[0] + old_sizes[1]:],
+            root_vec._data[:sys_offset],
+            np.zeros(sys_size),
+            root_vec._data[old_sizes_total - size_after_sys:],
         ])
 
         if self._alloc_complex and root_vec._cplx_data.size != root_vec._data.size:
@@ -74,7 +56,7 @@ class DefaultVector(Vector):
 
         root_vec._initialize_views()
 
-    def _extract_data(self):
+    def _extract_root_data(self):
         """
         Extract views of arrays from root_vector.
 
@@ -83,7 +65,7 @@ class DefaultVector(Vector):
         ndarray
             zeros array of correct size.
         """
-        system = self._system
+        system = self._system()
         type_ = self._typ
         iproc = self._iproc
         root_vec = self._root_vector
@@ -135,7 +117,7 @@ class DefaultVector(Vector):
                     self._scaling['norm'] = (np.zeros(data.size), np.ones(data.size))
                 elif self._name == 'linear':
                     # reuse the nonlinear scaling vecs since they're the same as ours
-                    nlvec = self._system._root_vecs[self._kind]['nonlinear']
+                    nlvec = self._system()._root_vecs[self._kind]['nonlinear']
                     self._scaling['phys'] = (None, nlvec._scaling['phys'][1])
                     self._scaling['norm'] = (None, nlvec._scaling['norm'][1])
                 else:
@@ -147,7 +129,7 @@ class DefaultVector(Vector):
                 self._cplx_data = np.zeros(self._data.shape, dtype=np.complex)
 
         else:
-            self._data, self._cplx_data, self._scaling = self._extract_data()
+            self._data, self._cplx_data, self._scaling = self._extract_root_data()
 
     def _initialize_views(self):
         """
@@ -157,7 +139,7 @@ class DefaultVector(Vector):
         _views
         _views_flat
         """
-        system = self._system
+        system = self._system()
         type_ = self._typ
         kind = self._kind
         iproc = self._iproc
@@ -177,11 +159,21 @@ class DefaultVector(Vector):
 
         allprocs_abs2idx_t = system._var_allprocs_abs2idx[self._name]
         sizes_t = system._var_sizes[self._name][type_]
+        offs = system._get_var_offsets()[self._name][type_]
+        if offs.size > 0:
+            offs = offs[iproc].copy()
+            # turn global offset into local offset
+            start = offs[0]
+            offs -= start
+        else:
+            offs = offs[0].copy()
+        offsets_t = offs
+
         abs2meta = system._var_abs2meta
         for abs_name in system._var_relevant_names[self._name][type_]:
             idx = allprocs_abs2idx_t[abs_name]
 
-            ind1 = np.sum(sizes_t[iproc, :idx])
+            ind1 = offsets_t[idx]
             ind2 = ind1 + sizes_t[iproc, idx]
             shape = abs2meta[abs_name]['shape']
             if ncol > 1:
@@ -334,158 +326,25 @@ class DefaultVector(Vector):
         """
         return np.linalg.norm(self._data)
 
-    def _enforce_bounds_vector(self, du, alpha, lower_bounds, upper_bounds):
+    def get_slice_dict(self):
         """
-        Enforce lower/upper bounds, backtracking the entire vector together.
+        Return a dict of var names mapped to their slice in the local data array.
 
-        This method modifies both self (u) and step (du) in-place.
-
-        Parameters
-        ----------
-        du : <Vector>
-            Newton step; the backtracking is applied to this vector in-place.
-        alpha : float
-            step size.
-        lower_bounds : <Vector>
-            Lower bounds vector.
-        upper_bounds : <Vector>
-            Upper bounds vector.
+        Returns
+        -------
+        dict
+            Mapping of var name to slice.
         """
-        u = self
+        if self._slices is None:
+            slices = {}
+            start = end = 0
+            for name in self._system()._var_relevant_names[self._name][self._typ]:
+                end += self._views_flat[name].size
+                slices[name] = slice(start, end)
+                start = end
+            self._slices = slices
 
-        # The assumption is that alpha * du has been added to self (i.e., u)
-        # just prior to this method being called. We are currently in the
-        # initialization of a line search, and we're trying to ensure that
-        # the u does not violate bounds in the first iteration. If it does,
-        # we modify the du vector directly.
-
-        # This is the required change in step size, relative to the du vector.
-        d_alpha = 0
-
-        # Find the largest amount a bound is violated
-        # where positive means a bound is violated - i.e. the required d_alpha.
-        mask = du._data != 0
-        if mask.any():
-            abs_du_mask = np.abs(du._data[mask])
-            u_mask = u._data[mask]
-
-            # Check lower bound
-            max_d_alpha = np.amax((lower_bounds._data[mask] - u_mask) / abs_du_mask)
-            if max_d_alpha > d_alpha:
-                d_alpha = max_d_alpha
-
-            # Check upper bound
-            max_d_alpha = np.amax((u_mask - upper_bounds._data[mask]) / abs_du_mask)
-            if max_d_alpha > d_alpha:
-                d_alpha = max_d_alpha
-
-        if d_alpha > 0:
-            # d_alpha will not be negative because it was initialized to be 0
-            # and we've only done max operations.
-            # d_alpha will not be greater than alpha because the assumption is that
-            # the original point was valid - i.e., no bounds were violated.
-            # Therefore 0 <= d_alpha <= alpha.
-
-            # We first update u to reflect the required change to du.
-            u.add_scal_vec(-d_alpha, du)
-
-            # At this point, we normalize d_alpha by alpha to figure out the relative
-            # amount that the du vector has to be reduced, then apply the reduction.
-            du *= 1 - d_alpha / alpha
-
-    def _enforce_bounds_scalar(self, du, alpha, lower_bounds, upper_bounds):
-        """
-        Enforce lower/upper bounds on each scalar separately, then backtrack as a vector.
-
-        This method modifies both self (u) and step (du) in-place.
-
-        Parameters
-        ----------
-        du : <Vector>
-            Newton step; the backtracking is applied to this vector in-place.
-        alpha : float
-            step size.
-        lower_bounds : <Vector>
-            Lower bounds vector.
-        upper_bounds : <Vector>
-            Upper bounds vector.
-        """
-        u = self
-
-        # The assumption is that alpha * step has been added to this vector
-        # just prior to this method being called. We are currently in the
-        # initialization of a line search, and we're trying to ensure that
-        # the initial step does not violate bounds. If it does, we modify
-        # the step vector directly.
-
-        # enforce bounds on step in-place.
-        u_data = u._data
-
-        # If u > lower, we're just adding zero. Otherwise, we're adding
-        # the step required to get up to the lower bound.
-        # For du, we normalize by alpha since du eventually gets
-        # multiplied by alpha.
-        change_lower = np.maximum(u_data, lower_bounds._data) - u_data
-
-        # If u < upper, we're just adding zero. Otherwise, we're adding
-        # the step required to get down to the upper bound, but normalized
-        # by alpha since du eventually gets multiplied by alpha.
-        change_upper = np.minimum(u_data, upper_bounds._data) - u_data
-
-        change = change_lower + change_upper
-
-        u_data += change
-        du._data += change / alpha
-
-    def _enforce_bounds_wall(self, du, alpha, lower_bounds, upper_bounds):
-        """
-        Enforce lower/upper bounds on each scalar separately, then backtrack along the wall.
-
-        This method modifies both self (u) and step (du) in-place.
-
-        Parameters
-        ----------
-        du : <Vector>
-            Newton step; the backtracking is applied to this vector in-place.
-        alpha : float
-            step size.
-        lower_bounds : <Vector>
-            Lower bounds vector.
-        upper_bounds : <Vector>
-            Upper bounds vector.
-        """
-        u = self
-
-        # The assumption is that alpha * step has been added to this vector
-        # just prior to this method being called. We are currently in the
-        # initialization of a line search, and we're trying to ensure that
-        # the initial step does not violate bounds. If it does, we modify
-        # the step vector directly.
-
-        # enforce bounds on step in-place.
-        u_data = u._data
-        du_data = du._data
-
-        # If u > lower, we're just adding zero. Otherwise, we're adding
-        # the step required to get up to the lower bound.
-        # For du, we normalize by alpha since du eventually gets
-        # multiplied by alpha.
-        change_lower = np.maximum(u_data, lower_bounds._data) - u_data
-
-        # If u < upper, we're just adding zero. Otherwise, we're adding
-        # the step required to get down to the upper bound, but normalized
-        # by alpha since du eventually gets multiplied by alpha.
-        change_upper = np.minimum(u_data, upper_bounds._data) - u_data
-
-        change = change_lower + change_upper
-
-        u_data += change
-        du_data += change / alpha
-
-        # Now we ensure that we will backtrack along the wall during the
-        # line search by setting the entries of du at the bounds to zero.
-        changed_either = change.astype(bool)
-        du_data[changed_either] = 0.
+        return self._slices
 
     def __getstate__(self):
         """

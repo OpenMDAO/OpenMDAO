@@ -1,13 +1,11 @@
 """Define the explicit test component (array)."""
-from __future__ import division, print_function
-
 import numpy as np
 import scipy.sparse
 
-from openmdao.api import ExplicitComponent
+import openmdao.api as om
 
 
-class TestExplCompArray(ExplicitComponent):
+class TestExplCompArray(om.ExplicitComponent):
 
     def initialize(self):
         self.options.declare('thickness', default=1.)

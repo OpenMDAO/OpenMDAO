@@ -1,22 +1,19 @@
-from __future__ import print_function, division, absolute_import
-
 import unittest
 
-from openmdao.utils.assert_utils import assert_rel_error
-
-from openmdao.api import Problem, ScipyOptimizeDriver, ExecComp, IndepVarComp, DirectSolver
+import openmdao.api as om
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class TestSellarOpt(unittest.TestCase):
 
     def test_sellar_opt(self):
-        from openmdao.api import Problem, ScipyOptimizeDriver, ExecComp, IndepVarComp, DirectSolver
+        import openmdao.api as om
         from openmdao.test_suite.components.sellar_feature import SellarMDA
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = SellarMDA()
 
-        prob.driver = ScipyOptimizeDriver()
+        prob.driver = om.ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         # prob.driver.options['maxiter'] = 100
         prob.driver.options['tol'] = 1e-8
@@ -36,11 +33,11 @@ class TestSellarOpt(unittest.TestCase):
         prob.run_driver()
 
         print('minimum found at')
-        assert_rel_error(self, prob['x'][0], 0., 1e-5)
-        assert_rel_error(self, prob['z'], [1.977639, 0.], 1e-5)
+        assert_near_equal(prob['x'][0], 0., 1e-5)
+        assert_near_equal(prob['z'], [1.977639, 0.], 1e-5)
 
         print('minumum objective')
-        assert_rel_error(self, prob['obj'][0], 3.18339395045, 1e-5)
+        assert_near_equal(prob['obj'][0], 3.18339395045, 1e-5)
 
 
 if __name__ == "__main__":

@@ -6,7 +6,6 @@ Surrogate Model based on second order response surface equations.
 from numpy import zeros, einsum
 from numpy.dual import lstsq
 from openmdao.surrogate_models.surrogate_model import SurrogateModel
-from six.moves import range
 
 
 class ResponseSurface(SurrogateModel):

@@ -68,7 +68,7 @@ Then, inside the :code:`setup` method of :code:`SellarMDA` we're also working di
 
 .. code::
 
-    cycle = self.add_subsystem('cycle', Group(), promotes=['*'])
+    cycle = self.add_subsystem('cycle', om.Group(), promotes=['*'])
     cycle.add_subsystem('d1', SellarDis1(), promotes_inputs=['x', 'z', 'y2'], promotes_outputs=['y1'])
     cycle.add_subsystem('d2', SellarDis2(), promotes_inputs=['z', 'y1'], promotes_outputs=['y2'])
 

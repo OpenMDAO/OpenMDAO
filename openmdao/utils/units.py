@@ -9,21 +9,19 @@ in Scientific Python, by Konrad Hinsen. Modifications by
 Justin Gray.
 """
 
-from __future__ import division, print_function
-
-
 import sys
 
 import re
 import os.path
 from collections import OrderedDict
 
-from six import iteritems
-from six.moves import zip
-from six.moves.configparser import RawConfigParser as ConfigParser
+from configparser import RawConfigParser as ConfigParser
+from openmdao.utils.general_utils import warn_deprecation
 
 # pylint: disable=E0611, F0401
 from math import floor, pi
+
+import numpy as np
 
 
 ####################################
@@ -94,9 +92,9 @@ class NumberDict(OrderedDict):
             new NumberDict with self+other values
         """
         sum_dict = NumberDict()
-        for k, v in iteritems(self):
+        for k, v in self.items():
             sum_dict[k] = v
-        for k, v in iteritems(other):
+        for k, v in other.items():
             sum_dict[k] = sum_dict[k] + v
         return sum_dict
 
@@ -115,9 +113,9 @@ class NumberDict(OrderedDict):
             new NumberDict instance, with self-other values
         """
         sum_dict = NumberDict()
-        for k, v in iteritems(self):
+        for k, v in self.items():
             sum_dict[k] = v
-        for k, v in iteritems(other):
+        for k, v in other.items():
             sum_dict[k] = sum_dict[k] - v
         return sum_dict
 
@@ -136,9 +134,9 @@ class NumberDict(OrderedDict):
             new NumberDict instance, with other-self values
         """
         sum_dict = NumberDict()
-        for k, v in iteritems(other):
+        for k, v in other.items():
             sum_dict[k] = v
-        for k, v in iteritems(self):
+        for k, v in self.items():
             sum_dict[k] = sum_dict[k] - v
         return sum_dict
 
@@ -157,7 +155,7 @@ class NumberDict(OrderedDict):
             new NumberDict instance, with other*self values
         """
         new = NumberDict()
-        for key, value in iteritems(self):
+        for key, value in self.items():
             new[key] = other * value
         return new
 
@@ -178,7 +176,7 @@ class NumberDict(OrderedDict):
             new NumberDict instance, with self/other values
         """
         new = NumberDict()
-        for key, value in iteritems(self):
+        for key, value in self.items():
             new[key] = value / other
         return new
 
@@ -572,7 +570,7 @@ class PhysicalUnit(object):
         """
         num = ''
         denom = ''
-        for unit, power in iteritems(self._names):
+        for unit, power in self._names.items():
             if power < 0:
                 denom = denom + '/' + unit
                 if power < -1:
@@ -756,8 +754,6 @@ def import_library(libfilepointer):
                          ' config file. missing: %s, at least %s required'
                          % (missing, required_base_types))
 
-    # Explicit unitless 'unit'.
-    _new_unit('unitless', 1, list(base_list))
     _update_library(_UNIT_LIB)
     return _UNIT_LIB
 
@@ -982,7 +978,7 @@ def is_compatible(old_units, new_units):
     return old_unit.is_compatible(new_unit)
 
 
-def get_conversion(old_units, new_units):
+def unit_conversion(old_units, new_units):
     """
     Return conversion factor and offset between old and new units.
 
@@ -998,7 +994,33 @@ def get_conversion(old_units, new_units):
     (float, float)
         Conversion factor and offset
     """
-    return _find_unit(old_units).conversion_tuple_to(_find_unit(new_units))
+    new_physical_units = _find_unit(new_units)
+    if new_physical_units is None:
+        raise RuntimeError("Cannot convert to new units: %s" % str(new_units))
+
+    return _find_unit(old_units).conversion_tuple_to(new_physical_units)
+
+
+def get_conversion(old_units, new_units):
+    """
+    Return conversion factor and offset between old and new units (deprecated).
+
+    Parameters
+    ----------
+    old_units : str
+        original units as a string.
+    new_units : str
+        new units to return the value in.
+
+    Returns
+    -------
+    (float, float)
+        Conversion factor and offset
+    """
+    warn_deprecation("'get_conversion' has been deprecated. Use "
+                     "'unit_conversion' instead.")
+
+    return unit_conversion(old_units, new_units)
 
 
 def convert_units(val, old_units, new_units=None):
@@ -1032,9 +1054,38 @@ def convert_units(val, old_units, new_units=None):
     return (val + offset) * factor
 
 
+def _has_val_mismatch(units1, val1, units2, val2):
+    """
+    Return True if values differ after unit conversion or if values differ when units are None.
+
+    Parameters
+    ----------
+    units1 : str or None
+        Units for first value.
+    val1 : float or ndarray
+        First value.
+    units2 : str or None
+        Units for second value.
+    val2 : float or ndarray
+        Second value.
+    """
+    if units1 != units2:
+        if units1 is None or units2 is None:
+            return True
+
+        # convert units
+        val1 = convert_units(val1, units1, new_units=units2)
+
+    rtol = 1e-10
+    norm1 = np.linalg.norm(val1)
+    if norm1 == 0.:
+        return np.linalg.norm(val2) > rtol
+    else:
+        return np.linalg.norm(val2 - val1) / norm1 > rtol
+
+
 # Load in the default unit library
-file_path = open(os.path.join(os.path.dirname(__file__),
-                 'unit_library.ini'))
+file_path = open(os.path.join(os.path.dirname(__file__), 'unit_library.ini'))
 with file_path as default_lib:
     import_library(default_lib)
 

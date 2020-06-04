@@ -6,13 +6,14 @@ import numpy as np
 from openmdao.api import ExplicitComponent, Problem, Group, IndepVarComp
 
 from openmdao.utils.array_utils import evenly_distrib_idxs
+from openmdao.utils.mpi import MPI
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
 except ImportError:
     PETScVector = None
 
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class DistributedAdder(ExplicitComponent):
@@ -75,7 +76,7 @@ class Summer(ExplicitComponent):
         outputs['sum'] = np.sum(inputs['y'])
 
 
-@unittest.skipIf(PETScVector is None, "PETSc is required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 @unittest.skipIf(os.environ.get("TRAVIS"), "Unreliable on Travis CI.")
 class DistributedAdderTest(unittest.TestCase):
 
@@ -85,13 +86,12 @@ class DistributedAdderTest(unittest.TestCase):
         size = 100  # how many items in the array
 
         prob = Problem()
-        prob.model = Group()
 
         prob.model.add_subsystem('des_vars', IndepVarComp('x', np.ones(size)), promotes=['x'])
         prob.model.add_subsystem('plus', DistributedAdder(size=size), promotes=['x', 'y'])
         summer = prob.model.add_subsystem('summer', Summer(size=size), promotes=['y', 'sum'])
 
-        prob.setup(check=False)
+        prob.setup()
 
         prob['x'] = np.ones(size)
 
@@ -104,7 +104,7 @@ class DistributedAdderTest(unittest.TestCase):
                 raise RuntimeError("Summer input y[%d] is %f but should be 11.0" %
                                    (i, inp[i]))
 
-        assert_rel_error(self, prob['sum'], 11.0 * size, 1.e-6)
+        assert_near_equal(prob['sum'], 11.0 * size, 1.e-6)
 
 
 if __name__ == "__main__":

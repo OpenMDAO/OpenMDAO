@@ -1,18 +1,23 @@
 """Some miscellaneous utility functions."""
-from __future__ import division
-
 from contextlib import contextmanager
 import os
 import re
 import sys
+import math
 import warnings
 import unittest
 from fnmatch import fnmatchcase
-from six import string_types, PY2
-from six.moves import range, cStringIO as StringIO
-from collections import Iterable
+from io import StringIO
+
+# note: this is a Python 3.3 change, clean this up for OpenMDAO 3.x
+try:
+    from collections.abc import Iterable
+except ImportError:
+    from collections import Iterable
+
 import numbers
 import json
+import importlib
 
 import numpy as np
 import openmdao
@@ -358,7 +363,7 @@ def format_as_float_or_array(name, values, val_if_none=0.0, flatten=False):
     Format array option values.
 
     Checks that the given array values are either None, float, or an iterable
-    of numeric values. On output all interables of numeric values are
+    of numeric values. On output all iterables of numeric values are
     converted to a flat np.ndarray. If values is scalar, it is converted
     to float.
 
@@ -389,7 +394,7 @@ def format_as_float_or_array(name, values, val_if_none=0.0, flatten=False):
     if isinstance(values, np.ndarray):
         if flatten:
             values = values.flatten()
-    elif not isinstance(values, string_types) \
+    elif not isinstance(values, str) \
             and isinstance(values, Iterable):
         values = np.asarray(values, dtype=float)
         if flatten:
@@ -528,10 +533,9 @@ def run_model(prob, ignore_exception=False):
     sys.stdout = strout
     try:
         prob.run_model()
-    except Exception:
+    except Exception as err:
         if not ignore_exception:
-            exc = sys.exc_info()
-            reraise(*exc)
+            raise err
     finally:
         sys.stdout = stdout
 
@@ -682,10 +686,7 @@ def json_load_byteified(file_handle):
     data item or structure
         data item or structure with unicode converted to bytes
     """
-    if PY2:
-        return _byteify(json.load(file_handle, object_hook=_byteify), ignore_dicts=True)
-    else:
-        return json.load(file_handle)
+    return json.load(file_handle)
 
 
 def json_loads_byteified(json_str):
@@ -704,10 +705,62 @@ def json_loads_byteified(json_str):
     data item or structure
         data item or structure with unicode converted to bytes
     """
-    if PY2:
-        return _byteify(json.loads(json_str, object_hook=_byteify), ignore_dicts=True)
-    else:
-        return json.loads(json_str)
+    return json.loads(json_str)
+
+
+def remove_whitespace(s, right=False, left=False):
+    """
+    Remove white-space characters from the given string.
+
+    If neither right nor left is specified (the default),
+    then all white-space is removed.
+
+    Parameters
+    ----------
+    s : str
+        The string to be modified.
+    right : bool
+        If True, remove white-space from the end of the string.
+    left : bool
+        If True, remove white-space from the beginning of the string.
+
+    Returns
+    -------
+    str
+        The string with white-space removed.
+    """
+    if not left and not right:
+        return re.sub(r"\s+", "", s, flags=re.UNICODE)
+    elif right and left:
+        return re.sub(r"^\s+|\s+$", "", s, flags=re.UNICODE)
+    elif right:
+        return re.sub(r"\s+$", "", s, flags=re.UNICODE)
+    else:  # left
+        return re.sub(r"^\s+", "", s, flags=re.UNICODE)
+
+
+_badtab = r'`~@#$%^&*()[]{}-+=|\/?<>,.:;'
+_transtab = str.maketrans(_badtab, '_' * len(_badtab))
+
+
+def str2valid_python_name(s):
+    """
+    Translate a given string into a valid python variable name.
+
+    Parameters
+    ----------
+    s : str
+        The string to be translated.
+
+    Returns
+    -------
+    str
+        The valid python name string.
+    """
+    return s.translate(_transtab)
+
+
+_container_classes = (list, tuple, set)
 
 
 def make_serializable(o):
@@ -724,13 +777,138 @@ def make_serializable(o):
     object
         The converted object.
     """
-    if (isinstance(o, np.number)):
-        return o.item()
-    elif isinstance(o, np.ndarray):
-        return make_serializable(o.tolist())
-    elif isinstance(o, (list, tuple, set)):
+    if isinstance(o, _container_classes):
         return [make_serializable(item) for item in o]
-    elif '__dict__' in dir(o):
-        return make_serializable(o.__class__.__name__)
+    elif isinstance(o, np.ndarray):
+        return o.tolist()
+    elif isinstance(o, np.number):
+        return o.item()
+    elif hasattr(o, '__dict__'):
+        return o.__class__.__name__
     else:
         return o
+
+
+def make_set(str_data, name=None):
+    """
+    Construct a set containing the specified character strings.
+
+    Parameters
+    ----------
+    str_data : None, str, or list of strs
+        Character string(s) to be included in the set.
+
+    name : str, optional
+        A name to be used in error messages.
+
+    Returns
+    -------
+    set
+        A set of character strings.
+    """
+    if not str_data:
+        return set()
+    elif isinstance(str_data, str):
+        return {str_data}
+    elif isinstance(str_data, set):
+        return str_data
+    elif isinstance(str_data, list):
+        return set(str_data)
+    elif name:
+        raise TypeError("The {} argument should be str, set, or list: {}".format(name, str_data))
+    else:
+        raise TypeError("The argument should be str, set, or list: {}".format(str_data))
+
+
+def match_includes_excludes(name, prom_name, includes, excludes):
+    """
+    Check to see if the variable names pass through the includes and excludes filter.
+
+    Parameters
+    ----------
+    name : str
+        Unpromoted variable name to be checked for match.
+    prom_name : str
+        Promoted variable name to be checked for match.
+    includes : None or list_like
+        List of glob patterns for name to include in the filtering.
+    excludes : None or list_like
+        List of glob patterns for name to exclude in the filtering.
+
+    Returns
+    -------
+    bool
+        Return True if the name passes through the filtering of includes and excludes.
+    """
+    # Process includes
+    if includes is not None:
+        for pattern in includes:
+            if fnmatchcase(name, pattern) or fnmatchcase(prom_name, pattern):
+                break
+        else:  # didn't find any match
+            return False
+
+    # Process excludes
+    if excludes is not None:
+        match = False
+        for pattern in excludes:
+            if fnmatchcase(name, pattern) or fnmatchcase(prom_name, pattern):
+                match = True
+                break
+        return not match
+
+    return True
+
+
+def env_truthy(env_var):
+    """
+    Return True if the given environment variable is 'truthy'.
+
+    Parameters
+    ----------
+    env_var : str
+        The name of the environment variable.
+
+    Returns
+    -------
+    bool
+        True if the specified environment variable is 'truthy'.
+    """
+    return os.environ.get(env_var, '0').lower() not in ('0', 'false', 'no', '')
+
+
+def common_subpath(pathnames):
+    """
+    Return the common dotted subpath found in all of the given dotted pathnames.
+
+    Parameters
+    ----------
+    pathnames : iter of str
+        Dotted pathnames of systems.
+
+    Returns
+    -------
+    str
+        Common dotted subpath.  Returns '' if no common subpath is found.
+    """
+    if len(pathnames) == 1:
+        return pathnames[0]
+
+    if pathnames:
+        npaths = len(pathnames)
+        splits = [p.split('.') for p in pathnames]
+        minlen = np.min([len(s) for s in splits])
+        for common_loc in range(minlen):
+            p0 = splits[0][common_loc]
+            for i in range(1, npaths):
+                if p0 != splits[i][common_loc]:
+                    break
+            else:
+                continue
+            break
+        else:
+            common_loc += 1
+
+        return '.'.join(splits[0][:common_loc])
+
+    return ''

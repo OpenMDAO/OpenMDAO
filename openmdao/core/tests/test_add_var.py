@@ -1,14 +1,13 @@
 """Acceptance and developer tests for add_input and add_output."""
-from __future__ import division
-
-import numpy as np
 import unittest
 
-from openmdao.api import Problem, ExplicitComponent
-from openmdao.utils.assert_utils import assert_rel_error
+import numpy as np
+
+import openmdao.api as om
+from openmdao.utils.assert_utils import assert_near_equal
 
 
-class CompAddWithDefault(ExplicitComponent):
+class CompAddWithDefault(om.ExplicitComponent):
     """Component for tests for declaring only default value."""
 
     def setup(self):
@@ -24,7 +23,7 @@ class CompAddWithDefault(ExplicitComponent):
         self.add_output('y_e', val=6. * np.ones((3, 2)))
 
 
-class CompAddWithShape(ExplicitComponent):
+class CompAddWithShape(om.ExplicitComponent):
     """Component for tests for declaring only shape."""
 
     def setup(self):
@@ -36,7 +35,7 @@ class CompAddWithShape(ExplicitComponent):
         self.add_output('y_c', shape=[3, 3])
 
 
-class CompAddWithIndices(ExplicitComponent):
+class CompAddWithIndices(om.ExplicitComponent):
     """Component for tests for declaring only indices."""
 
     def setup(self):
@@ -49,7 +48,7 @@ class CompAddWithIndices(ExplicitComponent):
 
 
 
-class CompAddWithShapeAndIndices(ExplicitComponent):
+class CompAddWithShapeAndIndices(om.ExplicitComponent):
     """Component for tests for declaring shape and array indices."""
 
     def setup(self):
@@ -59,7 +58,7 @@ class CompAddWithShapeAndIndices(ExplicitComponent):
         self.add_input('x_d', shape=[2, 2], src_indices=np.arange(4).reshape((2, 2)))
 
 
-class CompAddArrayWithScalar(ExplicitComponent):
+class CompAddArrayWithScalar(om.ExplicitComponent):
     """Component for tests for declaring a scalar val with an array variable."""
 
     def setup(self):
@@ -71,7 +70,7 @@ class CompAddArrayWithScalar(ExplicitComponent):
         self.add_output('y_b', val=3.0, shape=(3, 2))
 
 
-class CompAddWithArrayIndices(ExplicitComponent):
+class CompAddWithArrayIndices(om.ExplicitComponent):
     """Component for tests for declaring with array val and array indices."""
 
     def setup(self):
@@ -80,7 +79,7 @@ class CompAddWithArrayIndices(ExplicitComponent):
         self.add_output('y')
 
 
-class CompAddWithBounds(ExplicitComponent):
+class CompAddWithBounds(om.ExplicitComponent):
     """Component for tests for declaring bounds."""
 
     def setup(self):
@@ -96,101 +95,101 @@ class TestAddVar(unittest.TestCase):
 
     def test_val(self):
         """Test declaring only default value."""
-        from openmdao.api import Problem
+        import openmdao.api as om
         from openmdao.core.tests.test_add_var import CompAddWithDefault
 
-        p = Problem(model=CompAddWithDefault())
+        p = om.Problem(model=CompAddWithDefault())
         p.setup()
 
-        assert_rel_error(self, p['x_a'], 1.)
-        assert_rel_error(self, p['x_b'], 3.)
-        assert_rel_error(self, p['x_c'], 3. * np.ones(2))
-        assert_rel_error(self, p['x_d'], 3. * np.ones(2))
-        assert_rel_error(self, p['x_e'], 3. * np.ones((2, 2)))
-        assert_rel_error(self, p['y_a'], 1.)
-        assert_rel_error(self, p['y_b'], 6.)
-        assert_rel_error(self, p['y_c'], 6. * np.ones(3))
-        assert_rel_error(self, p['y_d'], 6. * np.ones(3))
-        assert_rel_error(self, p['y_e'], 6. * np.ones((3, 2)))
+        assert_near_equal(p['x_a'], 1.)
+        assert_near_equal(p['x_b'], 3.)
+        assert_near_equal(p['x_c'], 3. * np.ones(2))
+        assert_near_equal(p['x_d'], 3. * np.ones(2))
+        assert_near_equal(p['x_e'], 3. * np.ones((2, 2)))
+        assert_near_equal(p['y_a'], 1.)
+        assert_near_equal(p['y_b'], 6.)
+        assert_near_equal(p['y_c'], 6. * np.ones(3))
+        assert_near_equal(p['y_d'], 6. * np.ones(3))
+        assert_near_equal(p['y_e'], 6. * np.ones((3, 2)))
 
     def test_shape(self):
         """Test declaring only shape."""
-        from openmdao.api import Problem
+        import openmdao.api as om
         from openmdao.core.tests.test_add_var import CompAddWithShape
 
-        p = Problem(model=CompAddWithShape())
+        p = om.Problem(model=CompAddWithShape())
         p.setup()
 
-        assert_rel_error(self, p['x_a'], np.ones(2))
-        assert_rel_error(self, p['x_b'], np.ones((2, 2)))
-        assert_rel_error(self, p['x_c'], np.ones((2, 2)))
-        assert_rel_error(self, p['y_a'], np.ones(3))
-        assert_rel_error(self, p['y_b'], np.ones((3, 3)))
-        assert_rel_error(self, p['y_c'], np.ones((3, 3)))
+        assert_near_equal(p['x_a'], np.ones(2))
+        assert_near_equal(p['x_b'], np.ones((2, 2)))
+        assert_near_equal(p['x_c'], np.ones((2, 2)))
+        assert_near_equal(p['y_a'], np.ones(3))
+        assert_near_equal(p['y_b'], np.ones((3, 3)))
+        assert_near_equal(p['y_c'], np.ones((3, 3)))
 
     def test_indices(self):
         """Test declaring only indices."""
-        from openmdao.api import Problem
+        import openmdao.api as om
         from openmdao.core.tests.test_add_var import CompAddWithIndices
 
-        p = Problem(model=CompAddWithIndices())
+        p = om.Problem(model=CompAddWithIndices())
         p.setup()
 
-        assert_rel_error(self, p['x_a'], 1.)
-        assert_rel_error(self, p['x_b'], np.ones(2))
-        assert_rel_error(self, p['x_c'], np.ones(2))
-        assert_rel_error(self, p['x_d'], np.ones(6))
-        assert_rel_error(self, p['x_e'], np.ones((3,2)))
+        assert_near_equal(p['x_a'], 1.)
+        assert_near_equal(p['x_b'], np.ones(2))
+        assert_near_equal(p['x_c'], np.ones(2))
+        assert_near_equal(p['x_d'], np.ones(6))
+        assert_near_equal(p['x_e'], np.ones((3,2)))
 
     def test_shape_and_indices(self):
         """Test declaring shape and indices."""
-        p = Problem(model=CompAddWithShapeAndIndices())
+        p = om.Problem(model=CompAddWithShapeAndIndices())
         p.setup()
 
-        assert_rel_error(self, p['x_a'], np.ones(2))
-        assert_rel_error(self, p['x_b'], np.ones(2))
-        assert_rel_error(self, p['x_c'], np.ones((2,2)))
-        assert_rel_error(self, p['x_d'], np.ones((2,2)))
+        assert_near_equal(p['x_a'], np.ones(2))
+        assert_near_equal(p['x_b'], np.ones(2))
+        assert_near_equal(p['x_c'], np.ones((2,2)))
+        assert_near_equal(p['x_d'], np.ones((2,2)))
 
     def test_scalar_array(self):
         """Test declaring a scalar val with an array variable."""
-        from openmdao.api import Problem
+        import openmdao.api as om
         from openmdao.core.tests.test_add_var import CompAddArrayWithScalar
 
-        p = Problem(model=CompAddArrayWithScalar())
+        p = om.Problem(model=CompAddArrayWithScalar())
         p.setup()
 
-        assert_rel_error(self, p['x_a'], 2. * np.ones(6))
-        assert_rel_error(self, p['x_b'], 2. * np.ones((3, 2)))
-        assert_rel_error(self, p['x_c'], 2. * np.ones(6))
-        assert_rel_error(self, p['x_d'], 2. * np.ones((3, 2)))
-        assert_rel_error(self, p['y_a'], 3. * np.ones(6))
-        assert_rel_error(self, p['y_b'], 3. * np.ones((3, 2)))
+        assert_near_equal(p['x_a'], 2. * np.ones(6))
+        assert_near_equal(p['x_b'], 2. * np.ones((3, 2)))
+        assert_near_equal(p['x_c'], 2. * np.ones(6))
+        assert_near_equal(p['x_d'], 2. * np.ones((3, 2)))
+        assert_near_equal(p['y_a'], 3. * np.ones(6))
+        assert_near_equal(p['y_b'], 3. * np.ones((3, 2)))
 
     def test_array_indices(self):
         """Test declaring with array val and array indices."""
-        from openmdao.api import Problem
+        import openmdao.api as om
         from openmdao.core.tests.test_add_var import CompAddWithArrayIndices
 
-        p = Problem(model=CompAddWithArrayIndices())
+        p = om.Problem(model=CompAddWithArrayIndices())
         p.setup()
 
-        assert_rel_error(self, p['x_a'], 2. * np.ones(6))
-        assert_rel_error(self, p['x_b'], 2. * np.ones((3, 2)))
+        assert_near_equal(p['x_a'], 2. * np.ones(6))
+        assert_near_equal(p['x_b'], 2. * np.ones((3, 2)))
 
     def test_bounds(self):
         """Test declaring bounds."""
-        from openmdao.api import Problem
+        import openmdao.api as om
         from openmdao.core.tests.test_add_var import CompAddWithBounds
 
-        p = Problem(model=CompAddWithBounds())
+        p = om.Problem(model=CompAddWithBounds())
         p.setup()
 
-        assert_rel_error(self, p['y_a'], 2.)
-        assert_rel_error(self, p['y_b'], 2.)
-        assert_rel_error(self, p['y_c'], 2. * np.ones(6))
-        assert_rel_error(self, p['y_d'], 2. * np.ones(6))
-        assert_rel_error(self, p['y_e'], 2. * np.ones((3, 2)))
+        assert_near_equal(p['y_a'], 2.)
+        assert_near_equal(p['y_b'], 2.)
+        assert_near_equal(p['y_c'], 2. * np.ones(6))
+        assert_near_equal(p['y_d'], 2. * np.ones(6))
+        assert_near_equal(p['y_e'], 2. * np.ones((3, 2)))
 
 if __name__ == '__main__':
     unittest.main()

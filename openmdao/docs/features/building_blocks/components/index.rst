@@ -14,13 +14,14 @@ Components
     linearsystem_comp.rst
     metamodelstructured_comp.rst
     metamodelunstructured_comp.rst
+    multifi_metamodelunstructured_comp.rst
     mux_demux_comps.rst
     ks_comp.rst
-    bsplines_comp.rst
-    akima_spline_comp.rst
+    spline_comp.rst
     add_subtract_comp.rst
     cross_product_comp.rst
     dot_product_comp.rst
     matrix_vector_product_comp.rst
     vector_magnitude_comp.rst
+    spline_comp.rst
 

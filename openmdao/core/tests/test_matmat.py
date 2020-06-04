@@ -1,15 +1,12 @@
-from __future__ import print_function, division, absolute_import
-
 import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent, \
-    ScipyOptimizeDriver, ImplicitComponent, LinearBlockGS
-from openmdao.utils.assert_utils import assert_rel_error
+import openmdao.api as om
+from openmdao.utils.assert_utils import assert_near_equal
 
 
-class QuadraticCompVectorized(ImplicitComponent):
+class QuadraticCompVectorized(om.ImplicitComponent):
     """
     A Simple Implicit Component representing a Quadratic Equation.
 
@@ -79,7 +76,7 @@ class QuadraticCompVectorized(ImplicitComponent):
             d_residuals['x'] = self.inv_jac * d_outputs['x']
 
 
-class QCVProblem(Problem):
+class QCVProblem(om.Problem):
     """
     A QuadraticCompVectorized problem with configurable component class.
     """
@@ -89,7 +86,7 @@ class QCVProblem(Problem):
 
         model = self.model
 
-        comp1 = model.add_subsystem('p', IndepVarComp())
+        comp1 = model.add_subsystem('p', om.IndepVarComp())
         comp1.add_output('a', np.array([1.0, 2.0, 3.0]))
         comp1.add_output('b', np.array([2.0, 3.0, 4.0]))
         comp1.add_output('c', np.array([-1.0, -2.0, -3.0]))
@@ -104,10 +101,10 @@ class QCVProblem(Problem):
         model.add_design_var('p.c', vectorize_derivs=True)
         model.add_constraint('comp.x', vectorize_derivs=True)
 
-        model.linear_solver = LinearBlockGS()
+        model.linear_solver = om.LinearBlockGS()
 
 
-class RectangleCompVectorized(ExplicitComponent):
+class RectangleCompVectorized(om.ExplicitComponent):
     """
     A simple Explicit Component that computes the area of a rectangle.
     """
@@ -237,12 +234,12 @@ def lagrange_matrices(x_disc, x_interp):
     -------
     Li : np.array
         A num_i x num_c matrix which, when post-multiplied by values specified
-        at the cardinal nodes, yields the intepolated values at the interior
+        at the cardinal nodes, yields the interpolated values at the interior
         nodes.
 
     Di : np.array
         A num_i x num_c matrix which, when post-multiplied by values specified
-        at the cardinal nodes, yields the intepolated derivatives at the interior
+        at the cardinal nodes, yields the interpolated derivatives at the interior
         nodes.
 
     """
@@ -283,7 +280,7 @@ def lagrange_matrices(x_disc, x_interp):
     return Li, Di
 
 
-class LGLFit(ExplicitComponent):
+class LGLFit(om.ExplicitComponent):
     """
     Given values at discretization nodes, provide interpolated values at midpoint nodes and
     an approximation of arclength.
@@ -316,7 +313,7 @@ class LGLFit(ExplicitComponent):
         outputs['yp_lgl'] = np.dot(self.D_lgl, inputs['y_lgl'])/np.pi
 
 
-class DefectComp(ExplicitComponent):
+class DefectComp(om.ExplicitComponent):
 
     def initialize(self):
         self.options.declare(name='num_nodes', types=int)
@@ -336,7 +333,7 @@ class DefectComp(ExplicitComponent):
         outputs['defect'] = inputs['y_truth'] - inputs['y_approx']
 
 
-class ArcLengthFunction(ExplicitComponent):
+class ArcLengthFunction(om.ExplicitComponent):
 
     def initialize(self):
         self.options.declare(name='num_nodes', types=int)
@@ -357,7 +354,7 @@ class ArcLengthFunction(ExplicitComponent):
         partials['f_arclength', 'yp_lgl'] = inputs['yp_lgl'] / np.sqrt(1 + inputs['yp_lgl']**2)
 
 
-class ArcLengthQuadrature(ExplicitComponent):
+class ArcLengthQuadrature(om.ExplicitComponent):
     """
     Computes the arclength of a polynomial segment whose values are given at the LGL nodes.
     """
@@ -380,7 +377,7 @@ class ArcLengthQuadrature(ExplicitComponent):
 
         da_df = np.atleast_2d(self.w_lgl*np.pi*self._mask)
 
-        self.declare_partials(of='arclength', wrt='f_arclength', dependent=True, val=da_df)
+        self.declare_partials(of='arclength', wrt='f_arclength', val=da_df)
 
     def compute(self, inputs, outputs):
         n = self.options['num_nodes']
@@ -391,7 +388,7 @@ class ArcLengthQuadrature(ExplicitComponent):
         outputs['arclength'] = outputs['arclength']*np.pi
 
 
-class Phase(Group):
+class Phase(om.Group):
 
     def initialize(self):
         self.options.declare('order', types=int, default=10)
@@ -401,16 +398,16 @@ class Phase(Group):
         n = order + 1
 
         # Step 1:  Make an indep var comp that provides the approximated values at the LGL nodes.
-        self.add_subsystem('y_lgl_ivc', IndepVarComp('y_lgl', val=np.zeros(n), desc='values at LGL nodes'),
+        self.add_subsystem('y_lgl_ivc', om.IndepVarComp('y_lgl', val=np.zeros(n), desc='values at LGL nodes'),
                            promotes_outputs=['y_lgl'])
 
         # Step 2:  Make an indep var comp that provides the 'truth' values at the midpoint nodes.
         x_lgl, _ = lgl(n)
         x_lgl = x_lgl * np.pi  # put x_lgl on [-pi, pi]
         x_mid = (x_lgl[1:] + x_lgl[:-1]) * 0.5  # midpoints on [-pi, pi]
-        self.add_subsystem('truth', IndepVarComp('y_mid',
-                                                 val=np.sin(x_mid),
-                                                 desc='truth values at midpoint nodes'))
+        self.add_subsystem('truth', om.IndepVarComp('y_mid',
+                                                    val=np.sin(x_mid),
+                                                    desc='truth values at midpoint nodes'))
 
         # Step 3: Make a polynomial fitting component
         self.add_subsystem('lgl_fit', LGLFit(num_nodes=n))
@@ -429,7 +426,7 @@ class Phase(Group):
         self.connect('arclength_func.f_arclength', 'arclength_quad.f_arclength')
 
 
-class Summer(ExplicitComponent):
+class Summer(om.ExplicitComponent):
 
     def initialize(self):
         self.options.declare('n_phases', types=int)
@@ -451,20 +448,20 @@ class Summer(ExplicitComponent):
 def simple_model(order, dvgroup='pardv', congroup='parc', vectorize=False):
     n = order + 1
 
-    p = Problem(model=Group())
+    p = om.Problem()
 
     # Step 1:  Make an indep var comp that provides the approximated values at the LGL nodes.
-    p.model.add_subsystem('y_lgl_ivc', IndepVarComp('y_lgl', val=np.zeros(n),
-                                                    desc='values at LGL nodes'),
+    p.model.add_subsystem('y_lgl_ivc', om.IndepVarComp('y_lgl', val=np.zeros(n),
+                                                       desc='values at LGL nodes'),
                           promotes_outputs=['y_lgl'])
 
     # Step 2:  Make an indep var comp that provides the 'truth' values at the midpoint nodes.
     x_lgl, _ = lgl(n)
     x_lgl = x_lgl * np.pi  # put x_lgl on [-pi, pi]
     x_mid = (x_lgl[1:] + x_lgl[:-1])/2.0  # midpoints on [-pi, pi]
-    p.model.add_subsystem('truth', IndepVarComp('y_mid',
-                                                val=np.sin(x_mid),
-                                                desc='truth values at midpoint nodes'))
+    p.model.add_subsystem('truth', om.IndepVarComp('y_mid',
+                                                   val=np.sin(x_mid),
+                                                   desc='truth values at midpoint nodes'))
 
     # Step 3: Make a polynomial fitting component
     p.model.add_subsystem('lgl_fit', LGLFit(num_nodes=n))
@@ -487,7 +484,7 @@ def simple_model(order, dvgroup='pardv', congroup='parc', vectorize=False):
     p.model.add_constraint('defect.defect', lower=-1e-6, upper=1e-6,
                            parallel_deriv_color=congroup, vectorize_derivs=vectorize)
     p.model.add_objective('arclength_quad.arclength')
-    p.driver = ScipyOptimizeDriver()
+    p.driver = om.ScipyOptimizeDriver()
     return p, np.sin(x_lgl)
 
 
@@ -497,7 +494,7 @@ def phase_model(order, nphases, dvgroup='pardv', congroup='parc', vectorize=Fals
 
     n = PHASE_ORDER + 1
 
-    p = Problem()
+    p = om.Problem()
 
     # Step 1:  Make an indep var comp that provides the approximated values at the LGL nodes.
     for i in range(N_PHASES):
@@ -513,7 +510,7 @@ def phase_model(order, nphases, dvgroup='pardv', congroup='parc', vectorize=Fals
     p.model.add_subsystem('sum', Summer(n_phases=N_PHASES))
 
     p.model.add_objective('sum.total_arc_length')
-    p.driver = ScipyOptimizeDriver()
+    p.driver = om.ScipyOptimizeDriver()
 
     x_lgl, _ = lgl(n)
     x_lgl = x_lgl * np.pi  # put x_lgl on [-pi, pi]
@@ -526,11 +523,11 @@ class MatMatTestCase(unittest.TestCase):
 
     def test_feature_vectorized_derivs(self):
         import numpy as np
-        from openmdao.api import ExplicitComponent, IndepVarComp, Problem, ScipyOptimizeDriver
+        import openmdao.api as om
 
         SIZE = 5
 
-        class ExpensiveAnalysis(ExplicitComponent):
+        class ExpensiveAnalysis(om.ExplicitComponent):
 
             def setup(self):
 
@@ -551,7 +548,7 @@ class MatMatTestCase(unittest.TestCase):
                 J['f', 'x'] = inputs['y']*inputs['x']**(inputs['y']-1)
                 J['f', 'y'] = (inputs['x']**inputs['y'])*np.log(inputs['x'])
 
-        class CheapConstraint(ExplicitComponent):
+        class CheapConstraint(om.ExplicitComponent):
 
             def setup(self):
 
@@ -571,9 +568,9 @@ class MatMatTestCase(unittest.TestCase):
 
                 J['g', 'y'] = 2*inputs['y']
 
-        p = Problem()
+        p = om.Problem()
 
-        dvs = p.model.add_subsystem('des_vars', IndepVarComp(), promotes=['*'])
+        dvs = p.model.add_subsystem('des_vars', om.IndepVarComp(), promotes=['*'])
         dvs.add_output('x', 2*np.ones(SIZE))
         dvs.add_output('y', 2*np.ones(SIZE))
 
@@ -589,11 +586,11 @@ class MatMatTestCase(unittest.TestCase):
 
         p.run_model()
 
-        p.driver = ScipyOptimizeDriver()
+        p.driver = om.ScipyOptimizeDriver()
         p.run_driver()
 
-        assert_rel_error(self, p['x'], [0.10000691, 0.1, 0.1, 0.1, 0.1], 1e-5)
-        assert_rel_error(self, p['y'], [0, 1.41421, 2.0, 2.44948, 2.82842], 1e-5)
+        assert_near_equal(p['x'], [0.10000691, 0.1, 0.1, 0.1, 0.1], 1e-5)
+        assert_near_equal(p['y'], [0, 1.41421, 2.0, 2.44948, 2.82842], 1e-5)
 
     def test_simple_multi_fwd(self):
         p, expected = simple_model(order=20, vectorize=True)
@@ -609,7 +606,7 @@ class MatMatTestCase(unittest.TestCase):
         # plt.show()
 
         y_lgl = p['y_lgl']
-        assert_rel_error(self, expected, y_lgl, 1.e-5)
+        assert_near_equal(expected, y_lgl, 1.e-5)
 
     def test_simple_multi_rev(self):
         p, expected = simple_model(order=20, vectorize=True)
@@ -619,7 +616,7 @@ class MatMatTestCase(unittest.TestCase):
         p.run_driver()
 
         y_lgl = p['y_lgl']
-        assert_rel_error(self, expected, y_lgl, 1.e-5)
+        assert_near_equal(expected, y_lgl, 1.e-5)
 
     def test_phases_multi_fwd(self):
         N_PHASES = 4
@@ -639,7 +636,7 @@ class MatMatTestCase(unittest.TestCase):
         # plt.show()
 
         for i in range(N_PHASES):
-            assert_rel_error(self, expected, p['p%d.y_lgl' % i], 1.e-5)
+            assert_near_equal(expected, p['p%d.y_lgl' % i], 1.e-5)
 
     def test_phases_multi_rev(self):
         N_PHASES = 4
@@ -650,14 +647,14 @@ class MatMatTestCase(unittest.TestCase):
         p.run_driver()
 
         for i in range(N_PHASES):
-            assert_rel_error(self, expected, p['p%d.y_lgl' % i], 1.e-5)
+            assert_near_equal(expected, p['p%d.y_lgl' % i], 1.e-5)
 
     def test_feature_declaration(self):
         # Tests the code that shows the signature for compute_multi_jacvec
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        comp1 = model.add_subsystem('p', IndepVarComp())
+        comp1 = model.add_subsystem('p', om.IndepVarComp())
         comp1.add_output('length', np.array([3.0, 4.0, 5.0]))
         comp1.add_output('width', np.array([1.0, 2.0, 3.0]))
 
@@ -674,8 +671,8 @@ class MatMatTestCase(unittest.TestCase):
         prob.run_model()
 
         J = prob.compute_totals(of=['comp.area'], wrt=['p.length', 'p.width'])
-        assert_rel_error(self, J['comp.area', 'p.length'], np.diag(np.array([1.0, 2.0, 3.0])))
-        assert_rel_error(self, J['comp.area', 'p.width'], np.diag(np.array([3.0, 4.0, 5.0])))
+        assert_near_equal(J['comp.area', 'p.length'], np.diag(np.array([1.0, 2.0, 3.0])))
+        assert_near_equal(J['comp.area', 'p.width'], np.diag(np.array([3.0, 4.0, 5.0])))
 
     def test_implicit(self):
         prob = QCVProblem()
@@ -685,9 +682,9 @@ class MatMatTestCase(unittest.TestCase):
         prob.run_model()
 
         J = prob.compute_totals(of=['comp.x'], wrt=['p.a', 'p.b', 'p.c'])
-        assert_rel_error(self, J['comp.x', 'p.a'], np.diag(np.array([-0.06066017, -0.05, -0.03971954])), 1e-4)
-        assert_rel_error(self, J['comp.x', 'p.b'], np.diag(np.array([-0.14644661, -0.1, -0.07421663])), 1e-4)
-        assert_rel_error(self, J['comp.x', 'p.c'], np.diag(np.array([-0.35355339, -0.2, -0.13867505])), 1e-4)
+        assert_near_equal(J['comp.x', 'p.a'], np.diag(np.array([-0.06066017, -0.05, -0.03971954])), 1e-4)
+        assert_near_equal(J['comp.x', 'p.b'], np.diag(np.array([-0.14644661, -0.1, -0.07421663])), 1e-4)
+        assert_near_equal(J['comp.x', 'p.c'], np.diag(np.array([-0.35355339, -0.2, -0.13867505])), 1e-4)
 
     def test_apply_multi_linear_inputs_read_only(self):
         class BadComp(QuadraticCompVectorized):
@@ -785,7 +782,7 @@ class MatMatTestCase(unittest.TestCase):
                          "when it is read only.")
 
 
-class JacVec(ExplicitComponent):
+class JacVec(om.ExplicitComponent):
 
     def __init__(self, size):
         super(JacVec, self).__init__()
@@ -822,10 +819,10 @@ class MultiJacVec(JacVec):
 
 class ComputeMultiJacVecTestCase(unittest.TestCase):
     def setup_model(self, size, comp_class, vectorize, mode):
-        p = Problem()
+        p = om.Problem()
         model = p.model
-        model.add_subsystem('px', IndepVarComp('x', val=(np.arange(5, dtype=float) + 1.) * 3.0))
-        model.add_subsystem('py', IndepVarComp('y', val=(np.arange(5, dtype=float) + 1.) * 2.0))
+        model.add_subsystem('px', om.IndepVarComp('x', val=(np.arange(5, dtype=float) + 1.) * 3.0))
+        model.add_subsystem('py', om.IndepVarComp('y', val=(np.arange(5, dtype=float) + 1.) * 2.0))
         model.add_subsystem('comp', comp_class(size))
 
         model.connect('px.x', 'comp.x')
@@ -844,64 +841,64 @@ class ComputeMultiJacVecTestCase(unittest.TestCase):
 
         J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
-        assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
-        assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
+        assert_near_equal(J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
+        assert_near_equal(J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
 
     def test_compute_multi_jacvec_prod_rev(self):
         p = self.setup_model(size=5, comp_class=JacVec, vectorize=False, mode='rev')
 
         J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
-        assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
-        assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
+        assert_near_equal(J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
+        assert_near_equal(J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
 
     def test_compute_multi_jacvec_prod_fwd_vectorize(self):
         p = self.setup_model(size=5, comp_class=JacVec, vectorize=True, mode='fwd')
 
         J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
-        assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
-        assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
+        assert_near_equal(J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
+        assert_near_equal(J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
 
     def test_compute_multi_jacvec_prod_rev_vectorize(self):
         p = self.setup_model(size=5, comp_class=JacVec, vectorize=True, mode='rev')
 
         J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
-        assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
-        assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
+        assert_near_equal(J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
+        assert_near_equal(J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
 
     def test_compute_multi_jacvec_prod_fwd_multi(self):
         p = self.setup_model(size=5, comp_class=MultiJacVec, vectorize=False, mode='fwd')
 
         J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
-        assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
-        assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
+        assert_near_equal(J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
+        assert_near_equal(J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
 
     def test_compute_multi_jacvec_prod_rev_multi(self):
         p = self.setup_model(size=5, comp_class=MultiJacVec, vectorize=False, mode='rev')
 
         J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
-        assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
-        assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
+        assert_near_equal(J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
+        assert_near_equal(J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
 
     def test_compute_multi_jacvec_prod_fwd_vectorize_multi(self):
         p = self.setup_model(size=5, comp_class=MultiJacVec, vectorize=True, mode='fwd')
 
         J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
-        assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
-        assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
+        assert_near_equal(J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
+        assert_near_equal(J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
 
     def test_compute_multi_jacvec_prod_rev_vectorize_multi(self):
         p = self.setup_model(size=5, comp_class=MultiJacVec, vectorize=True, mode='rev')
 
         J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
-        assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
-        assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
+        assert_near_equal(J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
+        assert_near_equal(J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
 
     def test_compute_jacvec_product_mode_read_only(self):
         class BadComp(JacVec):

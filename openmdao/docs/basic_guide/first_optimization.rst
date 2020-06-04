@@ -55,7 +55,7 @@ Here we'll use the :ref:`ScipyOptimizeDriver <scipy_optimize_driver>`, and tell 
 
 .. code::
 
-    prob.driver = ScipyOptimizeDriver()
+    prob.driver = om.ScipyOptimizeDriver()
     prob.driver.options['optimizer'] = 'COBYLA'
 
 Defining the Design Variables and Objective

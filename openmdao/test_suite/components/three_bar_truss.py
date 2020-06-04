@@ -10,7 +10,7 @@ The global optima is 3,3,x (x can be anything), with mass = 5.28 kg
 
 import numpy as np
 
-from openmdao.core.explicitcomponent import ExplicitComponent
+import openmdao.api as om
 
 
 def stress_calc(A, E):
@@ -64,7 +64,7 @@ def stress_calc(A, E):
     return sigma
 
 
-class ThreeBarTruss(ExplicitComponent):
+class ThreeBarTruss(om.ExplicitComponent):
     """
     3 Bar truss problem with 3 continuous design variables and 3 discrete
     material choices. Material chosen as follows:
@@ -156,7 +156,7 @@ class ThreeBarTruss(ExplicitComponent):
         outputs['stress'] = (np.abs(sigma)/sigma_y)
 
 
-class ThreeBarTrussVector(ExplicitComponent):
+class ThreeBarTrussVector(om.ExplicitComponent):
     """
     3 Bar truss problem with 3 continuous design variables and 3 discrete
     material choices. Material chosen as follows:

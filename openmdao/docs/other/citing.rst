@@ -5,12 +5,12 @@ How to Cite OpenMDAO
 ********************
 
 
-There is a general OpenMDAO paper that includes a high-level overview of the framework, 
-including how implicit and explicit components leverage the underlying core APIs to support multidisciplinary modeling. 
-There is a walk-through example of how some of the key underlying mathematics of the framework are used and how analytic derivatives are computed. 
+There is a general OpenMDAO paper that includes a high-level overview of the framework,
+including how implicit and explicit components leverage the underlying core APIs to support multidisciplinary modeling.
+There is a walk-through example of how some of the key underlying mathematics of the framework are used and how analytic derivatives are computed.
 Lastly, there are  examples of how and when to use some of the specialized algorithms for computing derivatives efficiently for different kinds of problems.
 
-We hope the paper helps you understand the framework better, and most importantly, 
+We hope the paper helps you understand the framework better, and most importantly,
 helps you to solve some really nice MDO problems! If you do make use of OpenMDAO, please cite this paper.
 
 .. code-block:: none
@@ -20,11 +20,13 @@ helps you to solve some really nice MDO problems! If you do make use of OpenMDAO
     Title="{OpenMDAO: An Open-Source Framework for Multidisciplinary Design, Analysis, and Optimization}",
     Journal="{Structural and Multidisciplinary Optimization}",
     Year={2019},
+    Volume={59},
+    pages={1075-1104},
+    issue={4},
     Publisher={Springer},
-    pdf={http://openmdao.org/pubs/openmdao_overview_2019.pdf},
-    note= {In Press}
+    pdf={http://mdolab.engin.umich.edu/sites/default/files/OpenMDAO_preprint_0.pdf},
+    Doi={10.1007/s00158-019-02211-z},
     }
-
 
 
 With the `openmdao` command

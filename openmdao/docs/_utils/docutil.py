@@ -1,7 +1,6 @@
 """
 A collection of functions for modifying source code that is embeded into the Sphinx documentation.
 """
-from __future__ import print_function
 
 import sys
 import os
@@ -13,13 +12,17 @@ import subprocess
 import tempfile
 import unittest
 import traceback
+import ast
+
 from docutils import nodes
 
-from six import StringIO
-from six.moves import range, zip, cStringIO as cStringIO
+from collections import namedtuple
+
+from io import StringIO
 
 from sphinx.errors import SphinxError
 from sphinx.writers.html import HTMLTranslator
+from sphinx.writers.html5 import HTML5Translator
 from redbaron import RedBaron
 
 if sys.version_info[0] == 2:
@@ -35,6 +38,11 @@ table_name = 'feature_unit_tests'   # name of the table to be queried
 _sub_runner = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'run_sub.py')
 
 
+# an input block consists of a block of code and a tag that marks the end of any
+# output from that code in the output stream (via inserted print('>>>>>#') statements)
+InputBlock = namedtuple('InputBlock', 'code tag')
+
+
 class skipped_or_failed_node(nodes.Element):
     pass
 
@@ -44,7 +52,7 @@ def visit_skipped_or_failed_node(self, node):
 
 
 def depart_skipped_or_failed_node(self, node):
-    if not isinstance(self, HTMLTranslator):
+    if not isinstance(self, (HTMLTranslator, HTML5Translator)):
         self.body.append("output only available for HTML\n")
         return
 
@@ -65,7 +73,7 @@ def depart_in_or_out_node(self, node):
     This function creates the formatting that sets up the look of the blocks.
     The look of the formatting is controlled by _theme/static/style.css
     """
-    if not isinstance(self, HTMLTranslator):
+    if not isinstance(self, (HTMLTranslator, HTML5Translator)):
         self.body.append("output only available for HTML\n")
         return
     if node["kind"] == "In":
@@ -215,6 +223,17 @@ def replace_asserts_with_prints(src):
             #
             assert_node.value[0].replace("print")
 
+    if 'assert_near_equal' in src:
+        assert_nodes = rb.findAll("NameNode", value='assert_near_equal')
+        for assert_node in assert_nodes:
+            assert_node = assert_node.parent
+            # If relative error tolerance is specified, there are 3 arguments
+            if len(assert_node.value[1]) == 3:
+                # remove the relative error tolerance
+                remove_redbaron_node(assert_node.value[1], -1)
+            remove_redbaron_node(assert_node.value[1], -1)  # remove the expected value
+            assert_node.value[0].replace("print")
+
     if 'assert_almost_equal' in src:
         assert_nodes = rb.findAll("NameNode", value='assert_almost_equal')
         for assert_node in assert_nodes:
@@ -259,10 +278,13 @@ def get_source_code(path):
         The imported module.
     class or None
         The class specified by path.
+    method or None
+        The class method specified by path.
     """
 
     indent = 0
-    cls = None
+    class_obj = None
+    method_obj = None
 
     if path.endswith('.py'):
         if not os.path.isfile(path):
@@ -285,8 +307,8 @@ def get_source_code(path):
                 module_path = '.'.join(parts[:-1])
                 module = importlib.import_module(module_path)
                 class_name = parts[-1]
-                cls = getattr(module, class_name)
-                source = inspect.getsource(cls)
+                class_obj = getattr(module, class_name)
+                source = inspect.getsource(class_obj)
                 indent = 1
 
             except ImportError:
@@ -296,12 +318,12 @@ def get_source_code(path):
                 module = importlib.import_module(module_path)
                 class_name = parts[-2]
                 method_name = parts[-1]
-                cls = getattr(module, class_name)
-                meth = getattr(cls, method_name)
-                source = inspect.getsource(meth)
+                class_obj = getattr(module, class_name)
+                method_obj = getattr(class_obj, method_name)
+                source = inspect.getsource(method_obj)
                 indent = 2
 
-    return remove_leading_trailing_whitespace_lines(source), indent, module, cls
+    return remove_leading_trailing_whitespace_lines(source), indent, module, class_obj, method_obj
 
 
 def remove_raise_skip_tests(src):
@@ -398,18 +420,21 @@ def split_source_into_input_blocks(src):
         List of input code sections.
     """
     input_blocks = []
-
     current_block = []
 
-    for line in src.split('\n'):
+    for line in src.splitlines():
         if 'print(">>>>>' in line:
-            input_blocks.append('\n'.join(current_block))
+            tag = line.split('"')[1]
+            code = '\n'.join(current_block)
+            input_blocks.append(InputBlock(code, tag))
             current_block = []
         else:
             current_block.append(line)
 
-    if current_block and current_block[0]:
-        input_blocks.append('\n'.join(current_block))
+    if len(current_block) > 0:
+        # final input block, with no associated output
+        code = '\n'.join(current_block)
+        input_blocks.append(InputBlock(code, ''))
 
     return input_blocks
 
@@ -429,16 +454,17 @@ def insert_output_start_stop_indicators(src):
         String with output demarked.
     """
     lines = src.split('\n')
-    print_producing = ['.setup(',
-                       'print(',
-                       '.run_model(',
-                       '.run_driver(',
-                       '.check_partials(',
-                       '.check_totals(',
-                       '.list_inputs(',
-                       '.list_outputs(',
-                       '.list_problem_vars(',
-                       ]
+    print_producing = [
+        'print(',
+        '.setup(',
+        '.run_model(',
+        '.run_driver(',
+        '.check_partials(',
+        '.check_totals(',
+        '.list_inputs(',
+        '.list_outputs(',
+        '.list_problem_vars(',
+    ]
 
     newlines = []
     input_block_number = 0
@@ -488,32 +514,41 @@ def insert_output_start_stop_indicators(src):
     return '\n'.join(newlines)
 
 
-def clean_up_empty_output_blocks(input_blocks, output_blocks):
-    """Some of the blocks do not generate output. We only want to have
-    input blocks that have outputs.
+def consolidate_input_blocks(input_blocks, output_blocks):
     """
+    Merge any input blocks for which there is no corresponding output
+    with subsequent blocks that do have output.
 
+    Remove any leading and trailing blank lines from all input blocks.
+    """
     new_input_blocks = []
-    new_output_blocks = []
-    current_in_block = ''
+    new_block = ''
 
-    for in_block, out_block in zip(input_blocks, output_blocks):
-        if current_in_block and not current_in_block.endswith('\n'):
-            current_in_block += '\n'
-        current_in_block += in_block
-        if out_block:
-            current_in_block = remove_leading_trailing_whitespace_lines(current_in_block)
-            out_block = remove_leading_trailing_whitespace_lines(out_block)
-            new_input_blocks.append(current_in_block)
-            new_output_blocks.append(out_block)
-            current_in_block = ''
+    for (code, tag) in input_blocks:
+        if tag not in output_blocks:
+            # no output, add to new consolidated block
+            if new_block and not new_block.endswith('\n'):
+                new_block += '\n'
+            new_block += code
+        elif new_block:
+            # add current input to new consolidated block and save
+            if new_block and not new_block.endswith('\n'):
+                new_block += '\n'
+            new_block += code
+            new_block = remove_leading_trailing_whitespace_lines(new_block)
+            new_input_blocks.append(InputBlock(new_block, tag))
+            new_block = ''
+        else:
+            # just strip leading/trailing from input block
+            code = remove_leading_trailing_whitespace_lines(code)
+            new_input_blocks.append(InputBlock(code, tag))
 
-    # if there was no output, return the one input block and empty output block
-    if current_in_block:
-        new_input_blocks.append(current_in_block)
-        new_output_blocks.append('')
+    # trailing input with no corresponding output
+    if new_block:
+        new_block = remove_leading_trailing_whitespace_lines(new_block)
+        new_input_blocks.append(InputBlock(new_block, ''))
 
-    return new_input_blocks, new_output_blocks
+    return new_input_blocks
 
 
 def extract_output_blocks(run_output):
@@ -527,45 +562,94 @@ def extract_output_blocks(run_output):
 
     Returns
     -------
-    list of str
-        List containing output text blocks.
+    dict
+        output blocks keyed on tags like ">>>>>4"
     """
-
-    # Look for start and end lines that look like this:
-    #  <<<<<4
-    #  >>>>>4
-
     if isinstance(run_output, list):
         return sync_multi_output_blocks(run_output)
 
-    output_blocks = []
+    output_blocks = {}
     output_block = None
 
     for line in run_output.splitlines():
         if output_block is None:
             output_block = []
         if line[:5] == '>>>>>':
-            output_blocks.append('\n'.join(output_block))
+            output = ('\n'.join(output_block)).strip()
+            if output:
+                output_blocks[line] = output
             output_block = None
         else:
             output_block.append(line)
 
     if output_block is not None:
-        output_blocks.append('\n'.join(output_block))
+        # It is possible to have trailing output
+        # (e.g. if the last print_producing statement is in a try block)
+        output_blocks['Trailing'] = output_block
 
     return output_blocks
 
 
+def strip_decorators(src):
+    """
+    Remove any decorators from the source code of the method or function.
+
+    Parameters
+    ----------
+    src : str
+        Source code
+
+    Returns
+    -------
+    str
+        Source code minus any decorators
+    """
+    class Parser(ast.NodeVisitor):
+        def __init__(self):
+            self.function_node = None
+
+        def visit_FunctionDef(self, node):
+            self.function_node = node
+
+        def get_function(self):
+            return self.function_node
+
+    tree = ast.parse(src)
+    parser = Parser()
+    parser.visit(tree)
+
+    # get node for the first function
+    function_node = parser.get_function()
+    if not function_node.decorator_list:  # no decorators so no changes needed
+        return src
+
+    # Unfortunately, the ast library, for a decorated function, returns the line
+    #   number for the first decorator when asking for the line number of the function
+    # So using the line number for the argument for of the function, which is always
+    #   correct. But we assume that the argument is on the same line as the function.
+    # We also assume there IS an argument. If not, we raise an error.
+    if function_node.args.args:
+        function_lineno = function_node.args.args[0].lineno
+    else:
+        raise RuntimeError("Cannot determine line number for decorated function without args")
+    lines = src.splitlines()
+
+    undecorated_src = '\n'.join(lines[function_lineno - 1:])
+
+    return undecorated_src
+
+
 def strip_header(src):
     """
-    Directly manipulating function text to strip header.
+    Directly manipulating function text to strip header, usually or maybe always just the
+    "def" lines for a method or function.
 
     This function assumes that the docstring and header, if any, have already been removed.
 
     Parameters
     ----------
     src : str
-        sourec code for method
+        source code
     """
     lines = src.split('\n')
     first_len = None
@@ -590,7 +674,7 @@ def dedent(src):
     Parameters
     ----------
     src : str
-        sourec code for method
+        source code
     """
 
     lines = src.split('\n')
@@ -603,30 +687,37 @@ def dedent(src):
     return ''
 
 
-def sync_multi_output_blocks(blocks):
+def sync_multi_output_blocks(run_output):
     """
     Combine output from different procs into the same output blocks.
 
     Parameters
     ----------
-    blocks : list of str
+    run_output : list of dict
         List of outputs from individual procs.
 
     Returns
     -------
-    list of list of str
-        List of synced output blocks from all procs.
+    dict
+        Synced output blocks from all procs.
     """
-    if blocks:
-        split_blocks = [extract_output_blocks(b) for b in blocks]
-        n_out_blocks = len(split_blocks[0])
-        synced_blocks = []
-        for i in range(n_out_blocks):
-            synced_blocks.append('\n'.join(["(rank %d) %s" % (j, m[i])
-                for j, m in enumerate(split_blocks) if m[i]]))
+    if run_output:
+        # for each proc's run output, get a dict of output blocks keyed by tag
+        proc_output_blocks = [extract_output_blocks(outp) for outp in run_output]
+
+        synced_blocks = {}
+
+        for i, outp in enumerate(proc_output_blocks):
+            for tag in outp:
+                if str(outp[tag]).strip():
+                    if tag in synced_blocks:
+                        synced_blocks[tag] += "(rank %d) %s\n" % (i, outp[tag])
+                    else:
+                        synced_blocks[tag] = "(rank %d) %s\n" % (i, outp[tag])
+
         return synced_blocks
     else:
-        return []
+        return {}
 
 
 def run_code(code_to_run, path, module=None, cls=None, shows_plot=False, imports_not_required=False):
@@ -670,7 +761,7 @@ def run_code(code_to_run, path, module=None, cls=None, shows_plot=False, imports
             env['OPENMDAO_CURRENT_MODULE'] = module.__name__
             env['OPENMDAO_CODE_TO_RUN'] = code_to_run
 
-            p = subprocess.Popen(['mpirun', '-n', str(N_PROCS), 'python', _sub_runner],
+            p = subprocess.Popen(['mpirun', '-n', str(N_PROCS), sys.executable, _sub_runner],
                                  env=env)
             p.wait()
 
@@ -688,7 +779,7 @@ def run_code(code_to_run, path, module=None, cls=None, shows_plot=False, imports
                 with os.fdopen(fd, 'w') as tmp:
                     tmp.write(code_to_run)
                 try:
-                    p = subprocess.Popen(['python', code_to_run_path],
+                    p = subprocess.Popen([sys.executable, code_to_run_path],
                                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=os.environ)
                     output, _ = p.communicate()
                     if p.returncode != 0:
@@ -702,7 +793,7 @@ def run_code(code_to_run, path, module=None, cls=None, shows_plot=False, imports
                 env['OPENMDAO_CURRENT_MODULE'] = module.__name__
                 env['OPENMDAO_CODE_TO_RUN'] = code_to_run
 
-                p = subprocess.Popen(['python', _sub_runner],
+                p = subprocess.Popen([sys.executable, _sub_runner],
                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
                 output, _ = p.communicate()
                 if p.returncode != 0:
@@ -715,7 +806,7 @@ def run_code(code_to_run, path, module=None, cls=None, shows_plot=False, imports
             # capture all output
             stdout = sys.stdout
             stderr = sys.stderr
-            strout = cStringIO()
+            strout = StringIO()
             sys.stdout = strout
             sys.stderr = strout
 
@@ -739,10 +830,11 @@ def run_code(code_to_run, path, module=None, cls=None, shows_plot=False, imports
 
                 try:
                     exec(code_to_run, globals_dict)
-                except Exception:
-                    # print code (with line numbers) to facilitate debugging
-                    for n, line in enumerate(code_to_run.split('\n')):
-                        print('%4d: %s' % (n, line), file=stderr)
+                except Exception as err:
+                    # for actual errors, print code (with line numbers) to facilitate debugging
+                    if not isinstance(err, unittest.SkipTest):
+                        for n, line in enumerate(code_to_run.split('\n')):
+                            print('%4d: %s' % (n, line), file=stderr)
                     raise
                 finally:
                     sys.stdout = stdout
@@ -778,17 +870,33 @@ def get_skip_output_node(output):
 
 
 def get_interleaved_io_nodes(input_blocks, output_blocks):
+    """
+    Parameters
+    ----------
+    input_blocks : list of tuple
+        Each tuple is a block of code and the tag marking it's output.
+
+    output_blocks : dict
+        Output blocks keyed on tag.
+    """
     nodelist = []
     n = 1
-    output_blocks = [cgiesc.escape(ob) for ob in output_blocks]
-    for input_block, output_block in zip(input_blocks, output_blocks):
-        input_node = nodes.literal_block(input_block, input_block)
+
+    for (code, tag) in input_blocks:
+        input_node = nodes.literal_block(code, code)
         input_node['language'] = 'python'
         nodelist.append(input_node)
-        if len(output_block) > 0:
-            output_node = in_or_out_node(kind="Out", number=n, text=output_block)
-            nodelist.append(output_node)
+        if tag and tag in output_blocks:
+            outp = cgiesc.escape(output_blocks[tag])
+            if (outp.strip()):
+                output_node = in_or_out_node(kind="Out", number=n, text=outp)
+                nodelist.append(output_node)
         n += 1
+
+    if 'Trailing' in output_blocks:
+        output_node = in_or_out_node(kind="Out", number=n, text=output_blocks['Trailing'])
+        nodelist.append(output_node)
+
     return nodelist
 
 

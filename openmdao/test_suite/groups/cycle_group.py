@@ -26,14 +26,12 @@ Note: 'theta' is unique only up to equivalence mod (2*pi)/(num_comp - 1). Test a
 depend on particular values of 'theta' (or 'x_i'/'y_i' values) without taking this in to account.
 """
 
-from __future__ import print_function, division
-from six.moves import range
 import numpy as np
 
-from openmdao.api import IndepVarComp
-from openmdao.test_suite.groups.parametric_group import ParametericTestGroup
+import openmdao.api as om
 from openmdao.test_suite.components.cycle_comps import PSI, \
     ExplicitCycleComp, ExplicitFirstComp, ExplicitLastComp
+from openmdao.test_suite.groups.parametric_group import ParametericTestGroup
 
 
 class CycleGroup(ParametericTestGroup):
@@ -118,8 +116,8 @@ class CycleGroup(ParametericTestGroup):
             'num_comp': self.options['num_comp']
         }
 
-        self.add_subsystem('psi_comp', IndepVarComp('psi', PSI))
-        indep_var_comp = self.add_subsystem('x0_comp', IndepVarComp())
+        self.add_subsystem('psi_comp', om.IndepVarComp('psi', PSI))
+        indep_var_comp = self.add_subsystem('x0_comp', om.IndepVarComp())
         for i in range(num_var):
             indep_var_comp.add_output('x_{0}'.format(i), np.ones(var_shape))
 

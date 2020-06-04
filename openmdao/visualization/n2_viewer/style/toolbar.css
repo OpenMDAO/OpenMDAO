@@ -1,0 +1,444 @@
+/******************* Toolbar styling *******************/
+
+/* Search Bar */
+
+#searchbar-container {
+    align-self: flex-start;
+    display: flex;
+    align-items: center;
+    flex-direction: row;
+    margin-left: 12px;
+    margin-bottom: 20px;
+    z-index: 20;
+    overflow: visible;
+    height: 40px;
+}
+
+.search-button {
+    background-color: rgba(0, 0, 0, 0);
+    -moz-border-radius: 4px;
+    -webkit-border-radius: 4px;
+    border-radius: 4px;
+    border: 1px solid #aaa;
+    display: inline-block;
+    cursor: pointer;
+    color: #666666;
+    font-size: 16px;
+    text-align: center;
+    text-decoration: none;
+    width: 30px;
+    max-width: 30px;
+    height: 50px;
+    max-height: 50px;
+    margin: 30px 1px 2px 1px;
+    border: 0px solid rgba(0, 0, 0, 0);
+}
+
+#searchbar-and-label {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: -10px;
+}
+
+.searchbar {
+    width: 100%;
+    display: flex;
+    transition: border-color 0.5s, width 0.5s, margin-left 0.5s;
+    margin-left: 8px;
+    display: block;
+    border: 1px solid rgba(0, 0, 0, 0);
+    background-color: white;
+    border-top-right-radius: 25px;
+    border-bottom-right-radius: 25px;
+    padding: 8px 8px;
+    /* transition-delay: 0.5s; */
+    transition: border-color 0.5s, width 0.5s, margin-left 0.5s, visibility 0.5s;
+}
+
+.searchbar:focus {
+    background: lightcyan;
+}
+
+.searchbar-hidden {
+    overflow: hidden;
+    visibility: hidden;
+    width: 0px;
+    transition: border-color 0.5s, width 0.5s, margin-left 0.5s, visibility 0.5s;
+}
+
+.searchbar-visible {
+    overflow: visible;
+    visibility: visible;
+    width: 200px;
+    transition: border-color 0.5s, width 0.5s, margin-left 0.5s, visibility 0.5s;
+}
+
+.searchbar-visible .searchbar {
+    border-color: #03793f;
+}
+
+.searchbar-container label { 
+    font-size: 10pt;
+    color: black;
+    margin-left: 8px;
+    transition: font-size 0.2s;
+    transition-delay: 0.5s;
+    width: 200px;
+}
+
+/* Toolbar Container*/
+
+#toolbarLoc {
+    margin: 0;
+    padding: 0;
+    height: 615px;
+    width: 65px;
+    border-bottom-right-radius: 15px;
+    position: relative;
+    box-shadow: 20px 0px 35px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    left: -65px;
+    /* Start hidden */
+    transition: left 0.5s;
+    z-index: 5;
+    border-right: 1px solid gray;
+    border-bottom: 1px solid gray;
+}
+
+.toolbar {
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+    align-self: flex-start;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    padding: 0;
+    cursor: pointer;
+    position: relative;
+}
+
+.toolbar-hide-container {
+    background-color: white;
+    width: 15px;
+    height: 35px;
+    border-top-right-radius: 25%;
+    border-bottom-right-radius: 25%;
+
+    position: absolute;
+    top: 270px;
+    margin-left: 20px;
+    left: -20px;
+    /* Start hidden */
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    cursor: pointer;
+    z-index: 30;
+    transition: left 0.5s, transform 0.5s;
+    border-top: 1px solid gray;
+    border-right: 1px solid gray;
+    border-bottom: 1px solid gray;
+}
+
+.toolbar-hide-container:hover>.hide-toolbar-button {
+    color: green;
+    transform: scale(1.25);
+}
+
+.toolbar-hide-container i {
+    color: black;
+    margin-right: 5px;
+    cursor: pointer;
+    transform: rotate(-180deg);
+    /* Start hidden */
+    transition: color 0.4s, transform 0.4s;
+    font-size: 12px;
+}
+
+.toolbar-group-expandable {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    width: 0px;
+    padding: 2px 10px;
+    border-top-right-radius: 20px;
+    border-bottom-right-radius: 20px;
+    align-items: center;
+    max-width: 0;
+    opacity: 0;
+    min-height: 100%;
+    transition: opacity 1s, max-width 1s;
+
+}
+
+.toolbar-group-expandable p {
+    text-align: center;
+    color: white;
+    font-size: 10px;
+    margin: 0;
+}
+
+.toolbar-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 50px;
+    border-bottom-left-radius: 15px;
+    border-bottom-right-radius: 15px;
+    border-top-right-radius: 10px;
+    border-top-left-radius: 10px;
+    position: relative;
+}
+
+.expandable:hover>.toolbar-group-expandable {
+    opacity: 1;
+    width: auto;
+    max-width: 200px;
+    transition: opacity 1s, max-width 1s;
+    pointer-events: initial;
+}
+
+.expandable {
+    display: flex;
+    flex-direction: row;
+    align-self: flex-start;
+    align-items: center;
+}
+
+.expandable i:first-of-type {
+    margin-left: 15px;
+}
+
+.expandable>.toolbar-group-expandable {
+    pointer-events: none;
+}
+
+/* Toolbar Groups */
+
+.group-1 {
+    background-color: #98daba;
+    padding: 10px 0;
+    z-index: 5;
+}
+
+.group-2 {
+    background-color: #7dcda6;
+    padding: 20px 0 5px 0;
+    margin-top: -20px;
+    z-index: 4;
+    flex-direction: row;
+    align-items: center;
+}
+
+.group-3 {
+    background-color: #66b48e;
+    padding: 20px 0 5px 0;
+    margin-top: -20px;
+    z-index: 3;
+    height: 120px;
+}
+
+.group-4 {
+    background-color: #42926b;
+    padding: 20px 0 5px 0;
+    margin-top: -20px;
+    z-index: 2;
+}
+
+.group-5 {
+    background-color: #30684d;
+    padding: 20px 0 7px 0;
+    margin-top: -20px;
+    z-index: 1;
+}
+
+#collapse-expandable {
+    background-color: #7dcda6;
+}
+
+#connections-expandable {
+    background-color: #66b48e;
+}
+
+#solvers-expandable {
+    background-color: #66b48e;
+}
+
+#text-width-expandable {
+    background-color: #42926b;
+    display: flex;
+    align-items: center;
+}
+
+#text-width-expandable p {
+    color: white;
+    margin-left: 5px;
+    width: 20px;
+    font-weight: 600;
+}
+
+#model-height-expandable {
+    background-color: #42926b;
+    display: flex;
+    align-items: center;
+}
+
+#model-height-expandable p {
+    color: white;
+    margin-left: 5px;
+    width: 20px;
+    font-weight: 600;
+}
+
+#model-depth-expandable {
+    background-color: #42926b;
+    display: flex;
+    align-items: center;
+}
+
+#model-depth-expandable p {
+    color: white;
+    margin-left: 5px;
+    width: 20px;
+    font-weight: 600;
+}
+
+#depth-slider {
+    -webkit-transform: rotate(-180deg);
+    -moz-transform: rotate(-180deg);
+    transform: rotate(-180deg);
+}
+
+/* Icon Styling */
+
+.toolbar-group-expandable i {
+    padding: 0px 8px;
+}
+
+.icon-search {
+    color: #78d3a6;
+    font-size: 24px;
+}
+
+.toolbar .fas {
+    margin: 7px 0;
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.solver-button {
+    font-size: 25px !important;
+}
+
+.active-tab-icon {
+    color: #00ff00 !important;
+}
+
+.toolbar .fas:hover {
+    color: #aeffa4;
+}
+
+.caret {
+    opacity: 1;
+    color: white !important;
+    font-size: 15px !important;
+    margin-left: 5px !important;
+    transform: rotate('0deg');
+    transition: transform 0.4s, opacity 0.4s;
+}
+
+.expandable:hover>.caret {
+    transform: rotate(-180deg);
+    opacity: 0.5;
+    transition: transform 0.4s, opacity 0.4s;
+}
+
+#info-button {
+    font-size: 30px !important;
+    color: white;
+    opacity: 1;
+    transition: opacity 0.5s, color 0.5s;
+}
+
+#info-button:hover {
+    opacity: 0.7;
+}
+
+#question-button {
+    font-size: 30px !important;
+    opacity: 1;
+    color: white;
+}
+
+#question-button:hover {
+    opacity: 0.7;
+}
+
+/* Slider */
+
+.slider {
+    -webkit-appearance: none;
+    width: 100px;
+    height: 8px;
+    border-radius: 5px;
+    background: white;
+    outline: none;
+    opacity: 0.7;
+    -webkit-transition: 0.2s;
+    transition: opacity 0.2s, background 0.3s;
+    margin: 10px 0;
+}
+
+.slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #98daba;
+    cursor: pointer;
+}
+
+.slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #98daba;
+    cursor: pointer;
+}
+
+.slider datalist {
+    color: white;
+    display: flex;
+}
+
+#model-slider-label {
+    min-width: 30px;
+    text-align: center;
+}
+
+#model-slider-fit {
+    color: white;
+    background: #42926b;
+    border-radius: 40%;
+    border: 1px solid white;
+    padding: 5px;
+    font-weight: 600;
+    margin-left: 5px;
+    -webkit-transition: 0.2s;
+    transition: opacity 0.2s, background 0.3s;
+}
+
+#model-slider-fit:active {
+    background: #264c39;
+}
+
+.disabled-button {
+    color: #66b48e !important;
+}

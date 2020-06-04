@@ -96,7 +96,7 @@ class Mygroup(Group):
         self.add_constraint('c', lower=-3.)
 
 
-@unittest.skipIf(PETScVector is None, "PETSc is required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class DistributedRecorderTest(unittest.TestCase):
 
     N_PROCS = 2
@@ -117,19 +117,17 @@ class DistributedRecorderTest(unittest.TestCase):
 
     def test_distrib_record_system(self):
         prob = Problem()
-        prob.model = Group()
 
         try:
             prob.model.add_recorder(self.recorder)
         except RuntimeError as err:
-            msg = "Recording of Systems when running parallel code is not supported yet"
+            msg = "Group: Recording of Systems when running parallel code is not supported yet"
             self.assertEqual(str(err), msg)
         else:
             self.fail('RuntimeError expected.')
 
     def test_distrib_record_solver(self):
         prob = Problem()
-        prob.model = Group()
         try:
             prob.model.nonlinear_solver.add_recorder(self.recorder)
         except RuntimeError as err:
@@ -141,43 +139,43 @@ class DistributedRecorderTest(unittest.TestCase):
     def test_distrib_record_driver(self):
         size = 100  # how many items in the array
         prob = Problem()
-        prob.model = Group()
 
         prob.model.add_subsystem('des_vars', IndepVarComp('x', np.ones(size)), promotes=['x'])
         prob.model.add_subsystem('plus', DistributedAdder(size), promotes=['x', 'y'])
         prob.model.add_subsystem('summer', Summer(size), promotes=['y', 'sum'])
         prob.driver.recording_options['record_desvars'] = True
-        prob.driver.recording_options['record_responses'] = True
         prob.driver.recording_options['record_objectives'] = True
         prob.driver.recording_options['record_constraints'] = True
-        prob.driver.recording_options['includes'] = []
+        prob.driver.recording_options['includes'] = ['y']
         prob.driver.add_recorder(self.recorder)
 
         prob.model.add_design_var('x')
         prob.model.add_objective('sum')
 
-        prob.setup(check=False)
+        prob.setup()
 
         prob['x'] = np.ones(size)
 
         t0, t1 = run_driver(prob)
         prob.cleanup()
 
+        coordinate = [0, 'Driver', (0,)]
+
+        expected_desvars = {
+            "des_vars.x": prob['des_vars.x'],
+        }
+
+        expected_objectives = {
+            "summer.sum": prob['summer.sum'],
+        }
+
+        expected_outputs = expected_desvars.copy()
+        expected_outputs['plus.y'] = prob.get_val('plus.y', get_remote=True)
+
         if prob.comm.rank == 0:
-            coordinate = [0, 'Driver', (0,)]
-
-            expected_desvars = {
-                "des_vars.x": prob['des_vars.x'],
-            }
-
-            expected_objectives = {
-                "summer.sum": prob['summer.sum'],
-            }
-
-            expected_outputs = expected_desvars
             expected_outputs.update(expected_objectives)
 
-            expected_data = ((coordinate, (t0, t1), expected_outputs, None),)
+            expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
             assertDriverIterDataRecorded(self, expected_data, self.eps)
 
     def test_recording_remote_voi(self):
@@ -197,7 +195,6 @@ class DistributedRecorderTest(unittest.TestCase):
         driver = ScipyOptimizeDriver(disp=False)
 
         driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
         driver.recording_options['includes'] = ['par.G1.y', 'par.G2.y']
@@ -207,10 +204,10 @@ class DistributedRecorderTest(unittest.TestCase):
         # Create problem and run driver
         prob = Problem(model, driver)
         prob.add_recorder(self.recorder)
-        prob.setup()
+        prob.setup(mode='fwd')
 
         t0, t1 = run_driver(prob)
-        prob.record_iteration('final')
+        prob.record('final')
         t2 = time()
 
         prob.cleanup()
@@ -244,8 +241,8 @@ class DistributedRecorderTest(unittest.TestCase):
         if prob.comm.rank == 0:
             # Only on rank 0 do we have all the values. The all_vars variable is a list of
             # dicts from all ranks 0,1,... In this case, just ranks 0 and 1
-            dct = all_vars[-1]
-            for d in all_vars[:-1]:
+            dct = {}
+            for d in all_vars:
                 dct.update(d)
 
             expected_includes = {
@@ -257,7 +254,7 @@ class DistributedRecorderTest(unittest.TestCase):
 
             coordinate = [0, 'ScipyOptimize_SLSQP', (driver.iter_count-1,)]
 
-            expected_data = ((coordinate, (t0, t1), expected_outputs, None),)
+            expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
             assertDriverIterDataRecorded(self, expected_data, self.eps)
 
             expected_data = (('final', (t1, t2), expected_outputs),)

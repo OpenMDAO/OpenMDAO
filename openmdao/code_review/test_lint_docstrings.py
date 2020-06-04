@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 import ast
 import unittest
 import os.path
@@ -8,7 +6,6 @@ import inspect
 import textwrap
 import collections
 import re
-from six import PY3
 
 try:
     from numpydoc.docscrape import NumpyDocString
@@ -241,12 +238,8 @@ class LintTestCase(unittest.TestCase):
         # Do require documentation of *args and **kwargs
         if argspec.varargs:
             arg_set |= {'*' + argspec.varargs}
-        if PY3:
-            if argspec.varkw:
-                arg_set |= {'**' + argspec.varkw}
-        else:
-            if argspec.keywords:
-                arg_set |= {'**' + argspec.keywords}
+        if argspec.varkw:
+            arg_set |= {'**' + argspec.varkw}
 
         if len(arg_set) >= 1:
             if not numpy_doc_string['Parameters']:
@@ -368,10 +361,7 @@ class LintTestCase(unittest.TestCase):
             with information about every failure. Form is
             { 'dir_name/file_name:class_name.method_name': [ messages ] }
         """
-        if PY3:
-            argspec = inspect.getfullargspec(method)
-        else:
-            argspec = inspect.getargspec(method)
+        argspec = inspect.getfullargspec(method)
         doc = inspect.getdoc(method)
 
         new_failures = []
@@ -467,10 +457,7 @@ class LintTestCase(unittest.TestCase):
             { 'dir_name/file_name:class_name.method_name': [ messages ] }
         """
 
-        if PY3:
-            argspec = inspect.getfullargspec(func)
-        else:
-            argspec = inspect.getargspec(func)
+        argspec = inspect.getfullargspec(func)
         doc = inspect.getdoc(func)
 
         new_failures = []
@@ -521,7 +508,7 @@ class LintTestCase(unittest.TestCase):
 
             # Loop over files
             for file_name in os.listdir(dirpath):
-                if file_name != '__init__.py' and file_name[-3:] == '.py' and not os.path.isdir(file_name):
+                if not file_name.startswith("_") and file_name[-3:] == '.py' and not os.path.isdir(file_name):
                     if print_info:
                         print(file_name)
 

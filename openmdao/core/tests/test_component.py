@@ -1,11 +1,6 @@
 """Component unittests."""
-from __future__ import division
-
 import numpy as np
 import unittest
-
-from six.moves import range
-from six import assertRaisesRegex
 
 from openmdao.api import Problem, ExplicitComponent, Group, IndepVarComp
 from openmdao.core.component import Component
@@ -13,7 +8,7 @@ from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimple
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
 from openmdao.test_suite.components.impl_comp_simple import TestImplCompSimple
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArray
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class TestExplicitComponent(unittest.TestCase):
@@ -21,7 +16,7 @@ class TestExplicitComponent(unittest.TestCase):
     def test___init___simple(self):
         """Test a simple explicit component."""
         comp = TestExplCompSimple()
-        prob = Problem(comp).setup(check=False)
+        prob = Problem(comp).setup()
 
         # check optional metadata (desc)
         self.assertEqual(
@@ -37,17 +32,17 @@ class TestExplicitComponent(unittest.TestCase):
         prob['length'] = 3.
         prob['width'] = 2.
         prob.run_model()
-        assert_rel_error(self, prob['area'], 6.)
+        assert_near_equal(prob['area'], 6.)
 
     def test___init___array(self):
         """Test an explicit component with array inputs/outputs."""
         comp = TestExplCompArray(thickness=1.)
-        prob = Problem(comp).setup(check=False)
+        prob = Problem(comp).setup()
 
         prob['lengths'] = 3.
         prob['widths'] = 2.
         prob.run_model()
-        assert_rel_error(self, prob['total_volume'], 24.)
+        assert_near_equal(prob['total_volume'], 24.)
 
     def test_error_handling(self):
         """Test error handling when adding inputs/outputs."""
@@ -55,31 +50,31 @@ class TestExplicitComponent(unittest.TestCase):
 
         msg = "Incompatible shape for '.*': Expected (.*) but got (.*)"
 
-        with assertRaisesRegex(self, ValueError, msg):
+        with self.assertRaisesRegex(ValueError, msg):
             comp.add_output('arr', val=np.ones((2, 2)), shape=([2]))
 
-        with assertRaisesRegex(self, ValueError, msg):
+        with self.assertRaisesRegex(ValueError, msg):
             comp.add_input('arr', val=np.ones((2, 2)), shape=([2]))
 
         msg = "Shape of indices does not match shape for '.*': Expected (.*) but got (.*)"
 
-        with assertRaisesRegex(self, ValueError, msg):
+        with self.assertRaisesRegex(ValueError, msg):
             comp.add_input('arr', val=np.ones((2, 2)), src_indices=[0, 1])
 
         msg = ("The shape argument should be an int, tuple, or list "
                "but a '<(.*) 'numpy.ndarray'>' was given")
-        with assertRaisesRegex(self, TypeError, msg):
+        with self.assertRaisesRegex(TypeError, msg):
             comp.add_output('arr', shape=np.array([2.]))
 
-        with assertRaisesRegex(self, TypeError, msg):
+        with self.assertRaisesRegex(TypeError, msg):
             comp.add_input('arr', shape=np.array([2.]))
 
         msg = ("The shape argument should be an int, tuple, or list "
                "but a '<(.*) 'float'>' was given")
-        with assertRaisesRegex(self, TypeError, msg):
+        with self.assertRaisesRegex(TypeError, msg):
             comp.add_output('arr', shape=2.)
 
-        with assertRaisesRegex(self, TypeError, msg):
+        with self.assertRaisesRegex(TypeError, msg):
             comp.add_input('arr', shape=2.)
 
         # check that a numpy integer type is accepted for shape
@@ -87,104 +82,100 @@ class TestExplicitComponent(unittest.TestCase):
         comp.add_output('aro', shape=shapes[0])
         comp.add_input('ari', shape=shapes[0])
 
-        msg = "The name argument should be a string"
-        name = 3
-
-        with assertRaisesRegex(self, TypeError, msg):
-            comp.add_input(name, val=np.ones((2, 2)))
-
-        with assertRaisesRegex(self, TypeError, msg):
-            comp.add_output(name, val=np.ones((2, 2)))
-
         msg = 'The val argument should be a float, list, tuple, ndarray or Iterable'
         val = Component
 
-        with assertRaisesRegex(self, TypeError, msg):
+        with self.assertRaisesRegex(TypeError, msg):
             comp.add_input('x', val=val)
 
-        with assertRaisesRegex(self, TypeError, msg):
+        with self.assertRaisesRegex(TypeError, msg):
             comp.add_output('x', val=val)
 
         msg = 'The src_indices argument should be an int, list, tuple, ndarray or Iterable'
         src = Component
 
-        with assertRaisesRegex(self, TypeError, msg):
+        with self.assertRaisesRegex(TypeError, msg):
             comp.add_input('x', val=np.ones((2, 2)), src_indices=src)
 
         msg = 'The units argument should be a str or None'
         units = Component
 
-        with assertRaisesRegex(self, TypeError, msg):
+        with self.assertRaisesRegex(TypeError, msg):
             comp.add_input('x', val=np.ones((2, 2)), units=units)
 
-        with assertRaisesRegex(self, TypeError, msg):
+        with self.assertRaisesRegex(TypeError, msg):
             comp.add_output('x', val=np.ones((2, 2)), units=units)
 
         msg = 'The ref argument should be a float, list, tuple, ndarray or Iterable'
         val = Component
 
-        with assertRaisesRegex(self, TypeError, msg):
+        with self.assertRaisesRegex(TypeError, msg):
             comp.add_output('x', val=5.0, ref=val)
 
         msg = 'The ref0 argument should be a float, list, tuple, ndarray or Iterable'
         val = Component
 
-        with assertRaisesRegex(self, TypeError, msg):
+        with self.assertRaisesRegex(TypeError, msg):
             comp.add_output('x', val=5.0, ref0=val)
 
         msg = 'The res_ref argument should be a float, list, tuple, ndarray or Iterable'
         val = Component
 
-        with assertRaisesRegex(self, TypeError, msg):
+        with self.assertRaisesRegex(TypeError, msg):
             comp.add_output('x', val=5.0, res_ref=val)
 
         msg = 'The res_units argument should be a str or None'
         units = Component
 
-        with assertRaisesRegex(self, TypeError, msg):
+        with self.assertRaisesRegex(TypeError, msg):
             comp.add_output('x', val=5.0, res_units=val)
 
+    def test_invalid_name(self):
+        comp = ExplicitComponent()
+
+        add_input_methods = [comp.add_input, comp.add_discrete_input]
+        add_output_methods = [comp.add_output, comp.add_discrete_output]
+
         # Test some forbidden names.
+        invalid_names = ['a.b', 'a*b', 'a?b', 'a!', '[a', 'b]']
+        invalid_error = "ExplicitComponent: '%s' is not a valid %s name."
 
-        msg = "'x.y' is not a valid input name."
-        with assertRaisesRegex(self, NameError, msg):
-            comp.add_input('x.y', val=5.0)
+        nostr_names = [3, None, object, object()]
+        nostr_error = "ExplicitComponent: The name argument should be a string."
 
-        msg = "'*' is not a valid input name."
-        with assertRaisesRegex(self, NameError, msg):
-            comp.add_input('*', val=5.0)
+        empty_in_error = "ExplicitComponent: '' is not a valid input name."
+        empty_out_error = "ExplicitComponent: '' is not a valid output name."
 
-        msg = "'?' is not a valid input name."
-        with assertRaisesRegex(self, NameError, msg):
-            comp.add_input('?', val=5.0)
+        for func in add_input_methods:
+            for name in invalid_names:
+                with self.assertRaises(NameError) as cm:
+                    func(name, val=5.0)
+                self.assertEqual(str(cm.exception), invalid_error % (name, 'input'))
 
-        msg = r"'\[' is not a valid input name."
-        with assertRaisesRegex(self, NameError, msg):
-            comp.add_input('[', val=5.0)
+            for name in nostr_names:
+                with self.assertRaises(TypeError) as cm:
+                    func(name, val=5.0)
+                self.assertEqual(str(cm.exception), nostr_error)
 
-        msg = r"'\]' is not a valid input name."
-        with assertRaisesRegex(self, NameError, msg):
-            comp.add_input(']', val=5.0)
+            with self.assertRaises(NameError) as cm:
+                func('', val=5.0)
+            self.assertEqual(str(cm.exception), empty_in_error)
 
-        msg = "'x.y' is not a valid output name."
-        with assertRaisesRegex(self, NameError, msg):
-            comp.add_output('x.y', val=5.0)
+        for func in add_output_methods:
+            for name in invalid_names:
+                with self.assertRaises(NameError) as cm:
+                    func(name, val=5.0)
+                self.assertEqual(str(cm.exception), invalid_error % (name, 'output'))
 
-        msg = "'*' is not a valid output name."
-        with assertRaisesRegex(self, NameError, msg):
-            comp.add_output('*', val=5.0)
+            for name in nostr_names:
+                with self.assertRaises(TypeError) as cm:
+                    func(name, val=5.0)
+                self.assertEqual(str(cm.exception), nostr_error)
 
-        msg = "'?' is not a valid output name."
-        with assertRaisesRegex(self, NameError, msg):
-            comp.add_output('?', val=5.0)
+            with self.assertRaises(NameError) as cm:
+                func('', val=5.0)
+            self.assertEqual(str(cm.exception), empty_out_error)
 
-        msg = r"'\[' is not a valid output name."
-        with assertRaisesRegex(self, NameError, msg):
-            comp.add_output('[', val=5.0)
-
-        msg = r"'\]' is not a valid output name."
-        with assertRaisesRegex(self, NameError, msg):
-            comp.add_output(']', val=5.0)
 
         # Stuff we allow.
         comp.add_input('a:b', val=5.0)
@@ -210,15 +201,15 @@ class TestExplicitComponent(unittest.TestCase):
                 self.add_output('y', val=0.0)
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
         comp = model.add_subsystem('comp', MyComp())
 
-        prob.setup(check=False)
+        prob.setup()
         self.assertEqual(comp._var_abs_names['input'], ['comp.x'])
         self.assertEqual(comp._var_abs_names['output'], ['comp.y'])
 
         prob.run_model()
-        prob.setup(check=False)
+        prob.setup()
         self.assertEqual(comp._var_abs_names['input'], ['comp.x'])
         self.assertEqual(comp._var_abs_names['output'], ['comp.y'])
 
@@ -231,15 +222,15 @@ class TestExplicitComponent(unittest.TestCase):
                 self.add_output('y', val=3.0)
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
         model.add_subsystem('px', IndepVarComp('x', val=3.0))
         model.add_subsystem('comp', Comp())
 
         model.connect('px.x', 'comp.x')
 
         msg = "Variable name 'x' already exists."
-        with assertRaisesRegex(self, ValueError, msg):
-            prob.setup(check=False)
+        with self.assertRaisesRegex(ValueError, msg):
+            prob.setup()
 
         class Comp(ExplicitComponent):
             def setup(self):
@@ -248,15 +239,15 @@ class TestExplicitComponent(unittest.TestCase):
                 self.add_output('y', val=3.0)
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
         model.add_subsystem('px', IndepVarComp('x', val=3.0))
         model.add_subsystem('comp', Comp())
 
         model.connect('px.x', 'comp.x')
 
         msg = "Variable name 'y' already exists."
-        with assertRaisesRegex(self, ValueError, msg):
-            prob.setup(check=False)
+        with self.assertRaisesRegex(ValueError, msg):
+            prob.setup()
 
         class Comp(ExplicitComponent):
             def setup(self):
@@ -265,15 +256,15 @@ class TestExplicitComponent(unittest.TestCase):
                 self.add_output('y', val=3.0)
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
         model.add_subsystem('px', IndepVarComp('x', val=3.0))
         model.add_subsystem('comp', Comp())
 
         model.connect('px.x', 'comp.x')
 
         msg = "Variable name 'x' already exists."
-        with assertRaisesRegex(self, ValueError, msg):
-            prob.setup(check=False)
+        with self.assertRaisesRegex(ValueError, msg):
+            prob.setup()
 
         # Make sure we can reconfigure.
 
@@ -283,16 +274,16 @@ class TestExplicitComponent(unittest.TestCase):
                 self.add_output('y', val=3.0)
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
         model.add_subsystem('px', IndepVarComp('x', val=3.0))
         model.add_subsystem('comp', Comp())
 
         model.connect('px.x', 'comp.x')
 
-        prob.setup(check=False)
+        prob.setup()
 
         # pretend we reconfigured
-        prob.setup(check=False)
+        prob.setup()
 
 
 class TestImplicitComponent(unittest.TestCase):
@@ -303,20 +294,20 @@ class TestImplicitComponent(unittest.TestCase):
         a = np.abs(np.exp(0.5 * x) / x)
 
         comp = TestImplCompSimple()
-        prob = Problem(comp).setup(check=False)
+        prob = Problem(comp).setup()
 
         prob['a'] = a
         prob.run_model()
-        assert_rel_error(self, prob['x'], x)
+        assert_near_equal(prob['x'], x)
 
     def test___init___array(self):
         """Test an implicit component with array inputs/outputs."""
         comp = TestImplCompArray()
-        prob = Problem(comp).setup(check=False)
+        prob = Problem(comp).setup()
 
         prob['rhs'] = np.ones(2)
         prob.run_model()
-        assert_rel_error(self, prob['x'], np.ones(2))
+        assert_near_equal(prob['x'], np.ones(2))
 
 
 class TestRangePartials(unittest.TestCase):
@@ -361,11 +352,11 @@ class TestRangePartials(unittest.TestCase):
         comp = RangePartialsComp()
 
         prob = Problem(model=comp)
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['vSum'], np.array([2., 3., 4., 5.]), 0.00001)
-        assert_rel_error(self, prob['vProd'], np.array([0., 2., 4., 6.]), 0.00001)
+        assert_near_equal(prob['vSum'], np.array([2., 3., 4., 5.]), 0.00001)
+        assert_near_equal(prob['vProd'], np.array([0., 2., 4., 6.]), 0.00001)
 
 
 if __name__ == '__main__':

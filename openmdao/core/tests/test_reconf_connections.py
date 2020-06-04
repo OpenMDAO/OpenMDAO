@@ -6,8 +6,6 @@ Tests for absolute and promoted connections, for different nonlinear solvers.
 # FIXME With NonlinearRunOnce run_model() fails with ValueError (P.O.)
 # FIXME With Newton solver and NLBGS variable sizes are not updated. (P.O.)
 
-from __future__ import division
-
 import numpy as np
 import unittest
 
@@ -15,7 +13,7 @@ from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent
 from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.solvers.nonlinear.newton import NewtonSolver
 from openmdao.solvers.nonlinear.nonlinear_block_gs import NonlinearBlockGS
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class ReconfComp1(ExplicitComponent):
@@ -83,9 +81,9 @@ class TestReconfConnections(unittest.TestCase):
         p.run_model()
 
         totals = p.compute_totals(wrt=['x'], of=['y'])
-        assert_rel_error(self, p['x'], 3.0)
-        assert_rel_error(self, p['y'], 6.0)
-        assert_rel_error(self, totals['y', 'x'], [[2.0]])
+        assert_near_equal(p['x'], 3.0)
+        assert_near_equal(p['y'], 6.0)
+        assert_near_equal(totals['y', 'x'], [[2.0]])
 
         # Run the model again, which will trigger reconfiguration; counter = 2, size of y = 2
         p.run_model()  # Fails with ValueError
@@ -119,7 +117,7 @@ class TestReconfConnections(unittest.TestCase):
 
         p.model = model = Group()
         model.linear_solver = DirectSolver()
-        model.nonlinear_solver = NewtonSolver()
+        model.nonlinear_solver = NewtonSolver(solve_subsystems=False)
         model.add_subsystem('c1', IndepVarComp('x', 1.0), promotes_outputs=['x'])
         model.add_subsystem('c2', ReconfComp1(), promotes_inputs=['x'])
         model.add_subsystem('c3', ReconfComp2(), promotes_outputs=['f'])
@@ -137,7 +135,7 @@ class TestReconfConnections(unittest.TestCase):
 
         self.assertEqual(len(p['c2.y']), 2)
         self.assertEqual(len(p['c3.y']), 2)
-        assert_rel_error(self, p['c3.y'], [6., 6.])
+        assert_near_equal(p['c3.y'], [6., 6.])
 
     @unittest.expectedFailure
     def test_reconf_comp_connections_nlbgs_solver(self):
@@ -163,7 +161,7 @@ class TestReconfConnections(unittest.TestCase):
 
         self.assertEqual(len(p['c2.y']), 2)
         self.assertEqual(len(p['c3.y']), 2)
-        assert_rel_error(self, p['c3.y'], [6., 6.])
+        assert_near_equal(p['c3.y'], [6., 6.])
 
     @unittest.expectedFailure
     def test_promoted_connections_newton_solver(self):
@@ -171,7 +169,7 @@ class TestReconfConnections(unittest.TestCase):
 
         p.model = model = Group()
         model.linear_solver = DirectSolver()
-        model.nonlinear_solver = NewtonSolver()
+        model.nonlinear_solver = NewtonSolver(solve_subsystems=False)
         model.add_subsystem('c1', IndepVarComp('x', 1.0), promotes_outputs=['x'])
         model.add_subsystem('c2', ReconfComp1(), promotes_inputs=['x'], promotes_outputs=['y'])
         model.add_subsystem('c3', ReconfComp2(), promotes_inputs=['y'], promotes_outputs=['f'])
@@ -185,7 +183,7 @@ class TestReconfConnections(unittest.TestCase):
         # Run the model again, which will trigger reconfiguration; counter = 2, size of y = 2
         p.run_model()
         self.assertEqual(len(p['y']), 2)
-        assert_rel_error(self, p['y'], [6., 6.])
+        assert_near_equal(p['y'], [6., 6.])
 
     @unittest.expectedFailure
     def test_test_promoted_connections_nlbgs_solver(self):
@@ -194,6 +192,7 @@ class TestReconfConnections(unittest.TestCase):
         p.model = model = Group()
         model.linear_solver = DirectSolver()
         model.nonlinear_solver = NonlinearBlockGS()
+        model.nonlinear_solver.options['reraise_child_analysiserror'] = True
         model.add_subsystem('c1', IndepVarComp('x', 1.0), promotes_outputs=['x'])
         model.add_subsystem('c2', ReconfComp1(), promotes_inputs=['x'], promotes_outputs=['y'])
         model.add_subsystem('c3', ReconfComp2(), promotes_inputs=['y'], promotes_outputs=['f'])
@@ -207,7 +206,7 @@ class TestReconfConnections(unittest.TestCase):
         # Run the model again, which will trigger reconfiguration; counter = 2, size of y = 2
         p.run_model()
         self.assertEqual(len(p['y']), 2)
-        assert_rel_error(self, p['y'], [6., 6.])
+        assert_near_equal(p['y'], [6., 6.])
 
     def test_reconf_comp_not_connected(self):
         p = Problem()

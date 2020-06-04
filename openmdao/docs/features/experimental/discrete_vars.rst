@@ -11,16 +11,11 @@ can be any picklable python object.
 
 In explicit and implicit components, the user must call :code:`add_discrete_input` and
 :code:`add_discrete_output` to declare discrete variables in the :code:`setup` method.
-An example is given below that shows a component that has a discrete input along with
-continuous inputs and outputs.
 
+Methods for Adding Discrete Variables
+-------------------------------------
 
-.. embed-code::
-    openmdao.core.tests.test_discrete.DiscreteFeatureTestCase.test_feature_discrete
-    :layout: interleave
-
-Method Signatures
------------------
+Here are the methods used to add discrete variables to components.
 
 .. automethod:: openmdao.core.component.Component.add_discrete_input
     :noindex:
@@ -28,6 +23,8 @@ Method Signatures
 .. automethod:: openmdao.core.component.Component.add_discrete_output
     :noindex:
 
+Discrete Variable Considerations
+--------------------------------
 
 Discrete variables, like continuous ones, can be connected to each other using the :code:`connect`
 function or by promoting an input and an output to the same name.  The type of the output
@@ -40,8 +37,8 @@ must be a valid subclass of the type of the input or the connection will raise a
 
 If a component or group contains discrete variables, then the discrete inputs and/or outputs will
 be passed to the relevant API functions.  In general, if nonlinear inputs are passed to a function,
-then a discrete inputs arg will be added.  If nonlinear outputs are passed, then a discrete outputs
-arg will be added.  The signatures of the affected functions are shown below:
+then a discrete inputs argument will be added.  If nonlinear outputs are passed, then a discrete outputs
+argument will be added.  The signatures of the affected functions are shown below:
 
 
 .. automethod:: openmdao.core.explicitcomponent.ExplicitComponent.compute
@@ -53,6 +50,9 @@ arg will be added.  The signatures of the affected functions are shown below:
 .. automethod:: openmdao.core.explicitcomponent.ExplicitComponent.compute_partials
     :noindex:
 
+.. automethod:: openmdao.core.implicitcomponent.ImplicitComponent.apply_nonlinear
+    :noindex:
+
 .. automethod:: openmdao.core.implicitcomponent.ImplicitComponent.guess_nonlinear
     :noindex:
 
@@ -62,4 +62,20 @@ arg will be added.  The signatures of the affected functions are shown below:
 .. automethod:: openmdao.core.group.Group.guess_nonlinear
     :noindex:
 
+
+Discrete Variable Examples
+--------------------------
+
+An example is given below that shows an explicit component that has a discrete input along with
+continuous inputs and outputs.
+
+.. embed-code::
+    openmdao.core.tests.test_discrete.DiscreteFeatureTestCase.test_feature_discrete
+    :layout: interleave
+
+Similarly, discrete variables can be added to implicit components.
+
+.. embed-code::
+    openmdao.core.tests.test_discrete.DiscreteFeatureTestCase.test_feature_discrete_implicit
+    :layout: interleave
 

@@ -2,13 +2,11 @@
 
 import unittest
 
-from openmdao.api import Problem, ScipyKrylov, IndepVarComp, Group, ExplicitComponent, \
-     AnalysisError, ParallelGroup, ExecComp
-from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
+import openmdao.api as om
 from openmdao.test_suite.components.ae_tests import AEComp, AEDriver
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.groups.parallel_groups import ConvergeDivergeGroups
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.mpi import MPI
 
 try:
@@ -21,47 +19,47 @@ class TestNonlinearRunOnceSolver(unittest.TestCase):
 
     def test_converge_diverge_groups(self):
         # Test derivatives for converge-diverge-groups topology.
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model = ConvergeDivergeGroups()
 
-        model.linear_solver = ScipyKrylov()
-        model.nonlinear_solver = NonlinearRunOnce()
+        model.linear_solver = om.ScipyKrylov()
+        model.nonlinear_solver = om.NonlinearRunOnce()
 
-        model.g1.nonlinear_solver = NonlinearRunOnce()
-        model.g1.g2.nonlinear_solver = NonlinearRunOnce()
-        model.g3.nonlinear_solver = NonlinearRunOnce()
+        model.g1.nonlinear_solver = om.NonlinearRunOnce()
+        model.g1.g2.nonlinear_solver = om.NonlinearRunOnce()
+        model.g3.nonlinear_solver = om.NonlinearRunOnce()
 
         prob.set_solver_print(level=0)
         prob.setup(check=False, mode='fwd')
         prob.run_model()
 
         # Make sure value is fine.
-        assert_rel_error(self, prob['c7.y1'], -102.7, 1e-6)
+        assert_near_equal(prob['c7.y1'], -102.7, 1e-6)
 
     def test_undeclared_options(self):
         # Test that using options that should not exist in class cause an error
-        solver = NonlinearRunOnce()
+        solver = om.NonlinearRunOnce()
 
-        msg = "\"Option '%s' cannot be set because it has not been declared.\""
+        msg = "\"NonlinearRunOnce: Option '%s' cannot be set because it has not been declared.\""
 
-        for option in ['atol', 'rtol', 'maxiter', 'err_on_maxiter']:
+        for option in ['atol', 'rtol', 'maxiter', 'err_on_non_converge']:
             with self.assertRaises(KeyError) as context:
                 solver.options[option] = 1
 
             self.assertEqual(str(context.exception), msg % option)
 
     def test_feature_solver(self):
-        from openmdao.api import Problem, Group, NonlinearRunOnce, IndepVarComp
+        import openmdao.api as om
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
-        model.nonlinear_solver = NonlinearRunOnce()
+        model.nonlinear_solver = om.NonlinearRunOnce()
 
         prob.setup(check=False, mode='fwd')
 
@@ -70,27 +68,26 @@ class TestNonlinearRunOnceSolver(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, prob['f_xy'], 122.0)
+        assert_near_equal(prob['f_xy'], 122.0)
 
 
-@unittest.skipUnless(PETScVector, "PETSc is required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestNonlinearRunOnceSolverMPI(unittest.TestCase):
 
     N_PROCS = 2
 
-    @unittest.skipUnless(MPI, "MPI is not active.")
     def test_reraise_analylsis_error(self):
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 0.5))
-        model.add_subsystem('p2', IndepVarComp('x', 3.0))
-        sub = model.add_subsystem('sub', ParallelGroup())
+        model.add_subsystem('p1', om.IndepVarComp('x', 0.5))
+        model.add_subsystem('p2', om.IndepVarComp('x', 3.0))
+        sub = model.add_subsystem('sub', om.ParallelGroup())
 
         sub.add_subsystem('c1', AEComp())
         sub.add_subsystem('c2', AEComp())
 
-        model.add_subsystem('obj', ExecComp(['val = x1 + x2']))
+        model.add_subsystem('obj', om.ExecComp(['val = x1 + x2']))
 
         model.connect('p1.x', 'sub.c1.x')
         model.connect('p2.x', 'sub.c2.x')
@@ -99,7 +96,7 @@ class TestNonlinearRunOnceSolverMPI(unittest.TestCase):
 
         prob.driver = AEDriver()
 
-        prob.setup(check=False)
+        prob.setup()
 
         handled = prob.run_driver()
         self.assertTrue(handled)

@@ -3,8 +3,6 @@ Functions for making assertions about OpenMDAO Systems.
 """
 import numpy as np
 from math import isnan
-from six import raise_from
-from six.moves import zip
 
 import warnings
 import unittest
@@ -16,6 +14,7 @@ from openmdao.core.component import Component
 from openmdao.core.group import Group
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.utils.general_utils import pad_name, reset_warning_registry
+from openmdao.utils.general_utils import warn_deprecation
 
 
 @contextmanager
@@ -45,6 +44,33 @@ def assert_warning(category, msg):
             break
     else:
         raise AssertionError("Did not see expected %s: %s" % (category.__name__, msg))
+
+
+@contextmanager
+def assert_no_warning(category, msg):
+    """
+    Context manager asserting that a warning is not issued.
+
+    Parameters
+    ----------
+    category : class
+        The class of the warning.
+    msg : str
+        The text of the warning.
+
+    Raises
+    ------
+    AssertionError
+        If the warning is raised.
+    """
+    with reset_warning_registry():
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            yield
+
+    for warn in w:
+        if (issubclass(warn.category, category) and str(warn.message) == msg):
+            raise AssertionError("Found warning: ", msg)
 
 
 def assert_check_partials(data, atol=1e-6, rtol=1e-6):
@@ -77,40 +103,58 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6):
     len_absrel_width = len(absrel_header)
     norm_types = ['fwd-fd', 'rev-fd', 'fd-rev']
     len_norm_type_width = max(len(s) for s in norm_types)
+
     for comp in data:
-        # First do a pass to get the max widths for the columns. Also check to see if any over tol
-        #  in this Component
         len_wrt_width = len(wrt_header)
         len_norm_width = len(norm_value_header)
-        over_tol = False
-        for (var, wrt) in data[comp]:
-            for error_type, tolerance in [('abs error', atol), ('rel error', rtol), ]:
-                actual = data[comp][var, wrt][error_type]
-                for norm, norm_type in zip(actual, norm_types):
-                    if not np.isnan(norm):
-                        if not np.allclose(norm, 0.0, atol=tolerance):
-                            over_tol = True
-                            wrt_string = '{0} wrt {1}'.format(var, wrt)
-                            norm_string = '{}'.format(norm)
-                            len_wrt_width = max(len_wrt_width, len(wrt_string))
-                            len_norm_width = max(len_norm_width, len(norm_string))
+        bad_derivs = []
 
-        if over_tol:
+        # Find all derivatives whose errors exceed tolerance.
+        # Also, size the output to precompute column extents.
+        for (var, wrt) in data[comp]:
+            pair_data = data[comp][var, wrt]
+            for error_type, tolerance in [('abs error', atol), ('rel error', rtol), ]:
+                actual = pair_data[error_type]
+                for error_val, mode in zip(actual, norm_types):
+                    in_error = False
+
+                    if error_val is None:
+                        # Reverse derivatives only computed on matrix free comps.
+                        continue
+
+                    if not np.isnan(error_val):
+                        if not np.allclose(error_val, 0.0, atol=tolerance):
+
+                            if error_type == 'rel error' and mode == 'fwd-fd' and \
+                               np.allclose(pair_data['J_fwd'], 0.0, atol=atol) and \
+                               np.allclose(pair_data['J_fd'], 0.0, atol=atol):
+                                # Special case: both fd and fwd are really tiny, so we want to
+                                # ignore the rather large relative errors.
+                                in_error = False
+                            else:
+                                # This is a bona-fide error.
+                                in_error = True
+
+                    elif error_type == 'abs error' and mode == 'fwd-fd':
+                        # Either analytic or approximated derivatives contain a NaN.
+                        in_error = True
+
+                    if in_error:
+                        wrt_string = '{0} wrt {1}'.format(var, wrt)
+                        norm_string = '{}'.format(error_val)
+                        bad_derivs.append((wrt_string, norm_string, error_type, mode))
+                        len_wrt_width = max(len_wrt_width, len(wrt_string))
+                        len_norm_width = max(len_norm_width, len(norm_string))
+
+        if bad_derivs:
             comp_error_string = ''
-            for (var, wrt) in data[comp]:
-                for error_type, tolerance in [('abs error', atol), ('rel error', rtol), ]:
-                    actual = data[comp][var, wrt][error_type]
-                    for norm, norm_type in zip(actual, norm_types):
-                        if not np.isnan(norm):
-                            if not np.allclose(norm, 0.0, atol=tolerance):
-                                wrt_string = '{0} wrt {1}'.format(var, wrt)
-                                norm_string = '{}'.format(norm)
-                                err_msg = '{0} | {1} | {2} | {3}'.format(
-                                    pad_name(wrt_string, len_wrt_width),
-                                    pad_name(error_type.split()[0], len_absrel_width),
-                                    pad_name(norm_type, len_norm_type_width),
-                                    pad_name(norm_string, len_norm_width)) + '\n'
-                                comp_error_string += err_msg
+            for wrt_string, norm_string, error_type, mode in bad_derivs:
+                err_msg = '{0} | {1} | {2} | {3}'.format(
+                    pad_name(wrt_string, len_wrt_width),
+                    pad_name(error_type.split()[0], len_absrel_width),
+                    pad_name(mode, len_norm_type_width),
+                    pad_name(norm_string, len_norm_width)) + '\n'
+                comp_error_string += err_msg
 
             name_header = 'Component: {}\n'.format(comp)
             len_name_header = len(name_header)
@@ -163,16 +207,20 @@ def assert_no_approx_partials(system, include_self=True, recurse=True):
     AssertionError
         If a subsystem of group is found to be using approximated partials.
     """
-    approximated_partials = {}
+    has_approx_partials = False
     msg = 'The following components use approximated partials:\n'
     for s in system.system_iter(include_self=include_self, recurse=recurse):
         if isinstance(s, Component):
-            if s._approximated_partials:
-                approximated_partials[s.pathname] = s._approximated_partials
+            if s._approx_schemes:
+                has_approx_partials = True
+                approx_partials = [(k, v['method']) for k, v in s._declared_partials.items()
+                                   if 'method' in v and v['method']]
                 msg += '    ' + s.pathname + '\n'
-                for partial in s._approximated_partials:
-                    msg += '        of={0:12s}    wrt={1:12s}    method={2:2s}\n'.format(*partial)
-    if approximated_partials:
+                for key, method in approx_partials:
+                    msg += '        of={0:12s}    wrt={1:12s}    method={2:2s}\n'.format(key[0],
+                                                                                         key[1],
+                                                                                         method)
+    if has_approx_partials:
         raise AssertionError(msg)
 
 
@@ -225,6 +273,9 @@ def assert_rel_error(test_case, actual, desired, tolerance=1e-15):
     float
         The error.
     """
+    warn_deprecation("'assert_rel_error' has been deprecated. Use "
+                     "'assert_near_equal' instead.")
+
     if isinstance(actual, dict) and isinstance(desired, dict):
 
         actual_keys = set(actual.keys())
@@ -244,7 +295,7 @@ def assert_rel_error(test_case, actual, desired, tolerance=1e-15):
                 error = max(error, new_error)
             except test_case.failureException as exception:
                 msg = '{}: '.format(key) + str(exception)
-                raise_from(test_case.failureException(msg), None)
+                raise test_case.failureException(msg) from None
 
     elif isinstance(actual, float) and isinstance(desired, float):
         if isnan(actual) and not isnan(desired):
@@ -284,6 +335,94 @@ def assert_rel_error(test_case, actual, desired, tolerance=1e-15):
             else:
                 test_case.fail('arrays do not match, rel error %.3e > tol (%.3e)' %
                                (error, tolerance))
+
+    return error
+
+
+def assert_near_equal(actual, desired, tolerance=1e-15):
+    """
+    Check relative error.
+
+    Determine that the relative error between `actual` and `desired`
+    is within `tolerance`. If `desired` is zero, then use absolute error.
+
+    Parameters
+    ----------
+    actual : float, array-like, dict
+        The value from the test.
+    desired : float, array-like, dict
+        The value expected.
+    tolerance : float
+        Maximum relative error ``(actual - desired) / desired``.
+
+    Returns
+    -------
+    float
+        The error.
+    """
+    if isinstance(actual, dict) and isinstance(desired, dict):
+
+        actual_keys = set(actual.keys())
+        desired_keys = set(desired.keys())
+
+        if actual_keys.symmetric_difference(desired_keys):
+            msg = 'Actual and desired keys differ. Actual extra keys: {}, Desired extra keys: {}'
+            actual_extra = actual_keys.difference(desired_keys)
+            desired_extra = desired_keys.difference(actual_keys)
+            raise KeyError(msg.format(actual_extra, desired_extra))
+
+        error = 0.
+
+        for key in actual_keys:
+            try:
+                new_error = assert_near_equal(
+                    actual[key], desired[key], tolerance)
+                error = max(error, new_error)
+            except ValueError as exception:
+                msg = '{}: '.format(key) + str(exception)
+                raise ValueError(msg) from None
+            except KeyError as exception:
+                msg = '{}: '.format(key) + str(exception)
+                raise KeyError(msg) from None
+
+    elif isinstance(actual, float) and isinstance(desired, float):
+        if isnan(actual) and not isnan(desired):
+            raise ValueError('actual nan, desired %s' % desired)
+        if desired != 0:
+            error = (actual - desired) / desired
+        else:
+            error = actual
+        if abs(error) > tolerance:
+            raise ValueError('actual %s, desired %s, rel error %s, tolerance %s'
+                             % (actual, desired, error, tolerance))
+
+    # array values
+    else:
+        actual = np.atleast_1d(actual)
+        desired = np.atleast_1d(desired)
+        if actual.shape != desired.shape:
+            raise ValueError(
+                'actual and desired have differing shapes.'
+                ' actual {}, desired {}'.format(actual.shape, desired.shape))
+        if not np.all(np.isnan(actual) == np.isnan(desired)):
+            if actual.size == 1 and desired.size == 1:
+                raise ValueError('actual %s, desired %s' % (actual, desired))
+            else:
+                raise ValueError('actual and desired values have non-matching nan'
+                                 ' values')
+
+        if np.linalg.norm(desired) == 0:
+            error = np.linalg.norm(actual)
+        else:
+            error = np.linalg.norm(actual - desired) / np.linalg.norm(desired)
+
+        if abs(error) > tolerance:
+            if actual.size < 10 and desired.size < 10:
+                raise ValueError('actual %s, desired %s, rel error %s, tolerance %s'
+                                 % (actual, desired, error, tolerance))
+            else:
+                raise ValueError('arrays do not match, rel error %.3e > tol (%.3e)' %
+                                 (error, tolerance))
 
     return error
 

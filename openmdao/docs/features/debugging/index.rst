@@ -11,9 +11,9 @@ Sometimes things don't work. We have a set of tools and methods that you can use
 .. toctree::
     :maxdepth: 1
 
-    om_command.rst
     newton_solver_not_converging.rst
     listing_variables.rst
     debugging_drivers.rst
     debugging_solvers.rst
     profiling/index.rst
+    controlling_mpi.rst

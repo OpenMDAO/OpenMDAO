@@ -1,14 +1,12 @@
 """Define the implicit test component (simple)."""
-from __future__ import division, print_function
-
 import numpy as np
 import scipy.sparse
 import scipy.optimize
 
-from openmdao.api import ImplicitComponent
+import openmdao.api as om
 
 
-class TestImplCompSimple(ImplicitComponent):
+class TestImplCompSimple(om.ImplicitComponent):
 
     def setup(self):
         self.add_input('a', val=1.)

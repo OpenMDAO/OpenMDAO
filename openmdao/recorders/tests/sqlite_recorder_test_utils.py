@@ -1,19 +1,14 @@
-from six import iteritems, PY2, PY3
-
 import sqlite3
 import numpy as np
 import json
 
 from contextlib import contextmanager
 
-from openmdao.utils.record_util import format_iteration_coordinate, json_to_np_array
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.record_util import format_iteration_coordinate, deserialize
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.recorders.sqlite_recorder import blob_to_array, format_version
 
-if PY2:
-    import cPickle as pickle
-else:
-    import pickle
+import pickle
 
 
 @contextmanager
@@ -38,19 +33,15 @@ def get_format_version_abs2meta(db_cur):
 
     f_version = row[0]
 
-    # Need to also get abs2meta so that we can pass it to json_to_np_array
+    # Need to also get abs2meta so that we can pass it to deserialize
     if f_version >= 3:
         abs2meta = json.loads(row[1])
     elif f_version in (1, 2):
-        if PY2:
-            abs2meta = pickle.loads(str(row[1])) if row[1] is not None else None
-
-        if PY3:
-            try:
-                abs2meta = pickle.loads(row[1]) if row[1] is not None else None
-            except TypeError:
-                # Reading in a python 2 pickle recorded pre-OpenMDAO 2.4.
-                abs2meta = pickle.loads(row[1].encode()) if row[1] is not None else None
+        try:
+            abs2meta = pickle.loads(row[1]) if row[1] is not None else None
+        except TypeError:
+            # Reading in a python 2 pickle recorded pre-OpenMDAO 2.4.
+            abs2meta = pickle.loads(row[1].encode()) if row[1] is not None else None
 
     return f_version, abs2meta
 
@@ -71,10 +62,11 @@ def assertProblemDataRecorded(test, expected, tolerance):
             test.assertTrue(row_actual, 'Problem table does not contain the requested '
                             'case name: "{}"'.format(case))
 
-            counter, global_counter, case_name, timestamp, success, msg, outputs_text = row_actual
+            counter, global_counter, case_name, timestamp, success, msg, inputs_text, \
+                outputs_text, residuals_text, derivatives, abs_err, rel_err = row_actual
 
             if f_version >= 3:
-                outputs_actual = json_to_np_array(outputs_text, abs2meta)
+                outputs_actual = deserialize(outputs_text, abs2meta)
             elif f_version in (1, 2):
                 outputs_actual = blob_to_array(outputs_text)
 
@@ -94,13 +86,13 @@ def assertProblemDataRecorded(test, expected, tolerance):
                     actual = actual[0]
                     # Check to see if the number of values in actual and expected match
                     test.assertEqual(len(actual), len(expected))
-                    for key, value in iteritems(expected):
+                    for key, value in expected.items():
                         # Check to see if the keys in the actual and expected match
                         test.assertTrue(key in actual.dtype.names,
                                         '{} variable not found in actual data'
                                         ' from recorder'.format(key))
                         # Check to see if the values in actual and expected match
-                        assert_rel_error(test, actual[key], expected[key], tolerance)
+                        assert_near_equal(actual[key], expected[key], tolerance)
 
 
 def assertDriverIterDataRecorded(test, expected, tolerance, prefix=None):
@@ -111,7 +103,7 @@ def assertDriverIterDataRecorded(test, expected, tolerance, prefix=None):
         f_version, abs2meta = get_format_version_abs2meta(db_cur)
 
         # iterate through the cases
-        for coord, (t0, t1), outputs_expected, inputs_expected in expected:
+        for coord, (t0, t1), outputs_expected, inputs_expected, residuals_expected in expected:
             iter_coord = format_iteration_coordinate(coord, prefix=prefix)
             # from the database, get the actual data recorded
             db_cur.execute("SELECT * FROM driver_iterations WHERE "
@@ -124,11 +116,12 @@ def assertDriverIterDataRecorded(test, expected, tolerance, prefix=None):
                             'iteration coordinate: "{}"'.format(iter_coord))
 
             counter, global_counter, iteration_coordinate, timestamp, success, msg,\
-                inputs_text, outputs_text = row_actual
+                inputs_text, outputs_text, residuals_text = row_actual
 
             if f_version >= 3:
-                inputs_actual = json_to_np_array(inputs_text, abs2meta)
-                outputs_actual = json_to_np_array(outputs_text, abs2meta)
+                inputs_actual = deserialize(inputs_text, abs2meta)
+                outputs_actual = deserialize(outputs_text, abs2meta)
+                residuals_actual = deserialize(residuals_text, abs2meta)
             elif f_version in (1, 2):
                 inputs_actual = blob_to_array(inputs_text)
                 outputs_actual = blob_to_array(outputs_text)
@@ -141,7 +134,8 @@ def assertDriverIterDataRecorded(test, expected, tolerance, prefix=None):
 
             for vartype, actual, expected in (
                 ('outputs', outputs_actual, outputs_expected),
-                ('inputs', inputs_actual, inputs_expected)
+                ('inputs', inputs_actual, inputs_expected),
+                ('residuals', residuals_actual, residuals_expected)
             ):
 
                 if expected is None:
@@ -153,13 +147,13 @@ def assertDriverIterDataRecorded(test, expected, tolerance, prefix=None):
                     actual = actual[0]
                     # Check to see if the number of values in actual and expected match
                     test.assertEqual(len(actual), len(expected))
-                    for key, value in iteritems(expected):
+                    for key, value in expected.items():
                         # Check to see if the keys in the actual and expected match
                         test.assertTrue(key in actual.dtype.names,
                                         '{} variable not found in actual data'
                                         ' from recorder'.format(key))
                         # Check to see if the values in actual and expected match
-                        assert_rel_error(test, actual[key], expected[key], tolerance)
+                        assert_near_equal(actual[key], expected[key], tolerance)
 
 
 def assertDriverDerivDataRecorded(test, expected, tolerance, prefix=None):
@@ -205,13 +199,59 @@ def assertDriverDerivDataRecorded(test, expected, tolerance, prefix=None):
                 actual = totals_actual[0]
                 # Check to see if the number of values in actual and expected match
                 test.assertEqual(len(actual), len(totals_expected))
-                for key, value in iteritems(totals_expected):
+                for key, value in totals_expected.items():
                     # Check to see if the keys in the actual and expected match
                     test.assertTrue(key in actual.dtype.names,
                                     '{} variable not found in actual data'
                                     ' from recorder'.format(key))
                     # Check to see if the values in actual and expected match
-                    assert_rel_error(test, actual[key], totals_expected[key], tolerance)
+                    assert_near_equal(actual[key], totals_expected[key], tolerance)
+
+
+def assertProblemDerivDataRecorded(test, expected, tolerance, prefix=None):
+    """
+    Expected can be from multiple cases.
+    """
+    with database_cursor(test.filename) as db_cur:
+
+        # iterate through the cases
+        for case_name, (t0, t1), totals_expected in expected:
+
+            # from the database, get the actual data recorded
+            db_cur.execute("SELECT * FROM problem_cases WHERE "
+                           "case_name=:case_name",
+                           {"case_name": case_name})
+            row_actual = db_cur.fetchone()
+
+            test.assertTrue(row_actual,
+                            'Problem case table does not contain the requested '
+                            'case name: "{}"'.format(case_name))
+
+            counter, global_counter, case_name, timestamp, success, msg, inputs, outputs, \
+                residuals, totals_blob, abs_err, rel_err = \
+                row_actual
+
+            totals_actual = blob_to_array(totals_blob)
+
+            test.assertEqual(success, 1)
+            test.assertEqual(msg, '')
+
+            if totals_expected is None:
+                test.assertEqual(totals_actual.shape, (),
+                                 msg="Expected empty array derivatives in case recorder")
+            else:
+                test.assertNotEqual(totals_actual.shape[0], 0,
+                                    msg="Expected non-empty array derivatives in case recorder")
+                actual = totals_actual[0]
+                # Check to see if the number of values in actual and expected match
+                test.assertEqual(len(actual), len(totals_expected))
+                for key, value in totals_expected.items():
+                    # Check to see if the keys in the actual and expected match
+                    test.assertTrue(key in actual.dtype.names,
+                                    '{} variable not found in actual data'
+                                    ' from recorder'.format(key))
+                    # Check to see if the values in actual and expected match
+                    assert_near_equal(actual[key], totals_expected[key], tolerance)
 
 
 def assertSystemIterDataRecorded(test, expected, tolerance, prefix=None):
@@ -237,9 +277,9 @@ def assertSystemIterDataRecorded(test, expected, tolerance, prefix=None):
                 outputs_text, residuals_text = row_actual
 
             if f_version >= 3:
-                inputs_actual = json_to_np_array(inputs_text, abs2meta)
-                outputs_actual = json_to_np_array(outputs_text, abs2meta)
-                residuals_actual = json_to_np_array(residuals_text, abs2meta)
+                inputs_actual = deserialize(inputs_text, abs2meta)
+                outputs_actual = deserialize(outputs_text, abs2meta)
+                residuals_actual = deserialize(residuals_text, abs2meta)
             elif f_version in (1, 2):
                 inputs_actual = blob_to_array(inputs_text)
                 outputs_actual = blob_to_array(outputs_text)
@@ -265,13 +305,13 @@ def assertSystemIterDataRecorded(test, expected, tolerance, prefix=None):
                 else:
                     # Check to see if the number of values in actual and expected match
                     test.assertEqual(len(actual[0]), len(expected))
-                    for key, value in iteritems(expected):
+                    for key, value in expected.items():
                         # Check to see if the keys in the actual and expected match
                         test.assertTrue(key in actual[0].dtype.names,
                                         '{} variable not found in actual data '
                                         'from recorder'.format(key))
                         # Check to see if the values in actual and expected match
-                        assert_rel_error(test, actual[0][key], expected[key], tolerance)
+                        assert_near_equal(actual[0][key], expected[key], tolerance)
 
 
 def assertSolverIterDataRecorded(test, expected, tolerance, prefix=None):
@@ -299,8 +339,8 @@ def assertSolverIterDataRecorded(test, expected, tolerance, prefix=None):
                 abs_err, rel_err, input_blob, output_text, residuals_text = row_actual
 
             if f_version >= 3:
-                output_actual = json_to_np_array(output_text, abs2meta)
-                residuals_actual = json_to_np_array(residuals_text, abs2meta)
+                output_actual = deserialize(output_text, abs2meta)
+                residuals_actual = deserialize(residuals_text, abs2meta)
             elif f_version in (1, 2):
                 output_actual = blob_to_array(output_text)
                 residuals_actual = blob_to_array(residuals_text)
@@ -313,10 +353,10 @@ def assertSolverIterDataRecorded(test, expected, tolerance, prefix=None):
             test.assertEqual(msg, '')
             if expected_abs_error:
                 test.assertTrue(abs_err, 'Expected absolute error but none recorded')
-                assert_rel_error(test, abs_err, expected_abs_error, tolerance)
+                assert_near_equal(abs_err, expected_abs_error, tolerance)
             if expected_rel_error:
                 test.assertTrue(rel_err, 'Expected relative error but none recorded')
-                assert_rel_error(test, rel_err, expected_rel_error, tolerance)
+                assert_near_equal(rel_err, expected_rel_error, tolerance)
 
             for vartype, actual, expected in (
                     ('outputs', output_actual, expected_output),
@@ -331,13 +371,13 @@ def assertSolverIterDataRecorded(test, expected, tolerance, prefix=None):
                 else:
                     # Check to see if the number of values in actual and expected match
                     test.assertEqual(len(actual[0]), len(expected))
-                    for key, value in iteritems(expected):
+                    for key, value in expected.items():
                         # Check to see if the keys in the actual and expected match
                         test.assertTrue(key in actual[0].dtype.names,
                                         '{} variable not found in actual data '
                                         'from recorder'.format(key))
                         # Check to see if the values in actual and expected match
-                        assert_rel_error(test, actual[0][key], expected[key], tolerance)
+                        assert_near_equal(actual[0][key], expected[key], tolerance)
 
 
 def assertMetadataRecorded(test, expected_prom2abs, expected_abs2prom):
@@ -389,10 +429,16 @@ def assertViewerDataRecorded(test, expected):
         test.assertTrue(isinstance(model_viewer_data, dict))
 
         # primary keys
-        test.assertEqual(set(model_viewer_data.keys()), {
-            'tree', 'sys_pathnames_list', 'connections_list', 'abs2prom',
-            'driver', 'design_vars', 'responses'
-        })
+        if f_version >= 6:
+            test.assertEqual(set(model_viewer_data.keys()), {
+            'tree', 'sys_pathnames_list', 'connections_list',
+            'driver', 'design_vars', 'responses', 'declare_partials_list'
+            })
+        else:
+            test.assertEqual(set(model_viewer_data.keys()), {
+                'tree', 'sys_pathnames_list', 'connections_list', 'abs2prom',
+                'driver', 'design_vars', 'responses', 'declare_partials_list'
+            })
 
         # system pathnames
         test.assertTrue(isinstance(model_viewer_data['sys_pathnames_list'], list))
@@ -412,16 +458,18 @@ def assertViewerDataRecorded(test, expected):
         test.assertEqual(expected['tree_length'], len(tr))
 
         test.assertEqual({'name', 'type', 'subsystem_type', 'children', 'linear_solver',
-                          'nonlinear_solver', 'is_parallel', 'component_type'},
+                          'nonlinear_solver', 'is_parallel', 'component_type', 'class',
+                          'expressions'},
                          set(tr.keys()))
         test.assertEqual(expected['tree_children_length'],
                          len(model_viewer_data['tree']['children']))
 
-        # abs2prom map
-        abs2prom = model_viewer_data['abs2prom']
-        for io in ['input', 'output']:
-            for var in expected['abs2prom'][io]:
-                test.assertEqual(abs2prom[io][var], expected['abs2prom'][io][var])
+        if f_version < 6:
+            # abs2prom map
+            abs2prom = model_viewer_data['abs2prom']
+            for io in ['input', 'output']:
+                for var in expected['abs2prom'][io]:
+                    test.assertEqual(abs2prom[io][var], expected['abs2prom'][io][var])
 
 
 def assertSystemMetadataIdsRecorded(test, ids):

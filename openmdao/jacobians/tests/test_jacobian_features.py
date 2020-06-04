@@ -1,24 +1,24 @@
-from __future__ import print_function, division
-
+"""
+Unit and feature doc tests for partial derivative specifiation.
+"""
+import itertools
 import unittest
+
 import numpy as np
 import scipy as sp
-import itertools
 
-from six import iteritems
 
 try:
     from parameterized import parameterized
 except ImportError:
     from openmdao.utils.assert_utils import SkipParameterized as parameterized
 
-from openmdao.api import IndepVarComp, Group, Problem, ExplicitComponent, \
-                         ScipyKrylov, DirectSolver
+import openmdao.api as om
 
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 
 
-class SimpleComp(ExplicitComponent):
+class SimpleComp(om.ExplicitComponent):
     def setup(self):
         self.add_input('x', shape=1)
         self.add_input('y1', shape=2)
@@ -80,7 +80,7 @@ class SimpleCompGlob(SimpleComp):
         self.declare_partials('g', 'y[13]', val=[[1, 0], [1, 0], [0, 1], [0, 1]])
 
 
-class SimpleCompConst(ExplicitComponent):
+class SimpleCompConst(om.ExplicitComponent):
     def setup(self):
         self.add_input('x', shape=1)
         self.add_input('y1', shape=2)
@@ -167,8 +167,8 @@ class SimpleCompKwarg(SimpleComp):
 class TestJacobianFeatures(unittest.TestCase):
 
     def setUp(self):
-        self.model = model = Group()
-        comp = IndepVarComp()
+        self.model = model = om.Group()
+        comp = om.IndepVarComp()
         variables = (
             ('x', 1.),
             ('y1', np.ones(2)),
@@ -180,16 +180,16 @@ class TestJacobianFeatures(unittest.TestCase):
             comp.add_output(name, val)
         model.add_subsystem('input_comp', comp, promotes=['x', 'y1', 'y2', 'y3', 'z'])
 
-        self.problem = Problem(model=model)
+        self.problem = om.Problem(model=model)
         self.problem.set_solver_print(level=0)
-        model.linear_solver = ScipyKrylov(assemble_jac=True)
+        model.linear_solver = om.ScipyKrylov(assemble_jac=True)
 
     def test_dependence(self):
         problem = self.problem
         model = problem.model
         model.add_subsystem('simple', SimpleCompConst(),
                             promotes=['x', 'y1', 'y2', 'y3', 'z', 'f', 'g'])
-        problem.setup(check=False)
+        problem.setup()
         problem.run_model()
 
         # Note: since this test is looking for something not user-facing, it is inherently fragile
@@ -214,19 +214,19 @@ class TestJacobianFeatures(unittest.TestCase):
 
     @parameterized.expand([
         ({'of': 'f', 'wrt': 'z', 'val': np.ones((1, 5))},
-         'simple: d\(f\)/d\(z\): Expected 1x4 but val is 1x5'),
+         'SimpleCompKwarg \(simple\): d\(f\)/d\(z\): Expected 1x4 but val is 1x5'),
         ({'of': 'f', 'wrt': 'z', 'rows': [0, -1, 4], 'cols': [0, 0, 0]},
-         'simple: d\(f\)/d\(z\): row indices must be non-negative'),
+         'SimpleCompKwarg \(simple\): d\(f\)/d\(z\): row indices must be non-negative'),
         ({'of': 'f', 'wrt': 'z', 'rows': [0, 0, 0], 'cols': [0, -1, 4]},
-         'simple: d\(f\)/d\(z\): col indices must be non-negative'),
+         'SimpleCompKwarg \(simple\): d\(f\)/d\(z\): col indices must be non-negative'),
         ({'of': 'f', 'wrt': 'z', 'rows': [0, 0], 'cols': [0, 4]},
-         'simple: d\(f\)/d\(z\): Expected 1x4 but declared at least 1x5'),
+         'SimpleCompKwarg \(simple\): d\(f\)/d\(z\): Expected 1x4 but declared at least 1x5'),
         ({'of': 'f', 'wrt': 'z', 'rows': [0, 10]},
-         'If one of rows/cols is specified, then both must be specified'),
+         'SimpleCompKwarg \(simple\): d\(f\)/d\(z\): If one of rows/cols is specified, then both must be specified.'),
         ({'of': 'f', 'wrt': 'z', 'cols': [0, 10]},
-         'If one of rows/cols is specified, then both must be specified'),
+         'SimpleCompKwarg \(simple\): d\(f\)/d\(z\): If one of rows/cols is specified, then both must be specified.'),
         ({'of': 'f', 'wrt': 'z', 'rows': [0, 0, 0], 'cols': [0, 1, 3], 'val': [0, 1]},
-         'If rows and cols are specified, val must be a scalar or have the same shape, '
+         'SimpleCompKwarg \(simple\): d\(f\)/d\(z\): If rows and cols are specified, val must be a scalar or have the same shape, '
          'val: \(2L?,\), rows/cols: \(3L?,\)'),
     ])
     def test_bad_sizes(self, partials_kwargs, error_msg):
@@ -240,40 +240,40 @@ class TestJacobianFeatures(unittest.TestCase):
         # Some of the tests are expected to fail in setup, and some in final_setup, so put them
         # both under the assert.
         with self.assertRaises(ValueError) as ex:
-            problem.setup(check=False)
+            problem.setup()
             problem.run_model()
         self.assertRegexpMatches(str(ex.exception), error_msg)
 
     @parameterized.expand([
-        ({'of': 'q', 'wrt': 'z'}, 'No matches were found for of="q"'),
-        ({'of': 'f?', 'wrt': 'x'}, 'No matches were found for of="f?"'),
-        ({'of': 'f', 'wrt': 'q'}, 'No matches were found for wrt="q"'),
-        ({'of': 'f', 'wrt': 'x?'}, 'No matches were found for wrt="x?"'),
+        ({'of': 'q', 'wrt': 'z'}, 'SimpleCompKwarg (simple): No matches were found for of="q"'),
+        ({'of': 'f?', 'wrt': 'x'}, 'SimpleCompKwarg (simple): No matches were found for of="f?"'),
+        ({'of': 'f', 'wrt': 'q'}, 'SimpleCompKwarg (simple): No matches were found for wrt="q"'),
+        ({'of': 'f', 'wrt': 'x?'}, 'SimpleCompKwarg (simple): No matches were found for wrt="x?"'),
     ])
     def test_bad_names(self, partials_kwargs, error_msg):
         comp = SimpleCompKwarg(partials_kwargs)
         problem = self.problem
         model = problem.model
         model.add_subsystem('simple', comp, promotes=['x', 'y1', 'y2', 'y3', 'z', 'f', 'g'])
-        problem.setup(check=False)
+        problem.setup()
         with self.assertRaises(ValueError) as ex:
             problem.run_model()
         self.assertEquals(str(ex.exception), error_msg)
 
     def test_const_jacobian(self):
-        model = Group()
-        comp = IndepVarComp()
+        model = om.Group()
+        comp = om.IndepVarComp()
         for name, val in (('x', 1.), ('y1', np.ones(2)), ('y2', np.ones(2)),
                           ('y3', np.ones(2)), ('z', np.ones((2, 2)))):
             comp.add_output(name, val)
         model.add_subsystem('input_comp', comp, promotes=['x', 'y1', 'y2', 'y3', 'z'])
 
-        problem = Problem(model=model)
+        problem = om.Problem(model=model)
         problem.set_solver_print(level=0)
-        model.linear_solver = ScipyKrylov(assemble_jac=True)
+        model.linear_solver = om.ScipyKrylov(assemble_jac=True)
         model.add_subsystem('simple', SimpleCompConst(),
                             promotes=['x', 'y1', 'y2', 'y3', 'z', 'f', 'g'])
-        problem.setup(check=False)
+        problem.setup()
         problem.run_model()
         totals = problem.compute_totals(['f', 'g'],
                                               ['x', 'y1', 'y2', 'y3', 'z'])
@@ -292,7 +292,7 @@ class TestJacobianFeatures(unittest.TestCase):
         jacobian['g', 'x'] = [[1], [0], [0], [1]]
         jacobian['g', 'z'] = np.zeros((4, 4))
 
-        assert_rel_error(self, totals, jacobian)
+        assert_near_equal(totals, jacobian)
 
     @parameterized.expand(
         itertools.product([1e-6, 1e-8],  # Step size
@@ -324,7 +324,7 @@ class TestJacobianFeatures(unittest.TestCase):
         jacobian['g', 'x'] = [[1], [0], [0], [1]]
         jacobian['g', 'z'] = np.zeros((4, 4))
 
-        assert_rel_error(self, totals, jacobian, 1e-6)
+        assert_near_equal(totals, jacobian, 1e-6)
 
     def test_mixed_fd(self):
         comp = SimpleCompMixedFD()
@@ -350,10 +350,10 @@ class TestJacobianFeatures(unittest.TestCase):
         jacobian['g', 'x'] = [[1], [0], [0], [1]]
         jacobian['g', 'z'] = np.zeros((4, 4))
 
-        assert_rel_error(self, totals, jacobian, 1e-6)
+        assert_near_equal(totals, jacobian, 1e-6)
 
     def test_units_fd(self):
-        class UnitCompBase(ExplicitComponent):
+        class UnitCompBase(om.ExplicitComponent):
             def setup(self):
                 self.add_input('T', val=284., units="degR", desc="Temperature")
                 self.add_input('P', val=1., units='lbf/inch**2', desc="Pressure")
@@ -367,9 +367,9 @@ class TestJacobianFeatures(unittest.TestCase):
                 outputs['flow:T'] = inputs['T']
                 outputs['flow:P'] = inputs['P']
 
-        p = Problem()
-        model = p.model = Group()
-        indep = model.add_subsystem('indep', IndepVarComp(), promotes=['*'])
+        p = om.Problem()
+        model = p.model
+        indep = model.add_subsystem('indep', om.IndepVarComp(), promotes=['*'])
 
         indep.add_output('T', val=100., units='degK')
         indep.add_output('P', val=1., units='bar')
@@ -385,7 +385,7 @@ class TestJacobianFeatures(unittest.TestCase):
             ('flow:T', 'P'): [[0.]],
             ('flow:P', 'P'): [[14.50377]],
         }
-        assert_rel_error(self, totals, expected_totals, 1e-6)
+        assert_near_equal(totals, expected_totals, 1e-6)
 
         expected_subjacs = {
             ('units.flow:T', 'units.T'): [[1.]],
@@ -395,19 +395,19 @@ class TestJacobianFeatures(unittest.TestCase):
         }
 
         jac = units._subjacs_info
-        for deriv, val in iteritems(expected_subjacs):
-            assert_rel_error(self, jac[deriv]['value'], val, 1e-6)
+        for deriv, val in expected_subjacs.items():
+            assert_near_equal(jac[deriv]['value'], val, 1e-6)
 
     def test_reference(self):
-        class TmpComp(ExplicitComponent):
+        class TmpComp(om.ExplicitComponent):
 
             def initialize(self):
                 self.A = np.ones((3, 3))
 
             def setup(self):
-                self.add_output('y', shape=(3,))
-                self.add_output('z', shape=(3,))
-                self.add_input('x', shape=(3,), units='degF')
+                self.add_output('y', shape=(3, ))
+                self.add_output('z', shape=(3, ))
+                self.add_input('x', shape=(3, ), units='degF')
 
                 self.declare_partials(of='*', wrt='*')
 
@@ -415,9 +415,9 @@ class TestJacobianFeatures(unittest.TestCase):
                 partials['y', 'x'] = self.A
                 partials['z', 'x'] = self.A
 
-        p = Problem()
-        model = p.model = Group()
-        indep = model.add_subsystem('indep', IndepVarComp(), promotes=['*'])
+        p = om.Problem()
+        model = p.model
+        indep = model.add_subsystem('indep', om.IndepVarComp(), promotes=['*'])
 
         indep.add_output('x', val=100., shape=(3,), units='degK')
 
@@ -430,56 +430,58 @@ class TestJacobianFeatures(unittest.TestCase):
             ('y', 'x'): 9/5 * np.ones((3, 3)),
             ('z', 'x'): 9/5 * np.ones((3, 3)),
         }
-        assert_rel_error(self, totals, expected_totals, 1e-6)
+        assert_near_equal(totals, expected_totals, 1e-6)
 
 
 class TestJacobianForDocs(unittest.TestCase):
     def test_const_jacobian(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, DirectSolver
+        import openmdao.api as om
         from openmdao.jacobians.tests.test_jacobian_features import SimpleCompConst
 
-        model = Group(assembled_jac_type='dense')
-        comp = IndepVarComp()
+        model = om.Group(assembled_jac_type='dense')
+        comp = om.IndepVarComp()
         for name, val in (('x', 1.), ('y1', np.ones(2)), ('y2', np.ones(2)),
                           ('y3', np.ones(2)), ('z', np.ones((2, 2)))):
             comp.add_output(name, val)
         model.add_subsystem('input_comp', comp, promotes=['x', 'y1', 'y2', 'y3', 'z'])
 
-        problem = Problem(model=model)
+        problem = om.Problem(model=model)
         problem.set_solver_print(0)
 
-        model.linear_solver = DirectSolver(assemble_jac=True)
+        model.linear_solver = om.DirectSolver(assemble_jac=True)
         model.add_subsystem('simple', SimpleCompConst(),
                             promotes=['x', 'y1', 'y2', 'y3', 'z', 'f', 'g'])
-        problem.setup(check=False)
+        problem.setup()
         problem.run_model()
         totals = problem.compute_totals(['f', 'g'],
                                               ['x', 'y1', 'y2', 'y3', 'z'])
 
-        assert_rel_error(self, totals['f', 'x'], [[1.]])
-        assert_rel_error(self, totals['f', 'z'], np.ones((1, 4)))
-        assert_rel_error(self, totals['f', 'y1'], np.zeros((1, 2)))
-        assert_rel_error(self, totals['f', 'y2'], np.zeros((1, 2)))
-        assert_rel_error(self, totals['f', 'y3'], np.zeros((1, 2)))
-        assert_rel_error(self, totals['g', 'z'], np.zeros((4, 4)))
-        assert_rel_error(self, totals['g', 'y1'], [[1, 0], [1, 0], [0, 1], [0, 1]])
-        assert_rel_error(self, totals['g', 'y2'], [[1, 0], [0, 1], [1, 0], [0, 1]])
-        assert_rel_error(self, totals['g', 'y3'], [[1, 0], [1, 0], [0, 1], [0, 1]])
-        assert_rel_error(self, totals['g', 'x'], [[1], [0], [0], [1]])
+        assert_near_equal(totals['f', 'x'], [[1.]])
+        assert_near_equal(totals['f', 'z'], np.ones((1, 4)))
+        assert_near_equal(totals['f', 'y1'], np.zeros((1, 2)))
+        assert_near_equal(totals['f', 'y2'], np.zeros((1, 2)))
+        assert_near_equal(totals['f', 'y3'], np.zeros((1, 2)))
+        assert_near_equal(totals['g', 'z'], np.zeros((4, 4)))
+        assert_near_equal(totals['g', 'y1'], [[1, 0], [1, 0], [0, 1], [0, 1]])
+        assert_near_equal(totals['g', 'y2'], [[1, 0], [0, 1], [1, 0], [0, 1]])
+        assert_near_equal(totals['g', 'y3'], [[1, 0], [1, 0], [0, 1], [0, 1]])
+        assert_near_equal(totals['g', 'x'], [[1], [0], [0], [1]])
 
     def test_sparse_jacobian_in_place(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent
+        import openmdao.api as om
 
-        class SparsePartialComp(ExplicitComponent):
+        class SparsePartialComp(om.ExplicitComponent):
             def setup(self):
                 self.add_input('x', shape=(4,))
                 self.add_output('f', shape=(2,))
 
-                self.declare_partials(of='f', wrt='x', rows=[0,1,1,1], cols=[0,1,2,3])
+                self.declare_partials(of='f', wrt='x',
+                                      rows=[0, 1, 1, 1],
+                                      cols=[0, 1, 2, 3])
 
             def compute_partials(self, inputs, partials):
                 pd = partials['f', 'x']
@@ -497,8 +499,8 @@ class TestJacobianForDocs(unittest.TestCase):
                 pd[3] = 4
 
 
-        model = Group()
-        comp = IndepVarComp()
+        model = om.Group()
+        comp = om.IndepVarComp()
         comp.add_output('x', np.ones(4))
 
         model.add_subsystem('input', comp)
@@ -506,31 +508,33 @@ class TestJacobianForDocs(unittest.TestCase):
 
         model.connect('input.x', 'example.x')
 
-        problem = Problem(model=model)
-        problem.setup(check=False)
+        problem = om.Problem(model=model)
+        problem.setup()
         problem.run_model()
         totals = problem.compute_totals(['example.f'], ['input.x'])
 
-        assert_rel_error(self, totals['example.f', 'input.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]])
+        assert_near_equal(totals['example.f', 'input.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]])
 
     def test_sparse_jacobian(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent
+        import openmdao.api as om
 
-        class SparsePartialComp(ExplicitComponent):
+        class SparsePartialComp(om.ExplicitComponent):
             def setup(self):
                 self.add_input('x', shape=(4,))
                 self.add_output('f', shape=(2,))
 
-                self.declare_partials(of='f', wrt='x', rows=[0, 1, 1, 1], cols=[0, 1, 2, 3])
+                self.declare_partials(of='f', wrt='x',
+                                      rows=[0, 1, 1, 1],
+                                      cols=[0, 1, 2, 3])
 
             def compute_partials(self, inputs, partials):
                 # Corresponds to the [(0,0), (1,1), (1,2), (1,3)] entries.
                 partials['f', 'x'] = [1., 2., 3., 4.]
 
-        model = Group()
-        comp = IndepVarComp()
+        model = om.Group()
+        comp = om.IndepVarComp()
         comp.add_output('x', np.ones(4))
 
         model.add_subsystem('input', comp)
@@ -538,34 +542,36 @@ class TestJacobianForDocs(unittest.TestCase):
 
         model.connect('input.x', 'example.x')
 
-        problem = Problem(model=model)
-        problem.setup(check=False)
+        problem = om.Problem(model=model)
+        problem.setup()
         problem.run_model()
         totals = problem.compute_totals(['example.f'], ['input.x'])
 
-        assert_rel_error(self, totals['example.f', 'input.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]])
+        assert_near_equal(totals['example.f', 'input.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]])
 
     def test_sparse_jacobian_const(self):
         import numpy as np
         import scipy as sp
 
-        from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent
+        import openmdao.api as om
 
-        class SparsePartialComp(ExplicitComponent):
+        class SparsePartialComp(om.ExplicitComponent):
             def setup(self):
                 self.add_input('x', shape=(4,))
                 self.add_input('y', shape=(2,))
                 self.add_output('f', shape=(2,))
 
-                self.declare_partials(of='f', wrt='x', rows=[0,1,1,1], cols=[0,1,2,3],
-                                      val=[1. , 2., 3., 4.])
+                self.declare_partials(of='f', wrt='x',
+                                      rows=[0, 1, 1, 1],
+                                      cols=[0, 1, 2, 3],
+                                      val=[1., 2., 3., 4.])
                 self.declare_partials(of='f', wrt='y', val=sp.sparse.eye(2, format='csc'))
 
             def compute_partials(self, inputs, partials):
                 pass
 
-        model = Group()
-        comp = IndepVarComp()
+        model = om.Group()
+        comp = om.IndepVarComp()
         comp.add_output('x', np.ones(4))
         comp.add_output('y', np.ones(2))
 
@@ -575,20 +581,20 @@ class TestJacobianForDocs(unittest.TestCase):
         model.connect('input.x', 'example.x')
         model.connect('input.y', 'example.y')
 
-        problem = Problem(model=model)
-        problem.setup(check=False)
+        problem = om.Problem(model=model)
+        problem.setup()
         problem.run_model()
         totals = problem.compute_totals(['example.f'], ['input.x', 'input.y'])
 
-        assert_rel_error(self, totals['example.f', 'input.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]])
-        assert_rel_error(self, totals['example.f', 'input.y'], [[1., 0.], [0., 1.]])
+        assert_near_equal(totals['example.f', 'input.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]])
+        assert_near_equal(totals['example.f', 'input.y'], [[1., 0.], [0., 1.]])
 
     def test_fd_glob(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent
+        import openmdao.api as om
 
-        class FDPartialComp(ExplicitComponent):
+        class FDPartialComp(om.ExplicitComponent):
             def setup(self):
                 self.add_input('x', shape=(4,))
                 self.add_input('y', shape=(2,))
@@ -607,8 +613,8 @@ class TestJacobianForDocs(unittest.TestCase):
                 f[0] = x[0] + y[0]
                 f[1] = np.dot([0, 2, 3, 4], x) + y[1]
 
-        model = Group()
-        comp = IndepVarComp()
+        model = om.Group()
+        comp = om.IndepVarComp()
         comp.add_output('x', np.ones(4))
         comp.add_output('y', np.ones(2))
 
@@ -618,21 +624,21 @@ class TestJacobianForDocs(unittest.TestCase):
         model.connect('input.x', 'example.x')
         model.connect('input.y', 'example.y')
 
-        problem = Problem(model=model)
-        problem.setup(check=False)
+        problem = om.Problem(model=model)
+        problem.setup()
         problem.run_model()
         totals = problem.compute_totals(['example.f'], ['input.x', 'input.y'])
 
-        assert_rel_error(self, totals['example.f', 'input.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]],
+        assert_near_equal(totals['example.f', 'input.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]],
                          tolerance=1e-8)
-        assert_rel_error(self, totals['example.f', 'input.y'], [[1., 0.], [0., 1.]], tolerance=1e-8)
+        assert_near_equal(totals['example.f', 'input.y'], [[1., 0.], [0., 1.]], tolerance=1e-8)
 
     def test_fd_options(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent
+        import openmdao.api as om
 
-        class FDPartialComp(ExplicitComponent):
+        class FDPartialComp(om.ExplicitComponent):
 
             def setup(self):
                 self.add_input('x', shape=(4,))
@@ -652,8 +658,8 @@ class TestJacobianForDocs(unittest.TestCase):
                 f[0] = x[0] + y[0]
                 f[1] = np.dot([0, 2, 3, 4], x) + y[1]
 
-        model = Group()
-        comp = IndepVarComp()
+        model = om.Group()
+        comp = om.IndepVarComp()
         comp.add_output('x', np.ones(4))
         comp.add_output('y', np.ones(2))
 
@@ -663,14 +669,14 @@ class TestJacobianForDocs(unittest.TestCase):
         model.connect('input.x', 'example.x')
         model.connect('input.y', 'example.y')
 
-        problem = Problem(model=model)
-        problem.setup(check=False)
+        problem = om.Problem(model=model)
+        problem.setup()
         problem.run_model()
         totals = problem.compute_totals(['example.f'], ['input.x', 'input.y'])
 
-        assert_rel_error(self, totals['example.f', 'input.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]],
+        assert_near_equal(totals['example.f', 'input.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]],
                          tolerance=1e-8)
-        assert_rel_error(self, totals['example.f', 'input.y'], [[1., 0.], [0., 1.]], tolerance=1e-8)
+        assert_near_equal(totals['example.f', 'input.y'], [[1., 0.], [0., 1.]], tolerance=1e-8)
 
 
 if __name__ == '__main__':

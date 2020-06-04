@@ -1,6 +1,5 @@
 """A script wrapper for the Wing IDE."""
 
-from __future__ import print_function
 
 import os
 import os.path
@@ -9,8 +8,7 @@ import sys
 import fnmatch
 import logging
 from subprocess import Popen
-from six.moves.configparser import ConfigParser
-from six import text_type
+from configparser import ConfigParser
 from optparse import OptionParser
 
 
@@ -50,9 +48,9 @@ def _modify_wpr_file(template, outfile, version):
     config.read(template)
     if sys.platform == 'darwin':
         config.set('user attributes', 'proj.pyexec',
-                   text_type(dict({None: ('custom', sys.executable)})))
+                   str(dict({None: ('custom', sys.executable)})))
         config.set('user attributes', 'proj.pypath',
-                   text_type(dict({None: ('custom',
+                   str(dict({None: ('custom',
                                           os.pathsep.join(sys.path))})))
 
     with open(outfile, 'w') as fp:
@@ -110,7 +108,7 @@ def run_wing():
                       dest="projpath", default='',
                       help="location of WingIDE project file")
     parser.add_option("-v", "--version", action="store", type="string",
-                      dest="version", default='6.0',
+                      dest="version", default='7.0',
                       help="version of WingIDE")
     (options, args) = parser.parse_args(sys.argv[1:])
 

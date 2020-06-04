@@ -9,19 +9,8 @@ import ast
 import textwrap
 import importlib
 from collections import defaultdict, OrderedDict
-from six import iteritems, next
 
 import networkx as nx
-
-
-class OrderedDiGraph(nx.DiGraph):
-    """
-    A DiGraph using OrderedDicts for internal storage.
-    """
-
-    node_dict_factory = OrderedDict
-    adjlist_dict_factory = OrderedDict
-    edge_attr_dict_factory = OrderedDict
 
 
 def _get_long_name(node):
@@ -148,7 +137,7 @@ def _get_nested_calls(starting_class, class_, func_name, parent, graph, seen):
     seen.add('.'.join((class_.__name__, func_name)))
 
     # now find the actual owning class for each call
-    for klass, funcset in iteritems(visitor.self_calls):
+    for klass, funcset in visitor.self_calls.items():
         mro = inspect.getmro(klass)
         for f in funcset:
             full, c = _find_owning_class(mro, f)
@@ -176,6 +165,17 @@ def get_nested_calls(class_, method_name, stream=sys.stdout):
     networkx.DiGraph
         A graph containing edges from methods to their sub-methods.
     """
+    # moved this class def in here to keep the numpy doc scraper from barfing due to
+    # stuff in nx.DiGraph.
+    class OrderedDiGraph(nx.DiGraph):
+        """
+        A DiGraph using OrderedDicts for internal storage.
+        """
+
+        node_dict_factory = OrderedDict
+        adjlist_dict_factory = OrderedDict
+        edge_attr_dict_factory = OrderedDict
+
     graph = OrderedDiGraph()
     seen = set()
 
@@ -208,12 +208,14 @@ def _calltree_setup_parser(parser):
     """
     Set up the command line options for the 'openmdao call_tree' command line tool.
     """
-    parser.add_argument('method_path', nargs=1, help='Full module path to desired class method.')
+    parser.add_argument('method_path', nargs=1,
+                        help='Full module path to desired class method, e.g., '
+                        '"openmdao.components.exec_comp.ExecComp.setup".')
     parser.add_argument('-o', '--outfile', action='store', dest='outfile',
                         default='stdout', help='Output file.  Defaults to stdout.')
 
 
-def _calltree_exec(options):
+def _calltree_exec(options, user_args):
     """
     Process command line args and call get_nested_calls on the specified class method.
     """
@@ -240,5 +242,6 @@ def _calltree_exec(options):
 
 
 if __name__ == '__main__':
-    from openmdao.api import LinearBlockGS
-    get_nested_calls(LinearBlockGS, 'solve')
+    import openmdao.api as om
+
+    get_nested_calls(om.LinearBlockGS, 'solve')

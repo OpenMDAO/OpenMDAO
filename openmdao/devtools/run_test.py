@@ -9,14 +9,21 @@ To specify the test to run, use the following forms:
 
 <modpath>:<testcase name>.<funcname>   OR   <modpath>:<funcname>
 
+where <modpath> is either the dotted module name or the full filesystem path of the python file.
+
 for example:
 
     mpirun -n 4 run_test mypackage.mysubpackage.mymod:MyTestCase.test_foo
 
+    OR
+
+    mpirun -n 4 run_test /foo/bar/mypackage/mypackage/mysubpackage/mymod.py:MyTestCase.test_foo
 """
-from __future__ import print_function
 
 import sys
+import importlib
+from openmdao.utils.file_utils import get_module_path
+
 
 def run_test():
     """
@@ -35,9 +42,10 @@ def run_test():
         sys.exit(-1)
 
     modpath, funcpath = parts
+    if modpath.endswith('.py'):
+        modpath = get_module_path(modpath)
 
-    __import__(modpath)
-    mod = sys.modules[modpath]
+    mod = importlib.import_module(modpath)
 
     parts = funcpath.split('.', 1)
     if len(parts) == 2:

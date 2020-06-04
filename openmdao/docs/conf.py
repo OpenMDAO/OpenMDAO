@@ -82,7 +82,7 @@ author = u'openmdao.org'
 
 # The full version, including alpha/beta/rc tags.
 import openmdao
-release = openmdao.__version__ + ' Beta'
+release = openmdao.__version__
 print('Release: %s' % release)
 
 # Will be the Release version (x.y.z) or the commit ID if not a release build.
@@ -126,6 +126,8 @@ packages = [
     'test_suite.components',
     'test_suite.scripts',
     'vectors',
+    'utils',
+    'visualization',
 ]
 
 if os.path.isfile("make_sourcedocs"):
@@ -167,6 +169,9 @@ htmlhelp_basename = 'OpenMDAOdoc'
 html_sidebars = {
    '**': ['globaltoc.html', 'searchbox.html']
 }
+
+html_extra_path = ['_n2html']
+
 # -- Options for manual page output ---------------------------------------
 
 # One entry per manual page. List of tuples

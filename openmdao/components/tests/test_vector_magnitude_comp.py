@@ -1,10 +1,9 @@
-from __future__ import print_function, division, absolute_import
-
 import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, Group, IndepVarComp, VectorMagnitudeComp
+import openmdao.api as om
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class TestVectorMagnitudeCompNx3(unittest.TestCase):
@@ -12,9 +11,9 @@ class TestVectorMagnitudeCompNx3(unittest.TestCase):
     def setUp(self):
         self.nn = 5
 
-        self.p = Problem(model=Group())
+        self.p = om.Problem()
 
-        ivc = IndepVarComp()
+        ivc = om.IndepVarComp()
         ivc.add_output(name='a', shape=(self.nn, 3))
 
         self.p.model.add_subsystem(name='ivc',
@@ -22,7 +21,7 @@ class TestVectorMagnitudeCompNx3(unittest.TestCase):
                                    promotes_outputs=['a'])
 
         self.p.model.add_subsystem(name='vec_mag_comp',
-                                   subsys=VectorMagnitudeComp(vec_size=self.nn))
+                                   subsys=om.VectorMagnitudeComp(vec_size=self.nn))
 
         self.p.model.connect('a', 'vec_mag_comp.a')
 
@@ -56,9 +55,9 @@ class TestVectorMagnitudeCompNx4(unittest.TestCase):
     def setUp(self):
         self.nn = 100
 
-        self.p = Problem(model=Group())
+        self.p = om.Problem()
 
-        ivc = IndepVarComp()
+        ivc = om.IndepVarComp()
         ivc.add_output(name='a', shape=(self.nn, 4))
 
         self.p.model.add_subsystem(name='ivc',
@@ -66,7 +65,7 @@ class TestVectorMagnitudeCompNx4(unittest.TestCase):
                                    promotes_outputs=['a'])
 
         self.p.model.add_subsystem(name='vec_mag_comp',
-                                   subsys=VectorMagnitudeComp(vec_size=self.nn, length=4))
+                                   subsys=om.VectorMagnitudeComp(vec_size=self.nn, length=4))
 
         self.p.model.connect('a', 'vec_mag_comp.a')
 
@@ -101,9 +100,9 @@ class TestUnits(unittest.TestCase):
     def setUp(self):
         self.nn = 5
 
-        self.p = Problem(model=Group())
+        self.p = om.Problem()
 
-        ivc = IndepVarComp()
+        ivc = om.IndepVarComp()
         ivc.add_output(name='a', shape=(self.nn, 3), units='m')
 
         self.p.model.add_subsystem(name='ivc',
@@ -111,7 +110,7 @@ class TestUnits(unittest.TestCase):
                                    promotes_outputs=['a'])
 
         self.p.model.add_subsystem(name='vec_mag_comp',
-                                   subsys=VectorMagnitudeComp(vec_size=self.nn, units='m'))
+                                   subsys=om.VectorMagnitudeComp(vec_size=self.nn, units='m'))
 
         self.p.model.connect('a', 'vec_mag_comp.a')
 
@@ -141,29 +140,28 @@ class TestUnits(unittest.TestCase):
                                                decimal=6)
 
 
-class TestForDocs(unittest.TestCase):
+class TestFeature(unittest.TestCase):
 
     def test(self):
         """
         A simple example to compute the magnitude of 3-vectors at at 100 points simultaneously.
         """
         import numpy as np
-        from openmdao.api import Problem, Group, IndepVarComp, VectorMagnitudeComp
-        from openmdao.utils.assert_utils import assert_rel_error
+        import openmdao.api as om
 
         n = 100
 
-        p = Problem(model=Group())
+        p = om.Problem()
 
-        ivc = IndepVarComp()
+        ivc = om.IndepVarComp()
         ivc.add_output(name='pos', shape=(n, 3), units='m')
 
         p.model.add_subsystem(name='ivc',
                               subsys=ivc,
                               promotes_outputs=['pos'])
 
-        dp_comp = VectorMagnitudeComp(vec_size=n, length=3, in_name='r', mag_name='r_mag',
-                                      units='km')
+        dp_comp = om.VectorMagnitudeComp(vec_size=n, length=3, in_name='r', mag_name='r_mag',
+                                         units='km')
 
         p.model.add_subsystem(name='vec_mag_comp', subsys=dp_comp)
 
@@ -179,7 +177,7 @@ class TestForDocs(unittest.TestCase):
         for i in range(n):
             a_i = p['pos'][i, :]
             expected_i = np.sqrt(np.dot(a_i, a_i)) / 1000.0
-            assert_rel_error(self, p.get_val('vec_mag_comp.r_mag')[i], expected_i)
+            assert_near_equal(p.get_val('vec_mag_comp.r_mag')[i], expected_i)
 
 
 if __name__ == '__main__':

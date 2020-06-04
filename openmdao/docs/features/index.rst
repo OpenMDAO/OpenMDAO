@@ -5,7 +5,7 @@ Features
 ********
 
 OpenMDAO's fully-supported features are documented here, each in a self-contained context.
-Any feature documented here, with the exception of those in the *Experimental Featuers* section,
+Any feature documented here, with the exception of those in the *Experimental Features* section,
 has been thoroughly tested, and should be considered fully functional.
 
 .. toctree::

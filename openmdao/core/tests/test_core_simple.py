@@ -1,9 +1,8 @@
-from __future__ import division
 import numpy as np
 import unittest
 
 from openmdao.api import Problem, IndepVarComp, ExplicitComponent, Group, PETScVector
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 #      (A) -> x
@@ -61,23 +60,23 @@ class Test(unittest.TestCase):
                 idxs[name] for name in system._var_abs_names[type_]
             ])
 
-        assert_rel_error(self, get_inds(self.p, '', 'input'), np.array([0]))
-        assert_rel_error(self, get_inds(self.p, '', 'output'), np.array([0,1]))
+        assert_near_equal(get_inds(self.p, '', 'input'), np.array([0]))
+        assert_near_equal(get_inds(self.p, '', 'output'), np.array([0,1]))
 
-        assert_rel_error(self, get_inds(self.p, 'A', 'input'), np.array([]))
-        assert_rel_error(self, get_inds(self.p, 'A', 'output'), np.array([0]))
+        assert_near_equal(get_inds(self.p, 'A', 'input'), np.array([]))
+        assert_near_equal(get_inds(self.p, 'A', 'output'), np.array([0]))
 
-        assert_rel_error(self, get_inds(self.p, 'B', 'input'), np.array([0]))
-        assert_rel_error(self, get_inds(self.p, 'B', 'output'), np.array([1]))
+        assert_near_equal(get_inds(self.p, 'B', 'input'), np.array([0]))
+        assert_near_equal(get_inds(self.p, 'B', 'output'), np.array([1]))
 
     def test_var_allprocs_idx_range(self):
         rng = self.p.model._subsystems_var_range
 
-        assert_rel_error(self, rng['nonlinear']['input']['A'], np.array([0,0]))
-        assert_rel_error(self, rng['nonlinear']['input']['B'], np.array([0,1]))
+        assert_near_equal(rng['nonlinear']['input']['A'], np.array([0,0]))
+        assert_near_equal(rng['nonlinear']['input']['B'], np.array([0,1]))
 
-        assert_rel_error(self, rng['nonlinear']['output']['A'], np.array([0,1]))
-        assert_rel_error(self, rng['nonlinear']['output']['B'], np.array([1,2]))
+        assert_near_equal(rng['nonlinear']['output']['A'], np.array([0,1]))
+        assert_near_equal(rng['nonlinear']['output']['B'], np.array([1,2]))
 
     def test_GS(self):
         root = self.p.model
@@ -87,21 +86,21 @@ class Test(unittest.TestCase):
             compB = root.B
 
             if root.comm.rank == 0:
-                assert_rel_error(self, root._outputs['A.x'], 0)
-                assert_rel_error(self, compA._outputs['x'], 0)
+                assert_near_equal(root._outputs['A.x'], 0)
+                assert_near_equal(compA._outputs['x'], 0)
                 compA._outputs['x'] = 10
             if root.comm.rank == 2:
-                assert_rel_error(self, compB._inputs['x'], 0)
-                assert_rel_error(self, compB._outputs['f'], 0)
+                assert_near_equal(compB._inputs['x'], 0)
+                assert_near_equal(compB._outputs['f'], 0)
 
             root.run_solve_nonlinear()
 
             if root.comm.rank == 0:
-                assert_rel_error(self, root._outputs['A.x'], 10)
-                assert_rel_error(self, compA._outputs['x'], 10)
+                assert_near_equal(root._outputs['A.x'], 10)
+                assert_near_equal(compA._outputs['x'], 10)
             if root.comm.rank == 2:
-                assert_rel_error(self, compB._inputs['x'], 10)
-                assert_rel_error(self, compB._outputs['f'], 20)
+                assert_near_equal(compB._inputs['x'], 10)
+                assert_near_equal(compB._outputs['f'], 20)
 
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")

@@ -1,6 +1,4 @@
 """Define the LinearBlockJac class."""
-from six import iteritems
-
 from openmdao.solvers.solver import BlockLinearSolver
 
 
@@ -15,7 +13,7 @@ class LinearBlockJac(BlockLinearSolver):
         """
         Perform the operations in the iteration loop.
         """
-        system = self._system
+        system = self._system()
         mode = self._mode
         vec_names = self._vec_names
 

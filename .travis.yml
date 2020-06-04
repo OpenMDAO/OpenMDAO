@@ -2,8 +2,6 @@ branches:
   only:
   - master
 
-sudo: false
-
 group: deprecated-2017Q4
 
 filter_secrets: false
@@ -15,11 +13,11 @@ language: generic
 
 env:
   matrix:
-    - PY=3.7 NUMPY=1.16 SCIPY=1.2   PETSc=3.11
-    - PY=3.6 NUMPY=1.15 SCIPY=1.1
-    - PY=3.6 NUMPY=1.14 SCIPY=1.0.1 PETSc=3.10.1 UPLOAD_DOCS=1
-    - PY=2.7 NUMPY=1.13 SCIPY=1.1   PETSc=3.9.1
-    - PY=2.7 NUMPY=1.12 SCIPY=1.1
+    # test with the latest version of Python 3.x
+    - PY=3   NUMPY=1.18 SCIPY=1.4 PETSc=3.12 UPLOAD_DOCS=1 SNOPT_VERSION=7.7 PYOPTSPARSE_VERSION=v2.1.0
+    - PY=3 NUMPY=1.17 SCIPY=1.3 SNOPT_VERSION=7.2 PYOPTSPARSE_VERSION=v1.2
+    - PY=3.7 NUMPY=1.17 SCIPY=1.3 SNOPT_VERSION=7.7 PYOPTSPARSE_VERSION=v2.1.0
+    - PY=3.6 NUMPY=1.16 SCIPY=1.2 PETSc=3.10.2 SNOPT_VERSION=7.7 PYOPTSPARSE_VERSION=v2.1.0
 
 git:
   depth: 99999
@@ -31,40 +29,35 @@ addons:
     - ubuntu-toolchain-r-test
     packages:
     - gfortran
-    - libblas-dev
+    - gcc
+    - g++
     - liblapack-dev
-    - libopenmpi-dev
-    - openmpi-bin
     ssh_known_hosts:
     - web543.webfaction.com
 
-cache:
-  apt: true
-  timeout: 300
-  directories:
-    - $HOME/.cache/pip
-    - $HOME/miniconda
 
 notifications:
   slack:
     secure: Dd+tpZkz48Q47Y+PtdL4b+KAs55PsvWjt9ybhip6xljhA5kVsba9oZS+KsAC8RLWSzVJLOSjz3Cu3MsRym4sTd/g4Pbqyh0ldK2Xnl+n2JOgpPFSXtFuH4Ln3uWB6kYtUK6+aGIC8qhbvEt8tukTBT0RduEmdRyVIZ3oN7YjETPSZXvujeiUFLssfpZW2mqoA/tIgJHFSlySAp6J5694t2Z/p8sHOrK8G/Nm+qlk4xqXHvJ3xablcSBG4BZCrpqmMMdTLXBt2E2K9Rc1P2ZBIrSHVWfSLx+4n79U2385+og7miN1Zuf3gY3YuGKIwnBTtEzTu20905idkr4QdKELCBEcU4azdznwjvUkXWkiFAJII9UELTluSQmZX602zWk4AgJNeHxhN3EbBSMezfYVZjprhlAlwnZZv6t4qAkvuzb7KOA4s679xWzWOBOn1wkynfIF8A66APqssveyz/PvZHSjnHQoLgMU+kwzoX759o0Z/HuRlhCcjv0W9DWxU2bFNi/zVh9YyvR8fG15biGthzOyuf+CHjxohw+J6M+YdR1RIf1g/60nGUPHx4j4SN3kEFPmEDxzZT/f349gvaZGOmKXBi0wH8iY/i9RinM9LJB4t6chj2MkKwUA26bYaVaIO6FYPfE7r+tTG6OXdck4voCs/s4aa9VKEX97yhh0i9g=
 
 before_install:
-# Check for existence of files to determine if cache exists
+# When building master (e.g. after a merge), we will create a fresh env as a thorough test.
+# For other builds (e.g. pull requests), try to use cached env for faster testing.
+# Need to check for existence of files to determine if cache exists.
 # If the dir doesn't exist, but is slated to be cached later,
 # Travis unhelpfully creates it, which then causes "dir already exists"
 # errors when you go to actually install the thing, so we must non-intuitively
 # delete the file before re-creating it later.
-- if [ -d $HOME/miniconda/envs/PY$PY ]; then
+- if  [ "$TRAVIS_REPO_SLUG" = "OpenMDAO/OpenMDAO" ] && [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
+    echo "building master";
+    MASTER_BUILD=1;
+    rm -rf $HOME/miniconda;
+  elif [ -d $HOME/miniconda/envs/PY$PY ]; then
     echo "cached miniconda environment found";
     CACHED_ENV=1;
   else
     echo "cached miniconda environment not found";
     rm -rf $HOME/miniconda;
-  fi
-
-- if  [ "$TRAVIS_REPO_SLUG" = "OpenMDAO/OpenMDAO" ] && [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
-    MASTER_BUILD=1;
   fi
 
 install:
@@ -75,67 +68,86 @@ install:
     chmod 600 /tmp/travis_deploy_rsa;
     ssh-add /tmp/travis_deploy_rsa;
     echo -e "Host web543.webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config;
+  else
+    echo "KEY NOT FOUND";
   fi
 
 # if we don't have a cached conda environment then build one, otherwise just activate the cached one
-- if [ "$CACHED_ENV" ]; then
-    echo ">>> Using cached environment";
-    export PATH=$HOME/miniconda/bin:$PATH;
-    source $HOME/miniconda/bin/activate PY$PY;
-  else
-    echo ">>> Building python environment";
-    echo " >> Installing conda";
-    echo "  > Downloading miniconda";
-    wget "https://repo.continuum.io/miniconda/Miniconda${PY:0:1}-4.5.11-Linux-x86_64.sh" -O miniconda.sh;
-    chmod +x miniconda.sh;
-    echo "  > Installing miniconda";
-    ./miniconda.sh -b  -p $HOME/miniconda;
-    export PATH=$HOME/miniconda/bin:$PATH;
+- |
+  echo ">>> Building python environment";
+  echo " >> Installing conda";
+  echo "  > Downloading miniconda";
+  wget "https://repo.anaconda.com/miniconda/Miniconda${PY:0:1}-latest-Linux-x86_64.sh" -O miniconda.sh;
+  chmod +x miniconda.sh;
+  echo "  > Installing miniconda";
+  ./miniconda.sh -b  -p $HOME/miniconda;
+  export PATH=$HOME/miniconda/bin:$PATH;
 
-    echo " >> Creating conda environment";
-    conda create --yes -n PY$PY python=$PY;
-    source $HOME/miniconda/bin/activate PY$PY;
+  echo " >> Creating conda environment";
+  conda create --yes -n PY$PY python=$PY numpy=$NUMPY scipy=$SCIPY cython swig;
+  source $HOME/miniconda/bin/activate PY$PY;
 
-    echo " >> Installing non-pure Python dependencies from conda";
-    conda install --yes numpy=$NUMPY scipy=$SCIPY cython swig;
+  echo " >> Installing non-pure Python dependencies from conda";
 
-    pip install --upgrade pip;
-
-    echo " >> Installing forked python packages";
-    pip install git+https://github.com/swryan/coveralls-python@work;
-
-    echo " >> Installing pyOptSparse";
-    echo "  > Cloning pyOptSparse from OpenMDAO's fork";
-    git clone https://github.com/OpenMDAO/pyoptsparse.git;
-    cd pyoptsparse;
-
-    if [ "$SNOPT_LOCATION" ] && [ "${PY:0:1}" = "3" ]; then
-      cd pyoptsparse/pySNOPT;
-      echo "  > Secure copying SNOPT over SSH";
-      scp -r "$SNOPT_LOCATION" .;
-      cd ../..;
-    fi
-
-    echo "  > Install pyOptSparse";
-    python setup.py install;
-    cd ..;
-
-    if [ "$PETSc" ]; then
-      echo " >> Installing parallel processing dependencies";
-      pip install mpi4py;
-      pip install petsc4py==$PETSc;
-    fi
+  if [ "$PETSc" ]; then
+    echo "Installing PETSc";
+    conda install -c anaconda mpi4py --yes;
+    conda install -c conda-forge petsc=$PETSc petsc4py --yes;
   fi
+
+  pip install --upgrade pip;
+
+  echo " >> Installing forked python packages";
+  pip install git+https://github.com/swryan/coveralls-python@work;
+
+  echo " >> Installing pyOptSparse";
+  git clone https://github.com/OpenMDAO/build_pyoptsparse;
+  cd build_pyoptsparse;
+  chmod 755 ./build_pyoptsparse.sh;
+
+  echo " >> Checking SNOPT and PyoptSparse version"
+  if [[ "$SNOPT_VERSION" == "7.7" && "$PYOPTSPARSE_VERSION" == "v2.1.0" ]] || [[ "$SNOPT_VERSION" == "7.2" && "$PYOPTSPARSE_VERSION" == "v1.2" ]]; then
+    echo " >> Found SNOPT and PyoptSparse"
+    if [ "$SNOPT_VERSION" == "7.7" ] && [ "$SNOPT_LOCATION_77" ]; then
+      echo "  > Secure copying SNOPT 7.7 over SSH";
+      mkdir SNOPT;
+      scp -r "$SNOPT_LOCATION_77" SNOPT;
+      ./build_pyoptsparse.sh -s SNOPT/src -b "$PYOPTSPARSE_VERSION";
+
+    elif [ "$SNOPT_VERSION" == "7.2" ]  && [ "$SNOPT_LOCATION_72" ]; then
+      echo "  > Secure copying SNOPT 7.2 over SSH";
+      mkdir SNOPT;
+      scp -r "$SNOPT_LOCATION_72" SNOPT;
+      ./build_pyoptsparse.sh -s SNOPT/source -b "$PYOPTSPARSE_VERSION";
+
+    else
+      ./build_pyoptsparse.sh -b "$PYOPTSPARSE_VERSION";
+    fi
+  else
+    echo "Incompatible versions of SNOPT and PyoptSparse"
+  fi
+  cd ..;
+
+  echo " >> Installing optional packages for test coverage";
+  pip install psutil objgraph git+https://github.com/mdolab/pyxdsm;
 
 # install OpenMDAO and its development and documentation dependencies
 # NOTE: not using -e on purpose here, to catch packaging errors
 - echo ">>> Installing OpenMDAO";
   pip install .[all];
+  pyppeteer-install;
 
 # display summary of installed packages and their versions
 - conda list
 
 script:
+# prevent OpenMPI warning messages
+- export OMPI_MCA_btl=^openib
+# newer versions of OpenMPI require this
+- export OMPI_MCA_rmaps_base_oversubscribe=1
+# IPOPT Requires
+- export LD_LIBRARY_PATH=/home/travis/ipopt/lib
+
 # make docs first
 - cd openmdao/docs;
 - if [ "$PETSc" ]; then
@@ -143,18 +155,20 @@ script:
   fi
 
 # run the tests from down here to see if it can work without being at top level
-# only do coverage on the upload machine.
+# only do coverage on the upload machine (and show skipped tests).
 - if [ "$UPLOAD_DOCS" ]; then
-    testflo -n 1 openmdao --coverage  --coverpkg openmdao --cover-omit \*tests/\*  --cover-omit \*devtools/\* --cover-omit \*test_suite/\* --cover-omit \*docs/\*;
+    testflo -n 1 openmdao --timeout=120 --show_skipped --coverage  --coverpkg openmdao --cover-omit \*tests/\*  --cover-omit \*devtools/\* --cover-omit \*test_suite/\* --cover-omit \*docs/\* --cover-omit \*code_review/\*;
   else
-    testflo -n 1 --timeout=120 openmdao;
+    testflo -n 1 openmdao --timeout=120 --show_skipped;
   fi
 
 after_success:
 # again, only run coverage operations on the upload machine after success.
+# strip the site-package path so that links works on coveralls.io
 - if [ "$UPLOAD_DOCS" ]; then
     coveralls --rcfile=../../.coveragerc --output=coveralls.json;
-    sed 's/\/home\/travis\/miniconda\/lib\/python'"$PY"'\/site-packages\///g' < coveralls.json > coveralls-upd.json;
+    SITE=`python -c 'import site; print(site.getsitepackages()[0])'`;
+    sed "s/${SITE//\//\\/}\///g" < coveralls.json > coveralls-upd.json;
     coveralls --upload=coveralls-upd.json;
   fi
 

@@ -11,7 +11,7 @@ class CSCMatrix(COOMatrix):
     Sparse matrix in Compressed Col Storage format.
     """
 
-    def _build(self, num_rows, num_cols, in_ranges, out_ranges):
+    def _build(self, num_rows, num_cols, system=None):
         """
         Allocate the matrix.
 
@@ -21,12 +21,10 @@ class CSCMatrix(COOMatrix):
             number of rows in the matrix.
         num_cols : int
             number of cols in the matrix.
-        in_ranges : dict
-            Maps input var name to column range.
-        out_ranges : dict
-            Maps output var name to row range.
+        system : <System>
+            owning system.
         """
-        super(CSCMatrix, self)._build(num_rows, num_cols, in_ranges, out_ranges)
+        super(CSCMatrix, self)._build(num_rows, num_cols, system)
         self._coo = self._matrix
 
     def _pre_update(self):
@@ -45,3 +43,21 @@ class CSCMatrix(COOMatrix):
         # because on older versions of scipy, self._coo.tocsc() reuses the row/col arrays and the
         # result is that self._coo.row and self._coo.col get scrambled after csc conversion.
         self._matrix = csc_matrix((coo.data, (coo.row, coo.col)), shape=coo.shape)
+
+    def _convert_mask(self, mask):
+        """
+        Convert the mask to the format of this sparse matrix (CSC, etc.) from COO.
+
+        Parameters
+        ----------
+        mask : ndarray
+            The mask of indices to zero out.
+
+        Returns
+        -------
+        ndarray
+            The converted mask array.
+        """
+        coo = self._coo
+        csc = csc_matrix((mask, (coo.row, coo.col)), shape=coo.shape)
+        return csc.data

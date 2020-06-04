@@ -1,0 +1,312 @@
+input:focus,
+select:focus,
+textarea:focus,
+button:focus {
+	outline: none;
+}
+
+body {
+	position: absolute;
+	top: 0;
+	width: 100vw;
+	height: 100vh;
+	overflow: hidden;
+	font-family: helvetica, sans-serif;
+	margin: 0;
+	padding: 0;
+	background-color: white;
+}
+
+#all_pt_n2_content_div {
+	position: absolute;
+	width: 100vw;
+	z-index: 5;
+}
+
+#ptN2ContentDivId {
+    display: flex;
+    flex: 0 0 auto;
+}
+
+#d3_content_div {
+	display: flex;
+	flex: auto;
+	height: 100vh;
+	align-items: flex-start;
+	justify-content: baseline;
+	overflow: auto;
+	position: relative;
+	margin-left: -75px;
+	transition: margin-left 0.4s;
+}
+
+#svgDiv {
+	position: absolute;
+	top: 5px;
+	left: 30px;
+    z-index: 2;
+    display: flex;
+    /* flex: 0 0 auto; */
+    /* resize: both; */
+    overflow: visible;
+}
+
+
+#svgId {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: flex;
+    flex: 0 0 auto;
+    transform-origin: 0 0;
+}
+
+#n2-resizer-box {
+    position: absolute;
+    right: -3px;
+}
+
+.inactive-resizer-box {
+    visibility: visible;
+    left: auto;
+    border: 3px solid transparent;
+    pointer-events: none;
+}
+
+.active-resizer-box {
+    left: -3px;
+    visibility: visible;
+    border: 3px dashed #98daba;
+    pointer-events: initial;
+}
+
+.hidden-resizer-box {
+    visibility: hidden;
+}
+
+#n2-resizer-handle {
+    position: absolute;
+    right: -2px;
+    bottom: 0px;
+    margin: 0;
+    height: 18px;
+    cursor: nwse-resize;
+    pointer-events: initial;
+    overflow: hidden;
+}
+
+.inactive-resizer-handle::before {
+    content: '\25a8';
+}
+.inactive-resizer-handle {
+    background: linear-gradient(135deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0) 54%, rgba(255,255,255,1) 55%, rgba(255,255,255,1) 100%);
+    font-size: 20px;
+    border: 0;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    -moz-background-clip: text;
+    -moz-text-fill-color: transparent;
+    font-weight: bold;
+    text-align: right;
+    vertical-align: bottom;
+    width: 18px;
+    padding: 0;
+}
+
+.active-resizer-handle {
+    background: #98daba;
+    border: 1px solid #98daba;
+    border-bottom-right-radius: 0;
+    color: #006000;
+    font-size: 9pt;
+    align-items: center;
+    display: flex;
+    width: auto;
+    padding: 1px 5px 1px 5px;
+}
+
+/* The Modal (background) */
+.modal {
+	display: none;
+	/* Hidden by default */
+	position: fixed;
+	/* Stay in place */
+	z-index: 9999;
+	/* Sit on top */
+	padding-top: 10px;
+	/* Location of the box */
+	left: 0;
+	top: 0;
+	width: 100%;
+	/* Full width */
+	height: 100%;
+	/* Full height */
+	overflow: auto;
+	/* Enable scroll if needed */
+	background-color: rgb(0, 0, 0);
+	/* Fallback color */
+	background-color: rgba(0, 0, 0, 0.4);
+	/* Black w/ opacity */
+}
+
+/* Modal Content */
+.modal-content {
+	font-family: helvetica, sans-serif;
+	font-size: 14px;
+	position: relative;
+	background-color: #fefefe;
+	margin: 10px 100px 10px 100px;
+	padding: 0;
+	border: 1px solid #888;
+	width: auto;
+	min-width: 950px;
+	box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
+	-webkit-animation-name: animatetop;
+	-webkit-animation-duration: 0.4s;
+	animation-name: animatetop;
+	animation-duration: 0.4s;
+}
+
+@font-face {
+	/* Subset of fonts from Font Awesome v4.6.3 created using http://fontello.com/ */
+	font-family: 'fontello';
+	src: url('data:application/font-woff;charset=utf-8;base64,{{fontello}}')
+		format('woff');
+}
+
+
+.context-menu {
+	display: none;
+	position: absolute;
+	z-index: 10;
+	padding: 12px 0;
+	width: 240px;
+	background-color: #fff;
+	border: solid 1px #dfdfdf;
+	box-shadow: 1px 1px 2px #cfcfcf;
+}
+
+.context-menu--active {
+	display: block;
+}
+
+.context-menu__items {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.context-menu__item {
+	display: block;
+	margin-bottom: 4px;
+}
+
+.context-menu__item:last-child {
+	margin-bottom: 0;
+}
+
+.context-menu__link {
+	display: block;
+	padding: 4px 12px;
+	color: #0066aa;
+	text-decoration: none;
+}
+
+.context-menu__link:hover {
+	color: #fff;
+	background-color: #0066aa;
+}
+
+.tool-tip {
+	z-index: 10;
+	font-size: 11px;
+	padding: 5;
+	background-color: #fff;
+	border: solid 1px #dfdfdf;
+}
+
+div.offgrid {
+	z-index: 10;
+	font-size: 11px;
+	padding: 5;
+	background-color: #fff;
+	border: solid 1px #dfdfdf;
+	position: absolute;
+	opacity: 0.7;
+}
+
+
+/* The Close Button */
+.close {
+	color: white;
+	float: right;
+	font-size: 28px;
+	font-weight: bold;
+}
+
+.close:hover,
+.close:focus {
+	color: #000;
+	text-decoration: none;
+	cursor: pointer;
+}
+
+.modal-header {
+	font-family: helvetica, sans-serif;
+	font-size: 20px;
+	padding: 2px 16px;
+	background-color: steelblue;
+	color: white;
+	margin: 2px;
+	padding: 10px;
+}
+
+.modal-body {
+	padding: 2px 16px;
+}
+
+.modal-footer {
+	font-family: helvetica, sans-serif;
+	font-size: 12px;
+	padding: 2px 16px;
+	background-color: steelblue;
+	color: white;
+	margin: 2px;
+	padding: 10px;
+}
+
+.modal-section-header {
+    font-size: 30px;
+	font-weight: bold;
+ 	padding: 0px 20px;
+ }
+
+.toolbar-help {
+	width: auto;
+ 	height: auto;
+	padding: 0px 20px;
+}
+
+#logo-container {
+    position: absolute;
+    width: 70px;
+    height: 60px;
+    border-radius: 35px;
+    background-color: white;
+    opacity: 30%;
+    bottom: 15px;
+    right: 15px;
+    z-index: 15;
+    pointer-events: none;
+}
+
+#company-logo {
+    position: absolute;
+    max-width: 50px;
+    height: 30px;
+    left: 50%;
+    margin-left: -25px;
+    top: 50%;
+    margin-top: -15px;
+    pointer-events: none;
+}

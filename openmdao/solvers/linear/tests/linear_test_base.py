@@ -1,15 +1,11 @@
 """Common tests for linear solvers."""
-
-from __future__ import division, print_function
-from six import iteritems
-
 import unittest
 
 import numpy as np
 
 from openmdao.api import Group, IndepVarComp, Problem
 from openmdao.solvers.linear.direct import DirectSolver
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleJacVec
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
      SellarStateConnection, SellarDerivatives
@@ -32,7 +28,7 @@ class LinearSolverTests(object):
             group.linear_solver.options['maxiter'] = 2
 
             p = Problem(group)
-            p.setup(check=False)
+            p.setup()
             p.set_solver_print(level=0)
 
             # Conclude setup but don't run model.
@@ -58,7 +54,7 @@ class LinearSolverTests(object):
             # Tests derivatives on a simple comp that defines compute_jacvec.
             # Note, For DirectSolver, assemble_jac must be False for mat-vec.
             prob = Problem()
-            model = prob.model = Group()
+            model = prob.model
             model.add_subsystem('x_param', IndepVarComp('length', 3.0),
                                 promotes=['length'])
             model.add_subsystem('mycomp', TestExplCompSimpleJacVec(),
@@ -80,20 +76,20 @@ class LinearSolverTests(object):
             wrt = ['length']
 
             J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-            assert_rel_error(self, J['area', 'length'], [[2.0]], 1e-6)
+            assert_near_equal(J['area', 'length'], [[2.0]], 1e-6)
 
             prob.setup(check=False, mode='rev')
             prob['width'] = 2.0
             prob.run_model()
 
             J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-            assert_rel_error(self, J['area', 'length'], [[2.0]], 1e-6)
+            assert_near_equal(J['area', 'length'], [[2.0]], 1e-6)
 
         def test_simple_matvec_subbed(self):
             # Tests derivatives on a group that contains a simple comp that
             # defines compute_jacvec.
             prob = Problem()
-            model = prob.model = Group()
+            model = prob.model
             model.add_subsystem('x_param', IndepVarComp('length', 3.0),
                                 promotes=['length'])
             sub = model.add_subsystem('sub', Group(),
@@ -117,21 +113,21 @@ class LinearSolverTests(object):
             wrt = ['length']
 
             J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-            assert_rel_error(self, J['area', 'length'], [[2.0]], 1e-6)
+            assert_near_equal(J['area', 'length'], [[2.0]], 1e-6)
 
             prob.setup(check=False, mode='rev')
             prob['width'] = 2.0
             prob.run_model()
 
             J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-            assert_rel_error(self, J['area', 'length'], [[2.0]], 1e-6)
+            assert_near_equal(J['area', 'length'], [[2.0]], 1e-6)
 
         def test_simple_matvec_subbed_like_multipoint(self):
             # Tests derivatives on a group that contains a simple comp that
             # defines compute_jacvec. For this one, the indepvarcomp is also
             # in the subsystem.
             prob = Problem()
-            model = prob.model = Group()
+            model = prob.model
             sub = model.add_subsystem('sub', Group(),
                                       promotes=['length', 'width', 'area'])
             sub.add_subsystem('x_param', IndepVarComp('length', 3.0),
@@ -155,14 +151,14 @@ class LinearSolverTests(object):
             wrt = ['length']
 
             J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-            assert_rel_error(self, J['area', 'length'], [[2.0]], 1e-6)
+            assert_near_equal(J['area', 'length'], [[2.0]], 1e-6)
 
             prob.setup(check=False, mode='rev')
             prob['width'] = 2.0
             prob.run_model()
 
             J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-            assert_rel_error(self, J['area', 'length'], [[2.0]], 1e-6)
+            assert_near_equal(J['area', 'length'], [[2.0]], 1e-6)
 
         def test_double_arraycomp(self):
             # Mainly testing an old bug in the array return for multiple arrays
@@ -188,13 +184,13 @@ class LinearSolverTests(object):
 
             J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
             diff = np.linalg.norm(J['y1', 'x1'] - Jbase[0:2, 0:2])
-            assert_rel_error(self, diff, 0.0, 1e-8)
+            assert_near_equal(diff, 0.0, 1e-8)
             diff = np.linalg.norm(J['y1', 'x2'] - Jbase[0:2, 2:4])
-            assert_rel_error(self, diff, 0.0, 1e-8)
+            assert_near_equal(diff, 0.0, 1e-8)
             diff = np.linalg.norm(J['y2', 'x1'] - Jbase[2:4, 0:2])
-            assert_rel_error(self, diff, 0.0, 1e-8)
+            assert_near_equal(diff, 0.0, 1e-8)
             diff = np.linalg.norm(J['y2', 'x2'] - Jbase[2:4, 2:4])
-            assert_rel_error(self, diff, 0.0, 1e-8)
+            assert_near_equal(diff, 0.0, 1e-8)
 
         def test_fan_out_fwd(self):
             # Test derivatives for fan-out topology.
@@ -210,12 +206,12 @@ class LinearSolverTests(object):
             of = ['comp2.y', "comp3.y"]
 
             J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-            assert_rel_error(self, J['comp2.y', 'p.x'], [[-6.0]], 1e-6)
-            assert_rel_error(self, J['comp3.y', 'p.x'], [[15.0]], 1e-6)
+            assert_near_equal(J['comp2.y', 'p.x'], [[-6.0]], 1e-6)
+            assert_near_equal(J['comp3.y', 'p.x'], [[15.0]], 1e-6)
 
             J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-            assert_rel_error(self, J['comp2.y', 'p.x'], [[-6.0]], 1e-6)
-            assert_rel_error(self, J['comp3.y', 'p.x'], [[15.0]], 1e-6)
+            assert_near_equal(J['comp2.y', 'p.x'], [[-6.0]], 1e-6)
+            assert_near_equal(J['comp3.y', 'p.x'], [[15.0]], 1e-6)
 
         def test_fan_out_rev(self):
             # Test derivatives for fan-out topology.
@@ -231,12 +227,12 @@ class LinearSolverTests(object):
             of = ['comp2.y', "comp3.y"]
 
             J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-            assert_rel_error(self, J['comp2.y', 'p.x'], [[-6.0]], 1e-6)
-            assert_rel_error(self, J['comp3.y', 'p.x'], [[15.0]], 1e-6)
+            assert_near_equal(J['comp2.y', 'p.x'], [[-6.0]], 1e-6)
+            assert_near_equal(J['comp3.y', 'p.x'], [[15.0]], 1e-6)
 
             J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-            assert_rel_error(self, J['comp2.y', 'p.x'], [[-6.0]], 1e-6)
-            assert_rel_error(self, J['comp3.y', 'p.x'], [[15.0]], 1e-6)
+            assert_near_equal(J['comp2.y', 'p.x'], [[-6.0]], 1e-6)
+            assert_near_equal(J['comp3.y', 'p.x'], [[15.0]], 1e-6)
 
         def test_fan_out_grouped(self):
             # Test derivatives for fan-out-grouped topology.
@@ -252,12 +248,12 @@ class LinearSolverTests(object):
             of = ['sub.c2.y', "sub.c3.y"]
 
             J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-            assert_rel_error(self, J['sub.c2.y', 'iv.x'], [[-6.0]], 1e-6)
-            assert_rel_error(self, J['sub.c3.y', 'iv.x'], [[15.0]], 1e-6)
+            assert_near_equal(J['sub.c2.y', 'iv.x'], [[-6.0]], 1e-6)
+            assert_near_equal(J['sub.c3.y', 'iv.x'], [[15.0]], 1e-6)
 
             J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-            assert_rel_error(self, J['sub.c2.y', 'iv.x'], [[-6.0]], 1e-6)
-            assert_rel_error(self, J['sub.c3.y', 'iv.x'], [[15.0]], 1e-6)
+            assert_near_equal(J['sub.c2.y', 'iv.x'], [[-6.0]], 1e-6)
+            assert_near_equal(J['sub.c3.y', 'iv.x'], [[15.0]], 1e-6)
 
         def test_fan_in(self):
             # Test derivatives for fan-in topology.
@@ -273,15 +269,15 @@ class LinearSolverTests(object):
             of = ['comp3.y']
 
             J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-            assert_rel_error(self, J['comp3.y', 'p1.x1'], [[-6.0]], 1e-6)
-            assert_rel_error(self, J['comp3.y', 'p2.x2'], [[35.0]], 1e-6)
+            assert_near_equal(J['comp3.y', 'p1.x1'], [[-6.0]], 1e-6)
+            assert_near_equal(J['comp3.y', 'p2.x2'], [[35.0]], 1e-6)
 
             prob.setup(check=False, mode='rev')
             prob.run_model()
 
             J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-            assert_rel_error(self, J['comp3.y', 'p1.x1'], [[-6.0]], 1e-6)
-            assert_rel_error(self, J['comp3.y', 'p2.x2'], [[35.0]], 1e-6)
+            assert_near_equal(J['comp3.y', 'p1.x1'], [[-6.0]], 1e-6)
+            assert_near_equal(J['comp3.y', 'p2.x2'], [[35.0]], 1e-6)
 
         def test_fan_in_grouped(self):
             # Test derivatives for fan-in-grouped topology.
@@ -297,15 +293,15 @@ class LinearSolverTests(object):
             of = ['c3.y']
 
             J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-            assert_rel_error(self, J['c3.y', 'iv.x1'], [[-6.0]], 1e-6)
-            assert_rel_error(self, J['c3.y', 'iv.x2'], [[35.0]], 1e-6)
+            assert_near_equal(J['c3.y', 'iv.x1'], [[-6.0]], 1e-6)
+            assert_near_equal(J['c3.y', 'iv.x2'], [[35.0]], 1e-6)
 
             prob.setup(check=False, mode='rev')
             prob.run_model()
 
             J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-            assert_rel_error(self, J['c3.y', 'iv.x1'], [[-6.0]], 1e-6)
-            assert_rel_error(self, J['c3.y', 'iv.x2'], [[35.0]], 1e-6)
+            assert_near_equal(J['c3.y', 'iv.x1'], [[-6.0]], 1e-6)
+            assert_near_equal(J['c3.y', 'iv.x2'], [[35.0]], 1e-6)
 
         def test_converge_diverge_flat(self):
             # Test derivatives for converge-diverge-flat topology.
@@ -321,16 +317,16 @@ class LinearSolverTests(object):
             of = ['c7.y1']
 
             # Make sure value is fine.
-            assert_rel_error(self, prob['c7.y1'], -102.7, 1e-6)
+            assert_near_equal(prob['c7.y1'], -102.7, 1e-6)
 
             J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-            assert_rel_error(self, J['c7.y1', 'iv.x'], [[-40.75]], 1e-6)
+            assert_near_equal(J['c7.y1', 'iv.x'], [[-40.75]], 1e-6)
 
             prob.setup(check=False, mode='rev')
             prob.run_model()
 
             J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-            assert_rel_error(self, J['c7.y1', 'iv.x'], [[-40.75]], 1e-6)
+            assert_near_equal(J['c7.y1', 'iv.x'], [[-40.75]], 1e-6)
 
         def test_converge_diverge_groups(self):
             # Test derivatives for converge-diverge-groups topology.
@@ -346,16 +342,16 @@ class LinearSolverTests(object):
             of = ['c7.y1']
 
             # Make sure value is fine.
-            assert_rel_error(self, prob['c7.y1'], -102.7, 1e-6)
+            assert_near_equal(prob['c7.y1'], -102.7, 1e-6)
 
             J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-            assert_rel_error(self, J['c7.y1', 'iv.x'], [[-40.75]], 1e-6)
+            assert_near_equal(J['c7.y1', 'iv.x'], [[-40.75]], 1e-6)
 
             prob.setup(check=False, mode='rev')
             prob.run_model()
 
             J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-            assert_rel_error(self, J['c7.y1', 'iv.x'], [[-40.75]], 1e-6)
+            assert_near_equal(J['c7.y1', 'iv.x'], [[-40.75]], 1e-6)
 
         def test_single_diamond(self):
             # Test derivatives for flat diamond topology.
@@ -371,15 +367,15 @@ class LinearSolverTests(object):
             of = ['c4.y1', 'c4.y2']
 
             J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-            assert_rel_error(self, J['c4.y1', 'iv.x'], [[25]], 1e-6)
-            assert_rel_error(self, J['c4.y2', 'iv.x'], [[-40.5]], 1e-6)
+            assert_near_equal(J['c4.y1', 'iv.x'], [[25]], 1e-6)
+            assert_near_equal(J['c4.y2', 'iv.x'], [[-40.5]], 1e-6)
 
             prob.setup(check=False, mode='rev')
             prob.run_model()
 
             J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-            assert_rel_error(self, J['c4.y1', 'iv.x'], [[25]], 1e-6)
-            assert_rel_error(self, J['c4.y2', 'iv.x'], [[-40.5]], 1e-6)
+            assert_near_equal(J['c4.y1', 'iv.x'], [[25]], 1e-6)
+            assert_near_equal(J['c4.y2', 'iv.x'], [[-40.5]], 1e-6)
 
         def test_single_diamond_grouped(self):
             # Test derivatives for grouped diamond topology.
@@ -396,15 +392,15 @@ class LinearSolverTests(object):
             of = ['c4.y1', 'c4.y2']
 
             J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-            assert_rel_error(self, J['c4.y1', 'iv.x'], [[25]], 1e-6)
-            assert_rel_error(self, J['c4.y2', 'iv.x'], [[-40.5]], 1e-6)
+            assert_near_equal(J['c4.y1', 'iv.x'], [[25]], 1e-6)
+            assert_near_equal(J['c4.y2', 'iv.x'], [[-40.5]], 1e-6)
 
             prob.setup(check=False, mode='rev')
             prob.run_model()
 
             J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-            assert_rel_error(self, J['c4.y1', 'iv.x'], [[25]], 1e-6)
-            assert_rel_error(self, J['c4.y2', 'iv.x'], [[-40.5]], 1e-6)
+            assert_near_equal(J['c4.y1', 'iv.x'], [[25]], 1e-6)
+            assert_near_equal(J['c4.y2', 'iv.x'], [[-40.5]], 1e-6)
 
         def test_sellar_derivs_grouped(self):
             # Test derivatives across a converged Sellar model.
@@ -418,8 +414,8 @@ class LinearSolverTests(object):
             prob.run_model()
 
             # Just make sure we are at the right answer
-            assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-            assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+            assert_near_equal(prob['y1'], 25.58830273, .00001)
+            assert_near_equal(prob['y2'], 12.05848819, .00001)
 
             wrt = ['x', 'z']
             of = ['obj', 'con1', 'con2']
@@ -433,15 +429,15 @@ class LinearSolverTests(object):
             Jbase['obj', 'z'] = np.array([[9.61001155, 1.78448534]])
 
             J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-            for key, val in iteritems(Jbase):
-                assert_rel_error(self, J[key], val, .00001)
+            for key, val in Jbase.items():
+                assert_near_equal(J[key], val, .00001)
 
             prob.setup(check=False, mode='rev')
             prob.run_model()
 
             J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-            for key, val in iteritems(Jbase):
-                assert_rel_error(self, J[key], val, .00001)
+            for key, val in Jbase.items():
+                assert_near_equal(J[key], val, .00001)
 
         def test_sellar_state_connection(self):
             # Test derivatives across a converged Sellar model.
@@ -454,8 +450,8 @@ class LinearSolverTests(object):
             prob.run_model()
 
             # Just make sure we are at the right answer
-            assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-            assert_rel_error(self, prob['d2.y2'], 12.05848819, .00001)
+            assert_near_equal(prob['y1'], 25.58830273, .00001)
+            assert_near_equal(prob['d2.y2'], 12.05848819, .00001)
 
             wrt = ['x', 'z']
             of = ['obj', 'con1', 'con2']
@@ -469,12 +465,12 @@ class LinearSolverTests(object):
             Jbase['obj', 'z'] = np.array([[9.61001155, 1.78448534]])
 
             J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-            for key, val in iteritems(Jbase):
-                assert_rel_error(self, J[key], val, .00001)
+            for key, val in Jbase.items():
+                assert_near_equal(J[key], val, .00001)
 
             prob.setup(check=False, mode='rev')
             prob.run_model()
 
             J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-            for key, val in iteritems(Jbase):
-                assert_rel_error(self, J[key], val, .00001)
+            for key, val in Jbase.items():
+                assert_near_equal(J[key], val, .00001)

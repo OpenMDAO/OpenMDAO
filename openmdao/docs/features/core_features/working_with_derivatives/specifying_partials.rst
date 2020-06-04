@@ -22,7 +22,8 @@ However, in some cases it might be needed if a previous glob pattern matched a l
 .. embed-code::
     openmdao.jacobians.tests.test_jacobian_features.SimpleCompDependence.setup
 
-2. Declaring multiple derivatives using glob patterns (see https://docs.python.org/3.6/library/fnmatch.html).
+2. Declaring multiple derivatives using glob patterns
+(see https://docs.python.org/3.6/library/fnmatch.html).
 
 .. embed-code::
     openmdao.jacobians.tests.test_jacobian_features.SimpleCompGlob.setup

@@ -1,6 +1,7 @@
-from openmdao.api import ImplicitComponent
+import openmdao.api as om
 
-class QuadraticComp(ImplicitComponent):
+
+class QuadraticComp(om.ImplicitComponent):
     """
     A Simple Implicit Component representing a Quadratic Equation.
 

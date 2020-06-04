@@ -1,11 +1,9 @@
 """Define the MultiFiMetaModel class."""
-from six.moves import range
 from itertools import chain
 
 import numpy as np
 
 from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
-from openmdao.utils.general_utils import warn_deprecation
 
 
 def _get_name_fi(name, fi_index):
@@ -112,10 +110,11 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
         self.options.declare('nfi', types=int, default=1, lower=1,
                              desc='Number of levels of fidelity.')
 
-    def _setup_procs(self, pathname, comm, mode):
+    def _setup_procs(self, pathname, comm, mode, setup_mode, prob_options):
         self._input_sizes = list(self._static_input_sizes)
 
-        super(MultiFiMetaModelUnStructuredComp, self)._setup_procs(pathname, comm, mode)
+        super(MultiFiMetaModelUnStructuredComp, self)._setup_procs(pathname, comm, mode,
+                                                                   setup_mode, prob_options)
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
                   units=None, desc=''):
@@ -248,10 +247,10 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
                 if num_sample[fi] is None:
                     num_sample[fi] = len(val)
                 elif len(val) != num_sample[fi]:
-                    msg = "MultiFiMetaModelUnStructured: Each variable must have the same number"\
-                          " of training points. Expected {0} but found {1} "\
-                          "points for '{2}'."\
-                          .format(num_sample[fi], len(val), name)
+                    msg = "{}: Each variable must have the same number"\
+                          " of training points. Expected {} but found {} "\
+                          "points for '{}'."\
+                          .format(self.msginfo, num_sample[fi], len(val), name)
                     raise RuntimeError(msg)
 
         inputs = [np.zeros((num_sample[fi], self._input_sizes[fi]))
@@ -293,52 +292,10 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
 
             surrogate = self._metadata(name_root).get('surrogate')
             if surrogate is None:
-                msg = "MultiFiMetaModelUnStructured '{}': No surrogate specified for output '{}'"
-                raise RuntimeError(msg.format(self.pathname, name_root))
+                msg = "{}: No surrogate specified for output '{}'"
+                raise RuntimeError(msg.format(self.msginfo, name_root))
             else:
                 surrogate.train_multifi(inputs, self._training_output[name])
 
         self._training_input = inputs
         self.train = False
-
-
-class MultiFiMetaModel(MultiFiMetaModelUnStructuredComp):
-    """
-    Deprecated.
-    """
-
-    def __init__(self, *args, **kwargs):
-        """
-        Capture Initialize to throw warning.
-
-        Parameters
-        ----------
-        *args : list
-            Deprecated arguments.
-        **kwargs : dict
-            Deprecated arguments.
-        """
-        warn_deprecation("'MultiFiMetaModel' component has been deprecated. Use "
-                         "'MultiFiMetaModelUnStructuredComp' instead.")
-        super(MultiFiMetaModel, self).__init__(*args, **kwargs)
-
-
-class MultiFiMetaModelUnStructured(MultiFiMetaModelUnStructuredComp):
-    """
-    Deprecated.
-    """
-
-    def __init__(self, *args, **kwargs):
-        """
-        Capture Initialize to throw warning.
-
-        Parameters
-        ----------
-        *args : list
-            Deprecated arguments.
-        **kwargs : dict
-            Deprecated arguments.
-        """
-        warn_deprecation("'MultiFiMetaModelUnStructured' has been deprecated. Use "
-                         "'MultiFiMetaModelUnStructuredComp' instead.")
-        super(MultiFiMetaModelUnStructured, self).__init__(*args, **kwargs)

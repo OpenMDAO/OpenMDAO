@@ -1,10 +1,7 @@
 """Define the DefaultAllocator class."""
-from __future__ import division, print_function
-
 import warnings
 
 import numpy as np
-from six.moves import range
 
 from openmdao.proc_allocators.proc_allocator import ProcAllocator, ProcAllocationError
 from openmdao.utils.mpi import MPI
@@ -71,7 +68,7 @@ class DefaultAllocator(ProcAllocator):
 
             # Result
             sub_comm = comm.Split(iproc)
-            return isubs_list[iproc], sub_comm, [comm.rank, comm.rank + sub_comm.size]
+            return sorted(isubs_list[iproc]), sub_comm, [comm.rank, comm.rank + sub_comm.size]
 
         num_procs = min_procs.copy()
 

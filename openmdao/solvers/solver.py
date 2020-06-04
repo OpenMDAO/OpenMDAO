@@ -1,13 +1,11 @@
 """Define the base Solver, NonlinearSolver, and LinearSolver classes."""
 
-from __future__ import division, print_function
-
-from six import iteritems, reraise
 from collections import OrderedDict
 import os
 import pprint
 import re
 import sys
+import weakref
 
 import numpy as np
 
@@ -17,6 +15,7 @@ from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
+from openmdao.core.component import Component
 
 _emptyset = set()
 
@@ -161,7 +160,7 @@ class Solver(object):
         self._solver_info = None
 
         # Solver options
-        self.options = OptionsDictionary()
+        self.options = OptionsDictionary(parent_name=self.msginfo)
         self.options.declare('maxiter', types=int, default=10,
                              desc='maximum number of iterations')
         self.options.declare('atol', default=1e-10,
@@ -170,11 +169,11 @@ class Solver(object):
                              desc='relative error tolerance')
         self.options.declare('iprint', types=int, default=1,
                              desc='whether to print output')
-        self.options.declare('err_on_maxiter', types=bool, default=False,
+        self.options.declare('err_on_non_converge', types=bool, default=False,
                              desc="When True, AnalysisError will be raised if we don't converge.")
 
         # Case recording options
-        self.recording_options = OptionsDictionary()
+        self.recording_options = OptionsDictionary(parent_name=self.msginfo)
         self.recording_options.declare('record_abs_error', types=bool, default=True,
                                        desc='Set to True to record absolute error at the \
                                        solver level')
@@ -187,19 +186,28 @@ class Solver(object):
                                        desc='Set to True to record outputs at the solver level')
         self.recording_options.declare('record_solver_residuals', types=bool, default=False,
                                        desc='Set to True to record residuals at the solver level')
-        self.recording_options.declare('record_metadata', types=bool, desc='Record metadata',
+        self.recording_options.declare('record_metadata', types=bool, desc='Deprecated. Recording '
+                                       'of metadata will always be done',
+                                       deprecation="The recording option, record_metadata, on "
+                                       "Solver is "
+                                       "deprecated. Recording of metadata will always be done",
                                        default=True)
         self.recording_options.declare('includes', types=list, default=['*'],
-                                       desc='Patterns for variables to include in recording')
+                                       desc="Patterns for variables to include in recording. \
+                                       Paths are relative to solver's Group. \
+                                       Uses fnmatch wildcards")
         self.recording_options.declare('excludes', types=list, default=[],
-                                       desc='Patterns for vars to exclude in recording '
-                                            '(processed post-includes)')
+                                       desc="Patterns for vars to exclude in recording. \
+                                       (processed post-includes) \
+                                       Paths are relative to solver's Group. \
+                                       Uses fnmatch wildcards"
+                                       )
         # Case recording related
         self._filtered_vars_to_record = {}
         self._norm0 = 0.0
 
         # What the solver supports.
-        self.supports = OptionsDictionary()
+        self.supports = OptionsDictionary(parent_name=self.msginfo)
         self.supports.declare('gradients', types=bool, default=False)
         self.supports.declare('implicit_components', types=bool, default=False)
 
@@ -209,6 +217,20 @@ class Solver(object):
         self._rec_mgr = RecordingManager()
 
         self.cite = ""
+
+    @property
+    def msginfo(self):
+        """
+        Return info to prepend to messages.
+
+        Returns
+        -------
+        str
+            Info to prepend to messages.
+        """
+        if self._system is None:
+            return type(self).__name__
+        return '{} in {}'.format(type(self).__name__, self._system().msginfo)
 
     def _assembled_jac_solver_iter(self):
         """
@@ -250,10 +272,16 @@ class Solver(object):
         depth : int
             depth of the current system (already incremented).
         """
-        self._system = system
+        self._system = weakref.ref(system)
         self._depth = depth
         self._solver_info = system._solver_info
         self._recording_iter = system._recording_iter
+
+        if system.pathname:
+            parent_name = self.msginfo
+            self.options._parent_name = parent_name
+            self.recording_options._parent_name = parent_name
+            self.supports._parent_name = parent_name
 
         if isinstance(self, LinearSolver) and not system._use_derivatives:
             return
@@ -261,38 +289,30 @@ class Solver(object):
         self._rec_mgr.startup(self)
         self._rec_mgr.record_metadata(self)
 
-        myoutputs = myresiduals = myinputs = set()
+        myoutputs = myresiduals = myinputs = []
         incl = self.recording_options['includes']
         excl = self.recording_options['excludes']
 
-        if self.recording_options['record_solver_residuals']:
-            if isinstance(self, NonlinearSolver):
-                residuals = system._residuals
-            else:  # it's a LinearSolver
-                residuals = system._vectors['residual']['linear']
+        # doesn't matter if we're a linear or nonlinear solver.  The names for
+        # inputs, outputs, and residuals are the same for both the 'linear' and 'nonlinear'
+        # vectors.
+        if system.pathname:
+            incl = ['.'.join((system.pathname, i)) for i in incl]
+            excl = ['.'.join((system.pathname, i)) for i in excl]
 
-            myresiduals = {n for n in residuals._names if check_path(n, incl, excl)}
+        if self.recording_options['record_solver_residuals']:
+            myresiduals = [n for n in system._residuals._views if check_path(n, incl, excl)]
 
         if self.recording_options['record_outputs']:
-            if isinstance(self, NonlinearSolver):
-                outputs = system._outputs
-            else:  # it's a LinearSolver
-                outputs = system._vectors['output']['linear']
-
-            myoutputs = {n for n in outputs._names if check_path(n, incl, excl)}
+            myoutputs = [n for n in system._outputs._views if check_path(n, incl, excl)]
 
         if self.recording_options['record_inputs']:
-            if isinstance(self, NonlinearSolver):
-                inputs = system._inputs
-            else:
-                inputs = system._vectors['input']['linear']
-
-            myinputs = {n for n in inputs._names if check_path(n, incl, excl)}
+            myinputs = [n for n in system._inputs._views if check_path(n, incl, excl)]
 
         self._filtered_vars_to_record = {
-            'in': myinputs,
-            'out': myoutputs,
-            'res': myresiduals
+            'input': myinputs,
+            'output': myoutputs,
+            'residual': myresiduals
         }
 
     def _set_solver_print(self, level=2, type_='all'):
@@ -323,7 +343,7 @@ class Solver(object):
         rel_res : float
             current relative residual norm.
         """
-        if (self.options['iprint'] == 2 and self._system.comm.rank == 0):
+        if (self.options['iprint'] == 2 and self._system().comm.rank == 0):
 
             prefix = self._solver_info.prefix
             solver_name = self.SOLVER
@@ -369,24 +389,44 @@ class Solver(object):
                 # be wrapped in the with for stack purposes, so we locally assign  norm & norm0
                 # into the class.
                 rec.abs = norm
+                if norm0 == 0:
+                    norm0 = 1
                 rec.rel = norm / norm0
 
-            if norm0 == 0:
-                norm0 = 1
             self._mpi_print(self._iter_count, norm, norm / norm0)
 
-        if self._system.comm.rank == 0 or os.environ.get('USE_PROC_FILES'):
+        system = self._system()
+        if system.comm.rank == 0 or os.environ.get('USE_PROC_FILES'):
             prefix = self._solver_info.prefix + self.SOLVER
-            if np.isinf(norm) or np.isnan(norm) or (norm > atol and norm / norm0 > rtol):
+
+            # Solver terminated early because a Nan in the norm doesn't satisfy the while-loop
+            # conditionals.
+            if np.isinf(norm) or np.isnan(norm):
+                msg = "Solver '{}' on system '{}': residuals contain 'inf' or 'NaN' after {} " + \
+                      "iterations."
                 if iprint > -1:
-                    msg = ' Failed to Converge in {} iterations'.format(self._iter_count)
-                    print(prefix + msg)
+                    print(prefix + msg.format(self.SOLVER, system.pathname,
+                                              self._iter_count))
 
                 # Raise AnalysisError if requested.
-                if self.options['err_on_maxiter']:
-                    msg = "Solver '{}' on system '{}' failed to converge."
-                    raise AnalysisError(msg.format(self.SOLVER, self._system.pathname))
+                if self.options['err_on_non_converge']:
+                    raise AnalysisError(msg.format(self.SOLVER, system.pathname,
+                                                   self._iter_count))
 
+            # Solver hit maxiter without meeting desired tolerances.
+            elif (norm > atol and norm / norm0 > rtol):
+                msg = "Solver '{}' on system '{}' failed to converge in {} iterations."
+
+                if iprint > -1:
+                    print(prefix + msg.format(self.SOLVER, system.pathname,
+                                              self._iter_count))
+
+                # Raise AnalysisError if requested.
+                if self.options['err_on_non_converge']:
+                    raise AnalysisError(msg.format(self.SOLVER, system.pathname,
+                                                   self._iter_count))
+
+            # Solver converged
             elif iprint == 1:
                 print(prefix + ' Converged in {} iterations'.format(self._iter_count))
             elif iprint == 2:
@@ -454,60 +494,27 @@ class Solver(object):
         metadata = create_local_meta(self.SOLVER)
 
         # Get the data
-        data = {}
+        data = {
+            'abs': kwargs.get('abs') if self.recording_options['record_abs_error'] else None,
+            'rel': kwargs.get('rel') if self.recording_options['record_rel_error'] else None,
+            'input': {},
+            'output': {},
+            'residual': {}
+        }
 
-        if self.recording_options['record_abs_error']:
-            data['abs'] = kwargs.get('abs')
-        else:
-            data['abs'] = None
-
-        if self.recording_options['record_rel_error']:
-            data['rel'] = kwargs.get('rel')
-        else:
-            data['rel'] = None
-
-        system = self._system
-        if isinstance(self, NonlinearSolver):
-            outputs = system._outputs
-            inputs = system._inputs
-            residuals = system._residuals
-        else:  # it's a LinearSolver
-            outputs = system._vectors['output']['linear']
-            inputs = system._vectors['input']['linear']
-            residuals = system._vectors['residual']['linear']
+        system = self._system()
+        vec_name = 'nonlinear' if isinstance(self, NonlinearSolver) else 'linear'
+        filt = self._filtered_vars_to_record
+        parallel = self._rec_mgr._check_parallel() if system.comm.size > 1 else False
 
         if self.recording_options['record_outputs']:
-            data['o'] = {}
-            if 'out' in self._filtered_vars_to_record:
-                for out in self._filtered_vars_to_record['out']:
-                    if out in outputs._names:
-                        data['o'][out] = outputs._views[out]
-            else:
-                data['o'] = outputs
-        else:
-            data['o'] = None
+            data['output'] = system._retrieve_data_of_kind(filt, 'output', vec_name, parallel)
 
         if self.recording_options['record_inputs']:
-            data['i'] = {}
-            if 'in' in self._filtered_vars_to_record:
-                for inp in self._filtered_vars_to_record['in']:
-                    if inp in inputs._names:
-                        data['i'][inp] = inputs._views[inp]
-            else:
-                data['i'] = inputs
-        else:
-            data['i'] = None
+            data['input'] = system._retrieve_data_of_kind(filt, 'input', vec_name, parallel)
 
         if self.recording_options['record_solver_residuals']:
-            data['r'] = {}
-            if 'res' in self._filtered_vars_to_record:
-                for res in self._filtered_vars_to_record['res']:
-                    if res in residuals._names:
-                        data['r'][res] = residuals._views[res]
-            else:
-                data['r'] = residuals
-        else:
-            data['r'] = None
+            data['residual'] = system._retrieve_data_of_kind(filt, 'residual', vec_name, parallel)
 
         self._rec_mgr.record_iteration(self, data, metadata)
 
@@ -530,6 +537,21 @@ class Solver(object):
             Complex mode flag; set to True prior to commencing complex step.
         """
         pass
+
+    def _disallow_distrib_solve(self):
+        """
+        Raise an exception if our system or any subsystems are distributed or non-local.
+        """
+        s = self._system()
+        if s.comm.size == 1:
+            return
+
+        from openmdao.core.group import Group
+        if (isinstance(s, Group) and (s._has_distrib_vars or s._contains_parallel_group)) or \
+           (isinstance(s, Component) and s.options['distributed']):
+            msg = "{} linear solver in {} cannot be used in or above a ParallelGroup or a " + \
+                "distributed component."
+            raise RuntimeError(msg.format(type(self).__name__, s.msginfo))
 
 
 class NonlinearSolver(Solver):
@@ -569,11 +591,10 @@ class NonlinearSolver(Solver):
         """
         try:
             self._solve()
-        except Exception:
-            exc = sys.exc_info()
+        except Exception as err:
             if self.options['debug_print']:
                 self._print_exc_debug_info()
-            reraise(*exc)
+            raise err
 
     def _iter_initialize(self):
         """
@@ -586,9 +607,10 @@ class NonlinearSolver(Solver):
         float
             error at the first iteration.
         """
+        system = self._system()
         if self.options['debug_print']:
-            self._err_cache['inputs'] = self._system._inputs._copy_views()
-            self._err_cache['outputs'] = self._system._outputs._copy_views()
+            self._err_cache['inputs'] = system._inputs._copy_views()
+            self._err_cache['outputs'] = system._outputs._copy_views()
 
         if self.options['maxiter'] > 0:
             self._run_apply()
@@ -602,11 +624,11 @@ class NonlinearSolver(Solver):
         """
         Run the apply_nonlinear method on the system.
         """
-        self._recording_iter.stack.append(('_run_apply', 0))
+        self._recording_iter.push(('_run_apply', 0))
         try:
-            self._system._apply_nonlinear()
+            self._system()._apply_nonlinear()
         finally:
-            self._recording_iter.stack.pop()
+            self._recording_iter.pop()
 
     def _iter_get_norm(self):
         """
@@ -617,32 +639,33 @@ class NonlinearSolver(Solver):
         float
             norm.
         """
-        return self._system._residuals.get_norm()
+        return self._system()._residuals.get_norm()
 
     def _disallow_discrete_outputs(self):
         """
         Raise an exception if any discrete outputs exist in our System.
         """
-        if self._system._var_allprocs_discrete['output']:
-            raise RuntimeError("System '%s' has a %s solver and contains discrete outputs %s." %
-                               (self._system.pathname, type(self).__name__,
-                                sorted(self._system._var_allprocs_discrete['output'])))
+        if self._system()._var_allprocs_discrete['output']:
+            raise RuntimeError("%s has a %s solver and contains discrete outputs %s." %
+                               (self._system().msginfo, type(self).__name__,
+                                sorted(self._system()._var_allprocs_discrete['output'])))
 
     def _print_exc_debug_info(self):
         coord = self._recording_iter.get_formatted_iteration_coordinate()
 
-        out_str = "\n# Inputs and outputs at start of iteration '%s':\n" % coord
-        for vec_type, views in iteritems(self._err_cache):
-            out_str += '\n'
-            out_str += '# nonlinear %s\n' % vec_type
-            out_str += pprint.pformat(views)
-            out_str += '\n'
+        out_strs = ["\n# Inputs and outputs at start of iteration '%s':\n" % coord]
+        for vec_type, views in self._err_cache.items():
+            out_strs.append('\n# nonlinear %s\n' % vec_type)
+            out_strs.append(pprint.pformat(views))
+            out_strs.append('\n')
 
+        out_str = ''.join(out_strs)
         print(out_str)
 
-        filename = coord.replace('._solve_nonlinear', '')
-        filename = re.sub('[^0-9a-zA-Z]', '_', filename) + '.dat'
-        with open(filename, 'w') as f:
+        rank = MPI.COMM_WORLD.rank if MPI is not None else 0
+        filename = 'solver_errors.%d.out' % rank
+
+        with open(filename, 'a') as f:
             f.write(out_str)
             print("Inputs and outputs at start of iteration have been "
                   "saved to '%s'." % filename)
@@ -652,17 +675,20 @@ class NonlinearSolver(Solver):
         """
         Perform a Gauss-Seidel iteration over this Solver's subsystems.
         """
-        system = self._system
-        if system._subsystems_allprocs:
-            loc = system._loc_subsys_map
-
-        for isub, subsys in enumerate(system._subsystems_allprocs):
+        system = self._system()
+        for isub, (subsys, local) in enumerate(system._all_subsystem_iter()):
             system._transfer('nonlinear', 'fwd', isub)
 
-            if subsys.name in loc:
-                subsys._solve_nonlinear()
+            if local:
 
-            system._check_reconf_update(subsys)
+                try:
+                    subsys._solve_nonlinear()
+                except AnalysisError as err:
+                    if 'reraise_child_analysiserror' not in self.options or \
+                            self.options['reraise_child_analysiserror']:
+                        raise err
+
+            system._check_child_reconf(subsys)
 
 
 class LinearSolver(Solver):
@@ -730,8 +756,8 @@ class LinearSolver(Solver):
         """
         super(LinearSolver, self)._setup_solvers(system, depth)
         if self.options['assemble_jac'] and not self.supports['assembled_jac']:
-            raise RuntimeError("Linear solver '%s' in system '%s' doesn't support assembled "
-                               "jacobians." % (self.SOLVER, system.pathname))
+            raise RuntimeError("Linear solver %s doesn't support assembled "
+                               "jacobians." % self.msginfo)
 
     def solve(self, vec_names, mode, rel_systems=None):
         """
@@ -752,16 +778,16 @@ class LinearSolver(Solver):
         """
         Run the apply_linear method on the system.
         """
-        self._recording_iter.stack.append(('_run_apply', 0))
+        self._recording_iter.push(('_run_apply', 0))
 
-        system = self._system
+        system = self._system()
         scope_out, scope_in = system._get_scope()
 
         try:
             system._apply_linear(self._assembled_jac, self._vec_names, self._rel_systems,
                                  self._mode, scope_out, scope_in)
         finally:
-            self._recording_iter.stack.pop()
+            self._recording_iter.pop()
 
 
 class BlockLinearSolver(LinearSolver):
@@ -793,18 +819,20 @@ class BlockLinearSolver(LinearSolver):
 
     def _create_rhs_vecs(self):
         self._rhs_vecs = rhs = {}
-        for vec_name in self._system._lin_rel_vec_name_list:
+        system = self._system()
+        for vec_name in system._lin_rel_vec_name_list:
             if self._mode == 'fwd':
-                rhs[vec_name] = self._system._vectors['residual'][vec_name]._data.copy()
+                rhs[vec_name] = system._vectors['residual'][vec_name]._data.copy()
             else:
-                rhs[vec_name] = self._system._vectors['output'][vec_name]._data.copy()
+                rhs[vec_name] = system._vectors['output'][vec_name]._data.copy()
 
     def _update_rhs_vecs(self):
-        for vec_name in self._system._lin_rel_vec_name_list:
+        system = self._system()
+        for vec_name in system._lin_rel_vec_name_list:
             if self._mode == 'fwd':
-                self._rhs_vecs[vec_name][:] = self._system._vectors['residual'][vec_name]._data
+                self._rhs_vecs[vec_name][:] = system._vectors['residual'][vec_name]._data
             else:
-                self._rhs_vecs[vec_name][:] = self._system._vectors['output'][vec_name]._data
+                self._rhs_vecs[vec_name][:] = system._vectors['output'][vec_name]._data
 
     def _set_complex_step_mode(self, active):
         """
@@ -817,7 +845,7 @@ class BlockLinearSolver(LinearSolver):
         active : bool
             Complex mode flag; set to True prior to commencing complex step.
         """
-        for vec_name in self._system._lin_rel_vec_name_list:
+        for vec_name in self._system()._lin_rel_vec_name_list:
             if active:
                 self._rhs_vecs[vec_name] = self._rhs_vecs[vec_name].astype(np.complex)
             else:
@@ -855,7 +883,7 @@ class BlockLinearSolver(LinearSolver):
         float
             norm.
         """
-        system = self._system
+        system = self._system()
 
         if self._mode == 'fwd':
             b_vecs = system._vectors['residual']

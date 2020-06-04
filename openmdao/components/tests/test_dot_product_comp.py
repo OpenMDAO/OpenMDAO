@@ -1,10 +1,12 @@
-from __future__ import print_function, division, absolute_import
-
+"""
+Unit test for DotProductComp.
+"""
 import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, Group, IndepVarComp, DotProductComp
+import openmdao.api as om
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class TestDotProductCompNx3(unittest.TestCase):
@@ -12,9 +14,9 @@ class TestDotProductCompNx3(unittest.TestCase):
     def setUp(self):
         self.nn = 5
 
-        self.p = Problem(model=Group())
+        self.p = om.Problem()
 
-        ivc = IndepVarComp()
+        ivc = om.IndepVarComp()
         ivc.add_output(name='a', shape=(self.nn, 3))
         ivc.add_output(name='b', shape=(self.nn, 3))
 
@@ -23,7 +25,7 @@ class TestDotProductCompNx3(unittest.TestCase):
                                    promotes_outputs=['a', 'b'])
 
         self.p.model.add_subsystem(name='dot_prod_comp',
-                                   subsys=DotProductComp(vec_size=self.nn))
+                                   subsys=om.DotProductComp(vec_size=self.nn))
 
         self.p.model.connect('a', 'dot_prod_comp.a')
         self.p.model.connect('b', 'dot_prod_comp.b')
@@ -60,9 +62,9 @@ class TestDotProductCompNx4(unittest.TestCase):
     def setUp(self):
         self.nn = 100
 
-        self.p = Problem(model=Group())
+        self.p = om.Problem()
 
-        ivc = IndepVarComp()
+        ivc = om.IndepVarComp()
         ivc.add_output(name='a', shape=(self.nn, 4))
         ivc.add_output(name='b', shape=(self.nn, 4))
 
@@ -71,7 +73,7 @@ class TestDotProductCompNx4(unittest.TestCase):
                                    promotes_outputs=['a', 'b'])
 
         self.p.model.add_subsystem(name='dot_prod_comp',
-                                   subsys=DotProductComp(vec_size=self.nn, length=4))
+                                   subsys=om.DotProductComp(vec_size=self.nn, length=4))
 
         self.p.model.connect('a', 'dot_prod_comp.a')
         self.p.model.connect('b', 'dot_prod_comp.b')
@@ -108,9 +110,9 @@ class TestUnits(unittest.TestCase):
     def setUp(self):
         self.nn = 5
 
-        self.p = Problem(model=Group())
+        self.p = om.Problem()
 
-        ivc = IndepVarComp()
+        ivc = om.IndepVarComp()
         ivc.add_output(name='a', shape=(self.nn, 3), units='lbf')
         ivc.add_output(name='b', shape=(self.nn, 3), units='ft/s')
 
@@ -119,9 +121,9 @@ class TestUnits(unittest.TestCase):
                                    promotes_outputs=['a', 'b'])
 
         self.p.model.add_subsystem(name='dot_prod_comp',
-                                   subsys=DotProductComp(vec_size=self.nn,
-                                                         a_units='N', b_units='m/s',
-                                                         c_units='W'))
+                                   subsys=om.DotProductComp(vec_size=self.nn,
+                                                            a_units='N', b_units='m/s',
+                                                            c_units='W'))
 
         self.p.model.connect('a', 'dot_prod_comp.a')
         self.p.model.connect('b', 'dot_prod_comp.b')
@@ -154,7 +156,7 @@ class TestUnits(unittest.TestCase):
                                                decimal=6)
 
 
-class TestForDocs(unittest.TestCase):
+class TestFeature(unittest.TestCase):
 
     def test(self):
         """
@@ -162,14 +164,14 @@ class TestForDocs(unittest.TestCase):
         at 100 points simultaneously.
         """
         import numpy as np
-        from openmdao.api import Problem, Group, IndepVarComp, DotProductComp
-        from openmdao.utils.assert_utils import assert_rel_error
+
+        import openmdao.api as om
 
         n = 100
 
-        p = Problem(model=Group())
+        p = om.Problem()
 
-        ivc = IndepVarComp()
+        ivc = om.IndepVarComp()
         ivc.add_output(name='force', shape=(n, 3))
         ivc.add_output(name='vel', shape=(n, 3))
 
@@ -177,8 +179,8 @@ class TestForDocs(unittest.TestCase):
                               subsys=ivc,
                               promotes_outputs=['force', 'vel'])
 
-        dp_comp = DotProductComp(vec_size=n, length=3, a_name='F', b_name='v', c_name='P',
-                                 a_units='N', b_units='m/s', c_units='W')
+        dp_comp = om.DotProductComp(vec_size=n, length=3, a_name='F', b_name='v', c_name='P',
+                                    a_units='N', b_units='m/s', c_units='W')
 
         p.model.add_subsystem(name='dot_prod_comp', subsys=dp_comp)
 
@@ -199,7 +201,7 @@ class TestForDocs(unittest.TestCase):
             a_i = p['force'][i, :]
             b_i = p['vel'][i, :]
             expected_i = np.dot(a_i, b_i) / 1000.0
-            assert_rel_error(self, p.get_val('dot_prod_comp.P', units='kW')[i], expected_i)
+            assert_near_equal(p.get_val('dot_prod_comp.P', units='kW')[i], expected_i)
 
 
 if __name__ == '__main__':

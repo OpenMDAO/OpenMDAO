@@ -3,7 +3,7 @@ This benchmark documents a performance problem with data transfers that needs to
 """
 import unittest
 
-from openmdao.api import Problem
+import openmdao.api as om
 from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group import MultipointBeamGroup
 
 
@@ -22,9 +22,9 @@ class BenchBeamNP1(unittest.TestCase):
         num_cp = 4
         num_load_cases = 32
 
-        prob = Problem(model=MultipointBeamGroup(E=E, L=L, b=b, volume=volume,
-                                                 num_elements=num_elements, num_cp=num_cp,
-                                                 num_load_cases=num_load_cases))
+        prob = om.Problem(model=MultipointBeamGroup(E=E, L=L, b=b, volume=volume,
+                                                    num_elements=num_elements, num_cp=num_cp,
+                                                    num_load_cases=num_load_cases))
 
         prob.setup()
 
@@ -46,9 +46,9 @@ class BenchBeamNP2(unittest.TestCase):
         num_cp = 4
         num_load_cases = 32
 
-        prob = Problem(model=MultipointBeamGroup(E=E, L=L, b=b, volume=volume,
-                                                 num_elements=num_elements, num_cp=num_cp,
-                                                 num_load_cases=num_load_cases))
+        prob = om.Problem(model=MultipointBeamGroup(E=E, L=L, b=b, volume=volume,
+                                                    num_elements=num_elements, num_cp=num_cp,
+                                                    num_load_cases=num_load_cases))
 
         prob.setup()
 
@@ -71,9 +71,9 @@ class BenchBeamNP4(unittest.TestCase):
         num_cp = 4
         num_load_cases = 32
 
-        prob = Problem(model=MultipointBeamGroup(E=E, L=L, b=b, volume=volume,
-                                                 num_elements=num_elements, num_cp=num_cp,
-                                                 num_load_cases=num_load_cases))
+        prob = om.Problem(model=MultipointBeamGroup(E=E, L=L, b=b, volume=volume,
+                                                    num_elements=num_elements, num_cp=num_cp,
+                                                    num_load_cases=num_load_cases))
 
         prob.setup()
 

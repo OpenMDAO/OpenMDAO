@@ -2,7 +2,7 @@ import numpy as np
 import unittest
 
 from openmdao.api import NearestNeighbor
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class TestNearestNeighbor(unittest.TestCase):
@@ -11,7 +11,7 @@ class TestNearestNeighbor(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             NearestNeighbor(interpolant_type='junk')
 
-        expected_msg = "Value ('junk') of option 'interpolant_type' is not one of " \
+        expected_msg = "NearestNeighbor: Value ('junk') of option 'interpolant_type' is not one of " \
                        "['linear', 'weighted', 'rbf']."
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -26,7 +26,7 @@ class TestLinearInterpolator1D(unittest.TestCase):
     def test_training(self):
         for x0, y0 in zip(self.x, self.y):
             mu = self.surrogate.predict(x0)
-            assert_rel_error(self, mu, [y0], 1e-9)
+            assert_near_equal(mu, [y0], 1e-9)
 
     def test_prediction(self):
         test_x = np.array([[0.5], [1.5], [2.5]])
@@ -34,13 +34,13 @@ class TestLinearInterpolator1D(unittest.TestCase):
 
         for x0, y0 in zip(test_x, expected_y):
             mu = self.surrogate.predict(x0)
-            assert_rel_error(self, mu, [y0], 1e-9)
+            assert_near_equal(mu, [y0], 1e-9)
 
     def test_bulk_prediction(self):
         test_x = np.array([[0.5], [1.5], [2.5]])
         expected_y = np.array([[0.5], [1.], [0.5]])
         mu = self.surrogate.predict(test_x)
-        assert_rel_error(self, mu, expected_y, 1e-9)
+        assert_near_equal(mu, expected_y, 1e-9)
 
     def test_jacobian(self):
         test_x = np.array([[0.5], [1.5], [2.5]])
@@ -48,7 +48,7 @@ class TestLinearInterpolator1D(unittest.TestCase):
 
         for x0, y0 in zip(test_x, expected_deriv):
             jac = self.surrogate.linearize(x0)
-            assert_rel_error(self, jac, [y0], 1e-9)
+            assert_near_equal(jac, [y0], 1e-9)
 
     def test_pt_cache(self):
         test_x = np.array([[0.5]])
@@ -60,7 +60,7 @@ class TestLinearInterpolator1D(unittest.TestCase):
 
         mu = self.surrogate.linearize(test_x)
 
-        assert_rel_error(self, mu, np.array([[1.]]), 1e-6)
+        assert_near_equal(mu, np.array([[1.]]), 1e-6)
 
 
 class TestLinearInterpolatorND(unittest.TestCase):
@@ -77,7 +77,7 @@ class TestLinearInterpolatorND(unittest.TestCase):
     def test_training(self):
         for x0, y0 in zip(self.x, self.y):
             mu = self.surrogate.predict(x0)
-            assert_rel_error(self, mu, [y0], 1e-9)
+            assert_near_equal(mu, [y0], 1e-9)
 
     def test_prediction(self):
         test_x = np.array([[1., 0.5],
@@ -97,7 +97,7 @@ class TestLinearInterpolatorND(unittest.TestCase):
 
         for x0, y0 in zip(test_x, expected_y):
             mu = self.surrogate.predict(x0)
-            assert_rel_error(self, mu, [y0], 1e-9)
+            assert_near_equal(mu, [y0], 1e-9)
 
     def test_bulk_prediction(self):
         test_x = np.array([[1., 0.5],
@@ -116,7 +116,7 @@ class TestLinearInterpolatorND(unittest.TestCase):
                                ])
 
         mu = self.surrogate.predict(test_x)
-        assert_rel_error(self, mu, expected_y, 1e-9)
+        assert_near_equal(mu, expected_y, 1e-9)
 
     def test_jacobian(self):
         test_x = np.array([[1., 0.5],
@@ -133,7 +133,7 @@ class TestLinearInterpolatorND(unittest.TestCase):
 
         for x0, y0 in zip(test_x, expected_deriv):
             mu = self.surrogate.linearize(x0)
-            assert_rel_error(self, mu, y0, 1e-9)
+            assert_near_equal(mu, y0, 1e-9)
 
 
 class TestWeightedInterpolator1D(unittest.TestCase):
@@ -155,7 +155,7 @@ class TestWeightedInterpolator1D(unittest.TestCase):
     def test_training(self):
         for x0, y0 in zip(self.x, self.y):
             mu = self.surrogate.predict(x0, num_neighbors=3)
-            assert_rel_error(self, mu, [y0], 1e-9)
+            assert_near_equal(mu, [y0], 1e-9)
 
     def test_prediction(self):
         test_x = np.array([[0.5], [1.5], [2.5]])
@@ -163,7 +163,7 @@ class TestWeightedInterpolator1D(unittest.TestCase):
 
         for x0, y0 in zip(test_x, expected_y):
             mu = self.surrogate.predict(x0, num_neighbors=3)
-            assert_rel_error(self, mu, [y0], 1e-8)
+            assert_near_equal(mu, [y0], 1e-8)
 
     def test_bulk_prediction(self):
 
@@ -171,7 +171,7 @@ class TestWeightedInterpolator1D(unittest.TestCase):
         expected_y = np.array([[0.52631579], [0.94736842], [0.52631579]])
 
         mu = self.surrogate.predict(test_x, num_neighbors=3)
-        assert_rel_error(self, mu, expected_y, 1e-8)
+        assert_near_equal(mu, expected_y, 1e-8)
 
     def test_jacobian(self):
         test_x = np.array([[0.5], [1.5], [2.5]])
@@ -179,7 +179,7 @@ class TestWeightedInterpolator1D(unittest.TestCase):
 
         for x0, y0 in zip(test_x, expected_deriv):
             jac = self.surrogate.linearize(x0, num_neighbors=3)
-            assert_rel_error(self, jac, [y0], 1e-6)
+            assert_near_equal(jac, [y0], 1e-6)
 
     def test_pt_cache(self):
         test_x = np.array([[0.5]])
@@ -191,7 +191,7 @@ class TestWeightedInterpolator1D(unittest.TestCase):
 
         mu = self.surrogate.linearize(test_x, num_neighbors=3)
 
-        assert_rel_error(self, mu, np.array([[1.92797784]]), 1e-6)
+        assert_near_equal(mu, np.array([[1.92797784]]), 1e-6)
 
 
 class TestWeightedInterpolatorND(unittest.TestCase):
@@ -208,7 +208,7 @@ class TestWeightedInterpolatorND(unittest.TestCase):
     def test_training(self):
         for x0, y0 in zip(self.x, self.y):
             mu = self.surrogate.predict(x0)
-            assert_rel_error(self, mu, [y0], 1e-9)
+            assert_near_equal(mu, [y0], 1e-9)
 
     def test_prediction(self):
         test_x = np.array([[1., 0.5],
@@ -235,7 +235,7 @@ class TestWeightedInterpolatorND(unittest.TestCase):
 
         for x0, y0 in zip(test_x, expected_y):
             mu = self.surrogate.predict(x0, num_neighbors=5, dist_eff=3)
-            assert_rel_error(self, mu, [y0], 1e-6)
+            assert_near_equal(mu, [y0], 1e-6)
 
     def test_bulk_prediction(self):
         test_x = np.array([[1., 0.5],
@@ -261,7 +261,7 @@ class TestWeightedInterpolatorND(unittest.TestCase):
                                ])
 
         mu = self.surrogate.predict(test_x, num_neighbors=5, dist_eff=3)
-        assert_rel_error(self, mu, expected_y, 1e-6)
+        assert_near_equal(mu, expected_y, 1e-6)
 
     def test_jacobian(self):
         test_x = np.array([[1., 0.5],
@@ -279,7 +279,7 @@ class TestWeightedInterpolatorND(unittest.TestCase):
 
         for x0, y0 in zip(test_x, expected_deriv):
             mu = self.surrogate.linearize(x0)
-            assert_rel_error(self, mu, y0, 1e-6)
+            assert_near_equal(mu, y0, 1e-6)
 
 
 class TestRBFInterpolator1D(unittest.TestCase):
@@ -292,7 +292,7 @@ class TestRBFInterpolator1D(unittest.TestCase):
     def test_training(self):
         for x0, y0 in zip(self.x, self.y):
             mu = self.surrogate.predict(x0)
-            assert_rel_error(self, mu, [y0], 1e-9)
+            assert_near_equal(mu, [y0], 1e-9)
 
     def test_prediction(self):
         test_x = np.array([[0.5], [1.5], [2.5]])
@@ -300,7 +300,7 @@ class TestRBFInterpolator1D(unittest.TestCase):
 
         for x0, y0 in zip(test_x, expected_y):
             mu = self.surrogate.predict(x0)
-            assert_rel_error(self, mu, [y0], 1e-8)
+            assert_near_equal(mu, [y0], 1e-8)
 
     def test_bulk_prediction(self):
 
@@ -308,11 +308,11 @@ class TestRBFInterpolator1D(unittest.TestCase):
         expected_y = np.array([[0.82893803], [1.72485853], [0.82893803]])
 
         mu = self.surrogate.predict(test_x)
-        assert_rel_error(self, mu, expected_y, 1e-8)
+        assert_near_equal(mu, expected_y, 1e-8)
 
     def test_jacobian(self):
         from distutils.version import LooseVersion
-        if LooseVersion(np.__version__) >= LooseVersion("1.14"):
+        if LooseVersion(np.__version__) == LooseVersion("1.14"):
             raise unittest.SkipTest("This test doesn't work in numpy 1.14.")
 
         test_x = np.array([[0.5], [2.5], [1.0]])
@@ -320,7 +320,7 @@ class TestRBFInterpolator1D(unittest.TestCase):
 
         for x0, y0 in zip(test_x, expected_deriv):
             jac = self.surrogate.linearize(x0)
-            assert_rel_error(self, jac, [y0], 1e-6)
+            assert_near_equal(jac, [y0], 1e-6)
 
     def test_pt_cache(self):
         test_x = np.array([[0.5]])
@@ -332,7 +332,7 @@ class TestRBFInterpolator1D(unittest.TestCase):
 
         mu = self.surrogate.linearize(test_x)
 
-        assert_rel_error(self, mu, np.array([[2.34609214]]), 1e-6)
+        assert_near_equal(mu, np.array([[2.34609214]]), 1e-6)
 
 
 class TestRBFInterpolatorND(unittest.TestCase):
@@ -349,7 +349,7 @@ class TestRBFInterpolatorND(unittest.TestCase):
     def test_training(self):
         for x0, y0 in zip(self.x, self.y):
             mu = self.surrogate.predict(x0)
-            assert_rel_error(self, mu, [y0], 1e-9)
+            assert_near_equal(mu, [y0], 1e-9)
 
     def test_prediction(self):
         test_x = np.array([[1., 0.5],
@@ -374,7 +374,7 @@ class TestRBFInterpolatorND(unittest.TestCase):
 
         for x0, y0 in zip(test_x, expected_y):
             mu = self.surrogate.predict(x0)
-            assert_rel_error(self, mu, [y0], 1e-6)
+            assert_near_equal(mu, [y0], 1e-6)
 
     def test_bulk_prediction(self):
         test_x = np.array([[1., 0.5],
@@ -399,11 +399,11 @@ class TestRBFInterpolatorND(unittest.TestCase):
                                ])
 
         mu = self.surrogate.predict(test_x)
-        assert_rel_error(self, mu, expected_y, 1e-6)
+        assert_near_equal(mu, expected_y, 1e-6)
 
     def test_jacobian(self):
         from distutils.version import LooseVersion
-        if LooseVersion(np.__version__) >= LooseVersion("1.14"):
+        if LooseVersion(np.__version__) == LooseVersion("1.14"):
             raise unittest.SkipTest("This test doesn't work in numpy 1.14.")
 
         test_x = np.array([[0.5, 0.5],
@@ -425,4 +425,4 @@ class TestRBFInterpolatorND(unittest.TestCase):
 
         for x0, y0 in zip(test_x, expected_deriv):
             mu = self.surrogate.linearize(x0)
-            assert_rel_error(self, mu, y0, 1e-6)
+            assert_near_equal(mu, y0, 1e-6)

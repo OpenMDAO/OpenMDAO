@@ -91,14 +91,15 @@ NewtonSolver Option Examples
       openmdao.solvers.nonlinear.tests.test_newton.TestNewtonFeatures.test_feature_max_sub_solves
       :layout: interleave
 
-**err_on_maxiter**
+**err_on_non_converge**
 
-  If you set this to True, then when the solver hits the iteration limit without meeting the tolerance criteria, it
+  If you set this to True, then when the solver doesn't converge, either by hitting the iteration limit
+  without meeting the tolerance criteria, or by encountering a NaN or inf, it
   will raise an AnalysisError exception. This is mainly important when coupled with a higher-level solver or
   driver (e.g., `pyOptSparseDriver`)that can handle the AnalysisError by adapting the stepsize and retrying.
 
   .. embed-code::
-      openmdao.solvers.nonlinear.tests.test_newton.TestNewtonFeatures.test_feature_err_on_maxiter
+      openmdao.solvers.nonlinear.tests.test_newton.TestNewtonFeatures.test_feature_err_on_non_converge
       :layout: interleave
 
   This feature can be set on any iterative nonlinear or linear solver.

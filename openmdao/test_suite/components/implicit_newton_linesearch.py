@@ -1,13 +1,13 @@
 """Components used mainly for testing Newton and line searches."""
+from math import exp
 
 import numpy as np
 import unittest
-from math import exp
 
-from openmdao.api import ImplicitComponent
+import openmdao.api as om
 
 
-class ImplCompOneState(ImplicitComponent):
+class ImplCompOneState(om.ImplicitComponent):
     """
     A Simple Implicit Component
 
@@ -44,7 +44,7 @@ class ImplCompOneState(ImplicitComponent):
         J[('y', 'y')] = y + 2.0 - 32.0*y*exp(-16.0*y*y) - 10.0*exp(-5.0*y)
 
 
-class ImplCompTwoStates(ImplicitComponent):
+class ImplCompTwoStates(om.ImplicitComponent):
     """
     A Simple Implicit Component with an additional output equation.
 
@@ -100,7 +100,7 @@ class ImplCompTwoStates(ImplicitComponent):
         jac[('z', 'x')] = outputs['z']
 
 
-class ImplCompTwoStatesArrays(ImplicitComponent):
+class ImplCompTwoStatesArrays(om.ImplicitComponent):
     """
     A Simple Implicit Component with an additional output equation.
 

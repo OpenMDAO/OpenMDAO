@@ -1,7 +1,6 @@
 """
 Design-of-Experiments Driver.
 """
-from __future__ import print_function
 
 import traceback
 import inspect
@@ -162,7 +161,7 @@ class DOEDriver(Driver):
         else:
             case_gen = self.options['generator']
 
-        for case in case_gen(self._designvars, self._problem.model):
+        for case in case_gen(self._designvars, self._problem().model):
             self._run_case(case)
             self.iter_count += 1
 
@@ -191,7 +190,7 @@ class DOEDriver(Driver):
 
         with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
             try:
-                self._problem.model.run_solve_nonlinear()
+                self._problem().model.run_solve_nonlinear()
                 metadata['success'] = 1
                 metadata['msg'] = ''
             except AnalysisError:
@@ -269,60 +268,19 @@ class DOEDriver(Driver):
 
         super(DOEDriver, self)._setup_recording()
 
-    def record_iteration(self):
+    def _get_recorder_metadata(self, case_name):
         """
-        Record an iteration of the current Driver.
+        Return metadata from the latest iteration for use in the recorder.
+
+        Parameters
+        ----------
+        case_name : str
+            Name of current case.
+
+        Returns
+        -------
+        dict
+            Metadata dictionary for the recorder.
         """
-        if not self._rec_mgr._recorders:
-            return
-
-        # Get the data to record (collective calls that get across all ranks)
-        opts = self.recording_options
-        filt = self._filtered_vars_to_record
-
-        if opts['record_desvars']:
-            des_vars = self.get_design_var_values(filt['des'])
-        else:
-            des_vars = {}
-
-        if opts['record_objectives']:
-            obj_vars = self.get_objective_values(filt['obj'])
-        else:
-            obj_vars = {}
-
-        if opts['record_constraints']:
-            con_vars = self.get_constraint_values(filt['con'])
-        else:
-            con_vars = {}
-
-        if opts['record_responses']:
-            # res_vars = self.get_response_values(filt['res'])  # not really working yet
-            res_vars = {}
-        else:
-            res_vars = {}
-
-        model = self._problem.model
-
-        names = model._outputs._names
-        views = model._outputs._views
-        sys_vars = {name: views[name] for name in names if name in filt['sys']}
-
-        out_vars = des_vars
-        out_vars.update(res_vars)
-        out_vars.update(obj_vars)
-        out_vars.update(con_vars)
-        out_vars.update(sys_vars)
-
-        if self.recording_options['record_inputs']:
-            names = model._inputs._names
-            views = model._inputs._views
-            in_vars = {name: views[name] for name in names if name in filt['in']}
-        else:
-            in_vars = {}
-
-        data = {
-            'out': out_vars,
-            'in': in_vars
-        }
-
-        self._rec_mgr.record_iteration(self, data, self._metadata)
+        self._metadata['name'] = case_name
+        return self._metadata

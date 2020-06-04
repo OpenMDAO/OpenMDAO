@@ -1,19 +1,17 @@
 """ Unit tests for the design_variable and response interface to system."""
-from __future__ import print_function
-
-from six.moves import range
-
 import unittest
 
 import numpy as np
 
-import openmdao
-from openmdao.api import Problem, NonlinearBlockGS, Group, IndepVarComp
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.api import Problem, NonlinearBlockGS, Group, IndepVarComp, ExecComp, ScipyKrylov,  \
+    IndepVarComp, ScipyOptimizeDriver
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.mpi import MPI
 
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1withDerivatives, \
-     SellarDis2withDerivatives, ExecComp, ScipyKrylov
+     SellarDis2withDerivatives
+
+from openmdao.core.tests.test_distribcomp import DistribInputDistribOutputComp
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -22,31 +20,6 @@ except ImportError:
 
 
 class TestDesVarsResponses(unittest.TestCase):
-
-    def test_api_backwards_compatible(self):
-        raise unittest.SkipTest("api not implemented yet")
-
-        prob = Problem()
-        prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
-
-        prob.driver = ScipyOpt()
-        prob.driver.options['method'] = 'slsqp'
-        prob.driver.add_design_var('x', lower=-100, upper=100)
-        prob.driver.add_design_var('z', lower=-100, upper=100)
-        prob.driver.add_objective('obj')
-        prob.driver.add_constraint('con1')
-        prob.driver.add_constraint('con2')
-
-        prob.setup(check=False)
-
-        des_vars = prob.model.get_des_vars()
-        obj = prob.model.get_objectives()
-        constraints = prob.model.get_constraints()
-
-        self.assertItemsEqual(des_vars.keys(), ('x', 'z'))
-        self.assertItemsEqual(obj.keys(), ('obj',))
-        self.assertItemsEqual(constraints.keys(), ('con1', 'con2'))
 
     def test_api_on_model(self):
 
@@ -61,7 +34,7 @@ class TestDesVarsResponses(unittest.TestCase):
         prob.model.add_constraint('con1')
         prob.model.add_constraint('con2')
 
-        prob.setup(check=False)
+        prob.setup()
 
         des_vars = prob.model.get_design_vars()
         obj = prob.model.get_objectives()
@@ -84,7 +57,7 @@ class TestDesVarsResponses(unittest.TestCase):
         prob.model.add_response('con1', type_="con")
         prob.model.add_response('con2', type_="con")
 
-        prob.setup(check=False)
+        prob.setup()
 
         des_vars = prob.model.get_design_vars()
         responses = prob.model.get_responses()
@@ -109,7 +82,7 @@ class TestDesVarsResponses(unittest.TestCase):
         prob.model.add_constraint('con1')
         prob.model.add_constraint('con2')
 
-        prob.setup(check=False)
+        prob.setup()
 
         des_vars = prob.model.get_design_vars()
         obj = prob.model.get_objectives()
@@ -134,7 +107,7 @@ class TestDesVarsResponses(unittest.TestCase):
         prob.model.add_constraint('con1')
         prob.model.add_constraint('con2')
 
-        prob.setup(check=False)
+        prob.setup()
 
         des_vars = prob.model.get_design_vars()
         obj = prob.model.get_objectives()
@@ -160,7 +133,7 @@ class TestDesVarsResponses(unittest.TestCase):
         prob.model.add_constraint('con1')
         prob.model.add_constraint('con2')
 
-        prob.setup(check=False)
+        prob.setup()
 
         des_vars = prob.model.get_design_vars()
         obj = prob.model.get_objectives()
@@ -173,7 +146,7 @@ class TestDesVarsResponses(unittest.TestCase):
     def test_api_on_subsystems(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0))
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])))
@@ -210,7 +183,7 @@ class TestDesVarsResponses(unittest.TestCase):
         con_comp2 = prob.model.con_cmp2
         con_comp2.add_constraint('con2')
 
-        prob.setup(check=False)
+        prob.setup()
 
         des_vars = prob.model.get_design_vars()
         obj = prob.model.get_objectives()
@@ -233,9 +206,9 @@ class TestDesvarOnModel(unittest.TestCase):
         prob.model.add_design_var('junk')
 
         with self.assertRaises(RuntimeError) as context:
-            prob.setup(check=False)
+            prob.setup()
 
-        self.assertEqual(str(context.exception), "Output not found for design variable 'junk' in system ''.")
+        self.assertEqual(str(context.exception), "SellarDerivatives (<model>): Output not found for design variable 'junk'.")
 
     def test_desvar_affine_and_scaleradder(self):
 
@@ -290,7 +263,7 @@ class TestDesvarOnModel(unittest.TestCase):
         prob.model.add_constraint('con1')
         prob.model.add_constraint('con2')
 
-        prob.setup(check=False)
+        prob.setup()
 
         des_vars = prob.model.get_design_vars()
 
@@ -316,7 +289,7 @@ class TestDesvarOnModel(unittest.TestCase):
         prob.model.add_constraint('con1', scaler=1e6)
         prob.model.add_constraint('con2', scaler=1e6)
 
-        prob.setup(check=False)
+        prob.setup()
 
         des_vars = prob.model.get_design_vars()
 
@@ -341,7 +314,7 @@ class TestDesvarOnModel(unittest.TestCase):
             prob.model.add_design_var(42, lower=-100, upper=100, ref0=-100.0,
                                       ref=100)
 
-        self.assertEqual(str(context.exception), 'The name argument should '
+        self.assertEqual(str(context.exception), 'SellarDerivatives: The name argument should '
                                                  'be a string, got 42')
 
     def test_desvar_invalid_bounds(self):
@@ -376,9 +349,9 @@ class TestConstraintOnModel(unittest.TestCase):
         prob.model.add_constraint('junk')
 
         with self.assertRaises(RuntimeError) as context:
-            prob.setup(check=False)
+            prob.setup()
 
-        self.assertEqual(str(context.exception), "Output not found for response 'junk' in system ''.")
+        self.assertEqual(str(context.exception), "SellarDerivatives (<model>): Output not found for response 'junk'.")
 
     def test_constraint_affine_and_scaleradder(self):
 
@@ -433,7 +406,7 @@ class TestConstraintOnModel(unittest.TestCase):
                                   ref=100)
         prob.model.add_constraint('con2')
 
-        prob.setup(check=False)
+        prob.setup()
 
         constraints = prob.model.get_constraints()
 
@@ -458,7 +431,7 @@ class TestConstraintOnModel(unittest.TestCase):
             prob.model.add_design_var(42, lower=-100, upper=100, ref0=-100.0,
                                       ref=100)
 
-        self.assertEqual(str(context.exception), 'The name argument should '
+        self.assertEqual(str(context.exception), 'SellarDerivatives: The name argument should '
                                                  'be a string, got 42')
 
     def test_constraint_invalid_bounds(self):
@@ -492,28 +465,80 @@ class TestConstraintOnModel(unittest.TestCase):
             prob.model.add_constraint(42, lower=-100, upper=100, ref0=-100.0,
                                       ref=100)
 
-        self.assertEqual(str(context.exception), 'The name argument should '
+        self.assertEqual(str(context.exception), 'SellarDerivatives: The name argument should '
                                                  'be a string, got 42')
 
-    def test_constraint_invalid_bounds(self):
+    def test_constraint_invalid_lower(self):
 
         prob = Problem()
 
-        prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
 
         with self.assertRaises(TypeError) as context:
             prob.model.add_constraint('con1', lower='foo', upper=[0, 100],
                                       ref0=-100.0, ref=100)
 
-        self.assertEqual(str(context.exception), 'Expected values of lower to be an '
-                                                 'Iterable of numeric values, '
-                                                 'or a scalar numeric value. '
-                                                 'Got foo instead.')
-
-        with self.assertRaises(ValueError) as context:
-            prob.model.add_constraint('con1', lower=0.0, upper=['a', 'b'],
+        with self.assertRaises(TypeError) as context2:
+            prob.model.add_constraint('con1', lower=['zero', 5], upper=[0, 100],
                                       ref0=-100.0, ref=100)
+
+        msg = ("Argument 'lower' can not be a string ('foo' given). You can not "
+        "specify a variable as lower bound. You can only provide constant "
+        "float values")
+        self.assertEqual(str(context.exception), msg)
+
+        msg2 = ("Argument 'lower' can not be a string ('['zero', 5]' given). You can not "
+        "specify a variable as lower bound. You can only provide constant "
+        "float values")
+        self.assertEqual(str(context2.exception), msg2)
+
+    def test_constraint_invalid_upper(self):
+
+        prob = Problem()
+
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+
+        with self.assertRaises(TypeError) as context:
+            prob.model.add_constraint('con1', lower=0, upper='foo',
+                                      ref0=-100.0, ref=100)
+
+        with self.assertRaises(TypeError) as context2:
+            prob.model.add_constraint('con1', lower=0, upper=[1, 'foo'],
+                                      ref0=-100.0, ref=100)
+
+        msg = ("Argument 'upper' can not be a string ('foo' given). You can not "
+        "specify a variable as upper bound. You can only provide constant "
+        "float values")
+        self.assertEqual(str(context.exception), msg)
+
+        msg2 = ("Argument 'upper' can not be a string ('[1, 'foo']' given). You can not "
+        "specify a variable as upper bound. You can only provide constant "
+        "float values")
+        self.assertEqual(str(context2.exception), msg2)
+
+    def test_constraint_invalid_equals(self):
+        prob = Problem()
+
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+
+        with self.assertRaises(TypeError) as context:
+            prob.model.add_constraint('con1', equals='foo')
+
+        with self.assertRaises(TypeError) as context2:
+            prob.model.add_constraint('con1', equals=[1, 'two'])
+
+        msg = ("Argument 'equals' can not be a string ('foo' given). You can "
+               "not specify a variable as equals bound. You can only provide "
+               "constant float values")
+        self.assertEqual(str(context.exception), msg)
+
+        msg2 = ("Argument 'equals' can not be a string ('[1, 'two']' given). You can "
+               "not specify a variable as equals bound. You can only provide "
+               "constant float values")
+        self.assertEqual(str(context2.exception), msg2)
 
     def test_constraint_invalid_indices(self):
 
@@ -526,21 +551,21 @@ class TestConstraintOnModel(unittest.TestCase):
             prob.model.add_constraint('con1', lower=0.0, upper=5.0,
                                       indices='foo')
 
-        self.assertEqual(str(context.exception), 'If specified, indices must '
+        self.assertEqual(str(context.exception), 'SellarDerivatives: If specified, response indices must '
                                                  'be a sequence of integers.')
 
         with self.assertRaises(ValueError) as context:
             prob.model.add_constraint('con1', lower=0.0, upper=5.0,
                                       indices=1)
 
-        self.assertEqual(str(context.exception), 'If specified, indices must '
+        self.assertEqual(str(context.exception), 'SellarDerivatives: If specified, response indices must '
                                                  'be a sequence of integers.')
 
         with self.assertRaises(ValueError) as context:
             prob.model.add_constraint('con1', lower=0.0, upper=5.0,
                                       indices=[1, 'k'])
 
-        self.assertEqual(str(context.exception), 'If specified, indices must '
+        self.assertEqual(str(context.exception), 'SellarDerivatives: If specified, response indices must '
                                                  'be a sequence of integers.')
 
         # passing an iterator for indices should be valid
@@ -557,11 +582,11 @@ class TestConstraintOnModel(unittest.TestCase):
             prob.model.add_constraint('con1', lower=0.0, upper=5.0, equals=3.0,
                                       indices='foo')
 
-        msg = "Constraint 'con1' cannot be both equality and inequality."
+        msg = "SellarDerivatives: Constraint 'con1' cannot be both equality and inequality."
         self.assertEqual(str(context.exception), msg)
 
 
-@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc is required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestAddConstraintMPI(unittest.TestCase):
 
     N_PROCS = 2
@@ -579,7 +604,7 @@ class TestAddConstraintMPI(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             prob.setup(mode='rev')
 
-        msg = "Output not found for response 'd1.junk' in system 'sub'."
+        msg = "SellarDerivatives (sub): Output not found for response 'd1.junk'."
         self.assertEqual(str(context.exception), msg)
 
 
@@ -595,10 +620,10 @@ class TestObjectiveOnModel(unittest.TestCase):
         prob.model.add_objective('junk')
 
         with self.assertRaises(RuntimeError) as context:
-            prob.setup(check=False)
+            prob.setup()
 
         self.assertEqual(str(context.exception),
-                         "Output not found for response 'junk' in system ''.")
+                         "SellarDerivatives (<model>): Output not found for response 'junk'.")
 
     def test_objective_affine_and_scaleradder(self):
 
@@ -654,7 +679,7 @@ class TestObjectiveOnModel(unittest.TestCase):
         prob.model.add_objective('obj', ref0=1000, ref=1010)
         prob.model.add_objective('con2')
 
-        prob.setup(check=False)
+        prob.setup()
 
         objectives = prob.model.get_objectives()
 
@@ -680,7 +705,7 @@ class TestObjectiveOnModel(unittest.TestCase):
             with self.assertRaises(Exception) as context:
                 prob.model.add_design_var('z', indices=[1], **args)
             self.assertEqual(str(context.exception),
-                             "'': When adding design var 'z', %s should have size 1 but instead has size 2." % name)
+                             "SellarDerivatives: When adding design var 'z', %s should have size 1 but instead has size 2." % name)
 
     def test_constraint_size_err(self):
 
@@ -694,7 +719,7 @@ class TestObjectiveOnModel(unittest.TestCase):
             with self.assertRaises(Exception) as context:
                 prob.model.add_constraint('z', indices=[1], **args)
             self.assertEqual(str(context.exception),
-                             "'': When adding constraint 'z', %s should have size 1 but instead has size 2." % name)
+                             "SellarDerivatives: When adding constraint 'z', %s should have size 1 but instead has size 2." % name)
 
     def test_objective_size_err(self):
 
@@ -708,7 +733,7 @@ class TestObjectiveOnModel(unittest.TestCase):
             with self.assertRaises(Exception) as context:
                 prob.model.add_objective('z', index=1, **args)
             self.assertEqual(str(context.exception),
-                             "'': When adding objective 'z', %s should have size 1 but instead has size 2." % name)
+                             "SellarDerivatives: When adding objective 'z', %s should have size 1 but instead has size 2." % name)
 
     def test_objective_invalid_name(self):
 
@@ -720,7 +745,7 @@ class TestObjectiveOnModel(unittest.TestCase):
         with self.assertRaises(TypeError) as context:
             prob.model.add_objective(42, ref0=-100.0, ref=100)
 
-        self.assertEqual(str(context.exception), 'The name argument should '
+        self.assertEqual(str(context.exception), 'SellarDerivatives: The name argument should '
                                                  'be a string, got 42')
 
     def test_objective_invalid_index(self):
@@ -733,7 +758,7 @@ class TestObjectiveOnModel(unittest.TestCase):
         with self.assertRaises(TypeError) as context:
             prob.model.add_objective('obj', index='foo')
 
-        self.assertEqual(str(context.exception), 'If specified, index must be an int.')
+        self.assertEqual(str(context.exception), 'SellarDerivatives: If specified, objective index must be an int.')
 
         prob.model.add_objective('obj', index=1)
 

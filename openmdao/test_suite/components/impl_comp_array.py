@@ -1,14 +1,12 @@
 """Define the implicit test component (array)."""
 
-from __future__ import division, print_function
-
 import numpy as np
 import scipy.sparse
 
-from openmdao.api import ImplicitComponent
+import openmdao.api as om
 
 
-class TestImplCompArray(ImplicitComponent):
+class TestImplCompArray(om.ImplicitComponent):
 
     def initialize(self):
         self.mtx = np.array([

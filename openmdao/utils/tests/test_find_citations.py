@@ -1,5 +1,5 @@
 import unittest
-from six.moves import cStringIO as StringIO
+from io import StringIO
 
 from openmdao.api import Problem, Group, ParallelGroup, ExecComp, IndepVarComp, NonlinearRunOnce, LinearRunOnce, NewtonSolver
 from openmdao.utils.mpi import MPI
@@ -17,7 +17,6 @@ class TestFindCite(unittest.TestCase):
 
         p = Problem()
 
-        p.model = Group()
         p.model.cite = "foobar model"
         p.model.nonlinear_solver.cite = "foobar nonlinear_solver"
         p.model.linear_solver.cite = "foobar linear_solver"
@@ -139,8 +138,6 @@ class TestFindCitePar(unittest.TestCase):
 
         p = Problem()
 
-        p.model = Group()
-        
         p.model.cite = "foobar model"
         p.model.nonlinear_solver.cite = "foobar nonlinear_solver"
         p.model.linear_solver.cite = "foobar linear_solver"
@@ -159,7 +156,7 @@ class TestFindCitePar(unittest.TestCase):
 
         self.prob = p
 
-    @unittest.skipUnless(MPI and PETScVector, "This test must be run under MPI using PETSc.")
+    @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
     def test_find_cite_petsc(self):
         p = self.prob
         p.setup()
