@@ -582,8 +582,7 @@ class TestProblem(unittest.TestCase):
 
         prob = om.Problem()
 
-        model = prob.model
-        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+        prob.model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
         prob.setup()
 
@@ -887,8 +886,6 @@ class TestProblem(unittest.TestCase):
 
         prob.run_model()
 
-        assert_near_equal(prob['x'], 2.75, 1e-6)
-
         assert_near_equal(prob['y1'], 27.3049178437, 1e-6)
 
     def test_feature_not_promoted_sellar_set_get_outputs(self):
@@ -1043,7 +1040,6 @@ class TestProblem(unittest.TestCase):
         assert_near_equal(prob['axx'][0], 95.0, 1e-6)
         assert_near_equal(prob.get_val('axx', 'degC', indices=np.array([0])), 35.0, 1e-6)
 
-    @unittest.expectedFailure
     def test_feature_get_set_with_units_diff_err(self):
         import openmdao.api as om
 
@@ -1057,7 +1053,12 @@ class TestProblem(unittest.TestCase):
                                                      y={'value': 0.0, 'units': 'inch'}),
                                  promotes=['x'])
 
-        prob.setup()
+        try:
+            prob.setup()
+        except RuntimeError as err:
+            self.assertEqual(str(err), "Group (<model>): The following inputs, ['C1.x', 'C2.x'], promoted to 'x', are connected but the metadata entries ['units', 'value'] differ. Call <group>.set_input_defaults('x', units=?, value=?), where <group> is the Group named '' to remove the ambiguity.")
+        else:
+            self.fail("Exception expected.")
 
     def test_feature_get_set_with_units_diff(self):
         import openmdao.api as om

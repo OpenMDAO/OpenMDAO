@@ -165,16 +165,16 @@ class Group(System):
 
     def set_input_defaults(self, name, val=_undefined, units=None):
         """
-        Specify metadata for connected promoted inputs without a source.
+        Specify metadata to be assumed when multiple inputs are promoted to the same name.
 
         Parameters
         ----------
         name : str
-            The name of the promoted inputs.
+            Promoted input name.
         val : object
-            Value for the auto_ivc source.
+            Value to assume for the promoted input.
         units : str or None
-            Units for the auto_ivc source.
+            Units to assume for the promoted input.
         """
         if name in self._group_inputs:
             simple_warning(f"{self.msginfo}: Adding group input '{name}' which "
@@ -2842,7 +2842,7 @@ class Group(System):
             if prom in self._group_inputs:
                 gmeta = self._group_inputs[prom]
             else:
-                gmeta = ()
+                gmeta = self._group_inputs[prom] = {}
 
             for tgt in tgts:
                 tval = self._get_val(tgt, kind='input', get_remote=True, from_src=False)
@@ -2861,6 +2861,8 @@ class Group(System):
 
             if errs:
                 self._show_ambiguity_msg(prom, errs, tgts)
+            elif src not in all_discrete_outs:
+                gmeta['units'] = sunits
 
     def _show_ambiguity_msg(self, prom, metavars, tgts):
         errs = sorted(metavars)

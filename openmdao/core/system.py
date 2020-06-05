@@ -4334,11 +4334,12 @@ class System(object):
         # if we have multiple promoted inputs that are explicitly connected to an output and units
         # have not been specified, look for group input to disambiguate
         if units is None and len(abs_names) > 1 and name != abs_name:
-            # we can't get here unless self is a Group because len(abs_names) always == 1 for comp
-            try:
-                units = self._group_inputs[name]['units']
-            except KeyError:
-                self._show_ambiguity_msg(name, ('units',), abs_names)
+            if abs_name not in self._var_allprocs_discrete['input']:
+                # can't get here unless self is a Group because len(abs_names) always == 1 for comp
+                try:
+                    units = self._group_inputs[name]['units']
+                except KeyError:
+                    self._show_ambiguity_msg(name, ('units',), abs_names)
 
         if src in self._var_allprocs_discrete['output']:
             return self._abs_get_val(src, get_remote, rank, vec_name, kind, flat)

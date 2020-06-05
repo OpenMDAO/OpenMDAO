@@ -26,14 +26,14 @@ the following:
 
 
 You use the same syntax when working with the independent variables of your problem.
-Independent variables hold values set by a user or are used as design variables by a
-:ref:`Driver <openmdao.core.driver.py>`.
+Independent variables can be used as design variables by a
+:ref:`Driver <openmdao.core.driver.py>` or set directly by a user.
 OpenMDAO requires that every input variable must have a source.  The ultimate source for any
 flow of data in an OpenMDAO model is a special component,
 :ref:`IndepVarComp <openmdao.core.indepvarcomp.py>`, that does not have any inputs.  You can
 leave some of your inputs unconnected and OpenMDAO will automatically create an
-:ref:`IndepVarComp <openmdao.core.indepvarcomp.py>` with an output that connects to each input,
-or you can create your own :ref:`IndepVarComp <openmdao.core.indepvarcomp.py>` manually.
+:ref:`IndepVarComp <openmdao.core.indepvarcomp.py>` called `_auto_ivc` with an output that connects
+to each input, or you can create your own :ref:`IndepVarComp <openmdao.core.indepvarcomp.py>`s manually.
 For example, consider our paraboloid tutorial problem which has two independent
 variables: `x` and `y`.
 
@@ -43,14 +43,13 @@ These could be defined manually and set as follows:
     :layout: interleave
 
 
-or, the inputs `x` and `y` could be left unconnected and OpenMDAO would declare an
-:ref:`IndepVarComp <openmdao.core.indepvarcomp.py>` for you called `_auto_ivc`.  The names of
-the output variables belonging to `_auto_ivc` are sequentially named as they are created and
-are of the form `v0`, `v1`, etc.  You don't really need to know those names though.  You can
-just interact with the inputs that those outputs are connected to and the framework will ensure
-that the proper values are set into the outputs (and into any other inputs connected to the
-same output).  Here's what the paraboloid tutorial problem looks like without declaring the
-:ref:`IndepVarComps <openmdao.core.indepvarcomp.py>`:
+or, the inputs `x` and `y` could be left unconnected and OpenMDAO would connect them to
+outputs on `_auto_ivc`.  The names of the output variables on `_auto_ivc` are sequentially
+named as they are created and are of the form `v0`, `v1`, etc., but you don't really need to know
+those names.  You can just interact with the inputs that those outputs are connected to
+and the framework will ensure that the proper values are set into the outputs (and into any other
+inputs connected to the same output).  Here's what the paraboloid tutorial problem looks like
+without declaring the :ref:`IndepVarComps <openmdao.core.indepvarcomp.py>`:
 
 
 .. embed-code:: openmdao.core.tests.test_problem.TestProblem.test_feature_set_indeps_auto
@@ -104,7 +103,8 @@ input is connected to an output because the input and output are promoted to the
 the promoted name will be interpreted as that of the output, and the units will be assumed to be
 those of the output as well.  If the input has not been connected to an output then the framework
 will connect it automatically to an output of `_auto_ivc`.  In this case, setting or getting using
-the input name will cause the framework to assume the units are those of the input.
+the input name will cause the framework to assume the units are those of the input, assuming
+there is no abiguity in units for example.
 
 
 Connected Inputs Without a Source
