@@ -171,7 +171,7 @@ def _get_used_before_calc_subs(group, input_srcs):
             oparts = src_abs.split('.')
             src_sys = oparts[glen]
             tgt_sys = iparts[glen]
-            hierarchy_check = True if oparts[glen+1] == iparts[glen+1] else False
+            hierarchy_check = True if oparts[glen + 1] == iparts[glen + 1] else False
 
             if (src_sys in parallel_solver and tgt_sys in parallel_solver and
                     (parallel_solver[src_sys] not in ["NL: NLBJ", "NL: Newton", "BROYDEN"]) and
