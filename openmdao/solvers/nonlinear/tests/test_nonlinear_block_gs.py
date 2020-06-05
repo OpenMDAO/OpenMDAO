@@ -458,7 +458,6 @@ class TestNLBGaussSeidel(unittest.TestCase):
                     x = outputs['x'] = 0.5
                     outputs['y'] = 2.7951 + 10.56*x**2 - 5.4*x**3 + 0.5*x**4
 
-
         prob = om.Problem(model=SmartGroup())
 
         prob.setup()
