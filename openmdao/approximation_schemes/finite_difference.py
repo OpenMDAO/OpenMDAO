@@ -296,7 +296,7 @@ class FiniteDifference(ApproximationScheme):
         """
         for vec, idxs in idx_info:
             if vec is not None:
-                vec.iadd(delta, idxs)
+                vec._data[idxs] += delta
 
         if total:
             system.run_solve_nonlinear()
@@ -305,11 +305,11 @@ class FiniteDifference(ApproximationScheme):
             system.run_apply_nonlinear()
             self._results_tmp[:] = system._residuals._data
 
-        system._residuals.set_const(self._starting_resids)
+        system._residuals._data[:] = self._starting_resids
 
         # save results and restore starting inputs/outputs
-        system._inputs.set_const(self._starting_ins)
-        system._outputs.set_const(self._starting_outs)
+        system._inputs._data[:] = self._starting_ins
+        system._outputs._data[:] = self._starting_outs
 
         return self._results_tmp
 

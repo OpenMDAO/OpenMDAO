@@ -911,9 +911,6 @@ class Group(System):
             self._owned_sizes = self._var_sizes[vec_names[0]]['output']
             self._vector_class = self._local_vector_class
 
-        if self.pathname == '':  # only do at the top
-            self._problem_meta['top_sizes'] = self._var_sizes
-
         if self._use_derivatives:
             self._var_sizes['nonlinear'] = self._var_sizes['linear']
 
