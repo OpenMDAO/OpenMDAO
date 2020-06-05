@@ -2619,6 +2619,12 @@ class Group(System):
                     auto_ivc._add_remote(src)
                     tgt = tgts[0]
 
+                prom = abs2prom[tgt]
+                if prom not in self._group_inputs:
+                    self._group_inputs[prom] = {'use_tgt': tgt}
+                else:
+                    self._group_inputs[prom]['use_tgt'] = tgt
+
                 distrib = all_abs2meta[tgt]['distributed']
                 if not (all_abs2meta[tgt]['has_src_indices'] and distrib):
                     units = all_abs2meta[tgt]['units']

@@ -435,12 +435,20 @@ class Problem(object):
         all_discrete = self.model._var_allprocs_discrete['input']
         n_prom_ins = 0  # if nonzero, name given was promoted input name w/o a matching prom output
 
+        try:
+            ginputs = self.model._group_inputs
+        except AttributeError:
+            ginputs = {}  # could happen if top level system is not a Group
+
         if name in all_proms['output']:
             abs_name = all_proms['output'][name][0]
         elif name in all_proms['input']:
             abs_names = all_proms['input'][name]
             n_prom_ins = len(abs_names)
-            abs_name = abs_names[0]
+            if n_prom_ins == 1 or abs_names[0] in all_discrete:
+                abs_name = abs_names[0]
+            else:
+                abs_name = ginputs[name]['use_tgt']
         else:
             abs_name = name
 
@@ -458,10 +466,6 @@ class Problem(object):
                         ivalue = value
                         if all_meta[src]['units'] is not None:
                             if n_prom_ins > 1:  # promoted input name was used
-                                try:
-                                    ginputs = self.model._group_inputs
-                                except AttributeError:
-                                    ginputs = {}  # could happen if top level system is not a Group
                                 if name in ginputs and 'units' in ginputs[name]:
                                     tunits = ginputs[name]['units']
                                 else:
