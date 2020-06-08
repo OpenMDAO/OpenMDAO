@@ -2,6 +2,7 @@
 
 import numpy as np
 import os
+import sys
 
 from openmdao.solvers.solver import LinearSolver
 
