@@ -308,26 +308,6 @@ class N2Matrix {
     }
 
     /**
-     * Draw a rectangle at the specified locate to bring attention to
-     * a variable name.
-     * @param {Number} x Upper-left corner X-coordinate in px.
-     * @param {Number} y Upper-left corner Y-coordinate in px.
-     * @param {Number} width Rectangle width in px.
-     * @param {Number} height Rectangle height in px.
-     * @param {string} fill Fill color.
-     */
-    highlight(x, y, width, height, fill) {
-        this.n2Groups.highlights.insert("rect")
-            .attr("class", "n2_hover_elements")
-            .attr("y", y)
-            .attr("x", x)
-            .attr("width", width)
-            .attr("height", height)
-            .attr("fill", fill)
-            .attr("fill-opacity", "1");
-    }
-
-    /**
      * Create an SVG group for each visible element, and have the element
      * render its shape in it. Move the groups around to their correct
      * positions, providing an animated transition from the previous
@@ -809,9 +789,6 @@ class N2Matrix {
                 }
             }
         }
-
-        let leftTextWidthR = this.layout.visibleNodes[cell.row].nameWidthPx,
-            leftTextWidthC = this.layout.visibleNodes[cell.col].nameWidthPx;
 
         cell.highlight('source', 'input');
         cell.highlight('target', 'output');
