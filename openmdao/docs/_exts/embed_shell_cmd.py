@@ -17,11 +17,7 @@ from sphinx.writers.html import HTMLTranslator
 from sphinx.writers.html5 import HTML5Translator
 from sphinx.errors import SphinxError
 
-
-if sys.version_info[0] == 2:
-    import cgi as cgiesc
-else:
-    import html as cgiesc
+import html as cgiesc
 
 
 class failed_node(nodes.Element):
