@@ -1,13 +1,7 @@
 """Define the Component class."""
 
 from collections import OrderedDict, Counter, defaultdict
-
-# note: this is a Python 3.3 change, clean this up for OpenMDAO 3.x
-try:
-    from collections.abc import Iterable
-except ImportError:
-    from collections import Iterable
-
+from collections.abc import Iterable
 from itertools import product
 
 import numpy as np
@@ -133,7 +127,7 @@ class Component(System):
         """
         pass
 
-    def _setup_procs(self, pathname, comm, mode, prob_options):
+    def _setup_procs(self, pathname, comm, mode, setup_mode, prob_options):
         """
         Execute first phase of the setup process.
 
@@ -148,6 +142,8 @@ class Component(System):
         mode : string
             Derivatives calculation mode, 'fwd' for forward, and 'rev' for
             reverse (adjoint). Default is 'rev'.
+        setup_mode : string
+            What type of setup this is, one of ['full', 'reconf', 'update'].
         prob_options : OptionsDictionary
             Problem level options.
         """
@@ -156,6 +152,10 @@ class Component(System):
 
         self.options._parent_name = self.msginfo
         self.recording_options._parent_name = self.msginfo
+
+        # TODO: get rid of this after we remove reconfig.
+        if setup_mode == 'full':
+            self._vectors = {}
 
         orig_comm = comm
         if self._num_par_fd > 1:

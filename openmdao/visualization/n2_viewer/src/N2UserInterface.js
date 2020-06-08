@@ -115,6 +115,7 @@ class NodeInfo {
     unpin() {
         this.pinned = false;
         this.pinButton.attr('class', 'info-hidden');
+        this.clear();
     }
 
     togglePin() {

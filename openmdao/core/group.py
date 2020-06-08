@@ -1,12 +1,7 @@
 """Define the Group class."""
 import os
 from collections import Counter, OrderedDict, defaultdict
-
-# note: this is a Python 3.3 change, clean this up for OpenMDAO 3.x
-try:
-    from collections.abc import Iterable
-except ImportError:
-    from collections import Iterable
+from collections.abc import Iterable
 
 from itertools import product, chain
 from numbers import Number
@@ -27,11 +22,12 @@ from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import convert_neg, array_connection_compatible, \
     _flatten_src_indices
-from openmdao.utils.general_utils import ContainsAll, all_ancestors, simple_warning
-from openmdao.utils.units import is_compatible, unit_conversion
+from openmdao.utils.general_utils import ContainsAll, all_ancestors, simple_warning, common_subpath
+from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch
 from openmdao.utils.mpi import MPI
 from openmdao.utils.coloring import Coloring, _STD_COLORING_FNAME
 import openmdao.utils.coloring as coloring_mod
+from openmdao.utils.options_dictionary import _undefined
 
 # regex to check for valid names.
 import re
@@ -55,6 +51,8 @@ class Group(System):
         List of local subgroups.
     _manual_connections : dict
         Dictionary of input_name: (output_name, src_indices) connections.
+    _group_inputs : dict
+        Mapping of promoted names to certain metadata (src_indices, units).
     _static_manual_connections : dict
         Dictionary that stores all explicit connections added outside of setup.
     _conn_abs_in2out : {'abs_in': 'abs_out'}
@@ -103,6 +101,7 @@ class Group(System):
         self._local_system_set = None
         self._subgroups_myproc = None
         self._manual_connections = {}
+        self._group_inputs = {}
         self._static_manual_connections = {}
         self._conn_abs_in2out = {}
         self._conn_discrete_in2out = {}
@@ -163,6 +162,30 @@ class Group(System):
             system hieararchy with attribute access
         """
         pass
+
+    def add_input(self, name, val=_undefined, units=None):
+        """
+        Specify metadata for connected promoted inputs without a source.
+
+        Parameters
+        ----------
+        name : str
+            The name of the promoted inputs.
+        val : object
+            Value for the auto_ivc source.
+        units : str or None
+            Units for the auto_ivc source.
+        """
+        if name in self._group_inputs:
+            simple_warning(f"{self.msginfo}: Adding group input '{name}' which "
+                           "overrides a previous input of the same name.")
+        meta = {}
+        if val is not _undefined:
+            meta['value'] = val
+        if units is not None:
+            meta['units'] = units
+        if meta:
+            self._group_inputs[name] = meta
 
     def _get_scope(self, excl_sub=None):
         """
@@ -301,7 +324,7 @@ class Group(System):
 
         self.configure()
 
-    def _setup_procs(self, pathname, comm, mode, prob_options):
+    def _setup_procs(self, pathname, comm, mode, setup_mode, prob_options):
         """
         Execute first phase of the setup process.
 
@@ -317,6 +340,8 @@ class Group(System):
         mode : string
             Derivatives calculation mode, 'fwd' for forward, and 'rev' for
             reverse (adjoint). Default is 'rev'.
+        setup_mode : string
+            What type of setup this is, one of ['full', 'reconf', 'update'].
         prob_options : OptionsDictionary
             Problem level options.
         """
@@ -327,6 +352,10 @@ class Group(System):
         self.recording_options._parent_name = self.msginfo
 
         self._setup_procs_finished = False
+
+        # TODO: get rid of this after we remove reconfig.
+        if setup_mode == 'full':
+            self._vectors = {}
 
         if self._num_par_fd > 1:
             info = self._coloring_info
@@ -419,7 +448,7 @@ class Group(System):
             subsys._use_derivatives = self._use_derivatives
             subsys._solver_info = self._solver_info
             subsys._recording_iter = self._recording_iter
-            subsys._setup_procs(subsys.pathname, sub_comm, mode, prob_options)
+            subsys._setup_procs(subsys.pathname, sub_comm, mode, setup_mode, prob_options)
 
         # build a list of local subgroups to speed up later loops
         self._subgroups_myproc = [s for s in self._subsystems_myproc if isinstance(s, Group)]
@@ -598,6 +627,10 @@ class Group(System):
 
         allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
 
+        group_inputs = []
+        for n, meta in self._group_inputs.items():
+            meta['path'] = self.pathname  # used for error reporting
+
         for subsys in self._subsystems_myproc:
             if recurse:
                 subsys._setup_var_data(recurse)
@@ -643,6 +676,9 @@ class Group(System):
                     if prom_name not in allprocs_prom2abs_list[type_]:
                         allprocs_prom2abs_list[type_][prom_name] = []
                     allprocs_prom2abs_list[type_][prom_name].extend(sub_abs)
+                    if type_ == 'input' and isinstance(subsys, Group):
+                        if sub_prom in subsys._group_inputs:
+                            group_inputs.append((prom_name, subsys._group_inputs[sub_prom]))
 
         for prom_name, abs_list in allprocs_prom2abs_list['output'].items():
             if len(abs_list) > 1:
@@ -657,7 +693,7 @@ class Group(System):
                                                     mysub._full_comm.rank == 0)):
                 raw = (allprocs_abs_names, allprocs_discrete, allprocs_prom2abs_list,
                        allprocs_abs2prom, allprocs_abs2meta, self._has_output_scaling,
-                       self._has_resid_scaling)
+                       self._has_resid_scaling, group_inputs)
             else:
                 raw = (
                     {'input': [], 'output': []},
@@ -666,7 +702,8 @@ class Group(System):
                     {'input': {}, 'output': {}},
                     {},
                     False,
-                    False
+                    False,
+                    []
                 )
             gathered = self.comm.allgather(raw)
 
@@ -675,10 +712,13 @@ class Group(System):
                 allprocs_abs2prom[type_] = {}
                 allprocs_prom2abs_list[type_] = OrderedDict()
 
+            group_inputs = []
             for (myproc_abs_names, myproc_discrete, myproc_prom2abs_list, all_abs2prom,
-                 myproc_abs2meta, oscale, rscale) in gathered:
+                 myproc_abs2meta, oscale, rscale, ginputs) in gathered:
                 self._has_output_scaling |= oscale
                 self._has_resid_scaling |= rscale
+
+                group_inputs.extend(ginputs)
 
                 # Assemble in parallel allprocs_abs2meta
                 for n in myproc_abs2meta:
@@ -697,6 +737,35 @@ class Group(System):
                         if prom_name not in allprocs_prom2abs_list[type_]:
                             allprocs_prom2abs_list[type_][prom_name] = []
                         allprocs_prom2abs_list[type_][prom_name].extend(abs_names_list)
+
+        ginputs = self._group_inputs
+        for prom, meta in group_inputs:
+            if prom in ginputs:
+                # check for any conflicting units or values
+                old = ginputs[prom]
+
+                for n, val in meta.items():
+                    if n == 'path' or val is None:
+                        continue
+
+                    if n in old and old[n] is not None:
+                        if isinstance(val, np.ndarray) or isinstance(old[n], np.ndarray):
+                            eq = np.all(val == old[n])
+                        else:
+                            eq = val == old[n]
+
+                        if not eq:
+                            raise RuntimeError(f"Groups '{old['path']}' and '{meta['path']}' "
+                                               f"added the input '{prom}' with conflicting '{n}'.")
+                    old[n] = val
+            else:
+                ginputs[prom] = meta
+
+        if ginputs:
+            extra = set(ginputs).difference(self._var_allprocs_prom2abs_list['input'])
+            if extra:
+                raise RuntimeError(f"{self.msginfo}: The following group inputs could not be "
+                                   f"found: {sorted(extra)}.")
 
         if self._var_discrete['input'] or self._var_discrete['output']:
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
@@ -2438,3 +2507,60 @@ class Group(System):
                 graph.add_edge(src_sys, tgt_sys, conns=edge_data[key])
 
         return graph
+
+    def _resolve_connected_input_defaults(self):
+        conns = self._conn_global_abs_in2out
+        abs2prom = self._var_allprocs_abs2prom['input']
+
+        # inproms is a dict where the keys are promoted input names, and the values
+        # are all of the absolute input names with that promoted name, which indicates
+        # that the inputs will be connected to a common auto_ivc source in a future version.
+        inproms = defaultdict(list)
+        for n in self._var_allprocs_abs_names['input']:
+            if n not in conns:
+                inproms[abs2prom[n]].append(n)
+
+        all_abs2meta = self._var_allprocs_abs2meta
+        abs2meta = self._var_abs2meta
+
+        for prom, tgts in inproms.items():
+            if len(tgts) > 1:
+                if prom in self._group_inputs:
+                    gmeta = self._group_inputs[prom]
+                else:
+                    gmeta = ()
+
+                tgt0 = tgts[0]
+                if tgt0 in abs2meta:  # var is local
+                    t0meta = abs2meta[tgt0]
+                else:
+                    t0meta = all_abs2meta[tgt0]
+                t0units = t0meta['units']
+                t0val = self._get_val(tgt0, kind='input', get_remote=True)
+
+                for tgt in tgts[1:]:
+
+                    if tgt in abs2meta:  # var is local
+                        tmeta = abs2meta[tgt]
+                    else:
+                        tmeta = all_abs2meta[tgt]
+
+                    tunits = tmeta['units'] if 'units' in tmeta else None
+                    tval = self._get_val(tgt, kind='input', get_remote=True)
+
+                    errs = []
+                    if _has_val_mismatch(tunits, tval, t0units, t0val):
+                        if 'units' not in gmeta and t0units != tunits:
+                            errs.append('units')
+                        if 'value' not in gmeta:
+                            errs.append('value')
+
+                    if errs:
+                        inputs = list(sorted(tgts))
+                        grpname = common_subpath(inputs)
+                        simple_warning(f"{self.msginfo}: The following inputs, {inputs} are "
+                                       f"connected but the metadata entries {errs} differ and "
+                                       "have not been specified by Group.add_input.  This warning "
+                                       "will become an error in a future version.  To remove the "
+                                       f"abiguity, call {grpname}.add_input() and specify the "
+                                       f"{errs} arg(s).")

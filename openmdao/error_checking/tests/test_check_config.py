@@ -195,6 +195,31 @@ class TestCheckConfig(unittest.TestCase):
 
         testlogger.find_in('warning', expected_warning)
 
+    def test_no_connect_parallel_group(self):
+        prob = Problem()
+        model = prob.model
+
+        traj = model.add_subsystem('traj', ParallelGroup())
+
+        burn1 = traj.add_subsystem('burn1', Group())
+        burn1.add_subsystem('p1', IndepVarComp('x', 1.0))
+        burn1.add_subsystem('burn_eq1', ExecComp(['y=-2.0*x']))
+        burn1.connect('p1.x', 'burn_eq1.x')
+
+        burn2 = traj.add_subsystem('burn2', Group())
+        burn2.add_subsystem('p2', IndepVarComp('x', 1.0))
+        burn2.add_subsystem('burn_eq2', ExecComp(['y=5.0*x']))
+        burn2.connect('p2.x', 'burn_eq2.x')
+
+        testlogger = TestLogger()
+        prob.setup(check=True, mode='fwd', logger=testlogger)
+
+        msg = "Need to attach NonlinearBlockJac, NewtonSolver, or BroydenSolver to 'parallel' when " \
+              "connecting components inside parallel groups"
+
+        with assert_no_warning(UserWarning, msg):
+            prob.run_model()
+
     def test_dataflow_multi_level(self):
         p = Problem()
         root = p.model

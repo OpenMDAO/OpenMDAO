@@ -53,10 +53,10 @@ class _TotalJacInfo(object):
     model : <System>
         The top level System of the System tree.
     of_meta : dict
-        Map of absoute output 'of' var name to tuples of the form
+        Map of absolute output 'of' var name to tuples of the form
         (row/column slice, indices, distrib).
     wrt_meta : dict
-        Map of absoute output 'wrt' var name to tuples of the form
+        Map of absolute output 'wrt' var name to tuples of the form
         (row/column slice, indices, distrib).
     output_list : list of str
         List of names of output variables for this total jacobian.  In fwd mode, outputs

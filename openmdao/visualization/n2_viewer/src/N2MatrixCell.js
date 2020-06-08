@@ -225,7 +225,7 @@ class N2Connector extends N2CellRenderer {
             .style("fill", this.color)
             .attr("x", -5)
             .attr("y", -5)
-            .attr("xlink:href", "#matrix-connector")
+            .attr("xlink:href", "#matrix-connector-square")
 
         return this.update(svgGroup, dims, d3Elem);
     }

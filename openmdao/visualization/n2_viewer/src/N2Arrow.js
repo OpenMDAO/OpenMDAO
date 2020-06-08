@@ -24,6 +24,7 @@ class N2Arrow {
         this.elementsGrp = n2Groups.elements;
         this.nodeSize = nodeSize;
         this.attribs = attribs;
+        this._genPath = this._angledPath;
     }
 
     get offsetAbsX() {
@@ -72,8 +73,8 @@ class N2BentArrow extends N2Arrow {
 
         this.offsetX = (this.start.col < this.end.col) ? offsetAbsX : -offsetAbsX; // Left-to-Right : Right-to-Left
         this.pts.start.x = this.nodeSize.width * this.start.col + this.nodeSize.width * .5 + this.offsetX;
-        // this.pts.mid.x = this.nodeSize.width * this.middle.col + this.nodeSize.width * .5;
-        this.pts.mid.x = (this.offsetX > 0)? this.nodeSize.width * this.middle.col : this.nodeSize.width * (this.middle.col + 1);
+        this.pts.mid.x = this.nodeSize.width * this.middle.col + this.nodeSize.width * .5;
+        // this.pts.mid.x = (this.offsetX > 0)? this.nodeSize.width * this.middle.col : this.nodeSize.width * (this.middle.col + 1);
         this.pts.end.x = this.nodeSize.width * this.end.col + this.nodeSize.width * .5;
 
         let offsetY = (this.start.row < this.end.row) ? -offsetAbsY : offsetAbsY; // Down : Up
@@ -82,21 +83,51 @@ class N2BentArrow extends N2Arrow {
         this.pts.end.y = this.nodeSize.height * this.end.row + this.nodeSize.height * .5 + offsetY;
     }
 
-    /** Use SVG to draw the line segments and an arrow at the end-point. */
-    draw() {
+    /** Create a path string with a quadratic curve at the bend. */
+    _curvedPath() {
         const dir = (this.offsetX > 0)? 1 : -1;
         const s = this.nodeSize.width * .5 * dir;
 
+        return "M" + this.pts.start.x + " " + this.pts.start.y +
+            " L" + this.pts.mid.x + " " + this.pts.mid.y +
+            ` q${s} 0 ${s} ${s}` +
+            " L" + this.pts.end.x + " " + this.pts.end.y;
+    }
+
+    /** Generate a path with a 90-degree angle at the bend. */
+    _angledPath() {
+        return "M" + this.pts.start.x + " " + this.pts.start.y +
+            " L" + this.pts.mid.x + " " + this.pts.mid.y +
+            " L" + this.pts.end.x + " " + this.pts.end.y;
+    }
+
+    /** Use SVG to draw the line segments and an arrow at the end-point. */
+    draw() {
         this.path = this.arrowsGrp.insert("path")
             .attr("class", "n2_hover_elements")
             .attr("marker-end", "url(#arrow)")
-            .attr("d", "M" + this.pts.start.x + " " + this.pts.start.y +
-                " L" + this.pts.mid.x + " " + this.pts.mid.y +
-                ` q${s} 0 ${s} ${s}` +
-                " L" + this.pts.end.x + " " + this.pts.end.y)
+            .attr("d", this._genPath())
             .attr("fill", "none")
             .style("stroke-width", this.width)
             .style("stroke", this.color);
+
+        this.dotsGrp.append("circle")
+            .attr("class", "n2_hover_elements")
+            .attr("cx", this.pts.mid.x)
+            .attr("cy", this.pts.mid.y)
+            .attr("r", this.width * 1.0)
+            .style("stroke-width", 0)
+            .style("fill-opacity", 1)
+            .style("fill", N2Style.color.connection);
+
+        this.dotsGrp.append("circle")
+            .attr("class", "n2_hover_elements")
+            .attr("cx", this.pts.mid.x)
+            .attr("cy", this.pts.mid.y)
+            .attr("r", this.width * 1.0)
+            .style("stroke-width", 0)
+            .style("fill-opacity", .75)
+            .style("fill", this.color);
     }
 }
 
