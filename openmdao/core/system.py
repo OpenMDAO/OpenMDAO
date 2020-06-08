@@ -19,7 +19,7 @@ from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.vectors.vector import INT_DTYPE
 from openmdao.utils.mpi import MPI
-from openmdao.utils.options_dictionary import OptionsDictionary
+from openmdao.utils.options_dictionary import OptionsDictionary, _undefined
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.units import is_compatible, unit_conversion
 from openmdao.utils.variable_table import write_var_table
@@ -302,8 +302,6 @@ class System(object):
     _first_call_to_linearize : bool
         If True, this is the first call to _linearize.
     """
-
-    _undefined = object()
 
     def __init__(self, num_par_fd=1, **kwargs):
         """
@@ -786,7 +784,7 @@ class System(object):
         # If we're only updating and not recursing, processors don't need to be redistributed.
         if recurse:
             # Besides setting up the processors, this method also builds the model hierarchy.
-            self._setup_procs(self.pathname, comm, mode, self._problem_options)
+            self._setup_procs(self.pathname, comm, mode, setup_mode, self._problem_options)
 
         # Recurse model from the bottom to the top for configuring.
         # Set static_mode to False in all subsystems because inputs & outputs may be created.
@@ -805,6 +803,10 @@ class System(object):
         self._setup_relevance(mode, self._relevant)
         self._setup_var_index_ranges(recurse=recurse)
         self._setup_var_sizes(recurse=recurse)
+
+        if self.pathname == '':
+            self._resolve_connected_input_defaults()
+
         self._setup_connections(recurse=recurse)
 
     def _configure_check(self):
@@ -1455,8 +1457,10 @@ class System(object):
         self._var_abs_names = {'input': [], 'output': []}
         self._var_allprocs_prom2abs_list = {'input': OrderedDict(), 'output': OrderedDict()}
         self._var_abs2prom = {'input': {}, 'output': {}}
+        self._var_allprocs_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2meta = {}
         self._var_abs2meta = {}
+        self._var_allprocs_abs2idx = {}
 
     def _setup_var_index_maps(self, recurse=True):
         """
@@ -4122,7 +4126,7 @@ class System(object):
             The value of the requested output/input/resid variable.  None if variable is not found.
         """
         discrete = distrib = False
-        val = System._undefined
+        val = _undefined
         typ = 'output' if abs_name in self._var_allprocs_abs2prom['output'] else 'input'
 
         try:
@@ -4142,20 +4146,27 @@ class System(object):
                 pass  # non-local discrete output
             elif abs_name in self._var_allprocs_discrete['input']:
                 pass  # non-local discrete input
+            elif get_remote:
+                raise ValueError(f"{self.msginfo}: Can't find variable named '{abs_name}'.")
             else:
-                return System._undefined
+                return _undefined
 
         if kind is None:
             kind = typ
 
         if not discrete:
-            vec = self._vectors[kind][vec_name]
-            if abs_name in vec._views:
-                val = vec._views_flat[abs_name] if flat else vec._views[abs_name]
+            try:
+                vec = self._vectors[kind][vec_name]
+            except KeyError:
+                if abs_name in self._var_abs2meta:
+                    val = self._var_abs2meta[abs_name]['value']
+            else:
+                if abs_name in vec._views:
+                    val = vec._views_flat[abs_name] if flat else vec._views[abs_name]
 
         if get_remote and self.comm.size > 1:
             owner = self._owning_rank[abs_name]
-            loc_val = val if val is not System._undefined else np.zeros(0)
+            loc_val = val if val is not _undefined else np.zeros(0)
             if rank is None:   # bcast
                 if distrib:
                     idx = self._var_allprocs_abs2idx['nonlinear'][abs_name]
@@ -4193,7 +4204,7 @@ class System(object):
                         elif self.comm.rank == rank:
                             val = self.comm.recv(source=owner, tag=tag)
 
-        if not flat and val is not System._undefined and not discrete:
+        if not flat and val is not _undefined and not discrete:
             val.shape = meta['global_shape'] if get_remote and distrib else meta['shape']
 
         return val
@@ -4372,6 +4383,9 @@ class System(object):
             return meta[abs_name]
 
         raise KeyError('{}: Metadata for variable "{}" not found.'.format(self.msginfo, name))
+
+    def _resolve_connected_input_defaults(self):
+        pass
 
 
 def get_relevant_vars(connections, desvars, responses, mode):
