@@ -164,10 +164,10 @@ class N2Diagram {
             'svgStyle': d3.select("#svgId style"),
             'toolTip': d3.select(".tool-tip"),
             'arrowMarker': d3.select("#arrow"),
-            'nodeInfo': d3.select('#node-data'),
             'n2OuterGroup': d3.select('g#n2outer'),
             'n2InnerGroup': d3.select('g#n2inner'),
             'pTreeGroup': d3.select('g#tree'),
+            'highlightBar': d3.select('g#highlight-bar'),
             'pSolverTreeGroup': d3.select('g#solver_tree'),
             'n2BackgroundRect': d3.select('g#n2inner rect'),
             'clips': {
@@ -274,6 +274,11 @@ class N2Diagram {
                 .attr("width", this.dims.size.partitionTree.width)
                 .attr("transform", "translate(0 " + innerDims.margin + ")");
 
+            this.dom.highlightBar
+                .attr("height", innerDims.height)
+                .attr("width", "8")
+                .attr("transform", "translate(" + this.dims.size.partitionTree.width + 1 + " " + innerDims.margin + ")");
+
             this.dom.n2OuterGroup
                 .attr("height", outerDims.height)
                 .attr("width", outerDims.height)
@@ -330,7 +335,11 @@ class N2Diagram {
                     self.prevScales.model.y(d.prevDims.y) + ")";
             })
             .on("click", function (d) {
-                self.ui.leftClick(d);
+                if (self.ui.nodeInfoBox.hidden) { self.ui.leftClick(d); } // Zoom if not in info panel mode
+                else { // Pin/unpin the info panel
+                    self.ui.nodeInfoBox.togglePin();
+                    self.ui.nodeInfoBox.update(d3.event, d, d3.select(this).select('rect').style('fill'));
+                }
             })
             .on("contextmenu", function (d) {
                 self.ui.rightClick(d, this);
@@ -353,16 +362,18 @@ class N2Diagram {
                 return d.prevDims.height * self.prevTransitCoords.model.y;
             })
             .attr("id", function (d) {
-                return d.absPathName.replace(/\./g, '_');
-            });
+                return d.absPathName.replace(/[\.:]/g, '_');
+            })
+            .attr('rx', 12)
+            .attr('ry', 12);
 
         nodeEnter.append("text")
             .attr("dy", ".35em")
             .attr("transform", function (d) {
                 let anchorX = d.prevDims.width * self.prevTransitCoords.model.x -
                     self.layout.size.rightTextMargin;
-                return "translate(" + anchorX + " " + d.prevDims.height *
-                    self.prevTransitCoords.model.y / 2 + ")";
+                return "translate(" + anchorX + " " +
+                    (d.prevDims.height * self.prevTransitCoords.model.y / 2) + ")";
             })
             .style("opacity", function (d) {
                 if (d.depth < self.zoomedElement.depth) return 0;
@@ -407,8 +418,8 @@ class N2Diagram {
             .attr("transform", function (d) {
                 let anchorX = d.dims.width * self.transitCoords.model.x -
                     self.layout.size.rightTextMargin;
-                return "translate(" + anchorX + " " + d.dims.height *
-                    self.transitCoords.model.y / 2 + ")";
+                return "translate(" + anchorX + " " + (d.dims.height *
+                    self.transitCoords.model.y / 2) + ")";
             })
             .style("opacity", function (d) {
                 if (d.depth < self.zoomedElement.depth) return 0;
@@ -440,8 +451,8 @@ class N2Diagram {
             .attr("transform", function (d) {
                 let anchorX = d.dims.width * self.transitCoords.model.x -
                     self.layout.size.rightTextMargin;
-                return "translate(" + anchorX + "," + d.dims.height *
-                    self.transitCoords.model.y / 2 + ")";
+                return "translate(" + anchorX + "," + (d.dims.height *
+                    self.transitCoords.model.y / 2) + ")";
             })
             .style("opacity", 0);
     }
@@ -470,7 +481,11 @@ class N2Diagram {
                     self.prevScales.solver.y(d.prevSolverDims.y) + ")";
             })
             .on("click", function (d) {
-                self.ui.leftClick(d);
+                if (self.ui.nodeInfoBox.hidden) { self.ui.leftClick(d); } // Zoom if not in info panel mode
+                else { // Pin/unpin the info panel
+                    self.ui.nodeInfoBox.togglePin();
+                    self.ui.nodeInfoBox.update(d3.event, d, d3.select(this).select('rect').style('fill'));
+                }
             })
             .on("contextmenu", function (d) {
                 self.ui.rightClick(d, this);
@@ -497,6 +512,8 @@ class N2Diagram {
                 }
             })
             .on("mousemove", function () {
+                self.ui.nodeInfoBox.move(d3.event);
+
                 if (self.model.abs2prom != undefined) {
                     self.dom.toolTip.style("top", (d3.event.pageY - 30) + "px")
                         .style("left", (d3.event.pageX + 5) + "px");
@@ -614,8 +631,13 @@ class N2Diagram {
             .style("opacity", 0);
     }
 
+    clearHighlights() {
+        this.dom.highlightBar.selectAll('rect').remove();
+    }
+
     clearArrows() {
         this.dom.n2OuterGroup.selectAll("[class^=n2_hover_elements]").remove();
+        this.clearHighlights();
     }
 
     /** Reveal arrows that had been hidden */
@@ -752,43 +774,44 @@ class N2Diagram {
     /** When the mouse leaves a cell, remove all temporary arrows. */
     mouseOut() {
         this.dom.n2OuterGroup.selectAll(".n2_hover_elements").remove();
-        d3.selectAll("div.offgrid")
-            .style("visibility", "hidden")
-            .html('');
+        this.clearHighlights();
+        d3.selectAll("div.offgrid").style("visibility", "hidden").html('');
 
         this.ui.nodeInfoBox.clear();
     }
 
     /**
-     * When the mouse if left-clicked on a cell, change their CSS class
+     * When the mouse is left-clicked on a cell, change their CSS class
      * so they're not removed when the mouse moves out.
      * @param {N2MatrixCell} cell The cell the event occured on.
      */
     mouseClick(cell) {
-        let newClassName = "n2_hover_elements_" + cell.row + "_" + cell.col;
-        let selection = this.dom.n2OuterGroup.selectAll("." + newClassName);
-        if (selection.size() > 0) {
-            selection.remove();
-            const arrow = this.arrowCache.find(o => o.cell.row === cell.row && o.cell.col === cell.col);
-            const arrowIndex = this.arrowCache.indexOf(arrow);
-            this.arrowCache.splice(arrowIndex, 1);
-        }
-        else {
-            const arrow = {
-                'cell': cell,
-                'element': this.dom.n2OuterGroup
-                    .selectAll("path.n2_hover_elements, circle.n2_hover_elements"),
-                'className': newClassName
+        if (this.ui.nodeInfoBox.hidden) { // If not in info panel mode
+            let newClassName = "n2_hover_elements_" + cell.row + "_" + cell.col;
+            let selection = this.dom.n2OuterGroup.selectAll("." + newClassName);
+            if (selection.size() > 0) {
+                selection.remove();
+                const arrow = this.arrowCache.find(o => o.cell.row === cell.row && o.cell.col === cell.col);
+                const arrowIndex = this.arrowCache.indexOf(arrow);
+                this.arrowCache.splice(arrowIndex, 1);
             }
-            this.arrowCache.push(arrow);
-            this.dom.n2OuterGroup
-                .selectAll("path.n2_hover_elements, circle.n2_hover_elements")
-                .attr("class", newClassName);
+            else {
+                const arrow = {
+                    'cell': cell,
+                    'element': this.dom.n2OuterGroup
+                        .selectAll("path.n2_hover_elements, circle.n2_hover_elements"),
+                    'className': newClassName
+                }
+                this.arrowCache.push(arrow);
+                this.dom.n2OuterGroup
+                    .selectAll("path.n2_hover_elements, circle.n2_hover_elements")
+                    .attr("class", newClassName);
+            }
         }
-    }
-
-    clearActiveNode() {
-        this.dom.nodeInfo.html('');
+        else { // Pin/unpin the info panel
+            this.ui.nodeInfoBox.togglePin();
+            this.ui.nodeInfoBox.update(d3.event, cell.obj, cell.color());
+        }
     }
 
     mouseClickAll(cell) {
