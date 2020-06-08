@@ -1880,7 +1880,6 @@ class TestParallelDistribDOE(unittest.TestCase):
             for case in cases:
                 outputs = cr.get_case(case).outputs
                 values.append(outputs)
-                print('0', outputs)
 
             cr = om.CaseReader(filename1)
             cases = cr.list_cases('driver')
