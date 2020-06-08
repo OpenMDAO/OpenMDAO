@@ -330,6 +330,7 @@ class SqliteCaseReader(BaseCaseReader):
             if out_stream:
                 for source in sources:
                     out_stream.write('{}\n'.format(source))
+            return sources
 
     def list_source_vars(self, source, out_stream=_DEFAULT_OUT_STREAM):
         """
@@ -388,7 +389,8 @@ class SqliteCaseReader(BaseCaseReader):
                 out_stream = sys.stdout
 
             if out_stream:
-                return write_source_table(dct, out_stream)
+                write_source_table(dct, out_stream)
+            return dct
 
     def list_cases(self, source=None, recurse=True, flat=True, out_stream=_DEFAULT_OUT_STREAM):
         """
@@ -435,15 +437,7 @@ class SqliteCaseReader(BaseCaseReader):
                             (source, type(source).__name__))
 
         if not source:
-            if not out_stream:
-                return self._list_cases_recurse_flat()
-            else:
-                cases = self._list_cases_recurse_flat()
-                if out_stream is _DEFAULT_OUT_STREAM:
-                    out_stream = sys.stdout
-
-                if out_stream:
-                    return write_source_table(self.source_cases_table, out_stream)
+            return self._list_cases_recurse_flat(out_stream=out_stream)
 
         elif source == 'problem':
             if self._format_version >= 2:
@@ -491,7 +485,7 @@ class SqliteCaseReader(BaseCaseReader):
             else:
                 raise RuntimeError('Source not found: %s' % source)
 
-    def _list_cases_recurse_flat(self, coord=None):
+    def _list_cases_recurse_flat(self, coord=None, out_stream=_DEFAULT_OUT_STREAM):
         """
         Iterate recursively over Driver, Solver and System cases in order.
 
@@ -499,6 +493,9 @@ class SqliteCaseReader(BaseCaseReader):
         ----------
         coord : an iteration coordinate
             Identifies the parent of the cases to return.
+        out_stream : file-like object
+            Where to send human readable output. Default is sys.stdout.
+            Set to None to suppress.
 
         Returns
         -------
@@ -547,12 +544,19 @@ class SqliteCaseReader(BaseCaseReader):
             else:
                 raise RuntimeError('Unexpected table name in global iterations:', table)
 
-            self.source_cases_table[table].append(case_coord)
-
             if case_coord.startswith(coord):
+                self.source_cases_table[table].append(case_coord)
                 cases.append(case_coord)
 
-        return cases
+        if not out_stream:
+            return cases
+        else:
+            if out_stream is _DEFAULT_OUT_STREAM:
+                out_stream = sys.stdout
+
+            if out_stream:
+                write_source_table(self.source_cases_table, out_stream)
+            return cases
 
     def _list_cases_recurse_nested(self, coord=None):
         """
@@ -1003,12 +1007,6 @@ class CaseTable(object):
     def list_sources(self):
         """
         Get the list of sources that recorded data in this table.
-
-        Parameters
-        ----------
-        out_stream : file-like object
-            Where to send human readable output.
-            Set to None to suppress.
 
         Returns
         -------
