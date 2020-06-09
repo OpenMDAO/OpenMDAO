@@ -1819,21 +1819,15 @@ class TestParallelDistribDOE(unittest.TestCase):
 
     def setUp(self):
         self.startdir = os.getcwd()
-        # Have to hard code the tempdir so that all procs run in the same place.
-        self.tempdir = 'TestParallelDistribDOE_one_dir_only'
-        try:
-            os.mkdir(self.tempdir)
-        except OSError:
-            pass
+        self.tempdir = tempfile.mkdtemp(prefix='TestDOEDriver-')
         os.chdir(self.tempdir)
 
     def tearDown(self):
         os.chdir(self.startdir)
-        if MPI.COMM_WORLD.rank == 0:
-            try:
-                shutil.rmtree(self.tempdir)
-            except OSError:
-                pass
+        try:
+            shutil.rmtree(self.tempdir)
+        except OSError:
+            pass
 
     def test_doe_distributed_var(self):
         size = 3
@@ -1872,7 +1866,6 @@ class TestParallelDistribDOE(unittest.TestCase):
         rank = prob.comm.rank
         if rank == 0:
             filename0 = "cases.sql_0"
-            filename1 = "cases.sql_1"
             values = []
 
             cr = om.CaseReader(filename0)
@@ -1881,16 +1874,28 @@ class TestParallelDistribDOE(unittest.TestCase):
                 outputs = cr.get_case(case).outputs
                 values.append(outputs)
 
-            cr = om.CaseReader(filename1)
+            # 2**6 cases, half on each rank
+            self.assertEqual(len(values), 32)
+            x_inputs = [list(val['x']) for val in values]
+            for n1 in [-50.]:
+                for n2 in [-50., 50.]:
+                    for n3 in [-50., 50.]:
+                        self.assertEqual(x_inputs.count([n1, n2, n3]), 8)
+
+        elif rank == 1:
+            filename0 = "cases.sql_1"
+            values = []
+
+            cr = om.CaseReader(filename0)
             cases = cr.list_cases('driver')
             for case in cases:
                 outputs = cr.get_case(case).outputs
                 values.append(outputs)
 
-            # 2**6 cases
-            self.assertEqual(len(values), 64)
+            # 2**6 cases, half on each rank
+            self.assertEqual(len(values), 32)
             x_inputs = [list(val['x']) for val in values]
-            for n1 in [-50., 50.]:
+            for n1 in [50.]:
                 for n2 in [-50., 50.]:
                     for n3 in [-50., 50.]:
                         self.assertEqual(x_inputs.count([n1, n2, n3]), 8)
