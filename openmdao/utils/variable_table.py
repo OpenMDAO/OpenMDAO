@@ -163,6 +163,26 @@ def write_var_table(pathname, var_list, var_type, var_dict,
     out_stream.write(2 * '\n')
 
 
+def write_source_table(source_dict, out_stream):
+    """
+    Write table of cases and their respective sources.
+
+    Parameters
+    ----------
+    source_dict : dict
+        Dict of source and cases
+    out_stream : file-like object
+        Where to send human readable output.
+        Set to None to suppress.
+
+    """
+    for key, value in source_dict.items():
+        if value:
+            out_stream.write('{}\n'.format(key))
+            for i in value:
+                out_stream.write('    {}\n'.format(i))
+
+
 def _write_variable(out_stream, row, column_names, var_dict, print_arrays):
     """
     For one variable, write name, values, residuals, and metadata to out_stream.

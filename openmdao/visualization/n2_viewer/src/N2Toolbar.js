@@ -311,7 +311,11 @@ class N2Toolbar {
         new N2ToolbarButtonToggle('#info-button', tooltipBox,
             ["Show detailed node information", "Hide detailed node information"],
             pred => { return n2ui.nodeInfoBox.hidden; },
-            e => { n2ui.nodeInfoBox.toggle(); }
+            e => {
+                n2ui.nodeInfoBox.unpin();
+                n2ui.nodeInfoBox.clear();
+                n2ui.nodeInfoBox.toggle();
+            }
         );
 
         new N2ToolbarButtonToggle('#question-button', tooltipBox,
