@@ -1093,6 +1093,43 @@ class TestProblem(unittest.TestCase):
         # using absolute value will give us the value of the input C2.x, in its units of 'mm'
         assert_near_equal(prob['G1.C2.x'], 2000.0, 1e-6)
 
+    def test_feature_get_set_with_src_indices_diff(self):
+        import openmdao.api as om
+
+        prob = om.Problem()
+        G1 = prob.model.add_subsystem('G1', om.Group())
+        G1.add_subsystem('C1', om.ExecComp('y=x*2.',
+                                            x={'value': 1.0, 'units': 'cm', 'src_indices': [0]},
+                                            y={'value': 0.0, 'units': 'cm'}),
+                         promotes=['x'])
+        G1.add_subsystem('C2', om.ExecComp('y=x*3.',
+                                            x={'value': 1.0, 'units': 'mm', 'src_indices': [1,2]},
+                                            y={'value': np.zeros(2), 'units': 'mm'}),
+                         promotes=['x'])
+
+        # units and value to use for the _auto_ivc output are ambiguous.  This fixes that.
+        G1.set_input_defaults('x', units='m', val=np.ones(3))
+
+        prob.setup()
+
+        # set G1.x to 2.0 m, based on the units we gave in the set_input_defaults call
+        prob['G1.x'] = 2.0
+
+        prob.run_model()
+
+        # we gave 'G1.x' units of 'm' in the set_input_defaults call
+        assert_near_equal(prob['G1.x'], 2.0, 1e-6)
+
+        # using absolute value will give us the value of the input C1.x, in its units of 'cm'
+        assert_near_equal(prob['G1.C1.x'], 200.0, 1e-6)
+
+        assert_near_equal(prob['G1.C1.y'], 400.0, 1e-6)
+
+        # using absolute value will give us the value of the input C2.x, in its units of 'mm'
+        assert_near_equal(prob['G1.C2.x'], np.ones(2) * 2000.0, 1e-6)
+
+        assert_near_equal(prob['G1.C2.y'], np.ones(2) * 6000.0, 1e-6)
+
     def test_feature_get_set_with_units_prom_plus_explicit(self):
         import openmdao.api as om
 
@@ -1125,6 +1162,9 @@ class TestProblem(unittest.TestCase):
         # using the promoted name of the inputs will give the value in the units set in set_input_defaults,
         # which is 'dm'
         assert_near_equal(prob['G1.x'], 20.0, 1e-6)
+
+        # test _get_val on lower level group
+        assert_near_equal( G1._get_val('x'), 20.0, 1e-6)
 
         # using absolute value will give us the value of the input C1.x, in its units of 'inch'
         assert_near_equal(prob['G1.C1.x'], 200.0, 1e-6)

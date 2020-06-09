@@ -501,14 +501,12 @@ class Problem(object):
                 indices = _full_slice
             if abs_name in self.model._outputs._views:
                 self.model._outputs.set_var(abs_name, value, indices)
-            elif abs_name in self.model._discrete_outputs:
-                self.model._discrete_outputs[abs_name] = value
             elif abs_name in conns:  # input name given. Set value into output
                 if src in self.model._outputs._views:  # src is local
                     if (self.model._outputs._views_flat[src].size == 0 and
                             src.rsplit('.', 1)[0] == '_auto_ivc' and all_meta[src]['distributed']):
                         pass  # special case, auto_ivc dist var with 0 local size
-                    elif tmeta['has_src_indices']:
+                    elif tmeta['has_src_indices'] and n_prom_ins < 2:
                         if tlocmeta:  # target is local
                             src_indices = tlocmeta['src_indices']
                             if tmeta['distributed']:
@@ -535,17 +533,20 @@ class Problem(object):
                     self.model._discrete_outputs[src] = value
                 # also set the input
                 # TODO: maybe remove this if inputs are removed from case recording
-                if abs_name in self.model._inputs._views:
-                    # print(f"problem set_val: setting input {abs_name} to {ivalue}")
-                    self.model._inputs.set_var(abs_name, ivalue, indices)
-                elif abs_name in self.model._discrete_inputs:
-                    self.model._discrete_inputs[abs_name] = value
-                else:
-                    # must be a remote var. so, just do nothing on this proc. We can't get here
-                    # unless abs_name is found in connections, so the variable must exist.
-                    if abs_name in self.model._var_allprocs_abs2meta:
-                        print(f"Variable '{name}' is remote on rank {self.comm.rank}.  "
-                              "Local assignment ignored.")
+                if n_prom_ins < 2:
+                    if abs_name in self.model._inputs._views:
+                        # print(f"problem set_val: setting input {abs_name} to {ivalue}")
+                        self.model._inputs.set_var(abs_name, ivalue, indices)
+                    elif abs_name in self.model._discrete_inputs:
+                        self.model._discrete_inputs[abs_name] = value
+                    else:
+                        # must be a remote var. so, just do nothing on this proc. We can't get here
+                        # unless abs_name is found in connections, so the variable must exist.
+                        if abs_name in self.model._var_allprocs_abs2meta:
+                            print(f"Variable '{name}' is remote on rank {self.comm.rank}.  "
+                                  "Local assignment ignored.")
+            elif abs_name in self.model._discrete_outputs:
+                self.model._discrete_outputs[abs_name] = value
             elif isinstance(self.model, Component):
                 if abs_name in self.model._inputs._views:
                     self.model._inputs.set_var(abs_name, value, indices)

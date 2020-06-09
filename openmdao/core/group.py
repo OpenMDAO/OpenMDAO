@@ -517,6 +517,8 @@ class Group(System):
 
     def _top_level_setup(self, setup_mode, mode):
         self._problem_meta['connections'] = conns = self._conn_global_abs_in2out
+        self._problem_meta['top_all_meta'] = self._var_allprocs_abs2meta
+        self._problem_meta['top_meta'] = self._var_abs2meta
 
         if setup_mode == 'full':
             auto_ivc = self._setup_auto_ivcs(mode)
@@ -2532,8 +2534,11 @@ class Group(System):
 
     def _find_remote_owners(self):
         if self.comm.size > 1:
-            # compute the inputs that are remote in at least one proc and the owning rank for each
-            all_ins = set(self._var_allprocs_abs_names['input'])
+            all_meta = self._var_allprocs_abs2meta
+            # Compute the inputs that are remote in at least one proc and the owning rank for each.
+            # These do not include distributed vars.
+            all_ins = set([n for n in self._var_allprocs_abs_names['input']
+                           if not all_meta[n]['distributed']])
             all_ins.update(self._var_allprocs_discrete['input'])
             my_remote_ins = all_ins.difference(self._var_abs_names['input'])
             my_remote_ins = my_remote_ins.difference(self._var_abs_names_discrete['input'])
@@ -2561,6 +2566,127 @@ class Group(System):
 
         return remote_ins
 
+    def _get_src_inds_max(self, tgt, meta):
+        inds = meta['src_indices']
+        if np.min(inds) < 0:
+            raise RuntimeError(f"{self.msginfo}: Can't connect '{tgt}' to an "
+                               "auto_ivc using negative src_indices.")
+        return inds, np.max(inds)
+
+    def _get_auto_ivc_out_val(self, tgts, remote_ins, all_abs2meta, abs2meta):
+        info = []
+        dist_ranges = []
+        loc_ranges = []
+        for tgt in tgts:
+            all_meta = all_abs2meta[tgt]
+            dist = all_meta['distributed']
+            has_src_inds = all_meta['has_src_indices']
+
+            if tgt in remote_ins:  # remote somewhere
+                if self.comm.rank == remote_ins[tgt]:
+                    meta = abs2meta[tgt]
+                    val = meta['value']
+                    if has_src_inds:
+                        src_inds, sz = self._get_src_inds_max(tgt, meta)
+                        loc_ranges.append((tgt, sz, src_inds, val, False))
+                    else:
+                        info.append((tgt, meta['size'], val, False))
+                else:
+                    info.append((tgt, 0, np.zeros(0), True))
+            elif dist:  # distributed and local everywhere
+                if has_src_inds:
+                    if tgt in abs2meta:
+                        src_indices = abs2meta[tgt]['src_indices']
+                        rnginfo = (np.min(src_indices), np.max(src_indices), len(src_indices))
+                        dist_ranges.append((tgt, self.comm.allgather(rnginfo)))
+                    else:
+                        # no part of distrib var is local, e.g., a distrib comp under a
+                        # parallel group
+                        dist_ranges.append((tgt, self.comm.allgather((0, 0, 0))))
+                else:  # assume default distrib layout
+                    if tgt in abs2meta:
+                        info.append((tgt, abs2meta[tgt]['size'], abs2meta[tgt]['value'], True))
+                    else:
+                        info.append((tgt, 0, np.zeros(0), True))
+            elif has_src_inds:  # local with non-distrib src_indices
+                meta = abs2meta[tgt]
+                src_inds, mx = self._get_src_inds_max(tgt, meta)
+                loc_ranges.append((tgt, mx, src_inds, meta['value'], False))
+            else:  # duplicated variable with no src_indices.  Overrides any other conn sizing.
+                return tgt, abs2meta[tgt]['size'], abs2meta[tgt]['value'], False
+
+        if loc_ranges:  # auto_ivc connected to local vars with src_indices
+            totmax = np.max([t[1] for t in loc_ranges])
+            sval = np.zeros(totmax + 1)
+            remote = False
+            for tgt, _, src_inds, val, rem in loc_ranges:
+                sval[src_inds] = val
+                remote |= rem
+            # TODO: handle shape
+            # tgt here is only one of potentially multiple vars with src_indices connected
+            info.append((tgt, sval.size, sval, remote))
+
+        if dist_ranges:  # we have auto_ivc connected to distributed input
+            minstarts = []
+            maxends = []
+            sizes = []
+            fulls = []
+            for tgt, ranges in dist_ranges:
+                minstarts.append(np.min([start for start, _, _ in ranges]))
+                if minstarts[-1] < 0:
+                    raise RuntimeError(f"{self.msginfo}: Can't connect {tgt} to "
+                                       "_auto_ivc: _auto_ivc connections with negative "
+                                       "src_indices are not supported.")
+                maxends.append(np.max([end for _, end, _ in ranges]))
+                sizes.append(np.sum([sz for _, _, sz in ranges]))
+                fulls.append(np.all([sz == (end - start + 1) for start, end, sz in ranges]))
+
+            is_default = (np.all(fulls) and np.all([m == 0 for m in minstarts])
+                          and np.all([m + 1 == sizes[0] or m == 0 for m in maxends]))
+
+            if is_default:  # all src_indices are non-overlapping starting at 0
+                # just match local size of auto_ivc to local size of input(s)
+
+                # must check that values for different distrib inputs match
+                val = None
+                old_tgt = None
+                for tgt, _ in dist_ranges:
+                    if tgt in abs2meta:
+                        if val is None:
+                            val = abs2meta[tgt]['value']
+                            old_tgt = tgt
+                        elif np.linalg.norm(val - abs2meta[tgt]['value']) > 1e-40:
+                            raise RuntimeError(f"{self.msginfo}: Can't connect "
+                                               "_auto_ivc to distributed variables "
+                                               f"'{tgt}' and '{old_tgt}' because they "
+                                               "have different values in rank "
+                                               f"{self.comm.rank}.")
+
+                if val is None:
+                    val = np.zeros(0)
+            elif len(dist_ranges) > 1:
+                raise RuntimeError(f"{self.msginfo}: Can't connect _auto_ivc to distributed"
+                                   f" inputs {sorted(t[0] for t in dist_ranges)}.")
+            else:
+                # distributed size layout is undefined, so just take the total distrib
+                # size and chop it up evenly among procs where the input size > 0.
+                num_nz_divisions = len([t for t, rngs in dist_ranges if rngs[1][2] > 0])
+                total_size = np.max(maxends)
+                sizes, _ = evenly_distrib_idxs(num_nz_divisions, total_size)
+                tgt, ranges = dist_ranges[0]
+                nz_count = 0
+                for rank, (start, end, sz) in enumerate(ranges):
+                    if rank == myrank:
+                        val = np.ones(sizes[nz_count])
+                        break
+                    if sz > 0:
+                        nz_count += 1
+
+            info.append((tgt, val.size, val, True))
+
+        # return max sized tgt, size, value
+        return sorted(info, key=lambda x: x[1])[-1]
+
     def _setup_auto_ivcs(self, mode):
         from openmdao.core.indepvarcomp import _AutoIndepVarComp
 
@@ -2573,12 +2699,15 @@ class Group(System):
         auto_ivc.pathname = auto_ivc.name
 
         # NOTE: remote_ins does NOT include distributed inputs.
+        # NOTE: some distributed inputs do not have src_indices yet
         remote_ins = self._find_remote_owners()
 
         prom2auto = {}
         count = 0
         auto2tgt = defaultdict(list)
         abs2prom = self._var_allprocs_abs2prom['input']
+        abs2meta = self._var_abs2meta
+        all_abs2meta = self._var_allprocs_abs2meta
         conns = self._problem_meta['connections']
         auto_tgts = [n for n in self._var_allprocs_abs_names['input'] if n not in conns]
         for tgt in auto_tgts:
@@ -2596,136 +2725,26 @@ class Group(System):
             auto2tgt[src].append(tgt)
 
         myrank = self.comm.rank
-        abs2meta = self._var_abs2meta
-        all_abs2meta = self._var_allprocs_abs2meta
         with multi_proc_exception_check(self.comm):
             for src, tgts in auto2tgt.items():
-                val = _undefined
-
-                dup_ts = [t for t in tgts if not
-                          (t in remote_ins or all_abs2meta[t]['distributed'])]
-                if dup_ts:
-                    # allow for mix of inputs, some with (nondistributed) src_indices, some not.
-                    for t in dup_ts:
-                        if not all_abs2meta[t]['has_src_indices']:
-                            tgt = t
-                            break
-                    else:
-                        tgt = dup_ts[0]
-                else:
-                    auto_ivc._add_remote(src)
-                    tgt = tgts[0]
-
+                tgt, sz, val, remote = self._get_auto_ivc_out_val(tgts, remote_ins, all_abs2meta,
+                                                                  abs2meta)
                 prom = abs2prom[tgt]
                 if prom not in self._group_inputs:
                     self._group_inputs[prom] = {'use_tgt': tgt}
                 else:
                     self._group_inputs[prom]['use_tgt'] = tgt
+                gmeta = self._group_inputs[prom]
 
-                distrib = all_abs2meta[tgt]['distributed']
-                if not (all_abs2meta[tgt]['has_src_indices'] and distrib):
+                if 'units' in gmeta:
+                    units = gmeta['units']
+                else:
                     units = all_abs2meta[tgt]['units']
-                    if tgt in abs2meta:
-                        gval = None
-                        prom = abs2prom[tgt]
-                        if prom in self._group_inputs:
-                            meta = self._group_inputs[prom]
-                            gval = meta.get('value', None)
-                            units = meta.get('units', units)
-                        if tgt in remote_ins:
-                            irank = remote_ins[tgt]
-                        else:
-                            irank = 0
-                        if (tgt not in remote_ins or remote_ins[tgt] == self.comm.rank or
-                                distrib):
-                            if gval is None:
-                                if val is _undefined:
-                                    val = abs2meta[tgt]['value']
-                            elif distrib:
-                                raise RuntimeError(f"{self.msginfo}: Group.set_input_defaults "
-                                                   "currently does not support overriding "
-                                                   "distributed input values.")
-                            else:
-                                val = gval
-
-                    if val is _undefined:
-                        # remote var is treated as distrib with size 0 everywhere but owner
-                        val = np.zeros(0)
-
-                    auto_ivc.add_output(src.rsplit('.', 1)[-1], val=val, units=units)
-
-                all_ranges = []
-                for tgt in tgts:
-                    val = _undefined
-
-                    if all_abs2meta[tgt]['has_src_indices'] and all_abs2meta[tgt]['distributed']:
-                        if tgt in abs2meta:
-                            src_indices = abs2meta[tgt]['src_indices']
-                            rnginfo = (np.min(src_indices), np.max(src_indices), len(src_indices))
-                            all_ranges.append((tgt, self.comm.allgather(rnginfo)))
-                        else:
-                            # no part of distrib var is local, e.g., a distrib comp under a
-                            # parallel group
-                            all_ranges.append((tgt, self.comm.allgather((0, 0, 0))))
-
-                if all_ranges:  # we have auto_ivc connected to distributed input
-                    minstarts = []
-                    maxends = []
-                    sizes = []
-                    fulls = []
-                    for tgt, ranges in all_ranges:
-                        minstarts.append(np.min([start for start, _, _ in ranges]))
-                        if minstarts[-1] < 0:
-                            raise RuntimeError(f"{self.msginfo}: Can't connect {tgt} to "
-                                               "_auto_ivc: _auto_ivc connections with negative "
-                                               "src_indices are not supported yet.")
-                        maxends.append(np.max([end for _, end, _ in ranges]))
-                        sizes.append(np.sum([sz for _, _, sz in ranges]))
-                        fulls.append(np.all([sz == (end - start + 1) for start, end, sz in ranges]))
-
-                    is_default = (np.all(fulls) and np.all([m == 0 for m in minstarts])
-                                  and np.all([m + 1 == sizes[0] or m == 0 for m in maxends]))
-
-                    if is_default:  # all src_indices are non-overlapping starting at 0
-                        # just match local size of auto_ivc to local size of input(s)
-
-                        # must check that values for different distrib inputs match
-                        val = None
-                        old_tgt = None
-                        for tgt, _ in all_ranges:
-                            if tgt in abs2meta:
-                                if val is None:
-                                    val = abs2meta[tgt]['value']
-                                    old_tgt = tgt
-                                elif np.linalg.norm(val - abs2meta[tgt]['value']) > 1e-40:
-                                    raise RuntimeError(f"{self.msginfo}: Can't connect "
-                                                       "_auto_ivc to distributed variables "
-                                                       f"'{tgt}' and '{old_tgt}' because they "
-                                                       "have different values in rank "
-                                                       f"{self.comm.rank}.")
-
-                        if val is None:
-                            val = np.zeros(0)
-                    elif len(all_ranges) > 1:
-                        raise RuntimeError(f"{self.msginfo}: Can't connect _auto_ivc to distributed"
-                                           f" inputs {sorted(t[0] for t in all_ranges)}.")
-                    else:
-                        # distributed size layout is undefined, so just take the total distrib
-                        # size and chop it up evenly among procs where the input size > 0.
-                        num_nz_divisions = len([t for t, rngs in all_ranges if rngs[1][2] > 0])
-                        total_size = np.max(maxends)
-                        sizes, _ = evenly_distrib_idxs(num_nz_divisions, total_size)
-                        tgt, ranges = all_ranges[0]
-                        nz_count = 0
-                        for rank, (start, end, sz) in enumerate(ranges):
-                            if rank == myrank:
-                                val = np.ones(sizes[nz_count])
-                                break
-                            if sz > 0:
-                                nz_count += 1
-
-                    auto_ivc.add_output(src.rsplit('.', 1)[-1], val=val,
-                                        units=all_abs2meta[tgt]['units'])
+                if 'value' in gmeta:
+                    val = gmeta['value']
+                auto_ivc.add_output(src.rsplit('.', 1)[-1], val=val, units=units)
+                if remote:
+                    auto_ivc._add_remote(src)
 
         # have to sort to keep vars in sync because we may be doing bcasts
         for abs_in in sorted(self._var_allprocs_discrete['input']):
@@ -2852,9 +2871,15 @@ class Group(System):
                     tunits = tmeta['units'] if 'units' in tmeta else None
                     if 'units' not in gmeta and sunits != tunits:
                         errs.add('units')
-                    if _has_val_mismatch(tunits, tval, sunits, sval):
-                        if 'value' not in gmeta:
-                            errs.add('value')
+                    if 'value' not in gmeta:
+                        if tval.shape == sval.shape:
+                            if _has_val_mismatch(tunits, tval, sunits, sval):
+                                errs.add('value')
+                        else:
+                            if all_abs2meta[tgt]['has_src_indices'] and tgt in abs2meta:
+                                srcpart = sval[abs2meta[tgt]['src_indices']]
+                                if _has_val_mismatch(tunits, tval, sunits, srcpart):
+                                    errs.add('value')
 
             if errs:
                 self._show_ambiguity_msg(prom, errs, tgts)

@@ -4157,7 +4157,7 @@ class System(object):
         return new_list
 
     def _abs_get_val(self, abs_name, get_remote=False, rank=None, vec_name=None, kind=None,
-                     flat=False):
+                     flat=False, from_root=False):
         """
         Return the value of the variable specified by the given absolute name.
 
@@ -4179,6 +4179,8 @@ class System(object):
             will be either an input or output.
         flat : bool
             If True, return the flattened version of the value.
+        from_root : bool
+            If True, resolve variables from higher top level scope.
 
         Returns
         -------
@@ -4188,13 +4190,19 @@ class System(object):
         discrete = distrib = False
         val = _undefined
         typ = 'output' if abs_name in self._var_allprocs_abs2prom['output'] else 'input'
+        if from_root:
+            all_meta = self._problem_meta['top_all_meta']
+            my_meta = self._problem_meta['top_meta']
+        else:
+            all_meta = self._var_allprocs_abs2meta
+            my_meta = self._var_abs2meta
 
         try:
             if get_remote:
-                meta = self._var_allprocs_abs2meta[abs_name]
+                meta = all_meta[abs_name]
                 distrib = meta['distributed']
             else:
-                meta = self._var_abs2meta[abs_name]
+                meta = my_meta[abs_name]
         except KeyError:
             discrete = True
             relname = abs_name[len(self.pathname) + 1:] if self.pathname else abs_name
@@ -4221,6 +4229,8 @@ class System(object):
                 if abs_name in self._var_abs2meta:
                     val = self._var_abs2meta[abs_name]['value']
             else:
+                if from_root:
+                    vec = vec._root_vector
                 if abs_name in vec._views:
                     val = vec._views_flat[abs_name] if flat else vec._views[abs_name]
 
@@ -4313,7 +4323,7 @@ class System(object):
         if from_src and abs_names[0] in conns:  # pull input from source
             return self._get_input_from_src(name, abs_names, conns, units=units, indices=indices,
                                             get_remote=get_remote, rank=rank, vec_name='nonlinear',
-                                            kind=None, flat=flat)
+                                            kind='output', flat=flat)
         else:
             val = self._abs_get_val(abs_names[0], get_remote, rank, vec_name, kind, flat)
 
@@ -4342,7 +4352,7 @@ class System(object):
                     self._show_ambiguity_msg(name, ('units',), abs_names)
 
         if src in self._var_allprocs_discrete['output']:
-            return self._abs_get_val(src, get_remote, rank, vec_name, kind, flat)
+            return self._abs_get_val(src, get_remote, rank, vec_name, kind, flat, from_root=True)
 
         if abs_name in self._var_abs2meta:  # input is local
             vmeta = self._var_abs2meta[abs_name]
@@ -4354,8 +4364,7 @@ class System(object):
             has_src_indices = vmeta['has_src_indices']
 
         distrib = vmeta['distributed']
-        smeta = self._var_allprocs_abs2meta[src]
-        val = self._abs_get_val(src, get_remote, rank, vec_name, kind, flat)
+        val = self._abs_get_val(src, get_remote, rank, vec_name, kind, flat, from_root=True)
 
         if has_src_indices:
             if src_indices is None:  # input is remote
@@ -4396,6 +4405,7 @@ class System(object):
         if indices is not None:
             val = val[indices]
 
+        smeta = self._problem_meta['top_all_meta'][src]
         if units is not None:
             if smeta['units'] is not None:
                 try:
@@ -4558,7 +4568,7 @@ class System(object):
         dict
             The metadata dictionary for the named variable.
         """
-        meta = self._var_allprocs_abs2meta
+        meta = self._problem_meta['top_all_meta']
         if name in meta:
             return meta[name]
 

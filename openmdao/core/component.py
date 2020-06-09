@@ -797,8 +797,6 @@ class Component(System):
         sizes_out = all_sizes['nonlinear']['output']
         added_src_inds = set()
         for i, iname in enumerate(self._var_allprocs_abs_names['input']):
-            # if i not in no_src_inds:
-            #     continue
             if iname in abs2meta and abs2meta[iname]['src_indices'] is None:
                 src = abs_in2out[iname]
                 out_i = all_abs2idx[src]
