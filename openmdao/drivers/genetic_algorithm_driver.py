@@ -393,8 +393,8 @@ class SimpleGADriver(Driver):
             is_single_objective = False
         else:
             for obj in objs.items():
+                is_single_objective = len(obj) == 1
                 break
-            is_single_objective = len(obj) == 1
 
         obj_exponent = self.options['multi_obj_exponent']
         if self.options['multi_obj_weights']:  # not empty
