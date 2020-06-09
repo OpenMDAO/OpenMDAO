@@ -4,6 +4,7 @@ KS Function Component.
 import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent
+from openmdao.utils.units import valid_units
 
 
 CITATIONS = """
@@ -17,6 +18,25 @@ CITATIONS = """
         author = {Joaquim R. R. A. Martins and Nicholas M. K. Poon}
 }
 """
+
+
+def check_option(option, value):
+    """
+    Check option for validity.
+
+    Parameters
+    ----------
+    option : str
+        The name of the option
+    value : any
+        The value of the option
+
+    Raises
+    ------
+    ValueError
+    """
+    if option == 'units' and value is not None and not valid_units(value):
+        raise ValueError("The units '%s' are invalid." % value)
 
 
 class KSfunction(object):
@@ -145,6 +165,10 @@ class KSComp(ExplicitComponent):
                              desc='If True, add a constraint on the resulting output of the KSComp.'
                                   ' If False, the user will be expected to add a constraint '
                                   'explicitly.')
+        self.options.declare('units', types=str, allow_none=True, default=None,
+                             desc='Units to be assigned to all variables in this component. '
+                                  'Default is None, which means variables are unitless.',
+                             check_valid=check_option)
         self.options.declare('scaler', types=(int, float), allow_none=True, default=None,
                              desc="Scaler for constraint, if added, default is one.")
         self.options.declare('adder', types=(int, float), allow_none=True, default=None,
@@ -165,13 +189,15 @@ class KSComp(ExplicitComponent):
         opts = self.options
         width = opts['width']
         vec_size = opts['vec_size']
+        units = opts['units']
 
         # Inputs
-        self.add_input('g', shape=(vec_size, width),
+        self.add_input('g', shape=(vec_size, width), units=units,
                        desc="Array of function values to be aggregated")
 
         # Outputs
-        self.add_output('KS', shape=(vec_size, 1), desc="Value of the aggregate KS function")
+        self.add_output('KS', shape=(vec_size, 1), units=units,
+                        desc="Value of the aggregate KS function")
 
         if opts['add_constraint']:
             self.add_constraint(name='KS', upper=0.0, scaler=opts['scaler'], adder=opts['adder'],
