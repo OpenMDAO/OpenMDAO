@@ -74,11 +74,17 @@ class NodeInfo {
         ];
 
         this.abs2prom = abs2prom;
-        this.table = d3.select('#node-info-container');
+        this.table = d3.select('#node-info-table');
+        this.container = d3.select('#node-info-container');
         this.thead = this.table.select('thead');
         this.tbody = this.table.select('tbody');
         this.toolbarButton = d3.select('#info-button');
         this.hidden = true;
+        this.pinned = false;
+
+        const self = this;
+        this.pinButton = d3.select('#node-info-pin')
+            .on('click', e => { self.unpin(); })
     }
 
     /** Make the info box visible if it's hidden */
@@ -99,6 +105,22 @@ class NodeInfo {
     toggle() {
         if (this.hidden) this.show();
         else this.hide();
+    }
+
+    pin() { 
+        this.pinned = true;
+        this.pinButton.attr('class', 'info-visible');
+    }
+    
+    unpin() {
+        this.pinned = false;
+        this.pinButton.attr('class', 'info-hidden');
+        this.clear();
+    }
+
+    togglePin() {
+        if (this.pinned) this.unpin();
+        else this.pin();
     }
 
     _addPropertyRow(label, val, capitalize = false) {
@@ -122,7 +144,9 @@ class NodeInfo {
      * @param {N2TreeNode} color The color to make the title bar.
      */
     update(event, obj, color = '#42926b') {
-        if (this.hidden) return;
+        if (this.hidden || this.pinned) return;
+
+        this.clear();
         // Put the name in the title
         this.table.select('thead th')
             .style('background-color', color)
@@ -153,16 +177,20 @@ class NodeInfo {
             .style('height', this.table.node().scrollHeight + 'px')
 
         this.move(event);
-        this.table.attr('class', 'info-visible');
+        this.container.attr('class', 'info-visible');
     }
 
     /** Wipe the contents of the table body */
     clear() {
-        if (this.hidden) return;
-        this.table
+        if (this.hidden || this.pinned) return;
+        this.container
             .attr('class', 'info-hidden')
             .style('width', 'auto')
-            .style('height', 'auto')
+            .style('height', 'auto');
+
+        this.table
+            .style('width', 'auto')
+            .style('height', 'auto');
 
         this.tbody.html('');
     }
@@ -172,29 +200,29 @@ class NodeInfo {
      * @param {Object} event The triggering event containing the position.
      */
     move(event) {
-        if (this.hidden) return;
+        if (this.hidden || this.pinned) return;
         const offset = 30;
 
         // Mouse is in left half of window, put box to right of mouse
         if (event.clientX < window.innerWidth / 2) {
-            this.table.style('right', 'auto');
-            this.table.style('left', (event.clientX + offset) + 'px')
+            this.container.style('right', 'auto');
+            this.container.style('left', (event.clientX + offset) + 'px')
         }
         // Mouse is in right half of window, put box to left of mouse
         else {
-            this.table.style('left', 'auto');
-            this.table.style('right', (window.innerWidth - event.clientX + offset) + 'px')
+            this.container.style('left', 'auto');
+            this.container.style('right', (window.innerWidth - event.clientX + offset) + 'px')
         }
 
         // Mouse is in top half of window, put box below mouse
         if (event.clientY < window.innerHeight / 2) {
-            this.table.style('bottom', 'auto');
-            this.table.style('top', (event.clientY - offset) + 'px')
+            this.container.style('bottom', 'auto');
+            this.container.style('top', (event.clientY - offset) + 'px')
         }
         // Mouse is in bottom half of window, put box above mouse
         else {
-            this.table.style('top', 'auto');
-            this.table.style('bottom', (window.innerHeight - event.clientY - offset) + 'px')
+            this.container.style('top', 'auto');
+            this.container.style('bottom', (window.innerHeight - event.clientY - offset) + 'px')
         }
     }
 }
@@ -779,7 +807,7 @@ class N2UserInterface {
         testThis(this, 'N2UserInterface', 'toggleNodeData');
 
         const infoButton = d3.select('#info-button');
-        const nodeData = d3.select('#node-info-container');
+        const nodeData = d3.select('#node-info-table');
 
         if (nodeData.classed('info-hidden')) {
             nodeData.attr('class', 'info-visible');
