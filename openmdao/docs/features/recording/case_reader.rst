@@ -11,7 +11,7 @@ recorder. Therefore, all the examples will
 make use of this recorder. OpenMDAO will support other case recorders in the future.
 
 CaseReader Constructor
---------------------
+----------------------
 
 The call signature for the `CaseReader` constructor is:
 

@@ -13,7 +13,7 @@ AddSubtractComp
 
 
 DotProductComp Constructor
---------------------
+--------------------------
 
 The call signature for the `DotProductComp` constructor is:
 

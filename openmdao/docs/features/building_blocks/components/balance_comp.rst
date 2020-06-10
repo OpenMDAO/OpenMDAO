@@ -19,11 +19,11 @@ BalanceComp Options
     options
 
 BalanceComp Constructor
---------------------
+-----------------------
 
 The call signature for the `BalanceComp` constructor is:
 
-.. automethod:: openmdao.components.balance_comp.BalanceComp.__init__
+.. automethod:: openmdao.components.balance_comp.BalanceComp.__init__()
     :noindex:
 
 
