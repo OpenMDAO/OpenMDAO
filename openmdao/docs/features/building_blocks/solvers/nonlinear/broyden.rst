@@ -31,7 +31,7 @@ The BroydenSolver also contains a slot for a linear solver and a slot for a line
 :ref:`feature doc about linesearches <feature_line_search>` for more about these.
 
 BroydenSolver Constructor
-------------------------
+-------------------------
 
 The call signature for the `BroydenSolver` constructor is:
 

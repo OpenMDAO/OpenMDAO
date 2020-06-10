@@ -26,7 +26,7 @@ LinearBlockJac Options
     options
 
 LinearBlockJac Constructor
-------------------------
+--------------------------
 
 The call signature for the `LinearBlockJac` constructor is:
 

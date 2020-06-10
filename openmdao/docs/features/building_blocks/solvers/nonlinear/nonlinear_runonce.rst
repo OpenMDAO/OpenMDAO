@@ -30,7 +30,7 @@ NonlinearRunOnce Options
     options
 
 NonlinearRunOnce Constructor
-------------------------
+----------------------------
 
 The call signature for the `NonlinearRunOnce` constructor is:
 

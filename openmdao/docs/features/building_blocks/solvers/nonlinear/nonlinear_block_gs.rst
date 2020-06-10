@@ -39,7 +39,7 @@ NonlinearBlockGS Options
     options
 
 NonlinearBlockGS Constructor
-------------------------
+----------------------------
 
 The call signature for the `NonlinearBlockGS` constructor is:
 

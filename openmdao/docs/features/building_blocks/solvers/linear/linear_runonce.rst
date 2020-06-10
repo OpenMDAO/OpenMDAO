@@ -32,7 +32,7 @@ LinearRunOnce Options
     options
 
 LinearRunOnce Constructor
-------------------------
+-------------------------
 
 The call signature for the `LinearRunOnce` constructor is:
 

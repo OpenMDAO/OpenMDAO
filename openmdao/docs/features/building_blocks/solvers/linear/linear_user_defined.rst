@@ -49,7 +49,7 @@ LinearUserDefined Options
     options
 
 LinearUserDefined Constructor
-------------------------
+-----------------------------
 
 The call signature for the `LinearUserDefined` constructor is:
 

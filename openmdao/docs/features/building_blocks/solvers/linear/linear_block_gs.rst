@@ -32,7 +32,7 @@ LinearBlockGS Options
     options
 
 LinearBlockGS Constructor
-------------------------
+-------------------------
 
 The call signature for the `LinearBlockGS` constructor is:
 

@@ -39,7 +39,7 @@ NonlinearBlockJac Options
     options
 
 NonlinearBlockJac Constructor
-------------------------
+-----------------------------
 
 The call signature for the `NonlinearBlockJac` constructor is:
 

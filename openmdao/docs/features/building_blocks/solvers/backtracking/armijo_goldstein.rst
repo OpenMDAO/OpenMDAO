@@ -30,7 +30,7 @@ ArmijoGoldsteinLS Constructor
 
 The call signature for the `ArmijoGoldsteinLS` constructor is:
 
-.. automethod:: openmdao.solvers.armijo_goldstein.ArmijoGoldsteinLS.__init__
+.. automethod:: openmdao.solvers.linesearch.backtracking.ArmijoGoldsteinLS.__init__
     :noindex:
 
 
