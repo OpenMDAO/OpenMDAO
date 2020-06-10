@@ -34,6 +34,15 @@ SimpleGADriver Options
     SimpleGADriver
     options
 
+SimpleGADriver Constructor
+--------------------------
+
+The call signature for the `SimpleGADriver` constructor is:
+
+.. automethod:: openmdao.drivers.genetic_algorithm_driver.SimpleGADriver.__init__
+    :noindex:
+
+
 You can change the number of generations to run the genetic algorithm by setting the "max_gen" option.
 
 .. embed-code::
