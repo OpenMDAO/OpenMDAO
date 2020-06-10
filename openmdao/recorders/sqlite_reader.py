@@ -321,16 +321,14 @@ class SqliteCaseReader(BaseCaseReader):
         if self._format_version >= 2 and self._problem_cases.count() > 0:
             sources.extend(self._problem_cases.list_sources())
 
-        if not out_stream:
-            return sources
-        else:
+        if out_stream:
             if out_stream is _DEFAULT_OUT_STREAM:
                 out_stream = sys.stdout
 
-            if out_stream:
-                for source in sources:
-                    out_stream.write('{}\n'.format(source))
-            return sources
+            for source in sources:
+                out_stream.write('{}\n'.format(source))
+
+        return sources
 
     def list_source_vars(self, source, out_stream=_DEFAULT_OUT_STREAM):
         """
@@ -382,15 +380,13 @@ class SqliteCaseReader(BaseCaseReader):
         if case.residuals:
             dct['residuals'] = list(case.residuals)
 
-        if not out_stream:
-            return dct
-        else:
+        if out_stream:
             if out_stream is _DEFAULT_OUT_STREAM:
                 out_stream = sys.stdout
 
-            if out_stream:
-                write_source_table(dct, out_stream)
-            return dct
+            write_source_table(dct, out_stream)
+
+        return dct
 
     def list_cases(self, source=None, recurse=True, flat=True, out_stream=_DEFAULT_OUT_STREAM):
         """
@@ -548,15 +544,13 @@ class SqliteCaseReader(BaseCaseReader):
                 self.source_cases_table[table].append(case_coord)
                 cases.append(case_coord)
 
-        if not out_stream:
-            return cases
-        else:
+        if out_stream:
             if out_stream is _DEFAULT_OUT_STREAM:
                 out_stream = sys.stdout
 
-            if out_stream:
-                write_source_table(self.source_cases_table, out_stream)
-            return cases
+            write_source_table(self.source_cases_table, out_stream)
+
+        return cases
 
     def _list_cases_recurse_nested(self, coord=None):
         """

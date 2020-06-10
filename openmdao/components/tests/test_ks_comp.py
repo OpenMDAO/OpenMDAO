@@ -33,6 +33,11 @@ class TestKSFunction(unittest.TestCase):
 
         assert_near_equal(max(prob['comp.y2']), prob['ks.KS'][0])
 
+    def test_bad_units(self):
+        with self.assertRaises(ValueError) as ctx:
+            om.KSComp(units='wtfu')
+        self.assertEqual(str(ctx.exception), "The units 'wtfu' are invalid.")
+
     def test_vectorized(self):
         prob = om.Problem()
         model = prob.model
@@ -208,7 +213,8 @@ class TestKSFunctionFeatures(unittest.TestCase):
         model = prob.model
 
         model.add_subsystem('px', om.IndepVarComp('x', val=np.array([5.0, 4.0])))
-        model.add_subsystem('comp', om.ExecComp('y = 3.0*x', x=np.zeros((2, )),
+        model.add_subsystem('comp', om.ExecComp('y = 3.0*x',
+                                                x=np.zeros((2, )),
                                                 y=np.zeros((2, ))))
         model.add_subsystem('ks', om.KSComp(width=2))
 
@@ -218,7 +224,7 @@ class TestKSFunctionFeatures(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_near_equal(prob['ks.KS'][0], 15.0)
+        assert_near_equal(prob['ks.KS'], [[15.0]])
 
     def test_vectorized(self):
         import numpy as np
@@ -229,7 +235,8 @@ class TestKSFunctionFeatures(unittest.TestCase):
         model = prob.model
 
         model.add_subsystem('px', om.IndepVarComp('x', val=np.array([[5.0, 4.0], [10.0, 8.0]])))
-        model.add_subsystem('comp', om.ExecComp('y = 3.0*x', x=np.zeros((2, 2)),
+        model.add_subsystem('comp', om.ExecComp('y = 3.0*x',
+                                                x=np.zeros((2, 2)),
                                                 y=np.zeros((2, 2))))
         model.add_subsystem('ks', om.KSComp(width=2, vec_size=2))
 
@@ -239,8 +246,7 @@ class TestKSFunctionFeatures(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_near_equal(prob['ks.KS'][0], 15.0)
-        assert_near_equal(prob['ks.KS'][1], 30.0)
+        assert_near_equal(prob['ks.KS'], np.array([[15], [30]]))
 
     def test_upper(self):
         import numpy as np
@@ -251,7 +257,8 @@ class TestKSFunctionFeatures(unittest.TestCase):
         model = prob.model
 
         model.add_subsystem('px', om.IndepVarComp('x', val=np.array([5.0, 4.0])))
-        model.add_subsystem('comp', om.ExecComp('y = 3.0*x', x=np.zeros((2, )),
+        model.add_subsystem('comp', om.ExecComp('y = 3.0*x',
+                                                x=np.zeros((2, )),
                                                 y=np.zeros((2, ))))
         model.add_subsystem('ks', om.KSComp(width=2))
 
@@ -262,7 +269,7 @@ class TestKSFunctionFeatures(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_near_equal(prob['ks.KS'][0], -1.0)
+        assert_near_equal(prob['ks.KS'], np.array([[-1.0]]))
 
     def test_lower_flag(self):
         import numpy as np
@@ -273,7 +280,8 @@ class TestKSFunctionFeatures(unittest.TestCase):
         model = prob.model
 
         model.add_subsystem('px', om.IndepVarComp('x', val=np.array([5.0, 4.0])))
-        model.add_subsystem('comp', om.ExecComp('y = 3.0*x', x=np.zeros((2, )),
+        model.add_subsystem('comp', om.ExecComp('y = 3.0*x',
+                                                x=np.zeros((2, )),
                                                 y=np.zeros((2, ))))
         model.add_subsystem('ks', om.KSComp(width=2))
 
@@ -284,7 +292,7 @@ class TestKSFunctionFeatures(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_near_equal(prob['ks.KS'][0], -12.0)
+        assert_near_equal(prob['ks.KS'], [[-12.0]])
 
     def test_add_constraint(self):
         import numpy as np
@@ -301,8 +309,10 @@ class TestKSFunctionFeatures(unittest.TestCase):
         ivc.add_output('x', val=np.linspace(-np.pi/2, np.pi/2, n))
         ivc.add_output('k', val=5.0)
 
-        model.add_subsystem('comp', om.ExecComp('y = -3.0*x**2 + k', x=np.zeros((n, )),
-                                                y=np.zeros((n, )), k=0.0))
+        model.add_subsystem('comp', om.ExecComp('y = -3.0*x**2 + k',
+                                                x=np.zeros((n, )),
+                                                y=np.zeros((n, )),
+                                                k=0.0))
         model.add_subsystem('ks', om.KSComp(width=n, upper=4.0, add_constraint=True))
 
         model.add_design_var('ivc.k', lower=-10, upper=10)
@@ -330,6 +340,30 @@ class TestKSFunctionFeatures(unittest.TestCase):
         ax.text(-0.25, 0, f"k = {prob.get_val('ivc.k')[0]:6.3f}")
 
         plt.show()
+
+    def test_units(self):
+        import openmdao.api as om
+        from openmdao.utils.units import convert_units
+
+        n = 10
+
+        model = om.Group()
+
+        model.add_subsystem('indep', om.IndepVarComp('x', val=range(n), units='ft'))
+        model.add_subsystem('ks', om.KSComp(width=n, units='m'))
+
+        model.connect('indep.x', 'ks.g')
+
+        prob = om.Problem(model=model)
+        prob.setup()
+        prob.run_model()
+
+        # KS is expressed in meters, while the independent variable 'x' is in feet
+        assert_near_equal(prob['ks.KS'][0], convert_units(max(prob['indep.x']), 'ft', 'm'),
+                          tolerance=1e-8)
+
+        assert_near_equal(convert_units(prob['ks.KS'][0], 'm', 'ft'), max(prob['indep.x']),
+                          tolerance=1e-8)
 
 
 if __name__ == "__main__":
