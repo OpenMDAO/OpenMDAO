@@ -1036,6 +1036,7 @@ class MPITests3(unittest.TestCase):
                                                             [-0. , -0. , -0. , -0. , -0. , -0. , 12.2]]),
                           1e-11)
 
+
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class MPITestsBug(unittest.TestCase):
 
