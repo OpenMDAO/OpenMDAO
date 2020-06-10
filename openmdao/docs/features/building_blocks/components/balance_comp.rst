@@ -18,6 +18,14 @@ BalanceComp Options
     BalanceComp
     options
 
+BalanceComp Constructor
+--------------------
+
+The call signature for the `BalanceComp` constructor is:
+
+.. automethod:: openmdao.components.balance_comp.BalanceComp.__init__
+    :noindex:
+
 
 `BalanceComp` allows you to add one or more state variables and its associated
 implicit equations.  For each ``balance`` added to the component it

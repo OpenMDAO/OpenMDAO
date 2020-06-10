@@ -61,6 +61,14 @@ Note that the `kwargs` arguments can include any of the keyword arguments normal
 when creating an output variable with the
 :meth:`add_output <openmdao.core.component.Component.add_output>` method of a `Component`.
 
+EQConstraintComp Constructor
+-----------------------------
+
+The call signature for the `EQConstraintComp` constructor is:
+
+.. automethod:: openmdao.components.eq_constraint_comp.EQConstraintComp.__init__
+    :noindex:
+
 
 Example: Sellar IDF
 -------------------

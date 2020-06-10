@@ -25,6 +25,14 @@ KSComp Options
     KSComp
     options
 
+KSComp Constructor
+------------------
+
+The call signature for the `KSComp` constructor is:
+
+.. automethod:: openmdao.components.ks_comp.KSComp.__init__
+    :noindex:
+
 
 KSComp Example
 --------------
