@@ -517,11 +517,29 @@ class Group(System):
 
     def _top_level_setup(self, setup_mode, mode):
         self._problem_meta['connections'] = conns = self._conn_global_abs_in2out
-        self._problem_meta['top_all_meta'] = self._var_allprocs_abs2meta
+        self._problem_meta['top_all_meta'] = abs2meta = self._var_allprocs_abs2meta
         self._problem_meta['top_meta'] = self._var_abs2meta
 
         if setup_mode == 'full':
             auto_ivc = self._setup_auto_ivcs(mode)
+            prom2abs_in = self._var_allprocs_prom2abs_list['input']
+            prom2abs_out = self._var_allprocs_prom2abs_list['output']
+            for absname in abs2meta:
+                if absname in prom2abs_in:
+                    for name in prom2abs_in[absname]:
+                        if name != absname:
+                            raise RuntimeError(f"{self.msginfo}: Absolute variable name '{absname}'"
+                                               " is masked by a matching promoted name. Try"
+                                               " promoting to a different name. This can be caused"
+                                               " by promoting '*' at group level or promoting using"
+                                               " dotted names.")
+                elif absname in prom2abs_out:
+                    if absname != prom2abs_out[absname][0]:
+                        raise RuntimeError(f"{self.msginfo}: Absolute variable name '{absname}' is"
+                                           " masked by a matching promoted name. Try"
+                                           " promoting to a different name. This can be caused"
+                                           " by promoting '*' at group level or promoting using"
+                                           " dotted names.")
 
     def _top_level_setup2(self, setup_mode):
         self._resolve_connected_input_defaults()

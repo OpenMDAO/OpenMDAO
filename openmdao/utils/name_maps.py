@@ -178,16 +178,16 @@ def name2abs_names(system, name):
     tuple or list of str
         Tuple or list of absolute variable names found.
     """
-    if name in system._var_allprocs_abs2prom['output']:
-        return (name,)
-    if name in system._var_allprocs_abs2prom['input']:
-        return (name,)
-
     if name in system._var_allprocs_prom2abs_list['output']:
         return system._var_allprocs_prom2abs_list['output'][name]
 
     if name in system._var_allprocs_prom2abs_list['input']:
         return system._var_allprocs_prom2abs_list['input'][name]
+
+    if name in system._var_allprocs_abs2prom['output']:
+        return (name,)
+    if name in system._var_allprocs_abs2prom['input']:
+        return (name,)
 
     if system.pathname:
         abs_name = f"{system.pathname}.{name}"

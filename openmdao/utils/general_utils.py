@@ -67,6 +67,22 @@ def conditional_error(msg, exc=RuntimeError, category=UserWarning):
         raise exc(msg)
 
 
+@contextmanager
+def ignore_errors_context(flag=True):
+    """
+    Set ignore_errors to the given flag in this context.
+
+    Parameters
+    ----------
+    flag : bool
+        If not None, set ignore_errors to this value.
+    """
+    save = ignore_errors()
+    ignore_errors(flag)
+    yield
+    ignore_errors(save)
+
+
 def warn_deprecation(msg):
     """
     Raise a warning and prints a deprecation message to stdout.
