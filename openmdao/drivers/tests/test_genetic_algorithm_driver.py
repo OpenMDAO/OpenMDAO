@@ -465,6 +465,29 @@ class TestDriverOptionsSimpleGA(unittest.TestCase):
         self.assertEqual(driver.options['Pc'], 0.0123)
 
 
+class Box(om.ExplicitComponent):
+
+    def setup(self):
+        self.add_input('length', val=1.)
+        self.add_input('width', val=1.)
+        self.add_input('height', val=1.)
+
+        self.add_output('front_area', val=1.0)
+        self.add_output('top_area', val=1.0)
+        self.add_output('area', val=1.0)
+        self.add_output('volume', val=1.)
+
+    def compute(self, inputs, outputs):
+        length = inputs['length']
+        width = inputs['width']
+        height = inputs['height']
+
+        outputs['top_area'] = length * width
+        outputs['front_area'] = length * height
+        outputs['area'] = 2*length*height + 2*length*width + 2*height*width
+        outputs['volume'] = length*height*width
+
+
 class TestMultiObjectiveSimpleGA(unittest.TestCase):
 
     def setUp(self):
@@ -472,28 +495,6 @@ class TestMultiObjectiveSimpleGA(unittest.TestCase):
         os.environ['SimpleGADriver_seed'] = '11'
 
     def test_multi_obj(self):
-
-        class Box(om.ExplicitComponent):
-
-            def setup(self):
-                self.add_input('length', val=1.)
-                self.add_input('width', val=1.)
-                self.add_input('height', val=1.)
-
-                self.add_output('front_area', val=1.0)
-                self.add_output('top_area', val=1.0)
-                self.add_output('area', val=1.0)
-                self.add_output('volume', val=1.)
-
-            def compute(self, inputs, outputs):
-                length = inputs['length']
-                width = inputs['width']
-                height = inputs['height']
-
-                outputs['top_area'] = length * width
-                outputs['front_area'] = length * height
-                outputs['area'] = 2*length*height + 2*length*width + 2*height*width
-                outputs['volume'] = length*height*width
 
         prob = om.Problem()
         prob.model.add_subsystem('box', Box(), promotes=['*'])
@@ -577,6 +578,45 @@ class TestMultiObjectiveSimpleGA(unittest.TestCase):
 
         self.assertGreater(w1, w2)  # front area does not depend on width
         self.assertGreater(h2, h1)  # top area does not depend on height
+
+    def test_pareto(self):
+        np.random.seed(11)
+
+        prob = om.Problem()
+
+        indeps = prob.model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
+        indeps.add_output('length', 1.5)
+        indeps.add_output('width', 1.5)
+        indeps.add_output('height', 1.5)
+
+        prob.model.add_subsystem('box', Box(), promotes=['*'])
+
+        # setup the optimization
+        prob.driver = om.SimpleGADriver()
+        prob.driver.options['max_gen'] = 20
+        prob.driver.options['bits'] = {'length': 8, 'width': 8, 'height': 8}
+        prob.driver.options['penalty_parameter'] = 10.
+        prob.driver.options['compute_pareto'] = True
+
+        prob.driver._randomstate = 11
+
+        prob.model.add_design_var('length', lower=0.1, upper=2.)
+        prob.model.add_design_var('width', lower=0.1, upper=2.)
+        prob.model.add_design_var('height', lower=0.1, upper=2.)
+        prob.model.add_objective('front_area', scaler=-1)  # maximize
+        prob.model.add_objective('top_area', scaler=-1)  # maximize
+        prob.model.add_constraint('volume', upper=1.)
+
+        prob.setup()
+        prob.run_driver()
+
+        nd_obj = prob.driver.obj_nd
+        sorted_obj = nd_obj[nd_obj[:, 0].argsort()]
+
+        # We have sorted the pareto points by col 1, so col 1 should be ascending.
+        # Col 2 should be descending because the points are non-dominated.
+        self.assertTrue(np.all(sorted_obj[:-1, 0] <= sorted_obj[1:, 0]))
+        self.assertTrue(np.all(sorted_obj[:-1, 1] >= sorted_obj[1:, 1]))
 
 
 class TestConstrainedSimpleGA(unittest.TestCase):
