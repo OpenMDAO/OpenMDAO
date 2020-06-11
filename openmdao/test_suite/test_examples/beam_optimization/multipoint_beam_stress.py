@@ -124,9 +124,8 @@ class MultipointBeamGroup(om.Group):
             comp = MultiStressComp(num_elements=num_elements, E=E, num_rhs=num_rhs)
             sub.add_subsystem('stress_comp', comp)
 
-            self.connect(
-                'local_stiffness_matrix_comp.K_local',
-                'parallel.%s.states_comp.K_local' % name)
+            self.connect('local_stiffness_matrix_comp.K_local',
+                         'parallel.%s.states_comp.K_local' % name)
 
             for k in range(num_rhs):
                 sub.connect('states_comp.d_%d' % k,
@@ -144,9 +143,8 @@ class MultipointBeamGroup(om.Group):
 
                 sub.add_subsystem('KS_%d' % k, comp)
 
-                sub.connect(
-                    'stress_comp.stress_%d' % k,
-                    'KS_%d.g' % k)
+                sub.connect('stress_comp.stress_%d' % k,
+                            'KS_%d.g' % k)
 
                 if not self.options['ks_add_constraint']:
                     sub.add_constraint('KS_%d.KS' % k, upper=0.0,
