@@ -742,6 +742,39 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
         # verify read_only status is reset after AnalysisError
         prob['comp1.x'] = 111.
 
+    def test_guess_nonlinear_resids_read_only(self):
+        class ImpWithInitial(om.ImplicitComponent):
+
+            def setup(self):
+                self.add_input('x', 3.0)
+                self.add_output('y', 4.0)
+
+            def guess_nonlinear(self, inputs, outputs, resids):
+                # inputs is read_only, should not be allowed
+                resids['y'] = 0.
+
+        group = om.Group()
+
+        group.add_subsystem('px', om.IndepVarComp('x', 77.0))
+        group.add_subsystem('comp1', ImpWithInitial())
+        group.add_subsystem('comp2', ImpWithInitial())
+        group.connect('px.x', 'comp1.x')
+        group.connect('comp1.y', 'comp2.x')
+
+        group.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        group.nonlinear_solver.options['maxiter'] = 1
+
+        prob = om.Problem(model=group)
+        prob.set_solver_print(level=0)
+        prob.setup()
+
+        with self.assertRaises(ValueError) as cm:
+            prob.run_model()
+
+        self.assertEqual(str(cm.exception),
+                         "Attempt to set value of 'y' in residual vector "
+                         "when it is read only.")
+
 
 class ImplicitCompReadOnlyTestCase(unittest.TestCase):
 
