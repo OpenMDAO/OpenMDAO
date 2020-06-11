@@ -106,7 +106,8 @@ class ImplicitComponent(Component):
         Provide initial guess for states.
         """
         if self._has_guess:
-            self._inputs.read_only = self._residuals.read_only = True
+            self._apply_nonlinear()
+            self._inputs.read_only = True
             complex_step = self._inputs._under_complex_step
 
             try:
@@ -129,7 +130,7 @@ class ImplicitComponent(Component):
                     self._outputs.set_complex_step_mode(True)
                     self._residuals.set_complex_step_mode(False)
                     self._residuals._under_complex_step = True
-                self._inputs.read_only = self._residuals.read_only = False
+                self._inputs.read_only = False
 
     def _apply_linear(self, jac, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
         """
