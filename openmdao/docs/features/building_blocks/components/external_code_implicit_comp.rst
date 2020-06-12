@@ -25,6 +25,7 @@ The call signature for the `ExternalCodeImplicitComp` constructor is:
 .. automethod:: openmdao.components.external_code_comp.ExternalCodeImplicitComp.__init__
     :noindex:
 
+----
 
 When using an `ExternalCodeImplicitComp`, you have the option to define two external programs rather than one. The
 first of these is "command_apply", which is the command that you want to run to evaluate the residuals. You should
