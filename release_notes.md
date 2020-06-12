@@ -17,22 +17,22 @@ None
 
 ## New Features:
 
-- An error is now Raised if a component has a 0-length array #1391
+- An error is now raised if a component has a 0-length array #1391
 - BoundsEnforceLS linesearch no longer warns if bounds are not set #1393
 - Added SVG icons for the N2 toolbar. #1394
 - Added method signature for add_equation to the AddSubtractComp feature doc #1395
 - Added recording of the top level solver abs_err and rel_err to the case recording of Problem #1398
-- Support for group approximation across distributed components in certain cases. #1402
+- Added support for group approximation across distributed components in certain cases. #1402
 - The `Group.promotes` method now supports specification of `src_indices`. #1408
 - OpenMDAO now warns the user about out of order parallel components and recommends the use of a NonlinearBlockJac to converge the components in a parallel group. #1412
-- Update docs for options dictionary to include example for `check_valid` argument. #1417
-- Add support for response indices on distributed variables. #1426
+- Updated docs for options dictionary to include example for `check_valid` argument. #1417
+- Added support for response indices on distributed variables. #1426
 - Raise a RuntimeError rather than excluding pyOptSparseDriver from the API when pyoptsparse is not installed or not installed properly. #1427
 - Added Problem source to list_cases #1428
 - Integrated IPOPT into CI testing #1431
 - Added CI Support for SNOPT 7.7 and PyoptSparse 2.1.0 #1435
 - Also control importing of petsc4py with the use of OPENMDAO_REQUIRE_MPI #1445
-- Adding out_stream option to CaseReader list_* methods #1446
+- Added `out_stream` option to CaseReader list_* methods #1446
 - Added tests using DOE and GA driver with distributed driver responses . #1450
 - `guess_nonlinear` now works with NonlinearBlockGS #1452
 - User can specify units for KSComp inputs and outputs #1455
@@ -40,14 +40,14 @@ None
 ## Bug Fixes:
 
 - Improved several N2 resizing issues #1386
-- Fixed a bug when approximating totals on a group that caused derivs to be incorrect if a component under the group had partials declared with the 'val' argument. #1392
+- Fixed a bug when approximating totals on a group that caused derivatives to be incorrect if a component under the group had partials declared with the 'val' argument. #1392
 - Fixed N2 search autocomplete appending '.' to results #1399
-- Allow partials on distributed comps with zero-length inputs/outputs on some procs #1400
+- Allow partials on distributed components with zero-length inputs/outputs on some processors #1400
 - Approximated totals now work for objectives in parallel groups #1404
 - Distributed outputs as driver responses are now supported #1402
 - The N2 home button now restores the diagram to its original state #1409
-- Redundant calls no longer made to the matrix-free API when running under parallel deriv coloring (for fan-out parallel problems). #1413
-- Fix for ParallelComps over allocating processors #1416
+- Redundant calls no longer made to the matrix-free API when running under parallel derivative coloring (for fan-out parallel problems). #1413
+- Fix for distributed components over-allocating processors #1416
 - Fixed N2 toolbar icons overlapping when resized; compacted toolbar #1423
 - Fixed collapsing the zoomed element's parent, as well as other collapse/search bugs #1430
 - Fixed bug during (second) setup. #1447
