@@ -254,12 +254,60 @@ class ImplCompTwoStatesAE(om.ImplicitComponent):
         jac[('z', 'z')] = -inputs['x'] + 1.0
         jac[('z', 'x')] = -outputs['z']
 
+class ImplCompTwoStatesAEBug(om.ImplicitComponent):
+
+    def setup(self):
+        self.add_input('x', 0.5)
+        self.add_output('y', 0.0)
+        self.add_output('z', 2.0, lower=1.5, upper=2.5)
+
+        self.maxiter = 10
+        self.atol = 1.0e-12
+
+        self.declare_partials(of='*', wrt='*')
+
+        self.counter = 0
+
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        """
+        Don't solve; just calculate the residual.
+        """
+
+        x = inputs['x']
+        y = outputs['y']
+        z = outputs['z']
+
+        residuals['y'] = y - x - 2.0*z
+        residuals['z'] = x*z + z - 4.0
+
+        self.counter += 1
+        if self.counter > 20 and self.counter < 25:
+            raise om.AnalysisError('catch me')
+
+    def linearize(self, inputs, outputs, jac):
+        """
+        Analytical derivatives.
+        """
+
+        # Output equation
+        jac[('y', 'x')] = -1.0
+        jac[('y', 'y')] = 1.0
+        jac[('y', 'z')] = -2.0
+
+        # State equation
+        jac[('z', 'z')] = -inputs['x'] + 1.0
+        jac[('z', 'x')] = -outputs['z']
+
 
 class ImplCompTwoStatesGuess(ImplCompTwoStatesAE):
 
     def guess_nonlinear(self, inputs, outputs, residuals):
         outputs['z'] = 3.0
 
+class ImplCompTwoStatesGuessBug(ImplCompTwoStatesAEBug):
+
+    def guess_nonlinear(self, inputs, outputs, residuals):
+        outputs['z'] = 3.0
 
 class TestAnalysisErrorImplicit(unittest.TestCase):
 
@@ -320,7 +368,7 @@ class TestAnalysisErrorImplicit(unittest.TestCase):
         top.model.add_subsystem('px', om.IndepVarComp('x', 7.0))
 
         sub = top.model.add_subsystem('sub', om.Group())
-        sub.add_subsystem('comp', ImplCompTwoStatesGuess())
+        sub.add_subsystem('comp', ImplCompTwoStatesGuessBug())
 
         top.model.connect('px.x', 'sub.comp.x')
 
