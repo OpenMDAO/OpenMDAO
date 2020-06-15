@@ -522,24 +522,32 @@ class Group(System):
 
         if setup_mode == 'full':
             auto_ivc = self._setup_auto_ivcs(mode)
-            prom2abs_in = self._var_allprocs_prom2abs_list['input']
-            prom2abs_out = self._var_allprocs_prom2abs_list['output']
-            for absname in abs2meta:
-                if absname in prom2abs_in:
-                    for name in prom2abs_in[absname]:
-                        if name != absname:
-                            raise RuntimeError(f"{self.msginfo}: Absolute variable name '{absname}'"
-                                               " is masked by a matching promoted name. Try"
-                                               " promoting to a different name. This can be caused"
-                                               " by promoting '*' at group level or promoting using"
-                                               " dotted names.")
-                elif absname in prom2abs_out:
-                    if absname != prom2abs_out[absname][0]:
-                        raise RuntimeError(f"{self.msginfo}: Absolute variable name '{absname}' is"
-                                           " masked by a matching promoted name. Try"
+            self._check_prom_masking()
+
+    def _check_prom_masking(self):
+        """
+        Raise exception if any promoted variable name masks an absolute variable name.
+        """
+        prom2abs_in = self._var_allprocs_prom2abs_list['input']
+        prom2abs_out = self._var_allprocs_prom2abs_list['output']
+        abs2meta = self._problem_meta['top_all_meta']
+
+        for absname in abs2meta:
+            if absname in prom2abs_in:
+                for name in prom2abs_in[absname]:
+                    if name != absname:
+                        raise RuntimeError(f"{self.msginfo}: Absolute variable name '{absname}'"
+                                           " is masked by a matching promoted name. Try"
                                            " promoting to a different name. This can be caused"
                                            " by promoting '*' at group level or promoting using"
                                            " dotted names.")
+            elif absname in prom2abs_out:
+                if absname != prom2abs_out[absname][0]:
+                    raise RuntimeError(f"{self.msginfo}: Absolute variable name '{absname}' is"
+                                       " masked by a matching promoted name. Try"
+                                       " promoting to a different name. This can be caused"
+                                       " by promoting '*' at group level or promoting using"
+                                       " dotted names.")
 
     def _top_level_setup2(self, setup_mode):
         self._resolve_connected_input_defaults()
@@ -685,6 +693,7 @@ class Group(System):
 
             sub_prefix = subsys.name + '.'
 
+            seen = set()
             for type_ in ['input', 'output']:
                 # Assemble abs_names and allprocs_abs_names
                 allprocs_abs_names[type_].extend(
@@ -699,22 +708,17 @@ class Group(System):
                 var_discrete[type_].update({sub_prefix + k: v for k, v in
                                             subsys._var_discrete[type_].items()})
 
-                # Assemble abs2prom
+                # Assemble allprocs_prom2abs_list and abs2prom
                 sub_loc_proms = subsys._var_abs2prom[type_]
-                sub_proms = subsys._var_allprocs_abs2prom[type_]
-                for abs_name in chain(subsys._var_allprocs_abs_names[type_],
-                                      subsys._var_allprocs_abs_names_discrete[type_]):
-                    if abs_name in sub_loc_proms:
-                        abs2prom[type_][abs_name] = var_maps[type_][sub_loc_proms[abs_name]]
-
-                    allprocs_abs2prom[type_][abs_name] = var_maps[type_][sub_proms[abs_name]]
-
-                # Assemble allprocs_prom2abs_list
                 for sub_prom, sub_abs in subsys._var_allprocs_prom2abs_list[type_].items():
                     prom_name = var_maps[type_][sub_prom]
                     if prom_name not in allprocs_prom2abs_list[type_]:
                         allprocs_prom2abs_list[type_][prom_name] = []
                     allprocs_prom2abs_list[type_][prom_name].extend(sub_abs)
+                    for abs_name in sub_abs:
+                        if abs_name in sub_loc_proms:
+                            abs2prom[type_][abs_name] = prom_name
+                        allprocs_abs2prom[type_][abs_name] = prom_name
                     if type_ == 'input' and isinstance(subsys, Group):
                         if sub_prom in subsys._group_inputs:
                             group_inputs.append((prom_name, subsys._group_inputs[sub_prom]))
