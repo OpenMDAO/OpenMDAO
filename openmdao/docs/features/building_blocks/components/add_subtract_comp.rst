@@ -12,10 +12,10 @@ AddSubtractComp
     result = a * \textrm{scaling factor}_a + b * \textrm{scaling factor}_b + c * \textrm{scaling factor}_c + ...
 
 
-DotProductComp Constructor
+AddSubtractComp Constructor
 --------------------------
 
-The call signature for the `DotProductComp` constructor is:
+The call signature for the `AddSubtractComp` constructor is:
 
 .. automethod:: openmdao.components.add_subtract_comp.AddSubtractComp.__init__
     :noindex:
