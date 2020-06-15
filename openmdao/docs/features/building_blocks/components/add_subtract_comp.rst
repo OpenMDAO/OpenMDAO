@@ -13,7 +13,7 @@ AddSubtractComp
 
 
 AddSubtractComp Constructor
---------------------------
+---------------------------
 
 The call signature for the `AddSubtractComp` constructor is:
 
