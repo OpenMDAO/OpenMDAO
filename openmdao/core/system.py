@@ -4180,7 +4180,7 @@ class System(object):
         flat : bool
             If True, return the flattened version of the value.
         from_root : bool
-            If True, resolve variables from higher top level scope.
+            If True, resolve variables from top level scope.
 
         Returns
         -------
@@ -4343,7 +4343,7 @@ class System(object):
         src = conns[abs_name]
         # if we have multiple promoted inputs that are explicitly connected to an output and units
         # have not been specified, look for group input to disambiguate
-        if units is None and len(abs_names) > 1 and name != abs_name:
+        if units is None and len(abs_names) > 1:
             if abs_name not in self._var_allprocs_discrete['input']:
                 # can't get here unless self is a Group because len(abs_names) always == 1 for comp
                 try:

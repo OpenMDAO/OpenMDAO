@@ -166,6 +166,8 @@ def name2abs_names(system, name):
     """
     Map the given promoted, relative, or absolute name to any matching absolute names.
 
+    This will also match any buried promotes.
+
     Parameters
     ----------
     system : <System>
