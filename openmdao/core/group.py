@@ -2869,7 +2869,7 @@ class Group(System):
                 smeta = abs2meta[src] if src in abs2meta else all_abs2meta[src]
                 sunits = smeta['units'] if 'units' in smeta else None
 
-            sval = self._get_val(src, kind='output', get_remote=True, from_src=False)
+            sval = self.get_val(src, kind='output', get_remote=True, from_src=False)
             errs = set()
 
             prom = abs2prom[tgts[0]]
@@ -2879,7 +2879,7 @@ class Group(System):
                 gmeta = self._group_inputs[prom] = {}
 
             for tgt in tgts:
-                tval = self._get_val(tgt, kind='input', get_remote=True, from_src=False)
+                tval = self.get_val(tgt, kind='input', get_remote=True, from_src=False)
 
                 if tgt in all_discrete_ins:
                     if 'value' not in gmeta and sval != tval:

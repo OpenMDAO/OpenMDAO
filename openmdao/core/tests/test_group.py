@@ -18,6 +18,7 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.logger_utils import TestLogger
 from openmdao.utils.general_utils import ignore_errors_context
+from openmdao.utils.name_maps import name2abs_names
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -205,7 +206,7 @@ class TestGroup(unittest.TestCase):
 
         g3_ = g1.add_subsystem('g3', om.Group(), promotes=['x'])  # second g3, but directly under g1
         c1_ = g3_.add_subsystem('c1', om.ExecComp('y=3.*x', x=3.), promotes=['x'])
-        
+
         with self.assertRaises(Exception) as cm:
             p.setup()
         self.assertEqual(cm.exception.args[0], f"{p.model.msginfo}: Absolute variable name 'g1.g3.c1.x'"
@@ -223,7 +224,7 @@ class TestGroup(unittest.TestCase):
 
         g3_ = g1.add_subsystem('g3', om.Group(), promotes=['y'])  # second g3, but directly under g1
         c1_ = g3_.add_subsystem('c1', om.ExecComp('y=3.*x', x=3.), promotes=['y'])
-        
+
         with self.assertRaises(Exception) as cm:
             p.setup()
         self.assertEqual(cm.exception.args[0], f"{p.model.msginfo}: Absolute variable name 'g1.g3.c1.y'"
@@ -830,7 +831,7 @@ class TestGroupPromotes(unittest.TestCase):
             top['a']
 
         self.assertEqual(str(cm.exception),
-                         "'Problem: Variable name \"a\" not found.'")
+                         "'SimpleGroup (<model>): Variable \"a\" not found.'")
 
     def test_promotes_inputs_in_config(self):
 
@@ -850,7 +851,7 @@ class TestGroupPromotes(unittest.TestCase):
             top['b']
 
         self.assertEqual(str(cm.exception),
-                         "'Problem: Variable name \"b\" not found.'")
+                         "'SimpleGroup (<model>): Variable \"b\" not found.'")
 
     def test_promotes_any_in_config(self):
 
@@ -870,7 +871,7 @@ class TestGroupPromotes(unittest.TestCase):
             top['a']
 
         self.assertEqual(str(cm.exception),
-                         "'Problem: Variable name \"a\" not found.'")
+                         "'SimpleGroup (<model>): Variable \"a\" not found.'")
 
     def test_promotes_alias(self):
         class SubGroup(om.Group):
@@ -1002,7 +1003,7 @@ class TestGroupPromotes(unittest.TestCase):
             top['Branch1.G1.comp1.a']
 
         self.assertEqual(str(cm.exception),
-                         "'Problem: Variable name \"Branch1.G1.comp1.a\" not found.'")
+                         "'BranchGroup (<model>): Variable \"Branch1.G1.comp1.a\" not found.'")
 
     def test_multiple_promotes_collision(self):
 
@@ -2575,6 +2576,63 @@ class TestFeatureGuessNonlinear(unittest.TestCase):
         self.assertEqual(p.model.nonlinear_solver._iter_count, 0)
 
         assert_near_equal(p['discipline.x'], 1.41421356, 1e-6)
+
+
+class TestNaturalNaming(unittest.TestCase):
+    def test_buried_proms(self):
+        p = om.Problem()
+        model = p.model
+        g1 = model.add_subsystem('g1', om.Group())
+        g2 = g1.add_subsystem('g2', om.Group(), promotes=['*'])
+        g3 = g2.add_subsystem('g3', om.Group())
+        g4 = g3.add_subsystem('g4', om.Group(), promotes=['*'])
+        c1 = g4.add_subsystem('c1', om.ExecComp('y=2.0*x', x=7., y=9.), promotes=['x','y'])
+        p.setup()
+        
+        full_in = 'g1.g2.g3.g4.c1.x'
+        full_out = 'g1.g2.g3.g4.c1.y'
+        
+        prom_ins = ['g1.g2.g3.g4.x', 'g1.g2.g3.x', 'g1.g3.x']
+        for prom in prom_ins:
+            self.assertEqual(name2abs_names(model, prom), [full_in])
+            
+        prom_outs = ['g1.g2.g3.g4.y', 'g1.g2.g3.y', 'g1.g3.y']
+        for prom in prom_outs:
+            self.assertEqual(name2abs_names(model, prom), [full_out])
+
+        # check setting/getting before final setup
+        
+        for name in prom_ins + [full_in]:
+            self.assertEqual(p[name], 7.)
+
+        for name in prom_outs + [full_out]:
+            self.assertEqual(p[name], 9.)
+            
+        for name in prom_ins + [full_in]:
+            p[name] = 77.
+            self.assertEqual(p[name], 77.)
+
+        for name in prom_outs + [full_out]:
+            p[name] = 99.
+            self.assertEqual(p[name], 99.)
+
+        p.final_setup()
+
+        # now check after final setup
+        
+        for name in prom_ins + [full_in]:
+            self.assertEqual(p[name], 77.)
+
+        for name in prom_outs + [full_out]:
+            self.assertEqual(p[name], 99.)
+            
+        for name in prom_ins + [full_in]:
+            p[name] = 7.
+            self.assertEqual(p[name], 7.)
+
+        for name in prom_outs + [full_out]:
+            p[name] = 9.
+            self.assertEqual(p[name], 9.)
 
 
 if __name__ == "__main__":

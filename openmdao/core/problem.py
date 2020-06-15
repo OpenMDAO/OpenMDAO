@@ -31,7 +31,7 @@ from openmdao.utils.general_utils import ContainsAll, pad_name, simple_warning, 
 
 from openmdao.utils.mpi import FakeComm
 from openmdao.utils.mpi import MPI
-from openmdao.utils.name_maps import prom_name2abs_name
+from openmdao.utils.name_maps import prom_name2abs_name, name2abs_names
 from openmdao.utils.options_dictionary import OptionsDictionary, _undefined
 from openmdao.utils.units import unit_conversion
 from openmdao.utils import coloring as coloring_mod
@@ -305,26 +305,16 @@ class Problem(object):
             except AttributeError:
                 conns = {}
 
-            if name in meta:
-                if name in conns:
-                    val = meta[conns[name]]['value'].reshape(meta[name]['shape'])
-                else:
-                    val = meta[name]['value']
-            elif name in proms['output']:
-                abs_name = prom_name2abs_name(self.model, name, 'output')
-                if abs_name in meta:
-                    val = meta[abs_name]['value']  # output is local
+            abs_names = name2abs_names(self.model, name)
+            if not abs_names:
+                raise KeyError('{}: Variable "{}" not found.'.format(self.model.msginfo, name))
 
-            elif name in proms['input']:
-                abs_name = proms['input'][name][0]
-                conn = self.model._conn_abs_in2out
-                if abs_name in meta:  # input is local
-                    if abs_name in conns:
-                        val = meta[conns[abs_name]]['value']
-                    else:
-                        val = meta[abs_name]['value']
-            else:
-                raise KeyError('{}: Variable name "{}" not found.'.format(self.msginfo, name))
+            abs_name = abs_names[0]
+            if abs_name in meta:
+                if abs_name in conns:
+                    val = meta[conns[abs_name]]['value']
+                else:
+                    val = meta[abs_name]['value']
 
             if val is not _undefined:
                 # Need to cache the "get" in case the user calls in-place numpy operations.
@@ -384,8 +374,8 @@ class Problem(object):
                 val = self.model.convert2units(name, val, units)
             return val
 
-        val = self.model._get_val(name, units=units, indices=indices, get_remote=get_remote,
-                                  from_src=True)
+        val = self.model.get_val(name, units=units, indices=indices, get_remote=get_remote,
+                                 from_src=True)
 
         if val is _undefined:
             if get_remote:
@@ -433,24 +423,22 @@ class Problem(object):
         all_proms = self.model._var_allprocs_prom2abs_list
         all_meta = self.model._var_allprocs_abs2meta
         all_discrete = self.model._var_allprocs_discrete['input']
-        n_prom_ins = 0  # if nonzero, name given was promoted input name w/o a matching prom output
+        n_proms = 0  # if nonzero, name given was promoted input name w/o a matching prom output
 
         try:
             ginputs = self.model._group_inputs
         except AttributeError:
             ginputs = {}  # could happen if top level system is not a Group
 
-        if name in all_proms['output']:
-            abs_name = all_proms['output'][name][0]
-        elif name in all_proms['input']:
-            abs_names = all_proms['input'][name]
-            n_prom_ins = len(abs_names)
-            if n_prom_ins == 1 or abs_names[0] in all_discrete:
-                abs_name = abs_names[0]
+        abs_names = name2abs_names(self.model, name)
+        if abs_names:
+            n_proms = len(abs_names)  # for output this will never be > 1
+            if n_proms > 1 and name in ginputs:
+                abs_name = ginputs[name].get('use_tgt', abs_names[0])
             else:
-                abs_name = ginputs[name]['use_tgt']
+                abs_name = abs_names[0]
         else:
-            abs_name = name
+            raise KeyError(f'{self.model.msginfo}: Variable "{name}" not found.')
 
         if abs_name in conns:
             src = conns[abs_name]
@@ -465,7 +453,7 @@ class Problem(object):
                     if self._setup_status > 1:  # avoids double unit conversion
                         ivalue = value
                         if all_meta[src]['units'] is not None:
-                            if n_prom_ins > 1:  # promoted input name was used
+                            if n_proms > 1:  # promoted input name was used
                                 if name in ginputs and 'units' in ginputs[name]:
                                     tunits = ginputs[name]['units']
                                 else:
@@ -499,6 +487,7 @@ class Problem(object):
 
             if indices is None:
                 indices = _full_slice
+
             if abs_name in self.model._outputs._views:
                 self.model._outputs.set_var(abs_name, value, indices)
             elif abs_name in conns:  # input name given. Set value into output
@@ -506,7 +495,7 @@ class Problem(object):
                     if (self.model._outputs._views_flat[src].size == 0 and
                             src.rsplit('.', 1)[0] == '_auto_ivc' and all_meta[src]['distributed']):
                         pass  # special case, auto_ivc dist var with 0 local size
-                    elif tmeta['has_src_indices'] and n_prom_ins < 2:
+                    elif tmeta['has_src_indices'] and n_proms < 2:
                         if tlocmeta:  # target is local
                             src_indices = tlocmeta['src_indices']
                             if tmeta['distributed']:
@@ -533,7 +522,7 @@ class Problem(object):
                     self.model._discrete_outputs[src] = value
                 # also set the input
                 # TODO: maybe remove this if inputs are removed from case recording
-                if n_prom_ins < 2:
+                if n_proms < 2:
                     if abs_name in self.model._inputs._views:
                         # print(f"problem set_val: setting input {abs_name} to {ivalue}")
                         self.model._inputs.set_var(abs_name, ivalue, indices)

@@ -498,7 +498,7 @@ class Driver(object):
             # if var is distributed or only gathering to one rank
             # TODO - support distributed var under a parallel group.
             if owner is None or rank is not None:
-                val = model._get_val(name, get_remote=True, rank=rank, flat=True)
+                val = model.get_val(name, get_remote=True, rank=rank, flat=True)
                 if indices is not None:
                     val = val[indices]
             else:
@@ -515,7 +515,7 @@ class Driver(object):
                 comm.Bcast(val, root=owner)
 
         elif distributed:
-            local_val = model._get_val(name, flat=True)
+            local_val = model.get_val(name, flat=True)
             local_indices, sizes = distributed_vars[name]
             if local_indices is not None:
                 local_val = local_val[local_indices]
@@ -1034,7 +1034,7 @@ class Driver(object):
 
         if 'desvars' in debug_opt:
             model = self._problem().model
-            desvar_vals = {n: model._get_val(n, get_remote=True, rank=0) for n in self._designvars}
+            desvar_vals = {n: model.get_val(n, get_remote=True, rank=0) for n in self._designvars}
             if not MPI or rank == 0:
                 print("Design Vars")
                 if desvar_vals:

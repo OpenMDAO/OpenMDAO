@@ -4279,8 +4279,8 @@ class System(object):
 
         return val
 
-    def _get_val(self, name, units=None, indices=None, get_remote=False, rank=None,
-                 vec_name='nonlinear', kind=None, flat=False, from_src=True):
+    def get_val(self, name, units=None, indices=None, get_remote=False, rank=None,
+                vec_name='nonlinear', kind=None, flat=False, from_src=True):
         """
         Get an output/input/residual variable.
 
@@ -4482,9 +4482,8 @@ class System(object):
                             elif name[offset:] in discrete_vec:
                                 vdict[name] = discrete_vec[name[offset:]]['value']
                     else:
-                        vdict[name] = self._get_val(name, get_remote=True, rank=0,
-                                                    vec_name=vec_name, kind=kind,
-                                                    from_src=False)
+                        vdict[name] = self.get_val(name, get_remote=True, rank=0,
+                                                   vec_name=vec_name, kind=kind, from_src=False)
 
         return vdict
 

@@ -123,7 +123,6 @@ class TestGetSetVariables(unittest.TestCase):
         # inputs
         with self.assertRaises(KeyError) as ctx:
             p['x'] = 5.0
-            p.final_setup()
         self.assertEqual(str(ctx.exception), msg.format('x'))
         p._initial_condition_cache = {}
 
@@ -134,7 +133,6 @@ class TestGetSetVariables(unittest.TestCase):
         # outputs
         with self.assertRaises(KeyError) as ctx:
             p['y'] = 5.0
-            p.final_setup()
         self.assertEqual(str(ctx.exception), msg.format('y'))
         p._initial_condition_cache = {}
 
@@ -142,6 +140,7 @@ class TestGetSetVariables(unittest.TestCase):
             p['y']
         self.assertEqual(str(ctx.exception), msg.format('y'))
 
+        p.final_setup()
 
         msg = "Group (g): Variable name '{}' not found."
         inputs, outputs, residuals = g.get_nonlinear_vectors()

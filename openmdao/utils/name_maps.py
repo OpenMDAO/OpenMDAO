@@ -199,6 +199,32 @@ def name2abs_names(system, name):
     elif abs_name in system._var_allprocs_abs2prom['input']:
         return (abs_name,)
 
+    # haven't found it yet.  Try looking up using the apparent system path
+    return _find_buried_promoted_name(system, name)
+
+
+def _find_buried_promoted_name(system, name):
+    """
+    Convert given name to absolute, even if name is a buried promote.
+
+    Parameters
+    ----------
+    system : <System>
+        The scoping system.
+    name : str
+        The given name.
+
+    Returns
+    -------
+    tuple or list of str
+        List of matching absolute names.
+    """
+    parts = name.rsplit('.', 1)
+    s = system._get_subsystem(parts[0])
+    if s is not None:
+        names = name2abs_names(s, parts[-1])
+        if names:
+            return names
     return ()
 
 

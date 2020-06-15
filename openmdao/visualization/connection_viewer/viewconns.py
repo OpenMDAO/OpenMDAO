@@ -89,10 +89,10 @@ def view_connections(root, outfile='connections.html', show_browser=True,
             s = connections[t]
             if show_values:
                 if s.startswith('_auto_ivc.'):
-                    val = system._get_val(t, indices=idxs, flat=True, get_remote=True,
-                                          from_src=False)
+                    val = system.get_val(t, indices=idxs, flat=True, get_remote=True,
+                                         from_src=False)
                 else:
-                    val = system._get_val(t, indices=idxs, flat=True, get_remote=True)
+                    val = system.get_val(t, indices=idxs, flat=True, get_remote=True)
 
                     # if there's a unit conversion, express the value in the
                     # units of the target

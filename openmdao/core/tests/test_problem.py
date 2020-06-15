@@ -1164,7 +1164,7 @@ class TestProblem(unittest.TestCase):
         assert_near_equal(prob['G1.x'], 20.0, 1e-6)
 
         # test _get_val on lower level group
-        assert_near_equal( G1._get_val('x'), 20.0, 1e-6)
+        assert_near_equal( G1.get_val('x'), 20.0, 1e-6)
 
         # using absolute value will give us the value of the input C1.x, in its units of 'inch'
         assert_near_equal(prob['G1.C1.x'], 200.0, 1e-6)
