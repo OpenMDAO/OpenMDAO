@@ -157,19 +157,33 @@ class N2TreeNode {
         return false;
     }
 
+    /** Look for the supplied node in the parentage of this one.
+     * @param {N2TreeNode} compareNode The node to look for.
+     * @param {N2TreeNode} [parentLimit = null] Stop searching at this common parent.
+     * @returns {Boolean} True if the node is found, otherwise false.
+     */
+    hasParent(compareNode, parentLimit = null) {
+        for (let obj = this; obj != null && obj !== parentLimit; obj = obj.parent) {
+            if (obj === compareNode) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
     /**
-     * Look for the supplied node in the lineage of this one.
+     * Look for the supplied node in the lineage of this one. First the parents are
+     * searched, and if the node is minimized, the children are searched also.
      * @param {N2TreeNode} compareNode The node to look for.
      * @param {N2TreeNode} [parentLimit = null] Stop searching at this common parent.
      * @returns {Boolean} True if the node is found, otherwise false.
      */
     hasNode(compareNode, parentLimit = null) {
         // Check parents first.
-        for (let obj = this; obj != null && obj !== parentLimit; obj = obj.parent) {
-            if (obj === compareNode) {
-                return true;
-            }
-        }
+        if (this.hasParent(compareNode, parentLimit)) return true;
+
+        if (! this.isMinimized ) return false;
 
         // Check children if not found in parents.
         return this._hasNodeInChildren(compareNode);
