@@ -9,8 +9,10 @@ import openmdao.api as om
 from openmdao.drivers.genetic_algorithm_driver import GeneticAlgorithm
 from openmdao.test_suite.components.branin import Branin, BraninDiscrete
 from openmdao.test_suite.components.paraboloid import Paraboloid
+from openmdao.test_suite.components.paraboloid_distributed import DistParab
 from openmdao.test_suite.components.sellar_feature import SellarMDA
 from openmdao.test_suite.components.three_bar_truss import ThreeBarTruss
+
 from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.mpi import MPI
 
@@ -1166,6 +1168,41 @@ class MPITestSimpleGA4Procs(unittest.TestCase):
         prob.set_solver_print(level=0)
 
         prob.run_driver()
+
+    def test_distributed_obj(self):
+        size = 3
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', np.ones((size, )))
+        ivc.add_output('y', np.ones((size, )))
+        ivc.add_output('a', -3.0 + 0.6 * np.arange(size))
+
+        model.add_subsystem('p', ivc, promotes=['*'])
+        model.add_subsystem("parab", DistParab(arr_size=size, deriv_type='dense'),
+                            promotes=['*'])
+        model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
+                                               f_sum=np.ones((size, )),
+                                               f_xy=np.ones((size, ))),
+                            promotes=['*'])
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+
+        prob.driver = om.SimpleGADriver()
+        prob.driver.options['run_parallel'] = True
+        prob.driver.options['procs_per_model'] = 2
+        prob.driver.options['bits'] = {'x': 8, 'y': 8}
+        prob.driver.options['max_gen'] = 25
+        prob.driver.options['pop_size'] = 25
+
+        prob.setup()
+        prob.run_driver()
+
+        assert_near_equal(np.sum(prob.get_val('f_xy', get_remote=True))/3,
+                          2.396642317057536, 1e-6)
 
 
 class TestFeatureSimpleGA(unittest.TestCase):
