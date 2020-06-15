@@ -63,6 +63,14 @@ SplineComp Options
     SplineComp
     options
 
+SplineComp Constructor
+----------------------
+
+The call signature for the `SplineComp` constructor is:
+
+.. automethod:: openmdao.components.spline_comp.SplineComp.__init__
+    :noindex:
+
 
 SplineComp Basic Example
 -------------------------

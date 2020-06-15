@@ -27,6 +27,16 @@ pyOptSparseDriver Options
     pyOptSparseDriver
     options
 
+pyOptSparseDriver Constructor
+-----------------------------
+
+The call signature for the `pyOptSparseDriver` constructor is:
+
+.. automethod:: openmdao.drivers.pyoptsparse_driver.pyOptSparseDriver.__init__
+    :noindex:
+
+----
+
 pyOptSparseDriver has a small number of unified options that can be specified as keyword arguments when
 it is instantiated or by using the "options" dictionary. We have already shown how to set the
 `optimizer` option. Next we see how the `print_results` option can be used to turn on or off the echoing

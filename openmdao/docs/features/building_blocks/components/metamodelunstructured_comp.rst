@@ -27,6 +27,15 @@ MetaModelUnStructuredComp Options
     MetaModelUnStructuredComp
     options
 
+MetaModelUnStructuredComp Constructor
+-------------------------------------
+
+The call signature for the `MetaModelUnStructuredComp` constructor is:
+
+.. automethod:: openmdao.components.meta_model_unstructured_comp.MetaModelUnStructuredComp.__init__
+    :noindex:
+
+
 Simple Example
 --------------
 
