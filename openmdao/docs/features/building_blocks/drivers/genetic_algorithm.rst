@@ -49,7 +49,7 @@ bits for all variables encoded.
     :layout: interleave
 
 If you have more than one objective, you can use the `SimpleGADriver` to compute a set of non-dominated
-candidate optimums by setting the "compute_pareto" option to True.  In this case, the final state of the
+candidate optima by setting the "compute_pareto" option to True.  In this case, the final state of the
 model will only be one of the pareto-optimal designs. The full set can be accessed via the 'desvar_nd' and
 'obj_nd' attributes on the driver for the design variable values and their corresponding objectives.
 
