@@ -723,12 +723,6 @@ class Group(System):
                         if sub_prom in subsys._group_inputs:
                             group_inputs.append((prom_name, subsys._group_inputs[sub_prom]))
 
-        for prom_name, abs_list in allprocs_prom2abs_list['output'].items():
-            if len(abs_list) > 1:
-                raise RuntimeError("{}: Output name '{}' refers to "
-                                   "multiple outputs: {}.".format(self.msginfo, prom_name,
-                                                                  sorted(abs_list)))
-
         # If running in parallel, allgather
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
             mysub = self._subsystems_myproc[0] if self._subsystems_myproc else False
@@ -785,6 +779,12 @@ class Group(System):
                             allprocs_prom2abs_list[type_][prom_name] = []
                         allprocs_prom2abs_list[type_][prom_name].extend(abs_names_list)
 
+        for prom_name, abs_list in allprocs_prom2abs_list['output'].items():
+            if len(abs_list) > 1:
+                raise RuntimeError("{}: Output name '{}' refers to "
+                                   "multiple outputs: {}.".format(self.msginfo, prom_name,
+                                                                  sorted(abs_list)))
+
         ginputs = self._group_inputs
         for prom, meta in group_inputs:
             if prom in ginputs:
@@ -809,7 +809,8 @@ class Group(System):
                 ginputs[prom] = meta
 
         if ginputs:
-            extra = set(ginputs).difference(self._var_allprocs_prom2abs_list['input'])
+            p2abs_in = self._var_allprocs_prom2abs_list['input']
+            extra = [gin for gin in ginputs if gin not in p2abs_in]
             if extra:
                 raise RuntimeError(f"{self.msginfo}: The following group inputs could not be "
                                    f"found: {sorted(extra)}.")
