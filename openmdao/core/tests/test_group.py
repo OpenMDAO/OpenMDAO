@@ -1650,9 +1650,9 @@ class TestConnect(unittest.TestCase):
         self.sub.connect('src.x', 'arr.x', src_indices=[(2, -1), (4, 4)],
                          flat_src_indices=False)
 
-        msg = ("Group (sub): The source indices do not specify a valid index for the "
-               "connection 'sub.src.x' to 'sub.arr.x'. Index '4' "
-               "is out of range for source dimension of size 3.")
+        msg = ("Group (sub): The source indices do not specify a valid index for the " + \
+               "connection 'sub.src.x' to 'sub.arr.x'. src_indices index: 4 must out of range " + \
+               "for the input vector: 3.")
 
         try:
             self.prob.setup()

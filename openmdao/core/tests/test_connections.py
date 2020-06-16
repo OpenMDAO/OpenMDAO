@@ -339,9 +339,9 @@ class TestConnectionsIndices(unittest.TestCase):
         # the valid range for the source
         self.prob.model.connect('idvp.arrout', 'arraycomp.inp1', src_indices=[100000])
 
-        expected = "Group (<model>): The source indices do not specify a valid index " + \
-                   "for the connection 'idvp.arrout' to 'arraycomp.inp1'. " + \
-                   "Index '100000' is out of range for source dimension of size 5."
+        expected = "Group (<model>): The source indices do not specify a valid index for the connection "+\
+                   "'idvp.arrout' to 'arraycomp.inp1'. src_indices index: 100000 must out of range for the " +\
+                   "input vector: 5."
 
         try:
             self.prob.setup()
@@ -360,9 +360,9 @@ class TestConnectionsIndices(unittest.TestCase):
         # the valid range for the source.  A bug prevented this from being checked.
         self.prob.model.connect('idvp.arrout', 'arraycomp.inp', src_indices=[0, 100000])
 
-        expected = "Group (<model>): The source indices do not specify a valid index " + \
-                   "for the connection 'idvp.arrout' to 'arraycomp.inp'. " + \
-                   "Index '100000' is out of range for source dimension of size 5."
+        expected = "Group (<model>): The source indices do not specify a valid index for the connection "+\
+                   "'idvp.arrout' to 'arraycomp.inp'. src_indices index: 100000 must out of range for the " +\
+                   "input vector: 5."
 
         try:
             self.prob.setup()
@@ -567,9 +567,9 @@ class TestConnectionsDistrib(unittest.TestCase):
         model.add_subsystem('c3', TestComp())
         model.connect("p1.x", "c3.x")
 
-        expected = "Group (<model>): The source indices do not specify a valid index " + \
-                   "for the connection 'p1.x' to 'c3.x'. " + \
-                   "Index '2' is out of range for source dimension of size 2."
+        expected = "Group (<model>): The source indices do not specify a valid index for " + \
+                   "the connection 'p1.x' to 'c3.x'. src_indices index: 2 must out of range for " + \
+                   "the input vector: 2."
 
         try:
             prob.setup()

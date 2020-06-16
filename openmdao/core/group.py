@@ -1364,8 +1364,8 @@ class Group(System):
                                         msg = f"{self.msginfo}: The source indices " + \
                                               f"do not specify a valid index for the " + \
                                               f"connection '{abs_out}' to '{abs_in}'. " + \
-                                              f"Index '{i}' is out of range for source " + \
-                                              f"dimension of size {d_size}."
+                                              f"src_indices index: {i} must out of range for " + \
+                                              f"the input vector: {d_size}."
                                         if self._raise_connection_errors:
                                             raise ValueError(msg)
                                         else:
