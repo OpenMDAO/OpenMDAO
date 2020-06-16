@@ -500,6 +500,120 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
         for key, val in totals.items():
             assert_near_equal(val['rel error'][0], 0.0, 1e-9)
 
+    def test_guess_nonlinear_residuals(self):
+
+        class ImpWithInitial(om.ImplicitComponent):
+            """
+            An implicit component to solve the quadratic equation: x^2 - 4x + 3
+            (solutions at x=1 and x=3)
+            """
+            def setup(self):
+                self.add_input('a', val=1.)
+                self.add_input('b', val=-4.)
+                self.add_input('c', val=3.)
+
+                self.add_output('x', val=0.)
+
+                self.declare_partials(of='*', wrt='*')
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                a = inputs['a']
+                b = inputs['b']
+                c = inputs['c']
+                x = outputs['x']
+                residuals['x'] = a * x ** 2 + b * x + c
+
+            def linearize(self, inputs, outputs, partials):
+                a = inputs['a']
+                b = inputs['b']
+                c = inputs['c']
+                x = outputs['x']
+
+                partials['x', 'a'] = x ** 2
+                partials['x', 'b'] = x
+                partials['x', 'c'] = 1.0
+                partials['x', 'x'] = 2 * a * x + b
+
+            def guess_nonlinear(self, inputs, outputs, resids):
+                # Default initial state of zero for x takes us to x=1 solution.
+                # Here we set it to a value that will take us to the x=3 solution.
+                outputs['x'] = 5.0
+                self.resid = resids
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp', ImpWithInitial())
+
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        model.linear_solver = om.ScipyKrylov()
+
+        prob.setup()
+        prob['comp.x'] = 10
+        prob.run_model()
+
+        self.assertNotEqual(model.comp.resid, 0)
+
+    def test_guess_nonlinear_group_residual(self):
+        # Test that data is transfered to a component before calling guess_nonlinear.
+
+        class ImpWithInitial(om.ImplicitComponent):
+            """
+            An implicit component to solve the quadratic equation: x^2 - 4x + 3
+            (solutions at x=1 and x=3)
+            """
+            def setup(self):
+                self.add_input('a', val=1.)
+                self.add_input('b', val=-4.)
+                self.add_input('c', val=3.)
+
+                self.add_output('x', val=0.)
+
+                self.declare_partials(of='*', wrt='*')
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                a = inputs['a']
+                b = inputs['b']
+                c = inputs['c']
+                x = outputs['x']
+                residuals['x'] = a * x ** 2 + b * x + c
+
+            def linearize(self, inputs, outputs, partials):
+                a = inputs['a']
+                b = inputs['b']
+                c = inputs['c']
+                x = outputs['x']
+
+                partials['x', 'a'] = x ** 2
+                partials['x', 'b'] = x
+                partials['x', 'c'] = 1.0
+                partials['x', 'x'] = 2 * a * x + b
+
+            def guess_nonlinear(self, inputs, outputs, resids):
+                # Default initial state of zero for x takes us to x=1 solution.
+                # Here we set it to a value that will take us to the x=3 solution.
+                outputs['x'] = 5.0
+                self.resid = resids
+
+        group = om.Group()
+
+        group.add_subsystem('px', om.IndepVarComp('x', -1.0))
+        group.add_subsystem('comp1', ImpWithInitial())
+        group.add_subsystem('comp2', ImpWithInitial())
+        group.connect('px.x', 'comp1.a')
+        group.connect('comp1.x', 'comp2.a')
+
+        group.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        group.linear_solver = om.ScipyKrylov()
+
+        prob = om.Problem(model=group)
+        prob.set_solver_print(level=0)
+        prob.setup()
+
+        prob.run_model()
+        self.assertNotEqual(group.comp1.resid, 0)
+        self.assertNotEqual(group.comp2.resid, 0)
+
     def test_guess_nonlinear_transfer(self):
         # Test that data is transfered to a component before calling guess_nonlinear.
 
