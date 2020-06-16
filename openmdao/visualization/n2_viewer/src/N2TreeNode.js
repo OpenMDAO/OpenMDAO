@@ -22,6 +22,7 @@ class N2TreeNode {
         // From old ClearConnections():
         this.sourceParentSet = new Set();
         this.targetParentSet = new Set();
+        this.nameWidthPx = 1;
 
         // Solver names may be empty, so set them to "None" instead.
         if (this.linear_solver == "") this.linear_solver = "None";
@@ -55,11 +56,14 @@ class N2TreeNode {
             'height': 1e-6
         };
         this.isMinimized = false;
+        this.manuallyExpanded = false;
     }
 
     /** Run when a node is collapsed/restored. */
     toggleMinimize() {
         this.isMinimized = !this.isMinimized;
+        this.manuallyExpanded = !this.isMinimized;
+
         return this.isMinimized;
     }
 
@@ -173,8 +177,7 @@ class N2TreeNode {
     }
 
     /**
-     * Look for the supplied node in the lineage of this one. First the parents are
-     * searched, and if the node is minimized, the children are searched also.
+     * Look for the supplied node in the lineage of this one.
      * @param {N2TreeNode} compareNode The node to look for.
      * @param {N2TreeNode} [parentLimit = null] Stop searching at this common parent.
      * @returns {Boolean} True if the node is found, otherwise false.
@@ -183,10 +186,7 @@ class N2TreeNode {
         // Check parents first.
         if (this.hasParent(compareNode, parentLimit)) return true;
 
-        if (! this.isMinimized ) return false;
-
-        // Check children if not found in parents.
-        return this._hasNodeInChildren(compareNode);
+        return this.childNames.propExists(compareNode.absPathName);
     }
 
     /**
@@ -238,5 +238,22 @@ class N2TreeNode {
         // Should never get here because root is parent of all
         debugInfo("No common parent found between two nodes: ", this, other);
         return null;
+    }
+
+    /**
+     * If the node has a lot of descendants and it wasn't manually expanded,
+     * minimize it.
+     * @param {Number} maxDescendants The threshold number of descendants.
+     * @returns {Boolean} True if minimized here, false otherwise.
+     */
+    minimizeIfLarge(maxDescendants) {
+        if ( ! (this.type == 'root' || this.manuallyExpanded) &&
+            this.numDescendants > maxDescendants ) {
+            this.isMinimized = true;
+            return true;
+        }
+
+        return false;
+
     }
 }

@@ -36,6 +36,10 @@ class N2Layout {
         this.size = dims.size;
         this.svg = d3.select("#svgId");
 
+        startTimer('N2Layout._computeLeaves');
+        this._computeLeaves();
+        stopTimer('N2Layout._computeLeaves');
+
         this._setupTextRenderer();
         startTimer('N2Layout._updateTextWidths');
         this._updateTextWidths();
@@ -45,10 +49,6 @@ class N2Layout {
         this._updateSolverTextWidths();
         stopTimer('N2Layout._updateSolverTextWidths');
         delete (this.textRenderer);
-
-        startTimer('N2Layout._computeLeaves');
-        this._computeLeaves();
-        stopTimer('N2Layout._computeLeaves');
 
         startTimer('N2Layout._computeColumnWidths');
         this._computeColumnWidths();
@@ -198,7 +198,7 @@ class N2Layout {
         node.nameWidthPx = this._getTextWidth(this.getText(node)) + 2 *
             this.size.rightTextMargin;
 
-        if (node.hasChildren()) {
+        if (node.hasChildren() && !node.isMinimized) {
             for (let child of node.children) {
                 this._updateTextWidths(child);
             }
@@ -217,7 +217,7 @@ class N2Layout {
         node.nameSolverWidthPx = this._getTextWidth(this.getSolverText(node)) + 2 *
             this.size.rightTextMargin;
 
-        if (node.hasChildren()) {
+        if (node.hasChildren() && !node.isMinimized) {
             for (let child of node.children) {
                 this._updateSolverTextWidths(child);
             }
@@ -232,15 +232,19 @@ class N2Layout {
         if (node.varIsHidden) {
             node.numLeaves = 0;
         }
-        else if (node.hasChildren() && !node.isMinimized) {
-            node.numLeaves = 0;
-            for (let child of node.children) {
-                this._computeLeaves(child);
-                node.numLeaves += child.numLeaves;
-            }
-        }
         else {
-            node.numLeaves = 1;
+            node.minimizeIfLarge(100);
+
+            if (node.hasChildren() && !node.isMinimized) {
+                node.numLeaves = 0;
+                for (let child of node.children) {
+                    this._computeLeaves(child);
+                    node.numLeaves += child.numLeaves;
+                }
+            }
+            else {
+                node.numLeaves = 1;
+            }
         }
     }
 

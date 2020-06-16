@@ -127,10 +127,23 @@ class ModelData {
             this.maxSystemDepth = Math.max(depth, this.maxSystemDepth);
         }
 
+        node.childNames = {};
+        node.numDescendants = 0;
         if (node.hasChildren()) {
+            node.numDescendants = node.children.length;
             for (let child of node.children) {
+            
                 let implicit = this._setParentsAndDepth(child, node, depth + 1);
                 if (implicit) node.implicit = true;
+
+                node.numDescendants += child.numDescendants;
+
+                if (node.type != 'root') {
+                    node.childNames[child.absPathName] = true;
+                    for (let childName in child.childNames) {
+                        node.childNames[childName] = true;
+                    }
+                }
             }
         }
 

@@ -164,6 +164,11 @@ class NodeInfo {
             }
         }
 
+        if (obj.hasChildren()) {
+            this._addPropertyRow('Children', obj.children.length);
+            this._addPropertyRow('Leaves', obj.numLeaves);
+        }
+
         for (const prop of this.propList) {
             if (obj.propExists(prop.key) && obj[prop.key] != '') {
                 this._addPropertyRow(prop.desc, prop.output(obj[prop.key]), prop.capitalize)
@@ -703,7 +708,7 @@ class N2UserInterface {
      * @param {N2TreeNode} node The node to operate on.
      */
     _uncollapse(node) {
-        node.isMinimized = false;
+        node.toggleMinimize();
         node.varIsHidden = false;
 
         if (node.hasChildren()) {
