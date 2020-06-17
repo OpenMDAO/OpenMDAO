@@ -193,6 +193,7 @@ class N2Matrix {
 
         if (this.tooMuchDetail()) return;
 
+        if (this.diagNodes[0].type == 'root') console.log(this.diagNodes)
         for (let srcIdx = 0; srcIdx < this.diagNodes.length; ++srcIdx) {
             let diagNode = this.diagNodes[srcIdx];
 
@@ -212,7 +213,7 @@ class N2Matrix {
                     this._addCell(srcIdx, tgtIdx, newCell);
                 }
                 // Make sure tgt isn't descendant of zoomedElement, otherwise it's
-                // visiable at least as a collapsed node
+                // visible at least as a collapsed node
                 else if (tgt.isConnectable() && !this.layout.zoomedElement.hasNode(tgt)) {
                     newDiagCell.addOffScreenConn(diagNode, tgt);
                 }

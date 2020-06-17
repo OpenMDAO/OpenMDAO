@@ -164,9 +164,11 @@ class NodeInfo {
             }
         }
 
-        if (obj.hasChildren()) {
+        if (DebugFlags.info && obj.hasChildren()) {
             this._addPropertyRow('Children', obj.children.length);
+            this._addPropertyRow('Descendants', obj.numDescendants);
             this._addPropertyRow('Leaves', obj.numLeaves);
+            this._addPropertyRow('Manually Expanded', obj.manuallyExpanded.toString())
         }
 
         for (const prop of this.propList) {
@@ -436,7 +438,7 @@ class N2UserInterface {
 
             N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
             this.lastClickWasLeft = false;
-            node.toggleMinimize();
+            node.minimize();
             this.n2Diag.update();
         }
     }
@@ -454,6 +456,7 @@ class N2UserInterface {
         if (node.isMinimized) {
             this.rightClickedNode = node;
             this.addBackButtonHistory();
+            node.manuallyExpanded = true;
             this._uncollapse(node);
             this.n2Diag.update();
         }
@@ -708,7 +711,7 @@ class N2UserInterface {
      * @param {N2TreeNode} node The node to operate on.
      */
     _uncollapse(node) {
-        node.toggleMinimize();
+        node.unminimize();
         node.varIsHidden = false;
 
         if (node.hasChildren()) {
@@ -730,6 +733,7 @@ class N2UserInterface {
         N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
         this.lastClickWasLeft = false;
         this._uncollapse(startNode);
+        startNode.manuallyExpanded = true;
         this.n2Diag.update();
     }
 

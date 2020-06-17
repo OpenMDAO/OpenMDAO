@@ -60,11 +60,12 @@ class N2TreeNode {
     }
 
     /** Run when a node is collapsed/restored. */
-    toggleMinimize() {
-        this.isMinimized = !this.isMinimized;
-        this.manuallyExpanded = !this.isMinimized;
+    minimize() {
+        this.isMinimized = true;
+    }
 
-        return this.isMinimized;
+    unminimize() {
+        this.isMinimized = false;
     }
 
     /**
@@ -183,10 +184,19 @@ class N2TreeNode {
      * @returns {Boolean} True if the node is found, otherwise false.
      */
     hasNode(compareNode, parentLimit = null) {
+        if (this.type == 'root') return true;
+
         // Check parents first.
         if (this.hasParent(compareNode, parentLimit)) return true;
 
-        return this.childNames.propExists(compareNode.absPathName);
+        return this.childNames.has(compareNode.absPathName);
+        let ret = this.childNames.has(compareNode.absPathName);
+
+        if (! ret ) {
+            console.log("Node ", this, " doesn't have ", compareNode);
+        }
+
+        return ret;
     }
 
     /**

@@ -127,7 +127,9 @@ class ModelData {
             this.maxSystemDepth = Math.max(depth, this.maxSystemDepth);
         }
 
-        node.childNames = {};
+        node.childNames = new Set();
+        node.childNames.add(node.absPathName); // Add the node itself
+        
         node.numDescendants = 0;
         if (node.hasChildren()) {
             node.numDescendants = node.children.length;
@@ -139,9 +141,9 @@ class ModelData {
                 node.numDescendants += child.numDescendants;
 
                 if (node.type != 'root') {
-                    node.childNames[child.absPathName] = true;
-                    for (let childName in child.childNames) {
-                        node.childNames[childName] = true;
+                    node.childNames.add(child.absPathName);
+                    for (let childName of child.childNames) {
+                        node.childNames.add(childName);
                     }
                 }
             }
