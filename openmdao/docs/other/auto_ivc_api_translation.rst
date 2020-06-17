@@ -8,5 +8,5 @@ Conversion Guide for the Auto-IVC (IndepVarComp) Feature
 Building Models
 ---------------
 
-Declare a simple component
-==========================
+Declare a Design Variable
+=========================
