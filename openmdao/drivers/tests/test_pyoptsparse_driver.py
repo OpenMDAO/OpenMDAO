@@ -13,7 +13,7 @@ from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDens
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.paraboloid_distributed import DistParab
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.general_utils import set_pyoptsparse_opt, run_driver
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.mpi import MPI
@@ -2307,7 +2307,19 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
 
         prob.driver = om.pyOptSparseDriver()
         prob.driver.options['optimizer'] = "SNOPT"
-        prob.driver.options['user_teriminate_signal'] = signal.SIGUSR2
+        prob.driver.options['user_terminate_signal'] = signal.SIGUSR2
+
+    def test_options_deprecated(self):
+        # Not a feature test.
+        prob = om.Problem()
+        model = prob.model
+
+        prob.driver = om.pyOptSparseDriver()
+        prob.driver.options['optimizer'] = "SNOPT"
+
+        msg = "The option 'user_teriminate_signal' was misspelled and will be deprecated. Please use 'user_terminate_signal' instead."
+        with assert_warning(DeprecationWarning, msg):
+            prob.driver.options['user_teriminate_signal'] = None
 
 
 class MatMultCompExact(om.ExplicitComponent):
