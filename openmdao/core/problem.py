@@ -281,12 +281,7 @@ class Problem(object):
             abs_name = self._get_var_abs_name(name)
         except KeyError:
             sub = self.model._get_subsystem(name)
-            if sub is None:  # either the sub is remote or there is no sub by that name
-                # TODO: raise exception if sub does not exist
-                return False
-            else:
-                # if system has been set up, _var_sizes will be initialized
-                return sub._var_sizes is not None
+            return sub is not None and sub._is_local
 
         # variable exists, but may be remote
         return abs_name in self.model._var_abs2meta
@@ -368,14 +363,14 @@ class Problem(object):
         """
         if self._setup_status == 1:
             val = self._get_cached_val(name)
-            if indices is not None:
-                val = val[indices]
-            if units is not None:
-                val = self.model.convert2units(name, val, units)
-            return val
-
-        val = self.model.get_val(name, units=units, indices=indices, get_remote=get_remote,
-                                 from_src=True)
+            if val is not _undefined:
+                if indices is not None:
+                    val = val[indices]
+                if units is not None:
+                    val = self.model.convert2units(name, val, units)
+        else:
+            val = self.model.get_val(name, units=units, indices=indices, get_remote=get_remote,
+                                     from_src=True)
 
         if val is _undefined:
             if get_remote:
@@ -824,6 +819,8 @@ class Problem(object):
             'use_derivatives': derivatives,
             'force_alloc_complex': force_alloc_complex,
             'connections': {},
+            'sys_owning_ranks': {},  # does not include distrib systems
+            'var_owning_ranks': {},  # does not include distrib vars
         }
         model._setup(model_comm, 'full', mode, self._metadata)
 

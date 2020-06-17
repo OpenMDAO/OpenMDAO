@@ -162,7 +162,7 @@ def name2abs_name(system, name):
         return abs_name
 
 
-def name2abs_names(system, name):
+def name2abs_names(system, name, include_buried_promotes=True):
     """
     Map the given promoted, relative, or absolute name to any matching absolute names.
 
@@ -174,6 +174,8 @@ def name2abs_names(system, name):
         System to which name is relative.
     name : str
         Promoted or relative variable name in the owning system's namespace.
+    include_buried_promotes : bool
+        If True, also include buried promoted names in the search.
 
     Returns
     -------
@@ -201,13 +203,16 @@ def name2abs_names(system, name):
     elif abs_name in system._var_allprocs_abs2prom['input']:
         return (abs_name,)
 
-    # haven't found it yet.  Try looking up using the apparent system path
-    return _find_buried_promoted_name(system, name)
+    if include_buried_promotes:
+        # haven't found it yet.  Try looking for buried promotes
+        return _find_buried_promoted_name(system, name)
+
+    return ()
 
 
 def _find_buried_promoted_name(system, name):
     """
-    Convert given name to absolute, even if name is a buried promote.
+    Convert given buried promoted name to absolute.
 
     Parameters
     ----------
@@ -221,13 +226,22 @@ def _find_buried_promoted_name(system, name):
     tuple or list of str
         List of matching absolute names.
     """
-    parts = name.rsplit('.', 1)
-    s = system._get_subsystem(parts[0])
-    if s is not None:
-        names = name2abs_names(s, parts[-1])
-        if names:
-            return names
-    return ()
+    names = ()
+    if '.' in name:
+        sysname, vname = name.rsplit('.', 1)
+        s = system._get_subsystem(sysname)
+        if s is not None and s._is_local:
+            names = name2abs_names(s, vname, include_buried_promotes=False)
+
+        if system.comm.size > 1:
+            all_names = system.comm.gather(names, root=0)
+            if system.comm.rank == 0:
+                for lst in all_names:
+                    if lst:
+                        names = lst
+                        break
+            names = system.comm.bcast(names, root=0)
+    return names
 
 
 def prom_key2abs_key(system, prom_key):
