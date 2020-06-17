@@ -12,7 +12,6 @@ import numpy as np
 import openmdao.api as om
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
                          SellarDis2withDerivatives
-from openmdao.test_suite.components.double_sellar import SubSellar
 
 
 class SellarDis1(om.ExplicitComponent):
@@ -112,6 +111,7 @@ class SellarMDA(om.Group):
 
         self.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         self.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
 
 class SellarMDAWithUnits(om.Group):
     """

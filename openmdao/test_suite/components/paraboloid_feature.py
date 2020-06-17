@@ -33,21 +33,19 @@ class Paraboloid(om.ExplicitComponent):
 if __name__ == "__main__":
 
     model = om.Group()
-    ivc = om.IndepVarComp()
-    ivc.add_output('x', 3.0)
-    ivc.add_output('y', -4.0)
-    model.add_subsystem('des_vars', ivc)
     model.add_subsystem('parab_comp', Paraboloid())
-
-    model.connect('des_vars.x', 'parab_comp.x')
-    model.connect('des_vars.y', 'parab_comp.y')
 
     prob = om.Problem(model)
     prob.setup()
+
+    prob.set_val('parab_comp.x', 3.0)
+    prob.set_val('parab_comp.y', -4.0)
+
     prob.run_model()
     print(prob['parab_comp.f_xy'])
 
-    prob['des_vars.x'] = 5.0
-    prob['des_vars.y'] = -2.0
+    prob.set_val('parab_comp.x', 5.0)
+    prob.set_val('parab_comp.y', -2.0)
+
     prob.run_model()
     print(prob['parab_comp.f_xy'])
