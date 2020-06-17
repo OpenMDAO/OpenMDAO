@@ -1228,9 +1228,10 @@ class TestProblem(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, msg):
             prob.get_val('comp.x', 'degK')
 
-        msg = "Can't set variable 'comp.x' with units 'cm' to value with units 'degK'."
-        with self.assertRaisesRegex(TypeError, msg):
+        msg = "Group (<model>): Can't set variable 'comp.x' with units 'cm' to value with units 'degK'."
+        with self.assertRaises(TypeError) as cm:
             prob.set_val('comp.x', 55.0, 'degK')
+        self.assertTrue(str(cm.exception).startswith(msg))
 
         msg = "Can't express variable 'no_unit.x' with units of 'None' in units of 'degK'."
         with self.assertRaisesRegex(TypeError, msg):

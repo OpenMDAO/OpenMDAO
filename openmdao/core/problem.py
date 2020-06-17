@@ -316,11 +316,12 @@ class Problem(object):
                 else:
                     val = meta[abs_name]['value']
 
-            if val is not _undefined:
                 # Need to cache the "get" in case the user calls in-place numpy operations.
                 self._initial_condition_cache[name] = val
 
-            return val
+                return val
+
+            return _undefined
 
     @property
     def _recording_iter(self):
@@ -468,10 +469,15 @@ class Problem(object):
                                 tunits = tmeta['units']
                             value = self.model.convert_from_units(src, value, tunits)
                 else:
-                    value = self.model.convert_from_units(abs_name, value, units)
-                    ivalue = value
-        elif units is not None:
-            value = self.model.convert_from_units(abs_name, value, units)
+                    ivalue = self.model.convert_from_units(abs_name, value, units)
+                    if self._setup_status == 1:
+                        value = ivalue
+                    else:
+                        value = self.model.convert_from_units(src, value, units)
+        else:
+            src = abs_name
+            if units is not None:
+                value = self.model.convert_from_units(abs_name, value, units)
 
         # Caching only needed if vectors aren't allocated yet.
         if self._setup_status == 1:
