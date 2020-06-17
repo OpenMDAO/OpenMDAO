@@ -101,7 +101,7 @@ you are on a supercomputing cluster. Here is a simple example for unix and mpi.
     ktmoore1$ kill -SIGUSR1 17955
 
 If SIGUSR1 is already used for something else, or its behavior is not supported on your operating system, mpi implementation,
-or queuing system, then you can choose a different signal by setting the "user_teriminate_signal" option and giving it a
+or queuing system, then you can choose a different signal by setting the "user_terminate_signal" option and giving it a
 different signal, or None to disable the feature.  Here, we change the signal to SIGUSR2:
 
 .. embed-code::
