@@ -389,7 +389,12 @@ class SimpleGADriver(Driver):
         nr_objectives = len(objs)
 
         # Single objective, if there is only one objective, which has only one element
-        is_single_objective = (nr_objectives == 1) and (len(objs) == 1)
+        if nr_objectives > 1:
+            is_single_objective = False
+        else:
+            for obj in objs.items():
+                is_single_objective = len(obj) == 1
+                break
 
         obj_exponent = self.options['multi_obj_exponent']
         if self.options['multi_obj_weights']:  # not empty

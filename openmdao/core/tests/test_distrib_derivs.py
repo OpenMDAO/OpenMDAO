@@ -12,6 +12,11 @@ from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.assert_utils import assert_near_equal
 
 try:
+    from pyoptsparse import Optimization as pyoptsparse_opt
+except ImportError:
+    pyoptsparse_opt = None
+
+try:
     from parameterized import parameterized
 except ImportError:
     from openmdao.utils.assert_utils import SkipParameterized as parameterized
@@ -1031,6 +1036,7 @@ class MPITests3(unittest.TestCase):
                                                             [-0. , -0. , -0. , -0. , -0. , -0. , 12.2]]),
                           1e-11)
 
+
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class MPITestsBug(unittest.TestCase):
 
@@ -1204,6 +1210,7 @@ class MPIFeatureTests(unittest.TestCase):
         assert_near_equal(J[('C2.outvec', 'indep.x')],
                           np.eye(15)*np.append(2*np.ones(8), -3*np.ones(7)))
 
+    @unittest.skipUnless(pyoptsparse_opt, "pyOptsparse is required.")
     def test_distributed_constraint(self):
         import numpy as np
         import openmdao.api as om
@@ -1286,6 +1293,7 @@ class ZeroLengthInputsOutputs(unittest.TestCase):
         assert_near_equal(J[('C2.outvec', 'indep.x')],
                           np.eye(3)*np.append(2*np.ones(1), -3*np.ones(2)))
 
+
 class DistribCompDenseJac(om.ExplicitComponent):
     def initialize(self):
         self.options['distributed'] = True
@@ -1313,6 +1321,7 @@ class DistribCompDenseJac(om.ExplicitComponent):
         sizes, offsets = evenly_distrib_idxs(self.comm.size, N)
         # Define jacobian element by element with variable size array
         J['y','x'] = -2.33 * np.ones((sizes[rank],))
+
 
 class DeclarePartialsWithoutRowCol(unittest.TestCase):
     N_PROCS = 3
@@ -1342,6 +1351,7 @@ class DeclarePartialsWithoutRowCol(unittest.TestCase):
 
         data = prob.check_totals(out_stream=None)
         assert_near_equal(data[('execcomp.z', 'dvs.x')]['abs error'][0], 0.0, 1e-6)
+
 
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests

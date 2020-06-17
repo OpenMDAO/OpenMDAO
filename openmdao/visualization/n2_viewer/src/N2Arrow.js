@@ -24,6 +24,7 @@ class N2Arrow {
         this.elementsGrp = n2Groups.elements;
         this.nodeSize = nodeSize;
         this.attribs = attribs;
+        this._genPath = this._angledPath;
     }
 
     get offsetAbsX() {
@@ -70,9 +71,10 @@ class N2BentArrow extends N2Arrow {
         let offsetAbsX = this.offsetAbsX;
         let offsetAbsY = this.offsetAbsY;
 
-        let offsetX = (this.start.col < this.end.col) ? offsetAbsX : -offsetAbsX; // Left-to-Right : Right-to-Left
-        this.pts.start.x = this.nodeSize.width * this.start.col + this.nodeSize.width * .5 + offsetX;
+        this.offsetX = (this.start.col < this.end.col) ? offsetAbsX : -offsetAbsX; // Left-to-Right : Right-to-Left
+        this.pts.start.x = this.nodeSize.width * this.start.col + this.nodeSize.width * .5 + this.offsetX;
         this.pts.mid.x = this.nodeSize.width * this.middle.col + this.nodeSize.width * .5;
+        // this.pts.mid.x = (this.offsetX > 0)? this.nodeSize.width * this.middle.col : this.nodeSize.width * (this.middle.col + 1);
         this.pts.end.x = this.nodeSize.width * this.end.col + this.nodeSize.width * .5;
 
         let offsetY = (this.start.row < this.end.row) ? -offsetAbsY : offsetAbsY; // Down : Up
@@ -81,16 +83,30 @@ class N2BentArrow extends N2Arrow {
         this.pts.end.y = this.nodeSize.height * this.end.row + this.nodeSize.height * .5 + offsetY;
     }
 
-    /**
-     * Use SVG to draw the line segments, add a circle at the "middle",
-     * and an arrow at the end-point.
-     */
+    /** Create a path string with a quadratic curve at the bend. */
+    _curvedPath() {
+        const dir = (this.offsetX > 0)? 1 : -1;
+        const s = this.nodeSize.width * .5 * dir;
+
+        return "M" + this.pts.start.x + " " + this.pts.start.y +
+            " L" + this.pts.mid.x + " " + this.pts.mid.y +
+            ` q${s} 0 ${s} ${s}` +
+            " L" + this.pts.end.x + " " + this.pts.end.y;
+    }
+
+    /** Generate a path with a 90-degree angle at the bend. */
+    _angledPath() {
+        return "M" + this.pts.start.x + " " + this.pts.start.y +
+            " L" + this.pts.mid.x + " " + this.pts.mid.y +
+            " L" + this.pts.end.x + " " + this.pts.end.y;
+    }
+
+    /** Use SVG to draw the line segments and an arrow at the end-point. */
     draw() {
         this.path = this.arrowsGrp.insert("path")
             .attr("class", "n2_hover_elements")
-            .attr("d", "M" + this.pts.start.x + " " + this.pts.start.y +
-                " L" + this.pts.mid.x + " " + this.pts.mid.y +
-                " L" + this.pts.end.x + " " + this.pts.end.y)
+            .attr("marker-end", "url(#arrow)")
+            .attr("d", this._genPath())
             .attr("fill", "none")
             .style("stroke-width", this.width)
             .style("stroke", this.color);
@@ -102,7 +118,7 @@ class N2BentArrow extends N2Arrow {
             .attr("r", this.width * 1.0)
             .style("stroke-width", 0)
             .style("fill-opacity", 1)
-            .style("fill", "black");
+            .style("fill", N2Style.color.connection);
 
         this.dotsGrp.append("circle")
             .attr("class", "n2_hover_elements")
@@ -112,8 +128,6 @@ class N2BentArrow extends N2Arrow {
             .style("stroke-width", 0)
             .style("fill-opacity", .75)
             .style("fill", this.color);
-
-        this.path.attr("marker-end", "url(#arrow)");
     }
 }
 
@@ -180,14 +194,13 @@ class N2OffGridArrow extends N2Arrow {
         return true;
     }
 
-    /**
-     * Put the SVG arrow on the screen and position the tooltip.
-     */
+    /** Put the SVG arrow on the screen and position the tooltip. */
     draw() {
         debugInfo('Adding offscreen ' + this.attribs.direction +
             ' arrow connected to ' + this.label.text);
 
         this.path = this.arrowsGrp.insert('path')
+            .attr('marker-end', 'url(#arrow)')
             .attr('class', 'n2_hover_elements')
             .attr('stroke-dasharray', '5,5')
             .attr('d', 'M' + this.pts.start.x + ' ' + this.pts.start.y +
@@ -195,8 +208,6 @@ class N2OffGridArrow extends N2Arrow {
             .attr('fill', 'none')
             .style('stroke-width', this.width)
             .style('stroke', this.color);
-
-        this.path.attr('marker-end', 'url(#arrow)');
 
         for (let pos in this.label.pts) {
             this.label.ref.style(pos, this.label.pts[pos] + 'px');

@@ -351,6 +351,8 @@ class Group(System):
 
         self._setup_procs_finished = False
 
+        self._vectors = {}
+
         if self._num_par_fd > 1:
             info = self._coloring_info
             if comm.size > 1:

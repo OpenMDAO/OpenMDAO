@@ -101,6 +101,9 @@ class NonlinearBlockGS(NonlinearSolver):
         if system.under_complex_step and self.options['cs_reconverge']:
             system._outputs._data += np.linalg.norm(system._outputs._data) * 1e-10
 
+        # Execute guess_nonlinear if specified.
+        system._guess_nonlinear()
+
         return super(NonlinearBlockGS, self)._iter_initialize()
 
     def _single_iteration(self):

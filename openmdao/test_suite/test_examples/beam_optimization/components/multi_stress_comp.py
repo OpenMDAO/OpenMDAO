@@ -1,7 +1,7 @@
 """
 Stress calculation component.
 
-Simple calculation of beam bending stress assuming small angular displacments.
+Simple calculation of beam bending stress assuming small angular displacements.
 Vectorized for multiple load cases.
 """
 

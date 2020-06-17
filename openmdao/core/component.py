@@ -151,6 +151,8 @@ class Component(System):
         self.options._parent_name = self.msginfo
         self.recording_options._parent_name = self.msginfo
 
+        self._vectors = {}
+
         orig_comm = comm
         if self._num_par_fd > 1:
             if comm.size > 1:

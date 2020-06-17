@@ -28,6 +28,15 @@ PETScKrylov Options
     PETScKrylov
     options
 
+PETScKrylov Constructor
+------------------------
+
+The call signature for the `PETScKrylov` constructor is:
+
+.. automethod:: openmdao.solvers.linear.petsc_ksp.PETScKrylov.__init__
+    :noindex:
+
+
 PETScKrylov Option Examples
 ---------------------------
 

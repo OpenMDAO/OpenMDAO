@@ -116,10 +116,8 @@ class N2Layout {
 
     /** Create an off-screen area to render text for _getTextWidth() */
     _setupTextRenderer() {
-        let textGroup = this.svg.append("g").attr("class", "partition_group");
-        let textSVG = textGroup.append("text")
-            .text("")
-            .attr("x", -100); // Put text off screen to the left.
+        const textGroup = this.svg.select('#text-width-renderer');
+        const textSVG = textGroup.select('text');
 
         this.textRenderer = {
             'group': textGroup,
@@ -522,8 +520,8 @@ class N2Layout {
 
         this.ratio = (window.innerWidth - 200) / outerDims.width;
         if (this.ratio > 1 || manuallyResized) this.ratio = 1;
-        else if ( this.ratio < 1 )
-            debugInfo("Scaling diagram to " + Math.round(this.ratio * 100) + "%" );
+        else if (this.ratio < 1)
+            debugInfo("Scaling diagram to " + Math.round(this.ratio * 100) + "%");
 
         dom.svgDiv
             .style("width", (outerDims.width * this.ratio) + this.size.unit)
@@ -546,6 +544,12 @@ class N2Layout {
             .attr("height", innerDims.height)
             .attr("width", this.size.partitionTree.width)
             .attr("transform", "translate(0 " + innerDims.margin + ")");
+
+        dom.highlightBar
+            .transition(sharedTransition)
+            .attr("height", innerDims.height)
+            .attr("width", "8")
+            .attr("transform", "translate(" + this.size.partitionTree.width + 1 + " " + innerDims.margin + ")");
 
         // Move n2 outer group to right of partition tree, spaced by the margin.
         dom.n2OuterGroup

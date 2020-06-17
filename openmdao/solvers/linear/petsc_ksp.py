@@ -1,14 +1,30 @@
 """LinearSolver that uses PetSC KSP to solve for a system's derivatives."""
 
 import numpy as np
-
-try:
-    import petsc4py
-    from petsc4py import PETSc
-except ImportError:
-    PETSc = None
+import os
+import sys
 
 from openmdao.solvers.solver import LinearSolver
+
+# If OPENMDAO_REQUIRE_MPI is set to a recognized positive value, attempt import
+# and raise exception on failure. If set to anything else, no import is attempted.
+if 'OPENMDAO_REQUIRE_MPI' in os.environ:
+    if os.environ['OPENMDAO_REQUIRE_MPI'].lower() in ['always', '1', 'true', 'yes']:
+        import petsc4py
+        from petsc4py import PETSc
+    else:
+        PETSc = None
+# If OPENMDAO_REQUIRE_MPI is unset, attempt to import petsc4py, but continue on failure
+# with a notification.
+else:
+    try:
+        import petsc4py
+        from petsc4py import PETSc
+    except ImportError:
+        PETSc = None
+        sys.stdout.write("Unable to import petsc4py. Parallel processing unavailable.\n")
+        sys.stdout.flush()
+
 
 KSP_TYPES = [
     "richardson",

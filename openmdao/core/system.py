@@ -1275,8 +1275,10 @@ class System(object):
         self._var_abs_names = {'input': [], 'output': []}
         self._var_allprocs_prom2abs_list = {'input': OrderedDict(), 'output': OrderedDict()}
         self._var_abs2prom = {'input': {}, 'output': {}}
+        self._var_allprocs_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2meta = {}
         self._var_abs2meta = {}
+        self._var_allprocs_abs2idx = {}
 
     def _setup_var_index_maps(self):
         """
@@ -3908,6 +3910,8 @@ class System(object):
                 pass  # non-local discrete output
             elif abs_name in self._var_allprocs_discrete['input']:
                 pass  # non-local discrete input
+            elif get_remote:
+                raise ValueError(f"{self.msginfo}: Can't find variable named '{abs_name}'.")
             else:
                 return _undefined
 
