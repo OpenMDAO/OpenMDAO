@@ -538,7 +538,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
                 # Default initial state of zero for x takes us to x=1 solution.
                 # Here we set it to a value that will take us to the x=3 solution.
                 outputs['x'] = 5.0
-                self.resid = resids
+                assert(resids['x'] != 0.)
 
         prob = om.Problem()
         model = prob.model
@@ -551,8 +551,6 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
         prob.setup()
         prob['comp.x'] = 10
         prob.run_model()
-
-        self.assertNotEqual(model.comp.resid, 0)
 
     def test_guess_nonlinear_group_residual(self):
         # Test that data is transfered to a component before calling guess_nonlinear.
@@ -593,7 +591,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
                 # Default initial state of zero for x takes us to x=1 solution.
                 # Here we set it to a value that will take us to the x=3 solution.
                 outputs['x'] = 5.0
-                self.resid = resids
+                assert(resids['x'] != 0.)
 
         group = om.Group()
 
@@ -611,8 +609,6 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
         prob.setup()
 
         prob.run_model()
-        self.assertNotEqual(group.comp1.resid, 0)
-        self.assertNotEqual(group.comp2.resid, 0)
 
     def test_guess_nonlinear_transfer(self):
         # Test that data is transfered to a component before calling guess_nonlinear.
