@@ -325,13 +325,15 @@ class N2Matrix {
             .attr('class', 'n2cell')
             .attr('transform', function (d) {
                 if (self.lastClickWasLeft) {
-                    return 'translate(' +
+                    let tranStr = 'translate(' +
                         (self.prevCellDims.size.width *
                             (d.col - enterIndex) +
                             self.prevCellDims.bottomRight.x) + ',' +
                         (self.prevCellDims.size.height *
                             (d.row - enterIndex) +
                             self.prevCellDims.bottomRight.y) + ')';
+
+                    return tranStr;
                 }
 
                 let roc = (d.obj && self.findRootOfChangeFunction) ?
@@ -340,10 +342,12 @@ class N2Matrix {
                 if (roc) {
                     let prevIdx = roc.prevRootIndex -
                         self.layout.zoomedElement.prevRootIndex;
-                    return 'translate(' + (self.prevCellDims.size.width * prevIdx +
+                    let tranStr = 'translate(' + (self.prevCellDims.size.width * prevIdx +
                         self.prevCellDims.bottomRight.x) + ',' +
                         (self.prevCellDims.size.height * prevIdx +
                             self.prevCellDims.bottomRight.y) + ')';
+
+                    return tranStr;
                 }
                 throw ('Enter transform not found');
             })
@@ -359,10 +363,12 @@ class N2Matrix {
         gEnter.merge(selection)
             .transition(sharedTransition)
             .attr('transform', function (d) {
-                return 'translate(' + (self.cellDims.size.width * d.col +
+                let tranStr = 'translate(' + (self.cellDims.size.width * d.col +
                     self.cellDims.bottomRight.x) + ',' +
                     (self.cellDims.size.height * d.row +
                         self.cellDims.bottomRight.y) + ')';
+
+                return(tranStr);
             })
             // "this" refers to the element here, so leave it alone:
             .each(function (d) {
@@ -372,11 +378,13 @@ class N2Matrix {
         selection.exit()
             .transition(sharedTransition)
             .attr('transform', function (d) {
-                if (self.lastClickWasLeft)
-                    return 'translate(' + (self.cellDims.size.width *
+                if (self.lastClickWasLeft) {
+                    let tranStr = 'translate(' + (self.cellDims.size.width *
                         (d.col - exitIndex) + self.cellDims.bottomRight.x) + ',' +
                         (self.cellDims.size.height * (d.row - exitIndex) +
                             self.cellDims.bottomRight.y) + ')';
+                    return tranStr;
+                }
 
                 let roc = (d.obj && self.findRootOfChangeFunction) ?
                     self.findRootOfChangeFunction(d.obj) : null;

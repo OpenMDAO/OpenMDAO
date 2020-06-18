@@ -72,7 +72,7 @@ class ModelData {
         let newNode = new N2TreeNode(element);
 
         if (newNode.hasChildren()) {
-            for (let i = 0; i < newNode.children.length; ++i) {
+            for (let i in newNode.children) {
                 newNode.children[i] = this._convertToN2TreeNodes(newNode.children[i]);
                 newNode.children[i].parent = newNode;
                 if (exists(newNode.children[i].parentComponent))
@@ -92,11 +92,9 @@ class ModelData {
      * @return True is node is implicit, false otherwise.
      */
     _setParentsAndDepth(node, parent, depth) { // Formerly InitTree()
-        node.numLeaves = 0; // for nested params
         node.depth = depth;
         node.parent = parent;
         node.id = ++this.idCounter; // id starts at 1 for if comparision
-        node.absPathName = "";
 
         if (node.parent) { // not root node? node.parent.absPathName : "";
             if (node.parent.absPathName != "") {
@@ -127,10 +125,8 @@ class ModelData {
             this.maxSystemDepth = Math.max(depth, this.maxSystemDepth);
         }
 
-        node.childNames = new Set();
         node.childNames.add(node.absPathName); // Add the node itself
-        
-        node.numDescendants = 0;
+
         if (node.hasChildren()) {
             node.numDescendants = node.children.length;
             for (let child of node.children) {
@@ -140,7 +136,8 @@ class ModelData {
 
                 node.numDescendants += child.numDescendants;
 
-                if (node.type != 'root') {
+                // Add absolute pathnames of children to a set for quick searching
+                if (! node.isRoot()) { // All nodes are children of the model root 
                     node.childNames.add(child.absPathName);
                     for (let childName of child.childNames) {
                         node.childNames.add(childName);

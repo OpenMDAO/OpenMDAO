@@ -465,6 +465,7 @@ class N2UserInterface {
             node.collapsable = true;
 
             this.addBackButtonHistory();
+            node.manuallyExpanded = false;
             this.collapse();
         }
     }
@@ -509,16 +510,16 @@ class N2UserInterface {
      */
     updateClickedIndices() {
         enterIndex = exitIndex = 0;
+
         if (this.lastClickWasLeft) {
+            let lcRootIndex = (! this.leftClickedNode || ! this.leftClickedNode.rootIndex)? 0 :
+                this.leftClickedNode.rootIndex;
+
             if (this.leftClickIsForward) {
-                exitIndex =
-                    this.leftClickedNode.rootIndex -
-                    this.n2Diag.zoomedElementPrev.rootIndex;
+                exitIndex = lcRootIndex - this.n2Diag.zoomedElementPrev.rootIndex;
             }
             else {
-                enterIndex =
-                    this.n2Diag.zoomedElementPrev.rootIndex -
-                    this.leftClickedNode.rootIndex;
+                enterIndex = this.n2Diag.zoomedElementPrev.rootIndex - lcRootIndex;
             }
         }
     }

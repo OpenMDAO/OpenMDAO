@@ -718,6 +718,9 @@ class N2Diagram {
      * @param {number} height The new height in pixels.
      */
     verticalResize(height) {
+        // Don't resize if the height didn't actually change:
+        if (this.dims.size.partitionTree.height == height) return;
+
         if (!this.manuallyResized) {
             height = this.layout.calcFitDims().height;
         }

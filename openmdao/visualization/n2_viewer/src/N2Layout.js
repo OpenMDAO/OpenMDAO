@@ -18,8 +18,7 @@ class N2Layout {
      * @param {boolean} showLinearSolverNames Whether to show linear or non-linear solver names.
      * @param {Object} dims The initial sizes for multiple tree elements.
      */
-    constructor(model, newZoomedElement,
-        showLinearSolverNames, dims) {
+    constructor(model, newZoomedElement, showLinearSolverNames, dims) {
         this.model = model;
 
         this.zoomedElement = newZoomedElement;
@@ -225,18 +224,16 @@ class N2Layout {
     }
 
     /** Recurse through the tree and add up the number of leaves that each
-     * node has, based on their array of children.
+     * node has, based on their array of visible children.
      * @param {N2TreeNode} [node = this.model.root] The starting node.
      */
     _computeLeaves(node = this.model.root) {
-        if (node.varIsHidden) {
-            node.numLeaves = 0;
-        }
-        else {
-            node.minimizeIfLarge(100);
+        node.numLeaves = 0;
+
+        if (! node.varIsHidden) {
+            node.minimizeIfLarge();
 
             if (node.hasChildren() && !node.isMinimized) {
-                node.numLeaves = 0;
                 for (let child of node.children) {
                     this._computeLeaves(child);
                     node.numLeaves += child.numLeaves;
