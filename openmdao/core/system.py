@@ -4501,10 +4501,6 @@ class System(object):
 
         base_units = meta['units']
 
-        if base_units is None:
-            msg = "{}: Can't express variable '{}' with units of 'None' in units of '{}'."
-            raise TypeError(msg.format(self.msginfo, name, units))
-
         try:
             scale, offset = unit_conversion(base_units, units)
         except Exception:
@@ -4533,15 +4529,39 @@ class System(object):
         """
         base_units = self._get_var_meta(name)['units']
 
-        if base_units is None:
-            msg = "{}: Can't set variable '{}' with units 'None' to value with units '{}'."
-            raise TypeError(msg.format(self.msginfo, name, units))
-
         try:
             scale, offset = unit_conversion(units, base_units)
-        except TypeError:
-            msg = "{}: Can't set variable '{}' with units '{}' to value with units '{}'."
+        except Exception:
+            msg = "{}: Can't express variable '{}' with units of '{}' in units of '{}'."
             raise TypeError(msg.format(self.msginfo, name, base_units, units))
+
+        return (val + offset) * scale
+
+    def convert_units(self, name, val, units_from, units_to):
+        """
+        Wrap the utilty convert_units and give a good error message.
+
+        Parameters
+        ----------
+        name : str
+            Name of the variable.
+        val : float or ndarray of float
+            The value of the variable.
+        units_from : str
+            The units to convert from.
+        units_to : str
+            The units to convert to.
+
+        Returns
+        -------
+        float or ndarray of float
+            The value converted to the specified units.
+        """
+        try:
+            scale, offset = unit_conversion(units_from, units_to)
+        except Exception:
+            raise TypeError(f"{self.msginfo}: Can't set variable '{name}' with units "
+                            f"'{units_from}' to value with units '{units_to}'.")
 
         return (val + offset) * scale
 
