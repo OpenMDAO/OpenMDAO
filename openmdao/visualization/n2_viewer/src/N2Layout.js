@@ -231,7 +231,7 @@ class N2Layout {
         node.numLeaves = 0;
 
         if (! node.varIsHidden) {
-            node.minimizeIfLarge();
+            if (this.model.idCounter > ALLOW_PRECOLLAPSE_COUNT) node.minimizeIfLarge();
 
             if (node.hasChildren() && !node.isMinimized) {
                 for (let child of node.children) {
