@@ -283,6 +283,8 @@ class System(object):
         used if this System does no partial or semi-total coloring.
     _first_call_to_linearize : bool
         If True, this is the first call to _linearize.
+    _is_local : bool
+        If True, this system is local to this mpi process.
     """
 
     def __init__(self, num_par_fd=1, **kwargs):
@@ -299,6 +301,7 @@ class System(object):
         self.name = ''
         self.pathname = None
         self.comm = None
+        self._is_local = False
 
         # System options
         self.options = OptionsDictionary(parent_name=type(self).__name__)
@@ -1430,6 +1433,7 @@ class System(object):
         self.pathname = pathname
         self._problem_meta = prob_meta
         self._first_call_to_linearize = True
+        self._is_local = True
 
         self.options._parent_name = self.msginfo
         self.recording_options._parent_name = self.msginfo
@@ -2570,20 +2574,6 @@ class System(object):
             if recurse:
                 for sub in s.system_iter(recurse=True, typ=typ):
                     yield sub
-
-    def _all_subsystem_iter(self):
-        """
-        Yield a generator of subsystems along with their local status.
-
-        Yields
-        ------
-        System
-            Current subsystem.
-        bool
-            True if current subsystem is local.
-        """
-        for isub, subsys in enumerate(self._subsystems_allprocs):
-            yield subsys, subsys.name in self._loc_subsys_map
 
     def add_design_var(self, name, lower=None, upper=None, ref=None, ref0=None, indices=None,
                        adder=None, scaler=None, units=None,
@@ -4236,7 +4226,7 @@ class System(object):
 
         if get_remote and self.comm.size > 1:
             owner = self._owning_rank[abs_name]
-            loc_val = val if val is not _undefined else np.zeros(0)
+            myrank = self.comm.rank
             if rank is None:   # bcast
                 if distrib:
                     idx = self._var_allprocs_abs2idx[vec_name][abs_name]
@@ -4244,6 +4234,7 @@ class System(object):
                     # TODO: could cache these offsets
                     offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
                     offsets[1:] = np.cumsum(sizes[:-1])
+                    loc_val = val if val is not _undefined else np.zeros(sizes[myrank])
                     val = np.zeros(np.sum(sizes))
                     self.comm.Allgatherv(loc_val, [val, sizes, offsets, MPI.DOUBLE])
                 else:
@@ -4259,6 +4250,7 @@ class System(object):
                     # TODO: could cache these offsets
                     offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
                     offsets[1:] = np.cumsum(sizes[:-1])
+                    loc_val = val if val is not _undefined else np.zeros(sizes[idx])
                     val = np.zeros(np.sum(sizes))
                     self.comm.Gatherv(loc_val, [val, sizes, offsets, MPI.DOUBLE], root=rank)
                 else:
@@ -4274,7 +4266,7 @@ class System(object):
                         elif self.comm.rank == rank:
                             val = self.comm.recv(source=owner, tag=tag)
 
-        if not flat and val is not _undefined and not discrete:
+        if not flat and val is not _undefined and not discrete and not np.isscalar(val):
             val.shape = meta['global_shape'] if get_remote and distrib else meta['shape']
 
         return val
@@ -4509,10 +4501,6 @@ class System(object):
 
         base_units = meta['units']
 
-        if base_units is None:
-            msg = "{}: Can't express variable '{}' with units of 'None' in units of '{}'."
-            raise TypeError(msg.format(self.msginfo, name, units))
-
         try:
             scale, offset = unit_conversion(base_units, units)
         except Exception:
@@ -4541,15 +4529,39 @@ class System(object):
         """
         base_units = self._get_var_meta(name)['units']
 
-        if base_units is None:
-            msg = "{}: Can't set variable '{}' with units 'None' to value with units '{}'."
-            raise TypeError(msg.format(self.msginfo, name, units))
-
         try:
             scale, offset = unit_conversion(units, base_units)
-        except TypeError:
-            msg = "{}: Can't set variable '{}' with units '{}' to value with units '{}'."
+        except Exception:
+            msg = "{}: Can't express variable '{}' with units of '{}' in units of '{}'."
             raise TypeError(msg.format(self.msginfo, name, base_units, units))
+
+        return (val + offset) * scale
+
+    def convert_units(self, name, val, units_from, units_to):
+        """
+        Wrap the utilty convert_units and give a good error message.
+
+        Parameters
+        ----------
+        name : str
+            Name of the variable.
+        val : float or ndarray of float
+            The value of the variable.
+        units_from : str
+            The units to convert from.
+        units_to : str
+            The units to convert to.
+
+        Returns
+        -------
+        float or ndarray of float
+            The value converted to the specified units.
+        """
+        try:
+            scale, offset = unit_conversion(units_from, units_to)
+        except Exception:
+            raise TypeError(f"{self.msginfo}: Can't set variable '{name}' with units "
+                            f"'{units_from}' to value with units '{units_to}'.")
 
         return (val + offset) * scale
 

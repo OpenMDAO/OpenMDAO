@@ -2588,26 +2588,26 @@ class TestNaturalNaming(unittest.TestCase):
         g4 = g3.add_subsystem('g4', om.Group(), promotes=['*'])
         c1 = g4.add_subsystem('c1', om.ExecComp('y=2.0*x', x=7., y=9.), promotes=['x','y'])
         p.setup()
-        
+
         full_in = 'g1.g2.g3.g4.c1.x'
         full_out = 'g1.g2.g3.g4.c1.y'
-        
+
         prom_ins = ['g1.g2.g3.g4.x', 'g1.g2.g3.x', 'g1.g3.x']
         for prom in prom_ins:
             self.assertEqual(name2abs_names(model, prom), [full_in])
-            
+
         prom_outs = ['g1.g2.g3.g4.y', 'g1.g2.g3.y', 'g1.g3.y']
         for prom in prom_outs:
             self.assertEqual(name2abs_names(model, prom), [full_out])
 
         # check setting/getting before final setup
-        
+
         for name in prom_ins + [full_in]:
             self.assertEqual(p[name], 7.)
 
         for name in prom_outs + [full_out]:
             self.assertEqual(p[name], 9.)
-            
+
         for name in prom_ins + [full_in]:
             p[name] = 77.
             self.assertEqual(p[name], 77.)
@@ -2619,13 +2619,13 @@ class TestNaturalNaming(unittest.TestCase):
         p.final_setup()
 
         # now check after final setup
-        
+
         for name in prom_ins + [full_in]:
             self.assertEqual(p[name], 77.)
 
         for name in prom_outs + [full_out]:
             self.assertEqual(p[name], 99.)
-            
+
         for name in prom_ins + [full_in]:
             p[name] = 7.
             self.assertEqual(p[name], 7.)
@@ -2633,6 +2633,92 @@ class TestNaturalNaming(unittest.TestCase):
         for name in prom_outs + [full_out]:
             p[name] = 9.
             self.assertEqual(p[name], 9.)
+
+
+@unittest.skipIf(True, 'temporary skip')    # skip this for now...  #FIXME
+class TestNaturalNamingMPI(unittest.TestCase):
+    N_PROCS = 2
+
+    def test_buried_proms(self):
+        p = om.Problem()
+        model = p.model
+        par = model.add_subsystem('par', om.ParallelGroup())
+        g1 = par.add_subsystem('g1', om.Group())
+        g2 = g1.add_subsystem('g2', om.Group(), promotes=['*'])
+        g3 = g2.add_subsystem('g3', om.Group())
+        g4 = g3.add_subsystem('g4', om.Group(), promotes=['*'])
+        c1 = g4.add_subsystem('c1', om.ExecComp('y=2.0*x', x=7., y=9.), promotes=['x','y'])
+
+        g1a = par.add_subsystem('g1a', om.Group())
+        g2 = g1a.add_subsystem('g2', om.Group(), promotes=['*'])
+        g3 = g2.add_subsystem('g3', om.Group())
+        g4 = g3.add_subsystem('g4', om.Group(), promotes=['*'])
+        c1 = g4.add_subsystem('c1', om.ExecComp('y=2.0*x', x=7., y=9.), promotes=['x','y'])
+
+        # import wingdbstub
+
+        p.setup()
+
+        #from openmdao.devtools.debug import trace_mpi
+        #trace_mpi()
+
+        for gtop in ['par.g1', 'par.g1a']:
+            full_in = f'{gtop}.g2.g3.g4.c1.x'
+            full_out = f'{gtop}.g2.g3.g4.c1.y'
+
+            prom_ins = [f'{gtop}.g2.g3.g4.x', f'{gtop}.g2.g3.x', f'{gtop}.g3.x']
+            for prom in prom_ins:
+                self.assertEqual(name2abs_names(model, prom), [full_in])
+
+            prom_outs = [f'{gtop}.g2.g3.g4.y', f'{gtop}.g2.g3.y', f'{gtop}.g3.y']
+            for prom in prom_outs:
+                self.assertEqual(name2abs_names(model, prom), [full_out])
+
+            # check setting/getting before final setup
+
+            for name in prom_ins + [full_in]:
+                self.assertEqual(p.get_val(name, get_remote=True), 7.)
+
+            for name in prom_outs + [full_out]:
+                self.assertEqual(p.get_val(name, get_remote=True), 9.)
+
+            for name in prom_ins + [full_in]:
+                p[name] = 77.
+            p.model.comm.barrier()
+            for name in prom_ins + [full_in]:
+                self.assertEqual(p.get_val(name, get_remote=True), 77.)
+
+            for name in prom_outs + [full_out]:
+                p[name] = 99.
+            p.model.comm.barrier()
+            for name in prom_outs + [full_out]:
+                self.assertEqual(p.get_val(name, get_remote=True), 99.)
+
+        p.final_setup()
+
+        # now check after final setup
+
+        for gtop in ['par.g1', 'par.g1a']:
+            full_in = f'{gtop}.g2.g3.g4.c1.x'
+            full_out = f'{gtop}.g2.g3.g4.c1.y'
+
+            for name in prom_ins + [full_in]:
+                self.assertEqual(p.get_val(name, get_remote=True), 77.)
+
+            for name in prom_outs + [full_out]:
+                self.assertEqual(p.get_val(name, get_remote=True), 99.)
+
+        for gtop in ['par.g1', 'par.g1a']:
+            full_in = f'{gtop}.g2.g3.g4.c1.x'
+            full_out = f'{gtop}.g2.g3.g4.c1.y'
+
+            for name in prom_ins + [full_in]:
+                p[name] = 7.
+                self.assertEqual(p.get_val(name, get_remote=True), 7.)
+
+            for name in prom_outs + [full_out]:
+                p[name] = 9.
+                self.assertEqual(p.get_val(name, get_remote=True), 9.)
 
 
 if __name__ == "__main__":
