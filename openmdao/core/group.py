@@ -521,6 +521,9 @@ class Group(System):
         self._problem_meta['top_meta'] = self._var_abs2meta
 
         if setup_mode == 'full':
+            self._problem_meta['remote_systems'] = self._find_remote_sys_owners()
+            self._problem_meta['remote_vars'] = \
+                self._find_remote_var_owners(self._problem_meta['remote_systems'])
             auto_ivc = self._setup_auto_ivcs(mode)
             self._check_prom_masking()
 
@@ -1939,11 +1942,11 @@ class Group(System):
         """
         # let any lower level systems do their guessing first
         if self._has_guess:
-            for isub, (sub, loc) in enumerate(self._all_subsystem_iter()):
+            for isub, sub in enumerate(self._subsystems_allprocs):
                 # TODO: could gather 'has_guess' information during setup and be able to
                 # skip transfer for subs that don't have guesses...
                 self._transfer('nonlinear', 'fwd', isub)
-                if loc and sub._has_guess:
+                if sub._is_local and sub._has_guess:
                     sub._guess_nonlinear()
 
         # call our own guess_nonlinear method, after the recursion is done to
@@ -2555,19 +2558,32 @@ class Group(System):
 
         return graph
 
-    def _find_remote_owners(self):
+    def _find_remote_sys_owners(self):
+        """
+        Return a mapping of system pathname to owning rank.
+
+        The mapping will contain ONLY systems that are remote on at least one proc.
+        Distributed systems are not included.
+
+        Returns
+        -------
+        dict
+            The mapping of system pathname to owning rank.
+        """
         if self.comm.size > 1:
-            all_meta = self._var_allprocs_abs2meta
-            # Compute the inputs that are remote in at least one proc and the owning rank for each.
-            # These do not include distributed vars.
-            all_ins = set([n for n in self._var_allprocs_abs_names['input']
-                           if not all_meta[n]['distributed']])
-            all_ins.update(self._var_allprocs_discrete['input'])
-            my_remote_ins = all_ins.difference(self._var_abs_names['input'])
-            my_remote_ins = my_remote_ins.difference(self._var_abs_names_discrete['input'])
-            gathered = self.comm.gather(my_remote_ins, root=0)
+            loc_sys = set(s.pathname for s in self.system_iter(recurse=True))
+            # use the allprocs variable dicts to find any remote systems
+            remote_sys = set()
+            for typ in ('input', 'output'):
+                for abspath in self._var_allprocs_abs2prom[typ]:  # includes real and discrete vars
+                    sname, vname = abspath.rsplit('.', 1)
+                    if sname not in loc_sys:
+                        remote_sys.add(sname)
+
+            # Find systems that are remote in at least one proc and the owning rank for each.
+            gathered = self.comm.gather(remote_sys, root=0)
             if self.comm.rank == 0:
-                remote_ins = {}
+                remote_systems = {}
                 remaining_remotes = set()
                 for remotes in gathered:
                     remaining_remotes.update(remotes)
@@ -2577,17 +2593,44 @@ class Group(System):
                         break
                     diff = remaining_remotes - remotes
                     for name in diff:
-                        remote_ins[name] = rank
+                        remote_systems[name] = rank
 
                     remaining_remotes -= diff
 
-                self.comm.bcast(remote_ins, root=0)
+                self.comm.bcast(remote_systems, root=0)
             else:
-                remote_ins = self.comm.bcast(None, root=0)
+                remote_systems = self.comm.bcast(None, root=0)
         else:
-            remote_ins = {}
+            remote_systems = {}
 
-        return remote_ins
+        return remote_systems
+
+    def _find_remote_var_owners(self, sys_owners):
+        """
+        Return a mapping of abs var name to owning rank.
+
+        The mapping contains only non-distributed variables that are
+        remote on at least one proc.
+
+        Parameters
+        ----------
+        sys_owners : dict
+            Mapping of system pathname to owning rank. Contains remote systems only.
+
+        Returns
+        -------
+        dict
+            The mapping of variable pathname to owning rank.
+        """
+        owners = {}
+        all_abs2meta = self._var_allprocs_abs2meta
+        for typ in ('input', 'output'):
+            for abs_name in self._var_allprocs_abs2prom[typ]:
+                sname, vname = abs_name.rsplit('.', 1)
+                dist = abs_name in all_abs2meta and all_abs2meta[abs_name]['distributed']
+                if not dist and sname in sys_owners:
+                    owners[abs_name] = sys_owners[sname]
+        return owners
 
     def _get_src_inds_max(self, tgt, meta):
         inds = meta['src_indices']
@@ -2723,7 +2766,7 @@ class Group(System):
 
         # NOTE: remote_ins does NOT include distributed inputs.
         # NOTE: some distributed inputs do not have src_indices yet
-        remote_ins = self._find_remote_owners()
+        remote_ins = self._problem_meta['remote_vars']
 
         prom2auto = {}
         count = 0
