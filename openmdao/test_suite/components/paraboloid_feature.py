@@ -27,7 +27,7 @@ class Paraboloid(om.ExplicitComponent):
         x = inputs['x']
         y = inputs['y']
 
-        outputs['f_xy'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
+        outputs['f_xy'] = (x - 3.0)**2 + x * y + (y + 4.0)**2 - 3.0
 
 
 if __name__ == "__main__":
@@ -48,4 +48,4 @@ if __name__ == "__main__":
     prob.set_val('parab_comp.y', -2.0)
 
     prob.run_model()
-    print(prob['parab_comp.f_xy'])
+    print(prob.get_val('parab_comp.f_xy'))
