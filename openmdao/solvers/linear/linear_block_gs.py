@@ -19,14 +19,14 @@ class LinearBlockGS(BlockLinearSolver):
         vec_names = self._vec_names
 
         if mode == 'fwd':
-            for isub, (subsys, local) in enumerate(system._all_subsystem_iter()):
+            for isub, subsys in enumerate(system._subsystems_allprocs):
                 if self._rel_systems is not None and subsys.pathname not in self._rel_systems:
                     continue
                 for vec_name in vec_names:
                     # must always do the transfer on all procs even if subsys not local
                     system._transfer(vec_name, mode, isub)
 
-                if not local:
+                if not subsys._is_local:
                     continue
 
                 scope_out, scope_in = system._get_scope(subsys)
@@ -46,7 +46,7 @@ class LinearBlockGS(BlockLinearSolver):
                 if self._rel_systems is not None and subsys.pathname not in self._rel_systems:
                     continue
 
-                if subsys.name in system._loc_subsys_map:  # subsys is local
+                if subsys._is_local:
                     for vec_name in vec_names:
                         if vec_name in subsys._rel_vec_names:
                             b_vec = system._vectors['output'][vec_name]

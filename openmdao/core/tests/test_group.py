@@ -2635,6 +2635,7 @@ class TestNaturalNaming(unittest.TestCase):
             self.assertEqual(p[name], 9.)
 
 
+@unittest.skipIf(True, 'temporary skip')    # skip this for now...  #FIXME
 class TestNaturalNamingMPI(unittest.TestCase):
     N_PROCS = 2
 
@@ -2654,13 +2655,13 @@ class TestNaturalNamingMPI(unittest.TestCase):
         g4 = g3.add_subsystem('g4', om.Group(), promotes=['*'])
         c1 = g4.add_subsystem('c1', om.ExecComp('y=2.0*x', x=7., y=9.), promotes=['x','y'])
 
-        import wingdbstub
-        
+        # import wingdbstub
+
         p.setup()
 
         #from openmdao.devtools.debug import trace_mpi
         #trace_mpi()
-        
+
         for gtop in ['par.g1', 'par.g1a']:
             full_in = f'{gtop}.g2.g3.g4.c1.x'
             full_out = f'{gtop}.g2.g3.g4.c1.y'

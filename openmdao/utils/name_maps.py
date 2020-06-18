@@ -162,7 +162,7 @@ def name2abs_name(system, name):
         return abs_name
 
 
-def name2abs_names(system, name, include_buried_promotes=True):
+def name2abs_names(system, name, include_buried_promotes=True, get_remote=False):
     """
     Map the given promoted, relative, or absolute name to any matching absolute names.
 
@@ -176,6 +176,8 @@ def name2abs_names(system, name, include_buried_promotes=True):
         Promoted or relative variable name in the owning system's namespace.
     include_buried_promotes : bool
         If True, also include buried promoted names in the search.
+    get_remote : bool
+        If True, retrieve names from out-of-process systems.
 
     Returns
     -------
@@ -205,12 +207,12 @@ def name2abs_names(system, name, include_buried_promotes=True):
 
     if include_buried_promotes:
         # haven't found it yet.  Try looking for buried promotes
-        return _find_buried_promoted_name(system, name)
+        return _find_buried_promoted_name(system, name, get_remote)
 
     return ()
 
 
-def _find_buried_promoted_name(system, name):
+def _find_buried_promoted_name(system, name, get_remote=False):
     """
     Convert given buried promoted name to absolute.
 
@@ -231,9 +233,12 @@ def _find_buried_promoted_name(system, name):
         sysname, vname = name.rsplit('.', 1)
         s = system._get_subsystem(sysname)
         if s is not None and s._is_local:
-            names = name2abs_names(s, vname, include_buried_promotes=False)
+            names = name2abs_names(s, vname, include_buried_promotes=False, get_remote=get_remote)
 
-        if system.comm.size > 1:
+        if not get_remote:
+            return names
+
+        if system.comm.size > 1 and s.pathname in system._problem_meta['remote_systems']:
             all_names = system.comm.gather(names, root=0)
             if system.comm.rank == 0:
                 for lst in all_names:

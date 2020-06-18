@@ -2575,20 +2575,6 @@ class System(object):
                 for sub in s.system_iter(recurse=True, typ=typ):
                     yield sub
 
-    def _all_subsystem_iter(self):
-        """
-        Yield a generator of subsystems along with their local status.
-
-        Yields
-        ------
-        System
-            Current subsystem.
-        bool
-            True if current subsystem is local.
-        """
-        for isub, subsys in enumerate(self._subsystems_allprocs):
-            yield subsys, subsys.name in self._loc_subsys_map
-
     def add_design_var(self, name, lower=None, upper=None, ref=None, ref0=None, indices=None,
                        adder=None, scaler=None, units=None,
                        parallel_deriv_color=None, vectorize_derivs=False,
@@ -4240,6 +4226,7 @@ class System(object):
 
         if get_remote and self.comm.size > 1:
             owner = self._owning_rank[abs_name]
+            myrank = self.comm.rank
             if rank is None:   # bcast
                 if distrib:
                     idx = self._var_allprocs_abs2idx[vec_name][abs_name]
@@ -4247,7 +4234,7 @@ class System(object):
                     # TODO: could cache these offsets
                     offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
                     offsets[1:] = np.cumsum(sizes[:-1])
-                    loc_val = val if val is not _undefined else np.zeros(sizes[idx])
+                    loc_val = val if val is not _undefined else np.zeros(sizes[myrank])
                     val = np.zeros(np.sum(sizes))
                     self.comm.Allgatherv(loc_val, [val, sizes, offsets, MPI.DOUBLE])
                 else:

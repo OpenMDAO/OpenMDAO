@@ -689,11 +689,10 @@ class NonlinearSolver(Solver):
         Perform a Gauss-Seidel iteration over this Solver's subsystems.
         """
         system = self._system()
-        for isub, (subsys, local) in enumerate(system._all_subsystem_iter()):
+        for isub, subsys in enumerate(system._subsystems_allprocs):
             system._transfer('nonlinear', 'fwd', isub)
 
-            if local:
-
+            if subsys._is_local:
                 try:
                     subsys._solve_nonlinear()
                 except AnalysisError as err:

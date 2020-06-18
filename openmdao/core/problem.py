@@ -286,7 +286,7 @@ class Problem(object):
         # variable exists, but may be remote
         return abs_name in self.model._var_abs2meta
 
-    def _get_cached_val(self, name):
+    def _get_cached_val(self, name, get_remote=False):
         # We have set and cached already
         if name in self._initial_condition_cache:
             return self._initial_condition_cache[name]
@@ -300,7 +300,7 @@ class Problem(object):
             except AttributeError:
                 conns = {}
 
-            abs_names = name2abs_names(self.model, name)
+            abs_names = name2abs_names(self.model, name, get_remote=get_remote)
             if not abs_names:
                 raise KeyError('{}: Variable "{}" not found.'.format(self.model.msginfo, name))
 
@@ -363,7 +363,7 @@ class Problem(object):
             The value of the requested output/input variable.
         """
         if self._setup_status == 1:
-            val = self._get_cached_val(name)
+            val = self._get_cached_val(name, get_remote=get_remote)
             if val is not _undefined:
                 if indices is not None:
                     val = val[indices]
