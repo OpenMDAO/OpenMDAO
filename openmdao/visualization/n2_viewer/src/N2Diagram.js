@@ -718,6 +718,9 @@ class N2Diagram {
      * @param {number} height The new height in pixels.
      */
     verticalResize(height) {
+        // Don't resize if the height didn't actually change:
+        if (this.dims.size.partitionTree.height == height) return;
+
         if (!this.manuallyResized) {
             height = this.layout.calcFitDims().height;
         }
@@ -847,23 +850,25 @@ class N2Diagram {
 
     /**
      * Recurse through the model, and determine whether a group/component is
-     * minimized or an input/output hidden. If it is, add it to the hiddenList
-     * array, and optionally reset its state.
+     * minimized or manually expanded, or an input/output hidden. If it is,
+     * add it to the hiddenList array, and optionally reset its state.
      * @param {Object[]} hiddenList The provided array to populate.
      * @param {Boolean} reveal If true, make the node visible.
      * @param {N2TreeNode} node The current node to operate on.
      */
     findAllHidden(hiddenList, reveal = false, node = this.model.root) {
-        if (!node.isVisible()) {
+        if (!node.isVisible() || node.manuallyExpanded) {
             hiddenList.push({
                 'node': node,
                 'isMinimized': node.isMinimized,
-                'varIsHidden': node.varIsHidden
+                'varIsHidden': node.varIsHidden,
+                'manuallyExpanded': node.manuallyExpanded
             })
 
             if (reveal) {
                 node.isMinimized = false;
                 node.varIsHidden = false;
+                node.manuallyExpanded = false;
             }
         }
 
@@ -887,10 +892,12 @@ class N2Diagram {
         if (!foundEntry) { // Not found, reset values to default
             node.isMinimized = false;
             node.varIsHidden = false;
+            node.manuallyExpanded = false;
         }
         else { // Found, restore values
             node.isMinimized = foundEntry.isMinimized;
             node.varIsHidden = foundEntry.varIsHidden;
+            node.manuallyExpanded = foundEntry.manuallyExpanded;
         }
 
         if (node.hasChildren()) {
@@ -898,5 +905,83 @@ class N2Diagram {
                 this.resetAllHidden(hiddenList, child);
             }
         }
+    }
+
+    /** Unset all manually-selected node states and zoom to the root element */
+    reset() {
+        this.resetAllHidden([]);
+        this.updateZoomedElement(this.model.root);
+        N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
+        this.update();
+    }
+
+    /**
+     * Set the node as not minimized and manually expanded, as well as
+     * all children.
+     * @param {N2TreeNode} startNode The node to begin from.
+     */
+    manuallyExpandAll(startNode) {
+        startNode.isMinimized = false;
+        startNode.manuallyExpanded = true;
+
+        if (startNode.hasChildren()) {
+            for (let child of startNode.children) {
+                this.manuallyExpandAll(child);
+            }
+        }
+    }
+
+    /**
+     * Set all the children of the specified node as minimized and not manually expanded.
+     * @param {N2TreeNode} startNode The node to begin from.
+     * @param {Boolean} [initialNode = true] Indicate the starting node.
+     */
+    minimizeAll(startNode, initialNode = true) {
+        if (! initialNode) {
+            startNode.isMinimized = true;
+            startNode.manuallyExpanded = false;
+        }
+
+        if (startNode.hasChildren()) {
+            for (let child of startNode.children) {
+                this.minimizeAll(child, false);
+            }
+        }
+    }
+
+    /**
+     * Recursively minimize non-parameter nodes to the specified depth.
+     * @param {N2TreeNode} node The node to work on.
+     */
+    _minimizeToDepth(node) {
+        if (node.isParamOrUnknown()) {
+            return;
+        }
+
+        if (node.depth < this.chosenCollapseDepth) {
+            node.isMinimized = false;
+            node.manuallyExpanded = true;
+        }
+        else {
+            node.isMinimized = true;
+            node.manuallyExpanded = false;
+        }
+
+        if (node.hasChildren()) {
+            for (let child of node.children) {
+                this._minimizeToDepth(child);
+            }
+        }
+    }
+
+    /**
+     * Set the new depth to collapse to and perform the operation.
+     * @param {Number} depth If the node's depth is the same or more, collapse it.
+     */
+    minimizeToDepth(depth) {
+        this.chosenCollapseDepth = depth;
+
+        if (this.chosenCollapseDepth > this.zoomedElement.depth)
+            this._minimizeToDepth(this.model.root);
     }
 }

@@ -18,8 +18,7 @@ class N2Layout {
      * @param {boolean} showLinearSolverNames Whether to show linear or non-linear solver names.
      * @param {Object} dims The initial sizes for multiple tree elements.
      */
-    constructor(model, newZoomedElement,
-        showLinearSolverNames, dims) {
+    constructor(model, newZoomedElement, showLinearSolverNames, dims) {
         this.model = model;
 
         this.zoomedElement = newZoomedElement;
@@ -36,6 +35,10 @@ class N2Layout {
         this.size = dims.size;
         this.svg = d3.select("#svgId");
 
+        startTimer('N2Layout._computeLeaves');
+        this._computeLeaves();
+        stopTimer('N2Layout._computeLeaves');
+
         this._setupTextRenderer();
         startTimer('N2Layout._updateTextWidths');
         this._updateTextWidths();
@@ -45,10 +48,6 @@ class N2Layout {
         this._updateSolverTextWidths();
         stopTimer('N2Layout._updateSolverTextWidths');
         delete (this.textRenderer);
-
-        startTimer('N2Layout._computeLeaves');
-        this._computeLeaves();
-        stopTimer('N2Layout._computeLeaves');
 
         startTimer('N2Layout._computeColumnWidths');
         this._computeColumnWidths();
@@ -198,7 +197,7 @@ class N2Layout {
         node.nameWidthPx = this._getTextWidth(this.getText(node)) + 2 *
             this.size.rightTextMargin;
 
-        if (node.hasChildren()) {
+        if (node.hasChildren() && !node.isMinimized) {
             for (let child of node.children) {
                 this._updateTextWidths(child);
             }
@@ -217,7 +216,7 @@ class N2Layout {
         node.nameSolverWidthPx = this._getTextWidth(this.getSolverText(node)) + 2 *
             this.size.rightTextMargin;
 
-        if (node.hasChildren()) {
+        if (node.hasChildren() && !node.isMinimized) {
             for (let child of node.children) {
                 this._updateSolverTextWidths(child);
             }
@@ -225,22 +224,24 @@ class N2Layout {
     }
 
     /** Recurse through the tree and add up the number of leaves that each
-     * node has, based on their array of children.
+     * node has, based on their array of visible children.
      * @param {N2TreeNode} [node = this.model.root] The starting node.
      */
     _computeLeaves(node = this.model.root) {
-        if (node.varIsHidden) {
-            node.numLeaves = 0;
-        }
-        else if (node.hasChildren() && !node.isMinimized) {
-            node.numLeaves = 0;
-            for (let child of node.children) {
-                this._computeLeaves(child);
-                node.numLeaves += child.numLeaves;
+        node.numLeaves = 0;
+
+        if (! node.varIsHidden) {
+            if (this.model.idCounter > ALLOW_PRECOLLAPSE_COUNT) node.minimizeIfLarge();
+
+            if (node.hasChildren() && !node.isMinimized) {
+                for (let child of node.children) {
+                    this._computeLeaves(child);
+                    node.numLeaves += child.numLeaves;
+                }
             }
-        }
-        else {
-            node.numLeaves = 1;
+            else {
+                node.numLeaves = 1;
+            }
         }
     }
 
