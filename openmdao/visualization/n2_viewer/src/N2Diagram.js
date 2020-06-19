@@ -914,4 +914,38 @@ class N2Diagram {
         N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
         this.update();
     }
+
+    /**
+     * Set the node as not minimized and manually expanded, as well as
+     * all children.
+     * @param {N2TreeNode} startNode The node to begin from.
+     */
+    manuallyExpandAll(startNode) {
+        startNode.isMinimized = false;
+        startNode.manuallyExpanded = true;
+
+        if (startNode.hasChildren()) {
+            for (let child of startNode.children) {
+                this.manuallyExpandAll(child);
+            }
+        }
+    }
+
+    /**
+     * Set all the children of the specified node as minimized and not manually expanded.
+     * @param {N2TreeNode} startNode The node to begin from.
+     * @param {Boolean} [initialNode = true] Indicate the starting node.
+     */
+    minimizeAll(startNode, initialNode = true) {
+        if (! initialNode) {
+            startNode.isMinimized = true;
+            startNode.manuallyExpanded = false;
+        }
+
+        if (startNode.hasChildren()) {
+            for (let child of startNode.children) {
+                this.minimizeAll(child, false);
+            }
+        }
+    }
 }

@@ -742,6 +742,32 @@ class N2UserInterface {
         this.n2Diag.update();
     }
 
+    /** Any collapsed nodes are expanded, starting with the specified node. */
+    expandAll(startNode) {
+        testThis(this, 'N2UserInterface', 'expandAll');
+
+        this.addBackButtonHistory();
+        this.n2Diag.manuallyExpandAll(startNode);
+
+        this.findRootOfChangeFunction = this.findRootOfChangeForCollapseUncollapseOutputs;
+        N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
+        this.lastClickWasLeft = false;
+        this.n2Diag.update();
+    }
+
+    /** All nodes are collapsed, starting with the specified node. */
+    collapseAll(startNode) {
+        testThis(this, 'N2UserInterface', 'collapseAll');
+
+        this.addBackButtonHistory();
+        this.n2Diag.minimizeAll(startNode);
+
+        this.findRootOfChangeFunction = this.findRootOfChangeForCollapseUncollapseOutputs;
+        N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
+        this.lastClickWasLeft = false;
+        this.n2Diag.update();
+    }
+
     /**
      * Recursively minimize non-parameter nodes to the specified depth.
      * @param {N2TreeNode} node The node to work on.
