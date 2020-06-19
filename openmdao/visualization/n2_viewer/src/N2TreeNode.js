@@ -72,7 +72,7 @@ class N2TreeNode {
     }
 
     /** Run when a node is restored. */
-    unminimize() {
+    expand() {
         this.isMinimized = false;
     }
 

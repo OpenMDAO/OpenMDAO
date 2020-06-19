@@ -500,6 +500,8 @@ class N2UserInterface {
         if (!node.hasChildren() || node.isParam()) return;
         if (d3.event.button != 0) return;
         this.addBackButtonHistory();
+        node.expand();
+        node.manuallyExpanded = true;
         this._setupLeftClick(node);
 
         this.n2Diag.update();
@@ -716,7 +718,7 @@ class N2UserInterface {
      * @param {N2TreeNode} node The node to operate on.
      */
     _uncollapse(node) {
-        node.unminimize();
+        node.expand();
         node.varIsHidden = false;
 
         if (node.hasChildren()) {
@@ -769,25 +771,6 @@ class N2UserInterface {
     }
 
     /**
-     * Recursively minimize non-parameter nodes to the specified depth.
-     * @param {N2TreeNode} node The node to work on.
-     * @param {Number} depth If the node's depth is the same or more, collapse it.
-     */
-    _collapseToDepth(node, depth) {
-        if (node.isParamOrUnknown()) {
-            return;
-        }
-
-        node.isMinimized = node.depth < depth ? false : true;
-
-        if (node.hasChildren()) {
-            for (let child of node.children) {
-                this._collapseToDepth(child, depth);
-            }
-        }
-    }
-
-    /**
      * React to a new selection in the collapse-to-depth drop-down.
      * @param {Number} newChosenCollapseDepth Selected depth to collapse to.
      */
@@ -795,13 +778,7 @@ class N2UserInterface {
         testThis(this, 'N2UserInterface', 'collapseToDepthSelectChange');
 
         this.addBackButtonHistory();
-        this.n2Diag.chosenCollapseDepth = newChosenCollapseDepth;
-        if (this.n2Diag.chosenCollapseDepth > this.n2Diag.zoomedElement.depth) {
-            this._collapseToDepth(
-                this.n2Diag.model.root,
-                this.n2Diag.chosenCollapseDepth
-            );
-        }
+        this.n2Diag.minimizeToDepth(newChosenCollapseDepth);
         this.findRootOfChangeFunction = this.findRootOfChangeForCollapseDepth.bind(
             this
         );
@@ -843,6 +820,7 @@ class N2UserInterface {
             this.legend.hidden ? 'fas icon-key' : 'fas icon-key active-tab-icon');
     }
 
+    /** Show or hide the node info panel button */
     toggleNodeData() {
         testThis(this, 'N2UserInterface', 'toggleNodeData');
 

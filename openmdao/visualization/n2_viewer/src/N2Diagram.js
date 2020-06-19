@@ -948,4 +948,40 @@ class N2Diagram {
             }
         }
     }
+
+    /**
+     * Recursively minimize non-parameter nodes to the specified depth.
+     * @param {N2TreeNode} node The node to work on.
+     */
+    _minimizeToDepth(node) {
+        if (node.isParamOrUnknown()) {
+            return;
+        }
+
+        if (node.depth < this.chosenCollapseDepth) {
+            node.isMinimized = false;
+            node.manuallyExpanded = true;
+        }
+        else {
+            node.isMinimized = true;
+            node.manuallyExpanded = false;
+        }
+
+        if (node.hasChildren()) {
+            for (let child of node.children) {
+                this._minimizeToDepth(child);
+            }
+        }
+    }
+
+    /**
+     * Set the new depth to collapse to and perform the operation.
+     * @param {Number} depth If the node's depth is the same or more, collapse it.
+     */
+    minimizeToDepth(depth) {
+        this.chosenCollapseDepth = depth;
+
+        if (this.chosenCollapseDepth > this.zoomedElement.depth)
+            this._minimizeToDepth(this.model.root);
+    }
 }
