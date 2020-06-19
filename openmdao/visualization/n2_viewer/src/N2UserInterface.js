@@ -672,9 +672,13 @@ class N2UserInterface {
     homeButtonClick() {
         testThis(this, 'N2UserInterface', 'homeButtonClick');
 
+        this.leftClickedNode = this.n2Diag.model.root;
+        this.lastClickWasLeft = true;
+        this.leftClickIsForward = false;
+        this.findRootOfChangeFunction = this.findRootOfChangeForCollapseUncollapseOutputs;
         this.addBackButtonHistory();
-        this._setupLeftClick(this.n2Diag.model.root);
-        this.uncollapseButtonClick(this.n2Diag.model.root);
+
+        this.n2Diag.reset();
     }
 
     /**

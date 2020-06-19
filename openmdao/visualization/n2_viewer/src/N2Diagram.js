@@ -850,23 +850,25 @@ class N2Diagram {
 
     /**
      * Recurse through the model, and determine whether a group/component is
-     * minimized or an input/output hidden. If it is, add it to the hiddenList
-     * array, and optionally reset its state.
+     * minimized or manually expanded, or an input/output hidden. If it is,
+     * add it to the hiddenList array, and optionally reset its state.
      * @param {Object[]} hiddenList The provided array to populate.
      * @param {Boolean} reveal If true, make the node visible.
      * @param {N2TreeNode} node The current node to operate on.
      */
     findAllHidden(hiddenList, reveal = false, node = this.model.root) {
-        if (!node.isVisible()) {
+        if (!node.isVisible() || node.manuallyExpanded) {
             hiddenList.push({
                 'node': node,
                 'isMinimized': node.isMinimized,
-                'varIsHidden': node.varIsHidden
+                'varIsHidden': node.varIsHidden,
+                'manuallyExpanded': node.manuallyExpanded
             })
 
             if (reveal) {
                 node.isMinimized = false;
                 node.varIsHidden = false;
+                node.manuallyExpanded = false;
             }
         }
 
@@ -890,10 +892,12 @@ class N2Diagram {
         if (!foundEntry) { // Not found, reset values to default
             node.isMinimized = false;
             node.varIsHidden = false;
+            node.manuallyExpanded = false;
         }
         else { // Found, restore values
             node.isMinimized = foundEntry.isMinimized;
             node.varIsHidden = foundEntry.varIsHidden;
+            node.manuallyExpanded = foundEntry.manuallyExpanded;
         }
 
         if (node.hasChildren()) {
@@ -901,5 +905,13 @@ class N2Diagram {
                 this.resetAllHidden(hiddenList, child);
             }
         }
+    }
+
+    /** Unset all manually-selected node states and zoom to the root element */
+    reset() {
+        this.resetAllHidden([]);
+        this.updateZoomedElement(this.model.root);
+        N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
+        this.update();
     }
 }
