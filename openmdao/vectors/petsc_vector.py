@@ -40,7 +40,7 @@ class PETScVector(DefaultVector):
     TRANSFER = PETScTransfer
     cite = CITATION
 
-    def __init__(self, name, kind, system, root_vector=None, resize=False, alloc_complex=False,
+    def __init__(self, name, kind, system, root_vector=None, alloc_complex=False,
                  ncol=1, relevant=None):
         """
         Initialize all attributes.
@@ -55,8 +55,6 @@ class PETScVector(DefaultVector):
             Pointer to the owning system.
         root_vector : <Vector>
             Pointer to the vector owned by the root system.
-        resize : bool
-            If true, resize the root vector.
         alloc_complex : bool
             Whether to allocate any imaginary storage to perform complex step. Default is False.
         ncol : int
@@ -66,7 +64,7 @@ class PETScVector(DefaultVector):
             and dependent systems.
         """
         super(PETScVector, self).__init__(name, kind, system, root_vector=root_vector,
-                                          resize=resize, alloc_complex=alloc_complex, ncol=ncol,
+                                          alloc_complex=alloc_complex, ncol=ncol,
                                           relevant=relevant)
 
         self._dup_inds = None

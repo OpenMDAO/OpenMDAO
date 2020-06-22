@@ -29,6 +29,15 @@ NewtonSolver Options
     NewtonSolver
     options
 
+NewtonSolver Constructor
+------------------------
+
+The call signature for the `NewtonSolver` constructor is:
+
+.. automethod:: openmdao.solvers.nonlinear.newton.NewtonSolver.__init__
+    :noindex:
+
+
 NewtonSolver Option Examples
 ----------------------------
 

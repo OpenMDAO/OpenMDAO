@@ -759,7 +759,7 @@ class Problem(object):
 
         model_comm = self.driver._setup_comm(comm)
 
-        model._setup(model_comm, 'full', mode, distributed_vector_class, local_vector_class,
+        model._setup(model_comm, mode, distributed_vector_class, local_vector_class,
                      derivatives, self.options)
 
         # Cache all args for final setup.
@@ -793,7 +793,7 @@ class Problem(object):
             mode = self._orig_mode
 
         if self._setup_status < 2:
-            self.model._final_setup(self.comm, 'full',
+            self.model._final_setup(self.comm,
                                     force_alloc_complex=self._force_alloc_complex)
 
         driver._setup_driver(self)

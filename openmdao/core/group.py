@@ -324,7 +324,7 @@ class Group(System):
 
         self.configure()
 
-    def _setup_procs(self, pathname, comm, mode, setup_mode, prob_options):
+    def _setup_procs(self, pathname, comm, mode, prob_options):
         """
         Execute first phase of the setup process.
 
@@ -340,8 +340,6 @@ class Group(System):
         mode : string
             Derivatives calculation mode, 'fwd' for forward, and 'rev' for
             reverse (adjoint). Default is 'rev'.
-        setup_mode : string
-            What type of setup this is, one of ['full', 'reconf', 'update'].
         prob_options : OptionsDictionary
             Problem level options.
         """
@@ -353,9 +351,7 @@ class Group(System):
 
         self._setup_procs_finished = False
 
-        # TODO: get rid of this after we remove reconfig.
-        if setup_mode == 'full':
-            self._vectors = {}
+        self._vectors = {}
 
         if self._num_par_fd > 1:
             info = self._coloring_info
@@ -448,7 +444,7 @@ class Group(System):
             subsys._use_derivatives = self._use_derivatives
             subsys._solver_info = self._solver_info
             subsys._recording_iter = self._recording_iter
-            subsys._setup_procs(subsys.pathname, sub_comm, mode, setup_mode, prob_options)
+            subsys._setup_procs(subsys.pathname, sub_comm, mode, prob_options)
 
         # build a list of local subgroups to speed up later loops
         self._subgroups_myproc = [s for s in self._subsystems_myproc if isinstance(s, Group)]
@@ -465,41 +461,6 @@ class Group(System):
             subsys._configure_check()
 
         super(Group, self)._configure_check()
-
-    def _check_child_reconf(self, subsys=None):
-        """
-        Check if any subsystem has reconfigured and if so, perform the necessary update setup.
-
-        Parameters
-        ----------
-        subsys : System or None
-            If not None, check only if the given subsystem has reconfigured.
-        """
-        if subsys is None:
-            # See if any local subsystem has reconfigured
-            for subsys in self._subgroups_myproc:
-                if subsys._reconfigured:
-                    reconf = 1
-                    break
-            else:
-                reconf = 0
-        else:
-            reconf = int(subsys._reconfigured) if subsys.name in self._loc_subsys_map else 0
-
-        # See if any subsystem on this or any other processor has configured
-        if self.comm.size > 1:
-            reconf = self.comm.allreduce(reconf) > 0
-
-        if reconf:
-            # Perform an update setup
-            with self._unscaled_context_all():
-                self.resetup('update')
-
-            # Reset the _reconfigured attribute to False
-            for subsys in self._subsystems_myproc:
-                subsys._reconfigured = False
-
-            self._reconfigured = True
 
     def _list_states(self):
         """
@@ -534,14 +495,9 @@ class Group(System):
         else:
             return self._list_states()
 
-    def _setup_var_index_ranges(self, recurse=True):
+    def _setup_var_index_ranges(self):
         """
         Compute the division of variables by subsystem.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         nsub_allprocs = len(self._subsystems_allprocs)
 
@@ -592,21 +548,14 @@ class Group(System):
         if self._use_derivatives:
             subsystems_var_range['nonlinear'] = subsystems_var_range['linear']
 
-        self._setup_var_index_maps(recurse=recurse)
+        self._setup_var_index_maps()
 
-        # Recursion
-        if recurse:
-            for subsys in self._subsystems_myproc:
-                subsys._setup_var_index_ranges(recurse)
+        for subsys in self._subsystems_myproc:
+            subsys._setup_var_index_ranges()
 
-    def _setup_var_data(self, recurse=True):
+    def _setup_var_data(self):
         """
         Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         super(Group, self)._setup_var_data()
 
@@ -632,10 +581,9 @@ class Group(System):
             meta['path'] = self.pathname  # used for error reporting
 
         for subsys in self._subsystems_myproc:
-            if recurse:
-                subsys._setup_var_data(recurse)
-                self._has_output_scaling |= subsys._has_output_scaling
-                self._has_resid_scaling |= subsys._has_resid_scaling
+            subsys._setup_var_data()
+            self._has_output_scaling |= subsys._has_output_scaling
+            self._has_resid_scaling |= subsys._has_resid_scaling
 
             var_maps = subsys._get_maps(subsys._var_allprocs_prom2abs_list)
 
@@ -773,14 +721,9 @@ class Group(System):
         else:
             self._discrete_inputs = self._discrete_outputs = ()
 
-    def _setup_var_sizes(self, recurse=True):
+    def _setup_var_sizes(self):
         """
         Compute the arrays of local variable sizes for all variables/procs on this system.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         super(Group, self)._setup_var_sizes()
 
@@ -792,9 +735,8 @@ class Group(System):
         subsystems_proc_range = self._subsystems_proc_range
 
         # Recursion
-        if recurse:
-            for subsys in self._subsystems_myproc:
-                subsys._setup_var_sizes(recurse)
+        for subsys in self._subsystems_myproc:
+            subsys._setup_var_sizes()
 
         sizes = self._var_sizes
         relnames = self._var_allprocs_relevant_names
@@ -894,7 +836,7 @@ class Group(System):
         if self.comm.size > 1:
             self._setup_global_shapes()
 
-    def _setup_global_connections(self, recurse=True, conns=None):
+    def _setup_global_connections(self, conns=None):
         """
         Compute dict of all connections between this system's inputs and outputs.
 
@@ -906,8 +848,6 @@ class Group(System):
 
         Parameters
         ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         conns : dict
             Dictionary of connections passed down from parent group.
         """
@@ -1052,17 +992,15 @@ class Group(System):
                     new_conns[inparts[nparts]][abs_in] = abs_out
 
         # Recursion
-        if recurse:
-            distcomps = []
-            for subsys in self._subsystems_myproc:
-                if isinstance(subsys, Group):
-                    if subsys.name in new_conns:
-                        subsys._setup_global_connections(recurse=recurse,
-                                                         conns=new_conns[subsys.name])
-                    else:
-                        subsys._setup_global_connections(recurse=recurse)
-                elif subsys.options['distributed'] and subsys.comm.size > 1:
-                    distcomps.append(subsys)
+        distcomps = []
+        for subsys in self._subsystems_myproc:
+            if isinstance(subsys, Group):
+                if subsys.name in new_conns:
+                    subsys._setup_global_connections(conns=new_conns[subsys.name])
+                else:
+                    subsys._setup_global_connections()
+            elif subsys.options['distributed'] and subsys.comm.size > 1:
+                distcomps.append(subsys)
 
         # Compute global_abs_in2out by first adding this group's contributions,
         # then adding contributions from systems above/below, then allgathering.
@@ -1102,18 +1040,12 @@ class Group(System):
             for myproc_global_abs_in2out in gathered:
                 global_abs_in2out.update(myproc_global_abs_in2out)
 
-            if recurse:
-                for comp in distcomps:
-                    comp._update_dist_src_indices(global_abs_in2out)
+            for comp in distcomps:
+                comp._update_dist_src_indices(global_abs_in2out)
 
-    def _setup_connections(self, recurse=True):
+    def _setup_connections(self):
         """
         Compute dict of all connections owned by this Group.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         abs_in2out = self._conn_abs_in2out = {}
         global_abs_in2out = self._conn_global_abs_in2out
@@ -1122,9 +1054,8 @@ class Group(System):
         allprocs_discrete_out = self._var_allprocs_discrete['output']
 
         # Recursion
-        if recurse:
-            for subsys in self._subsystems_myproc:
-                subsys._setup_connections(recurse)
+        for subsys in self._subsystems_myproc:
+            subsys._setup_connections()
 
         if MPI:
             # collect set of local (not remote, not distributed) subsystems so we can
@@ -1482,68 +1413,13 @@ class Group(System):
                                 src_val = self._loc_subsys_map[src_sys_name]._discrete_outputs[src]
                             tgt_sys._discrete_inputs[tgt] = src_val
 
-    def _setup_global(self, ext_num_vars, ext_sizes):
-        """
-        Compute total number and total size of variables in systems before / after this system.
-
-        Parameters
-        ----------
-        ext_num_vars : {'input': (int, int), 'output': (int, int)}
-            Total number of allprocs variables in system before/after this one.
-        ext_sizes : {'input': (int, int), 'output': (int, int)}
-            Total size of local variables in system before/after this one.
-        """
-        super(Group, self)._setup_global(ext_num_vars, ext_sizes)
-
-        iproc = self.comm.rank
-        relnames = self._var_allprocs_relevant_names
-
-        for subsys in self._subsystems_myproc:
-            sub_ext_num_vars = {}
-            sub_ext_sizes = {}
-
-            if subsys._use_derivatives:
-                vec_names = subsys._lin_rel_vec_name_list
-            else:
-                vec_names = subsys._vec_names
-
-            for vec_name in vec_names:
-                subsystems_var_range = self._subsystems_var_range[vec_name]
-                sizes = self._var_sizes[vec_name]
-
-                sub_ext_num_vars[vec_name] = {}
-                sub_ext_sizes[vec_name] = {}
-
-                for type_ in ['input', 'output']:
-                    idx1, idx2 = subsystems_var_range[type_][subsys.name]
-
-                    sub_ext_num_vars[vec_name][type_] = (
-                        ext_num_vars[vec_name][type_][0] + idx1,
-                        ext_num_vars[vec_name][type_][1] + len(relnames[vec_name][type_]) - idx2,
-                    )
-                    sub_ext_sizes[vec_name][type_] = (
-                        ext_sizes[vec_name][type_][0] + np.sum(sizes[type_][iproc, :idx1]),
-                        ext_sizes[vec_name][type_][1] + np.sum(sizes[type_][iproc, idx2:]),
-                    )
-
-            if subsys._use_derivatives:
-                sub_ext_num_vars['nonlinear'] = sub_ext_num_vars['linear']
-                sub_ext_sizes['nonlinear'] = sub_ext_sizes['linear']
-
-            subsys._setup_global(sub_ext_num_vars, sub_ext_sizes)
-
-    def _setup_transfers(self, recurse=True):
+    def _setup_transfers(self):
         """
         Compute all transfers that are owned by this system.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         """
-        self._vector_class.TRANSFER._setup_transfers(self, recurse=recurse)
+        self._vector_class.TRANSFER._setup_transfers(self)
         if self._conn_discrete_in2out:
-            self._vector_class.TRANSFER._setup_discrete_transfers(self, recurse=recurse)
+            self._vector_class.TRANSFER._setup_discrete_transfers(self)
 
     def promotes(self, subsys_name, any=None, inputs=None, outputs=None,
                  src_indices=None, flat_src_indices=None):
@@ -1878,8 +1754,6 @@ class Group(System):
         """
         Compute outputs. The model is assumed to be in a scaled state.
         """
-        super(Group, self)._solve_nonlinear()
-
         name = self.pathname if self.pathname else 'root'
 
         with Recording(name + '._solve_nonlinear', self.iter_count, self):
@@ -2159,21 +2033,15 @@ class Group(System):
         self._owns_approx_jac = True
         self._owns_approx_jac_meta = kwargs
 
-    def _setup_partials(self, recurse=True):
+    def _setup_partials(self):
         """
         Call setup_partials in components.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         self._subjacs_info = info = {}
 
-        if recurse:
-            for subsys in self._subsystems_myproc:
-                subsys._setup_partials(recurse)
-                info.update(subsys._subjacs_info)
+        for subsys in self._subsystems_myproc:
+            subsys._setup_partials()
+            info.update(subsys._subjacs_info)
 
         if self._has_distrib_vars and self._owns_approx_jac:
             # We current cannot approximate across a group with a distributed component if the

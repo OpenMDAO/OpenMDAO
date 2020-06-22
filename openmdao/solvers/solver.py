@@ -688,8 +688,6 @@ class NonlinearSolver(Solver):
                             self.options['reraise_child_analysiserror']:
                         raise err
 
-            system._check_child_reconf(subsys)
-
 
 class LinearSolver(Solver):
     """

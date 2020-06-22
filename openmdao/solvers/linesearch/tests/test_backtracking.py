@@ -122,6 +122,44 @@ class TestArmejoGoldsteinBounds(unittest.TestCase):
         self.assertGreaterEqual(top['comp.z'], 2.5)
         self.assertLessEqual(top['comp.z'], 2.5)
 
+    def test_bound_enforce_print_bug(self):
+        # Error during print if bound was one-sided.
+
+        class OneSidedBounds(ImplCompTwoStatesArrays):
+
+            def setup(self):
+                self.add_input('x', np.zeros((3, 1)))
+                self.add_output('y', np.zeros((3, 1)))
+                self.add_output('z', 2.0*np.ones((3, 1)),
+                    upper=np.array([2.6, 2.5, 2.65]).reshape((3,1)))
+
+                self.maxiter = 10
+                self.atol = 1.0e-12
+
+                self.declare_partials(of='*', wrt='*')
+
+        top = om.Problem()
+        top.model.add_subsystem('px', om.IndepVarComp('x', np.ones((3, 1))))
+        top.model.add_subsystem('comp', OneSidedBounds())
+        top.model.connect('px.x', 'comp.x')
+
+        newt = top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        top.model.nonlinear_solver.options['maxiter'] = 2
+        top.model.linear_solver = om.ScipyKrylov()
+
+        ls = newt.linesearch = om.ArmijoGoldsteinLS()
+        ls.options['print_bound_enforce'] = True
+
+        top.set_solver_print(level=2)
+        top.setup()
+
+        top['px.x'] = 2.0
+        top['comp.y'] = 0.
+        top['comp.z'] = 1.6
+
+        # Should run without an exception being raised.
+        top.run_model()
+
 
 class ParaboloidAE(om.ExplicitComponent):
     """ Evaluates the equation f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3
