@@ -488,6 +488,10 @@ class Driver(object):
         distributed_vars = self._distributed_resp
         indices = meta['indices']
 
+        ivc_source = meta.get('ivc_source')
+        if ivc_source is not None:
+            name = ivc_source
+
         if MPI:
             distributed = comm.size > 0 and name in distributed_vars
         else:

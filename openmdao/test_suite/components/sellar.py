@@ -337,8 +337,8 @@ class SellarDerivativesGrouped(om.Group):
                              desc='Iteration limit for linear solver.')
 
     def setup(self):
-        self.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
-        self.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+        self.set_input_defaults('x', 1.0)
+        self.set_input_defaults('z', np.array([5.0, 2.0]))
 
         self.mda = mda = self.add_subsystem('mda', om.Group(), promotes=['x', 'z', 'y1', 'y2'])
         mda.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])

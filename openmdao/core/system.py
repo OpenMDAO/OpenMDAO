@@ -3066,10 +3066,20 @@ class System(object):
         try:
             for name, data in self._design_vars.items():
                 if name in pro2abs_out:
-                    out[pro2abs_out[name][0]] = data
+
+                    # This is an output name, most likely a manual indepvarcomp.
+                    abs_name = pro2abs_out[name][0]
+                    out[abs_name] = data
+                    out[abs_name]['ivc_source'] = None
+
                 else:  # assume an input name else KeyError
+
+                    # Design variable on an auto_ivc input, so use connected output name.
                     in_abs = pro2abs_in[name][0]
-                    out[conns[in_abs]] = data  # use connected output name
+                    ivc_path = conns[in_abs]
+                    out[name] = data
+                    out[name]['ivc_source'] = ivc_path
+
         except KeyError as err:
             msg = "{}: Output not found for design variable {}."
             raise RuntimeError(msg.format(self.msginfo, str(err)))

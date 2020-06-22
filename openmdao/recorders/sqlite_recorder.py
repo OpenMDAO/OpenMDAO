@@ -344,6 +344,11 @@ class SqliteRecorder(CaseRecorder):
 
             for var_set, var_type in full_var_set:
                 for name in var_set:
+
+                    if var_type == 'desvar':
+                        if var_set[name]['ivc_source'] is not None:
+                            name = var_set[name]['ivc_source']
+
                     if name not in self._abs2meta:
                         try:
                             self._abs2meta[name] = real_meta[name].copy()
