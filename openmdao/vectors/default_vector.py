@@ -32,30 +32,6 @@ class DefaultVector(Vector):
         size = np.sum(self._system()._var_sizes[self._name][self._typ][self._iproc, :])
         return np.zeros(size) if ncol == 1 else np.zeros((size, ncol))
 
-    def _update_root_data(self):
-        """
-        Resize the root data if necesary (i.e., due to reconfiguration).
-        """
-        system = self._system()
-        type_ = self._typ
-        vec_name = self._name
-        root_vec = self._root_vector
-
-        sys_offset, size_after_sys = system._ext_sizes[vec_name][type_]
-        sys_size = np.sum(system._var_sizes[vec_name][type_][self._iproc, :])
-        old_sizes_total = root_vec._data.size
-
-        root_vec._data = np.concatenate([
-            root_vec._data[:sys_offset],
-            np.zeros(sys_size),
-            root_vec._data[old_sizes_total - size_after_sys:],
-        ])
-
-        if self._alloc_complex and root_vec._cplx_data.size != root_vec._data.size:
-            root_vec._cplx_data = np.zeros(root_vec._data.size, dtype=complex)
-
-        root_vec._initialize_views()
-
     def _extract_root_data(self):
         """
         Extract views of arrays from root_vector.
@@ -66,6 +42,9 @@ class DefaultVector(Vector):
             zeros array of correct size.
         """
         system = self._system()
+        type_ = self._typ
+        iproc = self._iproc
+        ncol = self._ncol
         root_vec = self._root_vector
 
         cplx_data = None
@@ -74,24 +53,29 @@ class DefaultVector(Vector):
             scaling['phys'] = {}
             scaling['norm'] = {}
 
-        sizes = system._var_sizes[self._name][self._typ]
-        ind1 = system._ext_sizes[self._name][self._typ][0]
-        ind2 = ind1 + np.sum(sizes[self._iproc, :])
+        slices = root_vec.get_slice_dict()
 
-        data = root_vec._data[ind1:ind2]
+        sizes = system._var_sizes[self._name][type_]
+        mynames = system._var_relevant_names[self._name][type_]
+        if mynames:
+            myslice = slice(slices[mynames[0]].start // ncol, slices[mynames[-1]].stop // ncol)
+        else:
+            myslice = slice(0, 0)
+
+        data = root_vec._data[myslice]
 
         # Extract view for complex storage too.
         if self._alloc_complex:
-            cplx_data = root_vec._cplx_data[ind1:ind2]
+            cplx_data = root_vec._cplx_data[myslice]
 
         if self._do_scaling:
             for typ in ('phys', 'norm'):
                 root_scale = root_vec._scaling[typ]
                 rs0 = root_scale[0]
                 if rs0 is None:
-                    scaling[typ] = (rs0, root_scale[1][ind1:ind2])
+                    scaling[typ] = (rs0, root_scale[1][myslice])
                 else:
-                    scaling[typ] = (rs0[ind1:ind2], root_scale[1][ind1:ind2])
+                    scaling[typ] = (rs0[myslice], root_scale[1][myslice])
 
         return data, cplx_data, scaling
 

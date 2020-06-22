@@ -165,8 +165,6 @@ class TestParallelGroups(unittest.TestCase):
         par.add_subsystem('C1', om.ExecComp('y = 2.5 * x'), promotes=['x'])
         par.add_subsystem('C2', om.ExecComp('y = 7 * x'), promotes=['x'])
 
-        # import wingdbstub
-
         model.add_design_var('x')
 
         model.add_constraint('par.C1.y', upper=0.0, parallel_deriv_color='parc')

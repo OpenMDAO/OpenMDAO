@@ -25,6 +25,15 @@ LinearBlockJac Options
     LinearBlockJac
     options
 
+LinearBlockJac Constructor
+--------------------------
+
+The call signature for the `LinearBlockJac` constructor is:
+
+.. automethod:: openmdao.solvers.linear.linear_block_jac.LinearBlockJac.__init__
+    :noindex:
+
+
 LinearBlockJac Option Examples
 ------------------------------
 

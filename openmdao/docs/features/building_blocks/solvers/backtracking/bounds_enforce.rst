@@ -21,6 +21,14 @@ BoundsEnforceLS Options
     BoundsEnforceLS
     options
 
+BoundsEnforceLS Constructor
+-------------------------------
+
+The call signature for the `BoundsEnforceLS` constructor is:
+
+.. automethod:: openmdao.solvers.linesearch.backtracking.BoundsEnforceLS.__init__
+    :noindex:
+
 
 BoundsEnforceLS Option Examples
 -------------------------------

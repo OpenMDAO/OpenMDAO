@@ -31,4 +31,13 @@ LinearRunOnce Options
     LinearRunOnce
     options
 
+LinearRunOnce Constructor
+-------------------------
+
+The call signature for the `LinearRunOnce` constructor is:
+
+.. automethod:: openmdao.solvers.linear.linear_runonce.LinearRunOnce.__init__
+    :noindex:
+
+
 .. tags:: Solver, LinearSolver

@@ -131,14 +131,9 @@ class MetaModelStructuredComp(ExplicitComponent):
             super(MetaModelStructuredComp, self).add_input("%s_train" % name,
                                                            val=training_data, **kwargs)
 
-    def _setup_var_data(self, recurse=True):
+    def _setup_var_data(self):
         """
         Instantiate surrogates for the output variables that use the default surrogate.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         interp_method = self.options['method']
 
@@ -153,18 +148,13 @@ class MetaModelStructuredComp(ExplicitComponent):
         if self.options['training_data_gradients']:
             self.grad_shape = tuple([self.options['vec_size']] + [i.size for i in self.params])
 
-        super(MetaModelStructuredComp, self)._setup_var_data(recurse=recurse)
+        super(MetaModelStructuredComp, self)._setup_var_data()
 
-    def _setup_partials(self, recurse=True):
+    def _setup_partials(self):
         """
         Process all partials and approximations that the user declared.
 
         Metamodel needs to declare its partials after inputs and outputs are known.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         super(MetaModelStructuredComp, self)._setup_partials()
         arange = np.arange(self.options['vec_size'])

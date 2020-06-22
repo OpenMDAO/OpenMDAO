@@ -115,15 +115,24 @@
                         <clipPath id="solverTreeClip">
                             <rect id="solver-clip-rect" x="0" y="0" width="1200" height="600" />
                         </clipPath>
+                        <g id='matrix-connector-arrow' width='10' height='10'>
+                            <path d='M0,3 h2 q5,0 5,5 h1 l-3,2 l-3,-2 h1 q0,-1 -1,-1 h-2 z'></path>
+                        </g>
+                        <g id='matrix-connector-square' width='10' height='10'>
+                            <rect x='2' y='2' width='6' height='6'></rect>
+                        </g>
                     </defs>
+                    <g id='tree' clip-path='url(#partitionTreeClip)'></g>
+                    <g id='highlight-bar'></g>
+                    <g id='solver_tree' clip-path='url(#solverTreeClip)'></g>
                     <g id='n2outer'>
                         <g id='n2inner'>
                             <rect id='backgroundRect' class='background'></rect>
-                            <g id='n2elements' clip-path='url(#n2MatrixClip)'></g>
+                            <g id='n2background' clip-path='url(#n2MatrixClip)'></g>
                             <g id='n2gridlines' clip-path='url(#n2MatrixClip)'></g>
+                            <g id='n2elements' clip-path='url(#n2MatrixClip)'></g>
                             <g id='n2componentBoxes' clip-path='url(#n2MatrixClip)'></g>
                             <g id='n2dots' clip-path='url(#n2MatrixClip)'></g>
-                            <g id='n2highlights'></g>
                             <g id='n2arrows'></g>
                         </g>
                         <g id='n2top' class='offgridLabel'></g>
@@ -131,8 +140,9 @@
                         <g id='n2right' class='offgridLabel'></g>
                         <g id='n2bottom' class='offgridLabel'></g>
                     </g>
-                    <g id='tree' clip-path='url(#partitionTreeClip)'></g>
-                    <g id='solver_tree' clip-path='url(#solverTreeClip)'></g>
+                    <g id='text-width-renderer' class='partition_group'>
+                        <text x='-200'></text>
+                    </g>
                 </svg>
                 <div id='n2-resizer-box' class='inactive-resizer-box'>
                     <p id='n2-resizer-handle' class='inactive-resizer-handle'></p>
@@ -196,7 +206,8 @@
     </div>
 </div>
 
-<table id="node-info-container" class='info-hidden' cellpadding='0' cellspacing='0'>
+<div id="node-info-container" class='info-hidden'>
+<table id="node-info-table" cellpadding='0' cellspacing='0'>
     <thead>
         <tr>
             <th scope='col' colspan='2'>Name</th>
@@ -209,6 +220,8 @@
         </tr>
     </tfoot>
 </table>
+<p id='node-info-pin' class='info-hidden'>&#x1F4CC;</p>
+</div>
 
 <div class="tool-tip" style="position: absolute; visibility: hidden;"></div>
 <div id="top" class="offgrid" style="visibility: hidden;"></div>

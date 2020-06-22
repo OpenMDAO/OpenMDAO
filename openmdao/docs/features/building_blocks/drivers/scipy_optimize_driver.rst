@@ -20,6 +20,15 @@ ScipyOptimizeDriver Options
     ScipyOptimizeDriver
     options
 
+ScipyOptimizeDriver Constructor
+-------------------------------
+
+The call signature for the `ScipyOptimizeDriver` constructor is:
+
+.. automethod:: openmdao.drivers.scipy_optimizer.ScipyOptimizeDriver.__init__
+    :noindex:
+
+
 ScipyOptimizeDriver Option Examples
 -----------------------------------
 

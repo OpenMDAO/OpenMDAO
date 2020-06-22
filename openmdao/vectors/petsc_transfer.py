@@ -53,7 +53,7 @@ class PETScTransfer(DefaultTransfer):
             self._transfer = self._multi_transfer
 
     @staticmethod
-    def _setup_transfers(group, recurse=True):
+    def _setup_transfers(group):
         """
         Compute all transfers that are owned by our parent group.
 
@@ -61,14 +61,11 @@ class PETScTransfer(DefaultTransfer):
         ----------
         group : <Group>
             Parent group.
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         rev = group._mode != 'fwd'
 
-        if recurse:
-            for subsys in group._subgroups_myproc:
-                subsys._setup_transfers(recurse)
+        for subsys in group._subgroups_myproc:
+            subsys._setup_transfers()
 
         abs2meta = group._var_abs2meta
         allprocs_abs2meta = group._var_allprocs_abs2meta

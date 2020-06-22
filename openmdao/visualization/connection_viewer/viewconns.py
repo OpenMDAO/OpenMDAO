@@ -3,7 +3,6 @@
 import os
 import sys
 import json
-import contextlib
 from itertools import chain
 from collections import defaultdict
 

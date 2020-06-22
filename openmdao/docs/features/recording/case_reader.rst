@@ -10,6 +10,14 @@ Currently, OpenMDAO only supports the :code:`SqliteCaseRecorder` case
 recorder. Therefore, all the examples will
 make use of this recorder. OpenMDAO will support other case recorders in the future.
 
+CaseReader Constructor
+----------------------
+
+The call signature for the `CaseReader` constructor is:
+
+.. automethod:: openmdao.recorders.sqlite_reader.SqliteCaseReader.__init__
+    :noindex:
+
 Determining What Sources and Variables Were Recorded
 ----------------------------------------------------
 

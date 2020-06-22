@@ -310,3 +310,15 @@ div.offgrid {
     margin-top: -15px;
     pointer-events: none;
 }
+
+rect.diagHighlight {
+    fill: black !important;
+}
+
+rect.inputHighlight {
+    fill: salmon !important;
+}
+
+rect.outputHighlight {
+    fill: seagreen !important;
+}

@@ -847,7 +847,7 @@ class Problem(object):
             'remote_vars': {},  # does not include distrib vars
             'prom2abs': {'input': {}, 'output': {}}  # includes ALL promotes including buried ones
         }
-        model._setup(model_comm, 'full', mode, self._metadata)
+        model._setup(model_comm, mode, self._metadata)
 
         # Cache all args for final setup.
         self._check = check
@@ -879,7 +879,7 @@ class Problem(object):
             mode = self._orig_mode
 
         if self._setup_status < 2:
-            self.model._final_setup(self.comm, 'full')
+            self.model._final_setup(self.comm)
 
         driver._setup_driver(self)
 

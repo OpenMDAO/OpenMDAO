@@ -124,7 +124,7 @@ class Component(System):
         """
         pass
 
-    def _setup_procs(self, pathname, comm, mode, setup_mode, prob_meta):
+    def _setup_procs(self, pathname, comm, mode, prob_meta):
         """
         Execute first phase of the setup process.
 
@@ -139,16 +139,12 @@ class Component(System):
         mode : str
             Derivatives calculation mode, 'fwd' for forward, and 'rev' for
             reverse (adjoint). Default is 'rev'.
-        setup_mode : str
-            What type of setup this is, one of ['full', 'reconf', 'update'].
         prob_meta : dict
             Problem level metadata.
         """
-        super(Component, self)._setup_procs(pathname, comm, mode, setup_mode, prob_meta)
+        super(Component, self)._setup_procs(pathname, comm, mode, prob_meta)
 
-        # TODO: get rid of this after we remove reconfig.
-        if setup_mode == 'full':
-            self._vectors = {}
+        self._vectors = {}
 
         orig_comm = comm
         if self._num_par_fd > 1:
@@ -218,14 +214,9 @@ class Component(System):
 
         super(Component, self)._configure_check()
 
-    def _setup_var_data(self, recurse=True):
+    def _setup_var_data(self):
         """
         Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         global global_meta_names
         super(Component, self)._setup_var_data()
@@ -252,7 +243,7 @@ class Component(System):
                 allprocs_abs_names[type_].append(abs_name)
 
                 # Compute allprocs_prom2abs_list, abs2prom
-                allprocs_prom2abs_list[type_][prom_name] = alst = [abs_name]
+                allprocs_prom2abs_list[type_][prom_name] = [abs_name]
                 abs2prom[type_][abs_name] = prom_name
 
                 # Compute allprocs_abs2meta
@@ -274,7 +265,7 @@ class Component(System):
                 allprocs_abs_names_discrete[type_].append(abs_name)
 
                 # Compute allprocs_prom2abs_list, abs2prom
-                allprocs_prom2abs_list[type_][prom_name] = alst = [abs_name]
+                allprocs_prom2abs_list[type_][prom_name] = [abs_name]
                 abs2prom[type_][abs_name] = prom_name
 
                 # Compute allprocs_discrete (metadata for discrete vars)
@@ -292,14 +283,9 @@ class Component(System):
         else:
             self._discrete_inputs = self._discrete_outputs = ()
 
-    def _setup_var_sizes(self, recurse=True):
+    def _setup_var_sizes(self):
         """
         Compute the arrays of local variable sizes for all variables/procs on this system.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         super(Component, self)._setup_var_sizes()
 
@@ -352,14 +338,9 @@ class Component(System):
 
         self._setup_global_shapes()
 
-    def _setup_partials(self, recurse=True):
+    def _setup_partials(self):
         """
         Process all partials and approximations that the user declared.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         self._subjacs_info = {}
         self._jacobian = DictionaryJacobian(system=self)
