@@ -2635,7 +2635,7 @@ class TestNaturalNaming(unittest.TestCase):
             self.assertEqual(p[name], 9.)
 
 
-@unittest.skipIf(True, 'temporary skip')    # skip this for now...  #FIXME
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestNaturalNamingMPI(unittest.TestCase):
     N_PROCS = 2
 

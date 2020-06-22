@@ -1,11 +1,15 @@
 /******************* Node Data styling *******************/
 #node-info-container {
-	position: absolute;
+    position: absolute;
+    z-index: 10;
+    height: auto;
+}
+
+#node-info-table {
 	overflow: hidden;
 	background-color: white;
 	border-radius: 10px;
 	border: 1px solid #a0a0a0;
-	z-index: 10;
     transition: opacity 0.25s;
     box-shadow: 3px 3px 3px 1px rgba(0, 0, 0, 0.2);
     min-width: 200px;
@@ -21,14 +25,14 @@
     visibility: visible;
 }
 
-#node-info-container thead th {
+#node-info-table thead th {
     background-color: #42926b;
     color: black;
     padding: 5px;
     font-size: 11pt;
 }
 
-#node-info-container tbody th {
+#node-info-table tbody th {
     text-align: right;
     font-size: 9pt;
     margin-top: 0;
@@ -39,7 +43,7 @@
     white-space: nowrap;
 }
 
-#node-info-container tbody td {
+#node-info-table tbody td {
     text-align: left;
     font-size: 9pt;
     margin-top: 0;
@@ -51,7 +55,7 @@
     white-space: nowrap;
 }
 
-#node-info-container tfoot th {
+#node-info-table tfoot th {
     background-color: #42926b;
     padding: 2px;
     font-size: 11pt;
@@ -70,25 +74,29 @@
 	text-align: center;
 }
 
-.node-data-container {
-	width: 100%;
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-}
-
-.node-data {
-	display: flex;
-	justify-content: space-between;
-	font-size: 13px;
-	align-self: center;
-}
-
-.node-data p:first-child {
-	font-weight: 600;
-}
-
 .node-data-cursor {
     cursor: context-menu;
 }
 
+#node-info-pin {
+    position: absolute;
+    top: 5px;
+    right: 8px;
+    cursor: pointer;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    font-size: 12px;
+    background: #ccc;
+    width: 18px;
+    height: 18px;
+    padding: 0 2px 0 2px;
+    /* box-shadow: 1px 1px 1px 1px rgba(0, 0, 0, 0.2); */
+    border-radius: 3px;
+}
+
+#node-info-pin:hover {
+    top: 4px;
+    right: 9px;
+    box-shadow: 1px 1px 1px 1px rgba(0, 0, 0, 0.2);
+}

@@ -26,4 +26,13 @@ DirectSolver Options
     DirectSolver
     options
 
+DirectSolver Constructor
+------------------------
+
+The call signature for the `DirectSolver` constructor is:
+
+.. automethod:: openmdao.solvers.linear.direct.DirectSolver.__init__
+    :noindex:
+
+
 .. tags:: Solver, LinearSolver

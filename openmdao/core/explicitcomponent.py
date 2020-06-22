@@ -63,8 +63,8 @@ class ExplicitComponent(Component):
         tuple(list, list)
             'of' and 'wrt' variable lists.
         """
-        of = list(self._var_allprocs_prom2abs_list['output'])
-        wrt = list(self._var_allprocs_prom2abs_list['input'])
+        of = list(self._var_rel_names['output'])
+        wrt = list(self._var_rel_names['input'])
         return of, wrt
 
     def _get_partials_var_sizes(self):
@@ -102,14 +102,9 @@ class ExplicitComponent(Component):
                 yield wrt, offset, end, _full_slice
                 offset = end
 
-    def _setup_partials(self, recurse=True):
+    def _setup_partials(self):
         """
         Call setup_partials in components.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         super(ExplicitComponent, self)._setup_partials()
 
@@ -253,8 +248,6 @@ class ExplicitComponent(Component):
         """
         Compute outputs. The model is assumed to be in a scaled state.
         """
-        super(ExplicitComponent, self)._solve_nonlinear()
-
         with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
             with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
                 self._residuals.set_const(0.0)

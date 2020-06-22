@@ -500,6 +500,8 @@ def all_ancestors(pathname, delim='.'):
     """
     Return a generator of pathnames of the starting object and all of its parents.
 
+    Pathnames are ordered from longest to shortest.
+
     Parameters
     ----------
     pathname : str
@@ -508,8 +510,7 @@ def all_ancestors(pathname, delim='.'):
         Delimiter used to split the name
     """
     parts = pathname.split(delim)
-    yield parts[0]
-    for i in range(2, len(parts) + 1):
+    for i in range(len(parts), 0, -1):
         yield delim.join(parts[:i])
 
 

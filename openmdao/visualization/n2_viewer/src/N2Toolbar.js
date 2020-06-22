@@ -231,33 +231,33 @@ class N2Toolbar {
 
         new N2ToolbarButtonClick('#collapse-element', tooltipBox,
             "Control variable collapsing",
-            e => { n2ui.collapseOutputsButtonClick(n2ui.n2Diag.zoomedElement) });
+            e => { n2ui.collapseAll(n2ui.n2Diag.zoomedElement) });
 
         new N2ToolbarButtonClick('#collapse-element-2', tooltipBox,
             "Collapse only variables in current view",
             function (target) {
-                n2ui.collapseOutputsButtonClick(n2ui.n2Diag.zoomedElement);
+                n2ui.collapseAll(n2ui.n2Diag.zoomedElement);
                 self._setRootButton(target);
             });
 
         new N2ToolbarButtonClick('#collapse-all', tooltipBox,
             "Collapse all variables in entire model",
             function (target) {
-                n2ui.collapseOutputsButtonClick(n2ui.n2Diag.model.root);
+                n2ui.collapseAll(n2ui.n2Diag.model.root);
                 self._setRootButton(target);
             });
 
         new N2ToolbarButtonClick('#expand-element', tooltipBox,
             "Expand only variables in current view",
             function (target) {
-                n2ui.uncollapseButtonClick(n2ui.n2Diag.zoomedElement);
+                n2ui.expandAll(n2ui.n2Diag.zoomedElement);
                 self._setRootButton(target);
             });
 
         new N2ToolbarButtonClick('#expand-all', tooltipBox,
             "Expand all variables in entire model",
             function (target) {
-                n2ui.uncollapseButtonClick(n2ui.n2Diag.model.root);
+                n2ui.expandAll(n2ui.n2Diag.model.root);
                 self._setRootButton(target);
             });
 
@@ -311,7 +311,11 @@ class N2Toolbar {
         new N2ToolbarButtonToggle('#info-button', tooltipBox,
             ["Show detailed node information", "Hide detailed node information"],
             pred => { return n2ui.nodeInfoBox.hidden; },
-            e => { n2ui.nodeInfoBox.toggle(); }
+            e => {
+                n2ui.nodeInfoBox.unpin();
+                n2ui.nodeInfoBox.clear();
+                n2ui.nodeInfoBox.toggle();
+            }
         );
 
         new N2ToolbarButtonToggle('#question-button', tooltipBox,

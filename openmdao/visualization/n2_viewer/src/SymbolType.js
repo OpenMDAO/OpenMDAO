@@ -41,7 +41,7 @@ class SymbolType {
                 return;
             }
 
-            throw ("Unknown symbol type for cell on diagonal.");
+            throw ("Unknown symbol type '" + cell.srcObj.type + "' for cell on diagonal.");
         }
 
         if (cell.srcObj.isSubsystem()) {

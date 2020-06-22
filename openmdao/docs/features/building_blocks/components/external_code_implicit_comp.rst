@@ -24,6 +24,14 @@ to let the external program solve its own states. This is optional, but you shou
 solve itself, and if you want it to do so (for example, while using a Newton solver with "solve_subsystems" turned
 on in a higher-level `Group`.)
 
+ExternalCodeImplicitComp Constructor
+------------------------------------
+
+The call signature for the `ExternalCodeImplicitComp` constructor is:
+
+.. automethod:: openmdao.components.external_code_comp.ExternalCodeImplicitComp.__init__
+    :noindex:
+
 ExternalCodeImplicitComp Example
 --------------------------------
 

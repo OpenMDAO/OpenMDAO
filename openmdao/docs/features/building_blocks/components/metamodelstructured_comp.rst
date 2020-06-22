@@ -76,6 +76,15 @@ MetaModelStructuredComp Options
     MetaModelStructuredComp
     options
 
+MetaModelStructuredComp Constructor
+-----------------------------------
+
+The call signature for the `MetaModelStructuredComp` constructor is:
+
+.. automethod:: openmdao.components.meta_model_structured_comp.MetaModelStructuredComp.__init__
+    :noindex:
+
+
 MetaModelStructuredComp Examples
 --------------------------------
 

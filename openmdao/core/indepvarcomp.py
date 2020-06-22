@@ -202,7 +202,7 @@ class _AutoIndepVarComp(IndepVarComp):
 
         super(_AutoIndepVarComp, self)._set_vector_class()
 
-    def _setup_var_data(self, recurse=True):
+    def _setup_var_data(self):
         """
         Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
 
@@ -211,7 +211,7 @@ class _AutoIndepVarComp(IndepVarComp):
         recurse : bool (ignored)
             Whether to call this method in subsystems.
         """
-        super(_AutoIndepVarComp, self)._setup_var_data(recurse)
+        super(_AutoIndepVarComp, self)._setup_var_data()
         if self.comm.size > 1:
             all_abs2meta = self._var_allprocs_abs2meta
             abs2meta = self._var_abs2meta

@@ -193,6 +193,7 @@ class N2Matrix {
 
         if (this.tooMuchDetail()) return;
 
+        if (this.diagNodes[0].type == 'root') console.log(this.diagNodes)
         for (let srcIdx = 0; srcIdx < this.diagNodes.length; ++srcIdx) {
             let diagNode = this.diagNodes[srcIdx];
 
@@ -212,7 +213,7 @@ class N2Matrix {
                     this._addCell(srcIdx, tgtIdx, newCell);
                 }
                 // Make sure tgt isn't descendant of zoomedElement, otherwise it's
-                // visiable at least as a collapsed node
+                // visible at least as a collapsed node
                 else if (tgt.isConnectable() && !this.layout.zoomedElement.hasNode(tgt)) {
                     newDiagCell.addOffScreenConn(diagNode, tgt);
                 }
@@ -308,26 +309,6 @@ class N2Matrix {
     }
 
     /**
-     * Draw a rectangle at the specified locate to bring attention to
-     * a variable name.
-     * @param {Number} x Upper-left corner X-coordinate in px.
-     * @param {Number} y Upper-left corner Y-coordinate in px.
-     * @param {Number} width Rectangle width in px.
-     * @param {Number} height Rectangle height in px.
-     * @param {string} fill Fill color.
-     */
-    highlight(x, y, width, height, fill) {
-        this.n2Groups.highlights.insert("rect")
-            .attr("class", "n2_hover_elements")
-            .attr("y", y)
-            .attr("x", x)
-            .attr("width", width)
-            .attr("height", height)
-            .attr("fill", fill)
-            .attr("fill-opacity", "1");
-    }
-
-    /**
      * Create an SVG group for each visible element, and have the element
      * render its shape in it. Move the groups around to their correct
      * positions, providing an animated transition from the previous
@@ -344,13 +325,15 @@ class N2Matrix {
             .attr('class', 'n2cell')
             .attr('transform', function (d) {
                 if (self.lastClickWasLeft) {
-                    return 'translate(' +
+                    let tranStr = 'translate(' +
                         (self.prevCellDims.size.width *
                             (d.col - enterIndex) +
                             self.prevCellDims.bottomRight.x) + ',' +
                         (self.prevCellDims.size.height *
                             (d.row - enterIndex) +
                             self.prevCellDims.bottomRight.y) + ')';
+
+                    return tranStr;
                 }
 
                 let roc = (d.obj && self.findRootOfChangeFunction) ?
@@ -359,10 +342,12 @@ class N2Matrix {
                 if (roc) {
                     let prevIdx = roc.prevRootIndex -
                         self.layout.zoomedElement.prevRootIndex;
-                    return 'translate(' + (self.prevCellDims.size.width * prevIdx +
+                    let tranStr = 'translate(' + (self.prevCellDims.size.width * prevIdx +
                         self.prevCellDims.bottomRight.x) + ',' +
                         (self.prevCellDims.size.height * prevIdx +
                             self.prevCellDims.bottomRight.y) + ')';
+
+                    return tranStr;
                 }
                 throw ('Enter transform not found');
             })
@@ -378,10 +363,12 @@ class N2Matrix {
         gEnter.merge(selection)
             .transition(sharedTransition)
             .attr('transform', function (d) {
-                return 'translate(' + (self.cellDims.size.width * d.col +
+                let tranStr = 'translate(' + (self.cellDims.size.width * d.col +
                     self.cellDims.bottomRight.x) + ',' +
                     (self.cellDims.size.height * d.row +
                         self.cellDims.bottomRight.y) + ')';
+
+                return(tranStr);
             })
             // "this" refers to the element here, so leave it alone:
             .each(function (d) {
@@ -391,11 +378,13 @@ class N2Matrix {
         selection.exit()
             .transition(sharedTransition)
             .attr('transform', function (d) {
-                if (self.lastClickWasLeft)
-                    return 'translate(' + (self.cellDims.size.width *
+                if (self.lastClickWasLeft) {
+                    let tranStr = 'translate(' + (self.cellDims.size.width *
                         (d.col - exitIndex) + self.cellDims.bottomRight.x) + ',' +
                         (self.cellDims.size.height * (d.row - exitIndex) +
                             self.cellDims.bottomRight.y) + ')';
+                    return tranStr;
+                }
 
                 let roc = (d.obj && self.findRootOfChangeFunction) ?
                     self.findRootOfChangeFunction(d.obj) : null;
@@ -649,9 +638,7 @@ class N2Matrix {
 
         let leftTextWidthHovered = this.diagNodes[cell.row].nameWidthPx;
 
-        this.highlight(-leftTextWidthHovered - this.layout.size.partitionTreeGap,
-            this.nodeSize.height * cell.row, leftTextWidthHovered,
-            this.nodeSize.height, N2Style.color.highlightHovered); //highlight hovered
+        cell.highlight();
 
         this._drawOffscreenArrows(cell, lineWidth);
 
@@ -674,10 +661,7 @@ class N2Matrix {
                         'width': lineWidth
                     }, this.n2Groups, this.nodeSize);
 
-                    //highlight var name
-                    this.highlight(-leftTextWidthDependency - this.layout.size.partitionTreeGap,
-                        this.nodeSize.height * col, leftTextWidthDependency,
-                        this.nodeSize.height, N2Style.color.greenArrow);
+                    this.cell(cell.row, col).highlight('target', 'output');
                 }
 
             }
@@ -699,12 +683,8 @@ class N2Matrix {
                         'width': lineWidth
                     }, this.n2Groups, this.nodeSize);
 
-                    //highlight var name
-                    this.highlight(-leftTextWidthDependency - this.layout.size.partitionTreeGap,
-                        this.nodeSize.height * col, leftTextWidthDependency,
-                        this.nodeSize.height, N2Style.color.redArrow);
+                    this.cell(col, cell.row).highlight('source', 'input');
                 }
-
             }
         }
     }
@@ -819,17 +799,7 @@ class N2Matrix {
             }
         }
 
-        let leftTextWidthR = this.layout.visibleNodes[cell.row].nameWidthPx,
-            leftTextWidthC = this.layout.visibleNodes[cell.col].nameWidthPx;
-
-        // highlight var name
-        this.highlight(-leftTextWidthR - this.layout.size.partitionTreeGap,
-            this.nodeSize.height * cell.row, leftTextWidthR, this.nodeSize.height,
-            N2Style.color.redArrow);
-
-        // highlight var name
-        this.highlight(-leftTextWidthC - this.layout.size.partitionTreeGap,
-            this.nodeSize.height * cell.col, leftTextWidthC, this.nodeSize.height,
-            N2Style.color.greenArrow);
+        cell.highlight('source', 'input');
+        cell.highlight('target', 'output');
     }
 }
