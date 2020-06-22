@@ -228,7 +228,8 @@ N2Style.color = {
     'redArrow': 'salmon',
     'input': 'salmon',
     'greenArrow': 'seagreen',
-    'output': 'seagreen'
+    'output': 'seagreen',
+    'declaredPartial': 'black'
 };
 
 Object.freeze(N2Style.color); // Make it the equivalent of a constant

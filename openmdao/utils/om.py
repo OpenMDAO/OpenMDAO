@@ -64,9 +64,6 @@ def _n2_setup_parser(parser):
                         help="create embeddable version.")
     parser.add_argument('--title', default=None,
                         action='store', dest='title', help='diagram title.')
-    parser.add_argument('--use_declare_partial_info', action='store_true',
-                        dest='use_declare_partial_info',
-                        help="use declare partial info for internal connectivity.")
 
 
 def _n2_cmd(options, user_args):
@@ -89,8 +86,7 @@ def _n2_cmd(options, user_args):
 
         def _viewmod(prob):
             n2(prob, outfile=options.outfile, show_browser=not options.no_browser,
-               title=options.title, embeddable=options.embeddable,
-               use_declare_partial_info=options.use_declare_partial_info)
+               title=options.title, embeddable=options.embeddable)
             exit()  # could make this command line selectable later
 
         hooks._register_hook('setup', 'Problem', pre=_noraise)
@@ -100,8 +96,7 @@ def _n2_cmd(options, user_args):
     else:
         # assume the file is a recording, run standalone
         n2(filename, outfile=options.outfile, title=options.title,
-           show_browser=not options.no_browser, embeddable=options.embeddable,
-           use_declare_partial_info=options.use_declare_partial_info)
+           show_browser=not options.no_browser, embeddable=options.embeddable)
 
 
 def _view_connections_setup_parser(parser):

@@ -304,7 +304,7 @@ def _get_viewer_data(data_source):
 
 
 def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
-       title=None, use_declare_partial_info=False):
+       title=None):
     """
     Generate an HTML file containing a tree viewer.
 
@@ -329,11 +329,6 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     title : str, optional
         The title for the diagram. Used in the HTML title.
 
-    use_declare_partial_info : bool, optional
-        If True, in the N2 matrix, component internal connectivity computed using derivative
-        declarations, otherwise, derivative declarations ignored, so dense component connectivity
-        is assumed.
-
     """
     # grab the model viewer data
     model_data = _get_viewer_data(data_source)
@@ -342,7 +337,7 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     if MPI and MPI.COMM_WORLD.rank != 0:
         return
 
-    options = {'use_declare_partial_info': use_declare_partial_info}
+    options = {}
     model_data['options'] = options
 
     model_data = 'var modelData = %s' % json.dumps(
