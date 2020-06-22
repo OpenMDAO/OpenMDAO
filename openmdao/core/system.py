@@ -479,16 +479,9 @@ class System(object):
         """
         pass
 
-    def _get_root_vectors(self, force_alloc_complex=False):
+    def _get_root_vectors(self):
         """
         Get the root vectors for the nonlinear and linear vectors for the model.
-
-        Parameters
-        ----------
-        force_alloc_complex : bool
-            Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
-            detect when you need to do this, but in some cases (e.g., complex step is used
-            after a reconfiguration) you may need to set this to True.
 
         Returns
         -------
@@ -504,6 +497,7 @@ class System(object):
         relevant = self._relevant
         vec_names = self._rel_vec_name_list if self._use_derivatives else self._vec_names
         vectorized_vois = self._problem_meta['vectorized_vois']
+        force_alloc_complex = self._problem_meta['force_alloc_complex']
         abs2idx = self._var_allprocs_abs2idx
 
         # Check for complex step to set vectors up appropriately.
@@ -653,8 +647,7 @@ class System(object):
         comm : MPI.Comm or <FakeComm> or None
             The global communicator.
         """
-        root_vectors = self._get_root_vectors(force_alloc_complex=self._force_alloc_complex)
-        self._setup_vectors(root_vectors)
+        self._setup_vectors(self._get_root_vectors())
 
         # Transfers do not require recursion, but they have to be set up after the vector setup.
         self._setup_transfers()
