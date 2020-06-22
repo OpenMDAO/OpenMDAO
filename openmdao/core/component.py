@@ -252,7 +252,7 @@ class Component(System):
                 allprocs_abs_names[type_].append(abs_name)
 
                 # Compute allprocs_prom2abs_list, abs2prom
-                allprocs_prom2abs_list[type_][prom_name] = [abs_name]
+                allprocs_prom2abs_list[type_][prom_name] = alst = [abs_name]
                 abs2prom[type_][abs_name] = prom_name
 
                 # Compute allprocs_abs2meta
@@ -274,7 +274,7 @@ class Component(System):
                 allprocs_abs_names_discrete[type_].append(abs_name)
 
                 # Compute allprocs_prom2abs_list, abs2prom
-                allprocs_prom2abs_list[type_][prom_name] = [abs_name]
+                allprocs_prom2abs_list[type_][prom_name] = alst = [abs_name]
                 abs2prom[type_][abs_name] = prom_name
 
                 # Compute allprocs_discrete (metadata for discrete vars)

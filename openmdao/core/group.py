@@ -515,16 +515,78 @@ class Group(System):
         else:
             return self._list_states()
 
+    def _get_all_promotes(self, remote_systems):
+        """
+        Create the top level mapping of all promoted names to absolute names.
+
+        This includes all buried promoted names.
+
+        Parameters
+        ----------
+        remote_systems : dict
+            Mapping of system pathname to owning rank.  Includes only systems that are
+            remote in at least one MPI process.
+
+        Returns
+        -------
+        dict
+            Mapping of all promoted names to absolute names.
+        """
+        myrank = self.comm.rank
+        mysys = set(n for n, rank in remote_systems.items() if rank == myrank)
+        iotypes = ('input', 'output')
+        if self.comm.size > 1:
+            prom2abs = {'input': defaultdict(set), 'output': defaultdict(set)}
+
+            for s in self.system_iter(recurse=True):
+                if s.pathname in mysys:  # we 'own' this system
+                    prefix = s.pathname + '.' if s.pathname else ''
+                    for typ in iotypes:
+                        # use abs2prom to determine locality since prom2abs is for allprocs
+                        sys_abs2prom = s._var_abs2prom[typ]
+                        t_prom2abs = prom2abs[typ]
+                        for prom, alist in s._var_allprocs_prom2abs_list[typ].items():
+                            t_prom2abs[prefix + prom].update(n for n in alist if n in sys_abs2prom)
+
+            all_proms = self.comm.gather(prom2abs, root=0)
+            if myrank == 0:
+                prom2abs = {'input': defaultdict(list), 'output': defaultdict(list)}
+                for typ in iotypes:
+                    t_prom2abs = prom2abs[typ]
+                    for rankproms in all_proms:
+                        for prom, absnames in rankproms[typ].items():
+                            t_prom2abs[prom].extend(absnames)
+
+                t_prom2abs = prom2abs['input']
+                for prom, absnames in t_prom2abs.items():
+                    t_prom2abs[prom] = sorted(absnames)  # sort to keep order the same on all procs
+
+                self.comm.bcast(prom2abs, root=0)
+            else:
+                prom2abs = self.comm.bcast(prom2abs, root=0)
+        else:  # serial
+            prom2abs = {'input': defaultdict(list), 'output': defaultdict(list)}
+            for s in self.system_iter(recurse=True):
+                prefix = s.pathname + '.' if s.pathname else ''
+                for typ in iotypes:
+                    t_prom2abs = prom2abs[typ]
+                    for prom, abslist in s._var_allprocs_prom2abs_list[typ].items():
+                        t_prom2abs[prefix + prom] = abslist
+
+        return prom2abs
+
     def _top_level_setup(self, setup_mode, mode):
         self._problem_meta['connections'] = conns = self._conn_global_abs_in2out
-        self._problem_meta['top_all_meta'] = abs2meta = self._var_allprocs_abs2meta
-        self._problem_meta['top_meta'] = self._var_abs2meta
+        self._problem_meta['all_meta'] = abs2meta = self._var_allprocs_abs2meta
+        self._problem_meta['meta'] = self._var_abs2meta
 
         if setup_mode == 'full':
-            self._problem_meta['remote_systems'] = self._find_remote_sys_owners()
+            self._problem_meta['remote_systems'] = rsystems = self._find_remote_sys_owners()
             self._problem_meta['remote_vars'] = \
                 self._find_remote_var_owners(self._problem_meta['remote_systems'])
+            self._problem_meta['prom2abs'] = self._get_all_promotes(rsystems)
             auto_ivc = self._setup_auto_ivcs(mode)
+
             self._check_prom_masking()
 
     def _check_prom_masking(self):
@@ -533,7 +595,7 @@ class Group(System):
         """
         prom2abs_in = self._var_allprocs_prom2abs_list['input']
         prom2abs_out = self._var_allprocs_prom2abs_list['output']
-        abs2meta = self._problem_meta['top_all_meta']
+        abs2meta = self._problem_meta['all_meta']
 
         for absname in abs2meta:
             if absname in prom2abs_in:
@@ -677,6 +739,7 @@ class Group(System):
         allprocs_abs2prom = self._var_allprocs_abs2prom
 
         allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
+        top_prom2abs = self._problem_meta['prom2abs']
 
         group_inputs = []
         for n, meta in self._group_inputs.items():
@@ -696,7 +759,6 @@ class Group(System):
 
             sub_prefix = subsys.name + '.'
 
-            seen = set()
             for type_ in ['input', 'output']:
                 # Assemble abs_names and allprocs_abs_names
                 allprocs_abs_names[type_].extend(
@@ -2415,7 +2477,6 @@ class Group(System):
         """
         self._jacobian = DictionaryJacobian(system=self)
 
-        pro2abs = self._var_allprocs_prom2abs_list
         abs2prom = self._var_allprocs_abs2prom
         abs2meta = self._var_allprocs_abs2meta
         abs_outs = self._var_allprocs_abs_names['output']
@@ -2574,11 +2635,15 @@ class Group(System):
             loc_sys = set(s.pathname for s in self.system_iter(recurse=True))
             # use the allprocs variable dicts to find any remote systems
             remote_sys = set()
+            seen = set()
             for typ in ('input', 'output'):
                 for abspath in self._var_allprocs_abs2prom[typ]:  # includes real and discrete vars
                     sname, vname = abspath.rsplit('.', 1)
-                    if sname not in loc_sys:
-                        remote_sys.add(sname)
+                    if sname not in seen:
+                        seen.add(sname)
+                        for path in all_ancestors(sname):
+                            if path not in loc_sys:
+                                remote_sys.add(path)
 
             # Find systems that are remote in at least one proc and the owning rank for each.
             gathered = self.comm.gather(remote_sys, root=0)

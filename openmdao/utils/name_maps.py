@@ -162,7 +162,7 @@ def name2abs_name(system, name):
         return abs_name
 
 
-def name2abs_names(system, name, include_buried_promotes=True, get_remote=False):
+def name2abs_names(system, name):
     """
     Map the given promoted, relative, or absolute name to any matching absolute names.
 
@@ -174,79 +174,39 @@ def name2abs_names(system, name, include_buried_promotes=True, get_remote=False)
         System to which name is relative.
     name : str
         Promoted or relative variable name in the owning system's namespace.
-    include_buried_promotes : bool
-        If True, also include buried promoted names in the search.
-    get_remote : bool
-        If True, retrieve names from out-of-process systems.
 
     Returns
     -------
     tuple or list of str
         Tuple or list of absolute variable names found.
     """
+    # first check relative promoted names
     if name in system._var_allprocs_prom2abs_list['output']:
         return system._var_allprocs_prom2abs_list['output'][name]
 
     if name in system._var_allprocs_prom2abs_list['input']:
         return system._var_allprocs_prom2abs_list['input'][name]
 
+    # then check absolute names
     if name in system._var_allprocs_abs2prom['output']:
         return (name,)
     if name in system._var_allprocs_abs2prom['input']:
         return (name,)
 
-    if system.pathname:
-        abs_name = f"{system.pathname}.{name}"
-    else:
-        abs_name = name
+    # then check global promoted names, including buried promotes
+    if name in system._problem_meta['prom2abs']['output']:
+        absnames = system._problem_meta['prom2abs']['output'][name]
+        # reduce scope to this system
+        if absnames[0] in system._var_allprocs_abs2prom['output']:
+            return absnames
 
-    if abs_name in system._var_allprocs_abs2prom['output']:
-        return (abs_name,)
-    elif abs_name in system._var_allprocs_abs2prom['input']:
-        return (abs_name,)
-
-    if include_buried_promotes:
-        # haven't found it yet.  Try looking for buried promotes
-        return _find_buried_promoted_name(system, name, get_remote)
+    if name in system._problem_meta['prom2abs']['input']:
+        absnames = system._problem_meta['prom2abs']['input'][name]
+        # reduce scope to this system
+        if absnames[0] in system._var_allprocs_abs2prom['input']:
+            return absnames
 
     return ()
-
-
-def _find_buried_promoted_name(system, name, get_remote=False):
-    """
-    Convert given buried promoted name to absolute.
-
-    Parameters
-    ----------
-    system : <System>
-        The scoping system.
-    name : str
-        The given name.
-
-    Returns
-    -------
-    tuple or list of str
-        List of matching absolute names.
-    """
-    names = ()
-    if '.' in name:
-        sysname, vname = name.rsplit('.', 1)
-        s = system._get_subsystem(sysname)
-        if s is not None and s._is_local:
-            names = name2abs_names(s, vname, include_buried_promotes=False, get_remote=get_remote)
-
-        if not get_remote:
-            return names
-
-        if system.comm.size > 1 and s.pathname in system._problem_meta['remote_systems']:
-            all_names = system.comm.gather(names, root=0)
-            if system.comm.rank == 0:
-                for lst in all_names:
-                    if lst:
-                        names = lst
-                        break
-            names = system.comm.bcast(names, root=0)
-    return names
 
 
 def prom_key2abs_key(system, prom_key):

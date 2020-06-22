@@ -300,23 +300,31 @@ class Problem(object):
             except AttributeError:
                 conns = {}
 
-            abs_names = name2abs_names(self.model, name, get_remote=get_remote)
+            abs_names = name2abs_names(self.model, name)
             if not abs_names:
                 raise KeyError('{}: Variable "{}" not found.'.format(self.model.msginfo, name))
 
             abs_name = abs_names[0]
+            remote_vars = self._metadata['remote_vars']
+
             if abs_name in meta:
                 if abs_name in conns:
                     val = meta[conns[abs_name]]['value']
                 else:
                     val = meta[abs_name]['value']
 
+            if get_remote and abs_name in remote_vars:
+                owner = remote_vars[abs_name]
+                if self.model.comm.rank == owner:
+                    self.model.comm.bcast(val, root=owner)
+                else:
+                    val = self.model.comm.bcast(None, root=owner)
+
+            if val is not _undefined:
                 # Need to cache the "get" in case the user calls in-place numpy operations.
                 self._initial_condition_cache[name] = val
 
-                return val
-
-            return _undefined
+            return val
 
     @property
     def _recording_iter(self):
@@ -835,8 +843,9 @@ class Problem(object):
             'use_derivatives': derivatives,
             'force_alloc_complex': force_alloc_complex,
             'connections': {},
-            'sys_owning_ranks': {},  # does not include distrib systems
-            'var_owning_ranks': {},  # does not include distrib vars
+            'remote_systems': {},
+            'remote_vars': {},  # does not include distrib vars
+            'prom2abs': {'input': {}, 'output': {}}  # includes ALL promotes including buried ones
         }
         model._setup(model_comm, 'full', mode, self._metadata)
 

@@ -4181,8 +4181,8 @@ class System(object):
         val = _undefined
         typ = 'output' if abs_name in self._var_allprocs_abs2prom['output'] else 'input'
         if from_root:
-            all_meta = self._problem_meta['top_all_meta']
-            my_meta = self._problem_meta['top_meta']
+            all_meta = self._problem_meta['all_meta']
+            my_meta = self._problem_meta['meta']
         else:
             all_meta = self._var_allprocs_abs2meta
             my_meta = self._var_abs2meta
@@ -4397,7 +4397,7 @@ class System(object):
         if indices is not None:
             val = val[indices]
 
-        smeta = self._problem_meta['top_all_meta'][src]
+        smeta = self._problem_meta['all_meta'][src]
         if units is not None:
             if smeta['units'] is not None:
                 try:
@@ -4579,7 +4579,7 @@ class System(object):
         dict
             The metadata dictionary for the named variable.
         """
-        meta = self._problem_meta['top_all_meta']
+        meta = self._problem_meta['all_meta']
         if name in meta:
             return meta[name]
 
