@@ -877,17 +877,17 @@ class System(object):
         is_total = isinstance(self, Group)
 
         # compute perturbations
-        starting_inputs = self._inputs._data.copy()
+        starting_inputs = self._inputs.asarray(True)
         in_offsets = starting_inputs.copy()
         in_offsets[in_offsets == 0.0] = 1.0
         in_offsets *= info['perturb_size']
 
-        starting_outputs = self._outputs._data.copy()
+        starting_outputs = self._outputs.asarray(True)
         out_offsets = starting_outputs.copy()
         out_offsets[out_offsets == 0.0] = 1.0
         out_offsets *= info['perturb_size']
 
-        starting_resids = self._residuals._data.copy()
+        starting_resids = self._residuals.asarray(True)
 
         # for groups, this does some setup of approximations
         self._setup_approx_coloring()
@@ -899,11 +899,10 @@ class System(object):
         for i in range(info['num_full_jacs']):
             # randomize inputs (and outputs if implicit)
             if i > 0:
-                self._inputs._data[:] = \
-                    starting_inputs + in_offsets * np.random.random(in_offsets.size)
-                self._outputs._data[:] = \
-                    starting_outputs + out_offsets * np.random.random(out_offsets.size)
-
+                self._inputs.set_val(starting_inputs +
+                                     in_offsets * np.random.random(in_offsets.size))
+                self._outputs.set_val(starting_outputs +
+                                      out_offsets * np.random.random(out_offsets.size)
                 if is_total:
                     self._solve_nonlinear()
                 else:

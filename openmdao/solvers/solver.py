@@ -832,9 +832,9 @@ class BlockLinearSolver(LinearSolver):
         system = self._system()
         for vec_name in system._lin_rel_vec_name_list:
             if self._mode == 'fwd':
-                rhs[vec_name] = system._vectors['residual'][vec_name]._data.copy()
+                rhs[vec_name] = system._vectors['residual'][vec_name].asarray(True)
             else:
-                rhs[vec_name] = system._vectors['output'][vec_name]._data.copy()
+                rhs[vec_name] = system._vectors['output'][vec_name].asarray(True)
 
     def _update_rhs_vecs(self):
         system = self._system()

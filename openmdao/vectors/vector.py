@@ -447,15 +447,20 @@ class Vector(object):
             if adder is not None:  # nonlinear only
                 self._data += adder
 
-    def asarray(self):
+    def asarray(self, copy=False):
         """
-        Return an array representation of this vector.  Don't copy if it's avoidable.
+        Return an array representation of this vector.
+
+        If copy is True, return a copy.  Otherwise, try to avoid it.
 
         Returns
         -------
         ndarray
             Array representation of this vector.
         """
+        if copy:
+            return self._data.copy()
+
         return self._data
 
     def set_vec(self, vec):

@@ -1031,8 +1031,8 @@ class Problem(object):
         partials_data = defaultdict(lambda: defaultdict(dict))
 
         # Caching current point to restore after setups.
-        input_cache = model._inputs._data.copy()
-        output_cache = model._outputs._data.copy()
+        input_cache = model._inputs.asarray(True)
+        output_cache = model._outputs.asarray(True)
 
         # Keep track of derivative keys that are declared dependent so that we don't print them
         # unless they are in error.

@@ -231,15 +231,15 @@ class ScipyKrylov(LinearSolver):
             self._iter_count = 0
             if solver is gmres:
                 if LooseVersion(scipy.__version__) < LooseVersion("1.1"):
-                    x, info = solver(linop, b_vec._data.copy(), M=M, restart=restart,
+                    x, info = solver(linop, b_vec.asarray(True), M=M, restart=restart,
                                      x0=x_vec_combined, maxiter=maxiter, tol=atol,
                                      callback=self._monitor)
                 else:
-                    x, info = solver(linop, b_vec._data.copy(), M=M, restart=restart,
+                    x, info = solver(linop, b_vec.asarray(True), M=M, restart=restart,
                                      x0=x_vec_combined, maxiter=maxiter, tol=atol, atol='legacy',
                                      callback=self._monitor)
             else:
-                x, info = solver(linop, b_vec._data.copy(), M=M,
+                x, info = solver(linop, b_vec.asarray(True), M=M,
                                  x0=x_vec_combined, maxiter=maxiter, tol=atol,
                                  callback=self._monitor)
 
@@ -284,4 +284,4 @@ class ScipyKrylov(LinearSolver):
         self._solver_info.pop()
 
         # return resulting value of x vector
-        return x_vec._data.copy()
+        return x_vec.asarray(True)

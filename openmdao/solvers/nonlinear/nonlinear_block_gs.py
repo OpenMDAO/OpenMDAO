@@ -92,7 +92,7 @@ class NonlinearBlockGS(NonlinearSolver):
         system = self._system()
 
         if self.options['use_aitken']:
-            self._delta_outputs_n_1 = system._outputs._data.copy()
+            self._delta_outputs_n_1 = system._outputs.asarray(True)
             self._theta_n_1 = 1.
 
         # When under a complex step from higher in the hierarchy, sometimes the step is too small
@@ -125,15 +125,15 @@ class NonlinearBlockGS(NonlinearSolver):
             theta_n_1 = self._theta_n_1
 
             # store a copy of the outputs, used to compute the change in outputs later
-            delta_outputs_n = outputs._data.copy()
+            delta_outputs_n = outputs.asarray(True)
 
         if use_aitken or not self.options['use_apply_nonlinear']:
             # store a copy of the outputs
             if not self.options['use_apply_nonlinear']:
                 with system._unscaled_context(outputs=[outputs]):
-                    outputs_n = outputs._data.copy()
+                    outputs_n = outputs.asarray(True)
             else:
-                outputs_n = outputs._data.copy()
+                outputs_n = outputs.asarray(True)
 
         self._solver_info.append_subsolver()
         self._gs_iter()
@@ -154,7 +154,7 @@ class NonlinearBlockGS(NonlinearSolver):
 
                 # If MPI, piggyback on the residual vector to perform a distributed norm.
                 if system.comm.size > 1:
-                    backup_r = residuals._data.copy()
+                    backup_r = residuals.asarray(True)
                     residuals._data[:] = temp
                     temp_norm = residuals.get_norm()
                 else:
@@ -166,7 +166,7 @@ class NonlinearBlockGS(NonlinearSolver):
                 # If MPI, piggyback on the output and residual vectors to perform a distributed
                 # dot product.
                 if system.comm.size > 1:
-                    backup_o = outputs._data.copy()
+                    backup_o = outputs.asarray(True)
                     outputs._data[:] = delta_outputs_n
                     tddo = residuals.dot(outputs)
                     residuals._data[:] = backup_r
@@ -228,7 +228,7 @@ class NonlinearBlockGS(NonlinearSolver):
             residuals = system._residuals
 
             with system._unscaled_context(outputs=[outputs]):
-                outputs_n = outputs._data.copy()
+                outputs_n = outputs.asarray(True)
 
             self._solver_info.append_subsolver()
             for isub, subsys in enumerate(system._subsystems_allprocs):
