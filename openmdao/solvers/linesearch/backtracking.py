@@ -29,7 +29,7 @@ def _print_violations(unknowns, lower, upper):
         Vector containing the upper bounds.
     """
     start = end = 0
-    for name, val in unknowns._views_flat.items():
+    for name, val in unknowns._abs_val_iter():
         end += val.size
         if upper is not None and any(val > upper[start:end]):
             print("'%s' exceeds upper bounds" % name)

@@ -507,11 +507,11 @@ class Problem(object):
             if indices is None:
                 indices = _full_slice
 
-            if abs_name in model._outputs._views:
+            if model._outputs._contains_abs(abs_name):
                 model._outputs.set_var(abs_name, value, indices)
             elif abs_name in conns:  # input name given. Set value into output
-                if src in model._outputs._views:  # src is local
-                    if (model._outputs._views_flat[src].size == 0 and
+                if model._outputs._contains_abs(src):  # src is local
+                    if (model._outputs._abs_get_val(src).size == 0 and
                             src.rsplit('.', 1)[0] == '_auto_ivc' and all_meta[src]['distributed']):
                         pass  # special case, auto_ivc dist var with 0 local size
                     elif tmeta['has_src_indices'] and n_proms < 2:
@@ -542,7 +542,7 @@ class Problem(object):
                 # also set the input
                 # TODO: maybe remove this if inputs are removed from case recording
                 if n_proms < 2:
-                    if abs_name in model._inputs._views:
+                    if model._inputs._contains_abs(abs_name):
                         # print(f"problem set_val: setting input {abs_name} to {ivalue}")
                         model._inputs.set_var(abs_name, ivalue, indices)
                     elif abs_name in model._discrete_inputs:
@@ -556,7 +556,7 @@ class Problem(object):
             elif abs_name in model._discrete_outputs:
                 model._discrete_outputs[abs_name] = value
             elif isinstance(model, Component):
-                if abs_name in model._inputs._views:
+                if model._inputs._contains_abs(abs_name):
                     model._inputs.set_var(abs_name, value, indices)
                 elif abs_name in model._discrete_inputs:
                     model._discrete_inputs[abs_name] = value
@@ -1095,10 +1095,10 @@ class Problem(object):
                                 directional = c_name in mfree_directions
 
                             try:
-                                flat_view = dinputs._views_flat[inp_abs]
+                                flat_view = dinputs._abs_get_val(inp_abs)
                             except KeyError:
                                 # Implicit state
-                                flat_view = dstate._views_flat[inp_abs]
+                                flat_view = dstate._abs_get_val(inp_abs)
 
                             if directional:
                                 n_in = 1
@@ -1129,10 +1129,10 @@ class Problem(object):
                                     out_abs = rel_name2abs_name(comp, out)
 
                                     try:
-                                        derivs = doutputs._views_flat[out_abs]
+                                        derivs = doutputs._abs_get_val(out_abs)
                                     except KeyError:
                                         # Implicit state
-                                        derivs = dstate._views_flat[out_abs]
+                                        derivs = dstate._abs_get_val(out_abs)
 
                                     if mode == 'fwd':
                                         key = out, inp

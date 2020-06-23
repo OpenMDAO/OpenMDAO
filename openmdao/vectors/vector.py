@@ -122,7 +122,7 @@ class Vector(object):
         self._views = {}
         self._views_flat = {}
 
-        # self._names will either be equivalent to self._views or to the
+        # self._names will either contain the same names as self._views or to the
         # set of variables relevant to the current matvec product.
         self._names = self._views
 
@@ -174,28 +174,6 @@ class Vector(object):
             Total flattened length of this vector.
         """
         return self._len
-
-    def _clone(self, initialize_views=False):
-        """
-        Return a copy that optionally provides view access to its data.
-
-        Parameters
-        ----------
-        initialize_views : bool
-            Whether to initialize the views into the clone.
-
-        Returns
-        -------
-        <Vector>
-            instance of the clone; the data is copied.
-        """
-        vec = self.__class__(self._name, self._kind, self._system(), self._root_vector,
-                             alloc_complex=self._alloc_complex, ncol=self._ncol)
-        vec._under_complex_step = self._under_complex_step
-        vec._clone_data()
-        if initialize_views:
-            vec._initialize_views()
-        return vec
 
     def _copy_views(self):
         """
@@ -286,9 +264,16 @@ class Vector(object):
         for name, val in arrs.items():
             yield name, val
 
+    def _abs_iter(self):
+        """
+        Iterate over the absolute names in the vector.
+        """
+        for name in self._views:
+            yield name
+
     def __contains__(self, name):
         """
-        Check if the variable is involved in the current mat-vec product.
+        Check if the variable is found in this vector.
 
         Parameters
         ----------
@@ -301,6 +286,22 @@ class Vector(object):
             True or False.
         """
         return self.name2abs_name(name) is not None
+
+    def _contains_abs(self, name):
+        """
+        Check if the variable is found in this vector.
+
+        Parameters
+        ----------
+        name : str
+            Absolute variable name.
+
+        Returns
+        -------
+        boolean
+            True or False.
+        """
+        return name in self._names
 
     def __getitem__(self, name):
         """
@@ -325,6 +326,28 @@ class Vector(object):
         else:
             raise KeyError(f"{self._system().msginfo}: Variable name '{name}' not found.")
 
+    def _abs_get_val(self, name, flat=True):
+        """
+        Get the variable value using the absolute name.
+
+        No error checking is performed on the name.
+
+        Parameters
+        ----------
+        name : str
+            Absolute name in the owning system's namespace.
+        flat : bool
+            If True, return the flat value.
+
+        Returns
+        -------
+        float or ndarray
+            variable value.
+        """
+        if flat:
+            return self._views_flat[name]
+        return self._views[name]
+
     def __setitem__(self, name, value):
         """
         Set the variable value.
@@ -344,10 +367,6 @@ class Vector(object):
 
         Must be implemented by the subclass.
 
-        Sets the following attributes:
-
-        - _data
-
         Parameters
         ----------
         root_vector : <Vector> or None
@@ -361,11 +380,6 @@ class Vector(object):
         Internally assemble views onto the vectors.
 
         Must be implemented by the subclass.
-
-        Sets the following attributes:
-
-        - _views
-        - _views_flat
         """
         raise NotImplementedError('_initialize_views not defined for vector type %s' %
                                   type(self).__name__)
@@ -554,6 +568,13 @@ class Vector(object):
         raise NotImplementedError('get_norm not defined for vector type %s' %
                                   type(self).__name__)
         return None  # silence lint warning about missing return value.
+
+    def _in_matvec_context(self):
+        """
+        Return True if this vector is inside of a matvec_context.
+        """
+        raise NotImplementedError('_in_matvec_context not defined for vector type %s' %
+                                  type(self).__name__)
 
     def set_complex_step_mode(self, active, keep_real=False):
         """

@@ -156,10 +156,10 @@ class FiniteDifference(ApproximationScheme):
         fd_form = _generate_fd_coeff(form, order, system)
 
         if step_calc == 'rel':
-            if wrt in system._outputs._views_flat:
-                step *= np.linalg.norm(system._outputs._views_flat[wrt])
-            elif wrt in system._inputs._views_flat:
-                step *= np.linalg.norm(system._inputs._views_flat[wrt])
+            if system._outputs._contains_abs(wrt):
+                step *= np.linalg.norm(system._outputs._abs_get_val(wrt))
+            elif system._inputs._contains_abs(wrt):
+                step *= np.linalg.norm(system._inputs._abs_get_val(wrt))
 
         deltas = fd_form.deltas * step
         coeffs = fd_form.coeffs / step

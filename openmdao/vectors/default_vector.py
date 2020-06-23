@@ -28,8 +28,9 @@ class DefaultVector(Vector):
         ndarray
             zeros array of correct size to hold all of this vector's variables.
         """
+        system = self._system()
         ncol = self._ncol
-        size = np.sum(self._system()._var_sizes[self._name][self._typ][self._iproc, :])
+        size = np.sum(system._var_sizes[self._name][self._typ][system.comm.rank, :])
         return np.zeros(size) if ncol == 1 else np.zeros((size, ncol))
 
     def _extract_root_data(self):
@@ -43,19 +44,11 @@ class DefaultVector(Vector):
         """
         system = self._system()
         type_ = self._typ
-        iproc = self._iproc
         ncol = self._ncol
         root_vec = self._root_vector
 
-        cplx_data = None
-        scaling = {}
-        if self._do_scaling:
-            scaling['phys'] = {}
-            scaling['norm'] = {}
-
         slices = root_vec.get_slice_dict()
 
-        sizes = system._var_sizes[self._name][type_]
         mynames = system._var_relevant_names[self._name][type_]
         if mynames:
             myslice = slice(slices[mynames[0]].start // ncol, slices[mynames[-1]].stop // ncol)
@@ -65,10 +58,13 @@ class DefaultVector(Vector):
         data = root_vec._data[myslice]
 
         # Extract view for complex storage too.
-        if self._alloc_complex:
-            cplx_data = root_vec._cplx_data[myslice]
+        cplx_data = root_vec._cplx_data[myslice] if self._alloc_complex else None
 
+        scaling = {}
         if self._do_scaling:
+            scaling['phys'] = {}
+            scaling['norm'] = {}
+
             for typ in ('phys', 'norm'):
                 root_scale = root_vec._scaling[typ]
                 rs0 = root_scale[0]
@@ -174,6 +170,17 @@ class DefaultVector(Vector):
 
         self._names = frozenset(views)
         self._len = end
+
+    def _in_matvec_context(self):
+        """
+        Return True if this vector is inside of a matvec_context.
+
+        Returns
+        -------
+        bool
+            Whether or not this vector is in a matvec_context.
+        """
+        return len(self._names) != len(self._views)
 
     def __iadd__(self, vec):
         """

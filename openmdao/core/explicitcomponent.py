@@ -214,8 +214,8 @@ class ExplicitComponent(Component):
         for abs_key, meta in self._subjacs_info.items():
             if 'method' in meta:
                 method = meta['method']
-                if (method is not None and method in self._approx_schemes and abs_key[1]
-                        not in self._outputs._views_flat):
+                if (method is not None and method in self._approx_schemes and
+                        not self._outputs._contains_abs(abs_key[1])):
                     yield abs_key
 
     def _apply_nonlinear(self):
