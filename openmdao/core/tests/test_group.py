@@ -2629,6 +2629,8 @@ class TestNaturalNaming(unittest.TestCase):
         for name in prom_ins + [full_in]:
             self.assertEqual(p[name], 77. + incount)
 
+        self.assertEqual(g3.get_val('x', get_remote=True), 77. + incount)
+
         for name in prom_outs + [full_out]:
             self.assertEqual(p[name], 99. + outcount)
 
