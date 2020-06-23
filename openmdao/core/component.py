@@ -479,7 +479,6 @@ class Component(System):
         if src_indices is not None:
             metadata['src_indices'] = np.asarray(src_indices, dtype=INT_DTYPE)
 
-        # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:
             var_rel2meta = self._static_var_rel2meta
             var_rel_names = self._static_var_rel_names

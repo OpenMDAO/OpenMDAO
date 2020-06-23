@@ -526,7 +526,6 @@ class System(object):
         for vec_name in vec_names:
             sizes = self._var_sizes[vec_name]['output']
             ncol = 1
-            rel = None
             if vec_name == 'nonlinear':
                 alloc_complex = nl_alloc_complex
             else:
@@ -540,13 +539,11 @@ class System(object):
                         else:
                             owner = self._owning_rank[vec_name]
                             ncol = sizes[owner, abs2idx[vec_name][vec_name]]
-                    rdct, _ = relevant[vec_name]['@all']
-                    rel = rdct['output']
 
             for key in ['input', 'output', 'residual']:
                 root_vectors[key][vec_name] = self._vector_class(vec_name, key, self,
                                                                  alloc_complex=alloc_complex,
-                                                                 ncol=ncol, relevant=rel)
+                                                                 ncol=ncol)
         return root_vectors
 
     def _get_approx_scheme(self, method):

@@ -75,9 +75,6 @@ class Vector(object):
     _icol : int or None
         If not None, specifies the 'active' column of a multivector when interfaceing with
         a component that does not support multivectors.
-    _relevant : dict
-        Mapping of a VOI to a tuple containing dependent inputs, dependent outputs,
-        and dependent systems.
     _do_scaling : bool
         True if this vector performs scaling.
     _scaling : dict
@@ -93,8 +90,7 @@ class Vector(object):
     # Listing of relevant citations that should be referenced when
     cite = ""
 
-    def __init__(self, name, kind, system, root_vector=None, alloc_complex=False,
-                 ncol=1, relevant=None):
+    def __init__(self, name, kind, system, root_vector=None, alloc_complex=False, ncol=1):
         """
         Initialize all attributes.
 
@@ -112,16 +108,12 @@ class Vector(object):
             Whether to allocate any imaginary storage to perform complex step. Default is False.
         ncol : int
             Number of columns for multi-vectors.
-        relevant : dict
-            Mapping of a VOI to a tuple containing dependent inputs, dependent outputs,
-            and dependent systems.
         """
         self._name = name
         self._typ = _type_map[kind]
         self._kind = kind
         self._ncol = ncol
         self._icol = None
-        self._relevant = relevant
         self._len = 0
 
         self._system = weakref.ref(system)
@@ -170,10 +162,7 @@ class Vector(object):
         str
             String rep of this object.
         """
-        try:
-            return str(self._data)
-        except Exception as err:
-            return "<error during call to Vector.__str__>: %s" % err
+        return str(self.asarray())
 
     def __len__(self):
         """
@@ -457,6 +446,17 @@ class Vector(object):
             self._data *= scaler[:, np.newaxis]
             if adder is not None:  # nonlinear only
                 self._data += adder
+
+    def asarray(self):
+        """
+        Return an array representation of this vector.  Don't copy if it's avoidable.
+
+        Returns
+        -------
+        ndarray
+            Array representation of this vector.
+        """
+        return self._data
 
     def set_vec(self, vec):
         """
