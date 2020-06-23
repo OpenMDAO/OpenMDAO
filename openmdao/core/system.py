@@ -902,7 +902,7 @@ class System(object):
                 self._inputs.set_val(starting_inputs +
                                      in_offsets * np.random.random(in_offsets.size))
                 self._outputs.set_val(starting_outputs +
-                                      out_offsets * np.random.random(out_offsets.size)
+                                      out_offsets * np.random.random(out_offsets.size))
                 if is_total:
                     self._solve_nonlinear()
                 else:
@@ -2054,10 +2054,10 @@ class System(object):
 
         if clear:
             if mode == 'fwd':
-                d_residuals.set_const(0.0)
+                d_residuals.set_val(0.0)
             else:  # rev
-                d_inputs.set_const(0.0)
-                d_outputs.set_const(0.0)
+                d_inputs.set_val(0.0)
+                d_outputs.set_val(0.0)
 
         if scope_out is None and scope_in is None:
             yield d_inputs, d_outputs, d_residuals

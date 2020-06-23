@@ -1418,9 +1418,9 @@ class _TotalJacInfo(object):
         # Prepare model for calculation by cleaning out the derivatives
         # vectors.
         for vec_name in model._lin_vec_names:
-            model._vectors['input'][vec_name].set_const(0.0)
-            model._vectors['output'][vec_name].set_const(0.0)
-            model._vectors['residual'][vec_name].set_const(0.0)
+            model._vectors['input'][vec_name].set_val(0.0)
+            model._vectors['output'][vec_name].set_val(0.0)
+            model._vectors['residual'][vec_name].set_val(0.0)
 
         # Solve for derivs with the approximation_scheme.
         # This cuts out the middleman by grabbing the Jacobian directly after linearization.

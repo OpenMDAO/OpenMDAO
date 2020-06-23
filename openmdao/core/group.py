@@ -1979,7 +1979,7 @@ class Group(System):
                 if rel_systems is not None:
                     for s in irrelevant_subs:
                         # zero out dvecs of irrelevant subsystems
-                        s._vectors['residual']['linear'].set_const(0.0)
+                        s._vectors['residual']['linear'].set_val(0.0)
 
             for subsys in self._subsystems_myproc:
                 if rel_systems is None or subsys.pathname in rel_systems:
@@ -1992,7 +1992,7 @@ class Group(System):
                     if rel_systems is not None:
                         for s in irrelevant_subs:
                             # zero out dvecs of irrelevant subsystems
-                            s._vectors['output']['linear'].set_const(0.0)
+                            s._vectors['output']['linear'].set_val(0.0)
 
     def _solve_linear(self, vec_names, mode, rel_systems):
         """

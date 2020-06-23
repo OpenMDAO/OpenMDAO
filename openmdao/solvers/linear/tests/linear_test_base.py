@@ -37,15 +37,15 @@ class LinearSolverTests(object):
             d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
 
             # forward
-            d_residuals.set_const(1.0)
-            d_outputs.set_const(0.0)
+            d_residuals.set_val(1.0)
+            d_outputs.set_val(0.0)
             group.run_solve_linear(['linear'], 'fwd')
 
             self.assertTrue(group.linear_solver._iter_count == 2)
 
             # reverse
-            d_outputs.set_const(1.0)
-            d_residuals.set_const(0.0)
+            d_outputs.set_val(1.0)
+            d_residuals.set_val(0.0)
             group.run_solve_linear(['linear'], 'rev')
 
             self.assertTrue(group.linear_solver._iter_count == 2)

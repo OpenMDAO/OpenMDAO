@@ -437,15 +437,8 @@ class Vector(object):
         scale_to : str
             Values are "phys" or "norm" to scale to physical or normalized.
         """
-        adder, scaler = self._scaling[scale_to]
-        if self._ncol == 1:
-            self._data *= scaler
-            if adder is not None:  # nonlinear only
-                self._data += adder
-        else:
-            self._data *= scaler[:, np.newaxis]
-            if adder is not None:  # nonlinear only
-                self._data += adder
+        raise NotImplementedError('scale not defined for vector type %s' %
+                                  type(self).__name__)
 
     def asarray(self, copy=False):
         """
@@ -458,10 +451,8 @@ class Vector(object):
         ndarray
             Array representation of this vector.
         """
-        if copy:
-            return self._data.copy()
-
-        return self._data
+        raise NotImplementedError('asarray not defined for vector type %s' %
+                                  type(self).__name__)
 
     def set_vec(self, vec):
         """
@@ -587,4 +578,4 @@ class Vector(object):
         self._under_complex_step = active
 
         if arr is not None:
-            self.set_const(arr)
+            self.set_val(arr)

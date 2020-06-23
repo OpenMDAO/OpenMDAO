@@ -272,23 +272,40 @@ class DefaultVector(Vector):
         """
         self._data[idxs] = val
 
-    set_const = set_val  # for backward compat
-
-    def asarray(self, idxs=_full_slice):
+    def scale(self, scale_to):
         """
-        Return parts of the data array at the specified indices or slice(s).
+        Scale this vector to normalized or physical form.
 
         Parameters
         ----------
-        idxs : int or slice or tuple of ints and/or slices.
-            The locations to pull from the data array.
+        scale_to : str
+            Values are "phys" or "norm" to scale to physical or normalized.
+        """
+        adder, scaler = self._scaling[scale_to]
+        if self._ncol == 1:
+            self._data *= scaler
+            if adder is not None:  # nonlinear only
+                self._data += adder
+        else:
+            self._data *= scaler[:, np.newaxis]
+            if adder is not None:  # nonlinear only
+                self._data += adder
+
+    def asarray(self, copy=False):
+        """
+        Return an array representation of this vector.
+
+        If copy is True, return a copy.  Otherwise, try to avoid it.
 
         Returns
         -------
         ndarray
-            Array of values.
+            Array representation of this vector.
         """
-        return self._data[idxs]
+        if copy:
+            return self._data.copy()
+
+        return self._data
 
     def iadd(self, val, idxs=_full_slice):
         """

@@ -250,7 +250,7 @@ class ExplicitComponent(Component):
         """
         with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
             with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
-                self._residuals.set_const(0.0)
+                self._residuals.set_val(0.0)
                 self._inputs.read_only = True
                 try:
                     if self._discrete_inputs or self._discrete_outputs:

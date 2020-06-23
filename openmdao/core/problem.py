@@ -1044,8 +1044,8 @@ class Problem(object):
         # Analytic Jacobians
         print_reverse = False
         for mode in ('fwd', 'rev'):
-            model._inputs.set_const(input_cache)
-            model._outputs.set_const(output_cache)
+            model._inputs.set_val(input_cache)
+            model._outputs.set_val(output_cache)
             # Make sure we're in a valid state
             model.run_apply_nonlinear()
 
@@ -1112,8 +1112,8 @@ class Problem(object):
 
                             for idx in range(n_in):
 
-                                dinputs.set_const(0.0)
-                                dstate.set_const(0.0)
+                                dinputs.set_val(0.0)
+                                dstate.set_val(0.0)
 
                                 # Dictionary access returns a scalar for 1d input, and we
                                 # need a vector for clean code, so use _views_flat.
@@ -1222,8 +1222,8 @@ class Problem(object):
 
                             partials_data[c_name][rel_key][jac_key] = deriv_value.copy()
 
-        model._inputs.set_const(input_cache)
-        model._outputs.set_const(output_cache)
+        model._inputs.set_val(input_cache)
+        model._outputs.set_val(output_cache)
         model.run_apply_nonlinear()
 
         # Finite Difference to calculate Jacobian

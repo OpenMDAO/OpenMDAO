@@ -533,7 +533,7 @@ class BroydenSolver(NonlinearSolver):
         if self._full_inverse:
             linear._data[:] = dx
         else:
-            linear.set_const(0.0)
+            linear.set_val(0.0)
             for name in self.options['state_vars']:
                 i, j = self._idx[name]
                 linear[name] = dx[i:j]
@@ -556,7 +556,7 @@ class BroydenSolver(NonlinearSolver):
         d_out = system._vectors['output']['linear']
 
         inv_jac = self.Gm
-        d_res.set_const(0.0)
+        d_res.set_val(0.0)
 
         # Disable local fd
         approx_status = system._owns_approx_jac
