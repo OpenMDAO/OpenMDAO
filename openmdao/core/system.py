@@ -2848,14 +2848,19 @@ class System(object):
             sizes = self._var_sizes['nonlinear']['output']
             abs2idx = self._var_allprocs_abs2idx['nonlinear']
             for name, meta in out.items():
+
+                src_name = name
+                if meta['ivc_source'] is not None:
+                    src_name = meta['ivc_source']
+
                 if 'size' not in meta:
-                    if name in abs2idx:
-                        meta['size'] = sizes[self._owning_rank[name], abs2idx[name]]
+                    if src_name in abs2idx:
+                        meta['size'] = sizes[self._owning_rank[src_name], abs2idx[src_name]]
                     else:
                         meta['size'] = 0  # discrete var, don't know size
 
-                if name in abs2idx:
-                    meta = self._var_allprocs_abs2meta[name]
+                if src_name in abs2idx:
+                    meta = self._var_allprocs_abs2meta[src_name]
                     out[name]['distributed'] = meta['distributed']
                     out[name]['global_size'] = meta['global_size']
 

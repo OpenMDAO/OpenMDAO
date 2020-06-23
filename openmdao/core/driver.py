@@ -488,9 +488,10 @@ class Driver(object):
         distributed_vars = self._distributed_resp
         indices = meta['indices']
 
+        src_name = name
         ivc_source = meta.get('ivc_source')
         if ivc_source is not None:
-            name = ivc_source
+            src_name = ivc_source
 
         if MPI:
             distributed = comm.size > 0 and name in distributed_vars
@@ -502,15 +503,15 @@ class Driver(object):
             # if var is distributed or only gathering to one rank
             # TODO - support distributed var under a parallel group.
             if owner is None or rank is not None:
-                val = model.get_val(name, get_remote=True, rank=rank, flat=True)
+                val = model.get_val(src_name, get_remote=True, rank=rank, flat=True)
                 if indices is not None:
                     val = val[indices]
             else:
                 if owner == comm.rank:
                     if indices is None:
-                        val = vec[name].copy()
+                        val = vec[src_name].copy()
                     else:
-                        val = vec[name][indices]
+                        val = vec[src_name][indices]
                 else:
                     if indices is not None:
                         size = len(indices)
@@ -519,7 +520,7 @@ class Driver(object):
                 comm.Bcast(val, root=owner)
 
         elif distributed:
-            local_val = model.get_val(name, flat=True)
+            local_val = model.get_val(src_name, flat=True)
             local_indices, sizes = distributed_vars[name]
             if local_indices is not None:
                 local_val = local_val[local_indices]
@@ -530,7 +531,7 @@ class Driver(object):
 
         else:
             if name in self._designvars_discrete:
-                val = model._discrete_outputs[name]
+                val = model._discrete_outputs[src_name]
 
                 # At present, only integers are supported by OpenMDAO drivers.
                 # We check the values here.
@@ -544,9 +545,9 @@ class Driver(object):
                     raise ValueError(msg)
 
             elif indices is None:
-                val = vec[name].copy()
+                val = vec[src_name].copy()
             else:
-                val = vec[name][indices]
+                val = vec[src_name][indices]
 
         if self._has_scaling and driver_scaling:
             # Scale design variable values
@@ -584,13 +585,18 @@ class Driver(object):
             Value for the design variable.
         """
         problem = self._problem()
+        meta = self._designvars[name]
+
+        src_name = name
+        ivc_source = meta.get('ivc_source')
+        if ivc_source is not None:
+            src_name = ivc_source
 
         # if the value is not local, don't set the value
         if (name in self._remote_dvs and
-                problem.model._owning_rank[name] != problem.comm.rank):
+                problem.model._owning_rank[src_name] != problem.comm.rank):
             return
 
-        meta = self._designvars[name]
         indices = meta['indices']
         if indices is None:
             indices = slice(None)
@@ -603,16 +609,16 @@ class Driver(object):
             if isinstance(value, float):
                 value = int(value)
             elif isinstance(value, np.ndarray):
-                if isinstance(problem.model._discrete_outputs[name], int):
+                if isinstance(problem.model._discrete_outputs[src_name], int):
                     # Setting an integer value with a 1D array - don't want to convert to array.
                     value = int(value)
                 else:
                     value = value.astype(np.int)
 
-            problem.model._discrete_outputs[name] = value
+            problem.model._discrete_outputs[src_name] = value
 
         else:
-            desvar = problem.model._outputs._views_flat[name]
+            desvar = problem.model._outputs._views_flat[src_name]
             desvar[indices] = value
 
             # Undo driver scaling when setting design var values into model.

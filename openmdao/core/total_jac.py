@@ -118,6 +118,7 @@ class _TotalJacInfo(object):
         driver = problem.driver
         prom2abs = problem.model._var_allprocs_prom2abs_list['output']
         prom2abs_in = problem.model._var_allprocs_prom2abs_list['input']
+        conns = problem._metadata['connections']
 
         self.model = model = problem.model
         self.comm = problem.comm
@@ -131,6 +132,16 @@ class _TotalJacInfo(object):
 
         if isinstance(wrt, str):
             wrt = [wrt]
+
+        # Convert wrt inputs to auto_ivc output names.\
+        wrt_src = []
+        for name in wrt:
+            if name in prom2abs:
+                wrt_src.append(prom2abs[name][0])
+            else:
+                # assume an input name else KeyError
+                in_abs = prom2abs_in[name][0]
+                wrt_src.append(conns[in_abs])
 
         if isinstance(of, str):
             of = [of]
@@ -156,7 +167,6 @@ class _TotalJacInfo(object):
         else:
             prom_wrt = wrt
             if not use_abs_names:
-                conns = problem._metadata['connections']
                 wrt = []
                 for name in prom_wrt:
                     if name in prom2abs:
