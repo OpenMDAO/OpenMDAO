@@ -142,6 +142,7 @@ class _TotalJacInfo(object):
                 # assume an input name else KeyError
                 in_abs = prom2abs_in[name][0]
                 wrt_src.append(conns[in_abs])
+        wrt = wrt_src
 
         if isinstance(of, str):
             of = [of]
