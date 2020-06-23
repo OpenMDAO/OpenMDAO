@@ -304,7 +304,7 @@ def _get_viewer_data(data_source):
 
 
 def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
-       title=None):
+       title=None, use_declare_partial_info=None):
     """
     Generate an HTML file containing a tree viewer.
 
@@ -328,6 +328,10 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
 
     title : str, optional
         The title for the diagram. Used in the HTML title.
+
+    use_declare_partial_info : ignored
+        This option is no longer used because it is now always true.
+        Still present for backwards compatibility.
 
     """
     # grab the model viewer data

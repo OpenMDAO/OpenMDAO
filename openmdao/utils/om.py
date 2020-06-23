@@ -64,6 +64,9 @@ def _n2_setup_parser(parser):
                         help="create embeddable version.")
     parser.add_argument('--title', default=None,
                         action='store', dest='title', help='diagram title.')
+    parser.add_argument('--use_declare_partial_info', action='store_true',
+                        dest='use_declare_partial_info',
+                        help="ignored, now always true.")
 
 
 def _n2_cmd(options, user_args):
