@@ -496,10 +496,11 @@ def _enforce_bounds_vector(u, du, alpha, lower_bounds, upper_bounds):
 
     # Find the largest amount a bound is violated
     # where positive means a bound is violated - i.e. the required d_alpha.
-    mask = du._data != 0
+    du_arr = du.asarray()
+    mask = du_arr != 0
     if mask.any():
-        abs_du_mask = np.abs(du._data[mask])
-        u_mask = u._data[mask]
+        abs_du_mask = np.abs(du_arr[mask])
+        u_mask = u.asarray()[mask]
 
         # Check lower bound
         if lower_bounds is not None:

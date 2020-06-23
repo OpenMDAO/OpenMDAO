@@ -297,6 +297,11 @@ class DefaultVector(Vector):
 
         If copy is True, return a copy.  Otherwise, try to avoid it.
 
+        Parameters
+        ----------
+        copy : bool
+            If True, return a copy of the array.
+
         Returns
         -------
         ndarray

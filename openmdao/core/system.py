@@ -978,9 +978,9 @@ class System(object):
             coloring_mod._CLASS_COLORINGS[coloring_fname] = coloring
 
         # restore original inputs/outputs
-        self._inputs._data[:] = starting_inputs
-        self._outputs._data[:] = starting_outputs
-        self._residuals._data[:] = starting_resids
+        self._inputs.set_val(starting_inputs)
+        self._outputs.set_val(starting_outputs)
+        self._residuals.set_val(starting_resids)
 
         self._first_call_to_linearize = save_first_call
 

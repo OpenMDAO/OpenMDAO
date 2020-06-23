@@ -446,6 +446,11 @@ class Vector(object):
 
         If copy is True, return a copy.  Otherwise, try to avoid it.
 
+        Parameters
+        ----------
+        copy : bool
+            If True, return a copy of the array.
+
         Returns
         -------
         ndarray
@@ -453,6 +458,7 @@ class Vector(object):
         """
         raise NotImplementedError('asarray not defined for vector type %s' %
                                   type(self).__name__)
+        return None  # silence lint warning
 
     def set_vec(self, vec):
         """

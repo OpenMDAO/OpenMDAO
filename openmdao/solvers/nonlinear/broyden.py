@@ -512,7 +512,7 @@ class BroydenSolver(NonlinearSolver):
         outputs = self._system()._outputs
 
         if self._full_inverse:
-            outputs._data[:] = new_val
+            outputs.set_val(new_val)
         else:
             states = self.options['state_vars']
             for name in states:
@@ -531,7 +531,7 @@ class BroydenSolver(NonlinearSolver):
         linear = self._system()._vectors['output']['linear']
 
         if self._full_inverse:
-            linear._data[:] = dx
+            linear.set_val(dx)
         else:
             linear.set_val(0.0)
             for name in self.options['state_vars']:
