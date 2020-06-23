@@ -135,13 +135,15 @@ class _TotalJacInfo(object):
 
         # Convert wrt inputs to auto_ivc output names.\
         wrt_src = []
+        wrt_src2prom = {}
         for name in wrt:
             if name in prom2abs:
-                wrt_src.append(prom2abs[name][0])
-            else:
+                wrt_name = prom2abs[name][0]
                 # assume an input name else KeyError
                 in_abs = prom2abs_in[name][0]
-                wrt_src.append(conns[in_abs])
+                wrt_name = conns[in_abs]
+            wrt_src.append(wrt_name)
+            wrt_src2prom[wrt_name] = name
         wrt = wrt_src
 
         if isinstance(of, str):
