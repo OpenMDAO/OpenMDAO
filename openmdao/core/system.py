@@ -3957,8 +3957,8 @@ class System(object):
             try:
                 vec = self._vectors[kind][vec_name]
             except KeyError:
-                if abs_name in self._var_abs2meta:
-                    val = self._var_abs2meta[abs_name]['value']
+                if abs_name in my_meta:
+                    val = my_meta[abs_name]['value']
             else:
                 if from_root:
                     vec = vec._root_vector

@@ -2605,6 +2605,8 @@ class TestNaturalNaming(unittest.TestCase):
         for name in prom_ins + [full_in]:
             self.assertEqual(p[name], 7.)
 
+        self.assertEqual(g3.get_val('x', get_remote=True), 7.)
+
         for name in prom_outs + [full_out]:
             self.assertEqual(p[name], 9.)
 
