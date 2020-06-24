@@ -425,9 +425,7 @@ class Problem(object):
         """
         model = self.model
         conns = self._metadata['connections']
-        all_proms = model._var_allprocs_prom2abs_list
         all_meta = model._var_allprocs_abs2meta
-        all_discrete = model._var_allprocs_discrete['input']
         n_proms = 0  # if nonzero, name given was promoted input name w/o a matching prom output
 
         try:
@@ -447,7 +445,7 @@ class Problem(object):
 
         if abs_name in conns:
             src = conns[abs_name]
-            if abs_name not in all_discrete:
+            if abs_name not in model._var_allprocs_discrete['input']:
                 value = np.asarray(value)
                 tmeta = all_meta[abs_name]
                 tunits = tmeta['units']
@@ -468,15 +466,12 @@ class Problem(object):
                                                           abs_names)
 
                 if units is None:
-                    if self._setup_status == 1:
-                        pass
-                    else:  # avoids double unit conversion
+                    if self._setup_status > 1:  # avoids double unit conversion
                         ivalue = value
                         if sunits is not None:
                             if gunits is not None and gunits != tunits:
                                 value = model.convert_from_units(src, value, gunits)
                             else:
-                                # value = model.convert_units(src, value, tunits, sunits)
                                 value = model.convert_from_units(src, value, tunits)
                 else:
                     if gunits is None:
@@ -543,7 +538,6 @@ class Problem(object):
                 # TODO: maybe remove this if inputs are removed from case recording
                 if n_proms < 2:
                     if abs_name in model._inputs._views:
-                        # print(f"problem set_val: setting input {abs_name} to {ivalue}")
                         model._inputs.set_var(abs_name, ivalue, indices)
                     elif abs_name in model._discrete_inputs:
                         model._discrete_inputs[abs_name] = value
@@ -555,15 +549,10 @@ class Problem(object):
                                   "Local assignment ignored.")
             elif abs_name in model._discrete_outputs:
                 model._discrete_outputs[abs_name] = value
-            elif isinstance(model, Component):
-                if abs_name in model._inputs._views:
-                    model._inputs.set_var(abs_name, value, indices)
-                elif abs_name in model._discrete_inputs:
-                    model._discrete_inputs[abs_name] = value
-                else:
-                    raise KeyError(f'{model.msginfo}: Variable "{name}" not found.')
-            elif abs_name not in all_meta:
-                raise KeyError(f'{model.msginfo}: Variable "{name}" not found.')
+            elif abs_name in model._inputs._views:   # could happen if model is a component
+                model._inputs.set_var(abs_name, value, indices)
+            elif abs_name in model._discrete_inputs:   # could happen if model is a component
+                model._discrete_inputs[abs_name] = value
 
     def _set_initial_conditions(self):
         """

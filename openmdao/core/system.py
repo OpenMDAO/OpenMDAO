@@ -479,16 +479,9 @@ class System(object):
         """
         pass
 
-    def _get_root_vectors(self, force_alloc_complex=False):
+    def _get_root_vectors(self):
         """
         Get the root vectors for the nonlinear and linear vectors for the model.
-
-        Parameters
-        ----------
-        force_alloc_complex : bool
-            Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
-            detect when you need to do this, but in some cases (e.g., complex step is used
-            after a reconfiguration) you may need to set this to True.
 
         Returns
         -------
@@ -504,6 +497,7 @@ class System(object):
         relevant = self._relevant
         vec_names = self._rel_vec_name_list if self._use_derivatives else self._vec_names
         vectorized_vois = self._problem_meta['vectorized_vois']
+        force_alloc_complex = self._problem_meta['force_alloc_complex']
         abs2idx = self._var_allprocs_abs2idx
 
         # Check for complex step to set vectors up appropriately.
@@ -653,8 +647,7 @@ class System(object):
         comm : MPI.Comm or <FakeComm> or None
             The global communicator.
         """
-        root_vectors = self._get_root_vectors(force_alloc_complex=self._force_alloc_complex)
-        self._setup_vectors(root_vectors)
+        self._setup_vectors(self._get_root_vectors())
 
         # Transfers do not require recursion, but they have to be set up after the vector setup.
         self._setup_transfers()
@@ -3979,8 +3972,12 @@ class System(object):
             try:
                 vec = self._vectors[kind][vec_name]
             except KeyError:
-                if abs_name in self._var_abs2meta:
-                    val = self._var_abs2meta[abs_name]['value']
+                if abs_name in my_meta:
+                    if vec_name != 'nonlinear':
+                        raise ValueError(f"{self.msginfo}: Can't get variable named '{abs_name}' "
+                                         "because linear vectors are not available before "
+                                         "final_setup.")
+                    val = my_meta[abs_name]['value']
             else:
                 if from_root:
                     vec = vec._root_vector
@@ -4082,7 +4079,6 @@ class System(object):
         else:
             val = self._abs_get_val(abs_names[0], get_remote, rank, vec_name, kind, flat)
 
-            # TODO: get indexed value BEFORE transferring the variable (might be much smaller)
             if indices is not None:
                 val = val[indices]
 
@@ -4096,6 +4092,9 @@ class System(object):
                             flat=False):
         abs_name = abs_names[0]
         src = conns[abs_name]
+        if src in self._var_allprocs_discrete['output']:
+            return self._abs_get_val(src, get_remote, rank, vec_name, kind, flat, from_root=True)
+
         # if we have multiple promoted inputs that are explicitly connected to an output and units
         # have not been specified, look for group input to disambiguate
         if units is None and len(abs_names) > 1:
@@ -4106,8 +4105,7 @@ class System(object):
                 except KeyError:
                     self._show_ambiguity_msg(name, ('units',), abs_names)
 
-        if src in self._var_allprocs_discrete['output']:
-            return self._abs_get_val(src, get_remote, rank, vec_name, kind, flat, from_root=True)
+        val = self._abs_get_val(src, get_remote, rank, vec_name, kind, flat, from_root=True)
 
         if abs_name in self._var_abs2meta:  # input is local
             vmeta = self._var_abs2meta[abs_name]
@@ -4118,10 +4116,8 @@ class System(object):
             src_indices = None  # FIXME: remote var could have src_indices
             has_src_indices = vmeta['has_src_indices']
 
-        distrib = vmeta['distributed']
-        val = self._abs_get_val(src, get_remote, rank, vec_name, kind, flat, from_root=True)
-
         if has_src_indices:
+            distrib = vmeta['distributed']
             if src_indices is None:  # input is remote
                 val = np.zeros(0)
             else:
@@ -4156,7 +4152,6 @@ class System(object):
         else:
             val = val.reshape(vmeta['shape'])
 
-        # TODO: get indexed value BEFORE transferring the variable (might be much smaller)
         if indices is not None:
             val = val[indices]
 
