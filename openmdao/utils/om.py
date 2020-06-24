@@ -44,7 +44,7 @@ from openmdao.utils.entry_points import _list_installed_setup_parser, _list_inst
     split_ep, _compute_entry_points_setup_parser, _compute_entry_points_exec, \
         _find_plugins_setup_parser, _find_plugins_exec
 from openmdao.core.component import Component
-from openmdao.utils.general_utils import ignore_errors
+from openmdao.utils.general_utils import ignore_errors, warn_deprecation
 
 
 def _n2_setup_parser(parser):
@@ -67,7 +67,7 @@ def _n2_setup_parser(parser):
                         action='store', dest='title', help='diagram title.')
     parser.add_argument('--use_declare_partial_info', action='store_true',
                         dest='use_declare_partial_info',
-                        help="use declare partial info for internal connectivity.")
+                        help="ignored, now always true.")
 
 
 def _n2_cmd(options, user_args):
@@ -88,10 +88,13 @@ def _n2_cmd(options, user_args):
         def _noraise(prob):
             prob.model._raise_connection_errors = False
 
+        if options.use_declare_partial_info:
+            warn_deprecation("'--use_declare_partial_info' is now the"
+                             " default and the option is ignored.")
+
         def _viewmod(prob):
             n2(prob, outfile=options.outfile, show_browser=not options.no_browser,
-               title=options.title, embeddable=options.embeddable,
-               use_declare_partial_info=options.use_declare_partial_info)
+                title=options.title, embeddable=options.embeddable)
             exit()  # could make this command line selectable later
 
         hooks._register_hook('setup', 'Problem', pre=_noraise)
@@ -102,8 +105,7 @@ def _n2_cmd(options, user_args):
     else:
         # assume the file is a recording, run standalone
         n2(filename, outfile=options.outfile, title=options.title,
-           show_browser=not options.no_browser, embeddable=options.embeddable,
-           use_declare_partial_info=options.use_declare_partial_info)
+            show_browser=not options.no_browser, embeddable=options.embeddable)
 
 
 def _view_connections_setup_parser(parser):
