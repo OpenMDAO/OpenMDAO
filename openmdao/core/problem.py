@@ -555,13 +555,10 @@ class Problem(object):
                                   "Local assignment ignored.")
             elif abs_name in model._discrete_outputs:
                 model._discrete_outputs[abs_name] = value
-            elif isinstance(model, Component):
-                if abs_name in model._inputs._views:
-                    model._inputs.set_var(abs_name, value, indices)
-                elif abs_name in model._discrete_inputs:
-                    model._discrete_inputs[abs_name] = value
-                else:
-                    raise KeyError(f'{model.msginfo}: Variable "{name}" not found.')
+            elif abs_name in model._inputs._views:   # could happen if model is a component
+                model._inputs.set_var(abs_name, value, indices)
+            elif abs_name in model._discrete_inputs:   # could happen if model is a component
+                model._discrete_inputs[abs_name] = value
             elif abs_name not in all_meta:
                 raise KeyError(f'{model.msginfo}: Variable "{name}" not found.')
 

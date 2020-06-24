@@ -3958,6 +3958,10 @@ class System(object):
                 vec = self._vectors[kind][vec_name]
             except KeyError:
                 if abs_name in my_meta:
+                    if vec_name != 'nonlinear':
+                        raise ValueError(f"{self.msginfo}: Can't get variable named '{abs_name}' "
+                                         "because linear vectors are not available before "
+                                         "final_setup.")
                     val = my_meta[abs_name]['value']
             else:
                 if from_root:
