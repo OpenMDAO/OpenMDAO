@@ -25,6 +25,7 @@ from openmdao.utils.general_utils import simple_warning, make_serializable
 from openmdao.utils.record_util import check_valid_sqlite3_db
 from openmdao.utils.mpi import MPI
 from openmdao.visualization.html_utils import read_files, write_script, DiagramWriter
+from openmdao.utils.general_utils import warn_deprecation
 
 # Toolbar settings
 _FONT_SIZES = [8, 9, 10, 11, 12, 13, 14]
@@ -304,7 +305,7 @@ def _get_viewer_data(data_source):
 
 
 def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
-       title=None, use_declare_partial_info=None):
+       title=None, use_declare_partial_info=False):
     """
     Generate an HTML file containing a tree viewer.
 
@@ -343,6 +344,10 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
 
     options = {}
     model_data['options'] = options
+
+    if use_declare_partial_info == True:
+        warn_deprecation("'use_declare_partial_info' is now the"
+            " default and the option is ignored.")
 
     model_data = 'var modelData = %s' % json.dumps(
         model_data, default=make_serializable)
