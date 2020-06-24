@@ -347,7 +347,7 @@ class TestViewModelData(unittest.TestCase):
         """)
 
         self.expected_declare_partials = json.loads("""
-        ["px.x > px.x", "pz.z > pz.z", "sub.state_eq_group.state_eq.y2_command > sub.state_eq_group.state_eq.y2_command", "sub.state_eq_group.state_eq.y2_command > sub.state_eq_group.state_eq.y2_actual", "sub.d1.y1 > sub.d1.y1", "sub.d1.y1 > sub.d1.z", "sub.d1.y1 > sub.d1.x", "sub.d1.y1 > sub.d1.y2", "sub.d2.y2 > sub.d2.y2", "sub.d2.y2 > sub.d2.z", "sub.d2.y2 > sub.d2.y1", "obj_cmp.obj > obj_cmp.obj", "obj_cmp.obj > obj_cmp.x", "obj_cmp.obj > obj_cmp.y1", "obj_cmp.obj > obj_cmp.y2", "obj_cmp.obj > obj_cmp.z", "con_cmp1.con1 > con_cmp1.con1", "con_cmp1.con1 > con_cmp1.y1", "con_cmp2.con2 > con_cmp2.con2", "con_cmp2.con2 > con_cmp2.y2"]
+        ["sub.state_eq_group.state_eq.y2_command > sub.state_eq_group.state_eq.y2_actual", "sub.d1.y1 > sub.d1.z", "sub.d1.y1 > sub.d1.x", "sub.d1.y1 > sub.d1.y2", "sub.d2.y2 > sub.d2.z", "sub.d2.y2 > sub.d2.y1", "obj_cmp.obj > obj_cmp.x", "obj_cmp.obj > obj_cmp.y1", "obj_cmp.obj > obj_cmp.y2", "obj_cmp.obj > obj_cmp.z", "con_cmp1.con1 > con_cmp1.y1", "con_cmp2.con2 > con_cmp2.y2"]
         """)
 
         self.expected_driver_name = 'Driver'
@@ -630,7 +630,7 @@ class TestViewModelData(unittest.TestCase):
                     "a_disk.power": "a_disk.power"}}
                     """)
         expected_declare_partials_betz = json.loads("""
-                ["indeps.a > indeps.a", "indeps.Area > indeps.Area", "indeps.rho > indeps.rho", "indeps.Vu > indeps.Vu", "a_disk.Vr > a_disk.a", "a_disk.Vr > a_disk.Vu", "a_disk.Vd > a_disk.a", "a_disk.Ct > a_disk.a", "a_disk.thrust > a_disk.a", "a_disk.thrust > a_disk.Area", "a_disk.thrust > a_disk.rho", "a_disk.thrust > a_disk.Vu", "a_disk.Cp > a_disk.a", "a_disk.power > a_disk.a", "a_disk.power > a_disk.Area", "a_disk.power > a_disk.rho", "a_disk.power > a_disk.Vu", "a_disk.Vr > a_disk.Vr", "a_disk.Vd > a_disk.Vd", "a_disk.Ct > a_disk.Ct", "a_disk.thrust > a_disk.thrust", "a_disk.Cp > a_disk.Cp", "a_disk.power > a_disk.power"]
+                ["a_disk.Vr > a_disk.a", "a_disk.Vr > a_disk.Vu", "a_disk.Vd > a_disk.a", "a_disk.Ct > a_disk.a", "a_disk.thrust > a_disk.a", "a_disk.thrust > a_disk.Area", "a_disk.thrust > a_disk.rho", "a_disk.thrust > a_disk.Vu", "a_disk.Cp > a_disk.a", "a_disk.power > a_disk.a", "a_disk.power > a_disk.Area", "a_disk.power > a_disk.rho", "a_disk.power > a_disk.Vu"]
         """)
 
         expected_driver_name = 'ScipyOptimizeDriver'

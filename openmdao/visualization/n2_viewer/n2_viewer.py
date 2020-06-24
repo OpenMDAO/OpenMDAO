@@ -171,7 +171,8 @@ def _get_declare_partials(system):
         if isinstance(system, Component):
             subjacs = system._subjacs_info
             for abs_key, meta in subjacs.items():
-                dpl.append("{} > {}".format(abs_key[0], abs_key[1]))
+                if abs_key[1] != abs_key[0]:
+                    dpl.append("{} > {}".format(abs_key[0], abs_key[1]))
         elif isinstance(system, Group):
             for s in system._subsystems_myproc:
                 recurse_get_partials(s, dpl)
