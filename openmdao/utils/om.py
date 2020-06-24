@@ -88,9 +88,9 @@ def _n2_cmd(options, user_args):
         def _noraise(prob):
             prob.model._raise_connection_errors = False
 
-        if options.use_declare_partial_info == True:
+        if options.use_declare_partial_info:
             warn_deprecation("'--use_declare_partial_info' is now the"
-                " default and the option is ignored.")
+                             " default and the option is ignored.")
 
         def _viewmod(prob):
             n2(prob, outfile=options.outfile, show_browser=not options.no_browser,
@@ -104,7 +104,7 @@ def _n2_cmd(options, user_args):
     else:
         # assume the file is a recording, run standalone
         n2(filename, outfile=options.outfile, title=options.title,
-           show_browser=not options.no_browser, embeddable=options.embeddable)
+            show_browser=not options.no_browser, embeddable=options.embeddable)
 
 
 def _view_connections_setup_parser(parser):

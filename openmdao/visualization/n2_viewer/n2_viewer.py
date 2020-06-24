@@ -345,9 +345,9 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     options = {}
     model_data['options'] = options
 
-    if use_declare_partial_info == True:
+    if use_declare_partial_info:
         warn_deprecation("'use_declare_partial_info' is now the"
-            " default and the option is ignored.")
+                         " default and the option is ignored.")
 
     model_data = 'var modelData = %s' % json.dumps(
         model_data, default=make_serializable)
