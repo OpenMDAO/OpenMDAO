@@ -191,7 +191,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Hover on N2 matrix element and check arrow count",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_11_11.vMid",
+            "selector": "g#n2elements rect#cellShape_14_14.vMid",
             "arrowCount": 2
         },
         {
@@ -203,7 +203,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Hover on N2 matrix element and check arrow count",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_11_11.vMid",
+            "selector": "g#n2elements rect#cellShape_14_14.vMid",
             "arrowCount": 2
         },
         {
@@ -218,7 +218,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Hover over collapsed N2 matrix element and check arrow count",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_10_10.gMid",
+            "selector": "g#n2elements rect#cellShape_13_13.gMid",
             "arrowCount": 1
         },
         {
@@ -236,7 +236,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Hover over zoomed N2 cell and check arrow count",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_9_9.vMid",
+            "selector": "g#n2elements rect#cellShape_12_12.vMid",
             "arrowCount": 1
         },
         {
@@ -251,7 +251,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Hover over collapsed N2 cell and check arrow count",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_10_10.gMid",
+            "selector": "g#n2elements rect#cellShape_13_13.gMid",
             "arrowCount": 1
         },
         {
