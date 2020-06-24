@@ -3958,8 +3958,12 @@ class System(object):
             try:
                 vec = self._vectors[kind][vec_name]
             except KeyError:
-                if abs_name in self._var_abs2meta:
-                    val = self._var_abs2meta[abs_name]['value']
+                if abs_name in my_meta:
+                    if vec_name != 'nonlinear':
+                        raise ValueError(f"{self.msginfo}: Can't get variable named '{abs_name}' "
+                                         "because linear vectors are not available before "
+                                         "final_setup.")
+                    val = my_meta[abs_name]['value']
             else:
                 if from_root:
                     vec = vec._root_vector
@@ -4061,7 +4065,6 @@ class System(object):
         else:
             val = self._abs_get_val(abs_names[0], get_remote, rank, vec_name, kind, flat)
 
-            # TODO: get indexed value BEFORE transferring the variable (might be much smaller)
             if indices is not None:
                 val = val[indices]
 
@@ -4075,6 +4078,9 @@ class System(object):
                             flat=False):
         abs_name = abs_names[0]
         src = conns[abs_name]
+        if src in self._var_allprocs_discrete['output']:
+            return self._abs_get_val(src, get_remote, rank, vec_name, kind, flat, from_root=True)
+
         # if we have multiple promoted inputs that are explicitly connected to an output and units
         # have not been specified, look for group input to disambiguate
         if units is None and len(abs_names) > 1:
@@ -4085,8 +4091,7 @@ class System(object):
                 except KeyError:
                     self._show_ambiguity_msg(name, ('units',), abs_names)
 
-        if src in self._var_allprocs_discrete['output']:
-            return self._abs_get_val(src, get_remote, rank, vec_name, kind, flat, from_root=True)
+        val = self._abs_get_val(src, get_remote, rank, vec_name, kind, flat, from_root=True)
 
         if abs_name in self._var_abs2meta:  # input is local
             vmeta = self._var_abs2meta[abs_name]
@@ -4097,10 +4102,8 @@ class System(object):
             src_indices = None  # FIXME: remote var could have src_indices
             has_src_indices = vmeta['has_src_indices']
 
-        distrib = vmeta['distributed']
-        val = self._abs_get_val(src, get_remote, rank, vec_name, kind, flat, from_root=True)
-
         if has_src_indices:
+            distrib = vmeta['distributed']
             if src_indices is None:  # input is remote
                 val = np.zeros(0)
             else:
@@ -4135,7 +4138,6 @@ class System(object):
         else:
             val = val.reshape(vmeta['shape'])
 
-        # TODO: get indexed value BEFORE transferring the variable (might be much smaller)
         if indices is not None:
             val = val[indices]
 

@@ -2605,34 +2605,50 @@ class TestNaturalNaming(unittest.TestCase):
         for name in prom_ins + [full_in]:
             self.assertEqual(p[name], 7.)
 
+        self.assertEqual(g3.get_val('x', get_remote=True), 7.)
+        
+        # we allow 'g1.g3.x' here even though it isn't relative to g3,
+        # because it maps to an absolute name that is contained in g3.
+        self.assertEqual(g3.get_val('g1.g3.x', get_remote=True), 7.)
+
         for name in prom_outs + [full_out]:
             self.assertEqual(p[name], 9.)
 
+        incount = 0
         for name in prom_ins + [full_in]:
-            p[name] = 77.
-            self.assertEqual(p[name], 77.)
+            incount += 1
+            p[name] = 77. + incount
+            self.assertEqual(p[name], 77. + incount)
 
+        outcount = 0
         for name in prom_outs + [full_out]:
-            p[name] = 99.
-            self.assertEqual(p[name], 99.)
+            outcount += 1
+            p[name] = 99. + outcount
+            self.assertEqual(p[name], 99. + outcount)
 
         p.final_setup()
 
         # now check after final setup
 
         for name in prom_ins + [full_in]:
-            self.assertEqual(p[name], 77.)
+            self.assertEqual(p[name], 77. + incount)
+
+        self.assertEqual(g3.get_val('x', get_remote=True), 77. + incount)
 
         for name in prom_outs + [full_out]:
-            self.assertEqual(p[name], 99.)
+            self.assertEqual(p[name], 99. + outcount)
 
+        incount = 0
         for name in prom_ins + [full_in]:
-            p[name] = 7.
-            self.assertEqual(p[name], 7.)
+            incount += 1
+            p[name] = 7. + incount
+            self.assertEqual(p[name], 7. + incount)
 
+        outcount = 0
         for name in prom_outs + [full_out]:
-            p[name] = 9.
-            self.assertEqual(p[name], 9.)
+            outcount += 1
+            p[name] = 9. + outcount
+            self.assertEqual(p[name], 9. + outcount)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -2650,17 +2666,12 @@ class TestNaturalNamingMPI(unittest.TestCase):
         c1 = g4.add_subsystem('c1', om.ExecComp('y=2.0*x', x=7., y=9.), promotes=['x','y'])
 
         g1a = par.add_subsystem('g1a', om.Group())
-        g2 = g1a.add_subsystem('g2', om.Group(), promotes=['*'])
-        g3 = g2.add_subsystem('g3', om.Group())
-        g4 = g3.add_subsystem('g4', om.Group(), promotes=['*'])
-        c1 = g4.add_subsystem('c1', om.ExecComp('y=2.0*x', x=7., y=9.), promotes=['x','y'])
-
-        # import wingdbstub
+        g2a = g1a.add_subsystem('g2', om.Group(), promotes=['*'])
+        g3a = g2a.add_subsystem('g3', om.Group())
+        g4a = g3a.add_subsystem('g4', om.Group(), promotes=['*'])
+        c1 = g4a.add_subsystem('c1', om.ExecComp('y=2.0*x', x=7., y=9.), promotes=['x','y'])
 
         p.setup()
-
-        #from openmdao.devtools.debug import trace_mpi
-        #trace_mpi()
 
         for gtop in ['par.g1', 'par.g1a']:
             full_in = f'{gtop}.g2.g3.g4.c1.x'
@@ -2682,17 +2693,19 @@ class TestNaturalNamingMPI(unittest.TestCase):
             for name in prom_outs + [full_out]:
                 self.assertEqual(p.get_val(name, get_remote=True), 9.)
 
+            incount = 0
             for name in prom_ins + [full_in]:
-                p[name] = 77.
-            p.model.comm.barrier()
-            for name in prom_ins + [full_in]:
-                self.assertEqual(p.get_val(name, get_remote=True), 77.)
+                incount += 1
+                p[name] = 77. + incount
+                p.model.comm.barrier()
+                self.assertEqual(p.get_val(name, get_remote=True), 77. + incount)
 
+            outcount = 0
             for name in prom_outs + [full_out]:
-                p[name] = 99.
-            p.model.comm.barrier()
-            for name in prom_outs + [full_out]:
-                self.assertEqual(p.get_val(name, get_remote=True), 99.)
+                outcount += 1
+                p[name] = 99. + outcount
+                p.model.comm.barrier()
+                self.assertEqual(p.get_val(name, get_remote=True), 99. + outcount)
 
         p.final_setup()
 
@@ -2703,22 +2716,28 @@ class TestNaturalNamingMPI(unittest.TestCase):
             full_out = f'{gtop}.g2.g3.g4.c1.y'
 
             for name in prom_ins + [full_in]:
-                self.assertEqual(p.get_val(name, get_remote=True), 77.)
+                self.assertEqual(p.get_val(name, get_remote=True), 77. + incount)
 
             for name in prom_outs + [full_out]:
-                self.assertEqual(p.get_val(name, get_remote=True), 99.)
+                self.assertEqual(p.get_val(name, get_remote=True), 99. + outcount)
 
         for gtop in ['par.g1', 'par.g1a']:
             full_in = f'{gtop}.g2.g3.g4.c1.x'
             full_out = f'{gtop}.g2.g3.g4.c1.y'
 
+            incount = 0
             for name in prom_ins + [full_in]:
-                p[name] = 7.
-                self.assertEqual(p.get_val(name, get_remote=True), 7.)
+                incount += 1
+                p[name] = 7. + incount
+                p.model.comm.barrier()
+                self.assertEqual(p.get_val(name, get_remote=True), 7. + incount)
 
+            outcount = 0
             for name in prom_outs + [full_out]:
-                p[name] = 9.
-                self.assertEqual(p.get_val(name, get_remote=True), 9.)
+                outcount += 1
+                p[name] = 9. + outcount
+                p.model.comm.barrier()
+                self.assertEqual(p.get_val(name, get_remote=True), 9. + outcount)
 
 
 if __name__ == "__main__":
