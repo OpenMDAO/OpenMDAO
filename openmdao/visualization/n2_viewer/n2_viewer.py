@@ -25,6 +25,7 @@ from openmdao.utils.general_utils import simple_warning, make_serializable
 from openmdao.utils.record_util import check_valid_sqlite3_db
 from openmdao.utils.mpi import MPI
 from openmdao.visualization.html_utils import read_files, write_script, DiagramWriter
+from openmdao.utils.general_utils import warn_deprecation
 
 # Toolbar settings
 _FONT_SIZES = [8, 9, 10, 11, 12, 13, 14]
@@ -170,7 +171,8 @@ def _get_declare_partials(system):
         if isinstance(system, Component):
             subjacs = system._subjacs_info
             for abs_key, meta in subjacs.items():
-                dpl.append("{} > {}".format(abs_key[0], abs_key[1]))
+                if abs_key[1] != abs_key[0]:
+                    dpl.append("{} > {}".format(abs_key[0], abs_key[1]))
         elif isinstance(system, Group):
             for s in system._subsystems_myproc:
                 recurse_get_partials(s, dpl)
@@ -329,10 +331,9 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     title : str, optional
         The title for the diagram. Used in the HTML title.
 
-    use_declare_partial_info : bool, optional
-        If True, in the N2 matrix, component internal connectivity computed using derivative
-        declarations, otherwise, derivative declarations ignored, so dense component connectivity
-        is assumed.
+    use_declare_partial_info : ignored
+        This option is no longer used because it is now always true.
+        Still present for backwards compatibility.
 
     """
     # grab the model viewer data
@@ -342,8 +343,12 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     if MPI and MPI.COMM_WORLD.rank != 0:
         return
 
-    options = {'use_declare_partial_info': use_declare_partial_info}
+    options = {}
     model_data['options'] = options
+
+    if use_declare_partial_info:
+        warn_deprecation("'use_declare_partial_info' is now the"
+                         " default and the option is ignored.")
 
     model_data = 'var modelData = %s' % json.dumps(
         model_data, default=make_serializable)

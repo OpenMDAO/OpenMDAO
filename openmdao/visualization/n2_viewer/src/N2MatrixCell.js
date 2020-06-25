@@ -514,6 +514,9 @@ class N2MatrixCell {
      * Choose a color based on our location and state of the associated N2TreeNode.
      */
     color() {
+        if (this.symbolType.potentialDeclaredPartial &&
+            this.symbolType.declaredPartial) return N2Style.color.declaredPartial;
+
         if (this.onDiagonal()) {
             if (this.obj.isMinimized) return N2Style.color.collapsed;
             if (this.obj.isConnectedParam()) return N2Style.color.param;
@@ -577,31 +580,33 @@ class N2MatrixCell {
             return new N2ConnectorLower(this.color(), this.id)
         }
 
+        const color = this.color();
+
         switch (this.symbolType.name) {
             case "scalar":
-                return new N2ScalarCell(this.color(), this.id);
+                return new N2ScalarCell(color, this.id);
             case "vector":
-                return new N2VectorCell(this.color(), this.id);
+                return new N2VectorCell(color, this.id);
             case "group":
-                return new N2GroupCell(this.color(), this.id);
+                return new N2GroupCell(color, this.id);
             case "scalarScalar":
-                return new N2ScalarScalarCell(this.color(), this.id);
+                return new N2ScalarScalarCell(color, this.id);
             case "scalarVector":
-                return new N2ScalarVectorCell(this.color(), this.id);
+                return new N2ScalarVectorCell(color, this.id);
             case "vectorScalar":
-                return new N2VectorScalarCell(this.color(), this.id);
+                return new N2VectorScalarCell(color, this.id);
             case "vectorVector":
-                return new N2VectorVectorCell(this.color(), this.id);
+                return new N2VectorVectorCell(color, this.id);
             case "scalarGroup":
-                return new N2ScalarGroupCell(this.color(), this.id);
+                return new N2ScalarGroupCell(color, this.id);
             case "groupScalar":
-                return new N2GroupScalarCell(this.color(), this.id);
+                return new N2GroupScalarCell(color, this.id);
             case "vectorGroup":
-                return new N2VectorGroupCell(this.color(), this.id);
+                return new N2VectorGroupCell(color, this.id);
             case "groupVector":
-                return new N2GroupVectorCell(this.color(), this.id);
+                return new N2GroupVectorCell(color, this.id);
             case "groupGroup":
-                return new N2GroupGroupCell(this.color(), this.id);
+                return new N2GroupGroupCell(color, this.id);
         }
     }
 
