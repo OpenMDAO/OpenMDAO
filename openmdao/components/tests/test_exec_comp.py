@@ -6,6 +6,8 @@ import numpy as np
 from numpy.testing import assert_almost_equal
 import scipy
 
+from distutils.version import LooseVersion
+
 try:
     from parameterized import parameterized
 except ImportError:
@@ -13,7 +15,7 @@ except ImportError:
 
 import openmdao.api as om
 from openmdao.components.exec_comp import _expr_dict
-from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_warning
 
 _ufunc_test_data = {
     'abs': {
@@ -113,11 +115,6 @@ _ufunc_test_data = {
     'expm1': {
         'str': 'f=expm1(x)',
         'check_func': np.expm1,
-        'args': {'f': {'value': np.zeros(6)},
-                 'x': {'value': np.random.random(6)}}},
-    'factorial': {
-        'str': 'f=factorial(x)',
-        'check_func': scipy.special.factorial,
         'args': {'f': {'value': np.zeros(6)},
                  'x': {'value': np.random.random(6)}}},
     'fmax': {
@@ -252,6 +249,28 @@ _ufunc_test_data = {
         'check_val': np.zeros(21),
         'args': {'f': {'value': np.zeros(21)}}},
 }
+
+
+# 'factorial' will raise a RuntimeError or a deprecation warning depending on scipy version
+if LooseVersion(scipy.__version__) >= LooseVersion("1.5.0"):
+    _ufunc_test_data['factorial'] = {
+        'str': 'f=factorial(x)',
+        'args': {'f': {'value': np.zeros(6)},
+                 'x': {'value': np.random.random(6)}},
+        'error': (RuntimeError,
+                  "The 'factorial' function is not supported for SciPy "
+                  f"versions >= 1.5, current version: {scipy.__version__}")
+    }
+else:
+    _ufunc_test_data['factorial'] = {
+        'str': 'f=factorial(x)',
+        'check_func': scipy.special.factorial,
+        'args': {'f': {'value': np.zeros(6)},
+                 'x': {'value': np.random.random(6)}},
+        'warning': (DeprecationWarning,
+                    "The 'factorial' function is deprecated. "
+                    "It is no longer supported for SciPy versions >= 1.5.")
+    }
 
 
 class TestExecComp(unittest.TestCase):
@@ -1074,7 +1093,18 @@ class TestExecCompParameterized(unittest.TestCase):
         model.add_subsystem('comp', om.ExecComp(test_data['str'], **test_data['args']),
                             promotes_outputs=['f'])
         prob.setup()
-        prob.run_model()
+
+        if 'error' in test_data:
+            err, msg = test_data['error']
+            with self.assertRaises(err) as cm:
+                prob.run_model()
+            self.assertTrue(msg in str(cm.exception))
+            return
+        elif 'warning' in test_data:
+            with assert_warning(*test_data['warning']):
+                prob.run_model()
+        else:
+            prob.run_model()
 
         if 'check_func' in test_data:
             check_args = []
@@ -1121,7 +1151,18 @@ class TestExecCompParameterized(unittest.TestCase):
                             om.ExecComp(test_data['str'], **test_data['args']),
                             promotes_outputs=['f'])
         prob.setup()
-        prob.run_model()
+
+        if 'error' in test_data:
+            err, msg = test_data['error']
+            with self.assertRaises(err) as cm:
+                prob.run_model()
+            self.assertTrue(msg in str(cm.exception))
+            return
+        elif 'warning' in test_data:
+            with assert_warning(*test_data['warning']):
+                prob.run_model()
+        else:
+            prob.run_model()
 
         if 'check_val' not in test_data:
             cpd = prob.check_partials(out_stream=None)
