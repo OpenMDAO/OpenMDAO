@@ -22,7 +22,8 @@ class N2Legend {
             'outputExplicit': false,
             'outputImplicit': false,
             'collapsed': true,
-            'connection': true
+            'connection': true,
+            'declaredPartial': true
         };
 
         this.showN2Symbols = {
@@ -33,7 +34,8 @@ class N2Legend {
 
         this.sysAndVar = [
             { 'name': "Connection", 'color': N2Style.color.connection },
-            { 'name': "Collapsed", 'color': N2Style.color.collapsed }
+            { 'name': "Collapsed", 'color': N2Style.color.collapsed },
+            { 'name': "Declared Partial", 'color': N2Style.color.declaredPartial}
         ];
 
         this.n2Symbols = [];
@@ -81,7 +83,8 @@ class N2Legend {
                 outputExplicit,
                 outputImplicit,
                 collapsed,
-                connection
+                connection,
+                declaredPartial
             } = this.showSysVar;
 
             const linearSolver = node.linear_solver;
