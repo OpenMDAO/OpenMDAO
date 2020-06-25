@@ -1151,7 +1151,18 @@ class TestExecCompParameterized(unittest.TestCase):
                             om.ExecComp(test_data['str'], **test_data['args']),
                             promotes_outputs=['f'])
         prob.setup()
-        prob.run_model()
+
+        if 'error' in test_data:
+            err, msg = test_data['error']
+            with self.assertRaises(err) as cm:
+                prob.run_model()
+            self.assertTrue(msg in str(cm.exception))
+            return
+        elif 'warning' in test_data:
+            with assert_warning(*test_data['warning']):
+                prob.run_model()
+        else:
+            prob.run_model()
 
         if 'check_val' not in test_data:
             cpd = prob.check_partials(out_stream=None)
