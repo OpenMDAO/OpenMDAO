@@ -641,10 +641,16 @@ else:
     from distutils.version import LooseVersion
     if LooseVersion(scipy.__version__) >= LooseVersion("1.5.0"):
         def factorial(*args):
+            """
+            Raise a RuntimeError stating that the factorial function is not supported.
+            """
             raise RuntimeError("The 'factorial' function is not supported for SciPy "
                                f"versions >= 1.5, current version: {scipy.__version__}")
     else:
         def factorial(*args):
+            """
+            Raise a warning stating that the factorial function is deprecated.
+            """
             warn_deprecation("The 'factorial' function is deprecated. "
                              "It is no longer supported for SciPy versions >= 1.5.")
             return scipy.special.factorial(*args)
