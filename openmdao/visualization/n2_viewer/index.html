@@ -207,20 +207,20 @@
 </div>
 
 <div id="node-info-container" class='info-hidden'>
-<table id="node-info-table" cellpadding='0' cellspacing='0'>
-    <thead>
-        <tr>
-            <th scope='col' colspan='2'>Name</th>
-        </tr>
-    </thead>
-    <tbody></tbody>
-    <tfoot>
-        <tr>
-            <th scope='col' colspan='2'>&nbsp;</th>
-        </tr>
-    </tfoot>
-</table>
-<p id='node-info-pin' class='info-hidden'>&#x1F4CC;</p>
+    <table id="node-info-table" cellpadding='0' cellspacing='0'>
+        <thead>
+            <tr>
+                <th scope='col' colspan='2'>Name</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+        <tfoot>
+            <tr>
+                <th scope='col' colspan='2'>&nbsp;</th>
+            </tr>
+        </tfoot>
+    </table>
+    <p id='node-info-pin' class='info-hidden'>&#x1F4CC;</p>
 </div>
 
 <div class="tool-tip" style="position: absolute; visibility: hidden;"></div>
@@ -233,6 +233,9 @@
     <img id="company-logo" alt="OpenMDAO" src="data:image/png;base64,{{logo_png}}" />
 </div>
 
+<div class="show" id="waiting-container">
+    <img id="waiting-icon" src="data:image/png;base64,{{waiting_icon}}" alt="Processing..." />
+</div>
 {d3_lib} {awesomplete_lib} {vk_beautify_lib} {{model_data}} {modal_lib}
 {utils_lib} {symboltype_lib} {n2treenode_lib} {modeldata_lib} {n2style_lib}
 {n2layout_lib} {n2matrixcell_lib} {n2legend_lib} {n2matrix_lib} {n2arrow_lib}

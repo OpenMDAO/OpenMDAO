@@ -170,6 +170,7 @@ class N2Diagram {
             'highlightBar': d3.select('g#highlight-bar'),
             'pSolverTreeGroup': d3.select('g#solver_tree'),
             'n2BackgroundRect': d3.select('g#n2inner rect'),
+            'waiter': d3.select('#waiting-container'),
             'clips': {
                 'partitionTree': d3.select("#partitionTreeClip > rect"),
                 'n2Matrix': d3.select("#n2MatrixClip > rect"),
@@ -656,12 +657,25 @@ class N2Diagram {
         }
     }
 
+    /** Display an animation while the transition is in progress */
+    showWaiter() {
+        this.dom.waiter.attr('class', 'show');
+
+    }
+
+    /** Hide the animation after the transition completes */
+    hideWaiter() {
+        this.dom.waiter.attr('class', 'no-show');
+    }
+
     /**
      * Refresh the diagram when something has visually changed.
      * @param {Boolean} [computeNewTreeLayout = true] Whether to rebuild the layout and
      *  matrix objects.
      */
     update(computeNewTreeLayout = true) {
+        this.showWaiter();
+
         this.ui.update();
         this.search.update(this.zoomedElement, this.model.root);
 
@@ -691,6 +705,8 @@ class N2Diagram {
         this._runSolverTransition(d3SolverRefs.selection);
 
         this.matrix.draw();
+
+        if (!d3.selection.prototype.transitionAllowed) this.hideWaiter();
     }
 
     /**
@@ -937,7 +953,7 @@ class N2Diagram {
      * @param {Boolean} [initialNode = true] Indicate the starting node.
      */
     minimizeAll(startNode, initialNode = true) {
-        if (! initialNode) {
+        if (!initialNode) {
             startNode.isMinimized = true;
             startNode.manuallyExpanded = false;
         }

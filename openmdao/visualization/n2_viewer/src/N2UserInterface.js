@@ -748,6 +748,8 @@ class N2UserInterface {
     expandAll(startNode) {
         testThis(this, 'N2UserInterface', 'expandAll');
 
+        this.n2Diag.showWaiter();
+
         this.addBackButtonHistory();
         this.n2Diag.manuallyExpandAll(startNode);
 

@@ -30,6 +30,8 @@ class N2Layout {
 
         this.zoomedSolverNodes = [];
         this.visibleSolverNodes = [];
+        this.curVisibleNodeCount = 0;
+        this.prevVisibleNodeCount = 0;
 
         // Initial size values derived from read-only defaults
         this.size = dims.size;
@@ -85,8 +87,13 @@ class N2Layout {
      * the original transition methods are restored.
      */
     setTransitionPermission() {
+        this.prevVisibleNodeCount = this.visibleNodeCount;
+        this.visibleNodeCount = this.visibleNodes.length;
+        const highWaterMark = Math.max(this.prevVisibleNodeCount, this.visibleNodeCount);
+
+
         // Too many nodes, disable transitions.
-        if (this.visibleNodes.length >= N2TransitionDefaults.maxNodes) {
+        if (highWaterMark >= N2TransitionDefaults.maxNodes) {
             debugInfo("Denying transitions: ", this.visibleNodes.length,
                 " visible nodes, max allowed: ", N2TransitionDefaults.maxNodes)
 
@@ -512,7 +519,9 @@ class N2Layout {
     updateTransitionInfo(dom, transitionStartDelay, manuallyResized) {
         sharedTransition = d3.transition()
             .duration(N2TransitionDefaults.duration)
-            .delay(transitionStartDelay);
+            .delay(transitionStartDelay)
+            // Hide the transition waiting animation when it ends:
+            .on('end', function() { d3.select('#waiting-container').attr('class', 'no-show'); });
 
         this.transitionStartDelay = N2TransitionDefaults.startDelay;
 
