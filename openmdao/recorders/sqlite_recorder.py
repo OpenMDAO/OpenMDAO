@@ -650,10 +650,6 @@ class SqliteRecorder(CaseRecorder):
             pickled_metadata = sqlite3.Binary(pickled_metadata)
 
             with self.connection as c:
-                # Because we can have a recorder attached to multiple Systems,
-                #   and because we are now recording System metadata recursively,
-                #   we can store System metadata multiple times. Need to ignore when that happens
-                #   so we don't get database errors. So use OR IGNORE
                 c.execute("INSERT OR IGNORE INTO system_metadata"
                           "(id, scaling_factors, component_metadata) "
                           "VALUES(?,?,?)", (path, scaling_factors, pickled_metadata))

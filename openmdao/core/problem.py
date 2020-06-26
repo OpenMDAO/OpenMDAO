@@ -25,7 +25,8 @@ from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.solvers.solver import SolverInfo
 from openmdao.error_checking.check_config import _default_checks, _all_checks
 from openmdao.recorders.recording_iteration_stack import _RecIteration
-from openmdao.recorders.recording_manager import RecordingManager, record_viewer_data
+from openmdao.recorders.recording_manager import RecordingManager, record_viewer_data, \
+    record_system_options
 from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.general_utils import ContainsAll, pad_name, simple_warning, warn_deprecation
 
@@ -825,6 +826,7 @@ class Problem(object):
             driver._setup_recording()
             self._setup_recording()
             record_viewer_data(self)
+            record_system_options(self)
 
         if self._setup_status < 2:
             self._setup_status = 2

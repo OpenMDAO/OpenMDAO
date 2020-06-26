@@ -501,6 +501,68 @@ class TestSqliteRecorder(unittest.TestCase):
         value = cr.system_options['root']['component_options']['assembled_jac_type']
         self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
 
+    def test_record_system_options(self):
+        # Regardless what object the case recorder is attached to, system options
+        #  should be recorded for all systems in the model
+
+        expected_system_options_keys = ['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']
+
+        # Recorder on Driver
+        prob = om.Problem(model=SellarDerivatives())
+        prob.setup()
+        recorder = om.SqliteRecorder("cases_driver.sql")
+        prob.driver.add_recorder(recorder)
+        prob.set_solver_print(level=0)
+        prob.run_model()
+        prob.cleanup()
+        cr = om.CaseReader("cases_driver.sql")
+        # Quick check to see that keys and values were recorded
+        self.assertEqual(sorted(expected_system_options_keys), sorted(cr.system_options.keys()))
+        value = cr.system_options['root']['component_options']['assembled_jac_type']
+        self.assertEqual('csc', value)  # quick check only. Too much to check exhaustively
+
+        # Recorder on Problem
+        prob = om.Problem(model=SellarDerivatives())
+        prob.setup()
+        recorder = om.SqliteRecorder("cases_problem.sql")
+        prob.add_recorder(recorder)
+        prob.set_solver_print(level=0)
+        prob.run_model()
+        prob.cleanup()
+        cr = om.CaseReader("cases_problem.sql")
+        # Quick check to see that keys and values were recorded
+        self.assertEqual(sorted(expected_system_options_keys), sorted(cr.system_options.keys()))
+        value = cr.system_options['root']['component_options']['assembled_jac_type']
+        self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
+
+        # Recorder on a subsystem
+        prob = om.Problem(model=SellarDerivatives())
+        prob.setup()
+        recorder = om.SqliteRecorder("cases_subsystem.sql")
+        prob.model.d1.add_recorder(recorder)
+        prob.set_solver_print(level=0)
+        prob.run_model()
+        prob.cleanup()
+        cr = om.CaseReader("cases_subsystem.sql")
+        # Quick check to see that keys and values were recorded
+        self.assertEqual(sorted(expected_system_options_keys), sorted(cr.system_options.keys()))
+        value = cr.system_options['root']['component_options']['assembled_jac_type']
+        self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
+
+        # Recorder on a solver
+        prob = om.Problem(model=SellarDerivatives())
+        prob.setup()
+        recorder = om.SqliteRecorder("cases_solver.sql")
+        prob.model.nonlinear_solver.add_recorder(recorder)
+        prob.set_solver_print(level=0)
+        prob.run_model()
+        prob.cleanup()
+        cr = om.CaseReader("cases_solver.sql")
+        # Quick check to see that keys and values were recorded
+        self.assertEqual(sorted(expected_system_options_keys), sorted(cr.system_options.keys()))
+        value = cr.system_options['root']['component_options']['assembled_jac_type']
+        self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
+
     def test_without_n2_data(self):
         prob = SellarProblem()
 

@@ -452,10 +452,6 @@ class Driver(object):
 
         self._rec_mgr.startup(self)
 
-        # record the system metadata to the recorders attached to this Driver
-        for sub in self._problem().model.system_iter(recurse=True, include_self=True):
-            self._rec_mgr.record_metadata(sub)
-
     def _get_voi_val(self, name, meta, remote_vois, driver_scaling=True, rank=None):
         """
         Get the value of a variable of interest (objective, constraint, or design var).
