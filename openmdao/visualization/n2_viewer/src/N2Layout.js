@@ -91,7 +91,6 @@ class N2Layout {
         this.visibleNodeCount = this.visibleNodes.length;
         const highWaterMark = Math.max(this.prevVisibleNodeCount, this.visibleNodeCount);
 
-
         // Too many nodes, disable transitions.
         if (highWaterMark >= N2TransitionDefaults.maxNodes) {
             debugInfo("Denying transitions: ", this.visibleNodes.length,
@@ -517,11 +516,12 @@ class N2Layout {
      * @param {number} transitionStartDelay ms to wait before performing transition
      */
     updateTransitionInfo(dom, transitionStartDelay, manuallyResized) {
+
         sharedTransition = d3.transition()
             .duration(N2TransitionDefaults.duration)
             .delay(transitionStartDelay)
             // Hide the transition waiting animation when it ends:
-            .on('end', function() { d3.select('#waiting-container').attr('class', 'no-show'); });
+            .on('end', function() { dom.waiter.attr('class', 'no-show'); });
 
         this.transitionStartDelay = N2TransitionDefaults.startDelay;
 

@@ -493,6 +493,9 @@ class N2UserInterface {
      * @param {N2TreeNode} node The targetted node.
      */
     leftClick(node) {
+        // Don't do it if the node is already zoomed
+        if (node === this.n2Diag.zoomedElement) return;
+
         testThis(this, 'N2UserInterface', 'leftClick');
         d3.event.preventDefault();
         d3.event.stopPropagation();
