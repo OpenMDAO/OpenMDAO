@@ -657,6 +657,12 @@ class N2Diagram {
         }
     }
 
+    delay(time) {
+        return new Promise(function(resolve) { 
+            setTimeout(resolve, time)
+        });
+     }
+
     /** Display an animation while the transition is in progress */
     showWaiter() {
         this.dom.waiter.attr('class', 'show');
@@ -673,8 +679,9 @@ class N2Diagram {
      * @param {Boolean} [computeNewTreeLayout = true] Whether to rebuild the layout and
      *  matrix objects.
      */
-    update(computeNewTreeLayout = true) {
+    async update(computeNewTreeLayout = true) {
         this.showWaiter();
+        await this.delay(100);
 
         this.ui.update();
         this.search.update(this.zoomedElement, this.model.root);
