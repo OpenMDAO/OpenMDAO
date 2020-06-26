@@ -525,6 +525,22 @@ class TestGroup(unittest.TestCase):
 
         assert_near_equal(p['C1.x'], np.array([2, 2, 2, 2]))
 
+    def test_om_slice_in_promotes(self):
+
+        class SimpleGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('indep', om.IndepVarComp('a', arr), promotes=['*'])
+                self.add_subsystem('comp1', om.ExecComp('b=2*a', a=np.ones(3), b=np.ones(3)))
+                self.promotes('comp1', inputs=['a'], src_indices=om.slicer[:, 1])
+
+        arr = np.array([[1, 2, 3], [1, 2, 3], [1, 2, 3]])
+
+        p = om.Problem(model=SimpleGroup())
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['comp1.a'], [2., 2, 2])
+
     def test_promote_not_found1(self):
         p = om.Problem()
         p.model.add_subsystem('indep', om.IndepVarComp('x', np.ones(5)),

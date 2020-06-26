@@ -1775,6 +1775,12 @@ class System(object):
                 abs_name = self._var_allprocs_prom2abs_list['input'][name][0]
                 meta = self._var_abs2meta[abs_name]
 
+                # I'm trying to copy the functionality from default_transfer into here
+                if isinstance(src_indices, tuple):
+                    contains_slice = [True if isinstance(i, slice) else False for i in src_indices]
+                    if True in contains_slice:
+                        indices = np.arange(meta['size'], dtype=int)
+
                 _, _, src_indices = ensure_compatible(name, meta['value'], meta['shape'],
                                                       src_indices)
 
