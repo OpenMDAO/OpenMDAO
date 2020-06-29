@@ -1219,11 +1219,11 @@ class Group(System):
 
                 elif src_indices is not None:
 
-                    if hasattr(self, '_contains_slice') and self._contains_slice:
+                    contains_slice = [True if isinstance(i, slice) else False for i in src_indices]
 
+                    if True in contains_slice:
                         val = self._abs_get_val(abs_out)
-                        if src_indices is not None:
-                            src_indices = np.array([i for i in range(len(val[tuple(src_indices)]))])
+                        src_indices = np.array([i for i in range(len(val[tuple(src_indices)]))])
                     else:
                         src_indices = np.atleast_1d(src_indices)
 

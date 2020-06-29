@@ -533,13 +533,13 @@ class TestGroup(unittest.TestCase):
                 self.add_subsystem('comp1', om.ExecComp('b=2*a', a=np.ones(3), b=np.ones(3)))
                 self.promotes('comp1', inputs=['a'], src_indices=om.slicer[:, 1])
 
-        arr = np.array([[1, 2, 3], [1, 2, 3], [1, 2, 3]])
+        arr = np.array([[1, 2, 3], [1, 12, 3], [1, 15, 3]])
 
         p = om.Problem(model=SimpleGroup())
         p.setup()
         p.run_model()
 
-        assert_near_equal(p['comp1.a'], [2., 2, 2])
+        assert_near_equal(p['comp1.a'], [2., 12, 15])
 
     def test_promote_not_found1(self):
         p = om.Problem()
