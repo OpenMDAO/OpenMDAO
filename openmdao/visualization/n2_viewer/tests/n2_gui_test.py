@@ -210,7 +210,7 @@ n2_gui_test_scripts = {
             "desc": "Hover on N2 matrix element and check arrow count",
             "test": "hoverArrow",
             "selector": "g#n2elements rect#cellShape_11_11.vMid",
-            "arrowCount": 1
+            "arrowCount": 2
         },
         {
             "test": "root"
@@ -243,7 +243,7 @@ n2_gui_test_scripts = {
             "desc": "Hover over zoomed N2 cell and check arrow count",
             "test": "hoverArrow",
             "selector": "g#n2elements rect#cellShape_11_11.vMid",
-            "arrowCount": 1
+            "arrowCount": 2
         },
         {
             "test": "root"
