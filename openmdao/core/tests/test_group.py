@@ -525,17 +525,40 @@ class TestGroup(unittest.TestCase):
 
         assert_near_equal(p['C1.x'], np.array([2, 2, 2, 2]))
 
-    def test_om_slice_in_promotes(self):
+        p = om.Problem()
 
-        class SimpleGroup(om.Group):
-            def setup(self):
-                self.add_subsystem('indep', om.IndepVarComp('a', arr), promotes=['*'])
-                self.add_subsystem('comp1', om.ExecComp('b=2*a', a=np.ones(3), b=np.ones(3)))
-                self.promotes('comp1', inputs=['a'], src_indices=om.slicer[:, 1])
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
+        p.model.add_subsystem('C1', MyComp1())
+        p.model.connect('indep.x', 'C1.x', src_indices=om.slicer[:, 1], flat_src_indices=True)
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['C1.x'], np.array([2, 2, 2, 2]))
+
+    def test_om_slice_in_promotes(self):
 
         arr = np.array([[1, 2, 3], [1, 12, 3], [1, 15, 3]])
 
-        p = om.Problem(model=SimpleGroup())
+        p = om.Problem()
+
+        model = p.model
+        model.add_subsystem('indep', om.IndepVarComp('a', arr), promotes=['*'])
+        model.add_subsystem('comp1', om.ExecComp('b=2*a', a=np.ones(3), b=np.ones(3)))
+        model.promotes('comp1', inputs=['a'], src_indices=om.slicer[:, 1])
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['comp1.a'], [2., 12, 15])
+
+        p = om.Problem()
+
+        model = p.model
+        model.add_subsystem('indep', om.IndepVarComp('a', arr), promotes=['*'])
+        model.add_subsystem('comp1', om.ExecComp('b=2*a', a=np.ones(3), b=np.ones(3)))
+        model.promotes('comp1', inputs=['a'], src_indices=om.slicer[:, 1], flat_src_indices=True)
+
         p.setup()
         p.run_model()
 
