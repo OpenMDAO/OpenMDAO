@@ -81,8 +81,6 @@ class Group(System):
         group or distributed component is below a DirectSolver so that we can raise an exception.
     _raise_connection_errors : bool
         Flag indicating whether connection errors are raised as an Exception.
-    _contains_slice : list
-        List containing bool values identifying if a slice is present.
     """
 
     def __init__(self, **kwargs):
@@ -1646,8 +1644,8 @@ class Group(System):
                             " connect('%s', %s)?" % (self.msginfo, src_name, tgt_name))
 
         if isinstance(src_indices, tuple):
-            self._contains_slice = [True if isinstance(i, slice) else False for i in src_indices]
-            if True not in self._contains_slice and isinstance(src_indices, Iterable):
+            contains_slice = [True if isinstance(i, slice) else False for i in src_indices]
+            if True not in contains_slice and isinstance(src_indices, Iterable):
                 src_indices = np.atleast_1d(src_indices)
 
         if isinstance(src_indices, list):

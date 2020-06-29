@@ -227,8 +227,8 @@ def ensure_compatible(name, value, shape=None, indices=None):
 
     if indices is not None and shape != ind_shape[:len(shape)] and True not in contains_slice:
         raise ValueError("Shape of indices does not match shape for '%s': "
-                        "Expected %s but got %s." %
-                        (name, shape, ind_shape[:len(shape)]))
+                         "Expected %s but got %s." %
+                         (name, shape, ind_shape[:len(shape)]))
 
     return value, shape, indices
 
