@@ -32,7 +32,7 @@ from openmdao.utils.general_utils import ContainsAll, pad_name, simple_warning, 
 from openmdao.utils.mpi import FakeComm
 from openmdao.utils.mpi import MPI
 from openmdao.utils.name_maps import prom_name2abs_name
-from openmdao.utils.options_dictionary import OptionsDictionary
+from openmdao.utils.options_dictionary import OptionsDictionary, _undefined
 from openmdao.utils.units import unit_conversion
 from openmdao.utils import coloring as coloring_mod
 from openmdao.utils.name_maps import abs_key2rel_key
@@ -57,7 +57,6 @@ ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
 MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])
 
 _contains_all = ContainsAll()
-_undefined = object()
 
 
 CITATION = """@article{openmdao_2019,
@@ -397,7 +396,7 @@ class Problem(object):
 
         val = self.model._get_val(name, units=units, indices=indices, get_remote=get_remote)
 
-        if val is System._undefined:
+        if val is _undefined:
             if get_remote:
                 raise KeyError('{}: Variable name "{}" not found.'.format(self.msginfo, name))
             else:
@@ -760,7 +759,7 @@ class Problem(object):
 
         model_comm = self.driver._setup_comm(comm)
 
-        model._setup(model_comm, 'full', mode, distributed_vector_class, local_vector_class,
+        model._setup(model_comm, mode, distributed_vector_class, local_vector_class,
                      derivatives, self.options)
 
         # Cache all args for final setup.
@@ -794,7 +793,7 @@ class Problem(object):
             mode = self._orig_mode
 
         if self._setup_status < 2:
-            self.model._final_setup(self.comm, 'full',
+            self.model._final_setup(self.comm,
                                     force_alloc_complex=self._force_alloc_complex)
 
         driver._setup_driver(self)

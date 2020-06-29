@@ -196,16 +196,11 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
         return metadata
 
-    def _setup_var_data(self, recurse=True):
+    def _setup_var_data(self):
         """
         Count total variables.
 
         Also instantiates surrogates for the output variables that use the default surrogate.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         default_surrogate = self.options['default_surrogate']
         for name, shape in self._surrogate_output_names:
@@ -223,18 +218,13 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         # training will occur on first execution after setup
         self.train = True
 
-        super(MetaModelUnStructuredComp, self)._setup_var_data(recurse=recurse)
+        super(MetaModelUnStructuredComp, self)._setup_var_data()
 
-    def _setup_partials(self, recurse=True):
+    def _setup_partials(self):
         """
         Process all partials and approximations that the user declared.
 
         Metamodel needs to declare its partials after inputs and outputs are known.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         super(MetaModelUnStructuredComp, self)._setup_partials()
 

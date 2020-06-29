@@ -15,7 +15,10 @@ import traceback
 import numpy as np
 from scipy.sparse import coo_matrix
 
-from pyoptsparse import Optimization
+try:
+    from pyoptsparse import Optimization
+except ImportError:
+    Optimization = None
 
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.driver import Driver, RecordingDebugging
@@ -117,7 +120,7 @@ class pyOptSparseDriver(Driver):
         Contains the objectives plus nonlinear constraints.
     _signal_cache : <Function>
         Cached function pointer that was assigned as handler for signal defined in option
-        user_teriminate_signal.
+        user_terminate_signal.
     _user_termination_flag : bool
         This is set to True when the user sends a signal to terminate the job.
     """
@@ -131,6 +134,9 @@ class pyOptSparseDriver(Driver):
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Driver options.
         """
+        if Optimization is None:
+            raise RuntimeError('pyOptSparseDriver is not available, pyOptsparse is not installed.')
+
         super(pyOptSparseDriver, self).__init__(**kwargs)
 
         # What we support
@@ -182,9 +188,16 @@ class pyOptSparseDriver(Driver):
         self.options.declare('gradient method', default='openmdao',
                              values={'openmdao', 'pyopt_fd', 'snopt_fd'},
                              desc='Finite difference implementation to use')
-        self.options.declare('user_teriminate_signal', default=signal.SIGUSR1, allow_none=True,
-                             desc='OS signal that triggers a clean user-terimnation. Only SNOPT'
+        self.options.declare('user_terminate_signal', default=signal.SIGUSR1, allow_none=True,
+                             desc='OS signal that triggers a clean user-termination. Only SNOPT'
                              'supports this option.')
+
+        # Deprecated option
+        self.options.declare('user_teriminate_signal', default=None, allow_none=True,
+                             desc='OS signal that triggers a clean user-termination. Only SNOPT'
+                             'supports this option.',
+                             deprecation="The option 'user_teriminate_signal' was misspelled and "
+                             "will be deprecated. Please use 'user_terminate_signal' instead.")
 
     def _setup_driver(self, problem):
         """
@@ -209,6 +222,10 @@ class pyOptSparseDriver(Driver):
                                ' multiple objectives.'.format(self.options['optimizer']))
 
         self._setup_tot_jac_sparsity()
+
+        # Handle deprecated option.
+        if self.options['user_teriminate_signal'] is not None:
+            self.options['user_terminate_signal'] = self.options['user_teriminate_signal']
 
     def run(self):
         """
@@ -444,7 +461,7 @@ class pyOptSparseDriver(Driver):
             pass
 
         # revert signal handler to cached version
-        sigusr = self.options['user_teriminate_signal']
+        sigusr = self.options['user_terminate_signal']
         if sigusr is not None:
             signal.signal(sigusr, self._signal_cache)
             self._signal_cache = None   # to prevent memory leak test from failing
@@ -477,7 +494,7 @@ class pyOptSparseDriver(Driver):
 
         # Note: we place our handler as late as possible so that codes that run in the
         # workflow can place their own handlers.
-        sigusr = self.options['user_teriminate_signal']
+        sigusr = self.options['user_terminate_signal']
         if sigusr is not None and self._signal_cache is None:
             self._signal_cache = signal.getsignal(sigusr)
             signal.signal(sigusr, self._signal_handler)

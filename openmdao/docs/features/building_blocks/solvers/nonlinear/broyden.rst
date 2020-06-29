@@ -30,6 +30,14 @@ BroydenSolver Options
 The BroydenSolver also contains a slot for a linear solver and a slot for a linesearch. See the
 :ref:`feature doc about linesearches <feature_line_search>` for more about these.
 
+BroydenSolver Constructor
+-------------------------
+
+The call signature for the `BroydenSolver` constructor is:
+
+.. automethod:: openmdao.solvers.nonlinear.broyden.BroydenSolver.__init__
+    :noindex:
+
 
 BroydenSolver on a Full Model
 -----------------------------

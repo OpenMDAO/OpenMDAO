@@ -21,7 +21,7 @@ from openmdao.test_suite.parametric_suite import parametric_suite
 from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.mpi import MPI
-import time 
+import time
 
 try:
     from openmdao.parallel_api import PETScVector
@@ -1876,58 +1876,6 @@ class TestComponentComplexStep(unittest.TestCase):
         prob.run_model()
         model.run_linearize()
 
-        Jfd = comp._jacobian
-        assert_near_equal(Jfd['sub.comp.x', 'sub.comp.rhs'], -np.eye(2), 1e-6)
-        assert_near_equal(Jfd['sub.comp.x', 'sub.comp.x'], comp.mtx, 1e-6)
-
-    def test_reconfigure(self):
-        # In this test, we switch to 'cs' when we reconfigure.
-
-        class TestImplCompArrayDense(TestImplCompArray):
-
-            def initialize(self):
-                self.mtx = np.array([
-                    [0.99, 0.01],
-                    [0.01, 0.99],
-                ])
-                self.count = 0
-
-            def setup(self):
-                super(TestImplCompArrayDense, self).setup()
-                if self.count > 0:
-                    self.declare_partials('*', '*', method='cs')
-                else:
-                    self.declare_partials('*', '*', method='fd')
-                self.count += 1
-
-        prob = self.prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('p_rhs', om.IndepVarComp('rhs', val=np.ones(2)))
-        sub = model.add_subsystem('sub', om.Group())
-        comp = sub.add_subsystem('comp', TestImplCompArrayDense())
-        model.connect('p_rhs.rhs', 'sub.comp.rhs')
-
-        model.linear_solver = om.ScipyKrylov()
-
-        prob.setup()
-        prob.run_model()
-
-        with self.assertRaises(RuntimeError) as context:
-            model.resetup(setup_mode='reconf')
-
-        msg = "TestImplCompArrayDense (sub.comp): In order to activate complex step during reconfiguration, " \
-              "you need to set 'force_alloc_complex' to True during setup. " \
-              "e.g. 'problem.setup(force_alloc_complex=True)'"
-        self.assertEqual(str(context.exception), msg)
-
-        # This time, allocate complex in setup.
-        prob.setup(check=False, force_alloc_complex=True)
-        prob.run_model()
-        model.resetup(setup_mode='reconf')
-        prob.run_model()
-
-        model.run_linearize()
         Jfd = comp._jacobian
         assert_near_equal(Jfd['sub.comp.x', 'sub.comp.rhs'], -np.eye(2), 1e-6)
         assert_near_equal(Jfd['sub.comp.x', 'sub.comp.x'], comp.mtx, 1e-6)

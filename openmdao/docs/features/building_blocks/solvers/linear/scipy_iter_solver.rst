@@ -27,6 +27,15 @@ ScipyKrylov Options
     ScipyKrylov
     options
 
+ScipyKrylov Constructor
+------------------------
+
+The call signature for the `ScipyKrylov` constructor is:
+
+.. automethod:: openmdao.solvers.linear.scipy_iter_solver.ScipyKrylov.__init__
+    :noindex:
+
+
 ScipyKrylov Option Examples
 ---------------------------
 

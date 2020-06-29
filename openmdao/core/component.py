@@ -1,13 +1,7 @@
 """Define the Component class."""
 
 from collections import OrderedDict, Counter, defaultdict
-
-# note: this is a Python 3.3 change, clean this up for OpenMDAO 3.x
-try:
-    from collections.abc import Iterable
-except ImportError:
-    from collections import Iterable
-
+from collections.abc import Iterable
 from itertools import product
 
 import numpy as np
@@ -157,6 +151,8 @@ class Component(System):
         self.options._parent_name = self.msginfo
         self.recording_options._parent_name = self.msginfo
 
+        self._vectors = {}
+
         orig_comm = comm
         if self._num_par_fd > 1:
             if comm.size > 1:
@@ -228,14 +224,9 @@ class Component(System):
 
         super(Component, self)._configure_check()
 
-    def _setup_var_data(self, recurse=True):
+    def _setup_var_data(self):
         """
         Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         global global_meta_names
         super(Component, self)._setup_var_data()
@@ -299,14 +290,9 @@ class Component(System):
         else:
             self._discrete_inputs = self._discrete_outputs = ()
 
-    def _setup_var_sizes(self, recurse=True):
+    def _setup_var_sizes(self):
         """
         Compute the arrays of local variable sizes for all variables/procs on this system.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         super(Component, self)._setup_var_sizes()
 
@@ -359,14 +345,9 @@ class Component(System):
 
         self._setup_global_shapes()
 
-    def _setup_partials(self, recurse=True):
+    def _setup_partials(self):
         """
         Process all partials and approximations that the user declared.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         self._subjacs_info = {}
         self._jacobian = DictionaryJacobian(system=self)

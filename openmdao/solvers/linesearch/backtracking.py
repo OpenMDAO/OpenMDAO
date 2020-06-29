@@ -31,12 +31,12 @@ def _print_violations(unknowns, lower, upper):
     start = end = 0
     for name, val in unknowns._views_flat.items():
         end += val.size
-        if any(val > upper[start:end]):
+        if upper is not None and any(val > upper[start:end]):
             print("'%s' exceeds upper bounds" % name)
             print("  Val:", val)
             print("  Upper:", upper[start:end], '\n')
 
-        if any(val < lower[start:end]):
+        if lower is not None and any(val < lower[start:end]):
             print("'%s' exceeds lower bounds" % name)
             print("  Val:", val)
             print("  Lower:", lower[start:end], '\n')

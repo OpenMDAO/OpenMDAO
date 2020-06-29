@@ -51,43 +51,43 @@ class N2Style {
             'rect': {
                 'stroke': N2Style.color.treeStroke,
             },
-            'g.unknown > rect': {
+            '#tree > g.unknown > rect': {
                 'fill': N2Style.color.unknownExplicit,
                 'fill-opacity': '.8',
             },
-            'g.unknown_implicit > rect': {
+            '#tree > g.unknown_implicit > rect': {
                 'fill': N2Style.color.unknownImplicit,
                 'fill-opacity': '.8',
             },
-            'g.param > rect': {
+            '#tree > g.param > rect': {
                 'fill': N2Style.color.param,
                 'fill-opacity': '.8',
             },
-            'g.unconnected_param > rect': {
+            '#tree > g.unconnected_param > rect': {
                 'fill': N2Style.color.unconnectedParam,
                 'fill-opacity': '.8',
             },
-            'g.subsystem > rect': {
+            '#tree > g.subsystem > rect': {
                 'cursor': 'pointer',
                 'fill-opacity': '.8',
                 'fill': N2Style.color.group,
             },
-            'g.component > rect': {
+            '#tree > g.component > rect': {
                 'cursor': 'pointer',
                 'fill-opacity': '.8',
                 'fill': N2Style.color.component,
             },
-            'g.param_group > rect': {
+            '#tree > g.param_group > rect': {
                 'cursor': 'pointer',
                 'fill-opacity': '.8',
                 'fill': N2Style.color.paramGroup,
             },
-            'g.unknown_group > rect': {
+            '#tree > g.unknown_group > rect': {
                 'cursor': 'pointer',
                 'fill-opacity': '.8',
                 'fill': N2Style.color.unknownGroup,
             },
-            'g.minimized > rect': {
+            '#tree > g.minimized > rect': {
                 'cursor': 'pointer',
                 'fill-opacity': '.8',
                 'fill': N2Style.color.collapsed,
@@ -210,7 +210,7 @@ class N2Style {
 
 // From Isaias Reyes
 N2Style.color = {
-    'connection': '#000000',
+    'connection': 'gray',
     'unknownImplicit': '#C7D06D',
     'unknownExplicit': '#9FC4C6',
     'componentBox': '#555',
@@ -226,7 +226,10 @@ N2Style.color = {
     'unconnectedParam': '#F42F0D',
     'highlightHovered': 'blue',
     'redArrow': 'salmon',
+    'input': 'salmon',
     'greenArrow': 'seagreen',
+    'output': 'seagreen',
+    'declaredPartial': 'black'
 };
 
 Object.freeze(N2Style.color); // Make it the equivalent of a constant

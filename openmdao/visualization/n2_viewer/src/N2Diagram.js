@@ -164,10 +164,10 @@ class N2Diagram {
             'svgStyle': d3.select("#svgId style"),
             'toolTip': d3.select(".tool-tip"),
             'arrowMarker': d3.select("#arrow"),
-            'nodeInfo': d3.select('#node-data'),
             'n2OuterGroup': d3.select('g#n2outer'),
             'n2InnerGroup': d3.select('g#n2inner'),
             'pTreeGroup': d3.select('g#tree'),
+            'highlightBar': d3.select('g#highlight-bar'),
             'pSolverTreeGroup': d3.select('g#solver_tree'),
             'n2BackgroundRect': d3.select('g#n2inner rect'),
             'clips': {
@@ -274,6 +274,11 @@ class N2Diagram {
                 .attr("width", this.dims.size.partitionTree.width)
                 .attr("transform", "translate(0 " + innerDims.margin + ")");
 
+            this.dom.highlightBar
+                .attr("height", innerDims.height)
+                .attr("width", "8")
+                .attr("transform", "translate(" + this.dims.size.partitionTree.width + 1 + " " + innerDims.margin + ")");
+
             this.dom.n2OuterGroup
                 .attr("height", outerDims.height)
                 .attr("width", outerDims.height)
@@ -330,7 +335,11 @@ class N2Diagram {
                     self.prevScales.model.y(d.prevDims.y) + ")";
             })
             .on("click", function (d) {
-                self.ui.leftClick(d);
+                if (self.ui.nodeInfoBox.hidden) { self.ui.leftClick(d); } // Zoom if not in info panel mode
+                else { // Pin/unpin the info panel
+                    self.ui.nodeInfoBox.togglePin();
+                    self.ui.nodeInfoBox.update(d3.event, d, d3.select(this).select('rect').style('fill'));
+                }
             })
             .on("contextmenu", function (d) {
                 self.ui.rightClick(d, this);
@@ -353,16 +362,18 @@ class N2Diagram {
                 return d.prevDims.height * self.prevTransitCoords.model.y;
             })
             .attr("id", function (d) {
-                return d.absPathName.replace(/\./g, '_');
-            });
+                return d.absPathName.replace(/[\.:]/g, '_');
+            })
+            .attr('rx', 12)
+            .attr('ry', 12);
 
         nodeEnter.append("text")
             .attr("dy", ".35em")
             .attr("transform", function (d) {
                 let anchorX = d.prevDims.width * self.prevTransitCoords.model.x -
                     self.layout.size.rightTextMargin;
-                return "translate(" + anchorX + " " + d.prevDims.height *
-                    self.prevTransitCoords.model.y / 2 + ")";
+                return "translate(" + anchorX + " " +
+                    (d.prevDims.height * self.prevTransitCoords.model.y / 2) + ")";
             })
             .style("opacity", function (d) {
                 if (d.depth < self.zoomedElement.depth) return 0;
@@ -407,8 +418,8 @@ class N2Diagram {
             .attr("transform", function (d) {
                 let anchorX = d.dims.width * self.transitCoords.model.x -
                     self.layout.size.rightTextMargin;
-                return "translate(" + anchorX + " " + d.dims.height *
-                    self.transitCoords.model.y / 2 + ")";
+                return "translate(" + anchorX + " " + (d.dims.height *
+                    self.transitCoords.model.y / 2) + ")";
             })
             .style("opacity", function (d) {
                 if (d.depth < self.zoomedElement.depth) return 0;
@@ -440,8 +451,8 @@ class N2Diagram {
             .attr("transform", function (d) {
                 let anchorX = d.dims.width * self.transitCoords.model.x -
                     self.layout.size.rightTextMargin;
-                return "translate(" + anchorX + "," + d.dims.height *
-                    self.transitCoords.model.y / 2 + ")";
+                return "translate(" + anchorX + "," + (d.dims.height *
+                    self.transitCoords.model.y / 2) + ")";
             })
             .style("opacity", 0);
     }
@@ -470,7 +481,11 @@ class N2Diagram {
                     self.prevScales.solver.y(d.prevSolverDims.y) + ")";
             })
             .on("click", function (d) {
-                self.ui.leftClick(d);
+                if (self.ui.nodeInfoBox.hidden) { self.ui.leftClick(d); } // Zoom if not in info panel mode
+                else { // Pin/unpin the info panel
+                    self.ui.nodeInfoBox.togglePin();
+                    self.ui.nodeInfoBox.update(d3.event, d, d3.select(this).select('rect').style('fill'));
+                }
             })
             .on("contextmenu", function (d) {
                 self.ui.rightClick(d, this);
@@ -497,6 +512,8 @@ class N2Diagram {
                 }
             })
             .on("mousemove", function () {
+                self.ui.nodeInfoBox.move(d3.event);
+
                 if (self.model.abs2prom != undefined) {
                     self.dom.toolTip.style("top", (d3.event.pageY - 30) + "px")
                         .style("left", (d3.event.pageX + 5) + "px");
@@ -614,8 +631,13 @@ class N2Diagram {
             .style("opacity", 0);
     }
 
+    clearHighlights() {
+        this.dom.highlightBar.selectAll('rect').remove();
+    }
+
     clearArrows() {
         this.dom.n2OuterGroup.selectAll("[class^=n2_hover_elements]").remove();
+        this.clearHighlights();
     }
 
     /** Reveal arrows that had been hidden */
@@ -696,6 +718,9 @@ class N2Diagram {
      * @param {number} height The new height in pixels.
      */
     verticalResize(height) {
+        // Don't resize if the height didn't actually change:
+        if (this.dims.size.partitionTree.height == height) return;
+
         if (!this.manuallyResized) {
             height = this.layout.calcFitDims().height;
         }
@@ -752,43 +777,44 @@ class N2Diagram {
     /** When the mouse leaves a cell, remove all temporary arrows. */
     mouseOut() {
         this.dom.n2OuterGroup.selectAll(".n2_hover_elements").remove();
-        d3.selectAll("div.offgrid")
-            .style("visibility", "hidden")
-            .html('');
+        this.clearHighlights();
+        d3.selectAll("div.offgrid").style("visibility", "hidden").html('');
 
         this.ui.nodeInfoBox.clear();
     }
 
     /**
-     * When the mouse if left-clicked on a cell, change their CSS class
+     * When the mouse is left-clicked on a cell, change their CSS class
      * so they're not removed when the mouse moves out.
      * @param {N2MatrixCell} cell The cell the event occured on.
      */
     mouseClick(cell) {
-        let newClassName = "n2_hover_elements_" + cell.row + "_" + cell.col;
-        let selection = this.dom.n2OuterGroup.selectAll("." + newClassName);
-        if (selection.size() > 0) {
-            selection.remove();
-            const arrow = this.arrowCache.find(o => o.cell.row === cell.row && o.cell.col === cell.col);
-            const arrowIndex = this.arrowCache.indexOf(arrow);
-            this.arrowCache.splice(arrowIndex, 1);
-        }
-        else {
-            const arrow = {
-                'cell': cell,
-                'element': this.dom.n2OuterGroup
-                    .selectAll("path.n2_hover_elements, circle.n2_hover_elements"),
-                'className': newClassName
+        if (this.ui.nodeInfoBox.hidden) { // If not in info panel mode
+            let newClassName = "n2_hover_elements_" + cell.row + "_" + cell.col;
+            let selection = this.dom.n2OuterGroup.selectAll("." + newClassName);
+            if (selection.size() > 0) {
+                selection.remove();
+                const arrow = this.arrowCache.find(o => o.cell.row === cell.row && o.cell.col === cell.col);
+                const arrowIndex = this.arrowCache.indexOf(arrow);
+                this.arrowCache.splice(arrowIndex, 1);
             }
-            this.arrowCache.push(arrow);
-            this.dom.n2OuterGroup
-                .selectAll("path.n2_hover_elements, circle.n2_hover_elements")
-                .attr("class", newClassName);
+            else {
+                const arrow = {
+                    'cell': cell,
+                    'element': this.dom.n2OuterGroup
+                        .selectAll("path.n2_hover_elements, circle.n2_hover_elements"),
+                    'className': newClassName
+                }
+                this.arrowCache.push(arrow);
+                this.dom.n2OuterGroup
+                    .selectAll("path.n2_hover_elements, circle.n2_hover_elements")
+                    .attr("class", newClassName);
+            }
         }
-    }
-
-    clearActiveNode() {
-        this.dom.nodeInfo.html('');
+        else { // Pin/unpin the info panel
+            this.ui.nodeInfoBox.togglePin();
+            this.ui.nodeInfoBox.update(d3.event, cell.obj, cell.color());
+        }
     }
 
     mouseClickAll(cell) {
@@ -824,23 +850,25 @@ class N2Diagram {
 
     /**
      * Recurse through the model, and determine whether a group/component is
-     * minimized or an input/output hidden. If it is, add it to the hiddenList
-     * array, and optionally reset its state.
+     * minimized or manually expanded, or an input/output hidden. If it is,
+     * add it to the hiddenList array, and optionally reset its state.
      * @param {Object[]} hiddenList The provided array to populate.
      * @param {Boolean} reveal If true, make the node visible.
      * @param {N2TreeNode} node The current node to operate on.
      */
     findAllHidden(hiddenList, reveal = false, node = this.model.root) {
-        if (!node.isVisible()) {
+        if (!node.isVisible() || node.manuallyExpanded) {
             hiddenList.push({
                 'node': node,
                 'isMinimized': node.isMinimized,
-                'varIsHidden': node.varIsHidden
+                'varIsHidden': node.varIsHidden,
+                'manuallyExpanded': node.manuallyExpanded
             })
 
             if (reveal) {
                 node.isMinimized = false;
                 node.varIsHidden = false;
+                node.manuallyExpanded = false;
             }
         }
 
@@ -864,10 +892,12 @@ class N2Diagram {
         if (!foundEntry) { // Not found, reset values to default
             node.isMinimized = false;
             node.varIsHidden = false;
+            node.manuallyExpanded = false;
         }
         else { // Found, restore values
             node.isMinimized = foundEntry.isMinimized;
             node.varIsHidden = foundEntry.varIsHidden;
+            node.manuallyExpanded = foundEntry.manuallyExpanded;
         }
 
         if (node.hasChildren()) {
@@ -875,5 +905,83 @@ class N2Diagram {
                 this.resetAllHidden(hiddenList, child);
             }
         }
+    }
+
+    /** Unset all manually-selected node states and zoom to the root element */
+    reset() {
+        this.resetAllHidden([]);
+        this.updateZoomedElement(this.model.root);
+        N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
+        this.update();
+    }
+
+    /**
+     * Set the node as not minimized and manually expanded, as well as
+     * all children.
+     * @param {N2TreeNode} startNode The node to begin from.
+     */
+    manuallyExpandAll(startNode) {
+        startNode.isMinimized = false;
+        startNode.manuallyExpanded = true;
+
+        if (startNode.hasChildren()) {
+            for (let child of startNode.children) {
+                this.manuallyExpandAll(child);
+            }
+        }
+    }
+
+    /**
+     * Set all the children of the specified node as minimized and not manually expanded.
+     * @param {N2TreeNode} startNode The node to begin from.
+     * @param {Boolean} [initialNode = true] Indicate the starting node.
+     */
+    minimizeAll(startNode, initialNode = true) {
+        if (! initialNode) {
+            startNode.isMinimized = true;
+            startNode.manuallyExpanded = false;
+        }
+
+        if (startNode.hasChildren()) {
+            for (let child of startNode.children) {
+                this.minimizeAll(child, false);
+            }
+        }
+    }
+
+    /**
+     * Recursively minimize non-parameter nodes to the specified depth.
+     * @param {N2TreeNode} node The node to work on.
+     */
+    _minimizeToDepth(node) {
+        if (node.isParamOrUnknown()) {
+            return;
+        }
+
+        if (node.depth < this.chosenCollapseDepth) {
+            node.isMinimized = false;
+            node.manuallyExpanded = true;
+        }
+        else {
+            node.isMinimized = true;
+            node.manuallyExpanded = false;
+        }
+
+        if (node.hasChildren()) {
+            for (let child of node.children) {
+                this._minimizeToDepth(child);
+            }
+        }
+    }
+
+    /**
+     * Set the new depth to collapse to and perform the operation.
+     * @param {Number} depth If the node's depth is the same or more, collapse it.
+     */
+    minimizeToDepth(depth) {
+        this.chosenCollapseDepth = depth;
+
+        if (this.chosenCollapseDepth > this.zoomedElement.depth)
+            this._minimizeToDepth(this.model.root);
     }
 }

@@ -3,23 +3,35 @@ Helper class for total jacobian computation.
 """
 from collections import OrderedDict, defaultdict
 from copy import deepcopy
+import os
 import pprint
 import sys
 import time
 
 import numpy as np
 
-try:
-    from petsc4py import PETSc
-    from openmdao.vectors.petsc_vector import PETScVector
-except ImportError:
-    PETSc = None
-
 from openmdao.vectors.vector import INT_DTYPE
 from openmdao.utils.general_utils import ContainsAll, simple_warning
 from openmdao.utils.mpi import MPI
 from openmdao.utils.coloring import _initialize_model_approx, Coloring
 
+# Attempt to import petsc4py.
+# If OPENMDAO_REQUIRE_MPI is set to a recognized positive value, attempt import
+# and raise exception on failure. If set to anything else, no import is attempted.
+if 'OPENMDAO_REQUIRE_MPI' in os.environ:
+    if os.environ['OPENMDAO_REQUIRE_MPI'].lower() in ['always', '1', 'true', 'yes']:
+        from petsc4py import PETSc
+    else:
+        PETSc = None
+# If OPENMDAO_REQUIRE_MPI is unset, attempt to import petsc4py, but continue on failure
+# with a notification.
+else:
+    try:
+        from petsc4py import PETSc
+    except ImportError:
+        PETSc = None
+        sys.stdout.write("Unable to import petsc4py. Parallel processing unavailable.\n")
+        sys.stdout.flush()
 
 _contains_all = ContainsAll()
 
@@ -53,10 +65,10 @@ class _TotalJacInfo(object):
     model : <System>
         The top level System of the System tree.
     of_meta : dict
-        Map of absoute output 'of' var name to tuples of the form
+        Map of absolute output 'of' var name to tuples of the form
         (row/column slice, indices, distrib).
     wrt_meta : dict
-        Map of absoute output 'wrt' var name to tuples of the form
+        Map of absolute output 'wrt' var name to tuples of the form
         (row/column slice, indices, distrib).
     output_list : list of str
         List of names of output variables for this total jacobian.  In fwd mode, outputs

@@ -38,6 +38,15 @@ NonlinearBlockJac Options
     NonlinearBlockJac
     options
 
+NonlinearBlockJac Constructor
+-----------------------------
+
+The call signature for the `NonlinearBlockJac` constructor is:
+
+.. automethod:: openmdao.solvers.nonlinear.nonlinear_block_jac.NonlinearBlockJac.__init__
+    :noindex:
+
+
 NonlinearBlockJac Option Examples
 ---------------------------------
 

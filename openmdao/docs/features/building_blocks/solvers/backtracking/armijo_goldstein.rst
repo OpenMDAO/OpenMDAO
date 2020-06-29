@@ -25,6 +25,14 @@ ArmijoGoldsteinLS Options
     ArmijoGoldsteinLS
     options
 
+ArmijoGoldsteinLS Constructor
+-------------------------------
+
+The call signature for the `ArmijoGoldsteinLS` constructor is:
+
+.. automethod:: openmdao.solvers.linesearch.backtracking.ArmijoGoldsteinLS.__init__
+    :noindex:
+
 
 ArmijoGoldsteinLS Option Examples
 ---------------------------------

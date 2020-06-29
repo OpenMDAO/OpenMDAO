@@ -482,6 +482,9 @@ class SqliteRecorder(CaseRecorder):
                            inputs_text, outputs_text, residuals_text, totals_blob,
                            abs_err, rel_err))
 
+                c.execute("INSERT INTO global_iterations(record_type, rowid, source) VALUES(?,?,?)",
+                          ('problem', c.lastrowid, metadata['name']))
+
     def record_iteration_system(self, recording_requester, data, metadata):
         """
         Record data and metadata from a System.

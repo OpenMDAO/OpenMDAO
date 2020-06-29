@@ -389,7 +389,12 @@ class SimpleGADriver(Driver):
         nr_objectives = len(objs)
 
         # Single objective, if there is only one objective, which has only one element
-        is_single_objective = (nr_objectives == 1) and (len(objs) == 1)
+        if nr_objectives > 1:
+            is_single_objective = False
+        else:
+            for obj in objs.items():
+                is_single_objective = len(obj) == 1
+                break
 
         obj_exponent = self.options['multi_obj_exponent']
         if self.options['multi_obj_weights']:  # not empty
@@ -785,7 +790,7 @@ class GeneticAlgorithm(object):
             Lower bound array.
         vub : ndarray
             Upper bound array.
-        bits : ndarray
+        bits : ndarray(dtype=np.int)
             Number of bits for decoding.
 
         Returns
@@ -824,7 +829,7 @@ class GeneticAlgorithm(object):
             Lower bound array.
         vub : ndarray
             Upper bound array.
-        bits : int
+        bits : ndarray(dtype=np.int)
             Number of bits for decoding.
 
         Returns
@@ -842,7 +847,8 @@ class GeneticAlgorithm(object):
             result = self.to_gray(result)
         return result
 
-    def to_gray(self, g):
+    @staticmethod
+    def to_gray(g):
         """
         Convert a binary array representing a single population member to Gray code.
 
@@ -862,7 +868,8 @@ class GeneticAlgorithm(object):
         gs = np.binary_repr(gi, len(g))                      # convert to binary string: '0011'
         return np.array([0 if q == '0' else 1 for q in gs])  # convert to np.array: [0, 0, 1, 1]
 
-    def from_gray(self, g):
+    @staticmethod
+    def from_gray(g):
         """
         Convert a Gray coded binary array to normal binary coding.
 

@@ -91,7 +91,7 @@ class Vector(object):
     # Listing of relevant citations that should be referenced when
     cite = ""
 
-    def __init__(self, name, kind, system, root_vector=None, resize=False, alloc_complex=False,
+    def __init__(self, name, kind, system, root_vector=None, alloc_complex=False,
                  ncol=1, relevant=None):
         """
         Initialize all attributes.
@@ -106,8 +106,6 @@ class Vector(object):
             Pointer to the owning system.
         root_vector : <Vector>
             Pointer to the vector owned by the root system.
-        resize : bool
-            If true, resize the root vector.
         alloc_complex : bool
             Whether to allocate any imaginary storage to perform complex step. Default is False.
         ncol : int
@@ -154,13 +152,6 @@ class Vector(object):
             self._root_vector = self
         else:
             self._root_vector = root_vector
-
-        if resize:
-            if root_vector is None:
-                raise RuntimeError(
-                    'Cannot resize the vector because the root vector has not yet '
-                    'been created in system %s' % system.pathname)
-            self._update_root_data()
 
         self._initialize_data(root_vector)
         self._initialize_views()

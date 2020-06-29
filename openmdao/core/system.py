@@ -3,12 +3,7 @@ import sys
 import os
 from contextlib import contextmanager
 from collections import OrderedDict, defaultdict
-
-# note: this is a Python 3.3 change, clean this up for OpenMDAO 3.x
-try:
-    from collections.abc import Iterable
-except ImportError:
-    from collections import Iterable
+from collections.abc import Iterable
 
 from fnmatch import fnmatchcase
 import sys
@@ -24,7 +19,7 @@ from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.vectors.vector import INT_DTYPE
 from openmdao.utils.mpi import MPI
-from openmdao.utils.options_dictionary import OptionsDictionary
+from openmdao.utils.options_dictionary import OptionsDictionary, _undefined
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.units import is_compatible, unit_conversion
 from openmdao.utils.variable_table import write_var_table
@@ -182,10 +177,6 @@ class System(object):
     _conn_global_abs_in2out : {'abs_in': 'abs_out'}
         Dictionary containing all explicit & implicit connections owned by this system
         or any descendant system. The data is the same across all processors.
-    _ext_num_vars : {'input': (int, int), 'output': (int, int)}
-        Total number of allprocs variables in system before/after this one.
-    _ext_sizes : {'input': (int, int), 'output': (int, int)}
-        Total size of allprocs variables in system before/after this one.
     _vec_names : [str, ...]
         List of names of all vectors, including the nonlinear vector.
     _lin_vec_names : [str, ...]
@@ -243,15 +234,13 @@ class System(object):
         If true, we are outside of setup.
         In this case, add_input, add_output, and add_subsystem all add to the
         '_static' versions of the respective data structures.
-        These data structures are never reset during reconfiguration.
+        These data structures are never reset during setup.
     _static_subsystems_allprocs : [<System>, ...]
         List of subsystems that stores all subsystems added outside of setup.
     _static_design_vars : dict of dict
         Driver design variables added outside of setup.
     _static_responses : dict of dict
         Driver responses added outside of setup.
-    _reconfigured : bool
-        If True, this system has reconfigured, and the immediate parent should update.
     supports_multivecs : bool
         If True, this system overrides compute_multi_jacvec_product (if an ExplicitComponent),
         or solve_multi_linear/apply_multi_linear (if an ImplicitComponent).
@@ -307,8 +296,6 @@ class System(object):
     _first_call_to_linearize : bool
         If True, this is the first call to _linearize.
     """
-
-    _undefined = object()
 
     def __init__(self, num_par_fd=1, **kwargs):
         """
@@ -399,9 +386,6 @@ class System(object):
 
         self._full_comm = None
 
-        self._ext_num_vars = {'input': (0, 0), 'output': (0, 0)}
-        self._ext_sizes = {'input': (0, 0), 'output': (0, 0)}
-
         self._vectors = {'input': {}, 'output': {}, 'residual': {}}
 
         self._inputs = None
@@ -439,7 +423,6 @@ class System(object):
         self._static_design_vars = OrderedDict()
         self._static_responses = OrderedDict()
 
-        self._reconfigured = False
         self.supports_multivecs = False
 
         self._relevant = None
@@ -507,55 +490,6 @@ class System(object):
         """
         pass
 
-    def _check_self_reconf(self):
-        """
-        Check if this systems wants to reconfigure and if so, perform the reconfiguration.
-        """
-        if self.reconfigure():
-            with self._unscaled_context_all():
-                # Backup input values
-                old_in = self._inputs
-                old_out = self._outputs
-
-                # Perform reconfiguration
-                self.resetup('reconf')
-
-                new_in = self._inputs
-                new_out = self._outputs
-
-                # Reload input and output values where possible
-                for vold, vnew in [(old_in, new_in), (old_out, new_out)]:
-                    for abs_name, old_view in vold._views_flat.items():
-                        if abs_name in vnew._views_flat:
-                            new_view = vnew._views_flat[abs_name]
-
-                            if len(old_view) == len(new_view):
-                                new_view[:] = old_view
-
-            self._reconfigured = True
-
-    def _check_child_reconf(self, subsys=None):
-        """
-        Check if any subsystem has reconfigured and if so, perform the necessary update setup.
-
-        Parameters
-        ----------
-        subsys : System or None
-            ignored
-        """
-        self._reconfigured = False
-
-    def reconfigure(self):
-        """
-        Perform reconfiguration.
-
-        Returns
-        -------
-        bool
-            If True, reconfiguration is to be performed.
-        """
-        return False
-
     def initialize(self):
         """
         Perform any one-time initialization run at instantiation.
@@ -568,51 +502,12 @@ class System(object):
         """
         pass
 
-    def _get_initial_global(self, initial):
-        """
-        Get initial values for _ext_num_vars, _ext_sizes.
-
-        Parameters
-        ----------
-        initial : bool
-            Whether we are reconfiguring - i.e., the model has been previously setup.
-
-        Returns
-        -------
-        _ext_num_vars : {'input': (int, int), 'output': (int, int)}
-            Total number of allprocs variables in system before/after this one.
-        _ext_sizes : {'input': (int, int), 'output': (int, int)}
-            Total size of allprocs variables in system before/after this one.
-        """
-        if not initial:
-            return (self._ext_num_vars, self._ext_sizes)
-        else:
-            ext_num_vars = {}
-            ext_sizes = {}
-
-            vec_names = self._lin_rel_vec_name_list if self._use_derivatives else self._vec_names
-
-            for vec_name in vec_names:
-                ext_num_vars[vec_name] = {}
-                ext_sizes[vec_name] = {}
-                for type_ in ['input', 'output']:
-                    ext_num_vars[vec_name][type_] = (0, 0)
-                    ext_sizes[vec_name][type_] = (0, 0)
-
-            if self._use_derivatives:
-                ext_num_vars['nonlinear'] = ext_num_vars['linear']
-                ext_sizes['nonlinear'] = ext_sizes['linear']
-
-            return ext_num_vars, ext_sizes
-
-    def _get_root_vectors(self, initial, force_alloc_complex=False):
+    def _get_root_vectors(self, force_alloc_complex=False):
         """
         Get the root vectors for the nonlinear and linear vectors for the model.
 
         Parameters
         ----------
-        initial : bool
-            Whether we are reconfiguring - i.e., whether the model has been previously setup.
         force_alloc_complex : bool
             Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
             detect when you need to do this, but in some cases (e.g., complex step is used
@@ -629,67 +524,60 @@ class System(object):
                                           'output': OrderedDict(),
                                           'residual': OrderedDict()}
 
-        if initial:
-            relevant = self._relevant
-            vec_names = self._rel_vec_name_list if self._use_derivatives else self._vec_names
-            vois = self._vois
-            abs2idx = self._var_allprocs_abs2idx
+        relevant = self._relevant
+        vec_names = self._rel_vec_name_list if self._use_derivatives else self._vec_names
+        vois = self._vois
+        abs2idx = self._var_allprocs_abs2idx
 
-            # Check for complex step to set vectors up appropriately.
-            # If any subsystem needs complex step, then we need to allocate it everywhere.
-            nl_alloc_complex = force_alloc_complex
-            for sub in self.system_iter(include_self=True, recurse=True):
-                nl_alloc_complex |= 'cs' in sub._approx_schemes
-                if nl_alloc_complex:
-                    break
-
-            # Linear vectors allocated complex only if subsolvers require derivatives.
+        # Check for complex step to set vectors up appropriately.
+        # If any subsystem needs complex step, then we need to allocate it everywhere.
+        nl_alloc_complex = force_alloc_complex
+        for sub in self.system_iter(include_self=True, recurse=True):
+            nl_alloc_complex |= 'cs' in sub._approx_schemes
             if nl_alloc_complex:
-                from openmdao.error_checking.check_config import check_allocate_complex_ln
-                ln_alloc_complex = check_allocate_complex_ln(self, force_alloc_complex)
-            else:
-                ln_alloc_complex = False
+                break
 
-            if self._has_input_scaling or self._has_output_scaling or self._has_resid_scaling:
-                self._scale_factors = self._compute_root_scale_factors()
-            else:
-                self._scale_factors = {}
-
-            if self._vector_class is None:
-                self._vector_class = self._local_vector_class
-
-            vector_class = self._vector_class
-
-            for vec_name in vec_names:
-                sizes = self._var_sizes[vec_name]['output']
-                ncol = 1
-                rel = None
-                if vec_name == 'nonlinear':
-                    alloc_complex = nl_alloc_complex
-                else:
-                    alloc_complex = ln_alloc_complex
-
-                    if vec_name != 'linear':
-                        voi = vois[vec_name]
-                        if voi['vectorize_derivs']:
-                            if 'size' in voi:
-                                ncol = voi['size']
-                            else:
-                                owner = self._owning_rank[vec_name]
-                                ncol = sizes[owner, abs2idx[vec_name][vec_name]]
-                        rdct, _ = relevant[vec_name]['@all']
-                        rel = rdct['output']
-
-                for key in ['input', 'output', 'residual']:
-                    root_vectors[key][vec_name] = vector_class(vec_name, key, self,
-                                                               alloc_complex=alloc_complex,
-                                                               ncol=ncol, relevant=rel)
+        # Linear vectors allocated complex only if subsolvers require derivatives.
+        if nl_alloc_complex:
+            from openmdao.error_checking.check_config import check_allocate_complex_ln
+            ln_alloc_complex = check_allocate_complex_ln(self, force_alloc_complex)
         else:
+            ln_alloc_complex = False
 
-            for key, vardict in self._vectors.items():
-                for vec_name, vec in vardict.items():
-                    root_vectors[key][vec_name] = vec._root_vector
+        if self._has_input_scaling or self._has_output_scaling or self._has_resid_scaling:
+            self._scale_factors = self._compute_root_scale_factors()
+        else:
+            self._scale_factors = {}
 
+        if self._vector_class is None:
+            self._vector_class = self._local_vector_class
+
+        vector_class = self._vector_class
+
+        for vec_name in vec_names:
+            sizes = self._var_sizes[vec_name]['output']
+            ncol = 1
+            rel = None
+            if vec_name == 'nonlinear':
+                alloc_complex = nl_alloc_complex
+            else:
+                alloc_complex = ln_alloc_complex
+
+                if vec_name != 'linear':
+                    voi = vois[vec_name]
+                    if voi['vectorize_derivs']:
+                        if 'size' in voi:
+                            ncol = voi['size']
+                        else:
+                            owner = self._owning_rank[vec_name]
+                            ncol = sizes[owner, abs2idx[vec_name][vec_name]]
+                    rdct, _ = relevant[vec_name]['@all']
+                    rel = rdct['output']
+
+            for key in ['input', 'output', 'residual']:
+                root_vectors[key][vec_name] = vector_class(vec_name, key, self,
+                                                           alloc_complex=alloc_complex,
+                                                           ncol=ncol, relevant=rel)
         return root_vectors
 
     def _get_approx_scheme(self, method):
@@ -716,39 +604,15 @@ class System(object):
             self._approx_schemes[method] = _supported_methods[method]()
         return self._approx_schemes[method]
 
-    def resetup(self, setup_mode='full'):
-        """
-        Public wrapper for _setup that reconfigures after an initial setup has been performed.
-
-        Parameters
-        ----------
-        setup_mode : str
-            Must be one of 'full', 'reconf', or 'update'.
-        """
-        self._setup(self.comm, setup_mode=setup_mode, mode=self._mode,
-                    distributed_vector_class=self._distributed_vector_class,
-                    local_vector_class=self._local_vector_class,
-                    use_derivatives=self._use_derivatives,
-                    prob_options=self._problem_options)
-        self._final_setup(self.comm, setup_mode=setup_mode,
-                          force_alloc_complex=self._outputs._alloc_complex)
-
-    def _setup(self, comm, setup_mode, mode, distributed_vector_class, local_vector_class,
+    def _setup(self, comm, mode, distributed_vector_class, local_vector_class,
                use_derivatives, prob_options=None):
         """
         Perform setup for this system and its descendant systems.
-
-        There are three modes of setup:
-        1. 'full': wipe everything and setup this and all descendant systems from scratch
-        2. 'reconf': don't wipe everything, but reconfigure this and all descendant systems
-        3. 'update': update after one or more immediate systems has done a 'reconf' or 'update'
 
         Parameters
         ----------
         comm : MPI.Comm or <FakeComm> or None
             The global communicator.
-        setup_mode : str
-            Must be one of 'full', 'reconf', or 'update'.
         mode : str
             Derivative direction, either 'fwd', or 'rev', or 'auto'
         distributed_vector_class : type
@@ -769,29 +633,17 @@ class System(object):
         if self._coloring_info['dynamic'] or self._coloring_info['static'] is not None:
             self._coloring_info['coloring'] = None
 
-        # 1. Full setup that must be called in the root system.
-        if setup_mode == 'full':
-            recurse = True
-
-            self.pathname = ''
-            self.comm = comm
-            self._relevant = None
-            self._distributed_vector_class = distributed_vector_class
-            self._local_vector_class = local_vector_class
-            self._use_derivatives = use_derivatives
-        # 2. Partial setup called in the system initiating the reconfiguration.
-        elif setup_mode == 'reconf':
-            recurse = True
-        # 3. Update-mode setup called in all ancestors of the system initiating the reconf.
-        elif setup_mode == 'update':
-            recurse = False
+        self.pathname = ''
+        self.comm = comm
+        self._relevant = None
+        self._distributed_vector_class = distributed_vector_class
+        self._local_vector_class = local_vector_class
+        self._use_derivatives = use_derivatives
 
         self._mode = mode
 
-        # If we're only updating and not recursing, processors don't need to be redistributed.
-        if recurse:
-            # Besides setting up the processors, this method also builds the model hierarchy.
-            self._setup_procs(self.pathname, comm, mode, self._problem_options)
+        # Besides setting up the processors, this method also builds the model hierarchy.
+        self._setup_procs(self.pathname, comm, mode, self._problem_options)
 
         # Recurse model from the bottom to the top for configuring.
         # Set static_mode to False in all subsystems because inputs & outputs may be created.
@@ -804,13 +656,17 @@ class System(object):
         # For updating variable and connection data, setup needs to be performed only
         # in the current system, by gathering data from immediate subsystems,
         # and no recursion is necessary.
-        self._setup_var_data(recurse=recurse)
+        self._setup_var_data()
         self._setup_vec_names(mode, self._vec_names, self._vois)
-        self._setup_global_connections(recurse=recurse)
+        self._setup_global_connections()
         self._setup_relevance(mode, self._relevant)
-        self._setup_var_index_ranges(recurse=recurse)
-        self._setup_var_sizes(recurse=recurse)
-        self._setup_connections(recurse=recurse)
+        self._setup_var_index_ranges()
+        self._setup_var_sizes()
+
+        if self.pathname == '':
+            self._resolve_connected_input_defaults()
+
+        self._setup_connections()
 
     def _configure_check(self):
         """
@@ -818,67 +674,38 @@ class System(object):
         """
         pass
 
-    def _final_setup(self, comm, setup_mode, force_alloc_complex=False):
+    def _final_setup(self, comm, force_alloc_complex=False):
         """
         Perform final setup for this system and its descendant systems.
 
         This part of setup is called automatically at the start of run_model or run_driver.
 
-        There are three modes of setup:
-        1. 'full': wipe everything and setup this and all descendant systems from scratch
-        2. 'reconf': don't wipe everything, but reconfigure this and all descendant systems
-        3. 'update': update after one or more immediate systems has done a 'reconf' or 'update'
-
         Parameters
         ----------
         comm : MPI.Comm or <FakeComm> or None
             The global communicator.
-        setup_mode : str
-            Must be one of 'full', 'reconf', or 'update'.
         force_alloc_complex : bool
             Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
             detect when you need to do this, but in some cases (e.g., complex step is used
             after a reconfiguration) you may need to set this to True.
         """
-        # 1. Full setup that must be called in the root system.
-        if setup_mode == 'full':
-            initial = True
-            recurse = True
-            resize = False
-        # 2. Partial setup called in the system initiating the reconfiguration.
-        elif setup_mode == 'reconf':
-            initial = False
-            recurse = True
-            resize = True
-        # 3. Update-mode setup called in all ancestors of the system initiating the reconf.
-        elif setup_mode == 'update':
-            initial = False
-            recurse = False
-            resize = False
-
-        # For vector-related, setup, recursion is always necessary, even for updating.
-        # For reconfiguration setup, we resize the vectors once, only in the current system.
-        ext_num_vars, ext_sizes = self._get_initial_global(initial)
-        self._setup_global(ext_num_vars, ext_sizes)
-        root_vectors = self._get_root_vectors(initial, force_alloc_complex=force_alloc_complex)
-        self._setup_vectors(root_vectors, resize=resize)
+        root_vectors = self._get_root_vectors(force_alloc_complex=force_alloc_complex)
+        self._setup_vectors(root_vectors)
 
         # Transfers do not require recursion, but they have to be set up after the vector setup.
-        self._setup_transfers(recurse=recurse)
+        self._setup_transfers()
 
         # Same situation with solvers, partials, and Jacobians.
         # If we're updating, we just need to re-run setup on these, but no recursion necessary.
-        self._setup_solvers(recurse=recurse)
-        self._setup_solver_print(recurse=recurse)
+        self._setup_solvers()
+        self._setup_solver_print()
         if self._use_derivatives:
-            self._setup_partials(recurse=recurse)
-            self._setup_jacobians(recurse=recurse)
+            self._setup_partials()
+            self._setup_jacobians()
 
-        self._setup_recording(recurse=recurse)
+        self._setup_recording()
 
-        # If full or reconf setup, reset this system's variables to initial values.
-        if setup_mode in ('full', 'reconf'):
-            self.set_initial_values()
+        self.set_initial_values()
 
         # Tell all subsystems to record their metadata if they have recorders attached
         for sub in self.system_iter(recurse=True, include_self=True):
@@ -1067,7 +894,7 @@ class System(object):
                     from openmdao.core.component import Component
                     for s in self.system_iter(recurse=True, typ=Component):
                         s.declare_partials('*', '*', method=self._coloring_info['method'])
-                self._setup_partials(recurse=True)
+                self._setup_partials()
 
         approx_scheme = self._get_approx_scheme(self._coloring_info['method'])
 
@@ -1389,7 +1216,7 @@ class System(object):
 
         return comm
 
-    def _setup_recording(self, recurse=True):
+    def _setup_recording(self):
         if self._rec_mgr._recorders:
             myinputs = myoutputs = myresiduals = []
 
@@ -1431,46 +1258,31 @@ class System(object):
 
             self._rec_mgr.startup(self)
 
-        # Recursion
-        if recurse:
-            for subsys in self._subsystems_myproc:
-                subsys._setup_recording(recurse)
+        for subsys in self._subsystems_myproc:
+            subsys._setup_recording()
 
-    def _setup_var_index_ranges(self, recurse=True):
+    def _setup_var_index_ranges(self):
         """
         Compute the division of variables by subsystem.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems (ignored).
         """
-        self._setup_var_index_maps(recurse=recurse)
+        self._setup_var_index_maps()
 
-    def _setup_var_data(self, recurse=True):
+    def _setup_var_data(self):
         """
         Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         self._var_allprocs_abs_names = {'input': [], 'output': []}
         self._var_abs_names = {'input': [], 'output': []}
         self._var_allprocs_prom2abs_list = {'input': OrderedDict(), 'output': OrderedDict()}
         self._var_abs2prom = {'input': {}, 'output': {}}
+        self._var_allprocs_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2meta = {}
         self._var_abs2meta = {}
+        self._var_allprocs_abs2idx = {}
 
-    def _setup_var_index_maps(self, recurse=True):
+    def _setup_var_index_maps(self):
         """
         Compute maps from abs var names to their index among allprocs variables in this system.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         self._var_allprocs_abs2idx = abs2idx = {}
 
@@ -1485,19 +1297,12 @@ class System(object):
         if self._use_derivatives:
             abs2idx['nonlinear'] = abs2idx['linear']
 
-        # Recursion
-        if recurse:
-            for subsys in self._subsystems_myproc:
-                subsys._setup_var_index_maps(recurse)
+        for subsys in self._subsystems_myproc:
+            subsys._setup_var_index_maps()
 
-    def _setup_var_sizes(self, recurse=True):
+    def _setup_var_sizes(self):
         """
         Compute the arrays of local variable sizes for all variables/procs on this system.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         self._var_sizes = {}
         self._owned_sizes = None
@@ -1540,7 +1345,7 @@ class System(object):
                     global_shape = (global_size,)
                 mymeta['global_shape'] = global_shape
 
-    def _setup_global_connections(self, recurse=True, conns=None):
+    def _setup_global_connections(self, conns=None):
         """
         Compute dict of all connections between this system's inputs and outputs.
 
@@ -1552,8 +1357,6 @@ class System(object):
 
         Parameters
         ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         conns : dict
             Dictionary of connections passed down from parent group.
         """
@@ -1732,32 +1535,13 @@ class System(object):
         for s in self._subsystems_myproc:
             s._setup_relevance(mode, relevant)
 
-    def _setup_connections(self, recurse=True):
+    def _setup_connections(self):
         """
         Compute dict of all connections owned by this system.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         pass
 
-    def _setup_global(self, ext_num_vars, ext_sizes):
-        """
-        Compute total number and total size of variables in systems before / after this system.
-
-        Parameters
-        ----------
-        ext_num_vars : {'input': (int, int), 'output': (int, int)}
-            Total number of allprocs variables in system before/after this one.
-        ext_sizes : {'input': (int, int), 'output': (int, int)}
-            Total size of allprocs variables in system before/after this one.
-        """
-        self._ext_num_vars = ext_num_vars
-        self._ext_sizes = ext_sizes
-
-    def _setup_vectors(self, root_vectors, resize=False, alloc_complex=False):
+    def _setup_vectors(self, root_vectors, alloc_complex=False):
         """
         Compute all vectors for all vec names and assign excluded variables lists.
 
@@ -1765,8 +1549,6 @@ class System(object):
         ----------
         root_vectors : dict of dict of Vector
             Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
-        resize : bool
-            Whether to resize the root vectors - i.e, because this system is initiating a reconf.
         alloc_complex : bool
             Whether to allocate any imaginary storage to perform complex step. Default is False.
         """
@@ -1797,7 +1579,7 @@ class System(object):
             for kind in ['input', 'output', 'residual']:
                 rootvec = root_vectors[kind][vec_name]
                 vectors[kind][vec_name] = vector_class(
-                    vec_name, kind, self, rootvec, resize=resize,
+                    vec_name, kind, self, rootvec,
                     alloc_complex=vec_alloc_complex, ncol=rootvec._ncol)
 
         self._inputs = vectors['input']['nonlinear']
@@ -1839,25 +1621,15 @@ class System(object):
             }
         return scale_factors
 
-    def _setup_transfers(self, recurse=True):
+    def _setup_transfers(self):
         """
         Compute all transfers that are owned by this system.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         pass
 
-    def _setup_solvers(self, recurse=True):
+    def _setup_solvers(self):
         """
         Perform setup in all solvers.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         # remove old solver error files if they exist
         if self.pathname == '':
@@ -1872,9 +1644,8 @@ class System(object):
         if self._linear_solver is not None:
             self._linear_solver._setup_solvers(self, 0)
 
-        if recurse:
-            for subsys in self._subsystems_myproc:
-                subsys._setup_solvers(recurse=recurse)
+        for subsys in self._subsystems_myproc:
+            subsys._setup_solvers()
 
     def _setup_jacobians(self, recurse=True):
         """
@@ -3795,14 +3566,6 @@ class System(object):
         """
         pass
 
-    def _solve_nonlinear(self):
-        """
-        Compute outputs. The model is assumed to be in a scaled state.
-
-        """
-        # Reconfigure if needed.
-        self._check_self_reconf()
-
     def check_config(self, logger):
         """
         Perform optional error checks.
@@ -4127,7 +3890,7 @@ class System(object):
             The value of the requested output/input/resid variable.  None if variable is not found.
         """
         discrete = distrib = False
-        val = System._undefined
+        val = _undefined
         typ = 'output' if abs_name in self._var_allprocs_abs2prom['output'] else 'input'
 
         try:
@@ -4147,20 +3910,27 @@ class System(object):
                 pass  # non-local discrete output
             elif abs_name in self._var_allprocs_discrete['input']:
                 pass  # non-local discrete input
+            elif get_remote:
+                raise ValueError(f"{self.msginfo}: Can't find variable named '{abs_name}'.")
             else:
-                return System._undefined
+                return _undefined
 
         if kind is None:
             kind = typ
 
         if not discrete:
-            vec = self._vectors[kind][vec_name]
-            if abs_name in vec._views:
-                val = vec._views_flat[abs_name] if flat else vec._views[abs_name]
+            try:
+                vec = self._vectors[kind][vec_name]
+            except KeyError:
+                if abs_name in self._var_abs2meta:
+                    val = self._var_abs2meta[abs_name]['value']
+            else:
+                if abs_name in vec._views:
+                    val = vec._views_flat[abs_name] if flat else vec._views[abs_name]
 
         if get_remote and self.comm.size > 1:
             owner = self._owning_rank[abs_name]
-            loc_val = val if val is not System._undefined else np.zeros(0)
+            loc_val = val if val is not _undefined else np.zeros(0)
             if rank is None:   # bcast
                 if distrib:
                     idx = self._var_allprocs_abs2idx['nonlinear'][abs_name]
@@ -4198,7 +3968,7 @@ class System(object):
                         elif self.comm.rank == rank:
                             val = self.comm.recv(source=owner, tag=tag)
 
-        if not flat and val is not System._undefined and not discrete:
+        if not flat and val is not _undefined and not discrete:
             val.shape = meta['global_shape'] if get_remote and distrib else meta['shape']
 
         return val
@@ -4377,6 +4147,9 @@ class System(object):
             return meta[abs_name]
 
         raise KeyError('{}: Metadata for variable "{}" not found.'.format(self.msginfo, name))
+
+    def _resolve_connected_input_defaults(self):
+        pass
 
 
 def get_relevant_vars(connections, desvars, responses, mode):

@@ -2798,7 +2798,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         self.assertEqual(problem_cases, ['final'])
 
         # get list of output variables recorded on problem
-        problem_vars = cr.list_source_vars('problem')
+        problem_vars = cr.list_source_vars('problem', out_stream=None)
         self.assertEqual(sorted(problem_vars['outputs']), ['con1', 'con2', 'obj', 'x', 'z'])
 
         # get the recorded case and check values
@@ -2852,7 +2852,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         self.assertEqual(problem_cases, ['final'])
 
         # get list of output variables recorded on problem
-        problem_vars = cr.list_source_vars('problem')
+        problem_vars = cr.list_source_vars('problem', out_stream=None)
         self.assertEqual(sorted(problem_vars['outputs']), ['con1', 'con2', 'obj', 'x', 'z'])
 
         # get the recorded case and check values
@@ -3044,7 +3044,7 @@ class TestFeatureAdvancedExample(unittest.TestCase):
         self.assertEqual(problem_cases, ['final_state'])
 
         # get list of output variables recorded on problem
-        problem_vars = cr.list_source_vars('problem')
+        problem_vars = cr.list_source_vars('problem', out_stream=None)
         self.assertEqual(sorted(problem_vars['outputs']),
                          ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z'])
 

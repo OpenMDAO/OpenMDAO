@@ -13,7 +13,7 @@ def abs_smooth_complex(x, delta_x):
     """
     Compute the absolute value of a complex-stepped vector.
 
-    Rather than taking a Euclidian norm, simply negate the values that are less than zero.
+    Rather than taking a Euclidean norm, simply negate the values that are less than zero.
 
     Parameters
     ----------

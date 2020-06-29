@@ -31,6 +31,15 @@ LinearBlockGS Options
     LinearBlockGS
     options
 
+LinearBlockGS Constructor
+-------------------------
+
+The call signature for the `LinearBlockGS` constructor is:
+
+.. automethod:: openmdao.solvers.linear.linear_block_gs.LinearBlockGS.__init__
+    :noindex:
+
+
 LinearBlockGS Option Examples
 -----------------------------
 

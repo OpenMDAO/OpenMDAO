@@ -1,12 +1,7 @@
 """Define the Group class."""
 import os
 from collections import Counter, OrderedDict, defaultdict
-
-# note: this is a Python 3.3 change, clean this up for OpenMDAO 3.x
-try:
-    from collections.abc import Iterable
-except ImportError:
-    from collections import Iterable
+from collections.abc import Iterable
 
 from itertools import product, chain
 from numbers import Number
@@ -27,11 +22,12 @@ from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import convert_neg, array_connection_compatible, \
     _flatten_src_indices
-from openmdao.utils.general_utils import ContainsAll, all_ancestors, simple_warning
-from openmdao.utils.units import is_compatible, unit_conversion
+from openmdao.utils.general_utils import ContainsAll, all_ancestors, simple_warning, common_subpath
+from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch
 from openmdao.utils.mpi import MPI
 from openmdao.utils.coloring import Coloring, _STD_COLORING_FNAME
 import openmdao.utils.coloring as coloring_mod
+from openmdao.utils.options_dictionary import _undefined
 
 # regex to check for valid names.
 import re
@@ -55,6 +51,8 @@ class Group(System):
         List of local subgroups.
     _manual_connections : dict
         Dictionary of input_name: (output_name, src_indices) connections.
+    _group_inputs : dict
+        Mapping of promoted names to certain metadata (src_indices, units).
     _static_manual_connections : dict
         Dictionary that stores all explicit connections added outside of setup.
     _conn_abs_in2out : {'abs_in': 'abs_out'}
@@ -103,6 +101,7 @@ class Group(System):
         self._local_system_set = None
         self._subgroups_myproc = None
         self._manual_connections = {}
+        self._group_inputs = {}
         self._static_manual_connections = {}
         self._conn_abs_in2out = {}
         self._conn_discrete_in2out = {}
@@ -163,6 +162,30 @@ class Group(System):
             system hieararchy with attribute access
         """
         pass
+
+    def add_input(self, name, val=_undefined, units=None):
+        """
+        Specify metadata for connected promoted inputs without a source.
+
+        Parameters
+        ----------
+        name : str
+            The name of the promoted inputs.
+        val : object
+            Value for the auto_ivc source.
+        units : str or None
+            Units for the auto_ivc source.
+        """
+        if name in self._group_inputs:
+            simple_warning(f"{self.msginfo}: Adding group input '{name}' which "
+                           "overrides a previous input of the same name.")
+        meta = {}
+        if val is not _undefined:
+            meta['value'] = val
+        if units is not None:
+            meta['units'] = units
+        if meta:
+            self._group_inputs[name] = meta
 
     def _get_scope(self, excl_sub=None):
         """
@@ -328,6 +351,8 @@ class Group(System):
 
         self._setup_procs_finished = False
 
+        self._vectors = {}
+
         if self._num_par_fd > 1:
             info = self._coloring_info
             if comm.size > 1:
@@ -437,41 +462,6 @@ class Group(System):
 
         super(Group, self)._configure_check()
 
-    def _check_child_reconf(self, subsys=None):
-        """
-        Check if any subsystem has reconfigured and if so, perform the necessary update setup.
-
-        Parameters
-        ----------
-        subsys : System or None
-            If not None, check only if the given subsystem has reconfigured.
-        """
-        if subsys is None:
-            # See if any local subsystem has reconfigured
-            for subsys in self._subgroups_myproc:
-                if subsys._reconfigured:
-                    reconf = 1
-                    break
-            else:
-                reconf = 0
-        else:
-            reconf = int(subsys._reconfigured) if subsys.name in self._loc_subsys_map else 0
-
-        # See if any subsystem on this or any other processor has configured
-        if self.comm.size > 1:
-            reconf = self.comm.allreduce(reconf) > 0
-
-        if reconf:
-            # Perform an update setup
-            with self._unscaled_context_all():
-                self.resetup('update')
-
-            # Reset the _reconfigured attribute to False
-            for subsys in self._subsystems_myproc:
-                subsys._reconfigured = False
-
-            self._reconfigured = True
-
     def _list_states(self):
         """
         Return list of all local states at and below this system.
@@ -505,14 +495,9 @@ class Group(System):
         else:
             return self._list_states()
 
-    def _setup_var_index_ranges(self, recurse=True):
+    def _setup_var_index_ranges(self):
         """
         Compute the division of variables by subsystem.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         nsub_allprocs = len(self._subsystems_allprocs)
 
@@ -563,21 +548,14 @@ class Group(System):
         if self._use_derivatives:
             subsystems_var_range['nonlinear'] = subsystems_var_range['linear']
 
-        self._setup_var_index_maps(recurse=recurse)
+        self._setup_var_index_maps()
 
-        # Recursion
-        if recurse:
-            for subsys in self._subsystems_myproc:
-                subsys._setup_var_index_ranges(recurse)
+        for subsys in self._subsystems_myproc:
+            subsys._setup_var_index_ranges()
 
-    def _setup_var_data(self, recurse=True):
+    def _setup_var_data(self):
         """
         Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         super(Group, self)._setup_var_data()
 
@@ -598,11 +576,14 @@ class Group(System):
 
         allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
 
+        group_inputs = []
+        for n, meta in self._group_inputs.items():
+            meta['path'] = self.pathname  # used for error reporting
+
         for subsys in self._subsystems_myproc:
-            if recurse:
-                subsys._setup_var_data(recurse)
-                self._has_output_scaling |= subsys._has_output_scaling
-                self._has_resid_scaling |= subsys._has_resid_scaling
+            subsys._setup_var_data()
+            self._has_output_scaling |= subsys._has_output_scaling
+            self._has_resid_scaling |= subsys._has_resid_scaling
 
             var_maps = subsys._get_maps(subsys._var_allprocs_prom2abs_list)
 
@@ -643,6 +624,9 @@ class Group(System):
                     if prom_name not in allprocs_prom2abs_list[type_]:
                         allprocs_prom2abs_list[type_][prom_name] = []
                     allprocs_prom2abs_list[type_][prom_name].extend(sub_abs)
+                    if type_ == 'input' and isinstance(subsys, Group):
+                        if sub_prom in subsys._group_inputs:
+                            group_inputs.append((prom_name, subsys._group_inputs[sub_prom]))
 
         for prom_name, abs_list in allprocs_prom2abs_list['output'].items():
             if len(abs_list) > 1:
@@ -657,7 +641,7 @@ class Group(System):
                                                     mysub._full_comm.rank == 0)):
                 raw = (allprocs_abs_names, allprocs_discrete, allprocs_prom2abs_list,
                        allprocs_abs2prom, allprocs_abs2meta, self._has_output_scaling,
-                       self._has_resid_scaling)
+                       self._has_resid_scaling, group_inputs)
             else:
                 raw = (
                     {'input': [], 'output': []},
@@ -666,7 +650,8 @@ class Group(System):
                     {'input': {}, 'output': {}},
                     {},
                     False,
-                    False
+                    False,
+                    []
                 )
             gathered = self.comm.allgather(raw)
 
@@ -675,10 +660,13 @@ class Group(System):
                 allprocs_abs2prom[type_] = {}
                 allprocs_prom2abs_list[type_] = OrderedDict()
 
+            group_inputs = []
             for (myproc_abs_names, myproc_discrete, myproc_prom2abs_list, all_abs2prom,
-                 myproc_abs2meta, oscale, rscale) in gathered:
+                 myproc_abs2meta, oscale, rscale, ginputs) in gathered:
                 self._has_output_scaling |= oscale
                 self._has_resid_scaling |= rscale
+
+                group_inputs.extend(ginputs)
 
                 # Assemble in parallel allprocs_abs2meta
                 for n in myproc_abs2meta:
@@ -698,20 +686,44 @@ class Group(System):
                             allprocs_prom2abs_list[type_][prom_name] = []
                         allprocs_prom2abs_list[type_][prom_name].extend(abs_names_list)
 
+        ginputs = self._group_inputs
+        for prom, meta in group_inputs:
+            if prom in ginputs:
+                # check for any conflicting units or values
+                old = ginputs[prom]
+
+                for n, val in meta.items():
+                    if n == 'path' or val is None:
+                        continue
+
+                    if n in old and old[n] is not None:
+                        if isinstance(val, np.ndarray) or isinstance(old[n], np.ndarray):
+                            eq = np.all(val == old[n])
+                        else:
+                            eq = val == old[n]
+
+                        if not eq:
+                            raise RuntimeError(f"Groups '{old['path']}' and '{meta['path']}' "
+                                               f"added the input '{prom}' with conflicting '{n}'.")
+                    old[n] = val
+            else:
+                ginputs[prom] = meta
+
+        if ginputs:
+            extra = set(ginputs).difference(self._var_allprocs_prom2abs_list['input'])
+            if extra:
+                raise RuntimeError(f"{self.msginfo}: The following group inputs could not be "
+                                   f"found: {sorted(extra)}.")
+
         if self._var_discrete['input'] or self._var_discrete['output']:
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
             self._discrete_outputs = _DictValues(self._var_discrete['output'])
         else:
             self._discrete_inputs = self._discrete_outputs = ()
 
-    def _setup_var_sizes(self, recurse=True):
+    def _setup_var_sizes(self):
         """
         Compute the arrays of local variable sizes for all variables/procs on this system.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         super(Group, self)._setup_var_sizes()
 
@@ -723,9 +735,8 @@ class Group(System):
         subsystems_proc_range = self._subsystems_proc_range
 
         # Recursion
-        if recurse:
-            for subsys in self._subsystems_myproc:
-                subsys._setup_var_sizes(recurse)
+        for subsys in self._subsystems_myproc:
+            subsys._setup_var_sizes()
 
         sizes = self._var_sizes
         relnames = self._var_allprocs_relevant_names
@@ -825,7 +836,7 @@ class Group(System):
         if self.comm.size > 1:
             self._setup_global_shapes()
 
-    def _setup_global_connections(self, recurse=True, conns=None):
+    def _setup_global_connections(self, conns=None):
         """
         Compute dict of all connections between this system's inputs and outputs.
 
@@ -837,8 +848,6 @@ class Group(System):
 
         Parameters
         ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         conns : dict
             Dictionary of connections passed down from parent group.
         """
@@ -983,17 +992,15 @@ class Group(System):
                     new_conns[inparts[nparts]][abs_in] = abs_out
 
         # Recursion
-        if recurse:
-            distcomps = []
-            for subsys in self._subsystems_myproc:
-                if isinstance(subsys, Group):
-                    if subsys.name in new_conns:
-                        subsys._setup_global_connections(recurse=recurse,
-                                                         conns=new_conns[subsys.name])
-                    else:
-                        subsys._setup_global_connections(recurse=recurse)
-                elif subsys.options['distributed'] and subsys.comm.size > 1:
-                    distcomps.append(subsys)
+        distcomps = []
+        for subsys in self._subsystems_myproc:
+            if isinstance(subsys, Group):
+                if subsys.name in new_conns:
+                    subsys._setup_global_connections(conns=new_conns[subsys.name])
+                else:
+                    subsys._setup_global_connections()
+            elif subsys.options['distributed'] and subsys.comm.size > 1:
+                distcomps.append(subsys)
 
         # Compute global_abs_in2out by first adding this group's contributions,
         # then adding contributions from systems above/below, then allgathering.
@@ -1033,18 +1040,12 @@ class Group(System):
             for myproc_global_abs_in2out in gathered:
                 global_abs_in2out.update(myproc_global_abs_in2out)
 
-            if recurse:
-                for comp in distcomps:
-                    comp._update_dist_src_indices(global_abs_in2out)
+            for comp in distcomps:
+                comp._update_dist_src_indices(global_abs_in2out)
 
-    def _setup_connections(self, recurse=True):
+    def _setup_connections(self):
         """
         Compute dict of all connections owned by this Group.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         abs_in2out = self._conn_abs_in2out = {}
         global_abs_in2out = self._conn_global_abs_in2out
@@ -1053,9 +1054,8 @@ class Group(System):
         allprocs_discrete_out = self._var_allprocs_discrete['output']
 
         # Recursion
-        if recurse:
-            for subsys in self._subsystems_myproc:
-                subsys._setup_connections(recurse)
+        for subsys in self._subsystems_myproc:
+            subsys._setup_connections()
 
         if MPI:
             # collect set of local (not remote, not distributed) subsystems so we can
@@ -1413,68 +1413,13 @@ class Group(System):
                                 src_val = self._loc_subsys_map[src_sys_name]._discrete_outputs[src]
                             tgt_sys._discrete_inputs[tgt] = src_val
 
-    def _setup_global(self, ext_num_vars, ext_sizes):
-        """
-        Compute total number and total size of variables in systems before / after this system.
-
-        Parameters
-        ----------
-        ext_num_vars : {'input': (int, int), 'output': (int, int)}
-            Total number of allprocs variables in system before/after this one.
-        ext_sizes : {'input': (int, int), 'output': (int, int)}
-            Total size of local variables in system before/after this one.
-        """
-        super(Group, self)._setup_global(ext_num_vars, ext_sizes)
-
-        iproc = self.comm.rank
-        relnames = self._var_allprocs_relevant_names
-
-        for subsys in self._subsystems_myproc:
-            sub_ext_num_vars = {}
-            sub_ext_sizes = {}
-
-            if subsys._use_derivatives:
-                vec_names = subsys._lin_rel_vec_name_list
-            else:
-                vec_names = subsys._vec_names
-
-            for vec_name in vec_names:
-                subsystems_var_range = self._subsystems_var_range[vec_name]
-                sizes = self._var_sizes[vec_name]
-
-                sub_ext_num_vars[vec_name] = {}
-                sub_ext_sizes[vec_name] = {}
-
-                for type_ in ['input', 'output']:
-                    idx1, idx2 = subsystems_var_range[type_][subsys.name]
-
-                    sub_ext_num_vars[vec_name][type_] = (
-                        ext_num_vars[vec_name][type_][0] + idx1,
-                        ext_num_vars[vec_name][type_][1] + len(relnames[vec_name][type_]) - idx2,
-                    )
-                    sub_ext_sizes[vec_name][type_] = (
-                        ext_sizes[vec_name][type_][0] + np.sum(sizes[type_][iproc, :idx1]),
-                        ext_sizes[vec_name][type_][1] + np.sum(sizes[type_][iproc, idx2:]),
-                    )
-
-            if subsys._use_derivatives:
-                sub_ext_num_vars['nonlinear'] = sub_ext_num_vars['linear']
-                sub_ext_sizes['nonlinear'] = sub_ext_sizes['linear']
-
-            subsys._setup_global(sub_ext_num_vars, sub_ext_sizes)
-
-    def _setup_transfers(self, recurse=True):
+    def _setup_transfers(self):
         """
         Compute all transfers that are owned by this system.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         """
-        self._vector_class.TRANSFER._setup_transfers(self, recurse=recurse)
+        self._vector_class.TRANSFER._setup_transfers(self)
         if self._conn_discrete_in2out:
-            self._vector_class.TRANSFER._setup_discrete_transfers(self, recurse=recurse)
+            self._vector_class.TRANSFER._setup_discrete_transfers(self)
 
     def promotes(self, subsys_name, any=None, inputs=None, outputs=None,
                  src_indices=None, flat_src_indices=None):
@@ -1809,8 +1754,6 @@ class Group(System):
         """
         Compute outputs. The model is assumed to be in a scaled state.
         """
-        super(Group, self)._solve_nonlinear()
-
         name = self.pathname if self.pathname else 'root'
 
         with Recording(name + '._solve_nonlinear', self.iter_count, self):
@@ -2090,21 +2033,15 @@ class Group(System):
         self._owns_approx_jac = True
         self._owns_approx_jac_meta = kwargs
 
-    def _setup_partials(self, recurse=True):
+    def _setup_partials(self):
         """
         Call setup_partials in components.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         self._subjacs_info = info = {}
 
-        if recurse:
-            for subsys in self._subsystems_myproc:
-                subsys._setup_partials(recurse)
-                info.update(subsys._subjacs_info)
+        for subsys in self._subsystems_myproc:
+            subsys._setup_partials()
+            info.update(subsys._subjacs_info)
 
         if self._has_distrib_vars and self._owns_approx_jac:
             # We current cannot approximate across a group with a distributed component if the
@@ -2438,3 +2375,60 @@ class Group(System):
                 graph.add_edge(src_sys, tgt_sys, conns=edge_data[key])
 
         return graph
+
+    def _resolve_connected_input_defaults(self):
+        conns = self._conn_global_abs_in2out
+        abs2prom = self._var_allprocs_abs2prom['input']
+
+        # inproms is a dict where the keys are promoted input names, and the values
+        # are all of the absolute input names with that promoted name, which indicates
+        # that the inputs will be connected to a common auto_ivc source in a future version.
+        inproms = defaultdict(list)
+        for n in self._var_allprocs_abs_names['input']:
+            if n not in conns:
+                inproms[abs2prom[n]].append(n)
+
+        all_abs2meta = self._var_allprocs_abs2meta
+        abs2meta = self._var_abs2meta
+
+        for prom, tgts in inproms.items():
+            if len(tgts) > 1:
+                if prom in self._group_inputs:
+                    gmeta = self._group_inputs[prom]
+                else:
+                    gmeta = ()
+
+                tgt0 = tgts[0]
+                if tgt0 in abs2meta:  # var is local
+                    t0meta = abs2meta[tgt0]
+                else:
+                    t0meta = all_abs2meta[tgt0]
+                t0units = t0meta['units']
+                t0val = self._get_val(tgt0, kind='input', get_remote=True)
+
+                for tgt in tgts[1:]:
+
+                    if tgt in abs2meta:  # var is local
+                        tmeta = abs2meta[tgt]
+                    else:
+                        tmeta = all_abs2meta[tgt]
+
+                    tunits = tmeta['units'] if 'units' in tmeta else None
+                    tval = self._get_val(tgt, kind='input', get_remote=True)
+
+                    errs = []
+                    if _has_val_mismatch(tunits, tval, t0units, t0val):
+                        if 'units' not in gmeta and t0units != tunits:
+                            errs.append('units')
+                        if 'value' not in gmeta:
+                            errs.append('value')
+
+                    if errs:
+                        inputs = list(sorted(tgts))
+                        grpname = common_subpath(inputs)
+                        simple_warning(f"{self.msginfo}: The following inputs, {inputs} are "
+                                       f"connected but the metadata entries {errs} differ and "
+                                       "have not been specified by Group.add_input.  This warning "
+                                       "will become an error in a future version.  To remove the "
+                                       f"abiguity, call {grpname}.add_input() and specify the "
+                                       f"{errs} arg(s).")
