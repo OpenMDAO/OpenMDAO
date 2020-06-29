@@ -2787,7 +2787,7 @@ class System(object):
                           vectorize_derivs=vectorize_derivs,
                           cache_linear_solution=cache_linear_solution)
 
-    def get_design_vars(self, recurse=True, get_sizes=True):
+    def get_design_vars(self, recurse=True, get_sizes=True, use_prom_ivc=False):
         """
         Get the DesignVariable settings from this system.
 
@@ -2801,6 +2801,8 @@ class System(object):
             all design vars relative to the this system.
         get_sizes : bool, optional
             If True, compute the size of each design variable.
+        use_prom_ivc : bool
+            Translate auto_ivc_names to their promoted input names.
 
         Returns
         -------
@@ -2822,15 +2824,19 @@ class System(object):
                     # This is an output name, most likely a manual indepvarcomp.
                     abs_name = pro2abs_out[name][0]
                     out[abs_name] = data
-                    out[abs_name]['ivc_source'] = None
+                    out[abs_name]['ivc_source'] = abs_name
 
                 else:  # assume an input name else KeyError
 
                     # Design variable on an auto_ivc input, so use connected output name.
                     in_abs = pro2abs_in[name][0]
                     ivc_path = conns[in_abs]
-                    out[name] = data
-                    out[name]['ivc_source'] = ivc_path
+                    if use_prom_ivc:
+                        out[name] = data
+                        out[name]['ivc_source'] = ivc_path
+                    else:
+                        out[ivc_path] = data
+                        out[ivc_path]['ivc_source'] = ivc_path
 
         except KeyError as err:
             msg = "{}: Output not found for design variable {}."
@@ -2869,7 +2875,7 @@ class System(object):
 
         return out
 
-    def get_responses(self, recurse=True, get_sizes=True):
+    def get_responses(self, recurse=True, get_sizes=True, use_prom_ivc=False):
         """
         Get the response variable settings from this system.
 
@@ -2883,6 +2889,8 @@ class System(object):
             all responses relative to the this system.
         get_sizes : bool, optional
             If True, compute the size of each response.
+        use_prom_ivc : bool
+            Translate auto_ivc_names to their promoted input names.
 
         Returns
         -------
@@ -2892,11 +2900,31 @@ class System(object):
 
         """
         prom2abs = self._var_allprocs_prom2abs_list['output']
+        prom2abs_in = self._var_allprocs_prom2abs_list['input']
+        conns = self._problem_meta.get('connections', {})
 
         # Human readable error message during Driver setup.
         try:
             out = OrderedDict((prom2abs[name][0], data) for name, data in
                               self._responses.items())
+            for name, data in self._responses.items():
+                if name in prom2abs:
+                    abs_name = prom2abs[name][0]
+                    out[abs_name] = data
+                    out[abs_name]['ivc_source'] = abs_name
+
+                else:
+                    # A constraint can actaully be on an auto_ivc input, so use connected
+                    # output name.
+                    in_abs = prom2abs_in[name][0]
+                    ivc_path = conns[in_abs]
+                    if use_prom_ivc:
+                        out[name] = data
+                        out[name]['ivc_source'] = ivc_path
+                    else:
+                        out[ivc_path] = data
+                        out[ivc_path]['ivc_source'] = ivc_path
+
         except KeyError as err:
             msg = "{}: Output not found for response {}."
             raise RuntimeError(msg.format(self.msginfo, str(err)))
@@ -4190,6 +4218,8 @@ class System(object):
         dict
             Variable values keyed on absolute name.
         """
+        prom2abs_in = self._var_allprocs_prom2abs_list['input']
+        conns = self._problem_meta.get('connections', {})
         vdict = {}
         variables = filtered_vars.get(kind)
         if variables:
@@ -4208,7 +4238,13 @@ class System(object):
                         else:  # discrete
                             vdict[n] = discrete_vec[n[offset:]]['value']
                 else:
-                    vdict = {n: views[n] for n in variables}
+                    for name in variables:
+                        if name in views:
+                            vdict[name] = views[name]
+                        else:
+                            ivc_path = conns[prom2abs_in[name][0]]
+                            vdict[name] = views[ivc_path]
+
             elif parallel:
                 if discrete_vec:
                     vdict = {}

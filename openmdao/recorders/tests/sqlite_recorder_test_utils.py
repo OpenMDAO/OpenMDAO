@@ -28,10 +28,19 @@ def get_format_version_abs2meta(db_cur):
     """
         Return the format version and abs2meta dict from metadata table in the case recorder file.
     """
+    prom2abs = {}
+    conns = {}
     db_cur.execute("SELECT format_version, abs2meta FROM metadata")
     row = db_cur.fetchone()
 
     f_version = row[0]
+
+    if f_version >= 11:
+        db_cur.execute("SELECT prom2abs, conns FROM metadata")
+        row2 = db_cur.fetchone()
+        # Auto-IVC
+        prom2abs = json.loads(row2[0])
+        conns = json.loads(row2[1])
 
     # Need to also get abs2meta so that we can pass it to deserialize
     if f_version >= 3:
@@ -43,14 +52,15 @@ def get_format_version_abs2meta(db_cur):
             # Reading in a python 2 pickle recorded pre-OpenMDAO 2.4.
             abs2meta = pickle.loads(row[1].encode()) if row[1] is not None else None
 
-    return f_version, abs2meta
+    return f_version, abs2meta, prom2abs, conns
+
 
 def assertProblemDataRecorded(test, expected, tolerance):
     """
     Expected can be from multiple cases.
     """
     with database_cursor(test.filename) as db_cur:
-        f_version, abs2meta = get_format_version_abs2meta(db_cur)
+        f_version, abs2meta, prom2abs, conns = get_format_version_abs2meta(db_cur)
 
         # iterate through the cases
         for case, (t0, t1), outputs_expected in expected:
@@ -66,7 +76,7 @@ def assertProblemDataRecorded(test, expected, tolerance):
                 outputs_text, residuals_text, derivatives, abs_err, rel_err = row_actual
 
             if f_version >= 3:
-                outputs_actual = deserialize(outputs_text, abs2meta)
+                outputs_actual = deserialize(outputs_text, abs2meta, prom2abs, conns)
             elif f_version in (1, 2):
                 outputs_actual = blob_to_array(outputs_text)
 
@@ -100,7 +110,7 @@ def assertDriverIterDataRecorded(test, expected, tolerance, prefix=None):
     Expected can be from multiple cases.
     """
     with database_cursor(test.filename) as db_cur:
-        f_version, abs2meta = get_format_version_abs2meta(db_cur)
+        f_version, abs2meta, prom2abs, conns = get_format_version_abs2meta(db_cur)
 
         # iterate through the cases
         for coord, (t0, t1), outputs_expected, inputs_expected, residuals_expected in expected:
@@ -119,9 +129,9 @@ def assertDriverIterDataRecorded(test, expected, tolerance, prefix=None):
                 inputs_text, outputs_text, residuals_text = row_actual
 
             if f_version >= 3:
-                inputs_actual = deserialize(inputs_text, abs2meta)
-                outputs_actual = deserialize(outputs_text, abs2meta)
-                residuals_actual = deserialize(residuals_text, abs2meta)
+                inputs_actual = deserialize(inputs_text, abs2meta, prom2abs, conns)
+                outputs_actual = deserialize(outputs_text, abs2meta, prom2abs, conns)
+                residuals_actual = deserialize(residuals_text, abs2meta, prom2abs, conns)
             elif f_version in (1, 2):
                 inputs_actual = blob_to_array(inputs_text)
                 outputs_actual = blob_to_array(outputs_text)
@@ -259,7 +269,7 @@ def assertSystemIterDataRecorded(test, expected, tolerance, prefix=None):
         Expected can be from multiple cases.
     """
     with database_cursor(test.filename) as db_cur:
-        f_version, abs2meta = get_format_version_abs2meta(db_cur)
+        f_version, abs2meta, prom2abs, conns = get_format_version_abs2meta(db_cur)
 
         # iterate through the cases
         for coord, (t0, t1), inputs_expected, outputs_expected, residuals_expected in expected:
@@ -277,9 +287,9 @@ def assertSystemIterDataRecorded(test, expected, tolerance, prefix=None):
                 outputs_text, residuals_text = row_actual
 
             if f_version >= 3:
-                inputs_actual = deserialize(inputs_text, abs2meta)
-                outputs_actual = deserialize(outputs_text, abs2meta)
-                residuals_actual = deserialize(residuals_text, abs2meta)
+                inputs_actual = deserialize(inputs_text, abs2meta, prom2abs, conns)
+                outputs_actual = deserialize(outputs_text, abs2meta, prom2abs, conns)
+                residuals_actual = deserialize(residuals_text, abs2meta, prom2abs, conns)
             elif f_version in (1, 2):
                 inputs_actual = blob_to_array(inputs_text)
                 outputs_actual = blob_to_array(outputs_text)
@@ -319,7 +329,7 @@ def assertSolverIterDataRecorded(test, expected, tolerance, prefix=None):
         Expected can be from multiple cases.
     """
     with database_cursor(test.filename) as db_cur:
-        f_version, abs2meta = get_format_version_abs2meta(db_cur)
+        f_version, abs2meta, prom2abs, conns = get_format_version_abs2meta(db_cur)
 
         # iterate through the cases
         for coord, (t0, t1), expected_abs_error, expected_rel_error, expected_output, \
@@ -339,8 +349,8 @@ def assertSolverIterDataRecorded(test, expected, tolerance, prefix=None):
                 abs_err, rel_err, input_blob, output_text, residuals_text = row_actual
 
             if f_version >= 3:
-                output_actual = deserialize(output_text, abs2meta)
-                residuals_actual = deserialize(residuals_text, abs2meta)
+                output_actual = deserialize(output_text, abs2meta, prom2abs, conns)
+                residuals_actual = deserialize(residuals_text, abs2meta, prom2abs, conns)
             elif f_version in (1, 2):
                 output_actual = blob_to_array(output_text)
                 residuals_actual = blob_to_array(residuals_text)

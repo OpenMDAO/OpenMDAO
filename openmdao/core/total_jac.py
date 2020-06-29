@@ -133,19 +133,6 @@ class _TotalJacInfo(object):
         if isinstance(wrt, str):
             wrt = [wrt]
 
-        # Convert wrt inputs to auto_ivc output names.\
-        wrt_src = []
-        wrt_src2prom = {}
-        for name in wrt:
-            if name in prom2abs:
-                wrt_name = prom2abs[name][0]
-                # assume an input name else KeyError
-                in_abs = prom2abs_in[name][0]
-                wrt_name = conns[in_abs]
-            wrt_src.append(wrt_name)
-            wrt_src2prom[wrt_name] = name
-        wrt = wrt_src
-
         if isinstance(of, str):
             of = [of]
 
@@ -158,7 +145,6 @@ class _TotalJacInfo(object):
 
         driver_wrt = list(design_vars)
         driver_of = driver._get_ordered_nl_responses()
-        input_wrts = set()
 
         # Convert of and wrt names from promoted to absolute
         if wrt is None:
@@ -168,18 +154,20 @@ class _TotalJacInfo(object):
                 raise RuntimeError("Driver is not providing any design variables "
                                    "for compute_totals.")
         else:
+
+            # Convert wrt inputs to auto_ivc output names.\
             prom_wrt = wrt
-            if not use_abs_names:
-                wrt = []
-                for name in prom_wrt:
-                    if name in prom2abs:
-                        wrt.append(prom2abs[name][0])
-                    else:
-                        abs_in = prom2abs_in[name][0]
-                        src = conns[abs_in]
-                        if abs_in not in input_wrts:
-                            input_wrts.add(abs_in)
-                            wrt.append(src)
+            wrt = []
+            for name in prom_wrt:
+                if not use_abs_names and name in prom2abs:
+                    wrt_name = prom2abs[name][0]
+                elif name in prom2abs_in:
+                    in_abs = prom2abs_in[name][0]
+                    wrt_name = conns[in_abs]
+                else:
+                    wrt_name = name
+                wrt.append(wrt_name)
+
 
         if of is None:
             if driver_of:

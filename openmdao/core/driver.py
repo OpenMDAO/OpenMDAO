@@ -488,10 +488,10 @@ class Driver(object):
         distributed_vars = self._distributed_resp
         indices = meta['indices']
 
-        src_name = name
-        ivc_source = meta.get('ivc_source')
-        if ivc_source is not None:
-            src_name = ivc_source
+        if meta.get('ivc_source') is not None:
+            src_name = meta['ivc_source']
+        else:
+            src_name = name
 
         if MPI:
             distributed = comm.size > 0 and name in distributed_vars
@@ -587,10 +587,7 @@ class Driver(object):
         problem = self._problem()
         meta = self._designvars[name]
 
-        src_name = name
-        ivc_source = meta.get('ivc_source')
-        if ivc_source is not None:
-            src_name = ivc_source
+        src_name = meta['ivc_source']
 
         # if the value is not local, don't set the value
         if (name in self._remote_dvs and
@@ -730,7 +727,7 @@ class Driver(object):
 
         model._setup_driver_units()
 
-        self._responses = resps = model.get_responses(recurse=True)
+        self._responses = resps = model.get_responses(recurse=True, use_prom_ivc=True)
         for name, data in resps.items():
             if data['type'] == 'con':
                 cons[name] = data
@@ -740,7 +737,7 @@ class Driver(object):
         response_size = sum(resps[n]['size'] for n in self._get_ordered_nl_responses())
 
         # Gather up the information for design vars.
-        self._designvars = designvars = model.get_design_vars(recurse=True)
+        self._designvars = designvars = model.get_design_vars(recurse=True, use_prom_ivc=True)
         desvar_size = sum(data['size'] for data in designvars.values())
 
         return response_size, desvar_size

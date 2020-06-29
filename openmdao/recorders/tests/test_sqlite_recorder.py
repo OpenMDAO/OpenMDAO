@@ -1508,8 +1508,8 @@ class TestSqliteRecorder(unittest.TestCase):
         coordinate = [0, 'ScipyOptimize_SLSQP', (6, )]
 
         expected_desvars = {
-            "pz.z": prob['pz.z'],
-            "px.x": prob['px.x']
+            "z": prob['z'],
+            "x": prob['x']
         }
         expected_objectives = {
             "obj_cmp.obj": prob['obj_cmp.obj']

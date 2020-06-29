@@ -60,13 +60,16 @@ class Case(object):
         Dictionary mapping absolute names of all variables to promoted names.
     _abs2meta : dict
         Dictionary mapping absolute names of all variables to variable metadata.
+    _conns : dict
+        Dictionary of all model connections.
     _var_info : dict
         Dictionary with information about variables (scaling, indices, execution order).
     _format_version : int
         A version number specifying the format of array data, if not numpy arrays.
     """
 
-    def __init__(self, source, data, prom2abs, abs2prom, abs2meta, var_info, data_format=None):
+    def __init__(self, source, data, prom2abs, abs2prom, abs2meta, conns, var_info,
+                 data_format=None):
         """
         Initialize.
 
@@ -82,6 +85,8 @@ class Case(object):
             Dictionary mapping absolute names of all variables to promoted names.
         abs2meta : dict
             Dictionary mapping absolute names of all variables to variable metadata.
+        conns : dict
+            Dictionary of all model connections.
         var_info : dict
             Dictionary with information about variables (scaling, indices, execution order).
         data_format : int
@@ -129,7 +134,7 @@ class Case(object):
 
         if 'inputs' in data.keys():
             if data_format >= 3:
-                inputs = deserialize(data['inputs'], abs2meta)
+                inputs = deserialize(data['inputs'], abs2meta, prom2abs, conns)
             elif data_format in (1, 2):
                 inputs = blob_to_array(data['inputs'])
                 if type(inputs) is np.ndarray and not inputs.shape:
@@ -141,7 +146,7 @@ class Case(object):
 
         if 'outputs' in data.keys():
             if data_format >= 3:
-                outputs = deserialize(data['outputs'], abs2meta)
+                outputs = deserialize(data['outputs'], abs2meta, prom2abs, conns)
             elif self._format_version in (1, 2):
                 outputs = blob_to_array(data['outputs'])
                 if type(outputs) is np.ndarray and not outputs.shape:
@@ -153,7 +158,7 @@ class Case(object):
 
         if 'residuals' in data.keys():
             if data_format >= 3:
-                residuals = deserialize(data['residuals'], abs2meta)
+                residuals = deserialize(data['residuals'], abs2meta, prom2abs, conns)
             elif data_format in (1, 2):
                 residuals = blob_to_array(data['residuals'])
                 if type(residuals) is np.ndarray and not residuals.shape:
@@ -177,6 +182,7 @@ class Case(object):
         self._prom2abs = prom2abs
         self._abs2prom = abs2prom
         self._abs2meta = abs2meta
+        self._conns = conns
 
         # save VOI dict reference for use by self._scale()
         self._var_info = var_info

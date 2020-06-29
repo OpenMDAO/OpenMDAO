@@ -330,10 +330,10 @@ class pyOptSparseDriver(Driver):
             size = meta['global_size'] if meta['distributed'] else meta['size']
             lower = upper = meta['equals']
             if fwd:
-                wrt = [v for v in indep_list if name in relevant[v]]
+                wrt = [v for v in indep_list if name in relevant[param_meta[v]['ivc_source']]]
             else:
                 rels = relevant[name]
-                wrt = [v for v in indep_list if v in rels]
+                wrt = [v for v in indep_list if param_meta[v]['ivc_source'] in rels]
 
             if meta['linear']:
                 jac = {w: _lin_jacs[name][w] for w in wrt}
@@ -359,10 +359,10 @@ class pyOptSparseDriver(Driver):
             upper = meta['upper']
 
             if fwd:
-                wrt = [v for v in indep_list if name in relevant[v]]
+                wrt = [v for v in indep_list if name in relevant[param_meta[v]['ivc_source']]]
             else:
                 rels = relevant[name]
-                wrt = [v for v in indep_list if v in rels]
+                wrt = [v for v in indep_list if param_meta[v]['ivc_source'] in rels]
 
             if meta['linear']:
                 jac = {w: _lin_jacs[name][w] for w in wrt}
