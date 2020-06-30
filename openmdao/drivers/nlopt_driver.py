@@ -22,9 +22,9 @@ from openmdao.utils.mpi import MPI
 # All optimizers in NLopt and their corresponding package name
 optimizer_methods = { 'GN_DIRECT' : nlopt.GN_DIRECT,
                       'GN_DIRECT_L' : nlopt.GN_DIRECT_L,
-                      'GN_DIRECT_L_RAND' : nlopt.GN_DIRECT_L_RAND,
+                      # 'GN_DIRECT_L_RAND' : nlopt.GN_DIRECT_L_RAND,
                       'GN_DIRECT_L_NOSCAL' : nlopt.GN_DIRECT_L_NOSCAL,
-                      'GN_DIRECT_L_RAND_NOSCAL' : nlopt.GN_DIRECT_L_RAND_NOSCAL,
+                      # 'GN_DIRECT_L_RAND_NOSCAL' : nlopt.GN_DIRECT_L_RAND_NOSCAL,
                       'GN_ORIG_DIRECT' : nlopt.GN_ORIG_DIRECT,
                       'GN_ORIG_DIRECT_L' : nlopt.GN_ORIG_DIRECT_L,
                       'GN_CRS2_LM' : nlopt.GN_CRS2_LM,
@@ -65,7 +65,8 @@ _gradient_optimizers = {'LD_MMA', 'LD_SLSQP', 'LD_LBFGS',
                         'AUGLAG_EQ', 'GD_STOGO', 'GD_STOGO_RAND'}
 _bounds_optimizers = _optimizers
 _constraint_optimizers = {'LD_SLSQP', 'LN_COBYLA', 'LD_MMA', 'LD_CCSAQ',
-                          'GN_ORIG_DIRECT', 'GN_ISRES'}  # These are all tested
+                          'GN_ORIG_DIRECT',
+                          'GN_ORIG_DIRECT_L', 'GN_ISRES'}  # These are all tested
 _constraint_grad_optimizers = _gradient_optimizers & _constraint_optimizers
 _eq_constraint_optimizers = {'LD_SLSQP', 'LN_COBYLA', 'GN_ISRES'}
 _global_optimizers = {'GN_DIRECT',
