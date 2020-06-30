@@ -19,12 +19,10 @@ from openmdao.utils.class_util import weak_method_wrapper
 from openmdao.utils.mpi import MPI
 
 
-# All optimizers in NLopt and their corresponding package name
+# All optimizers in NLopt that we support and their corresponding package name.
 optimizer_methods = { 'GN_DIRECT' : nlopt.GN_DIRECT,
                       'GN_DIRECT_L' : nlopt.GN_DIRECT_L,
-                      # 'GN_DIRECT_L_RAND' : nlopt.GN_DIRECT_L_RAND,
                       'GN_DIRECT_L_NOSCAL' : nlopt.GN_DIRECT_L_NOSCAL,
-                      # 'GN_DIRECT_L_RAND_NOSCAL' : nlopt.GN_DIRECT_L_RAND_NOSCAL,
                       'GN_ORIG_DIRECT' : nlopt.GN_ORIG_DIRECT,
                       'GN_ORIG_DIRECT_L' : nlopt.GN_ORIG_DIRECT_L,
                       'GN_CRS2_LM' : nlopt.GN_CRS2_LM,
@@ -65,15 +63,13 @@ _gradient_optimizers = {'LD_MMA', 'LD_SLSQP', 'LD_LBFGS',
                         'AUGLAG_EQ', 'GD_STOGO', 'GD_STOGO_RAND'}
 _bounds_optimizers = _optimizers
 _constraint_optimizers = {'LD_SLSQP', 'LN_COBYLA', 'LD_MMA', 'LD_CCSAQ',
-                          'GN_ORIG_DIRECT',
-                          'GN_ORIG_DIRECT_L', 'GN_ISRES'}  # These are all tested
+                          'GN_ORIG_DIRECT', 'GN_ORIG_DIRECT_L',
+                          'GN_AGS', 'GN_ISRES'}
 _constraint_grad_optimizers = _gradient_optimizers & _constraint_optimizers
 _eq_constraint_optimizers = {'LD_SLSQP', 'LN_COBYLA', 'GN_ISRES'}
 _global_optimizers = {'GN_DIRECT',
                       'GN_DIRECT_L',
                       'GN_DIRECT_L_RAND',
-                      'GN_DIRECT_L_NOSCAL',
-                      'GN_DIRECT_L_RAND_NOSCAL',
                       'GN_ORIG_DIRECT',
                       'GN_ORIG_DIRECT_L',
                       'GN_CRS2_LM',
@@ -83,7 +79,8 @@ _global_optimizers = {'GN_DIRECT',
                       'GD_STOGO_RAND',
                       'GN_AGS',
                       'GN_ISRES',
-                      'GN_ESCH',}
+                      'GN_ESCH',
+                      }
 
 CITATIONS = """
 @article{johnson_nlopt
@@ -325,7 +322,11 @@ class NLoptDriver(Driver):
                     # Equality constraints are added as two inequality constraints
                     if equals is not None:
                         args = [name, False, j]
-                        opt_prob.add_equality_constraint(signature_extender(weak_method_wrapper(self, '_confunc'), args))
+                        try:
+                            opt_prob.add_equality_constraint(signature_extender(weak_method_wrapper(self, '_confunc'), args))
+                        except ValueError:
+                            msg = 'The selected optimizer, {}, does not support equality constraints. Select from {}.'
+                            raise NotImplementedError(msg.format(opt, _eq_constraint_optimizers))
                         
                     else:
                         # Double-sided constraints are accepted by the algorithm
