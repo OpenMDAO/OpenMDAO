@@ -189,6 +189,12 @@ n2_gui_test_scripts = {
     ],
     "bug_arrow": [
         {
+            "desc": "Check the number of cells in the N2 Matrix",
+            "test": "count",
+            "selector": "g#n2elements > g.n2cell",
+            "count": 11
+        },
+        {
             "desc": "Hover on N2 matrix element and check arrow count",
             "test": "hoverArrow",
             "selector": "g#n2elements rect#cellShape_11_11.vMid",
@@ -230,14 +236,14 @@ n2_gui_test_scripts = {
         {
             "desc": "Left-click to zoom on solver element",
             "test": "click",
-            "selector": "g#solver_tree rect#design_fan_map_d1",
+            "selector": "g#solver_tree rect#design_fan_map_scalars",
             "button": "left"
         },
         {
             "desc": "Hover over zoomed N2 cell and check arrow count",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_9_9.vMid",
-            "arrowCount": 1
+            "selector": "g#n2elements rect#cellShape_11_11.vMid",
+            "arrowCount": 2
         },
         {
             "test": "root"
@@ -347,14 +353,6 @@ n2_gui_test_scripts = {
             "arrowCount": 2
         },
     ],
-    "udpi_circuit": [
-        {
-            "desc": "Check the number of cells in the N2 Matrix",
-            "test": "count",
-            "selector": "g#n2elements > g.n2cell",
-            "count": 29
-        }
-    ],
     "parabaloid": [
         {
             "desc": "Collapse the indeps view",
@@ -451,15 +449,9 @@ class n2_gui_test_case(unittest.TestCase):
         self.n2files[self.current_model] = n2file
         print("Creating " + n2file)
 
-        if (self.current_model[:5] == 'udpi_'):
-            subprocess.run(
-                ['openmdao', 'n2', '-o', n2file,  '--no_browser',
-                    '--use_declare_partial_info', pyfile],
-                stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-        else:
-            subprocess.run(
-                ['openmdao', 'n2', '-o', n2file,  '--no_browser', pyfile],
-                stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        subprocess.run(
+            ['openmdao', 'n2', '-o', n2file,  '--no_browser', pyfile],
+            stderr=subprocess.PIPE, stdout=subprocess.PIPE)
 
     async def load_test_page(self):
         """ Load the specified HTML file from the local filesystem. """
