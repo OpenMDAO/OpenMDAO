@@ -1525,7 +1525,7 @@ class TestNLoptDriver(unittest.TestCase):
         # Just get pretty close to the optimum
         assert_near_equal(prob["x"], 7.1666666, 1e-2)
         assert_near_equal(prob["y"], -7.83333333, 1e-2)
-
+    
     def test_simple_paraboloid_equality_COBYLA(self):
     
         prob = om.Problem()
@@ -1588,186 +1588,211 @@ class TestNLoptDriver(unittest.TestCase):
         # Loose tolerance
         assert_near_equal(prob["x"], 7.16667, 1e-2)
         assert_near_equal(prob["y"], -7.833334, 1e-2)
-
+    
     def test_simple_paraboloid_equality_failure_MMA(self):
-
+    
         prob = om.Problem()
         model = prob.model
-
+    
         # Start very close to the correct answer with tight bounds to
         # reduce test runtime
         model.add_subsystem("p1", om.IndepVarComp("x", 7.5), promotes=["*"])
         model.add_subsystem("p2", om.IndepVarComp("y", -7.6), promotes=["*"])
         model.add_subsystem("comp", Paraboloid(), promotes=["*"])
         model.add_subsystem("con", om.ExecComp("c = - x + y"), promotes=["*"])
-
+    
         prob.set_solver_print(level=0)
-
+    
         prob.driver = NLoptDriver()
         prob.driver.options["optimizer"] = "LD_MMA"
         prob.driver.options["tol"] = 1e-6
-
+    
         prob.driver.options["maxiter"] = 5000
-
+    
         model.add_design_var("x", lower=7.0, upper=7.5)
         model.add_design_var("y", lower=-8.0, upper=-7.5)
         model.add_objective("f_xy")
         model.add_constraint("c", equals=-15.0)
-
+    
         prob.setup()
-
+    
         with self.assertRaises(NotImplementedError) as raises_msg:
             failed = prob.run_driver()
-
+    
         exception = raises_msg.exception
-
+    
         msg = "The selected optimizer, LD_MMA, does not support equality constraints."
-
+    
         self.assertIn(msg, exception.args[0])
-
+    
     def test_simple_paraboloid_equality_failure_LD_CCSAQ(self):
-
+    
         prob = om.Problem()
         model = prob.model
-
+    
         # Start very close to the correct answer with tight bounds to
         # reduce test runtime
         model.add_subsystem("p1", om.IndepVarComp("x", 7.5), promotes=["*"])
         model.add_subsystem("p2", om.IndepVarComp("y", -7.6), promotes=["*"])
         model.add_subsystem("comp", Paraboloid(), promotes=["*"])
         model.add_subsystem("con", om.ExecComp("c = - x + y"), promotes=["*"])
-
+    
         prob.set_solver_print(level=0)
-
+    
         prob.driver = NLoptDriver()
         prob.driver.options["optimizer"] = "LD_CCSAQ"
         prob.driver.options["tol"] = 1e-6
-
+    
         prob.driver.options["maxiter"] = 5000
-
+    
         model.add_design_var("x", lower=7.0, upper=7.5)
         model.add_design_var("y", lower=-8.0, upper=-7.5)
         model.add_objective("f_xy")
         model.add_constraint("c", equals=-15.0)
-
+    
         prob.setup()
-
+    
         with self.assertRaises(NotImplementedError) as raises_msg:
             failed = prob.run_driver()
-
+    
         exception = raises_msg.exception
-
+    
         msg = "The selected optimizer, LD_CCSAQ, does not support equality constraints."
-
+    
         self.assertIn(msg, exception.args[0])
-
+    
     def test_simple_paraboloid_equality_failure_GN_ORIG_DIRECT(self):
-
+    
         prob = om.Problem()
         model = prob.model
-
+    
         # Start very close to the correct answer with tight bounds to
         # reduce test runtime
         model.add_subsystem("p1", om.IndepVarComp("x", 7.5), promotes=["*"])
         model.add_subsystem("p2", om.IndepVarComp("y", -7.6), promotes=["*"])
         model.add_subsystem("comp", Paraboloid(), promotes=["*"])
         model.add_subsystem("con", om.ExecComp("c = - x + y"), promotes=["*"])
-
+    
         prob.set_solver_print(level=0)
-
+    
         prob.driver = NLoptDriver()
         prob.driver.options["optimizer"] = "GN_ORIG_DIRECT"
         prob.driver.options["tol"] = 1e-6
-
+    
         prob.driver.options["maxiter"] = 5000
-
+    
         model.add_design_var("x", lower=7.0, upper=7.5)
         model.add_design_var("y", lower=-8.0, upper=-7.5)
         model.add_objective("f_xy")
         model.add_constraint("c", equals=-15.0)
-
+    
         prob.setup()
-
+    
         with self.assertRaises(NotImplementedError) as raises_msg:
             failed = prob.run_driver()
-
+    
         exception = raises_msg.exception
-
+    
         msg = "The selected optimizer, GN_ORIG_DIRECT, does not support equality constraints."
-
+    
         self.assertIn(msg, exception.args[0])
-
+    
     def test_simple_paraboloid_equality_failure_GN_ORIG_DIRECT_L(self):
-
+    
         prob = om.Problem()
         model = prob.model
-
+    
         # Start very close to the correct answer with tight bounds to
         # reduce test runtime
         model.add_subsystem("p1", om.IndepVarComp("x", 7.5), promotes=["*"])
         model.add_subsystem("p2", om.IndepVarComp("y", -7.6), promotes=["*"])
         model.add_subsystem("comp", Paraboloid(), promotes=["*"])
         model.add_subsystem("con", om.ExecComp("c = - x + y"), promotes=["*"])
-
+    
         prob.set_solver_print(level=0)
-
+    
         prob.driver = NLoptDriver()
         prob.driver.options["optimizer"] = "GN_ORIG_DIRECT_L"
         prob.driver.options["tol"] = 1e-6
-
+    
         prob.driver.options["maxiter"] = 5000
-
+    
         model.add_design_var("x", lower=7.0, upper=7.5)
         model.add_design_var("y", lower=-8.0, upper=-7.5)
         model.add_objective("f_xy")
         model.add_constraint("c", equals=-15.0)
-
+    
         prob.setup()
-
+    
         with self.assertRaises(NotImplementedError) as raises_msg:
             failed = prob.run_driver()
-
+    
         exception = raises_msg.exception
-
+    
         msg = "The selected optimizer, GN_ORIG_DIRECT_L, does not support equality constraints."
-
+    
         self.assertIn(msg, exception.args[0])
-
+    
     def test_simple_paraboloid_equality_failure_GN_AGS(self):
-
+    
         prob = om.Problem()
         model = prob.model
-
+    
         # Start very close to the correct answer with tight bounds to
         # reduce test runtime
         model.add_subsystem("p1", om.IndepVarComp("x", 7.5), promotes=["*"])
         model.add_subsystem("p2", om.IndepVarComp("y", -7.6), promotes=["*"])
         model.add_subsystem("comp", Paraboloid(), promotes=["*"])
         model.add_subsystem("con", om.ExecComp("c = - x + y"), promotes=["*"])
-
+    
         prob.set_solver_print(level=0)
-
+    
         prob.driver = NLoptDriver()
         prob.driver.options["optimizer"] = "GN_AGS"
         prob.driver.options["tol"] = 1e-6
-
+    
         prob.driver.options["maxiter"] = 5000
-
+    
         model.add_design_var("x", lower=7.0, upper=7.5)
         model.add_design_var("y", lower=-8.0, upper=-7.5)
         model.add_objective("f_xy")
         model.add_constraint("c", equals=-15.0)
-
+    
         prob.setup()
-
+    
         with self.assertRaises(NotImplementedError) as raises_msg:
             failed = prob.run_driver()
-
+    
         exception = raises_msg.exception
-
+    
         msg = "The selected optimizer, GN_AGS, does not support equality constraints."
-
+    
         self.assertIn(msg, exception.args[0])
+    
+    def test_maxtime(self):
+    
+        prob = om.Problem()
+        model = prob.model
+    
+        model.add_subsystem("p1", om.IndepVarComp("x", 50.0), promotes=["*"])
+        model.add_subsystem("p2", om.IndepVarComp("y", 50.0), promotes=["*"])
+        model.add_subsystem("comp", Paraboloid(), promotes=["*"])
+    
+        prob.set_solver_print(level=0)
+    
+        prob.driver = NLoptDriver(optimizer="LD_SLSQP", tol=1e-9, maxtime=0.0001)
+    
+        model.add_design_var("x", lower=-50.0, upper=50.0)
+        model.add_design_var("y", lower=-50.0, upper=50.0)
+        model.add_objective("f_xy")
+    
+        prob.setup()
+    
+        failed = prob.run_driver()
+    
+        # It shouldn't have time to move from the initial point
+        assert_near_equal(prob["x"], 50., 1e-6)
+        assert_near_equal(prob["y"], 50., 1e-6)
 
 
 if __name__ == "__main__":
