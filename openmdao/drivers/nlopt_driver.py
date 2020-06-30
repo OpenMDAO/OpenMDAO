@@ -6,7 +6,6 @@ OpenMDAO Wrapper for the NLopt package of optimizers.
 
 import sys
 from collections import OrderedDict
-from distutils.version import LooseVersion
 
 import numpy as np
 import nlopt
@@ -16,70 +15,42 @@ import openmdao.utils.coloring as coloring_mod
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.class_util import weak_method_wrapper
-from openmdao.utils.mpi import MPI
 
 
 # All optimizers in NLopt that we support and their corresponding package name.
+# Other optimizers could be added, but we've focused on those that can
+# handle either inequality or equality constraints.
 optimizer_methods = { 'GN_DIRECT' : nlopt.GN_DIRECT,
                       'GN_DIRECT_L' : nlopt.GN_DIRECT_L,
                       'GN_DIRECT_L_NOSCAL' : nlopt.GN_DIRECT_L_NOSCAL,
                       'GN_ORIG_DIRECT' : nlopt.GN_ORIG_DIRECT,
                       'GN_ORIG_DIRECT_L' : nlopt.GN_ORIG_DIRECT_L,
-                      'GN_CRS2_LM' : nlopt.GN_CRS2_LM,
-                      'G_MLSL_LDS' : nlopt.G_MLSL_LDS,
-                      'G_MLSL' : nlopt.G_MLSL,
-                      'GD_STOGO' : nlopt.GD_STOGO,
-                      'GD_STOGO_RAND' : nlopt.GD_STOGO_RAND,
                       'GN_AGS' : nlopt.GN_AGS,
                       'GN_ISRES' : nlopt.GN_ISRES,
-                      'GN_ESCH' : nlopt.GN_ESCH,
                       'LN_COBYLA' : nlopt.LN_COBYLA,
-                      'LN_BOBYQA' : nlopt.LN_BOBYQA,
-                      'LN_NEWUOA' : nlopt.LN_NEWUOA,
-                      'LN_NEWUOA_BOUND' : nlopt.LN_NEWUOA_BOUND,
-                      'LN_PRAXIS' : nlopt.LN_PRAXIS,
-                      'LN_NELDERMEAD' : nlopt.LN_NELDERMEAD,
-                      'LN_SBPLX' : nlopt.LN_SBPLX,
                       'LD_MMA' : nlopt.LD_MMA,
                       'LD_CCSAQ' : nlopt.LD_CCSAQ,
                       'LD_SLSQP' : nlopt.LD_SLSQP,
-                      'LD_TNEWTON_PRECOND_RESTART' : nlopt.LD_TNEWTON_PRECOND_RESTART,
-                      'LD_TNEWTON_PRECOND' : nlopt.LD_TNEWTON_PRECOND,
-                      'LD_TNEWTON_RESTART' : nlopt.LD_TNEWTON_RESTART,
-                      'LD_TNEWTON' : nlopt.LD_TNEWTON,
-                      'LD_VAR2' : nlopt.LD_VAR2,
-                      'LD_VAR1' : nlopt.LD_VAR1,
-                      'AUGLAG' : nlopt.AUGLAG,
-                      'AUGLAG_EQ' : nlopt.AUGLAG_EQ,
                       }
                 
 _optimizers = set(optimizer_methods)
 
 # Define subsets of optimizers that support different functions
-_gradient_optimizers = {'LD_MMA', 'LD_SLSQP', 'LD_LBFGS',
-                        'LD_TNEWTON_PRECOND_RESTART', 'LD_TNEWTON_PRECOND',
-                        'LD_TNEWTON_RESTART', 'LD_TNEWTON',
-                        'LD_VAR2', 'LD_VAR1', 'AUGLAG',
-                        'AUGLAG_EQ', 'GD_STOGO', 'GD_STOGO_RAND'}
+_gradient_optimizers = {'LD_MMA', 'LD_SLSQP', 'LD_CCSAQ'}
 _bounds_optimizers = _optimizers
 _constraint_optimizers = {'LD_SLSQP', 'LN_COBYLA', 'LD_MMA', 'LD_CCSAQ',
                           'GN_ORIG_DIRECT', 'GN_ORIG_DIRECT_L',
                           'GN_AGS', 'GN_ISRES'}
 _constraint_grad_optimizers = _gradient_optimizers & _constraint_optimizers
 _eq_constraint_optimizers = {'LD_SLSQP', 'LN_COBYLA', 'GN_ISRES'}
-_global_optimizers = {'GN_DIRECT',
+_global_optimizers = {
+                      'GN_DIRECT',
                       'GN_DIRECT_L',
-                      'GN_DIRECT_L_RAND',
                       'GN_ORIG_DIRECT',
                       'GN_ORIG_DIRECT_L',
-                      'GN_CRS2_LM',
-                      'G_MLSL_LDS',
-                      'G_MLSL',
-                      'GD_STOGO',
-                      'GD_STOGO_RAND',
+                      'GN_DIRECT_L_NOSCAL',
                       'GN_AGS',
                       'GN_ISRES',
-                      'GN_ESCH',
                       }
 
 CITATIONS = """
