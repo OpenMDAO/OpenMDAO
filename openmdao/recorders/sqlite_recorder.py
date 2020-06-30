@@ -649,6 +649,10 @@ class SqliteRecorder(CaseRecorder):
             scaling_factors = sqlite3.Binary(scaling_factors)
             pickled_metadata = sqlite3.Binary(pickled_metadata)
 
+            # Need to use OR IGNORE in here because if the user does run_driver more than once
+            #   the current OpenMDAO code will call this function each time and there will be
+            #   SQL errors for "UNIQUE constraint failed: system_metadata.id"
+            # Future versions of OpenMDAO will handle this better.
             with self.connection as c:
                 c.execute("INSERT OR IGNORE INTO system_metadata"
                           "(id, scaling_factors, component_metadata) "
