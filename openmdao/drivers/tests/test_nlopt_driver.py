@@ -1860,6 +1860,137 @@ class TestNLoptDriverFeatures(unittest.TestCase):
 
         assert_near_equal(prob['x'], 6.66666667, 1e-6)
         assert_near_equal(prob['y'], -7.3333333, 1e-6)
+        
+    def test_feature_optimizer(self):
+        import openmdao.api as om
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+
+        prob.driver = om.NLoptDriver(optimizer='LD_SLSQP')
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+
+        prob.setup()
+
+        prob.run_driver()
+
+        assert_near_equal(prob['x'], 6.66666667, 1e-6)
+        assert_near_equal(prob['y'], -7.3333333, 1e-6)
+
+    def test_feature_maxiter(self):
+        import openmdao.api as om
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+
+        prob.driver = om.NLoptDriver()
+        prob.driver.options['maxiter'] = 20
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+
+        prob.setup()
+
+        prob.run_driver()
+
+        assert_near_equal(prob['x'], 6.66666667, 1e-6)
+        assert_near_equal(prob['y'], -7.3333333, 1e-6)
+
+    def test_feature_tol(self):
+        import openmdao.api as om
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+
+        prob.driver = om.NLoptDriver()
+        prob.driver.options['tol'] = 1.0e-9
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+
+        prob.setup()
+
+        prob.run_driver()
+
+        assert_near_equal(prob['x'], 6.66666667, 1e-6)
+        assert_near_equal(prob['y'], -7.3333333, 1e-6)
+
+    def test_feature_debug_print_option(self):
+
+        import openmdao.api as om
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = om.NLoptDriver()
+
+        prob.driver.options['debug_print'] = ['desvars','ln_cons','nl_cons','objs']
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+
+        prob.setup()
+
+        prob.run_driver()
+
+    def test_feature_debug_print_option_totals(self):
+
+        import openmdao.api as om
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = om.NLoptDriver()
+
+        prob.driver.options['debug_print'] = ['totals']
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+
+        prob.setup()
+
+        prob.run_driver()
+        
 
 
 if __name__ == "__main__":

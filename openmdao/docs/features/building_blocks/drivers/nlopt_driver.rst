@@ -6,7 +6,7 @@ NLoptDriver
 
 NLoptDriver wraps the optimizers in `NLopt` and makes them accessible for OpenMDAO problems.
 NLopt_ is a "free/open-source library for nonlinear optimization, providing a common interface for a number of different free optimization routines available online as well as original implementations of various other algorithms."
-It includes methods for both local and global optimization and some of these methods use derivative information whereas others are derivative-free.
+It includes `methods for both local and global optimization <https://nlopt.readthedocs.io/en/latest/NLopt_Algorithms/>`_ and some of these methods use derivative information whereas others are derivative-free.
 
 .. note::
     The NLopt package does not come included with the OpenMDAO installation. It is a separate optional package that can be installed via `pip install nlopt`.
@@ -44,10 +44,11 @@ NLoptDriver Option Examples
   The "optimizer" option lets you choose which optimizer to use.
   NLoptDriver only supports some of the optimizers.
 
-  Here we pass the optimizer option as a keyword argument.
+  Here we pass the optimizer option as a keyword argument, but it could be passed as an option after we instantiate the driver as well.
+  The other examples show options being set after instantiation.
 
   .. embed-code::
-      openmdao.drivers.tests.test_scipy_optimizer.TestNLoptDriverFeatures.test_feature_optimizer
+      openmdao.drivers.tests.test_nlopt_driver.TestNLoptDriverFeatures.test_feature_optimizer
       :layout: interleave
 
 **maxiter**
@@ -56,7 +57,7 @@ NLoptDriver Option Examples
   is generally a valid option across all of the available options.
 
   .. embed-code::
-      openmdao.drivers.tests.test_scipy_optimizer.TestNLoptDriverFeatures.test_feature_maxiter
+      openmdao.drivers.tests.test_nlopt_driver.TestNLoptDriverFeatures.test_feature_maxiter
       :layout: interleave
 
 **tol**
@@ -64,28 +65,27 @@ NLoptDriver Option Examples
   The "tol" option allows you to specify the tolerance for termination.
 
   .. embed-code::
-      openmdao.drivers.tests.test_scipy_optimizer.TestNLoptDriverFeatures.test_feature_tol
+      openmdao.drivers.tests.test_nlopt_driver.TestNLoptDriverFeatures.test_feature_tol
       :layout: interleave
+      
+      
+      
+      
+      
+      
+NLoptDriver Tutorial Examples
+-----------------------------------      
+      
+      
+      
+      
+      
+
 
 .. tags:: Driver, Optimizer, Optimization
 
 
-NLoptDriver Driver Specific Options
--------------------------------------------
-Optimizers in `scipy.optimize.minimize` have optimizer specific options. To let the user specify values for these
-options, OpenMDAO provides an option in the form of a dictionary named `opt_settings`. See the `scipy.optimize.minimize`
-documentation for more information about the driver specific options that are available.
 
-As an example, here is code using some `opt_settings` for the `shgo` optimizer:
-
-  .. embed-code::
-      openmdao.drivers.tests.test_scipy_optimizer.TestNLoptDriverFeatures.test_feature_shgo_rastrigin
-      :layout: interleave
-
-Notice that when using the `shgo` optimizer, setting the `opt_settings['maxiter']` to `None` overrides
-`NLoptDriver`'s `options['maxiter']` value. It is not possible to set `options['maxiter']` to anything other
-than an integer so the `opt_settings['maxiter']` option provides a way to set the `maxiter` value for the `shgo`
-optimizer to `None`.
 
 .. _mdolab: https://github.com/mdolab/pyoptsparse
 
