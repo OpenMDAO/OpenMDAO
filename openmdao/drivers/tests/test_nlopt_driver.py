@@ -1793,6 +1793,73 @@ class TestNLoptDriver(unittest.TestCase):
         # It shouldn't have time to move from the initial point
         assert_near_equal(prob["x"], 50., 1e-6)
         assert_near_equal(prob["y"], 50., 1e-6)
+    
+    def test_simple_paraboloid_inequalities(self):
+        # This test checks that you can set a constraint with the same value
+        # for both the lower and upper bounds to effectively create an equality
+        # constraint even if the optimization method doesn't allow equality constraints
+    
+        prob = om.Problem()
+        model = prob.model
+    
+        # Start very close to the correct answer with tight bounds to
+        # reduce test runtime
+        model.add_subsystem("p1", om.IndepVarComp("x", 7.5), promotes=["*"])
+        model.add_subsystem("p2", om.IndepVarComp("y", -7.6), promotes=["*"])
+        model.add_subsystem("comp", Paraboloid(), promotes=["*"])
+        model.add_subsystem("con", om.ExecComp("c = - x + y"), promotes=["*"])
+    
+        prob.set_solver_print(level=0)
+    
+        prob.driver = NLoptDriver()
+        prob.driver.options["optimizer"] = "GN_ORIG_DIRECT"
+        prob.driver.options["tol"] = 1e-6
+    
+        prob.driver.options["maxiter"] = 5000
+    
+        model.add_design_var("x", lower=7.0, upper=7.5)
+        model.add_design_var("y", lower=-8.0, upper=-7.5)
+        model.add_objective("f_xy")
+        model.add_constraint("c", lower=-15.0, upper=-15.0)
+    
+        prob.setup()
+    
+        failed = prob.run_driver()
+    
+        # Minimum should be at (7.166667, -7.833334)
+        # Loose tolerance
+        assert_near_equal(prob["x"], 7.16667, 1e-2)
+        assert_near_equal(prob["y"], -7.833334, 1e-2)
+        
+        
+        
+class TestNLoptDriverFeatures(unittest.TestCase):
+
+    def test_feature_basic(self):
+        import openmdao.api as om
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+
+        prob.driver = om.NLoptDriver()
+        prob.driver.options['optimizer'] = 'LD_SLSQP'
+        prob.driver.options['tol'] = 1e-9
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+
+        prob.setup()
+
+        prob.run_driver()
+
+        assert_near_equal(prob['x'], 6.66666667, 1e-6)
+        assert_near_equal(prob['y'], -7.3333333, 1e-6)
 
 
 if __name__ == "__main__":
