@@ -402,6 +402,7 @@ class System(object):
         self._subjacs_info = {}
         self.matrix_free = False
 
+        self.under_approx = False
         self._owns_approx_jac = False
         self._owns_approx_jac_meta = {}
         self._owns_approx_wrt = None
@@ -3781,6 +3782,20 @@ class System(object):
 
                 if sub._assembled_jac:
                     sub._assembled_jac.set_complex_step_mode(active)
+                    
+    def _set_approx_mode(self, active):
+        """
+        Turn on or off approx mode flag.
+    
+        Recurses to turn on or off approx mode flag in all subsystems.
+    
+        Parameters
+        ----------
+        active : bool
+            Approx mode flag; set to True prior to commencing approximation.
+        """
+        for sub in self.system_iter(include_self=True, recurse=True):
+            sub.under_approx = active
 
     def cleanup(self):
         """
