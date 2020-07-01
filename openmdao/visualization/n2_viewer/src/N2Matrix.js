@@ -108,14 +108,6 @@ class N2Matrix {
         return undefined;
     }
 
-    findCellById(cellId) {
-        for (const cell of this.visibleCells) {
-            if (cell.id == cellId) return cell;
-        }
-
-        return undefined;
-    }
-
     /**
      * Compute the new minimum element size when the diagram height changes.
      * @param {number} height In pixels.
@@ -374,7 +366,7 @@ class N2Matrix {
                     (self.cellDims.size.height * d.row +
                         self.cellDims.bottomRight.y) + ')';
 
-                return (tranStr);
+                return(tranStr);
             })
             // "this" refers to the element here, so leave it alone:
             .each(function (d) {

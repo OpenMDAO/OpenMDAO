@@ -3,7 +3,6 @@ import base64
 import inspect
 import json
 import os
-import zlib
 from collections import OrderedDict
 from itertools import chain
 import networkx as nx
@@ -351,9 +350,8 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
         warn_deprecation("'use_declare_partial_info' is now the"
                          " default and the option is ignored.")
 
-    raw_data = json.dumps(model_data, default=make_serializable).encode('utf8')
-    b64_data = str(base64.b64encode(zlib.compress(raw_data)).decode("ascii"))
-    model_data = 'var compressedModel = "%s";' % b64_data
+    model_data = 'var modelData = %s' % json.dumps(
+        model_data, default=make_serializable)
 
     import openmdao
     openmdao_dir = os.path.dirname(inspect.getfile(openmdao))
@@ -364,12 +362,8 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     assets_dir = os.path.join(vis_dir, "assets")
 
     # grab the libraries, src and style
-    lib_dct = {
-        'd3': 'd3.v5.min',
-        'awesomplete': 'awesomplete',
-        'vk_beautify': 'vkBeautify',
-        'pako_inflate': 'pako_inflate.min'
-    }
+    lib_dct = {'d3': 'd3.v5.min', 'awesomplete': 'awesomplete',
+               'vk_beautify': 'vkBeautify'}
     libs = read_files(lib_dct.values(), libs_dir, 'js')
     src_names = \
         'modal', \
