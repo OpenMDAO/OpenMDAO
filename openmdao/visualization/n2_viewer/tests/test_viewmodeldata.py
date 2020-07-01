@@ -24,7 +24,7 @@ from openmdao.utils.assert_utils import assert_warning
 DEBUG_BROWSER = False
 
 # set DEBUG_FILES to True if you want to view the generated HTML file(s)
-DEBUG_FILES = True
+DEBUG_FILES = False
 
 
 class TestViewModelData(unittest.TestCase):
