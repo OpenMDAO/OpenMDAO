@@ -451,7 +451,7 @@ class N2MatrixCell {
         this.col = col;
         this.srcObj = this.obj = srcObj;
         this.tgtObj = tgtObj;
-        this.id = srcObj.id + "_" + tgtObj.id;
+        this.id = srcObj.id + "_to_" + tgtObj.id;
 
         this.symbolType = new SymbolType(this, model);
         this.renderer = this._newRenderer();
