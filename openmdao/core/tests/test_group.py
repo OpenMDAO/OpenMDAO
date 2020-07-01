@@ -512,7 +512,7 @@ class TestGroup(unittest.TestCase):
             def compute(self, inputs, outputs):
                 outputs['y'] = np.sum(inputs['x'])*2.0
 
-        arr = np.array([[1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4]])
+        arr = np.array([[1, 5, 3, 4], [1, 3, 3, 4], [1, 2, 3, 4], [1, 1, 3, 4]])
 
         p = om.Problem()
 
@@ -523,7 +523,7 @@ class TestGroup(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(p['C1.x'], np.array([2, 2, 2, 2]))
+        assert_near_equal(p['C1.x'], np.array([5, 3, 2, 1]))
 
         p = om.Problem()
 
@@ -534,7 +534,7 @@ class TestGroup(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(p['C1.x'], np.array([2, 2, 2, 2]))
+        assert_near_equal(p['C1.x'], np.array([5, 3, 2, 1]))
 
     def test_om_slice_in_promotes(self):
 
@@ -563,6 +563,32 @@ class TestGroup(unittest.TestCase):
         p.run_model()
 
         assert_near_equal(p['comp1.a'], [2., 12, 15])
+
+    def test_desvar_indice_slice(self):
+
+        class MyComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones(4))
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])**2.0
+
+        p = om.Problem()
+
+        arr = np.array([1, 2, 3, 4])
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
+        p.model.add_subsystem('C1', MyComp())
+        p.model.connect('indep.x', 'C1.x')
+        p.model.add_design_var('indep.x', indices=om.slicer[2:])
+
+        p.model.add_objective('C1.y')
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(arr[p.model._design_vars['indep.x']['indices']], np.array([3., 4]))
 
     def test_om_slice_in_add_input(self):
         class MyComp1(om.ExplicitComponent):

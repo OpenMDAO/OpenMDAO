@@ -2432,14 +2432,17 @@ class System(object):
         dvs['cache_linear_solution'] = cache_linear_solution
 
         if indices is not None:
+
+            if isinstance(indices, slice):
+                pass
             # If given, indices must be a sequence
-            if not (isinstance(indices, Iterable) and
+            elif not (isinstance(indices, Iterable) and
                     all([isinstance(i, Integral) for i in indices])):
                 raise ValueError("{}: If specified, design var indices must be a sequence of "
                                  "integers.".format(self.msginfo))
-
-            indices = np.atleast_1d(indices)
-            dvs['size'] = size = len(indices)
+            else:
+                indices = np.atleast_1d(indices)
+                dvs['size'] = size = len(indices)
 
             # All refs: check the shape if necessary
             for item, item_name in zip([ref, ref0, scaler, adder, upper, lower],
