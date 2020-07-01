@@ -62,13 +62,16 @@ class Case(object):
         Dictionary mapping absolute names of all variables to variable metadata.
     _conns : dict
         Dictionary of all model connections.
+    _auto_ivc_map : dict
+        Dictionary that maps all auto_ivc sources to either an absolute input name for single
+        connections or a promoted input name for multiple connections. This is for output display.
     _var_info : dict
         Dictionary with information about variables (scaling, indices, execution order).
     _format_version : int
         A version number specifying the format of array data, if not numpy arrays.
     """
 
-    def __init__(self, source, data, prom2abs, abs2prom, abs2meta, conns, var_info,
+    def __init__(self, source, data, prom2abs, abs2prom, abs2meta, conns, auto_ivc_map, var_info,
                  data_format=None):
         """
         Initialize.
@@ -87,6 +90,10 @@ class Case(object):
             Dictionary mapping absolute names of all variables to variable metadata.
         conns : dict
             Dictionary of all model connections.
+        auto_ivc_map : dict
+            Dictionary that maps all auto_ivc sources to either an absolute input name for single
+            connections or a promoted input name for multiple connections. This is for output
+            display.
         var_info : dict
             Dictionary with information about variables (scaling, indices, execution order).
         data_format : int
@@ -154,7 +161,9 @@ class Case(object):
             else:
                 outputs = data['outputs']
             if outputs is not None:
-                self.outputs = PromAbsDict(outputs, prom2abs['output'], abs2prom['output'])
+                self.outputs = PromAbsDict(outputs, prom2abs['output'], abs2prom['output'],
+                                           in_prom2abs=prom2abs['input'],
+                                           auto_ivc_map=auto_ivc_map)
 
         if 'residuals' in data.keys():
             if data_format >= 3:
@@ -166,7 +175,9 @@ class Case(object):
             else:
                 residuals = data['residuals']
             if residuals is not None:
-                self.residuals = PromAbsDict(residuals, prom2abs['output'], abs2prom['output'])
+                self.residuals = PromAbsDict(residuals, prom2abs['output'], abs2prom['output'],
+                                             in_prom2abs=prom2abs['input'],
+                                             auto_ivc_map=auto_ivc_map)
 
         if 'jacobian' in data.keys():
             if data_format >= 2:
@@ -183,6 +194,7 @@ class Case(object):
         self._abs2prom = abs2prom
         self._abs2meta = abs2meta
         self._conns = conns
+        self._auto_ivc_map = auto_ivc_map
 
         # save VOI dict reference for use by self._scale()
         self._var_info = var_info
@@ -696,11 +708,27 @@ class Case(object):
         if self.outputs is None:
             return PromAbsDict({}, self._prom2abs, self._abs2prom)
 
+        abs2meta = self._abs2meta
+        prom2abs = self._prom2abs['input']
+        conns = self._conns
+        auto_ivc_map = self._auto_ivc_map
+
         ret_vars = {}
         update_vals = scaled or use_indices
         for name in self.outputs.absolute_names():
-            if var_type in self._abs2meta[name]['type']:
-                ret_vars[name] = val = self.outputs[name]
+            if name in abs2meta:
+                type_match = var_type in abs2meta[name]['type']
+            elif name in prom2abs:
+                abs_name = prom2abs[name][0]
+                src_name = conns[abs_name]
+                type_match = var_type in abs2meta[src_name]['type']
+
+            if type_match:
+                if name in auto_ivc_map:
+                    return_name = auto_ivc_map[name]
+                else:
+                    return_name = name
+                ret_vars[return_name] = val = self.outputs[name]
                 if update_vals and name in self._var_info:
                     meta = self._var_info[name]
                     if use_indices and meta['indices'] is not None:
@@ -710,9 +738,10 @@ class Case(object):
                             val += meta['total_adder']
                         if meta['total_scaler'] is not None:
                             val *= meta['total_scaler']
-                    ret_vars[name] = val
+                    ret_vars[return_name] = val
 
-        return PromAbsDict(ret_vars, self._prom2abs['output'], self._abs2prom['output'])
+        return PromAbsDict(ret_vars, self._prom2abs['output'], self._abs2prom['output'],
+                           in_prom2abs=prom2abs)
 
 
 class PromAbsDict(dict):
@@ -729,11 +758,15 @@ class PromAbsDict(dict):
         Dictionary mapping promoted names to absolute names.
     _abs2prom : dict
         Dictionary mapping absolute names to promoted names.
+    _auto_ivc_map : dict
+        Dictionary that maps all auto_ivc sources to either an absolute input name for single
+        connections or a promoted input name for multiple connections. This is for output display.
     _DERIV_KEY_SEP : str
         Separator character for derivative keys.
     """
 
-    def __init__(self, values, prom2abs, abs2prom, data_format=current_version):
+    def __init__(self, values, prom2abs, abs2prom, data_format=current_version,
+                 in_prom2abs=None, auto_ivc_map=None):
         """
         Initialize.
 
@@ -747,11 +780,17 @@ class PromAbsDict(dict):
             Dictionary mapping absolute names to promoted names.
         data_format : int
             A version number specifying the OpenMDAO SQL case database version.
+        auto_ivc_map : dict
+            Dictionary that maps all auto_ivc sources to either an absolute input name for single
+            connections or a promoted input name for multiple connections. This is for output
+            display.
         """
         super(PromAbsDict, self).__init__()
 
         self._prom2abs = prom2abs
         self._abs2prom = abs2prom
+        auto_ivc_map = auto_ivc_map if auto_ivc_map is not None else {}
+        self._auto_ivc_map = auto_ivc_map
 
         if data_format <= 8:
             DERIV_KEY_SEP = self._DERIV_KEY_SEP = ','
@@ -762,7 +801,12 @@ class PromAbsDict(dict):
             # dict of values, keyed on either absolute or promoted names
             self._values = {}
             for key in values.keys():
-                if key in abs2prom:
+                if key in auto_ivc_map:
+                    # key is auto_ivc, so translate to a readable input name.
+                    self._values[key] = values[key]
+                    in_key = auto_ivc_map[key]
+                    super(PromAbsDict, self).__setitem__(in_key, values[key])
+                elif key in abs2prom:
                     # key is absolute name
                     self._values[key] = values[key]
                     prom_key = abs2prom[key]
@@ -778,13 +822,20 @@ class PromAbsDict(dict):
                     for abs_key in abs_keys:
                         self._values[abs_key] = values[key]
                     super(PromAbsDict, self).__setitem__(prom_key, values[key])
+                elif in_prom2abs is not None and key in in_prom2abs:
+                    # Auto-ivc outputs, use abs source (which is prom source.)
+                    super(PromAbsDict, self).__setitem__(key, values[key])
             self._keys = self._values.keys()
         else:
             # numpy structured array, which will always use absolute names
             self._values = values[0]
             self._keys = values.dtype.names
             for key in self._keys:
-                if key in abs2prom:
+                if key in auto_ivc_map:
+                    # key is auto_ivc, so translate to a readable input name.
+                    in_key = auto_ivc_map[key]
+                    super(PromAbsDict, self).__setitem__(in_key, self._values[key])
+                elif key in abs2prom:
                     prom_key = abs2prom[key]
                     if prom_key in self:
                         # We already set a value for this promoted name, which means
@@ -797,6 +848,10 @@ class PromAbsDict(dict):
                     # derivative keys will be a string in the form of 'of!wrt'
                     abs_keys, prom_key = self._deriv_keys(key)
                     super(PromAbsDict, self).__setitem__(prom_key, self._values[key])
+                elif in_prom2abs is not None and key in in_prom2abs:
+                    # Auto-ivc outputs, use abs source (which is prom source.)
+                    # TODO - maybe get rid of this by always saving the source name
+                    super(PromAbsDict, self).__setitem__(key, self._values[key])
 
     def __str__(self):
         """
@@ -838,11 +893,19 @@ class PromAbsDict(dict):
 
         # if promoted, will map to all connected absolute names
         abs_of = [of] if of in abs2prom else prom2abs[of]
-        abs_wrt = [wrt] if wrt in abs2prom else prom2abs[wrt]
+        if wrt in prom2abs:
+            abs_wrt = [prom2abs[wrt]]
+        else:
+            abs_wrt = [wrt]
+
         abs_keys = ['%s%s%s' % (o, DERIV_KEY_SEP, w) for o, w in itertools.product(abs_of, abs_wrt)]
 
         prom_of = of if of in prom2abs else abs2prom[of]
-        prom_wrt = wrt if wrt in prom2abs else abs2prom[wrt]
+        if wrt in abs2prom:
+            prom_wrt = abs2prom[wrt]
+        else:
+            prom_wrt = wrt
+
         prom_key = (prom_of, prom_wrt)
 
         return abs_keys, prom_key

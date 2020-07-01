@@ -363,7 +363,6 @@ class SqliteRecorder(CaseRecorder):
                     if var_type not in self._abs2meta[name]['type']:
                         self._abs2meta[name]['type'].append(var_type)
 
-
             for name in inputs:
                 try:
                     self._abs2meta[name] = real_meta[name].copy()
@@ -394,7 +393,7 @@ class SqliteRecorder(CaseRecorder):
             var_settings_json = json.dumps(var_settings)
 
             with self.connection as c:
-                c.execute("UPDATE metadata SET " + \
+                c.execute("UPDATE metadata SET " +
                           "abs2prom=?, prom2abs=?, abs2meta=?, var_settings=?, conns=?",
                           (abs2prom, prom2abs, abs2meta, var_settings_json, conns))
 

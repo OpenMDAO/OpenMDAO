@@ -682,17 +682,17 @@ class TestSqliteRecorder(unittest.TestCase):
 
         model.mda.nonlinear_solver.options['use_apply_nonlinear'] = True
 
-        pz = model.pz  # IndepVarComp which is an ExplicitComponent
-        pz.recording_options['record_inputs'] = True
-        pz.recording_options['record_outputs'] = True
-        pz.recording_options['record_residuals'] = True
-        pz.add_recorder(self.recorder)
-
         d1 = model.mda.d1
         d1.recording_options['record_inputs'] = True
         d1.recording_options['record_outputs'] = True
         d1.recording_options['record_residuals'] = True
         d1.add_recorder(self.recorder)
+
+        d2 = model.mda.d2
+        d2.recording_options['record_inputs'] = True
+        d2.recording_options['record_outputs'] = True
+        d2.recording_options['record_residuals'] = True
+        d2.add_recorder(self.recorder)
 
         prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
 
@@ -726,14 +726,27 @@ class TestSqliteRecorder(unittest.TestCase):
         assertSystemIterDataRecorded(self, expected_data, self.eps)
 
         #
-        # check data for 'pz'
+        # check data for 'd2'
         #
-        coordinate = [0, 'ScipyOptimize_SLSQP', (2, ), 'root._solve_nonlinear', (2, ), 'NLRunOnce', (0, ),
-                      'pz._solve_nonlinear', (2, )]
+        coordinate = [
+            0,
+            'ScipyOptimize_SLSQP', (1, ),
+            'root._solve_nonlinear', (1, ),
+            'NLRunOnce', (0, ),
+            'mda._solve_nonlinear', (1, ),
+            'NonlinearBlockGS', (0,),
+            'mda.d2._solve_nonlinear', (7, )
+        ]
 
         expected_inputs = None
         expected_outputs = {"pz.z": [2.8640616, 0.825643, ], }
         expected_residuals = {"pz.z": [0.0, 0.0], }
+        expected_inputs = {
+            "mda.d2.z": [5.0, 2.0],
+            "mda.d2.y1": [25.5883027, ],
+        }
+        expected_outputs = {"mda.d2.y2": [12.0584865, ], }
+        expected_residuals = {"mda.d2.y2": [0.0, ], }
 
         expected_data = (
             (coordinate, (t0, t1), expected_inputs, expected_outputs, expected_residuals),
@@ -1192,11 +1205,11 @@ class TestSqliteRecorder(unittest.TestCase):
         driver.add_recorder(self.recorder)
 
         # System
-        pz = prob.model.pz  # IndepVarComp which is an ExplicitComponent
-        pz.recording_options['record_inputs'] = True
-        pz.recording_options['record_outputs'] = True
-        pz.recording_options['record_residuals'] = True
-        pz.add_recorder(self.recorder)
+        cc = prob.model.con_cmp1
+        cc.recording_options['record_inputs'] = True
+        cc.recording_options['record_outputs'] = True
+        cc.recording_options['record_residuals'] = True
+        cc.add_recorder(self.recorder)
 
         # Solver
         nl = prob.model.mda.nonlinear_solver = om.NonlinearBlockGS()
@@ -1215,8 +1228,8 @@ class TestSqliteRecorder(unittest.TestCase):
         coordinate = [0, 'ScipyOptimize_SLSQP', (6, )]
 
         expected_desvars = {
-            "pz.z": prob['pz.z'],
-            "px.x": prob['px.x']
+            "z": prob['z'],
+            "x": prob['x']
         }
         expected_objectives = {
             "obj_cmp.obj": prob['obj_cmp.obj']
@@ -1237,11 +1250,11 @@ class TestSqliteRecorder(unittest.TestCase):
         # System recording test
         #
         coordinate = [0, 'ScipyOptimize_SLSQP', (2, ), 'root._solve_nonlinear', (2, ), 'NLRunOnce', (0, ),
-                      'pz._solve_nonlinear', (2, )]
+                      'con_cmp1._solve_nonlinear', (2, )]
 
-        expected_inputs = None
-        expected_outputs = {"pz.z": [2.8640616, 0.825643, ], }
-        expected_residuals = {"pz.z": [0.0, 0.0], }
+        expected_inputs = {"con_cmp1.y1": [7.73433739], }
+        expected_outputs = {"con_cmp1.con1": [-4.57433739], }
+        expected_residuals = {"con_cmp1.con1": [0.0], }
 
         expected_system_data = (
             (coordinate, (t0, t1), expected_inputs, expected_outputs, expected_residuals),
@@ -1416,8 +1429,7 @@ class TestSqliteRecorder(unittest.TestCase):
         # Just make sure all Systems had some metadata recorded
         assertSystemMetadataIdsRecorded(self, [
             'root',
-            'px',
-            'pz',
+            '_auto_ivc',
             'mda',
             'mda.d1',
             'mda.d2',
@@ -1435,8 +1447,7 @@ class TestSqliteRecorder(unittest.TestCase):
             'rank0:root._solve_nonlinear|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|0|mda.d1._solve_nonlinear|0',
             'rank0:root._solve_nonlinear|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|0|mda.d2._solve_nonlinear|0',
             'rank0:root._solve_nonlinear|0|NLRunOnce|0|obj_cmp._solve_nonlinear|0',
-            'rank0:root._solve_nonlinear|0|NLRunOnce|0|px._solve_nonlinear|0',
-            'rank0:root._solve_nonlinear|0|NLRunOnce|0|pz._solve_nonlinear|0',
+            'rank0:root._solve_nonlinear|0|NLRunOnce|0|_auto_ivc._solve_nonlinear|0',
         ])
 
     def test_record_system_with_prefix(self):
@@ -1454,8 +1465,7 @@ class TestSqliteRecorder(unittest.TestCase):
         # Just make sure all Systems had some metadata recorded
         assertSystemMetadataIdsRecorded(self, [
             'root',
-            'px',
-            'pz',
+            '_auto_ivc',
             'mda',
             'mda.d1',
             'mda.d2',
@@ -1473,8 +1483,7 @@ class TestSqliteRecorder(unittest.TestCase):
             'Run1_rank0:root._solve_nonlinear|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|0|mda.d1._solve_nonlinear|0',
             'Run1_rank0:root._solve_nonlinear|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|0|mda.d2._solve_nonlinear|0',
             'Run1_rank0:root._solve_nonlinear|0|NLRunOnce|0|obj_cmp._solve_nonlinear|0',
-            'Run1_rank0:root._solve_nonlinear|0|NLRunOnce|0|px._solve_nonlinear|0',
-            'Run1_rank0:root._solve_nonlinear|0|NLRunOnce|0|pz._solve_nonlinear|0',
+            'Run1_rank0:root._solve_nonlinear|0|NLRunOnce|0|_auto_ivc._solve_nonlinear|0',
 
             'Run2_rank0:root._solve_nonlinear|0',
             'Run2_rank0:root._solve_nonlinear|0|NLRunOnce|0|con_cmp1._solve_nonlinear|0',
@@ -1483,8 +1492,7 @@ class TestSqliteRecorder(unittest.TestCase):
             'Run2_rank0:root._solve_nonlinear|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|0|mda.d1._solve_nonlinear|0',
             'Run2_rank0:root._solve_nonlinear|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|0|mda.d2._solve_nonlinear|0',
             'Run2_rank0:root._solve_nonlinear|0|NLRunOnce|0|obj_cmp._solve_nonlinear|0',
-            'Run2_rank0:root._solve_nonlinear|0|NLRunOnce|0|px._solve_nonlinear|0',
-            'Run2_rank0:root._solve_nonlinear|0|NLRunOnce|0|pz._solve_nonlinear|0',
+            'Run2_rank0:root._solve_nonlinear|0|NLRunOnce|0|_auto_ivc._solve_nonlinear|0',
         ])
 
     def test_driver_recording_with_system_vars(self):

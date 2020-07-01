@@ -158,12 +158,20 @@ def assertDriverIterDataRecorded(test, expected, tolerance, prefix=None):
                     # Check to see if the number of values in actual and expected match
                     test.assertEqual(len(actual), len(expected))
                     for key, value in expected.items():
+
+                        # ivc sources
+                        if vartype == 'outputs' and key in prom2abs['input']:
+                            prom_in = prom2abs['input'][key][0]
+                            src_key = conns[prom_in]
+                        else:
+                            src_key = key
+
                         # Check to see if the keys in the actual and expected match
-                        test.assertTrue(key in actual.dtype.names,
+                        test.assertTrue(src_key in actual.dtype.names,
                                         '{} variable not found in actual data'
                                         ' from recorder'.format(key))
                         # Check to see if the values in actual and expected match
-                        assert_near_equal(actual[key], expected[key], tolerance)
+                        assert_near_equal(actual[src_key], expected[key], tolerance)
 
 
 def assertDriverDerivDataRecorded(test, expected, tolerance, prefix=None):

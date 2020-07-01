@@ -4243,7 +4243,7 @@ class System(object):
                             vdict[name] = views[name]
                         else:
                             ivc_path = conns[prom2abs_in[name][0]]
-                            vdict[name] = views[ivc_path]
+                            vdict[ivc_path] = views[ivc_path]
 
             elif parallel:
                 if discrete_vec:

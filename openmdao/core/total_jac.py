@@ -168,7 +168,6 @@ class _TotalJacInfo(object):
                     wrt_name = name
                 wrt.append(wrt_name)
 
-
         if of is None:
             if driver_of:
                 of = prom_of = driver_of

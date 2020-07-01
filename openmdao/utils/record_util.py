@@ -182,6 +182,7 @@ def deserialize(json_data, abs2meta, prom2abs, conns):
         that are recorded with their promoted input name.
     conns : dict
         Dictionary of all model connections.
+
     Returns
     -------
     array or dict
