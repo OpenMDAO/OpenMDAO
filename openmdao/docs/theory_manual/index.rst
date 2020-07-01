@@ -21,7 +21,7 @@ mathematical manner to help users gain a deeper understanding of how the framewo
 
 
 Total Derivatives Theory
--------------------------
+------------------------
 
 .. toctree::
    :maxdepth: 1
