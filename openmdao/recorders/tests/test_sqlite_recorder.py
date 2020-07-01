@@ -525,6 +525,23 @@ class TestSqliteRecorder(unittest.TestCase):
         value = cr.system_options['root']['component_options']['assembled_jac_type']
         self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
 
+    def test_warning_system_options_overwriting(self):
+
+        prob = ParaboloidProblem()
+        prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
+        prob.add_recorder(self.recorder)
+        prob.setup()
+        prob.set_solver_print(0)
+        prob.run_driver()
+        prob.record('final')
+
+        prob.setup()
+        msg = "The model is being run again, if the options or scaling of any components " \
+              "has changed then only their new values will be recorded."
+
+        with assert_warning(UserWarning, msg):
+            prob.run_driver()
+
     def test_without_n2_data(self):
         prob = SellarProblem()
 

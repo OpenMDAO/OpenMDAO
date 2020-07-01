@@ -182,6 +182,7 @@ class Problem(object):
         # 2 -- The `final_setup` has been run, everything ready to run.
         self._setup_status = 0
 
+        self._problem_context_recorded = False
         self._rec_mgr = RecordingManager()
 
         # General options

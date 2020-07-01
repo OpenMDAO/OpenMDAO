@@ -3,6 +3,8 @@ RecordingManager class definition.
 """
 import time
 
+from openmdao.utils.general_utils import simple_warning
+
 try:
     from openmdao.utils.mpi import MPI
 except ImportError:
@@ -260,6 +262,12 @@ def record_system_options(problem):
     # get all recorders in the problem
     recorders = set(_get_all_recorders(problem))
     if recorders:
+        if problem._problem_context_recorded:
+            simple_warning("The model is being run again, if the options or scaling of any "
+                           "components has changed then only their new values will be recorded.")
+        else:
+            problem._problem_context_recorded = True
+
         for recorder in recorders:
             for sub in problem.model.system_iter(recurse=True, include_self=True):
                 recorder.record_metadata_system(sub)
