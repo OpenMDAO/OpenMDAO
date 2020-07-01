@@ -20,25 +20,6 @@ from openmdao.utils.general_utils import run_driver
 from openmdao.drivers.nlopt_driver import NLoptDriver
 
 
-rosenbrock_size = 6
-
-
-def rosenbrock(x):
-    x_0 = x[:-1]
-    x_1 = x[1:]
-    return sum((1 - x_0) ** 2) + 100 * sum((x_1 - x_0 ** 2) ** 2)
-
-
-class Rosenbrock(om.ExplicitComponent):
-    def setup(self):
-        self.add_input("x", np.ones(rosenbrock_size))
-        self.add_output("f", 0.0)
-
-    def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
-        x = inputs["x"]
-        outputs["f"] = rosenbrock(x)
-
-
 def rastrigin(x):
     a = 10  # constant
     return np.sum(np.square(x) - a * np.cos(2 * np.pi * x)) + a * np.size(x)
