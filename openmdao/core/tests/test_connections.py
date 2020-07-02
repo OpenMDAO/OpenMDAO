@@ -618,10 +618,6 @@ class TestConnectionsError(unittest.TestCase):
     N_PROCS = 2
 
     def test_incompatible_src_indices(self):
-        SRC_INDICES = [1, 2]
-        FORCE_PETSCTRANSFER = True
-        COMP_DISTRIBUTED = False
-
         class TestCompDist(om.ExplicitComponent):
         # this comp is distributed and forces PETScTransfer
             def initialize(self):
@@ -637,11 +633,11 @@ class TestConnectionsError(unittest.TestCase):
 
         class TestComp(om.ExplicitComponent):
             def initialize(self):
-                self.options['distributed'] = COMP_DISTRIBUTED
+                self.options['distributed'] = False
 
             def setup(self):
                 # read SRC_INDICES on each proc
-                self.add_input('x', shape=2, src_indices=SRC_INDICES, val=-2038.0)
+                self.add_input('x', shape=2, src_indices=[1, 2], val=-2038.0)
                 self.add_output('y', shape=1)
                 self.declare_partials('y', 'x')
 
@@ -662,8 +658,7 @@ class TestConnectionsError(unittest.TestCase):
         # no parallel or distributed comps, so default_vector is used (local xfer only)
         model.add_subsystem('p1', om.IndepVarComp('x', setval))
         model.add_subsystem('c3', TestComp())
-        if FORCE_PETSCTRANSFER:
-            model.add_subsystem('c4', TestCompDist())
+        model.add_subsystem('c4', TestCompDist())
         model.connect("p1.x", "c3.x")
 
         with self.assertRaises(ValueError) as context:
