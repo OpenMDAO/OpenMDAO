@@ -2437,7 +2437,7 @@ class System(object):
                 pass
             # If given, indices must be a sequence
             elif not (isinstance(indices, Iterable) and
-                    all([isinstance(i, Integral) for i in indices])):
+                      all([isinstance(i, Integral) for i in indices])):
                 raise ValueError("{}: If specified, design var indices must be a sequence of "
                                  "integers.".format(self.msginfo))
             else:
