@@ -262,11 +262,11 @@ def record_system_options(problem):
     # get all recorders in the problem
     recorders = set(_get_all_recorders(problem))
     if recorders:
-        if problem._problem_context_recorded:
+        if problem._system_options_recorded:
             simple_warning("The model is being run again, if the options or scaling of any "
                            "components has changed then only their new values will be recorded.")
         else:
-            problem._problem_context_recorded = True
+            problem._system_options_recorded = True
 
         for recorder in recorders:
             for sub in problem.model.system_iter(recurse=True, include_self=True):

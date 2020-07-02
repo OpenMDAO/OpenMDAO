@@ -124,6 +124,8 @@ class Problem(object):
         after a reconfiguration) you may need to set this to True.
     _name : str
         Problem name.
+    _system_options_recorded : bool
+        A flag to indicate whether the system options for all the systems have been recorded
     """
 
     def __init__(self, model=None, driver=None, comm=None, name=None, **options):
@@ -182,7 +184,7 @@ class Problem(object):
         # 2 -- The `final_setup` has been run, everything ready to run.
         self._setup_status = 0
 
-        self._problem_context_recorded = False
+        self._system_options_recorded = False
         self._rec_mgr = RecordingManager()
 
         # General options
