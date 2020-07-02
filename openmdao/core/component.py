@@ -17,7 +17,7 @@ from openmdao.utils.units import valid_units
 from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key, rel_name2abs_name
 from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
-    find_matches, simple_warning, make_set
+    find_matches, simple_warning, make_set, _is_slice
 import openmdao.utils.coloring as coloring_mod
 
 
@@ -485,8 +485,8 @@ class Component(System):
 
         if src_indices is not None:
 
-            contains_slice = [True if isinstance(i, slice) else False for i in src_indices]
-            if True in contains_slice:
+            contains_slice = _is_slice(src_indices)
+            if contains_slice:
                 metadata['src_indices'] = src_indices
             else:
                 metadata['src_indices'] = np.asarray(src_indices, dtype=INT_DTYPE)

@@ -223,9 +223,9 @@ def ensure_compatible(name, value, shape=None, indices=None):
 
     # finally make sure shape of indices is compatible
     if isinstance(indices, np.ndarray):
-        contains_slice = [True if isinstance(i, slice) else False for i in indices]
+        contains_slice = _is_slice(indices)
 
-    if indices is not None and shape != ind_shape[:len(shape)] and True not in contains_slice:
+    if indices is not None and shape != ind_shape[:len(shape)] and not contains_slice:
         raise ValueError("Shape of indices does not match shape for '%s': "
                          "Expected %s but got %s." %
                          (name, shape, ind_shape[:len(shape)]))
@@ -915,3 +915,9 @@ def common_subpath(pathnames):
         return '.'.join(splits[0][:common_loc])
 
     return ''
+
+def _is_slice(indices):
+
+    contains_slice = any(isinstance(i, slice) for i in indices)
+
+    return contains_slice

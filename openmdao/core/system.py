@@ -31,7 +31,7 @@ from openmdao.utils.coloring import _compute_coloring, Coloring, \
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, ContainsAll, all_ancestors, \
-    simple_warning, make_set, match_includes_excludes, ensure_compatible
+    simple_warning, make_set, match_includes_excludes, ensure_compatible, _is_slice
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.utils.units import unit_conversion
@@ -1775,11 +1775,6 @@ class System(object):
                 abs_name = self._var_allprocs_prom2abs_list['input'][name][0]
                 meta = self._var_abs2meta[abs_name]
 
-                if isinstance(src_indices, tuple):
-                    contains_slice = [True if isinstance(i, slice) else False for i in src_indices]
-                    if True in contains_slice:
-                        indices = np.arange(meta['size'], dtype=int)
-
                 _, _, src_indices = ensure_compatible(name, meta['value'], meta['shape'],
                                                       src_indices)
 
@@ -1797,12 +1792,12 @@ class System(object):
                                            (self.msginfo, name, str(flat_src_indices),
                                             str(meta['flat_src_indices'])))
 
-                if isinstance(src_indices, np.ndarray):
-                    contains_slice = [True if isinstance(i, slice) else False for i in src_indices]
-                    if True in contains_slice:
+                if isinstance(src_indices, np.ndarray) and src_indices.dtype == object:
+                    contains_slice = _is_slice(src_indices)
+                    if contains_slice:
                         meta['src_indices'] = src_indices
-                    else:
-                        meta['src_indices'] = np.asarray(src_indices, dtype=INT_DTYPE)
+                elif isinstance(src_indices, np.ndarray):
+                    meta['src_indices'] = np.asarray(src_indices, dtype=INT_DTYPE)
 
                 meta['flat_src_indices'] = flat_src_indices
 

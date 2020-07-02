@@ -22,7 +22,8 @@ from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import convert_neg, array_connection_compatible, \
     _flatten_src_indices
-from openmdao.utils.general_utils import ContainsAll, all_ancestors, simple_warning, common_subpath
+from openmdao.utils.general_utils import ContainsAll, all_ancestors, simple_warning, \
+    common_subpath, _is_slice
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch
 from openmdao.utils.mpi import MPI
 from openmdao.utils.coloring import Coloring, _STD_COLORING_FNAME
@@ -1217,9 +1218,8 @@ class Group(System):
 
                 elif src_indices is not None:
 
-                    contains_slice = [True if isinstance(i, slice) else False for i in src_indices]
-
-                    if True in contains_slice:
+                    contains_slice = _is_slice(src_indices)
+                    if contains_slice:
                         val = self._abs_get_val(abs_out)
                         src_indices = np.array([i for i in range(len(val[tuple(src_indices)]))])
                     else:
@@ -1644,8 +1644,8 @@ class Group(System):
                             " connect('%s', %s)?" % (self.msginfo, src_name, tgt_name))
 
         if isinstance(src_indices, tuple):
-            contains_slice = [True if isinstance(i, slice) else False for i in src_indices]
-            if True not in contains_slice and isinstance(src_indices, Iterable):
+            contains_slice = _is_slice(src_indices)
+            if not contains_slice:
                 src_indices = np.atleast_1d(src_indices)
 
         if isinstance(src_indices, list):
