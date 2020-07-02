@@ -131,6 +131,11 @@ class SimpleGADriver(Driver):
                              'if not given.')
         self.options.declare('multi_obj_exponent', default=1., lower=0.,
                              desc='Multi-objective weighting exponent.')
+        self.options.declare('compute_pareto', default=False, types=(bool, ),
+                             desc='When True, compute a set of non-dominated points based on all '
+                             'given objectives and update it each generation. The multi-objective '
+                             'weight and exponents are ignored because the algorithm uses all '
+                             'objective values instead of a composite.')
 
     def _setup_driver(self, problem):
         """
@@ -223,10 +228,15 @@ class SimpleGADriver(Driver):
         pop_size = self.options['pop_size']
         max_gen = self.options['max_gen']
         user_bits = self.options['bits']
+        compute_pareto = self.options['compute_pareto']
+
         Pm = self.options['Pm']  # if None, it will be calculated in execute_ga()
         Pc = self.options['Pc']
 
         self._check_for_missing_objective()
+
+        if compute_pareto:
+            self._ga.nobj = len(self._objs)
 
         # Size design variables.
         desvars = self._designvars
@@ -297,18 +307,24 @@ class SimpleGADriver(Driver):
                                               bits, pop_size, max_gen,
                                               self._randomstate, Pm, Pc)
 
-        # Pull optimal parameters back into framework and re-run, so that
-        # framework is left in the right final state
-        for name in desvars:
-            i, j = self._desvar_idx[name]
-            val = desvar_new[i:j]
-            self.set_design_var(name, val)
+        if compute_pareto:
+            # Just save the non-dominated points.
+            self.desvar_nd = desvar_new
+            self.obj_nd = obj
 
-        with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
-            model.run_solve_nonlinear()
-            rec.abs = 0.0
-            rec.rel = 0.0
-        self.iter_count += 1
+        else:
+            # Pull optimal parameters back into framework and re-run, so that
+            # framework is left in the right final state
+            for name in desvars:
+                i, j = self._desvar_idx[name]
+                val = desvar_new[i:j]
+                self.set_design_var(name, val)
+
+            with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
+                model.run_solve_nonlinear()
+                rec.abs = 0.0
+                rec.rel = 0.0
+            self.iter_count += 1
 
         return False
 
@@ -426,6 +442,10 @@ class SimpleGADriver(Driver):
             if is_single_objective:  # Single objective optimization
                 for i in obj_values.values():
                     obj = i  # First and only key in the dict
+
+            elif self.options['compute_pareto']:
+                obj = np.array([val for val in obj_values.values()]).flatten()
+
             else:  # Multi-objective optimization with weighted sums
                 weighted_objectives = np.array([])
                 for name, val in obj_values.items():
@@ -499,6 +519,8 @@ class GeneticAlgorithm(object):
         If the model in objfun is also parallel, then this will contain a tuple with the the
         total number of population points to evaluate concurrently, and the color of the point
         to evaluate on this rank.
+    nobj : int
+        Number of objectives.
     npop : int
         Population size.
     objfun : function
@@ -525,6 +547,7 @@ class GeneticAlgorithm(object):
 
         self.lchrom = 0
         self.npop = 0
+        self.nobj = 1
         self.elite = True
         self.gray_code = False
         self.cross_bits = False
@@ -568,14 +591,28 @@ class GeneticAlgorithm(object):
             Number of successful function evaluations.
         """
         comm = self.comm
-        xopt = copy.deepcopy(vlb)
-        fopt = np.inf
+        nobj = self.nobj
         self.lchrom = int(np.sum(bits))
 
-        if np.mod(pop_size, 2) == 1:
-            pop_size += 1
+        if nobj > 1:
+            xopt = []
+            fopt = []
+
+            # Needs to be divisible by number of objectives because of tournament selection
+            # strategy.
+            if np.mod(pop_size, nobj) > 0:
+                pop_size += nobj - np.mod(pop_size, nobj)
+        else:
+            xopt = copy.deepcopy(vlb)
+            fopt = np.inf
+
+            # Needs to be divisible by two because tournament selection pits one half of the
+            # population against the other half.
+            if np.mod(pop_size, 2) == 1:
+                pop_size += 1
+
         self.npop = int(pop_size)
-        fitness = np.zeros((self.npop, ))
+        fitness = np.zeros((self.npop, nobj))
 
         # If mutation rate is not provided as input
         if Pm is None:
@@ -620,7 +657,7 @@ class GeneticAlgorithm(object):
                     if returns:
                         val, success, ii = returns
                         if success:
-                            fitness[ii] = val
+                            fitness[ii, :] = val
                             nfit += 1
 
                     else:
@@ -637,36 +674,91 @@ class GeneticAlgorithm(object):
                         # Exceeded bounds for integer variables that are over-allocated.
                         success = False
                     else:
-                        fitness[ii], success, _ = self.objfun(x, 0)
+                        fitness[ii, :], success, _ = self.objfun(x, 0)
 
                     if success:
                         nfit += 1
                     else:
-                        fitness[ii] = np.inf
+                        fitness[ii, :] = np.inf
 
-            # Elitism means replace worst performing point with best from previous generation.
-            if elite and generation > 0:
-                max_index = np.argmax(fitness)
-                old_gen[max_index] = min_gen
-                x_pop[max_index] = min_x
-                fitness[max_index] = min_fit
+            # Find Pareto front.
+            if nobj > 1:
+                xopt, fopt = self.eval_pareto(x_pop, fitness, xopt, fopt)
 
-            # Find best performing point in this generation.
-            min_fit = np.min(fitness)
-            min_index = np.argmin(fitness)
-            min_gen = old_gen[min_index]
-            min_x = x_pop[min_index]
+            # Find best objective.
+            else:
+                # Elitism means replace worst performing point with best from
+                # previous generation.
+                if elite and generation > 0:
+                    max_index = np.argmax(fitness[:, 0])
+                    old_gen[max_index] = min_gen
+                    x_pop[max_index] = min_x
+                    fitness[max_index, 0] = min_fit
 
-            if min_fit < fopt:
-                fopt = min_fit
-                xopt = min_x
+                # Find best performing point in this generation.
+                min_fit = np.min(fitness)
+                min_index = np.argmin(fitness)
+                min_gen = old_gen[min_index]
+                min_x = x_pop[min_index]
+
+                if min_fit < fopt:
+                    fopt = min_fit
+                    xopt = min_x
 
             # Evolve new generation.
-            new_gen = self.tournament(old_gen, fitness)
+
+            if nobj > 1:
+                new_gen, new_obj = self.tournament_multi_obj(old_gen, fitness)
+            else:
+                new_gen = self.tournament(old_gen, fitness[:, 0])
+
             new_gen = self.crossover(new_gen, Pc)
             new_gen = self.mutate(new_gen, Pm)
 
         return xopt, fopt, nfit
+
+    def eval_pareto(self, x, obj, x_nd, obj_nd):
+        """
+        Produce a set of non dominated designs.
+
+        Parameters
+        ----------
+        x : ndarray
+            Design points from new generation.
+        obj : ndarray
+            Objective values from new generation.
+        x_nd : ndarray
+            Non dominated design points from previous pareto evaluation.
+        obj_nd : ndarray
+            Non dominated objective values from previous pareto evaluation.
+
+        Returns
+        -------
+        ndarray
+            Nondominated design points.
+        ndarray
+            Objective at nondominated design points.
+        """
+        if len(x_nd) > 1:
+            ypop = np.concatenate((np.array(obj_nd), obj), axis=0)
+            xpop = np.concatenate((x_nd, x), axis=0)
+        else:
+            ypop = obj
+            xpop = x
+
+        n_pts = ypop.shape[0]
+        i = 0
+        pot_idx = np.arange(n_pts)
+        while i < len(ypop):
+            nd_point_mask = np.any(ypop < ypop[i, :], axis=1)
+            nd_point_mask[i] = True
+
+            # Remove dominated points
+            pot_idx = pot_idx[nd_point_mask]
+            ypop = ypop[nd_point_mask]
+            i = np.sum(nd_point_mask[:i]) + 1
+
+        return xpop[pot_idx, :], ypop
 
     def tournament(self, old_gen, fitness):
         """
@@ -676,7 +768,6 @@ class GeneticAlgorithm(object):
         ----------
         old_gen : ndarray
             Points in current generation
-
         fitness : ndarray
             Objective value of each point.
 
@@ -697,6 +788,47 @@ class GeneticAlgorithm(object):
             new_gen.append(old_gen[selected])
 
         return np.concatenate(np.array(new_gen), axis=1).reshape(old_gen.shape)
+
+    def tournament_multi_obj(self, old_gen, obj_val):
+        """
+        Apply tournament selection and keep the best points.
+
+        This method is used if there are multiple objectives and the non-dominated set is being
+        kept.
+
+        Parameters
+        ----------
+        old_gen : ndarray
+            Points in current generation
+        obj_val : ndarray
+            Objective value of each point.
+
+        Returns
+        -------
+        ndarray
+            New generation with best points.
+        ndarray
+            Corresponding objective values.
+        """
+        nobj = self.nobj
+        npop = self.npop
+        nrow = npop // nobj
+        new_gen = []
+        new_obj = []
+
+        idx = np.array(range(0, npop - 1, nobj))
+        for j in np.arange(nobj):
+            old_gen, i_shuffled = self.shuffle(old_gen)
+            obj_val = obj_val[i_shuffled]
+
+            # Each point competes with its neighbor; save the best.
+            i_min = np.argmin(obj_val[:, j].reshape((nrow, nobj)), axis=1)
+            selected = i_min + idx
+            new_gen.append(old_gen[selected])
+            new_obj.append(obj_val[selected])
+
+        return np.concatenate(np.array(new_gen), axis=1).reshape(old_gen.shape), \
+            np.concatenate(np.array(new_obj), axis=1).reshape(obj_val.shape)
 
     def crossover(self, old_gen, Pc):
         """
