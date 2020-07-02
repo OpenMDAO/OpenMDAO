@@ -590,6 +590,58 @@ class TestGroup(unittest.TestCase):
 
         assert_near_equal(arr[p.model._design_vars['indep.x']['indices']], np.array([3., 4]))
 
+    def test_om_slice_in_add_response(self):
+
+        prob = Problem()
+
+        prob.model = SellarDerivatives()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
+
+        prob.model.add_design_var('x', lower=-100, upper=100)
+        prob.model.add_design_var('z', lower=-100, upper=100)
+        prob.model.add_response('obj', type_="obj")
+        prob.model.add_response('con1', type_="con")
+        # prob.model.add_response('con2', type_="con")
+
+        prob.setup()
+
+        des_vars = prob.model.get_design_vars()
+        responses = prob.model.get_responses()
+        obj = prob.model.get_objectives()
+        constraints = prob.model.get_constraints()
+
+        self.assertEqual(set(des_vars.keys()), {'px.x', 'pz.z'})
+        self.assertEqual(set(obj.keys()), {'obj_cmp.obj'})
+        self.assertEqual(set(constraints.keys()), {'con_cmp1.con1', 'con_cmp2.con2'})
+        self.assertEqual(set(responses.keys()), {'obj_cmp.obj', 'con_cmp1.con1', 'con_cmp2.con2'})
+
+    def test_om_slice_in_add_constraint(self):
+
+        class MyComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones(4))
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])**2.0
+
+        p = om.Problem()
+
+        arr = np.array([1, 2, 3, 4])
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
+        p.model.add_subsystem('C1', MyComp())
+        p.model.connect('indep.x', 'C1.x')
+        p.model.add_constraint('indep.x', indices=om.slicer[2:])
+
+        p.model.add_objective('C1.y')
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(arr[tuple(p.model._responses['indep.x']['indices'])], np.array([3, 4]))
+        self.assertTrue(p.model._responses['indep.x']['indices'][0], slice(2, None, None))
+
     def test_om_slice_in_add_input(self):
         class MyComp1(om.ExplicitComponent):
             def setup(self):

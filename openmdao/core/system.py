@@ -2544,8 +2544,10 @@ class System(object):
             msg = "{}: Constraint '{}' cannot be both equality and inequality."
             raise ValueError(msg.format(self.msginfo, name))
 
+        if isinstance(indices, slice):
+            pass
         # If given, indices must be a sequence
-        if (indices is not None and not (
+        elif (indices is not None and not (
                 isinstance(indices, Iterable) and all([isinstance(i, Integral) for i in indices]))):
             raise ValueError("{}: If specified, response indices must be a sequence of "
                              "integers.".format(self.msginfo))
@@ -2600,8 +2602,8 @@ class System(object):
             resp['equals'] = equals
             resp['linear'] = linear
             if indices is not None:
-                resp['size'] = len(indices)
                 indices = np.atleast_1d(indices)
+                resp['size'] = len(indices)
             resp['indices'] = indices
         else:  # 'obj'
             if index is not None:
