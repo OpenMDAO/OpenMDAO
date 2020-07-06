@@ -737,6 +737,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
 
     def test_guess_nonlinear_feature(self):
         import openmdao.api as om
+        import numpy as np
 
         class ImpWithInitial(om.ImplicitComponent):
             """
@@ -773,8 +774,8 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
             def guess_nonlinear(self, inputs, outputs, resids):
                 # Check residuals
                 if np.abs(resids['x']) > 1.0E-2:
-                # Default initial state of zero for x takes us to x=1 solution.
-                # Here we set it to a value that will take us to the x=3 solution.
+                    # Default initial state of zero for x takes us to x=1 solution.
+                    # Here we set it to a value that will take us to the x=3 solution.
                     outputs['x'] = 5.0
 
         prob = om.Problem()

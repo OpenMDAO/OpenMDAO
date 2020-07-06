@@ -2519,6 +2519,7 @@ class TestFeatureGuessNonlinear(unittest.TestCase):
 
     def test_guess_nonlinear(self):
         import openmdao.api as om
+        import numpy as np
 
         class Discipline(om.Group):
 
@@ -2541,7 +2542,7 @@ class TestFeatureGuessNonlinear(unittest.TestCase):
             def guess_nonlinear(self, inputs, outputs, residuals):
                 # Check residuals
                 if np.abs(residuals['x']) > 1.0E-2:
-                # inputs are addressed using full path name, regardless of promotion
+                    # inputs are addressed using full path name, regardless of promotion
                     external_input = inputs['comp1.external_input']
 
                     # balance drives x**2 = 2*external_input
