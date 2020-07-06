@@ -1793,9 +1793,7 @@ class System(object):
                                             str(meta['flat_src_indices'])))
 
                 if src_indices.dtype == object:
-                    contains_slice = _is_slice(src_indices)
-                    if contains_slice:
-                        meta['src_indices'] = src_indices
+                    meta['src_indices'] = src_indices
                 else:
                     meta['src_indices'] = np.asarray(src_indices, dtype=INT_DTYPE)
 
