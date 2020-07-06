@@ -1642,11 +1642,10 @@ class Group(System):
                             " connect('%s', %s)?" % (self.msginfo, src_name, tgt_name))
 
         if isinstance(src_indices, tuple):
-            contains_slice = _is_slice(src_indices)
-            if not contains_slice:
+            if not _is_slice(src_indices):
                 src_indices = np.atleast_1d(src_indices)
 
-        if isinstance(src_indices, list):
+        elif isinstance(src_indices, list):
             src_indices = np.atleast_1d(src_indices)
 
         if isinstance(src_indices, np.ndarray):

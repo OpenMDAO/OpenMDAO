@@ -186,7 +186,10 @@ def ensure_compatible(name, value, shape=None, indices=None):
 
     if indices is not None:
         indices = np.atleast_1d(indices)
+        contains_slice = _is_slice(indices)
         ind_shape = indices.shape
+    else:
+        contains_slice = None
 
     # if shape is not given, infer from value (if not scalar) or indices
     if shape is not None:
@@ -220,10 +223,6 @@ def ensure_compatible(name, value, shape=None, indices=None):
                 raise ValueError("Incompatible shape for '%s': "
                                  "Expected %s but got %s." %
                                  (name, shape, value.shape))
-
-    # finally make sure shape of indices is compatible
-    if isinstance(indices, np.ndarray):
-        contains_slice = _is_slice(indices)
 
     if indices is not None and shape != ind_shape[:len(shape)] and not contains_slice:
         raise ValueError("Shape of indices does not match shape for '%s': "
