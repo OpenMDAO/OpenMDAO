@@ -103,6 +103,8 @@ class System(object):
         Problem level options.
     under_complex_step : bool
         When True, this system is undergoing complex step.
+    under_approx : bool
+        When True, this system is undergoing approximation.
     force_alloc_complex : bool
         When True, the vectors have been allocated for checking with complex step.
     iter_count : int
