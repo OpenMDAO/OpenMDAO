@@ -35,7 +35,8 @@ The call signature for the `pyOptSparseDriver` constructor is:
 .. automethod:: openmdao.drivers.pyoptsparse_driver.pyOptSparseDriver.__init__
     :noindex:
 
-----
+Using pyOptSparseDriver
+-----------------------
 
 pyOptSparseDriver has a small number of unified options that can be specified as keyword arguments when
 it is instantiated or by using the "options" dictionary. We have already shown how to set the
