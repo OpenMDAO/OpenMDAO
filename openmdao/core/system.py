@@ -358,7 +358,7 @@ class System(object):
 
         # Case recording related
         self.iter_count = 0
-        self.iter_count_without_approx = 0        
+        self.iter_count_without_approx = 0
 
         self.cite = ""
 
@@ -3790,13 +3790,13 @@ class System(object):
 
                 if sub._assembled_jac:
                     sub._assembled_jac.set_complex_step_mode(active)
-                    
+
     def _set_approx_mode(self, active):
         """
         Turn on or off approx mode flag.
-    
+
         Recurses to turn on or off approx mode flag in all subsystems.
-    
+
         Parameters
         ----------
         active : bool
