@@ -1558,7 +1558,7 @@ class TestNLoptDriver(unittest.TestCase):
         prob.driver.options["optimizer"] = "GN_ISRES"
         prob.driver.options["tol"] = 1e-6
 
-        prob.driver.options["maxiter"] = 5000
+        prob.driver.options["maxiter"] = 20000
 
         model.add_design_var("x", lower=7.0, upper=7.5)
         model.add_design_var("y", lower=-8.0, upper=-7.5)
@@ -1924,7 +1924,7 @@ class TestNotInstalled(unittest.TestCase):
 
     def test_nlopt_not_installed(self):
         # the import should not fail
-        import nlopt
+        from openmdao.drivers.nlopt_driver import NLoptDriver
 
         # but we get a RuntimeError if we try to instantiate
         with self.assertRaises(RuntimeError) as ctx:
