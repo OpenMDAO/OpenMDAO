@@ -189,6 +189,7 @@ setup(
             'driver=openmdao.core.driver:Driver',
             'simplegadriver=openmdao.drivers.genetic_algorithm_driver:SimpleGADriver',
             'pyoptsparsedriver=openmdao.drivers.pyoptsparse_driver:pyOptSparseDriver',
+            'nloptdriver=openmdao.drivers.nlopt_driver:NLoptDriver',
             'scipydriver=openmdao.drivers.scipy_optimizer:ScipyOptimizeDriver',
         ],
         'openmdao_group': [
