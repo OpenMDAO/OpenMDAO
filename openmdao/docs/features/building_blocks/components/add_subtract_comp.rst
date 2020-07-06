@@ -22,7 +22,7 @@ The call signature for the `AddSubtractComp` constructor is:
 
 
 Using the AddSubtractComp
----------------------------------------------------
+-------------------------
 
 The `add_equation` method is used to set up a system of inputs to be added/subtracted (with scaling factors).
 Each time the user adds an equation, all of the inputs and outputs must be of identical shape (this is a requirement for element-wise addition/subtraction).
@@ -35,7 +35,7 @@ Method Signature
     :noindex:
 
 AddSubtractComp Example
----------------------------------------------------
+-----------------------
 
 In the following example AddSubtractComp is used to add thrust, drag, lift, and weight forces. Note the scaling factor of -1 for the drag force and weight force.
 

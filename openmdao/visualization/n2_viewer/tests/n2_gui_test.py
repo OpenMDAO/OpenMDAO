@@ -189,10 +189,16 @@ n2_gui_test_scripts = {
     ],
     "bug_arrow": [
         {
+            "desc": "Check the number of cells in the N2 Matrix",
+            "test": "count",
+            "selector": "g#n2elements > g.n2cell",
+            "count": 11
+        },
+        {
             "desc": "Hover on N2 matrix element and check arrow count",
             "test": "hoverArrow",
             "selector": "g#n2elements rect#cellShape_11_11.vMid",
-            "arrowCount": 1
+            "arrowCount": 2
         },
         {
             "desc": "Left-click on partition tree element to zoom",
@@ -204,7 +210,7 @@ n2_gui_test_scripts = {
             "desc": "Hover on N2 matrix element and check arrow count",
             "test": "hoverArrow",
             "selector": "g#n2elements rect#cellShape_11_11.vMid",
-            "arrowCount": 1
+            "arrowCount": 2
         },
         {
             "test": "root"
@@ -237,7 +243,7 @@ n2_gui_test_scripts = {
             "desc": "Hover over zoomed N2 cell and check arrow count",
             "test": "hoverArrow",
             "selector": "g#n2elements rect#cellShape_11_11.vMid",
-            "arrowCount": 1
+            "arrowCount": 2
         },
         {
             "test": "root"
