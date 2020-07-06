@@ -76,10 +76,9 @@ CITATIONS = """
 
 class NLoptDriver(Driver):
     """
+    Driver wrapper for NLopt.
 
-    NLoptDriver supports the following:
-        equality_constraints
-        inequality_constraints
+    NLopt is an open-source nonlinear optimization framework.
 
     Attributes
     ----------
@@ -118,7 +117,7 @@ class NLoptDriver(Driver):
         """
         if nlopt is None:
             raise RuntimeError('NLoptDriver is not available, NLopt is not installed.')
-            
+
         super(NLoptDriver, self).__init__(**kwargs)
 
         # What we support
@@ -211,11 +210,6 @@ class NLoptDriver(Driver):
     def run(self):
         """
         Optimize the problem using selected NLopt optimizer.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
         """
         problem = self._problem()
         opt = self.options["optimizer"]
@@ -254,7 +248,7 @@ class NLoptDriver(Driver):
         # Loop through all OpenMDAO design variables and process their bounds
         for name, meta in self._designvars.items():
             size = meta["size"]
-            x_init[i : i + size] = desvar_vals[name]
+            x_init[i: i + size] = desvar_vals[name]
             i += size
 
             # Bounds if our optimizer supports them
@@ -421,6 +415,9 @@ class NLoptDriver(Driver):
         ----------
         x_new : ndarray
             Array containing parameter values at new design point.
+        grad : ndarray
+            Empty array that is modified in-place with gradient information for
+            the new design point.
 
         Returns
         -------
@@ -435,7 +432,7 @@ class NLoptDriver(Driver):
             i = 0
             for name, meta in self._designvars.items():
                 size = meta["size"]
-                self.set_design_var(name, x_new[i : i + size])
+                self.set_design_var(name, x_new[i: i + size])
                 i += size
 
             with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
@@ -475,6 +472,9 @@ class NLoptDriver(Driver):
         ----------
         x_new : ndarray
             Array containing parameter values at new design point.
+        grad : ndarray
+            Empty array that is modified in-place with gradient information for
+            the new design point.
         name : string
             Name of the constraint to be evaluated.
         dbl : bool
@@ -556,7 +556,6 @@ def signature_extender(fcn, extra_args):
     callable
         The function with the signature expected by the driver.
     """
-
     def closure(x, grad, *args):
         return fcn(x, grad, *extra_args)
 
