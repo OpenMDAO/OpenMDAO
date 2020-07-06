@@ -1147,7 +1147,8 @@ class DriverCases(CaseTable):
         """
         super(DriverCases, self).__init__(filename, format_version,
                                           'driver_iterations', 'iteration_coordinate', giter,
-                                          prom2abs, abs2prom, abs2meta, conns, auto_ivc_map, var_info)
+                                          prom2abs, abs2prom, abs2meta, conns, auto_ivc_map,
+                                          var_info)
         self._var_info = var_info
 
     def cases(self, cache=False):
@@ -1319,7 +1320,8 @@ class SystemCases(CaseTable):
             Dictionary of all model connections.
         auto_ivc_map : dict
             Dictionary that maps all auto_ivc sources to either an absolute input name for single
-            connections or a promoted input name for multiple connections. This is for output display.
+            connections or a promoted input name for multiple connections. This is for output
+            display.
         var_info : dict
             Dictionary with information about variables (scaling, indices, execution order).
         """
