@@ -6,7 +6,10 @@ More info at https://nlopt.readthedocs.io/
 
 
 import numpy as np
-import nlopt
+try:
+    import nlopt
+except ImportError:
+    nlopt = None
 
 import openmdao
 import openmdao.utils.coloring as coloring_mod
@@ -18,19 +21,22 @@ from openmdao.utils.class_util import weak_method_wrapper
 # All optimizers in NLopt that we support and their corresponding package name.
 # Other optimizers could be added, but we've focused on those that can
 # handle either inequality or equality constraints.
-optimizer_methods = {
-    "GN_DIRECT": nlopt.GN_DIRECT,
-    "GN_DIRECT_L": nlopt.GN_DIRECT_L,
-    "GN_DIRECT_L_NOSCAL": nlopt.GN_DIRECT_L_NOSCAL,
-    "GN_ORIG_DIRECT": nlopt.GN_ORIG_DIRECT,
-    "GN_ORIG_DIRECT_L": nlopt.GN_ORIG_DIRECT_L,
-    "GN_AGS": nlopt.GN_AGS,
-    "GN_ISRES": nlopt.GN_ISRES,
-    "LN_COBYLA": nlopt.LN_COBYLA,
-    "LD_MMA": nlopt.LD_MMA,
-    "LD_CCSAQ": nlopt.LD_CCSAQ,
-    "LD_SLSQP": nlopt.LD_SLSQP,
-}
+if nlopt is not None:
+    optimizer_methods = {
+        "GN_DIRECT": nlopt.GN_DIRECT,
+        "GN_DIRECT_L": nlopt.GN_DIRECT_L,
+        "GN_DIRECT_L_NOSCAL": nlopt.GN_DIRECT_L_NOSCAL,
+        "GN_ORIG_DIRECT": nlopt.GN_ORIG_DIRECT,
+        "GN_ORIG_DIRECT_L": nlopt.GN_ORIG_DIRECT_L,
+        "GN_AGS": nlopt.GN_AGS,
+        "GN_ISRES": nlopt.GN_ISRES,
+        "LN_COBYLA": nlopt.LN_COBYLA,
+        "LD_MMA": nlopt.LD_MMA,
+        "LD_CCSAQ": nlopt.LD_CCSAQ,
+        "LD_SLSQP": nlopt.LD_SLSQP,
+    }
+else:
+    optimizer_methods = {}
 
 _optimizers = set(optimizer_methods)
 
@@ -110,6 +116,9 @@ class NLoptDriver(Driver):
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Driver options.
         """
+        if nlopt is None:
+            raise RuntimeError('NLoptDriver is not available, NLopt is not installed.')
+            
         super(NLoptDriver, self).__init__(**kwargs)
 
         # What we support

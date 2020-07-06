@@ -14,7 +14,7 @@ language: generic
 env:
   matrix:
     # latest versions
-    - PY=3   NUMPY=1    SCIPY=1   PYOPTSPARSE=v2.1.0 SNOPT=7.7 PETSc=3
+    - PY=3   NUMPY=1    SCIPY=1   PYOPTSPARSE=v2.1.0 SNOPT=7.7 PETSc=3 NLOPT=2
     # baseline versions
     - PY=3.8 NUMPY=1.18 SCIPY=1.4 PYOPTSPARSE=v2.1.0 SNOPT=7.7 PETSc=3.12 UPLOAD_DOCS=1
     # older versions
@@ -124,6 +124,11 @@ install:
     fi
 
     cd ..;
+  fi
+  
+  if [ "$NLOPT" ]; then
+    echo " >> Installing NLopt";
+    pip install nlopt;
   fi
 
   echo " >> Installing optional packages for test coverage";

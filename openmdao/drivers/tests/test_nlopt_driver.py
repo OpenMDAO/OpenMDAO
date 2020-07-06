@@ -19,12 +19,18 @@ from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.general_utils import run_driver
 from openmdao.drivers.nlopt_driver import NLoptDriver
 
+try:
+    import nlopt
+except ImportError:
+    nlopt = None
+
 
 def rastrigin(x):
     a = 10  # constant
     return np.sum(np.square(x) - a * np.cos(2 * np.pi * x)) + a * np.size(x)
 
 
+@unittest.skipIf(nlopt is None, "only run if NLopt is installed.")
 class TestNLoptDriver(unittest.TestCase):
     def test_driver_supports(self):
         prob = om.Problem()
@@ -1811,6 +1817,7 @@ class TestNLoptDriver(unittest.TestCase):
         assert_near_equal(prob["y"], -7.833334, 1e-2)
 
 
+@unittest.skipIf(nlopt is None, "only run if NLopt is installed.")
 class TestNLoptDriverFeatures(unittest.TestCase):
     def test_feature_basic(self):
         import openmdao.api as om
@@ -1911,6 +1918,20 @@ class TestNLoptDriverFeatures(unittest.TestCase):
 
         assert_near_equal(prob["x"], 6.66666667, 1e-6)
         assert_near_equal(prob["y"], -7.3333333, 1e-6)
+        
+@unittest.skipUnless(nlopt is None, "only run if NLopt is NOT installed.")
+class TestNotInstalled(unittest.TestCase):
+
+    def test_nlopt_not_installed(self):
+        # the import should not fail
+        import nlopt
+
+        # but we get a RuntimeError if we try to instantiate
+        with self.assertRaises(RuntimeError) as ctx:
+            NLoptDriver()
+
+        self.assertEqual(str(ctx.exception),
+                         'NLoptDriver is not available, NLopt is not installed.')
 
 
 if __name__ == "__main__":
