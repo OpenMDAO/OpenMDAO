@@ -777,7 +777,7 @@ class PromAbsDict(dict):
         prom2abs : dict
             Dictionary mapping promoted names to absolute names.
         abs2prom : dict
-            Dictionary mapping absolute names to promoted names.
+            Dictionary mapping absolute names in the output vector to promoted names.
         data_format : int
             A version number specifying the OpenMDAO SQL case database version.
         in_prom2abs : dict
