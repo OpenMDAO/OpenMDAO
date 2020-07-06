@@ -493,7 +493,7 @@ class TestViewModelData(unittest.TestCase):
 
         prob.setup()
         prob.final_setup()
-
+        
         model_viewer_data = _get_viewer_data(prob)
 
         expected_tree_betz = json.loads("""

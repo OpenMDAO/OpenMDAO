@@ -171,7 +171,7 @@ def _get_declare_partials(system):
         if isinstance(system, Component):
             subjacs = system._subjacs_info
             for abs_key, meta in subjacs.items():
-                if abs_key[1] != abs_key[0]:
+                if abs_key[0] != abs_key[1]:
                     dpl.append("{} > {}".format(abs_key[0], abs_key[1]))
         elif isinstance(system, Group):
             for s in system._subsystems_myproc:
@@ -402,6 +402,9 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     with open(os.path.join(style_dir, "logo_png.b64"), "r") as f:
         logo_png = str(f.read())
 
+    with open(os.path.join(assets_dir, "spinner.png"), "rb") as f:
+        waiting_icon = str(base64.b64encode(f.read()).decode("ascii"))
+
     if title:
         title = "OpenMDAO Model Hierarchy and N2 diagram: %s" % title
     else:
@@ -416,8 +419,8 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
 
     # put all style and JS into index
     h.insert('{{fontello}}', encoded_font)
-
     h.insert('{{logo_png}}', logo_png)
+    h.insert('{{waiting_icon}}', waiting_icon)
 
     for k, v in lib_dct.items():
         h.insert('{{{}_lib}}'.format(k), write_script(libs[v], indent=_IND))

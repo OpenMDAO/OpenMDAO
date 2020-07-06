@@ -189,6 +189,12 @@ n2_gui_test_scripts = {
     ],
     "bug_arrow": [
         {
+            "desc": "Check the number of cells in the N2 Matrix",
+            "test": "count",
+            "selector": "g#n2elements > g.n2cell",
+            "count": 15
+        },
+        {
             "desc": "Hover on N2 matrix element and check arrow count",
             "test": "hoverArrow",
             "selector": "g#n2elements rect#cellShape_14_14.vMid",
