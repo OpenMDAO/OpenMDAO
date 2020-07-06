@@ -79,8 +79,8 @@ class AddSubtractComp(ExplicitComponent):
         self._input_names = {}
 
         if isinstance(output_name, str):
-            self.add_equation(output_name, input_names, vec_size, length, val, scaling_factors,
-                              kwargs)
+            self.add_equation(output_name, input_names, vec_size, length, val,
+                              scaling_factors=scaling_factors, **kwargs)
         elif isinstance(output_name, collections.Iterable):
             raise NotImplementedError(self.msginfo + ': Declaring multiple addition systems '
                                       'on initiation is not implemented.'

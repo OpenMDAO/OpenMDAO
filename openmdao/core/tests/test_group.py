@@ -2606,6 +2606,10 @@ class TestNaturalNaming(unittest.TestCase):
             self.assertEqual(p[name], 7.)
 
         self.assertEqual(g3.get_val('x', get_remote=True), 7.)
+        
+        # we allow 'g1.g3.x' here even though it isn't relative to g3,
+        # because it maps to an absolute name that is contained in g3.
+        self.assertEqual(g3.get_val('g1.g3.x', get_remote=True), 7.)
 
         for name in prom_outs + [full_out]:
             self.assertEqual(p[name], 9.)
@@ -2662,10 +2666,10 @@ class TestNaturalNamingMPI(unittest.TestCase):
         c1 = g4.add_subsystem('c1', om.ExecComp('y=2.0*x', x=7., y=9.), promotes=['x','y'])
 
         g1a = par.add_subsystem('g1a', om.Group())
-        g2 = g1a.add_subsystem('g2', om.Group(), promotes=['*'])
-        g3 = g2.add_subsystem('g3', om.Group())
-        g4 = g3.add_subsystem('g4', om.Group(), promotes=['*'])
-        c1 = g4.add_subsystem('c1', om.ExecComp('y=2.0*x', x=7., y=9.), promotes=['x','y'])
+        g2a = g1a.add_subsystem('g2', om.Group(), promotes=['*'])
+        g3a = g2a.add_subsystem('g3', om.Group())
+        g4a = g3a.add_subsystem('g4', om.Group(), promotes=['*'])
+        c1 = g4a.add_subsystem('c1', om.ExecComp('y=2.0*x', x=7., y=9.), promotes=['x','y'])
 
         p.setup()
 
