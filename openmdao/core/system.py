@@ -1792,11 +1792,11 @@ class System(object):
                                            (self.msginfo, name, str(flat_src_indices),
                                             str(meta['flat_src_indices'])))
 
-                if isinstance(src_indices, np.ndarray) and src_indices.dtype == object:
+                if src_indices.dtype == object:
                     contains_slice = _is_slice(src_indices)
                     if contains_slice:
                         meta['src_indices'] = src_indices
-                elif isinstance(src_indices, np.ndarray):
+                else:
                     meta['src_indices'] = np.asarray(src_indices, dtype=INT_DTYPE)
 
                 meta['flat_src_indices'] = flat_src_indices

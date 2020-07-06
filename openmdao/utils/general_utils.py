@@ -916,8 +916,21 @@ def common_subpath(pathnames):
 
     return ''
 
-def _is_slice(indices):
 
+def _is_slice(indices):
+    """
+    Check if an array of indices contains a slice object.
+
+    Parameters
+    ----------
+    indices : ndarray
+        Dotted pathnames of systems.
+
+    Returns
+    -------
+    bool
+        Returns True if indices contains a slice.
+    """
     contains_slice = any(isinstance(i, slice) for i in indices)
 
     return contains_slice
