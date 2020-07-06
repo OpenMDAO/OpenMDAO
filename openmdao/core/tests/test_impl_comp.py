@@ -771,9 +771,11 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
                 partials['x', 'x'] = 2 * a * x + b
 
             def guess_nonlinear(self, inputs, outputs, resids):
+                # Check residuals
+                if np.abs(resids['x']) > 1.0E-2:
                 # Default initial state of zero for x takes us to x=1 solution.
                 # Here we set it to a value that will take us to the x=3 solution.
-                outputs['x'] = 5.0
+                    outputs['x'] = 5.0
 
         prob = om.Problem()
         model = prob.model
