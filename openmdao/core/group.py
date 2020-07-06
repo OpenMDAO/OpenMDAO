@@ -1217,9 +1217,7 @@ class Group(System):
                             simple_warning(msg)
 
                 elif src_indices is not None:
-
-                    contains_slice = _is_slice(src_indices)
-                    if contains_slice:
+                    if _is_slice(src_indices):
                         val = self._abs_get_val(abs_out)
                         src_indices = np.array([i for i in range(len(val[tuple(src_indices)]))])
                     else:

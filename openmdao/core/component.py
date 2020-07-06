@@ -484,9 +484,7 @@ class Component(System):
         }
 
         if src_indices is not None:
-
-            contains_slice = _is_slice(src_indices)
-            if contains_slice:
+            if _is_slice(src_indices):
                 metadata['src_indices'] = src_indices
             else:
                 metadata['src_indices'] = np.asarray(src_indices, dtype=INT_DTYPE)
