@@ -108,6 +108,9 @@ class System(object):
     iter_count : int
         Int that holds the number of times this system has iterated
         in a recording run.
+    iter_count_without_approx : int
+        Int that holds the number of times this system has iterated
+        in a recording run excluding any calls due to approximation schemes.
     cite : str
         Listing of relevant citations that should be referenced when
         publishing work that uses this class.
@@ -353,6 +356,7 @@ class System(object):
 
         # Case recording related
         self.iter_count = 0
+        self.iter_count_without_approx = 0        
 
         self.cite = ""
 
@@ -3715,6 +3719,8 @@ class System(object):
             self._rec_mgr.record_iteration(self, data, metadata)
 
         self.iter_count += 1
+        if not self.under_approx:
+            self.iter_count_without_approx += 1
 
     def is_active(self):
         """
