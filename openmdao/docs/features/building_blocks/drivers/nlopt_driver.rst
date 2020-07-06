@@ -8,6 +8,10 @@ NLoptDriver wraps the optimizers in `NLopt` and makes them accessible for OpenMD
 NLopt_ is a "free/open-source library for nonlinear optimization, providing a common interface for a number of different free optimization routines available online as well as original implementations of various other algorithms."
 It includes `methods for both local and global optimization <https://nlopt.readthedocs.io/en/latest/NLopt_Algorithms/>`_ and some of these methods use derivative information whereas others are derivative-free.
 
+Depending on your optimization problem formulation, one method might be more advantageous to use over others.
+In general, there is no single best optimization algorithm.
+Please see the NLopt documentation for more information on how the methods are implemented and best used. 
+
 .. note::
     The NLopt package does not come included with the OpenMDAO installation. It is a separate optional package that can be installed via `pip install nlopt`.
 
@@ -67,25 +71,9 @@ NLoptDriver Option Examples
   .. embed-code::
       openmdao.drivers.tests.test_nlopt_driver.TestNLoptDriverFeatures.test_feature_tol
       :layout: interleave
-      
-      
-      
-      
-      
-      
-NLoptDriver Tutorial Examples
------------------------------------      
-      
-      
-      
-      
-      
 
-
+      
 .. tags:: Driver, Optimizer, Optimization
-
-
-
 
 .. _mdolab: https://github.com/mdolab/pyoptsparse
 

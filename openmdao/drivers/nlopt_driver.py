@@ -1,6 +1,7 @@
 """
 OpenMDAO Wrapper for the NLopt package of optimizers.
 
+More info at https://nlopt.readthedocs.io/
 """
 
 
@@ -147,9 +148,9 @@ class NLoptDriver(Driver):
             "tol",
             1.0e-6,
             lower=0.0,
-            desc="Tolerance for termination. Based on " +\
-            "relative function value change. Uses the " +\
-            "method `set_ftol_rel()` from NLOpt.",
+            desc="Tolerance for termination. Based on "
+            + "relative function value change. Uses the "
+            + "method `set_ftol_rel()` from NLOpt.",
         )
         self.options.declare(
             "maxiter", 200, lower=0, desc="Maximum number of iterations."
@@ -311,8 +312,10 @@ class NLoptDriver(Driver):
                                 )
                             )
                         except ValueError:
-                            msg = "The selected optimizer, {}, does not support" +\
-                            " equality constraints. Select from {}."
+                            msg = (
+                                "The selected optimizer, {}, does not support"
+                                + " equality constraints. Select from {}."
+                            )
                             raise NotImplementedError(
                                 msg.format(opt, _eq_constraint_optimizers)
                             )
