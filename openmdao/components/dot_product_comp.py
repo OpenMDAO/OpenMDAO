@@ -40,6 +40,35 @@ class DotProductComp(ExplicitComponent):
         self.options.declare('c_units', types=str, default=None, allow_none=True,
                              desc='The units for vector c.')
 
+    def add_product(self, output, a, b, output_units=None, a_units=None, b_units=None,
+                    vec_size=1, length=3):
+        """
+        Adds a new output product to the dot product component.
+
+        Parameters
+        ----------
+        output : str
+            The name of the vector product output.
+        a : str
+            The name of the first vector input.
+        b : str
+            The name of the second input.
+        output_units : str or None
+            The units of the output.
+        a_units : str or None
+            The units of input a.
+        b_units : str or None
+            The units of input b.
+        vec_size : int
+            The number of points at which the dot vector product
+            should be computed simultaneously.  The shape of
+            the output is (vec_size,).
+        length : int
+            The length of the vectors a and b.  Their shapes are
+            (vec_size, length)
+        """
+        raise NotImplementedError()
+
     def setup(self):
         """
         Declare inputs, outputs, and derivatives for the dot product component.

@@ -3,6 +3,7 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
+from openmdao.utils.units import convert_units
 from openmdao.utils.assert_utils import assert_near_equal
 
 
@@ -189,6 +190,79 @@ class TestUnits(unittest.TestCase):
 
             expected_i = np.dot(A_i, x_i)
             np.testing.assert_almost_equal(b_i, expected_i)
+
+    def test_partials(self):
+        np.set_printoptions(linewidth=1024)
+        cpd = self.p.check_partials(out_stream=None, method='cs')
+
+        for comp in cpd:
+            for (var, wrt) in cpd[comp]:
+                np.testing.assert_almost_equal(actual=cpd[comp][var, wrt]['J_fwd'],
+                                               desired=cpd[comp][var, wrt]['J_fd'],
+                                               decimal=6)
+
+
+class TestMultipleUnits(unittest.TestCase):
+
+    def setUp(self):
+        self.nn = 2
+
+        ivc = om.IndepVarComp()
+        ivc.add_output(name='A', shape=(self.nn, 5, 3), units='ft')
+        ivc.add_output(name='x', shape=(self.nn, 3), units='lbf')
+        ivc.add_output(name='B', shape=(self.nn, 5, 3), units='m')
+        ivc.add_output(name='y', shape=(self.nn, 3), units='N')
+
+        mvc = om.MatrixVectorProductComp(vec_size=self.nn, A_shape=(5, 3),
+                                         b_units='N*m', A_units='m', x_units='N')
+
+        mvc.add_product('c', 'B', 'y', vec_size=self.nn, shape=(5, 3),
+                        output_units='N*m', matrix_units='m', vector_units='N')
+
+        model = om.Group()
+        model.add_subsystem(name='ivc',
+                            subsys=ivc,
+                            promotes_outputs=['*'])
+
+        model.add_subsystem(name='mat_vec_product_comp',
+                            subsys=mvc,
+                            promotes=['*'])
+
+        self.p = om.Problem(model)
+        self.p.setup(force_alloc_complex=True)
+
+        A = np.random.rand(self.nn, 5, 3)
+        x = np.random.rand(self.nn, 3)
+
+        self.p['A'] = A
+        self.p['x'] = x
+
+        self.p['B'] = convert_units(A, 'ft', 'm')
+        self.p['y'] = convert_units(x, 'lbf', 'N')
+
+        self.p.run_model()
+
+    def test_results(self):
+
+        for i in range(self.nn):
+            # b = Ax
+            A_i = self.p['A'][i, :, :]
+            x_i = self.p['x'][i, :]
+            b_i = self.p.get_val('mat_vec_product_comp.b', units='ft*lbf')[i, :]
+
+            expected_i = np.dot(A_i, x_i)
+            np.testing.assert_almost_equal(b_i, expected_i)
+
+            # c = By
+            B_i = self.p['B'][i, :, :]
+            y_i = self.p['y'][i, :]
+            c_i = self.p.get_val('mat_vec_product_comp.c', units='N*m')[i, :]
+
+            expected_i = np.dot(B_i, y_i)
+            np.testing.assert_almost_equal(c_i, expected_i)
+
+            # b & c should match after unit conversion
+            np.testing.assert_almost_equal(convert_units(b_i, 'ft*lbf', 'N*m'), c_i)
 
     def test_partials(self):
         np.set_printoptions(linewidth=1024)
