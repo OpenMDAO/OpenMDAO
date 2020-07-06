@@ -54,6 +54,59 @@ def count_keys(d):
 
     return count
 
+class SellarDerivativesGroupedPreAutoIVC(om.Group):
+    """
+    This version is needed for testing backwards compatibility for load_case on pre-3.2
+    models.
+    """
+
+    def initialize(self):
+        self.options.declare('nonlinear_solver', default=om.NonlinearBlockGS,
+                             desc='Nonlinear solver (class or instance) for Sellar MDA')
+        self.options.declare('nl_atol', default=None,
+                             desc='User-specified atol for nonlinear solver.')
+        self.options.declare('nl_maxiter', default=None,
+                             desc='Iteration limit for nonlinear solver.')
+        self.options.declare('linear_solver', default=om.ScipyKrylov,
+                             desc='Linear solver (class or instance)')
+        self.options.declare('ln_atol', default=None,
+                             desc='User-specified atol for linear solver.')
+        self.options.declare('ln_maxiter', default=None,
+                             desc='Iteration limit for linear solver.')
+
+    def setup(self):
+        self.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
+        self.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        self.mda = mda = self.add_subsystem('mda', om.Group(), promotes=['x', 'z', 'y1', 'y2'])
+        mda.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        mda.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        self.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                  z=np.array([0.0, 0.0]), x=0.0, y1=0.0, y2=0.0),
+                           promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        self.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        self.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        nl = self.options['nonlinear_solver']
+        self.nonlinear_solver = nl()
+        if self.options['nl_atol']:
+            self.nonlinear_solver.options['atol'] = self.options['nl_atol']
+        if self.options['nl_maxiter']:
+            self.nonlinear_solver.options['maxiter'] = self.options['nl_maxiter']
+
+        ln = self.options['linear_solver']
+        self.linear_solver = ln()
+        if self.options['ln_atol']:
+            self.linear_solver.options['atol'] = self.options['ln_atol']
+        if self.options['ln_maxiter']:
+            self.linear_solver.options['maxiter'] = self.options['ln_maxiter']
+
+    def configure(self):
+        self.mda.linear_solver = om.ScipyKrylov()
+        self.mda.nonlinear_solver = om.NonlinearBlockGS()
+
 
 @use_tempdirs
 class TestSqliteCaseReader(unittest.TestCase):
@@ -3603,8 +3656,8 @@ class TestFeatureSqliteReader(unittest.TestCase):
 @use_tempdirs
 class TestPromAbsDict(unittest.TestCase):
 
-    def test_dict_functionality(self):
-        prob = SellarProblem(SellarDerivativesGrouped)
+    def test_dict_functionality_pre_autoivc(self):
+        prob = SellarProblem(SellarDerivativesGroupedPreAutoIVC)
         driver = prob.driver = om.ScipyOptimizeDriver(disp=False)
 
         recorder = om.SqliteRecorder("cases.sql")
@@ -3634,8 +3687,8 @@ class TestPromAbsDict(unittest.TestCase):
         self.assertEqual(sorted(dvs.items()), [('x', dvs['x']), ('z', dvs['z'])])
 
         # verify that using absolute names works the same as using promoted names
-        self.assertEqual(sorted(dvs.absolute_names()), ['x', 'z'])
-        self.assertEqual(dvs['px.x'], dvs['x'])
+        self.assertEqual(sorted(dvs.absolute_names()), ['px.x', 'pz.z'])
+        self.assertEqual(dvs['x'], dvs['x'])
         self.assertEqual(dvs['pz.z'][0], dvs['z'][0])
         self.assertEqual(dvs['pz.z'][1], dvs['z'][1])
 
@@ -3689,6 +3742,85 @@ class TestPromAbsDict(unittest.TestCase):
         self.assertEqual(set(derivs.absolute_names()), set([
             ('obj_cmp.obj', 'pz.z'), ('con_cmp2.con2', 'pz.z'), ('con_cmp1.con1', 'px.x'),
             ('obj_cmp.obj', 'px.x'), ('con_cmp2.con2', 'px.x'), ('con_cmp1.con1', 'pz.z')
+        ]))
+
+    def test_dict_functionality(self):
+        prob = SellarProblem(SellarDerivativesGrouped)
+        driver = prob.driver = om.ScipyOptimizeDriver(disp=False)
+
+        recorder = om.SqliteRecorder("cases.sql")
+
+        driver.add_recorder(recorder)
+        driver.recording_options['includes'] = []
+        driver.recording_options['record_objectives'] = True
+        driver.recording_options['record_constraints'] = True
+        driver.recording_options['record_desvars'] = True
+        driver.recording_options['record_derivatives'] = True
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = om.CaseReader("cases.sql")
+
+        driver_cases = cr.list_cases('driver')
+        driver_case = cr.get_case(driver_cases[-1])
+
+        dvs = driver_case.get_design_vars()
+        derivs = driver_case.derivatives
+
+        # verify that map looks and acts like a regular dict
+        self.assertTrue(isinstance(dvs, dict))
+        self.assertEqual(sorted(dvs.keys()), ['x', 'z'])
+        self.assertEqual(sorted(dvs.items()), [('x', dvs['x']), ('z', dvs['z'])])
+
+        # verify that using absolute names works the same as using promoted names
+        self.assertEqual(sorted(dvs.absolute_names()), ['x', 'z'])
+        self.assertEqual(dvs['x'], dvs['x'])
+        self.assertEqual(dvs['z'][0], dvs['z'][0])
+        self.assertEqual(dvs['z'][1], dvs['z'][1])
+
+        dvs['x'] = 111.
+        self.assertEqual(dvs['x'], 111.)
+
+        dvs['x'] = 222.
+        self.assertEqual(dvs['x'], 222.)
+
+        # verify deriv keys are tuples as expected, both promoted and absolute
+        self.assertEqual(set(derivs.keys()), set([
+            ('obj', 'z'), ('con2', 'z'), ('con1', 'x'),
+            ('obj', 'x'), ('con2', 'x'), ('con1', 'z')
+        ]))
+        self.assertEqual(set(derivs.absolute_names()), set([
+            ('obj_cmp.obj', 'z'), ('con_cmp2.con2', 'z'), ('con_cmp1.con1', 'x'),
+            ('obj_cmp.obj', 'x'), ('con_cmp2.con2', 'x'), ('con_cmp1.con1', 'z')
+        ]))
+
+        # verify we can access derivs via tuple or string, with promoted or absolute names
+        J = prob.compute_totals(of=['obj'], wrt=['x'])
+        expected = J[('obj', 'x')]
+        np.testing.assert_almost_equal(derivs[('obj', 'x')], expected, decimal=6)
+        np.testing.assert_almost_equal(derivs[('obj_cmp.obj', 'x')], expected, decimal=6)
+        np.testing.assert_almost_equal(derivs['obj!x'], expected, decimal=6)
+        np.testing.assert_almost_equal(derivs['obj_cmp.obj!x'], expected, decimal=6)
+
+        # verify we can set derivs via tuple or string, with promoted or absolute names
+        # (although users wouldn't normally do this, it's used when copying)
+        for key, value in [(('obj', 'x'), 111.), ('obj_cmp.obj!x', 444.)]:
+            derivs[key] = value
+            self.assertEqual(derivs[('obj', 'x')], value)
+            self.assertEqual(derivs[('obj_cmp.obj', 'x')], value)
+            self.assertEqual(derivs['obj!x'], value)
+            self.assertEqual(derivs['obj_cmp.obj!x'], value)
+
+        # verify that we didn't mess up deriv keys by setting values
+        self.assertEqual(set(derivs.keys()), set([
+            ('obj', 'z'), ('con2', 'z'), ('con1', 'x'),
+            ('obj', 'x'), ('con2', 'x'), ('con1', 'z')
+        ]))
+        self.assertEqual(set(derivs.absolute_names()), set([
+            ('obj_cmp.obj', 'z'), ('con_cmp2.con2', 'z'), ('con_cmp1.con1', 'x'),
+            ('obj_cmp.obj', 'x'), ('con_cmp2.con2', 'x'), ('con_cmp1.con1', 'z')
         ]))
 
 
@@ -4117,7 +4249,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         Legacy case recording file generated using code from test_record_driver_system_solver
         test in test_sqlite_recorder.py
         """
-        prob = SellarProblem(SellarDerivativesGrouped)
+        prob = SellarProblem(SellarDerivativesGroupedPreAutoIVC)
         prob.driver = om.ScipyOptimizeDriver(tol=1e-9, disp=False)
         prob.setup()
         prob.run_driver()
@@ -4169,7 +4301,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
 
     def test_driver_v2(self):
         """ Backwards compatibility version 2. """
-        prob = SellarProblem(SellarDerivativesGrouped)
+        prob = SellarProblem(SellarDerivativesGroupedPreAutoIVC)
         prob.driver = om.ScipyOptimizeDriver(tol=1e-9, disp=False)
         prob.setup()
         prob.run_driver()
@@ -4279,7 +4411,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
 
     def test_driver_v1(self):
         """ Backwards compatibility oldest version. """
-        prob = SellarProblem(SellarDerivativesGrouped)
+        prob = SellarProblem(SellarDerivativesGroupedPreAutoIVC)
         prob.driver = om.ScipyOptimizeDriver(tol=1e-9, disp=False)
         prob.setup()
         prob.run_driver()
@@ -4326,7 +4458,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
 
     def test_driver_v1_pre_problem(self):
         """ Backwards compatibility oldest version. """
-        prob = SellarProblem(SellarDerivativesGrouped)
+        prob = SellarProblem(SellarDerivativesGroupedPreAutoIVC)
         prob.driver = om.ScipyOptimizeDriver(tol=1e-9, disp=False)
         prob.setup()
         prob.run_driver()

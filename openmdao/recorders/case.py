@@ -741,7 +741,7 @@ class Case(object):
                     ret_vars[return_name] = val
 
         return PromAbsDict(ret_vars, self._prom2abs['output'], self._abs2prom['output'],
-                           in_prom2abs=prom2abs)
+                           in_prom2abs=prom2abs, auto_ivc_map=auto_ivc_map)
 
 
 class PromAbsDict(dict):
@@ -755,7 +755,7 @@ class PromAbsDict(dict):
     _keys : array
         Absolute variable names that map to the values in the _values array.
     _prom2abs : dict
-        Dictionary mapping promoted names to absolute names.
+        Dictionary mapping promoted names in the output vector to absolute names.
     _abs2prom : dict
         Dictionary mapping absolute names to promoted names.
     _auto_ivc_map : dict
@@ -780,6 +780,8 @@ class PromAbsDict(dict):
             Dictionary mapping absolute names to promoted names.
         data_format : int
             A version number specifying the OpenMDAO SQL case database version.
+        in_prom2abs : dict
+           Dictionary mapping promoted names in the input vector to absolute names.
         auto_ivc_map : dict
             Dictionary that maps all auto_ivc sources to either an absolute input name for single
             connections or a promoted input name for multiple connections. This is for output
@@ -824,6 +826,7 @@ class PromAbsDict(dict):
                     super(PromAbsDict, self).__setitem__(prom_key, values[key])
                 elif in_prom2abs is not None and key in in_prom2abs:
                     # Auto-ivc outputs, use abs source (which is prom source.)
+                    self._values[key] = values[key]
                     super(PromAbsDict, self).__setitem__(key, values[key])
             self._keys = self._values.keys()
         else:
@@ -894,7 +897,7 @@ class PromAbsDict(dict):
         # if promoted, will map to all connected absolute names
         abs_of = [of] if of in abs2prom else prom2abs[of]
         if wrt in prom2abs:
-            abs_wrt = [prom2abs[wrt]]
+            abs_wrt = [prom2abs[wrt]][0]
         else:
             abs_wrt = [wrt]
 
@@ -957,6 +960,10 @@ class PromAbsDict(dict):
         value : any
             value for variable
         """
+        auto_ivc_map = self._auto_ivc_map
+        abs2prom = self._abs2prom
+        prom2abs = self._prom2abs
+
         if isinstance(key, tuple) or self._DERIV_KEY_SEP in key:
             # derivative keys can be either (of, wrt) or 'of!wrt'
             abs_keys, prom_key = self._deriv_keys(key)
@@ -966,15 +973,25 @@ class PromAbsDict(dict):
 
             super(PromAbsDict, self).__setitem__(prom_key, value)
 
-        elif key in self._keys:
-            # absolute name
-            self._values[key] = value
-            super(PromAbsDict, self).__setitem__(self._abs2prom[key], value)
-        else:
+        elif key in abs2prom:
+            if key in auto_ivc_map:
+                # key is auto_ivc, so translate to a readable input name.
+                self._values[key] = value
+                in_key = auto_ivc_map[key]
+                super(PromAbsDict, self).__setitem__(in_key, self._values[key])
+            else:
+                # absolute name
+                self._values[key] = value
+                super(PromAbsDict, self).__setitem__(self._abs2prom[key], value)
+        elif key in prom2abs:
             # promoted name, propagate to all connected absolute names
             for abs_key in self._prom2abs[key]:
                 if abs_key in self._keys:
                     self._values[abs_key] = value
+            super(PromAbsDict, self).__setitem__(key, value)
+        else:
+            # Design variable by promoted input name.
+            self._values[key] = value
             super(PromAbsDict, self).__setitem__(key, value)
 
     def absolute_names(self):
