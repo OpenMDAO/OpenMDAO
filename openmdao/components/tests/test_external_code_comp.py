@@ -598,7 +598,6 @@ class TestExternalCodeImplicitCompFeature(unittest.TestCase):
                 outputs['mach'] = mach
 
         group = om.Group()
-        group.add_subsystem('ar', om.IndepVarComp('area_ratio', 0.5))
         mach_comp = group.add_subsystem('comp', MachExternalCodeComp(), promotes=['*'])
         prob = om.Problem(model=group)
         group.nonlinear_solver = om.NewtonSolver()
@@ -609,6 +608,7 @@ class TestExternalCodeImplicitCompFeature(unittest.TestCase):
 
         prob.setup()
 
+        prob.set_val('area_ratio', 0.5)
         area_ratio = 1.3
         super_sonic = False
         prob['area_ratio'] = area_ratio
