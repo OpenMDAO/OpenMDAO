@@ -3,6 +3,9 @@
 import unittest
 import os
 import json
+import re
+import base64
+import zlib
 
 import errno
 from shutil import rmtree
@@ -664,6 +667,22 @@ class TestViewModelData(unittest.TestCase):
                         (self.problem_html_filename + " is not a valid file."))
         self.assertGreater(os.path.getsize(self.problem_html_filename), 100)
 
+    def _extract_compressed_model(self, filename):
+        """
+        Load an N2 html, find the compressed data string, uncompress and decode it.
+        """
+        file = open(filename, 'r')
+        for line in file:
+            if re.search('var compressedModel', line):
+                b64_data = line.replace('var compressedModel = "', '').replace('";', '')
+                break
+        
+        file.close()
+        compressed_data = base64.b64decode(b64_data)
+        model_data = json.loads(zlib.decompress(compressed_data).decode("utf-8"))
+
+        return model_data
+
     def test_n2_from_sqlite(self):
         """
         Test that an n2 html file is generated from a sqlite file.
@@ -686,13 +705,12 @@ class TestViewModelData(unittest.TestCase):
         # Check that there are no errors when running from the command line with a recording.
         check_call('openmdao n2 --no_browser %s' % self.sqlite_db_filename2)
 
-        # Compare the sizes of the files generated from the Problem and the recording
-        size1 = os.path.getsize(self.sqlite_html_filename)
-        size2 = os.path.getsize(self.compare_html_filename)
-        self.assertTrue(size1 == size2,
-                        'File size of ' + self.sqlite_html_filename + ' is ' + str(size1) +
-                        ', but size of ' + self.compare_html_filename + ' is ' + str(size2))
-                        
+        # Compare models from the files generated from the Problem and the recording
+        sqlite_model_data = self._extract_compressed_model(self.sqlite_html_filename)
+        compare_model_data = self._extract_compressed_model(self.compare_html_filename)
+
+        self.assertTrue(sqlite_model_data == compare_model_data,
+                        'Model data from sqlite does not match data from Problem.')
 
     def test_n2_command(self):
         """
