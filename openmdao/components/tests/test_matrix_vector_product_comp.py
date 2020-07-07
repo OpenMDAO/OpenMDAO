@@ -275,6 +275,220 @@ class TestMultipleUnits(unittest.TestCase):
                                                decimal=6)
 
 
+class TestMultipleCommonMatrix(unittest.TestCase):
+
+    def setUp(self):
+        self.nn = 2
+
+        ivc = om.IndepVarComp()
+        ivc.add_output(name='A', shape=(self.nn, 5, 3), units='ft')
+        ivc.add_output(name='x', shape=(self.nn, 3), units='lbf')
+        ivc.add_output(name='y', shape=(self.nn, 3), units='N')
+
+        mvc = om.MatrixVectorProductComp(vec_size=self.nn, A_shape=(5, 3),
+                                         b_units='N*m', A_units='m', x_units='N')
+
+        mvc.add_product('c', 'A', 'y', vec_size=self.nn, shape=(5, 3),
+                        output_units='N*m', matrix_units='m', vector_units='N')
+
+        model = om.Group()
+        model.add_subsystem(name='ivc',
+                            subsys=ivc,
+                            promotes_outputs=['*'])
+
+        model.add_subsystem(name='mat_vec_product_comp',
+                            subsys=mvc,
+                            promotes=['*'])
+
+        self.p = om.Problem(model)
+        self.p.setup(force_alloc_complex=True)
+
+        A = np.random.rand(self.nn, 5, 3)
+        x = np.random.rand(self.nn, 3)
+
+        self.p['A'] = A
+        self.p['x'] = x
+        self.p['y'] = convert_units(x, 'lbf', 'N')
+
+        self.p.run_model()
+
+    def test_results(self):
+
+        for i in range(self.nn):
+            # b = Ax
+            A_i = self.p['A'][i, :, :]
+            x_i = self.p['x'][i, :]
+            b_i = self.p.get_val('mat_vec_product_comp.b', units='ft*lbf')[i, :]
+
+            expected_i = np.dot(A_i, x_i)
+            np.testing.assert_almost_equal(b_i, expected_i)
+
+            # c = Ay
+            y_i = self.p['y'][i, :]
+            c_i = self.p.get_val('mat_vec_product_comp.c', units='N*m')[i, :]
+
+            expected_i = np.dot(convert_units(A_i, 'ft', 'm'), y_i)
+            np.testing.assert_almost_equal(c_i, expected_i)
+
+            # b & c should match after unit conversion
+            np.testing.assert_almost_equal(convert_units(b_i, 'ft*lbf', 'N*m'), c_i)
+
+    def test_partials(self):
+        np.set_printoptions(linewidth=1024)
+        cpd = self.p.check_partials(out_stream=None, method='cs')
+
+        for comp in cpd:
+            for (var, wrt) in cpd[comp]:
+                np.testing.assert_almost_equal(actual=cpd[comp][var, wrt]['J_fwd'],
+                                               desired=cpd[comp][var, wrt]['J_fd'],
+                                               decimal=6)
+
+
+class TestMultipleCommonVector(unittest.TestCase):
+
+    def setUp(self):
+        self.nn = 2
+
+        ivc = om.IndepVarComp()
+        ivc.add_output(name='A', shape=(self.nn, 5, 3), units='ft')
+        ivc.add_output(name='B', shape=(self.nn, 7, 3), units='m')
+        ivc.add_output(name='x', shape=(self.nn, 3), units='lbf')
+
+        mvc = om.MatrixVectorProductComp(vec_size=self.nn, A_shape=(5, 3),
+                                         b_units='N*m', A_units='m', x_units='N')
+
+        mvc.add_product('c', 'B', 'x', vec_size=self.nn, shape=(7, 3),
+                        output_units='N*m', matrix_units='m', vector_units='N')
+
+        model = om.Group()
+        model.add_subsystem(name='ivc',
+                            subsys=ivc,
+                            promotes_outputs=['*'])
+
+        model.add_subsystem(name='mat_vec_product_comp',
+                            subsys=mvc,
+                            promotes=['*'])
+
+        self.p = om.Problem(model)
+        self.p.setup(force_alloc_complex=True)
+
+        A = np.random.rand(self.nn, 5, 3)
+        B = np.random.rand(self.nn, 7, 3)
+        x = np.random.rand(self.nn, 3)
+
+        self.p['A'] = A
+        self.p['B'] = B
+        self.p['x'] = x
+
+        self.p.run_model()
+
+    def test_results(self):
+
+        for i in range(self.nn):
+            # b = Ax
+            A_i = self.p['A'][i, :, :]
+            x_i = self.p['x'][i, :]
+            b_i = self.p.get_val('mat_vec_product_comp.b', units='ft*lbf')[i, :]
+
+            expected_i = np.dot(A_i, x_i)
+            np.testing.assert_almost_equal(b_i, expected_i)
+
+            # c = Bx
+            B_i = self.p['B'][i, :, :]
+            c_i = self.p.get_val('mat_vec_product_comp.c', units='N*m')[i, :]
+
+            expected_i = np.dot(B_i, convert_units(x_i, 'lbf', 'N'))
+            np.testing.assert_almost_equal(c_i, expected_i)
+
+    def test_partials(self):
+        np.set_printoptions(linewidth=1024)
+        cpd = self.p.check_partials(out_stream=None, method='cs')
+
+        for comp in cpd:
+            for (var, wrt) in cpd[comp]:
+                np.testing.assert_almost_equal(actual=cpd[comp][var, wrt]['J_fwd'],
+                                               desired=cpd[comp][var, wrt]['J_fd'],
+                                               decimal=6)
+
+
+class TestMultipleErrors(unittest.TestCase):
+
+    def test_duplicate_outputs(self):
+        mvc = om.MatrixVectorProductComp()
+        mvc.add_product('b', 'B', 'y')
+
+        model = om.Group()
+        model.add_subsystem('mvc', mvc)
+
+        p = om.Problem(model)
+
+        with self.assertRaises(NameError) as ctx:
+            p.setup()
+
+        self.assertEqual(str(ctx.exception), "MatrixVectorProductComp (mvc): "
+                         "Multiple definition of output 'b'")
+
+    def test_vec_size_mismatch(self):
+        mvc = om.MatrixVectorProductComp()
+        mvc.add_product('c', 'A', 'y', vec_size=10)
+
+        model = om.Group()
+        model.add_subsystem('mvc', mvc)
+
+        p = om.Problem(model)
+
+        with self.assertRaises(ValueError) as ctx:
+            p.setup()
+
+        self.assertEqual(str(ctx.exception), "MatrixVectorProductComp (mvc): "
+                         "Conflicting shapes specified for matrix A, (1, 3, 3) and (10, 3, 3)")
+
+    def test_shape_mismatch(self):
+        mvc = om.MatrixVectorProductComp()
+        mvc.add_product('c', 'A', 'y', shape=(5, 5))
+
+        model = om.Group()
+        model.add_subsystem('mvc', mvc)
+
+        p = om.Problem(model)
+
+        with self.assertRaises(ValueError) as ctx:
+            p.setup()
+
+        self.assertEqual(str(ctx.exception), "MatrixVectorProductComp (mvc): "
+                         "Conflicting shapes specified for matrix A, (1, 3, 3) and (1, 5, 5)")
+
+    def test_matrix_units_mismatch(self):
+        mvc = om.MatrixVectorProductComp()
+        mvc.add_product('c', 'A', 'y', matrix_units='ft')
+
+        model = om.Group()
+        model.add_subsystem('mvc', mvc)
+
+        p = om.Problem(model)
+
+        with self.assertRaises(ValueError) as ctx:
+            p.setup()
+
+        self.assertEqual(str(ctx.exception), "MatrixVectorProductComp (mvc): "
+                         "Conflicting units specified for matrix A, 'None' and 'ft'")
+
+    def test_vector_units_mismatch(self):
+        mvc = om.MatrixVectorProductComp()
+        mvc.add_product('c', 'A', 'x', vector_units='ft')
+
+        model = om.Group()
+        model.add_subsystem('mvc', mvc)
+
+        p = om.Problem(model)
+
+        with self.assertRaises(ValueError) as ctx:
+            p.setup()
+
+        self.assertEqual(str(ctx.exception), "MatrixVectorProductComp (mvc): "
+                         "Conflicting units specified for vector x, 'None' and 'ft'")
+
+
 class TestFeature(unittest.TestCase):
 
     def test(self):

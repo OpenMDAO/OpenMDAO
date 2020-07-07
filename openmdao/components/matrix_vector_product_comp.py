@@ -134,26 +134,46 @@ class MatrixVectorProductComp(ExplicitComponent):
         var_rel2meta = self._var_rel2meta
 
         for product in products:
-            if product['matrix'] not in var_rel2meta:
-                self.add_input(name=product['matrix'],
-                               shape=product['matrix_shape'],
-                               units=product['matrix_units'])
-            else:
-                raise NotImplementedError(f"Need to check consistency of {product['matrix']}")
+            output = product['output']
+            matrix = product['matrix']
+            vector = product['vector']
 
-            if product['vector'] not in var_rel2meta:
-                self.add_input(name=product['vector'],
-                               shape=product['vector_shape'],
-                               units=product['vector_units'])
-            else:
-                raise NotImplementedError(f"Need to check consistency of {product['vector']}")
+            output_units = product['output_units']
+            matrix_units = product['matrix_units']
+            vector_units = product['vector_units']
 
-            if product['output'] not in var_rel2meta:
-                self.add_output(name=product['output'],
-                                shape=product['output_shape'],
-                                units=product['output_units'])
+            output_shape = product['output_shape']
+            matrix_shape = product['matrix_shape']
+            vector_shape = product['vector_shape']
+
+            if output not in var_rel2meta:
+                self.add_output(name=output, shape=output_shape, units=output_units)
             else:
-                raise RuntimeError(f"Multiple definition of output '{product['output']}'")
+                raise NameError(f"{self.msginfo}: Multiple definition of output '{output}'")
+
+            if matrix not in var_rel2meta:
+                self.add_input(name=matrix, shape=matrix_shape, units=matrix_units)
+            else:
+                meta = var_rel2meta[matrix]
+                if matrix_shape != meta['shape']:
+                    raise ValueError(f"{self.msginfo}: Conflicting shapes specified for matrix "
+                                     f"{matrix}, {matrix_shape} and {meta['shape']}")
+
+                elif matrix_units != meta['units']:
+                    raise ValueError(f"{self.msginfo}: Conflicting units specified for matrix "
+                                     f"{matrix}, '{matrix_units}' and '{meta['units']}'")
+
+            if vector not in var_rel2meta:
+                self.add_input(name=vector, shape=vector_shape, units=vector_units)
+            else:
+                meta = var_rel2meta[vector]
+                if vector_shape != meta['shape']:
+                    raise ValueError(f"{self.msginfo}: Conflicting shapes specified for vector "
+                                     f"{vector}, {vector_shape} and {meta['shape']}")
+
+                elif vector_units != meta['units']:
+                    raise ValueError(f"{self.msginfo}: Conflicting units specified for vector "
+                                     f"{vector}, '{vector_units}' and '{meta['units']}'")
 
             # Make a dummy version of A so we can figure out the nonzero indices
             A = np.ones(product['matrix_shape'])
