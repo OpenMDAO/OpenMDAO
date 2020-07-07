@@ -467,6 +467,29 @@ class TestDriverOptionsSimpleGA(unittest.TestCase):
         self.assertEqual(driver.options['Pc'], 0.0123)
 
 
+class Box(om.ExplicitComponent):
+
+    def setup(self):
+        self.add_input('length', val=1.)
+        self.add_input('width', val=1.)
+        self.add_input('height', val=1.)
+
+        self.add_output('front_area', val=1.0)
+        self.add_output('top_area', val=1.0)
+        self.add_output('area', val=1.0)
+        self.add_output('volume', val=1.)
+
+    def compute(self, inputs, outputs):
+        length = inputs['length']
+        width = inputs['width']
+        height = inputs['height']
+
+        outputs['top_area'] = length * width
+        outputs['front_area'] = length * height
+        outputs['area'] = 2*length*height + 2*length*width + 2*height*width
+        outputs['volume'] = length*height*width
+
+
 class TestMultiObjectiveSimpleGA(unittest.TestCase):
 
     def setUp(self):
@@ -474,28 +497,6 @@ class TestMultiObjectiveSimpleGA(unittest.TestCase):
         os.environ['SimpleGADriver_seed'] = '11'
 
     def test_multi_obj(self):
-
-        class Box(om.ExplicitComponent):
-
-            def setup(self):
-                self.add_input('length', val=1.)
-                self.add_input('width', val=1.)
-                self.add_input('height', val=1.)
-
-                self.add_output('front_area', val=1.0)
-                self.add_output('top_area', val=1.0)
-                self.add_output('area', val=1.0)
-                self.add_output('volume', val=1.)
-
-            def compute(self, inputs, outputs):
-                length = inputs['length']
-                width = inputs['width']
-                height = inputs['height']
-
-                outputs['top_area'] = length * width
-                outputs['front_area'] = length * height
-                outputs['area'] = 2*length*height + 2*length*width + 2*height*width
-                outputs['volume'] = length*height*width
 
         prob = om.Problem()
         prob.model.add_subsystem('box', Box(), promotes=['*'])
@@ -579,6 +580,45 @@ class TestMultiObjectiveSimpleGA(unittest.TestCase):
 
         self.assertGreater(w1, w2)  # front area does not depend on width
         self.assertGreater(h2, h1)  # top area does not depend on height
+
+    def test_pareto(self):
+        np.random.seed(11)
+
+        prob = om.Problem()
+
+        indeps = prob.model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
+        indeps.add_output('length', 1.5)
+        indeps.add_output('width', 1.5)
+        indeps.add_output('height', 1.5)
+
+        prob.model.add_subsystem('box', Box(), promotes=['*'])
+
+        # setup the optimization
+        prob.driver = om.SimpleGADriver()
+        prob.driver.options['max_gen'] = 20
+        prob.driver.options['bits'] = {'length': 8, 'width': 8, 'height': 8}
+        prob.driver.options['penalty_parameter'] = 10.
+        prob.driver.options['compute_pareto'] = True
+
+        prob.driver._randomstate = 11
+
+        prob.model.add_design_var('length', lower=0.1, upper=2.)
+        prob.model.add_design_var('width', lower=0.1, upper=2.)
+        prob.model.add_design_var('height', lower=0.1, upper=2.)
+        prob.model.add_objective('front_area', scaler=-1)  # maximize
+        prob.model.add_objective('top_area', scaler=-1)  # maximize
+        prob.model.add_constraint('volume', upper=1.)
+
+        prob.setup()
+        prob.run_driver()
+
+        nd_obj = prob.driver.obj_nd
+        sorted_obj = nd_obj[nd_obj[:, 0].argsort()]
+
+        # We have sorted the pareto points by col 1, so col 1 should be ascending.
+        # Col 2 should be descending because the points are non-dominated.
+        self.assertTrue(np.all(sorted_obj[:-1, 0] <= sorted_obj[1:, 0]))
+        self.assertTrue(np.all(sorted_obj[:-1, 1] >= sorted_obj[1:, 1]))
 
 
 class TestConstrainedSimpleGA(unittest.TestCase):
@@ -1365,6 +1405,108 @@ class TestFeatureSimpleGA(unittest.TestCase):
         # will be above 1.0 (actual values will vary.)
         self.assertGreater(prob['radius'], 1.)
         self.assertGreater(prob['height'], 1.)
+
+    def test_pareto(self):
+        import openmdao.api as om
+
+        class Box(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_input('length', val=1.)
+                self.add_input('width', val=1.)
+                self.add_input('height', val=1.)
+
+                self.add_output('front_area', val=1.0)
+                self.add_output('top_area', val=1.0)
+                self.add_output('area', val=1.0)
+                self.add_output('volume', val=1.)
+
+            def compute(self, inputs, outputs):
+                length = inputs['length']
+                width = inputs['width']
+                height = inputs['height']
+
+                outputs['top_area'] = length * width
+                outputs['front_area'] = length * height
+                outputs['area'] = 2*length*height + 2*length*width + 2*height*width
+                outputs['volume'] = length*height*width
+
+        prob = om.Problem()
+
+        indeps = prob.model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
+        indeps.add_output('length', 1.5)
+        indeps.add_output('width', 1.5)
+        indeps.add_output('height', 1.5)
+
+        prob.model.add_subsystem('box', Box(), promotes=['*'])
+
+        # setup the optimization
+        prob.driver = om.SimpleGADriver()
+        prob.driver.options['max_gen'] = 20
+        prob.driver.options['bits'] = {'length': 8, 'width': 8, 'height': 8}
+        prob.driver.options['penalty_parameter'] = 10.
+        prob.driver.options['compute_pareto'] = True
+
+        prob.model.add_design_var('length', lower=0.1, upper=2.)
+        prob.model.add_design_var('width', lower=0.1, upper=2.)
+        prob.model.add_design_var('height', lower=0.1, upper=2.)
+        prob.model.add_objective('front_area', scaler=-1)  # maximize
+        prob.model.add_objective('top_area', scaler=-1)  # maximize
+        prob.model.add_constraint('volume', upper=1.)
+
+        prob.setup()
+        prob.run_driver()
+
+        desvar_nd = prob.driver.desvar_nd
+        nd_obj = prob.driver.obj_nd
+
+        assert_near_equal(desvar_nd,
+                          np.array([[1.83607843, 0.54705882, 0.95686275],
+                                    [1.50823529, 0.28627451, 1.95529412],
+                                    [1.45607843, 1.90313725, 0.34588235],
+                                    [1.76156863, 0.54705882, 1.01647059],
+                                    [1.85098039, 1.03137255, 0.49490196],
+                                    [1.87333333, 0.57686275, 0.90470588],
+                                    [1.38156863, 1.87333333, 0.38313725],
+                                    [1.68705882, 0.39803922, 1.47098039],
+                                    [1.86588235, 0.50980392, 1.01647059],
+                                    [2.        , 0.42784314, 1.13568627],
+                                    [1.99254902, 0.69607843, 0.70352941],
+                                    [1.74666667, 0.39803922, 1.40392157],
+                                    [1.99254902, 0.30117647, 1.38901961],
+                                    [1.97764706, 0.20431373, 1.95529412],
+                                    [1.99254902, 0.57686275, 0.84509804],
+                                    [1.9254902 , 0.30117647, 1.50823529],
+                                    [1.75411765, 0.57686275, 0.97176471],
+                                    [1.94039216, 0.92705882, 0.5545098 ],
+                                    [1.74666667, 0.81529412, 0.70352941],
+                                    [1.75411765, 0.42039216, 1.35176471]]),
+                          1e-6)
+
+        sorted_obj = nd_obj[nd_obj[:, 0].argsort()]
+
+        assert_near_equal(sorted_obj,
+                          np.array([[-3.86688166, -0.40406044],
+                                    [-2.9490436 , -0.43176932],
+                                    [-2.90409227, -0.57991234],
+                                    [-2.76768966, -0.60010888],
+                                    [-2.48163045, -0.67151557],
+                                    [-2.45218301, -0.69524183],
+                                    [-2.37115433, -0.7374173 ],
+                                    [-2.27137255, -0.85568627],
+                                    [-1.89661453, -0.95123414],
+                                    [-1.7905827 , -0.96368166],
+                                    [-1.75687505, -1.00444291],
+                                    [-1.70458962, -1.01188512],
+                                    [-1.69481569, -1.08065621],
+                                    [-1.68389927, -1.1494273 ],
+                                    [-1.40181684, -1.3869704 ],
+                                    [-1.21024148, -1.40545716],
+                                    [-1.07596647, -1.79885767],
+                                    [-0.91605383, -1.90905037],
+                                    [-0.52933041, -2.58813856],
+                                    [-0.50363183, -2.77111711]]),
+                          1e-6)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
