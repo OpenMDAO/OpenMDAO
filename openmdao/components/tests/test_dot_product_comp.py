@@ -156,6 +156,179 @@ class TestUnits(unittest.TestCase):
                                                decimal=6)
 
 
+class TestMultipleUnits(unittest.TestCase):
+
+    def setUp(self):
+        self.nn = 5
+
+        ivc = om.IndepVarComp()
+        ivc.add_output(name='a', shape=(self.nn, 3), units='lbf')
+        ivc.add_output(name='b', shape=(self.nn, 3), units='ft/s')
+        ivc.add_output(name='x', shape=(self.nn, 7), units='N')
+        ivc.add_output(name='y', shape=(self.nn, 7), units='m/s')
+
+        dpc = om.DotProductComp(vec_size=self.nn,
+                                a_units='N', b_units='m/s', c_units='W')
+
+        dpc.add_product('z', 'x', 'y', vec_size=self.nn, length=7,
+                        a_units='N', b_units='m/s', output_units='hp')
+
+        model = om.Group()
+        model.add_subsystem(name='ivc', subsys=ivc,
+                            promotes_outputs=['a', 'b', 'x', 'y'])
+
+        model.add_subsystem(name='dot_prod_comp', subsys=dpc)
+
+        model.connect('a', 'dot_prod_comp.a')
+        model.connect('b', 'dot_prod_comp.b')
+        model.connect('x', 'dot_prod_comp.x')
+        model.connect('y', 'dot_prod_comp.y')
+
+        p = self.p = om.Problem(model)
+        p.setup()
+
+        p['a'] = np.random.rand(self.nn, 3)
+        p['b'] = np.random.rand(self.nn, 3)
+        p['x'] = np.random.rand(self.nn, 7)
+        p['y'] = np.random.rand(self.nn, 7)
+
+        p.run_model()
+
+    def test_results(self):
+
+        for i in range(self.nn):
+            a_i = self.p['a'][i, :]
+            b_i = self.p['b'][i, :]
+            c_i = self.p.get_val('dot_prod_comp.c', units='hp')[i]
+            expected_i = np.dot(a_i, b_i) / 550.0
+
+            np.testing.assert_almost_equal(c_i, expected_i)
+
+            x_i = self.p['x'][i, :]
+            y_i = self.p['y'][i, :]
+            z_i = self.p.get_val('dot_prod_comp.z', units='hp')[i]
+            expected_i = np.dot(x_i, y_i)
+            np.testing.assert_almost_equal(z_i, expected_i)
+
+    def test_partials(self):
+        np.set_printoptions(linewidth=1024)
+        cpd = self.p.check_partials(compact_print=True)
+
+        for comp in cpd:
+            for (var, wrt) in cpd[comp]:
+                np.testing.assert_almost_equal(actual=cpd[comp][var, wrt]['J_fwd'],
+                                               desired=cpd[comp][var, wrt]['J_fd'],
+                                               decimal=6)
+
+
+class TestMultipleErrors(unittest.TestCase):
+
+    def test_duplicate_outputs(self):
+        dpc = om.DotProductComp()
+        dpc.add_product('c', 'a', 'b')
+
+        model = om.Group()
+        model.add_subsystem('dpc', dpc)
+
+        p = om.Problem(model)
+
+        with self.assertRaises(NameError) as ctx:
+            p.setup()
+
+        self.assertEqual(str(ctx.exception), "DotProductComp (dpc): "
+                         "Multiple definition of output 'c'.")
+
+    def test_b_vec_size_mismatch(self):
+        dpc = om.DotProductComp()
+        dpc.add_product('z', 'a', 'y', vec_size=10)
+
+        model = om.Group()
+        model.add_subsystem('dpc', dpc)
+
+        p = om.Problem(model)
+
+        with self.assertRaises(ValueError) as ctx:
+            p.setup()
+
+        self.assertEqual(str(ctx.exception), "DotProductComp (dpc): "
+                         "Conflicting vec_size specified for input 'a', 1 versus 10.")
+
+    def test_a_length_mismatch(self):
+        dpc = om.DotProductComp()
+        dpc.add_product('z', 'a', 'y', length=10)
+
+        model = om.Group()
+        model.add_subsystem('dpc', dpc)
+
+        p = om.Problem(model)
+
+        with self.assertRaises(ValueError) as ctx:
+            p.setup()
+
+        self.assertEqual(str(ctx.exception), "DotProductComp (dpc): "
+                         "Conflicting length specified for input 'a', 3 versus 10.")
+
+    def test_a_units_mismatch(self):
+        dpc = om.DotProductComp()
+        dpc.add_product('z', 'a', 'b', a_units='ft')
+
+        model = om.Group()
+        model.add_subsystem('dpc', dpc)
+
+        p = om.Problem(model)
+
+        with self.assertRaises(ValueError) as ctx:
+            p.setup()
+
+        self.assertEqual(str(ctx.exception), "DotProductComp (dpc): "
+                         "Conflicting units specified for input 'a', 'None' and 'ft'.")
+
+    def test_b_vec_size_mismatch(self):
+        dpc = om.DotProductComp()
+        dpc.add_product('z', 'x', 'b', vec_size=10)
+
+        model = om.Group()
+        model.add_subsystem('dpc', dpc)
+
+        p = om.Problem(model)
+
+        with self.assertRaises(ValueError) as ctx:
+            p.setup()
+
+        self.assertEqual(str(ctx.exception), "DotProductComp (dpc): "
+                         "Conflicting vec_size specified for input 'b', 1 versus 10.")
+
+    def test_b_length_mismatch(self):
+        dpc = om.DotProductComp()
+        dpc.add_product('z', 'x', 'b', length=10)
+
+        model = om.Group()
+        model.add_subsystem('dpc', dpc)
+
+        p = om.Problem(model)
+
+        with self.assertRaises(ValueError) as ctx:
+            p.setup()
+
+        self.assertEqual(str(ctx.exception), "DotProductComp (dpc): "
+                         "Conflicting length specified for input 'b', 3 versus 10.")
+
+    def test_b_units_mismatch(self):
+        dpc = om.DotProductComp()
+        dpc.add_product('z', 'a', 'b', b_units='ft')
+
+        model = om.Group()
+        model.add_subsystem('dpc', dpc)
+
+        p = om.Problem(model)
+
+        with self.assertRaises(ValueError) as ctx:
+            p.setup()
+
+        self.assertEqual(str(ctx.exception), "DotProductComp (dpc): "
+                         "Conflicting units specified for input 'b', 'None' and 'ft'.")
+
+
 class TestFeature(unittest.TestCase):
 
     def test(self):

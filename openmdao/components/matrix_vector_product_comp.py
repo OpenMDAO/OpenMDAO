@@ -53,7 +53,7 @@ class MatrixVectorProductComp(ExplicitComponent):
                              desc='The variable name for the matrix.')
         self.options.declare('A_shape', types=tuple, default=(3, 3),
                              desc='The shape of the input matrix at a single point.')
-        self.options.declare('A_units', types=str, allow_none=True, default=None,
+        self.options.declare('A_units', types=str, default=None, allow_none=True,
                              desc='The units of the input matrix.')
         self.options.declare('x_name', types=str, default='x',
                              desc='The name of the input vector.')
@@ -61,7 +61,7 @@ class MatrixVectorProductComp(ExplicitComponent):
                              desc='The units of the input vector.')
         self.options.declare('b_name', types=str, default='b',
                              desc='The variable name of the output vector.')
-        self.options.declare('b_units', types=str, allow_none=True, default=None,
+        self.options.declare('b_units', types=str, default=None, allow_none=True,
                              desc='The units of the output vector.')
 
     def add_product(self, output, matrix, vector, output_units=None, matrix_units=None,
@@ -113,12 +113,12 @@ class MatrixVectorProductComp(ExplicitComponent):
         """
         products = self._products
 
-        # add product specified in component options
+        # prepend the product specified in component options
         opts = self.options
         vec_size = opts['vec_size']
         n_rows, n_cols = opts['A_shape']
 
-        products.append({
+        products.insert(0, {
             'output': opts['b_name'],
             'matrix': opts['A_name'],
             'vector': opts['x_name'],
@@ -149,7 +149,7 @@ class MatrixVectorProductComp(ExplicitComponent):
             if output not in var_rel2meta:
                 self.add_output(name=output, shape=output_shape, units=output_units)
             else:
-                raise NameError(f"{self.msginfo}: Multiple definition of output '{output}'")
+                raise NameError(f"{self.msginfo}: Multiple definition of output '{output}'.")
 
             if matrix not in var_rel2meta:
                 self.add_input(name=matrix, shape=matrix_shape, units=matrix_units)
@@ -157,11 +157,11 @@ class MatrixVectorProductComp(ExplicitComponent):
                 meta = var_rel2meta[matrix]
                 if matrix_shape != meta['shape']:
                     raise ValueError(f"{self.msginfo}: Conflicting shapes specified for matrix "
-                                     f"{matrix}, {matrix_shape} and {meta['shape']}")
+                                     f"'{matrix}', {meta['shape']} and {matrix_shape}.")
 
                 elif matrix_units != meta['units']:
                     raise ValueError(f"{self.msginfo}: Conflicting units specified for matrix "
-                                     f"{matrix}, '{matrix_units}' and '{meta['units']}'")
+                                     f"'{matrix}', '{meta['units']}' and '{matrix_units}'.")
 
             if vector not in var_rel2meta:
                 self.add_input(name=vector, shape=vector_shape, units=vector_units)
@@ -169,11 +169,11 @@ class MatrixVectorProductComp(ExplicitComponent):
                 meta = var_rel2meta[vector]
                 if vector_shape != meta['shape']:
                     raise ValueError(f"{self.msginfo}: Conflicting shapes specified for vector "
-                                     f"{vector}, {vector_shape} and {meta['shape']}")
+                                     f"'{vector}', {meta['shape']} and {vector_shape}.")
 
                 elif vector_units != meta['units']:
                     raise ValueError(f"{self.msginfo}: Conflicting units specified for vector "
-                                     f"{vector}, '{vector_units}' and '{meta['units']}'")
+                                     f"'{vector}', '{meta['units']}' and '{vector_units}'.")
 
             # Make a dummy version of A so we can figure out the nonzero indices
             A = np.ones(product['matrix_shape'])

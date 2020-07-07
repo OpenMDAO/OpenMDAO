@@ -19,6 +19,19 @@ class DotProductComp(ExplicitComponent):
     Vectors a and b must be of the same length, specified by the option 'length'.
     """
 
+    def __init__(self, **kwargs):
+        """
+        Initialize the Matrix Vector Product component.
+
+        Parameters
+        ----------
+        **kwargs : dict of keyword arguments
+            Keyword arguments that will be mapped into the Component options.
+        """
+        super(DotProductComp, self).__init__(**kwargs)
+
+        self._products = []
+
     def initialize(self):
         """
         Declare options.
@@ -67,32 +80,88 @@ class DotProductComp(ExplicitComponent):
             The length of the vectors a and b.  Their shapes are
             (vec_size, length)
         """
-        raise NotImplementedError()
+        self._products.append({
+            'a_name': a,
+            'b_name': b,
+            'c_name': output,
+            'a_units': a_units,
+            'b_units': b_units,
+            'c_units': output_units,
+            'vec_size': vec_size,
+            'length': length
+        })
 
     def setup(self):
         """
         Declare inputs, outputs, and derivatives for the dot product component.
         """
+        products = self._products
+
+        # prepend the product specified in component options
         opts = self.options
-        vec_size = opts['vec_size']
-        m = opts['length']
 
-        self.add_input(name=opts['a_name'],
-                       shape=(vec_size, m),
-                       units=opts['a_units'])
+        products.insert(0, {
+            'a_name': opts['a_name'],
+            'b_name': opts['b_name'],
+            'c_name': opts['c_name'],
+            'a_units': opts['a_units'],
+            'b_units': opts['b_units'],
+            'c_units': opts['c_units'],
+            'vec_size': opts['vec_size'],
+            'length': opts['length']
+        })
 
-        self.add_input(name=opts['b_name'],
-                       shape=(vec_size, m),
-                       units=opts['b_units'])
+        # add inputs and outputs for all products
+        var_rel2meta = self._var_rel2meta
 
-        self.add_output(name=opts['c_name'],
-                        shape=(vec_size,),
-                        units=opts['c_units'])
+        for product in products:
+            a_name = product['a_name']
+            b_name = product['b_name']
+            c_name = product['c_name']
+            a_units = product['a_units']
+            b_units = product['b_units']
+            c_units =  product['c_units']
+            vec_size = product['vec_size']
+            length = product['length']
 
-        row_idxs = np.repeat(np.arange(vec_size), m)
-        col_idxs = np.arange(vec_size * m)
-        self.declare_partials(of=opts['c_name'], wrt=opts['a_name'], rows=row_idxs, cols=col_idxs)
-        self.declare_partials(of=opts['c_name'], wrt=opts['b_name'], rows=row_idxs, cols=col_idxs)
+            if a_name not in var_rel2meta:
+                self.add_input(name=a_name, shape=(vec_size, length), units=a_units)
+            else:
+                meta = var_rel2meta[a_name]
+                if a_units != meta['units']:
+                    raise ValueError(f"{self.msginfo}: Conflicting units specified for input "
+                                     f"'{a_name}', '{meta['units']}' and '{a_units}'.")
+                if vec_size != meta['shape'][0]:
+                    raise ValueError(f"{self.msginfo}: Conflicting vec_size specified for input "
+                                     f"'{a_name}', {meta['shape'][0]} versus {vec_size}.")
+                if length != meta['shape'][1]:
+                    raise ValueError(f"{self.msginfo}: Conflicting length specified for input "
+                                     f"'{a_name}', {meta['shape'][1]} versus {length}.")
+
+            if b_name not in var_rel2meta:
+                self.add_input(name=b_name, shape=(vec_size, length), units=b_units)
+            else:
+                meta = var_rel2meta[b_name]
+                if b_units != meta['units']:
+                    raise ValueError(f"{self.msginfo}: Conflicting units specified for input "
+                                     f"'{b_name}', '{meta['units']}' and '{b_units}'.")
+                if vec_size != meta['shape'][0]:
+                    raise ValueError(f"{self.msginfo}: Conflicting vec_size specified for input "
+                                     f"'{b_name}', {meta['shape'][0]} versus {vec_size}.")
+                if length != meta['shape'][1]:
+                    raise ValueError(f"{self.msginfo}: Conflicting length specified for input "
+                                     f"'{b_name}', {meta['shape'][1]} versus {length}.")
+
+            if c_name not in var_rel2meta:
+                self.add_output(name=c_name, shape=(vec_size,), units=c_units)
+            else:
+                raise NameError(f"{self.msginfo}: Multiple definition of output '{c_name}'.")
+
+            row_idxs = np.repeat(np.arange(vec_size), length)
+            col_idxs = np.arange(vec_size * length)
+
+            self.declare_partials(of=c_name, wrt=a_name, rows=row_idxs, cols=col_idxs)
+            self.declare_partials(of=c_name, wrt=b_name, rows=row_idxs, cols=col_idxs)
 
     def compute(self, inputs, outputs):
         """
@@ -105,10 +174,10 @@ class DotProductComp(ExplicitComponent):
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
         """
-        opts = self.options
-        a = inputs[opts['a_name']]
-        b = inputs[opts['b_name']]
-        outputs[opts['c_name']] = np.einsum('ni,ni->n', a, b)
+        for product in self._products:
+            a = inputs[product['a_name']]
+            b = inputs[product['b_name']]
+            outputs[product['c_name']] = np.einsum('ni,ni->n', a, b)
 
     def compute_partials(self, inputs, partials):
         """
@@ -121,10 +190,10 @@ class DotProductComp(ExplicitComponent):
         partials : Jacobian
             sub-jac components written to partials[output_name, input_name]
         """
-        opts = self.options
-        a = inputs[opts['a_name']]
-        b = inputs[opts['b_name']]
+        for product in self._products:
+            a = inputs[product['a_name']]
+            b = inputs[product['b_name']]
 
-        # Use the following for sparse partials
-        partials[opts['c_name'], opts['a_name']] = b.ravel()
-        partials[opts['c_name'], opts['b_name']] = a.ravel()
+            # Use the following for sparse partials
+            partials[product['c_name'], product['a_name']] = b.ravel()
+            partials[product['c_name'], product['b_name']] = a.ravel()
