@@ -11,7 +11,7 @@ from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.record_util import create_local_meta, check_path
-from openmdao.utils.general_utils import simple_warning, warn_deprecation
+from openmdao.utils.general_utils import simple_warning, warn_deprecation, prom2ivc_src_dict
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 import openmdao.utils.coloring as coloring_mod
@@ -64,7 +64,7 @@ class Driver(object):
         Contains all design variable info.
     _designvars_discrete : list
         List of design variables that are discrete.
-    _distributed_resp : dict
+    _dist_driver_vars : dict
         Dict of constraints that are distributed outputs. Key is rank, values are
         (local indices, local sizes).
     _cons : dict
@@ -278,15 +278,20 @@ class Driver(object):
 
         self._remote_dvs = remote_dv_dict = {}
         self._remote_cons = remote_con_dict = {}
-        self._distributed_resp = dist_resp_dict = {}
+        self._dist_driver_vars = dist_resp_dict = {}
         self._remote_objs = remote_obj_dict = {}
+
+        src_design_vars = prom2ivc_src_dict(self._designvars)
+        src_cons = prom2ivc_src_dict(self._cons)
+        src_objs = prom2ivc_src_dict(self._objs)
+        responses = prom2ivc_src_dict(self._responses)
 
         # Now determine if later we'll need to allgather cons, objs, or desvars.
         if model.comm.size > 1 and model._subsystems_allprocs:
             local_out_vars = set(model._outputs._views)
-            remote_dvs = set(self._designvars) - local_out_vars
-            remote_cons = set(self._cons) - local_out_vars
-            remote_objs = set(self._objs) - local_out_vars
+            remote_dvs = set(src_design_vars) - local_out_vars
+            remote_cons = set(src_cons) - local_out_vars
+            remote_objs = set(src_objs) - local_out_vars
 
             all_remote_vois = model.comm.allgather(
                 (remote_dvs, remote_cons, remote_objs))
@@ -302,17 +307,9 @@ class Driver(object):
             abs2meta = model._var_allprocs_abs2meta
             for i, vname in enumerate(model._var_allprocs_abs_names['output']):
                 distributed = abs2meta[vname]['distributed']
-                if distributed:
-                    owner = sz = None
-                else:
-                    owner = owning_ranks[vname]
-                    sz = sizes[owner, i]
-
-                if vname in dv_set:
-                    remote_dv_dict[vname] = (owner, sz)
 
                 # Note that design vars are not distributed.
-                elif distributed and vname in self._responses:
+                if distributed:
                     idx = model._var_allprocs_abs2idx['nonlinear'][vname]
                     dist_sizes = model._var_sizes['nonlinear']['output'][:, idx]
 
@@ -321,8 +318,12 @@ class Driver(object):
                     size = dist_sizes.size
                     offsets = np.cumsum(dist_sizes)
 
-                    resp_dict = self._responses[vname]
-                    indices = resp_dict['indices']
+                    if vname in responses:
+                        idx_dict = responses[vname]
+                    elif vname in src_design_vars:
+                        idx_dict = src_design_vars[vname]
+
+                    indices = idx_dict['indices']
 
                     if indices is not None:
                         local_indices = []
@@ -342,6 +343,13 @@ class Driver(object):
 
                     dist_resp_dict[vname] = (indices, dist_sizes)
 
+                else:
+                    owner = owning_ranks[vname]
+                    sz = sizes[owner, i]
+
+
+                if vname in dv_set:
+                    remote_dv_dict[vname] = (owner, sz)
                 if vname in con_set:
                     remote_con_dict[vname] = (owner, sz)
                 if vname in obj_set:
@@ -485,7 +493,7 @@ class Driver(object):
         model = self._problem().model
         comm = model.comm
         vec = model._outputs._views_flat
-        distributed_vars = self._distributed_resp
+        distributed_vars = self._dist_driver_vars
         indices = meta['indices']
 
         if meta.get('ivc_source') is not None:
@@ -494,12 +502,12 @@ class Driver(object):
             src_name = name
 
         if MPI:
-            distributed = comm.size > 0 and name in distributed_vars
+            distributed = comm.size > 0 and src_name in distributed_vars
         else:
             distributed = False
 
-        if name in remote_vois:
-            owner, size = remote_vois[name]
+        if src_name in remote_vois:
+            owner, size = remote_vois[src_name]
             # if var is distributed or only gathering to one rank
             # TODO - support distributed var under a parallel group.
             if owner is None or rank is not None:
@@ -521,7 +529,7 @@ class Driver(object):
 
         elif distributed:
             local_val = model.get_val(src_name, flat=True)
-            local_indices, sizes = distributed_vars[name]
+            local_indices, sizes = distributed_vars[src_name]
             if local_indices is not None:
                 local_val = local_val[local_indices]
             offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
@@ -570,6 +578,7 @@ class Driver(object):
         dict
            Dictionary containing values of each design variable.
         """
+        print(self._remote_dvs, flush=True)
         return {n: self._get_voi_val(n, dv, self._remote_dvs)
                 for n, dv in self._designvars.items()}
 
@@ -590,7 +599,7 @@ class Driver(object):
         src_name = meta['ivc_source']
 
         # if the value is not local, don't set the value
-        if (name in self._remote_dvs and
+        if (src_name in self._remote_dvs and
                 problem.model._owning_rank[src_name] != problem.comm.rank):
             return
 

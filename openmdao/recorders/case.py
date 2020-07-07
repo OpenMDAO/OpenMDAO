@@ -937,7 +937,9 @@ class PromAbsDict(dict):
 
         elif key in self._auto_ivc_map:
             # We allow the user to query with auto_ivc varname.
-            return self._values[self._auto_ivc_map[key]]
+            src_key = self._auto_ivc_map[key]
+            if src_key in self._keys:
+                return self._values[self._auto_ivc_map[key]]
 
         elif key in self:
             # promoted name

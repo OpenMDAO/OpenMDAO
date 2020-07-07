@@ -11,7 +11,8 @@ import time
 import numpy as np
 
 from openmdao.vectors.vector import INT_DTYPE
-from openmdao.utils.general_utils import ContainsAll, simple_warning
+from openmdao.utils.general_utils import ContainsAll, simple_warning, prom2ivc_src_dict
+
 from openmdao.utils.mpi import MPI
 from openmdao.utils.coloring import _initialize_model_approx, Coloring
 
@@ -111,7 +112,7 @@ class _TotalJacInfo(object):
         driver_scaling : bool
             If True (default), scale derivative values by the quantities specified when the desvars
             and responses were added. If False, leave them unscaled.
-        _distributed_resp : dict
+        _dist_driver_vars : dict
             Dict of constraints that are distributed outputs. Key is rank, values are
             (local indices, local sizes).
         """
@@ -136,21 +137,8 @@ class _TotalJacInfo(object):
         if isinstance(of, str):
             of = [of]
 
-        design_vars = {}
-        for name, meta in driver._designvars.items():
-            if meta['ivc_source'] is not None:
-                src_name = meta['ivc_source']
-                design_vars[src_name] = meta
-            else:
-                design_vars[name] = meta
-
-        responses = {}
-        for name, meta in driver._responses.items():
-            if meta['ivc_source'] is not None:
-                src_name = meta['ivc_source']
-                responses[src_name] = meta
-            else:
-                responses[name] = meta
+        design_vars = prom2ivc_src_dict(driver._designvars)
+        responses = prom2ivc_src_dict(driver._responses)
 
         if not model._use_derivatives:
             raise RuntimeError("Derivative support has been turned off but compute_totals "
@@ -226,7 +214,7 @@ class _TotalJacInfo(object):
         self.output_meta = {'fwd': responses, 'rev': design_vars}
         self.input_vec = {'fwd': model._vectors['residual'], 'rev': model._vectors['output']}
         self.output_vec = {'fwd': model._vectors['output'], 'rev': model._vectors['residual']}
-        self._distributed_resp = driver._distributed_resp
+        self._dist_driver_vars = driver._dist_driver_vars
 
         abs2meta = model._var_allprocs_abs2meta
 
@@ -712,8 +700,8 @@ class _TotalJacInfo(object):
                     slc = slices[name]
                     if MPI and meta['distributed'] and model.comm.size > 1:
                         if indices is not None:
-                            if name in self._distributed_resp:
-                                local_idx, sizes_idx = self._distributed_resp[name]
+                            if name in self._dist_driver_vars:
+                                local_idx, sizes_idx = self._dist_driver_vars[name]
 
                             dist_offset = np.sum(sizes_idx[:myproc])
                             full_inds = np.arange(slc.start / ncols, slc.stop / ncols,
@@ -1479,7 +1467,7 @@ class _TotalJacInfo(object):
         if return_format == 'flat_dict':
             for prom_out, output_name in zip(self.prom_of, of):
 
-                dist_resp = self._distributed_resp.get(output_name)
+                dist_resp = self._dist_driver_vars.get(output_name)
 
                 for prom_in, input_name in zip(self.prom_wrt, wrt):
 
@@ -1496,7 +1484,7 @@ class _TotalJacInfo(object):
             for prom_out, output_name in zip(self.prom_of, of):
                 tot = totals[prom_out]
 
-                dist_resp = self._distributed_resp.get(output_name)
+                dist_resp = self._dist_driver_vars.get(output_name)
 
                 for prom_in, input_name in zip(self.prom_wrt, wrt):
                     if output_name in wrt_meta and output_name != input_name:

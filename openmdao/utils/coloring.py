@@ -2208,7 +2208,7 @@ def _initialize_model_approx(model, driver, of=None, wrt=None):
         # Support for indices defined on driver vars.
         if MPI and model.comm.size > 1:
             of_idx = model._owns_approx_of_idx
-            driver_resp = driver._distributed_resp
+            driver_resp = driver._dist_driver_vars
             for key, val in driver._responses.items():
                 if val['indices'] is not None:
                     if val['distributed'] and key in driver_resp:

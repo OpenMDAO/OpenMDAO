@@ -291,7 +291,8 @@ class pyOptSparseDriver(Driver):
         param_vals = self.get_design_var_values()
 
         for name, meta in param_meta.items():
-            opt_prob.addVarGroup(name, meta['size'], type='c',
+            size = meta['global_size'] if meta['distributed'] else meta['size']
+            opt_prob.addVarGroup(name, size, type='c',
                                  value=param_vals[name],
                                  lower=meta['lower'], upper=meta['upper'])
 

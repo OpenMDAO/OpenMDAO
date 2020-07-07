@@ -973,3 +973,28 @@ def common_subpath(pathnames):
         return '.'.join(splits[0][:common_loc])
 
     return ''
+
+
+def prom2ivc_src_dict(prom_dict):
+    """
+    Convert a dictionary with promoted input names into one with ivc source names.
+
+    Parameters
+    ----------
+    prom_dict : dict
+        Original dict with some promoted paths.
+
+    Returns
+    -------
+    dict
+        New dict with ivc source pathnames.
+    """
+    src_dict = {}
+    for name, meta in prom_dict.items():
+        if meta['ivc_source'] is not None:
+            src_name = meta['ivc_source']
+            src_dict[src_name] = meta
+        else:
+            src_dict[name] = meta
+
+    return src_dict
