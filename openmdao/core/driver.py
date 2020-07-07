@@ -310,6 +310,14 @@ class Driver(object):
 
                 # Note that design vars are not distributed.
                 if distributed:
+
+                    if vname in responses:
+                        idx_dict = responses[vname]
+                    elif vname in src_design_vars:
+                        idx_dict = src_design_vars[vname]
+                    else:
+                        continue
+
                     idx = model._var_allprocs_abs2idx['nonlinear'][vname]
                     dist_sizes = model._var_sizes['nonlinear']['output'][:, idx]
 
@@ -318,12 +326,7 @@ class Driver(object):
                     size = dist_sizes.size
                     offsets = np.cumsum(dist_sizes)
 
-                    if vname in responses:
-                        idx_dict = responses[vname]
-                    elif vname in src_design_vars:
-                        idx_dict = src_design_vars[vname]
-
-                    indices = idx_dict['indices']
+                    indices = idx_dict.get('indices')
 
                     if indices is not None:
                         local_indices = []
@@ -346,7 +349,6 @@ class Driver(object):
                 else:
                     owner = owning_ranks[vname]
                     sz = sizes[owner, i]
-
 
                 if vname in dv_set:
                     remote_dv_dict[vname] = (owner, sz)
@@ -578,7 +580,6 @@ class Driver(object):
         dict
            Dictionary containing values of each design variable.
         """
-        print(self._remote_dvs, flush=True)
         return {n: self._get_voi_val(n, dv, self._remote_dvs)
                 for n, dv in self._designvars.items()}
 
