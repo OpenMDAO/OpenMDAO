@@ -136,8 +136,21 @@ class _TotalJacInfo(object):
         if isinstance(of, str):
             of = [of]
 
-        design_vars = driver._designvars
-        responses = driver._responses
+        design_vars = {}
+        for name, meta in driver._designvars.items():
+            if meta['ivc_source'] is not None:
+                src_name = meta['ivc_source']
+                design_vars[src_name] = meta
+            else:
+                design_vars[name] = meta
+
+        responses = {}
+        for name, meta in driver._responses.items():
+            if meta['ivc_source'] is not None:
+                src_name = meta['ivc_source']
+                responses[src_name] = meta
+            else:
+                responses[name] = meta
 
         if not model._use_derivatives:
             raise RuntimeError("Derivative support has been turned off but compute_totals "
@@ -149,35 +162,45 @@ class _TotalJacInfo(object):
         # Convert of and wrt names from promoted to absolute
         if wrt is None:
             if driver_wrt:
-                wrt = prom_wrt = driver_wrt
+                prom_wrt = list(driver._designvars)
             else:
                 raise RuntimeError("Driver is not providing any design variables "
                                    "for compute_totals.")
         else:
-
             # Convert wrt inputs to auto_ivc output names.\
             prom_wrt = wrt
-            wrt = []
-            for name in prom_wrt:
-                if not use_abs_names and name in prom2abs:
-                    wrt_name = prom2abs[name][0]
-                elif name in prom2abs_in:
-                    in_abs = prom2abs_in[name][0]
-                    wrt_name = conns[in_abs]
-                else:
-                    wrt_name = name
-                wrt.append(wrt_name)
+
+        wrt = []
+        for name in prom_wrt:
+            if not use_abs_names and name in prom2abs:
+                wrt_name = prom2abs[name][0]
+            elif name in prom2abs_in:
+                in_abs = prom2abs_in[name][0]
+                wrt_name = conns[in_abs]
+            else:
+                wrt_name = name
+            wrt.append(wrt_name)
 
         if of is None:
             if driver_of:
-                of = prom_of = driver_of
+                prom_of = driver_of
             else:
                 raise RuntimeError("Driver is not providing any response variables "
                                    "for compute_totals.")
         else:
             prom_of = of
-            if not use_abs_names:
-                of = [prom2abs[name][0] for name in prom_of]
+
+        of = []
+        for name in prom_of:
+            if not use_abs_names and name in prom2abs:
+                of_name = prom2abs[name][0]
+            elif name in prom2abs_in:
+                # An auto_ivc design var can be used as a response too.
+                in_abs = prom2abs_in[name][0]
+                of_name = conns[in_abs]
+            else:
+                of_name = name
+            of.append(of_name)
 
         # raise an exception if we depend on any discrete outputs
         if model._var_allprocs_discrete['output']:
@@ -209,7 +232,7 @@ class _TotalJacInfo(object):
 
         constraints = driver._cons
 
-        for name in of:
+        for name in prom_of:
             if name in constraints and constraints[name]['linear']:
                 has_lin_cons = True
                 self.simul_coloring = None
@@ -443,7 +466,6 @@ class _TotalJacInfo(object):
             dictionary of iterators.
         """
         iproc = self.comm.rank
-        owning_ranks = self.owning_ranks
         model = self.model
         relevant = model._relevant
         has_par_deriv_color = False

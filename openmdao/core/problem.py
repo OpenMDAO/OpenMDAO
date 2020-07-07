@@ -1623,6 +1623,7 @@ class Problem(object):
         # Get the values for all the elements in the tables
         rows = []
         for name, meta in meta.items():
+
             row = {}
             for col_name in col_names:
                 if col_name == 'name':
@@ -1631,8 +1632,12 @@ class Problem(object):
                     else:
                         if name in abs2prom['input']:
                             row[col_name] = abs2prom['input'][name]
-                        else:
+                        elif name in abs2prom['output']:
                             row[col_name] = abs2prom['output'][name]
+                        else:
+                            # Promoted auto_ivc name. Keep it promoted
+                            row[col_name] = name
+
                 elif col_name == 'value':
                     row[col_name] = vals[name]
                 else:

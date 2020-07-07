@@ -40,7 +40,7 @@ class TestDesVarsResponses(unittest.TestCase):
         obj = prob.model.get_objectives()
         constraints = prob.model.get_constraints()
 
-        self.assertEqual(set(des_vars.keys()), {'px.x', 'pz.z'})
+        self.assertEqual(set(des_vars.keys()), {'x', 'z'})
         self.assertEqual(set(obj.keys()), {'obj_cmp.obj'})
         self.assertEqual(set(constraints.keys()), {'con_cmp1.con1', 'con_cmp2.con2'})
 
@@ -64,7 +64,7 @@ class TestDesVarsResponses(unittest.TestCase):
         obj = prob.model.get_objectives()
         constraints = prob.model.get_constraints()
 
-        self.assertEqual(set(des_vars.keys()), {'px.x', 'pz.z'})
+        self.assertEqual(set(des_vars.keys()), {'x', 'z'})
         self.assertEqual(set(obj.keys()), {'obj_cmp.obj'})
         self.assertEqual(set(constraints.keys()), {'con_cmp1.con1', 'con_cmp2.con2'})
         self.assertEqual(set(responses.keys()), {'obj_cmp.obj', 'con_cmp1.con1', 'con_cmp2.con2'})
@@ -88,7 +88,7 @@ class TestDesVarsResponses(unittest.TestCase):
         obj = prob.model.get_objectives()
         constraints = prob.model.get_constraints()
 
-        self.assertEqual(set(des_vars.keys()), {'px.x', 'pz.z'})
+        self.assertEqual(set(des_vars.keys()), {'x', 'z'})
         self.assertEqual(set(obj.keys()), {'obj_cmp.obj',})
         self.assertEqual(set(constraints.keys()), {'con_cmp1.con1', 'con_cmp2.con2'})
 
@@ -113,7 +113,7 @@ class TestDesVarsResponses(unittest.TestCase):
         obj = prob.model.get_objectives()
         constraints = prob.model.get_constraints()
 
-        self.assertEqual(set(des_vars.keys()), {'px.x', 'pz.z'})
+        self.assertEqual(set(des_vars.keys()), {'x', 'z'})
         self.assertEqual(set(obj.keys()), {'obj_cmp.obj',})
         self.assertEqual(set(constraints.keys()), {'con_cmp1.con1', 'con_cmp2.con2'})
 
@@ -139,7 +139,7 @@ class TestDesVarsResponses(unittest.TestCase):
         obj = prob.model.get_objectives()
         constraints = prob.model.get_constraints()
 
-        self.assertEqual(set(des_vars.keys()), {'px.x', 'pz.z'})
+        self.assertEqual(set(des_vars.keys()), {'x', 'z'})
         self.assertEqual(set(obj.keys()), {'obj_cmp.obj',})
         self.assertEqual(set(constraints.keys()), {'con_cmp1.con1', 'con_cmp2.con2'})
 
@@ -267,10 +267,10 @@ class TestDesvarOnModel(unittest.TestCase):
 
         des_vars = prob.model.get_design_vars()
 
-        x_ref0 = des_vars['px.x']['ref0']
-        x_ref = des_vars['px.x']['ref']
-        x_scaler = des_vars['px.x']['scaler']
-        x_adder = des_vars['px.x']['adder']
+        x_ref0 = des_vars['x']['ref0']
+        x_ref = des_vars['x']['ref']
+        x_scaler = des_vars['x']['scaler']
+        x_adder = des_vars['x']['adder']
 
         self.assertAlmostEqual( x_scaler*(x_ref0 + x_adder), 0.0, places=12)
         self.assertAlmostEqual( x_scaler*(x_ref + x_adder), 1.0, places=12)
@@ -293,8 +293,8 @@ class TestDesvarOnModel(unittest.TestCase):
 
         des_vars = prob.model.get_design_vars()
 
-        self.assertFalse(np.isinf(des_vars['px.x']['upper']))
-        self.assertFalse(np.isinf(-des_vars['px.x']['lower']))
+        self.assertFalse(np.isinf(des_vars['x']['upper']))
+        self.assertFalse(np.isinf(-des_vars['x']['lower']))
 
         responses = prob.model.get_responses()
 

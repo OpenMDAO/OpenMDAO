@@ -1416,7 +1416,7 @@ class System(object):
             The relevance dictionary.
         """
         if self._use_derivatives:
-            desvars = self.get_design_vars(recurse=True, get_sizes=False)
+            desvars = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
             responses = self.get_responses(recurse=True, get_sizes=False)
             return get_relevant_vars(self._conn_global_abs_in2out, desvars, responses,
                                      mode)
@@ -2787,7 +2787,7 @@ class System(object):
                           vectorize_derivs=vectorize_derivs,
                           cache_linear_solution=cache_linear_solution)
 
-    def get_design_vars(self, recurse=True, get_sizes=True, use_prom_ivc=False):
+    def get_design_vars(self, recurse=True, get_sizes=True, use_prom_ivc=True):
         """
         Get the DesignVariable settings from this system.
 
@@ -2865,7 +2865,8 @@ class System(object):
 
         if recurse:
             for subsys in self._subsystems_myproc:
-                out.update(subsys.get_design_vars(recurse=recurse, get_sizes=get_sizes))
+                out.update(subsys.get_design_vars(recurse=recurse, get_sizes=get_sizes,
+                                                  use_prom_ivc=False))
 
             if self.comm.size > 1 and self._subsystems_allprocs:
                 allouts = self.comm.allgather(out)
@@ -2905,8 +2906,7 @@ class System(object):
 
         # Human readable error message during Driver setup.
         try:
-            out = OrderedDict((prom2abs[name][0], data) for name, data in
-                              self._responses.items())
+            out = {}
             for name, data in self._responses.items():
                 if name in prom2abs:
                     abs_name = prom2abs[name][0]
@@ -2933,8 +2933,8 @@ class System(object):
             # Size them all
             sizes = self._var_sizes['nonlinear']['output']
             abs2idx = self._var_allprocs_abs2idx['nonlinear']
-            for name in out:
-                response = out[name]
+            for prom_name, response in out.items():
+                name = response['ivc_source']
 
                 # Discrete vars
                 if name not in abs2idx:

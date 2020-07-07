@@ -187,7 +187,9 @@ class Case(object):
             else:
                 jacobian = data['jacobian']
             if jacobian is not None:
-                self.derivatives = PromAbsDict(jacobian, prom2abs['output'], abs2prom['output'])
+                self.derivatives = PromAbsDict(jacobian, prom2abs['output'], abs2prom['output'],
+                                               in_prom2abs=prom2abs['input'],
+                                               auto_ivc_map=auto_ivc_map)
 
         # save var name & meta dict references for use by self._get_variables_of_type()
         self._prom2abs = prom2abs
@@ -228,6 +230,8 @@ class Case(object):
             try:
                 return self.outputs[name]
             except KeyError:
+                if name in self._auto_ivc_map:
+                    return self.inputs[self._auto_ivc_map[name]]
                 if self.inputs is not None:
                     return self.inputs[name]
         elif self.inputs is not None:
@@ -930,6 +934,10 @@ class PromAbsDict(dict):
         if key in self._keys:
             # absolute name
             return self._values[key]
+
+        elif key in self._auto_ivc_map:
+            # We allow the user to query with auto_ivc varname.
+            return self._values[self._auto_ivc_map[key]]
 
         elif key in self:
             # promoted name
