@@ -23,7 +23,7 @@ from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import convert_neg, array_connection_compatible, \
     _flatten_src_indices
 from openmdao.utils.general_utils import ContainsAll, all_ancestors, simple_warning, \
-    common_subpath, _is_slice
+    common_subpath, _is_slice, _slice_indices
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch
 from openmdao.utils.mpi import MPI
 from openmdao.utils.coloring import Coloring, _STD_COLORING_FNAME
@@ -1217,9 +1217,14 @@ class Group(System):
                             simple_warning(msg)
 
                 elif src_indices is not None:
+                    inds_size = None
                     if _is_slice(src_indices):
-                        val = self._abs_get_val(abs_out)
-                        src_indices = np.array([i for i in range(len(val[tuple(src_indices)]))])
+                        if MPI:
+                            val = self._abs_get_val(abs_out, get_remote=True)
+                        else:
+                            val = self._abs_get_val(abs_out)
+                        src_indices = _slice_indices(src_indices, val.size, val.shape)
+                        inds_size = val.size
                     else:
                         src_indices = np.atleast_1d(src_indices)
 
@@ -1296,7 +1301,11 @@ class Group(System):
                             arr = src_indices[..., d]
                             if np.any(arr >= d_size) or np.any(arr <= -d_size):
                                 for i in arr.flat:
-                                    if abs(i) >= d_size:
+                                    if inds_size:
+                                        size_check = abs(i) >= val.size
+                                    else:
+                                        size_check = abs(i) >= d_size
+                                    if size_check:
                                         msg = f"{self.msginfo}: The source indices " + \
                                               f"do not specify a valid index for the " + \
                                               f"connection '{abs_out}' to '{abs_in}'. " + \

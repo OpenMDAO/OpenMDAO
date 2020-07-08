@@ -933,3 +933,25 @@ def _is_slice(indices):
     contains_slice = any(isinstance(i, slice) for i in indices)
 
     return contains_slice
+
+def _slice_indices(slicer, out_size, out_shape):
+    """
+    Check if an array of indices contains a slice object.
+
+    Parameters
+    ----------
+    slicer : slice
+        Slice object to slice array
+    out_size : int
+        Size of output array
+    out_shape : tuple
+        Tuple of output array shape
+
+    Returns
+    -------
+    array
+        Returns the sliced indices.
+    """
+    sliced_inds = np.arange(out_size, dtype=int).reshape(out_shape)[tuple(slicer)]
+
+    return sliced_inds
