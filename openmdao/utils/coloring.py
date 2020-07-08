@@ -21,7 +21,7 @@ from scipy.sparse.compressed import get_index_dtype
 
 from openmdao.jacobians.jacobian import Jacobian
 from openmdao.utils.array_utils import array_viz
-from openmdao.utils.general_utils import simple_warning
+from openmdao.utils.general_utils import simple_warning, prom2ivc_src_dict
 import openmdao.utils.hooks as hooks
 from openmdao.utils.mpi import MPI
 from openmdao.utils.file_utils import _load_and_exec
@@ -1433,7 +1433,8 @@ def _get_bool_total_jac(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_ja
         prob.run_model(reset_iter_counts=False)
 
     if of is None or wrt is None:
-        driver_wrt = list(driver._designvars)
+        desvars = prom2ivc_src_dict(driver._designvars)
+        driver_wrt = list(desvars)
         driver_of = driver._get_ordered_nl_responses()
         if not driver_wrt or not driver_of:
             raise RuntimeError("When computing total jacobian sparsity, either 'of' and 'wrt' "
@@ -1563,7 +1564,8 @@ def _write_sparsity(sparsity, stream):
 
 
 def _get_desvar_info(driver, names=None, use_abs_names=True):
-    desvars = driver._designvars
+    desvars = prom2ivc_src_dict(driver._designvars)
+
     if names is None:
         abs_names = list(desvars)
         return abs_names, [desvars[n]['size'] for n in abs_names]
@@ -2193,10 +2195,12 @@ def _initialize_model_approx(model, driver, of=None, wrt=None):
     """
     Set up internal data structures needed for computing approx totals.
     """
+    design_vars = driver._designvars
+
     if of is None:
         of = driver._get_ordered_nl_responses()
     if wrt is None:
-        wrt = list(driver._designvars)
+        wrt = list(design_vars)
 
     # Initialization based on driver (or user) -requested "of" and "wrt".
     if (not model._owns_approx_jac or model._owns_approx_of is None or
@@ -2221,7 +2225,7 @@ def _initialize_model_approx(model, driver, of=None, wrt=None):
                 if val['indices'] is not None
             }
         model._owns_approx_wrt_idx = {
-            key: val['indices'] for key, val in driver._designvars.items()
+            key: val['indices'] for key, val in design_vars.items()
             if val['indices'] is not None
         }
 

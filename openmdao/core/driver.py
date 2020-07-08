@@ -309,23 +309,21 @@ class Driver(object):
             rank = model.comm.rank
             nprocs = model.comm.size
             for i, vname in enumerate(model._var_allprocs_abs_names['output']):
-                if vname not in responses and vname not in src_design_vars:
+                if vname in responses:
+                    indices = responses[vname].get('indices')
+                elif vname in src_design_vars:
+                    indices = src_design_vars[vname].get('indices')
+                else:
                     continue
 
-                distributed = abs2meta[vname]['distributed']
+                if abs2meta[vname]['distributed']:
 
-                if distributed:
                     idx = model._var_allprocs_abs2idx['nonlinear'][vname]
                     dist_sizes = model._var_sizes['nonlinear']['output'][:, idx]
                     total_dist_size = np.sum(dist_sizes)
 
                     # Determine which indices are on our proc.
                     offsets = sizes2offsets(dist_sizes)
-
-                    if vname in responses:
-                        indices = responses[vname]['indices']
-                    else:  # it's a design var
-                        indices = src_design_vars[vname]['indices']
 
                     if indices is not None:
                         indices = convert_neg(indices, total_dist_size)
@@ -578,7 +576,6 @@ class Driver(object):
         dict
            Dictionary containing values of each design variable.
         """
-        # print(self._remote_dvs, flush=True)
         return {n: self._get_voi_val(n, dv, self._remote_dvs)
                 for n, dv in self._designvars.items()}
 
