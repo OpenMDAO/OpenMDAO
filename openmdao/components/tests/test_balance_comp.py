@@ -737,19 +737,11 @@ class TestBalanceComp(unittest.TestCase):
         bal = om.BalanceComp()
         bal.add_balance('x', use_mult=True)
 
-        tgt = om.IndepVarComp(name='y_tgt', val=4)
-
-        mult_ivc = om.IndepVarComp(name='mult', val=2.0)
-
         exec_comp = om.ExecComp('y=x**2', x={'value': 1}, y={'value': 1})
 
-        prob.model.add_subsystem(name='target', subsys=tgt, promotes_outputs=['y_tgt'])
-        prob.model.add_subsystem(name='mult_comp', subsys=mult_ivc, promotes_outputs=['mult'])
         prob.model.add_subsystem(name='exec', subsys=exec_comp)
         prob.model.add_subsystem(name='balance', subsys=bal)
 
-        prob.model.connect('y_tgt', 'balance.rhs:x')
-        prob.model.connect('mult', 'balance.mult:x')
         prob.model.connect('balance.x', 'exec.x')
         prob.model.connect('exec.y', 'balance.lhs:x')
 
@@ -757,6 +749,9 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=100, iprint=0)
 
         prob.setup()
+
+        prob.set_val('balance.rhs:x', 4)
+        prob.set_val('balance.mult:x', 2.)
 
         # A reasonable initial guess to find the positive root.
         prob['balance.x'] = 1.0
@@ -774,15 +769,11 @@ class TestBalanceComp(unittest.TestCase):
         bal = om.BalanceComp()
         bal.add_balance('x', use_mult=True, mult_val=2.0)
 
-        tgt = om.IndepVarComp(name='y_tgt', val=4)
-
         exec_comp = om.ExecComp('y=x**2', x={'value': 1}, y={'value': 1})
 
-        prob.model.add_subsystem(name='target', subsys=tgt, promotes_outputs=['y_tgt'])
         prob.model.add_subsystem(name='exec', subsys=exec_comp)
         prob.model.add_subsystem(name='balance', subsys=bal)
 
-        prob.model.connect('y_tgt', 'balance.rhs:x')
         prob.model.connect('balance.x', 'exec.x')
         prob.model.connect('exec.y', 'balance.lhs:x')
 
@@ -790,6 +781,8 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=100, iprint=0)
 
         prob.setup()
+
+        prob.set_val('balance.rhs:x', 4)
 
         # A reasonable initial guess to find the positive root.
         prob['balance.x'] = 1.0

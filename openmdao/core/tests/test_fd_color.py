@@ -801,7 +801,7 @@ class TestColoring(unittest.TestCase):
         model.add_design_var('indeps.x0', lower=np.ones(3), upper=np.ones(3)+.1)
         model.add_design_var('indeps.x1', lower=np.ones(2), upper=np.ones(2)+.1)
         model.approx_totals(method='cs')
-        model.declare_coloring(min_improve_pct=25.)
+        model.declare_coloring(min_improve_pct=25., method='cs')
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
 

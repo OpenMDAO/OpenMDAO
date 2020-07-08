@@ -9,6 +9,7 @@ from scipy.sparse import issparse
 
 from openmdao.utils.name_maps import key2abs_key, rel_name2abs_name
 from openmdao.matrices.matrix import sparse_types
+from openmdao.vectors.vector import _full_slice
 
 SUBJAC_META_DEFAULTS = {
     'rows': None,
@@ -16,8 +17,6 @@ SUBJAC_META_DEFAULTS = {
     'value': None,
     'dependent': False,
 }
-
-_full_slice = slice(None)
 
 
 class Jacobian(object):
@@ -353,7 +352,7 @@ class Jacobian(object):
                     else:
                         J[roffset:rend, coffset:cend] = summ[key]
 
-        J *= (1.0 / num_full_jacs)
+        J *= (1.0 / np.max(J))
 
         tol_info = _tol_sweep(J, tol, orders)
 

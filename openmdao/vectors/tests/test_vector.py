@@ -52,10 +52,9 @@ class TestVector(unittest.TestCase):
         p.setup()
         p.final_setup()
 
-        new_vec = p.model._outputs._clone()
-        new_vec.set_const(3.)
+        p.model._residuals.set_const(3.)
 
-        self.assertEqual(new_vec.dot(p.model._outputs), 9.)
+        self.assertEqual(p.model._residuals.dot(p.model._outputs), 9.)
 
 
 A = np.array([[1.0, 8.0, 0.0], [-1.0, 10.0, 2.0], [3.0, 100.5, 1.0]])

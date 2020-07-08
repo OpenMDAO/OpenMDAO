@@ -44,7 +44,7 @@ from openmdao.utils.entry_points import _list_installed_setup_parser, _list_inst
     split_ep, _compute_entry_points_setup_parser, _compute_entry_points_exec, \
         _find_plugins_setup_parser, _find_plugins_exec
 from openmdao.core.component import Component
-from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.general_utils import ignore_errors, warn_deprecation
 
 
 def _n2_setup_parser(parser):
@@ -100,6 +100,7 @@ def _n2_cmd(options, user_args):
         hooks._register_hook('setup', 'Problem', pre=_noraise)
         hooks._register_hook('final_setup', 'Problem', post=_viewmod)
 
+        ignore_errors(True)
         _load_and_exec(options.file[0], user_args)
     else:
         # assume the file is a recording, run standalone
@@ -155,6 +156,7 @@ def _view_connections_cmd(options, user_args):
         funcname = 'setup'
     hooks._register_hook(funcname, class_name='Problem', inst_id=options.problem, post=_viewconns)
 
+    ignore_errors(True)
     _load_and_exec(options.file[0], user_args)
 
 
@@ -271,6 +273,7 @@ def _config_summary_cmd(options, user_args):
 
     hooks._register_hook('final_setup', 'Problem', post=summary)
 
+    ignore_errors(True)
     _load_and_exec(options.file[0], user_args)
 
 
@@ -381,6 +384,7 @@ def _tree_cmd(options, user_args):
         funcname = 'setup'
     hooks._register_hook(funcname, class_name='Problem', inst_id=options.problem, post=_tree)
 
+    ignore_errors(True)
     _load_and_exec(options.file[0], user_args)
 
 
@@ -426,6 +430,7 @@ def _cite_cmd(options, user_args):
 
     hooks._register_hook('setup', 'Problem', post=_cite)
 
+    ignore_errors(True)
     _load_and_exec(options.file[0], user_args)
 
 

@@ -33,11 +33,11 @@ class TestParaboloidTLDR(unittest.TestCase):
         #
         try:
             # minimum value
-            assert_near_equal(prob['paraboloid.f'], -27.33333, 1e-6)
+            assert_near_equal(prob.get_val('paraboloid.f'), -27.33333, 1e-6)
 
             # location of the minimum
-            assert_near_equal(prob['indeps.x'], 6.6667, 1e-4)
-            assert_near_equal(prob['indeps.y'], -7.33333, 1e-4)
+            assert_near_equal(prob.get_val('indeps.x'), 6.6667, 1e-4)
+            assert_near_equal(prob.get_val('indeps.y'), -7.33333, 1e-4)
         except AssertionError as err:
             msg = str(err) + "\n If the code in this test must be changed, please go change sister example, " \
                              "tldr_paraboloid.py, and also the front page of the OpenMDAO website!"
