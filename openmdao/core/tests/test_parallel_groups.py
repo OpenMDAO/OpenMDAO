@@ -375,14 +375,16 @@ class TestParallelListStates(unittest.TestCase):
             def solve_nonlinear(self, inputs, outputs):
                 outputs['x'] = np.linalg.solve(self.mtx, inputs['rhs'])
 
-        p = om.Problem(model=om.ParallelGroup())
-        p.model.add_subsystem('C1', StateComp())
-        p.model.add_subsystem('C2', StateComp())
-        p.model.add_subsystem('C3', om.ExecComp('y=2.0*x'))
-        p.model.add_subsystem('C4', StateComp())
+        p = om.Problem()
+        par = p.model.add_subsystem('par', om.ParallelGroup())
+        par.add_subsystem('C1', StateComp())
+        par.add_subsystem('C2', StateComp())
+        par.add_subsystem('C3', om.ExecComp('y=2.0*x'))
+        par.add_subsystem('C4', StateComp())
+                
         p.setup()
         p.final_setup()
-        self.assertEqual(sorted(p.model._list_states_allprocs()), ['C1.x', 'C2.x', 'C4.x'])
+        self.assertEqual(sorted(p.model._list_states_allprocs()), ['par.C1.x', 'par.C2.x', 'par.C4.x'])
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")

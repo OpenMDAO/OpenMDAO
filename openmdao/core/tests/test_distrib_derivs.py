@@ -180,7 +180,8 @@ class MPITests2(unittest.TestCase):
         group.add_subsystem('P', om.IndepVarComp('x', np.arange(size)))
         group.add_subsystem('C1', DistribExecComp(['y=2.0*x', 'y=3.0*x'], arr_size=size,
                                                   x=np.zeros(size),
-                                                  y=np.zeros(size)))
+                                                  y=np.zeros(size)),
+                            promotes_inputs=['x'])
         group.add_subsystem('C2', om.ExecComp(['z=3.0*y'],
                                            y=np.zeros(size),
                                            z=np.zeros(size)))
@@ -188,21 +189,20 @@ class MPITests2(unittest.TestCase):
         prob = om.Problem()
         prob.model = group
         prob.model.linear_solver = om.LinearBlockGS()
-        prob.model.connect('P.x', 'C1.x')
         prob.model.connect('C1.y', 'C2.y')
 
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
 
-        J = prob.compute_totals(['C2.z'], ['P.x'])
-        assert_near_equal(J['C2.z', 'P.x'], np.diag([6.0, 6.0, 9.0]), 1e-6)
+        J = prob.compute_totals(['C2.z'], ['x'])
+        assert_near_equal(J['C2.z', 'x'], np.diag([6.0, 6.0, 9.0]), 1e-6)
 
         prob.setup(check=False, mode='rev')
         prob.run_model()
 
-        J = prob.compute_totals(['C2.z'], ['P.x'])
-        assert_near_equal(J['C2.z', 'P.x'], np.diag([6.0, 6.0, 9.0]), 1e-6)
+        J = prob.compute_totals(['C2.z'], ['x'])
+        assert_near_equal(J['C2.z', 'x'], np.diag([6.0, 6.0, 9.0]), 1e-6)
 
     @parameterized.expand(itertools.product([om.NonlinearRunOnce, om.NonlinearBlockGS]),
                           name_func=_test_func_name)
