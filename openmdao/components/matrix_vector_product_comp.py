@@ -27,6 +27,12 @@ class MatrixVectorProductComp(ExplicitComponent):
     otherwise.
 
     The size of vectors x and b is determined by the number of rows in m at each point.
+
+    Attributes
+    ----------
+    _products : list
+        Cache the data provided during `add_product`
+        so everything can be saved until setup is called.
     """
 
     def __init__(self, **kwargs):
@@ -67,7 +73,7 @@ class MatrixVectorProductComp(ExplicitComponent):
     def add_product(self, output, matrix, vector, output_units=None, matrix_units=None,
                     vector_units=None, vec_size=1, shape=(3, 3)):
         """
-        Adds a new output product to the matrix vector product component.
+        Add a new output product to the matrix vector product component.
 
         Parameters
         ----------

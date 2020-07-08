@@ -17,6 +17,12 @@ class DotProductComp(ExplicitComponent):
           c is of shape (vec_size,)
 
     Vectors a and b must be of the same length, specified by the option 'length'.
+
+    Attributes
+    ----------
+    _products : list
+        Cache the data provided during `add_product`
+        so everything can be saved until setup is called.
     """
 
     def __init__(self, **kwargs):
@@ -56,7 +62,7 @@ class DotProductComp(ExplicitComponent):
     def add_product(self, output, a, b, output_units=None, a_units=None, b_units=None,
                     vec_size=1, length=3):
         """
-        Adds a new output product to the dot product component.
+        Add a new output product to the dot product component.
 
         Parameters
         ----------
@@ -120,7 +126,7 @@ class DotProductComp(ExplicitComponent):
             c_name = product['c_name']
             a_units = product['a_units']
             b_units = product['b_units']
-            c_units =  product['c_units']
+            c_units = product['c_units']
             vec_size = product['vec_size']
             length = product['length']
 
