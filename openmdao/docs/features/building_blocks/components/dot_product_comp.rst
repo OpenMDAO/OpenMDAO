@@ -46,8 +46,8 @@ DotProductComp Usage
 There are often situations when numerous products need to be computed, essentially in parallel.
 You can reduce the number of components required by having one `DotProductComp` perform multiple operations.
 This is also convenient when the different operations have common inputs.
+
 The ``add_product`` method is used to create additional products after instantiation.
-It has a slightly different set of arguments than the options, which are normally passed via the constructor:
 
 .. automethod:: openmdao.components.dot_product_comp.DotProductComp.add_product
    :noindex:

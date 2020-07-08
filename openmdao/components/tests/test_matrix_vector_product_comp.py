@@ -214,10 +214,10 @@ class TestMultipleUnits(unittest.TestCase):
         ivc.add_output(name='y', shape=(self.nn, 3), units='N')
 
         mvp = om.MatrixVectorProductComp(vec_size=self.nn, A_shape=(5, 3),
-                                         b_units='N*m', A_units='m', x_units='N')
+                                         A_units='m', x_units='N', b_units='N*m')
 
-        mvp.add_product('c', 'B', 'y', vec_size=self.nn, shape=(5, 3),
-                        output_units='N*m', matrix_units='m', vector_units='N')
+        mvp.add_product(A_name='B', x_name='y', b_name='c', vec_size=self.nn, shape=(5, 3),
+                        A_units='m', x_units='N', b_units='N*m')
 
         model = om.Group()
         model.add_subsystem(name='ivc',
@@ -286,10 +286,10 @@ class TestMultipleCommonMatrix(unittest.TestCase):
         ivc.add_output(name='y', shape=(self.nn, 3), units='N')
 
         mvp = om.MatrixVectorProductComp(vec_size=self.nn, A_shape=(5, 3),
-                                         b_units='N*m', A_units='m', x_units='N')
+                                         A_units='m', x_units='N', b_units='N*m')
 
-        mvp.add_product('c', 'A', 'y', vec_size=self.nn, shape=(5, 3),
-                        output_units='N*m', matrix_units='m', vector_units='N')
+        mvp.add_product(b_name='c', A_name='A', x_name='y', vec_size=self.nn, shape=(5, 3),
+                        b_units='N*m', A_units='m', x_units='N')
 
         model = om.Group()
         model.add_subsystem(name='ivc',
@@ -355,10 +355,10 @@ class TestMultipleCommonVector(unittest.TestCase):
         ivc.add_output(name='x', shape=(self.nn, 3), units='lbf')
 
         mvp = om.MatrixVectorProductComp(vec_size=self.nn, A_shape=(5, 3),
-                                         b_units='N*m', A_units='m', x_units='N')
+                                         A_units='m', x_units='N', b_units='N*m')
 
-        mvp.add_product('c', 'B', 'x', vec_size=self.nn, shape=(7, 3),
-                        output_units='N*m', matrix_units='m', vector_units='N')
+        mvp.add_product(A_name='B', x_name='x', b_name='c', vec_size=self.nn, shape=(7, 3),
+                        A_units='m', x_units='N', b_units='N*m')
 
         model = om.Group()
         model.add_subsystem(name='ivc',
@@ -415,7 +415,7 @@ class TestMultipleErrors(unittest.TestCase):
 
     def test_duplicate_outputs(self):
         mvp = om.MatrixVectorProductComp()
-        mvp.add_product('b', 'B', 'y')
+        mvp.add_product('B', 'y', 'b')
 
         model = om.Group()
         model.add_subsystem('mvp', mvp)
@@ -430,7 +430,7 @@ class TestMultipleErrors(unittest.TestCase):
 
     def test_vec_size_mismatch(self):
         mvp = om.MatrixVectorProductComp()
-        mvp.add_product('c', 'A', 'y', vec_size=10)
+        mvp.add_product('A', 'y', 'c', vec_size=10)
 
         model = om.Group()
         model.add_subsystem('mvp', mvp)
@@ -445,7 +445,7 @@ class TestMultipleErrors(unittest.TestCase):
 
     def test_shape_mismatch(self):
         mvp = om.MatrixVectorProductComp()
-        mvp.add_product('c', 'A', 'y', shape=(5, 5))
+        mvp.add_product('A', 'y', 'c', shape=(5, 5))
 
         model = om.Group()
         model.add_subsystem('mvp', mvp)
@@ -458,9 +458,9 @@ class TestMultipleErrors(unittest.TestCase):
         self.assertEqual(str(ctx.exception), "MatrixVectorProductComp (mvp): "
                          "Conflicting shapes specified for matrix 'A', (1, 3, 3) and (1, 5, 5).")
 
-    def test_matrix_units_mismatch(self):
+    def test_A_units_mismatch(self):
         mvp = om.MatrixVectorProductComp()
-        mvp.add_product('c', 'A', 'y', matrix_units='ft')
+        mvp.add_product('A', 'y', 'c', A_units='ft')
 
         model = om.Group()
         model.add_subsystem('mvp', mvp)
@@ -473,9 +473,9 @@ class TestMultipleErrors(unittest.TestCase):
         self.assertEqual(str(ctx.exception), "MatrixVectorProductComp (mvp): "
                          "Conflicting units specified for matrix 'A', 'None' and 'ft'.")
 
-    def test_vector_units_mismatch(self):
+    def test_x_units_mismatch(self):
         mvp = om.MatrixVectorProductComp()
-        mvp.add_product('c', 'A', 'x', vector_units='ft')
+        mvp.add_product('A', 'x', 'c', x_units='ft')
 
         model = om.Group()
         model.add_subsystem('mvp', mvp)

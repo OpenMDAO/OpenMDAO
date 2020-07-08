@@ -70,25 +70,25 @@ class MatrixVectorProductComp(ExplicitComponent):
         self.options.declare('b_units', types=str, default=None, allow_none=True,
                              desc='The units of the output vector.')
 
-    def add_product(self, output, matrix, vector, output_units=None, matrix_units=None,
-                    vector_units=None, vec_size=1, shape=(3, 3)):
+    def add_product(self, A_name, x_name, b_name, A_units=None, x_units=None, b_units=None,
+                    vec_size=1, shape=(3, 3)):
         """
         Add a new output product to the matrix vector product component.
 
         Parameters
         ----------
-        output : str
-            The name of the vector product output.
-        matrix : str
+        A_name : str
             The name of the matrix input.
-        vector : str
+        x_name : str
             The name of the vector input.
-        output_units : str or None
-            The units of the output matrix.
-        matrix_units : str or None
+        b_name : str
+            The name of the vector product output.
+        A_units : str or None
             The units of the input matrix.
-        vector_units : str or None
+        x_units : str or None
             The units of the input vector.
+        b_units : str or None
+            The units of the output matrix.
         vec_size : int
             The number of points at which the matrix vector product
             should be computed simultaneously.
@@ -102,12 +102,12 @@ class MatrixVectorProductComp(ExplicitComponent):
             the output vector will have shape of (10, 5).
         """
         self._products.append({
-            'output': output,
-            'matrix': matrix,
-            'vector': vector,
-            'output_units': output_units,
-            'matrix_units': matrix_units,
-            'vector_units': vector_units,
+            'output': b_name,
+            'matrix': A_name,
+            'vector': x_name,
+            'output_units': b_units,
+            'matrix_units': A_units,
+            'vector_units': x_units,
             'output_shape': (vec_size, shape[0]) if vec_size > 1 else (shape[0], ),
             'matrix_shape': (vec_size, ) + shape,
             'vector_shape': (vec_size, shape[1])

@@ -170,8 +170,8 @@ class TestMultipleUnits(unittest.TestCase):
         dpc = om.DotProductComp(vec_size=self.nn,
                                 a_units='N', b_units='m/s', c_units='W')
 
-        dpc.add_product('z', 'x', 'y', vec_size=self.nn, length=7,
-                        a_units='N', b_units='m/s', output_units='hp')
+        dpc.add_product(a_name='x', b_name='y', c_name='z', vec_size=self.nn, length=7,
+                        a_units='N', b_units='m/s', c_units='hp')
 
         model = om.Group()
         model.add_subsystem(name='ivc', subsys=ivc,
@@ -225,7 +225,7 @@ class TestMultipleErrors(unittest.TestCase):
 
     def test_duplicate_outputs(self):
         dpc = om.DotProductComp()
-        dpc.add_product('c', 'a', 'b')
+        dpc.add_product('a', 'b', 'c')
 
         model = om.Group()
         model.add_subsystem('dpc', dpc)
@@ -240,7 +240,7 @@ class TestMultipleErrors(unittest.TestCase):
 
     def test_b_vec_size_mismatch(self):
         dpc = om.DotProductComp()
-        dpc.add_product('z', 'a', 'y', vec_size=10)
+        dpc.add_product('a', 'y', 'z', vec_size=10)
 
         model = om.Group()
         model.add_subsystem('dpc', dpc)
@@ -255,7 +255,7 @@ class TestMultipleErrors(unittest.TestCase):
 
     def test_a_length_mismatch(self):
         dpc = om.DotProductComp()
-        dpc.add_product('z', 'a', 'y', length=10)
+        dpc.add_product('a', 'y', 'z', length=10)
 
         model = om.Group()
         model.add_subsystem('dpc', dpc)
@@ -270,7 +270,7 @@ class TestMultipleErrors(unittest.TestCase):
 
     def test_a_units_mismatch(self):
         dpc = om.DotProductComp()
-        dpc.add_product('z', 'a', 'b', a_units='ft')
+        dpc.add_product('a', 'b', 'z', a_units='ft')
 
         model = om.Group()
         model.add_subsystem('dpc', dpc)
@@ -285,7 +285,7 @@ class TestMultipleErrors(unittest.TestCase):
 
     def test_b_vec_size_mismatch(self):
         dpc = om.DotProductComp()
-        dpc.add_product('z', 'x', 'b', vec_size=10)
+        dpc.add_product('x', 'b', 'z', vec_size=10)
 
         model = om.Group()
         model.add_subsystem('dpc', dpc)
@@ -300,7 +300,7 @@ class TestMultipleErrors(unittest.TestCase):
 
     def test_b_length_mismatch(self):
         dpc = om.DotProductComp()
-        dpc.add_product('z', 'x', 'b', length=10)
+        dpc.add_product('x', 'b', 'z', length=10)
 
         model = om.Group()
         model.add_subsystem('dpc', dpc)
@@ -315,7 +315,7 @@ class TestMultipleErrors(unittest.TestCase):
 
     def test_b_units_mismatch(self):
         dpc = om.DotProductComp()
-        dpc.add_product('z', 'a', 'b', b_units='ft')
+        dpc.add_product('a', 'b', 'z', b_units='ft')
 
         model = om.Group()
         model.add_subsystem('dpc', dpc)
