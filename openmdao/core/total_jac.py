@@ -701,7 +701,7 @@ class _TotalJacInfo(object):
                     if MPI and meta['distributed'] and model.comm.size > 1:
                         if indices is not None:
                             if name in self._dist_driver_vars:
-                                local_idx, sizes_idx = self._dist_driver_vars[name]
+                                local_idx, sizes_idx, _ = self._dist_driver_vars[name]
 
                             dist_offset = np.sum(sizes_idx[:myproc])
                             full_inds = np.arange(slc.start / ncols, slc.stop / ncols,
@@ -1683,7 +1683,7 @@ def _get_subjac(jac_meta, prom_out, prom_in, of_idx, wrt_idx, dist_resp, comm):
     if dist_resp:
         n_wrt = tot.shape[1]
         tot = tot.flatten()
-        _, sizes = dist_resp
+        _, sizes, _ = dist_resp
         n_of_global = np.sum(sizes)
 
         # Adjust sizes to account for wrt dimension in jacobian.
