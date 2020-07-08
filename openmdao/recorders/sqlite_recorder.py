@@ -299,7 +299,7 @@ class SqliteRecorder(CaseRecorder):
         if self.connection:
 
             if driver is None:
-                desvars = system.get_design_vars(True, get_sizes=False)
+                desvars = system.get_design_vars(True, get_sizes=False, use_prom_ivc=False)
                 responses = system.get_responses(True, get_sizes=False)
                 objectives = OrderedDict()
                 constraints = OrderedDict()
@@ -348,7 +348,7 @@ class SqliteRecorder(CaseRecorder):
             for var_set, var_type in full_var_set:
                 for name in var_set:
 
-                    # Design variables are always requested by input name.
+                    # Design variables can be requested by input name.
                     if var_type == 'desvar':
                         name = var_set[name]['ivc_source']
 

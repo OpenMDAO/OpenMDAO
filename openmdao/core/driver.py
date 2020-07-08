@@ -11,11 +11,12 @@ from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.record_util import create_local_meta, check_path
-from openmdao.utils.general_utils import simple_warning, warn_deprecation
+from openmdao.utils.general_utils import simple_warning, warn_deprecation, prom2ivc_src_dict
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 import openmdao.utils.coloring as coloring_mod
-from openmdao.vectors.vector import INT_DTYPE
+from openmdao.utils.array_utils import sizes2offsets, convert_neg
+from openmdao.vectors.vector import INT_DTYPE, _full_slice
 
 
 def _check_debug_print_opts_valid(name, opts):
@@ -64,7 +65,7 @@ class Driver(object):
         Contains all design variable info.
     _designvars_discrete : list
         List of design variables that are discrete.
-    _distributed_resp : dict
+    _dist_driver_vars : dict
         Dict of constraints that are distributed outputs. Key is rank, values are
         (local indices, local sizes).
     _cons : dict
@@ -278,15 +279,20 @@ class Driver(object):
 
         self._remote_dvs = remote_dv_dict = {}
         self._remote_cons = remote_con_dict = {}
-        self._distributed_resp = dist_resp_dict = {}
+        self._dist_driver_vars = dist_dict = {}
         self._remote_objs = remote_obj_dict = {}
+
+        src_design_vars = prom2ivc_src_dict(self._designvars)
+        src_cons = prom2ivc_src_dict(self._cons)
+        src_objs = prom2ivc_src_dict(self._objs)
+        responses = prom2ivc_src_dict(self._responses)
 
         # Now determine if later we'll need to allgather cons, objs, or desvars.
         if model.comm.size > 1 and model._subsystems_allprocs:
             local_out_vars = set(model._outputs._views)
-            remote_dvs = set(self._designvars) - local_out_vars
-            remote_cons = set(self._cons) - local_out_vars
-            remote_objs = set(self._objs) - local_out_vars
+            remote_dvs = set(src_design_vars) - local_out_vars
+            remote_cons = set(src_cons) - local_out_vars
+            remote_objs = set(src_objs) - local_out_vars
 
             all_remote_vois = model.comm.allgather(
                 (remote_dvs, remote_cons, remote_objs))
@@ -300,52 +306,52 @@ class Driver(object):
             owning_ranks = model._owning_rank
             sizes = model._var_sizes['nonlinear']['output']
             abs2meta = model._var_allprocs_abs2meta
+            rank = model.comm.rank
+            nprocs = model.comm.size
             for i, vname in enumerate(model._var_allprocs_abs_names['output']):
-                distributed = abs2meta[vname]['distributed']
-                if distributed:
-                    owner = sz = None
+                if vname in responses:
+                    indices = responses[vname].get('indices')
+                elif vname in src_design_vars:
+                    indices = src_design_vars[vname].get('indices')
+                else:
+                    continue
+
+                if abs2meta[vname]['distributed']:
+
+                    idx = model._var_allprocs_abs2idx['nonlinear'][vname]
+                    dist_sizes = model._var_sizes['nonlinear']['output'][:, idx]
+                    total_dist_size = np.sum(dist_sizes)
+
+                    # Determine which indices are on our proc.
+                    offsets = sizes2offsets(dist_sizes)
+
+                    if indices is not None:
+                        indices = convert_neg(indices, total_dist_size)
+                        true_sizes = np.zeros(nprocs, dtype=INT_DTYPE)
+                        for irank in range(nprocs):
+                            dist_inds = indices[np.logical_and(indices >= offsets[irank],
+                                                               indices < (offsets[irank] +
+                                                                          dist_sizes[irank]))]
+                            if irank == rank:
+                                local_indices = dist_inds - offsets[rank]
+                                distrib_indices = dist_inds
+
+                            true_sizes[irank] = dist_inds.size
+                        dist_dict[vname] = (local_indices, true_sizes, distrib_indices)
+                    else:
+                        dist_dict[vname] = (_full_slice, dist_sizes,
+                                            slice(offsets[rank], offsets[rank] + dist_sizes[rank]))
+
                 else:
                     owner = owning_ranks[vname]
                     sz = sizes[owner, i]
 
-                if vname in dv_set:
-                    remote_dv_dict[vname] = (owner, sz)
-
-                # Note that design vars are not distributed.
-                elif distributed and vname in self._responses:
-                    idx = model._var_allprocs_abs2idx['nonlinear'][vname]
-                    dist_sizes = model._var_sizes['nonlinear']['output'][:, idx]
-
-                    # Determine which indices are on our proc.
-                    rank = model.comm.rank
-                    size = dist_sizes.size
-                    offsets = np.cumsum(dist_sizes)
-
-                    resp_dict = self._responses[vname]
-                    indices = resp_dict['indices']
-
-                    if indices is not None:
-                        local_indices = []
-                        true_sizes = np.zeros(size, dtype=INT_DTYPE)
-                        for index in indices:
-                            if index < 0:
-                                # Support for negative indices. Convert to positive index.
-                                index = index + np.sum(dist_sizes)
-                            irank = np.argwhere(offsets > index)[0][0]
-                            true_sizes[irank] += 1
-                            if rank == irank:
-                                new_index = index - offsets[irank] + dist_sizes[irank]
-                                local_indices.append(new_index)
-
-                        indices = local_indices
-                        dist_sizes = true_sizes
-
-                    dist_resp_dict[vname] = (indices, dist_sizes)
-
-                if vname in con_set:
-                    remote_con_dict[vname] = (owner, sz)
-                if vname in obj_set:
-                    remote_obj_dict[vname] = (owner, sz)
+                    if vname in dv_set:
+                        remote_dv_dict[vname] = (owner, sz)
+                    if vname in con_set:
+                        remote_con_dict[vname] = (owner, sz)
+                    if vname in obj_set:
+                        remote_obj_dict[vname] = (owner, sz)
 
         self._remote_responses = self._remote_cons.copy()
         self._remote_responses.update(self._remote_objs)
@@ -485,7 +491,7 @@ class Driver(object):
         model = self._problem().model
         comm = model.comm
         vec = model._outputs._views_flat
-        distributed_vars = self._distributed_resp
+        distributed_vars = self._dist_driver_vars
         indices = meta['indices']
 
         if meta.get('ivc_source') is not None:
@@ -494,12 +500,12 @@ class Driver(object):
             src_name = name
 
         if MPI:
-            distributed = comm.size > 0 and name in distributed_vars
+            distributed = comm.size > 0 and src_name in distributed_vars
         else:
             distributed = False
 
-        if name in remote_vois:
-            owner, size = remote_vois[name]
+        if src_name in remote_vois:
+            owner, size = remote_vois[src_name]
             # if var is distributed or only gathering to one rank
             # TODO - support distributed var under a parallel group.
             if owner is None or rank is not None:
@@ -521,7 +527,7 @@ class Driver(object):
 
         elif distributed:
             local_val = model.get_val(src_name, flat=True)
-            local_indices, sizes = distributed_vars[name]
+            local_indices, sizes, _ = distributed_vars[src_name]
             if local_indices is not None:
                 local_val = local_val[local_indices]
             offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
@@ -590,13 +596,13 @@ class Driver(object):
         src_name = meta['ivc_source']
 
         # if the value is not local, don't set the value
-        if (name in self._remote_dvs and
+        if (src_name in self._remote_dvs and
                 problem.model._owning_rank[src_name] != problem.comm.rank):
             return
 
         indices = meta['indices']
         if indices is None:
-            indices = slice(None)
+            indices = _full_slice
 
         if name in self._designvars_discrete:
 
@@ -614,19 +620,25 @@ class Driver(object):
 
             problem.model._discrete_outputs[src_name] = value
 
-        else:
+        elif src_name in problem.model._outputs._views_flat:
             desvar = problem.model._outputs._views_flat[src_name]
-            desvar[indices] = value
+            if src_name in self._dist_driver_vars:
+                loc_idxs, _, dist_idxs = self._dist_driver_vars[src_name]
+            else:
+                loc_idxs = indices
+                dist_idxs = _full_slice
+
+            desvar[loc_idxs] = np.atleast_1d(value)[dist_idxs]
 
             # Undo driver scaling when setting design var values into model.
             if self._has_scaling:
                 scaler = meta['total_scaler']
                 if scaler is not None:
-                    desvar[indices] *= 1.0 / scaler
+                    desvar[loc_idxs] *= 1.0 / scaler
 
                 adder = meta['total_adder']
                 if adder is not None:
-                    desvar[indices] -= adder
+                    desvar[loc_idxs] -= adder
 
     def get_objective_values(self, driver_scaling=True):
         """
@@ -737,7 +749,7 @@ class Driver(object):
         response_size = sum(resps[n]['size'] for n in self._get_ordered_nl_responses())
 
         # Gather up the information for design vars.
-        self._designvars = designvars = model.get_design_vars(recurse=True, use_prom_ivc=True)
+        self._designvars = designvars = model.get_design_vars(recurse=True)
         desvar_size = sum(data['size'] for data in designvars.values())
 
         return response_size, desvar_size

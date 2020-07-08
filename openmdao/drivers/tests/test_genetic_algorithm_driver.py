@@ -88,19 +88,18 @@ class TestSimpleGA(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('xC', 7.5))
-        model.add_subsystem('p2', om.IndepVarComp('xI', 0.0))
-        model.add_subsystem('comp', Branin())
+        model.set_input_defaults('xC', 7.5)
+        model.set_input_defaults('xI', 0.0)
 
-        model.connect('p2.xI', 'comp.x0')
-        model.connect('p1.xC', 'comp.x1')
+        model.add_subsystem('comp', Branin(),
+                            promotes_inputs=[('x0', 'xI'), ('x1', 'xC')])
 
-        model.add_design_var('p2.xI', lower=-5.0, upper=10.0)
-        model.add_design_var('p1.xC', lower=0.0, upper=15.0)
+        model.add_design_var('xI', lower=-5.0, upper=10.0)
+        model.add_design_var('xC', lower=0.0, upper=15.0)
         model.add_objective('comp.f')
 
         prob.driver = om.SimpleGADriver(max_gen=75, pop_size=25)
-        prob.driver.options['bits'] = {'p1.xC': 8}
+        prob.driver.options['bits'] = {'xC': 8}
 
         prob.driver._randomstate = 1
 
@@ -112,7 +111,7 @@ class TestSimpleGA(unittest.TestCase):
 
         # Optimal solution
         assert_near_equal(prob['comp.f'], 0.49399549, 1e-4)
-        self.assertTrue(int(prob['p2.xI']) in [3, -3])
+        self.assertTrue(int(prob['xI']) in [3, -3])
 
     def test_mixed_integer_branin_discrete(self):
         prob = om.Problem()
@@ -1261,21 +1260,21 @@ class TestFeatureSimpleGA(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('xC', 7.5))
-        model.add_subsystem('p2', om.IndepVarComp('xI', 0.0))
-        model.add_subsystem('comp', Branin())
+        model.add_subsystem('comp', Branin(),
+                            promotes_inputs=[('x0', 'xI'), ('x1', 'xC')])
 
-        model.connect('p2.xI', 'comp.x0')
-        model.connect('p1.xC', 'comp.x1')
-
-        model.add_design_var('p2.xI', lower=-5.0, upper=10.0)
-        model.add_design_var('p1.xC', lower=0.0, upper=15.0)
+        model.add_design_var('xI', lower=-5.0, upper=10.0)
+        model.add_design_var('xC', lower=0.0, upper=15.0)
         model.add_objective('comp.f')
 
         prob.driver = om.SimpleGADriver()
-        prob.driver.options['bits'] = {'p1.xC': 8}
+        prob.driver.options['bits'] = {'xC': 8}
 
         prob.setup()
+
+        prob.set_val('xC', 7.5)
+        prob.set_val('xI', 0.0)
+
         prob.run_driver()
 
     def test_basic_with_assert(self):
@@ -1285,23 +1284,23 @@ class TestFeatureSimpleGA(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('xC', 7.5))
-        model.add_subsystem('p2', om.IndepVarComp('xI', 0.0))
-        model.add_subsystem('comp', Branin())
+        model.add_subsystem('comp', Branin(),
+                            promotes_inputs=[('x0', 'xI'), ('x1', 'xC')])
 
-        model.connect('p2.xI', 'comp.x0')
-        model.connect('p1.xC', 'comp.x1')
-
-        model.add_design_var('p2.xI', lower=-5.0, upper=10.0)
-        model.add_design_var('p1.xC', lower=0.0, upper=15.0)
+        model.add_design_var('xI', lower=-5.0, upper=10.0)
+        model.add_design_var('xC', lower=0.0, upper=15.0)
         model.add_objective('comp.f')
 
         prob.driver = om.SimpleGADriver()
-        prob.driver.options['bits'] = {'p1.xC': 8}
+        prob.driver.options['bits'] = {'xC': 8}
 
         prob.driver._randomstate = 1
 
         prob.setup()
+
+        prob.set_val('xC', 7.5)
+        prob.set_val('xI', 0.0)
+
         prob.run_driver()
 
         # Optimal solution
@@ -1433,11 +1432,6 @@ class TestFeatureSimpleGA(unittest.TestCase):
 
         prob = om.Problem()
 
-        indeps = prob.model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
-        indeps.add_output('length', 1.5)
-        indeps.add_output('width', 1.5)
-        indeps.add_output('height', 1.5)
-
         prob.model.add_subsystem('box', Box(), promotes=['*'])
 
         # setup the optimization
@@ -1455,6 +1449,11 @@ class TestFeatureSimpleGA(unittest.TestCase):
         prob.model.add_constraint('volume', upper=1.)
 
         prob.setup()
+
+        prob.set_val('length', 1.5)
+        prob.set_val('width', 1.5)
+        prob.set_val('height', 1.5)
+
         prob.run_driver()
 
         desvar_nd = prob.driver.desvar_nd

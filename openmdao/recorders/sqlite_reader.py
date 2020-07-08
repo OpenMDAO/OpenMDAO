@@ -193,6 +193,7 @@ class SqliteCaseReader(BaseCaseReader):
             # Map ivc_source names to input display text.
             if version >= 11:
                 self._auto_ivc_map = auto_ivc_map = {}
+                abs2prom_in = self._abs2prom['input']
                 for target, src in self._conns.items():
                     if src.startswith('_auto_ivc.'):
                         if src not in auto_ivc_map:
@@ -200,7 +201,12 @@ class SqliteCaseReader(BaseCaseReader):
                         auto_ivc_map[src].append(target)
                 for output, input_list in auto_ivc_map.items():
                     if len(input_list) > 1:
-                        auto_ivc_map[output] = self._abs2prom['input'][input_list[0]]
+                        for input_name in input_list:
+                            # If this recorder is on a component, we might have only a subset of
+                            # the metadata dictionary, but one of them will be in there.
+                            if input_name in abs2prom_in:
+                                auto_ivc_map[output] = abs2prom_in[input_name]
+                                break
                     else:
                         auto_ivc_map[output] = input_list[0]
 

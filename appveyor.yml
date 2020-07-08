@@ -3,6 +3,7 @@ build: off
 branches:
   only:
     - master
+    - auto_ivc
 
 environment:
   matrix:

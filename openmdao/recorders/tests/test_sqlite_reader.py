@@ -1501,8 +1501,8 @@ class TestSqliteCaseReader(unittest.TestCase):
             "con1": -22.42830237,
             "con2": -11.94151185,
             # unpromoted output names
-            "px.x": 1.,
-            "pz.z": [5., 2.],
+            "_auto_ivc.v1": 1.,
+            "_auto_ivc.v0": [5., 2.],
             "obj_cmp.obj": 28.58830817,
             "con_cmp1.con1": -22.42830237,
             "con_cmp2.con2": -11.94151185,
@@ -3433,16 +3433,16 @@ class TestFeatureSqliteReader(unittest.TestCase):
 
         # alternatively, you can get the absolute names
         self.assertEqual((sorted(objs.absolute_names()), sorted(cons.absolute_names()), sorted(dvs.absolute_names())),
-                         (['obj_cmp.obj'], ['con_cmp1.con1', 'con_cmp2.con2'], ['px.x', 'pz.z']))
+                         (['obj_cmp.obj'], ['con_cmp1.con1', 'con_cmp2.con2'], ['x', 'z']))
 
         # you can access variable values using either the promoted or the absolute name
         self.assertEqual((objs['obj'], objs['obj_cmp.obj']), (objs['obj_cmp.obj'], objs['obj']))
-        self.assertEqual((dvs['x'], dvs['px.x']), (dvs['px.x'], dvs['x']))
+        self.assertEqual((dvs['x'], dvs['_auto_ivc.v1']), (dvs['_auto_ivc.v1'], dvs['x']))
         self.assertEqual((rsps['obj'], rsps['obj_cmp.obj']), (rsps['obj_cmp.obj'], rsps['obj']))
 
         # you can also access the variables directly from the case object
         self.assertEqual((case['obj'], case['obj_cmp.obj']), (objs['obj_cmp.obj'], objs['obj']))
-        self.assertEqual((case['x'], case['px.x']), (dvs['px.x'], dvs['x']))
+        self.assertEqual((case['x'], case['_auto_ivc.v1']), (dvs['_auto_ivc.v1'], dvs['x']))
 
     def test_feature_list_inputs_and_outputs(self):
         import openmdao.api as om

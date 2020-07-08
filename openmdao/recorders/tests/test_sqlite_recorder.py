@@ -98,7 +98,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.cleanup()
 
         coordinate = [0, 'Driver', (0, )]
-        expected_outputs = {"px.x": [1.0, ], "pz.z": [5.0, 2.0]}
+        expected_outputs = {"x": [1.0, ], "z": [5.0, 2.0]}
 
         expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
         assertDriverIterDataRecorded(self, expected_data, self.eps)
@@ -119,7 +119,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.cleanup()
 
         coordinate = [0, 'Driver', (0, )]
-        expected_outputs = {"px.x": [1.0, ], "pz.z": [5.0, 2.0]}
+        expected_outputs = {"x": [1.0, ], "z": [5.0, 2.0]}
 
         expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
         assertDriverIterDataRecorded(self, expected_data, self.eps)
@@ -399,8 +399,8 @@ class TestSqliteRecorder(unittest.TestCase):
                 'y1': ['d2.y1', 'obj_cmp.y1', 'con_cmp1.y1']
             },
             'output': {
-                'x': ['px.x'],
-                'z': ['pz.z'],
+                '_auto_ivc.v0': ['_auto_ivc.v0'],
+                '_auto_ivc.v1': ['_auto_ivc.v1'],
                 'y1': ['d1.y1'],
                 'y2': ['d2.y2'],
                 'obj': ['obj_cmp.obj'],
@@ -424,8 +424,8 @@ class TestSqliteRecorder(unittest.TestCase):
                 'con_cmp2.y2': 'y2'
             },
             'output': {
-                'px.x': 'x',
-                'pz.z': 'z',
+                '_auto_ivc.v0': '_auto_ivc.v0',
+                '_auto_ivc.v1': '_auto_ivc.v1',
                 'd1.y1': 'y1',
                 'd2.y2': 'y2',
                 'obj_cmp.obj': 'obj',
@@ -438,7 +438,7 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_problem_metadata = {
             'connections_list_length': 11,
             'tree_length': 10,
-            'tree_children_length': 7,
+            'tree_children_length': 6,
             'abs2prom': abs2prom,
         }
         assertViewerDataRecorded(self, expected_problem_metadata)
@@ -457,7 +457,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         cr = om.CaseReader("cases.sql")
         # Quick check to see that keys and values were recorded
-        for key in ['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']:
+        for key in ['root', '_auto_ivc', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']:
             self.assertTrue(key in cr.system_options.keys())
 
         value = cr.system_options['root']['component_options']['assembled_jac_type']
@@ -476,7 +476,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         cr = om.CaseReader("cases.sql")
         # Quick check to see that keys and values were recorded
-        for key in ['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']:
+        for key in ['root', '_auto_ivc', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']:
             self.assertTrue(key in cr.system_options.keys())
 
         value = cr.system_options['root']['component_options']['assembled_jac_type']
@@ -495,7 +495,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         cr = om.CaseReader("cases.sql")
         # Quick check to see that keys and values were recorded
-        for key in ['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']:
+        for key in ['root', '_auto_ivc', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']:
             self.assertTrue(key in cr.system_options.keys())
 
         value = cr.system_options['root']['component_options']['assembled_jac_type']
@@ -775,20 +775,20 @@ class TestSqliteRecorder(unittest.TestCase):
             "con_cmp1.con1": [-22.42830237],
             "d1.y1": [25.58830237],
             "con_cmp2.con2": [-11.941511849],
-            "pz.z": [5.0, 2.0],
+            "_auto_ivc.v0": [5.0, 2.0],
             "obj_cmp.obj": [28.588308165],
             "d2.y2": [12.058488150],
-            "px.x": [1.0]
+            "_auto_ivc.v1": [1.0]
         }
 
         expected_solver_residuals = {
             "con_cmp1.con1": [0.0],
             "d1.y1": [-1.318802844707534e-10],
             "con_cmp2.con2": [0.0],
-            "pz.z": [0.0, 0.0],
+            "_auto_ivc.v0": [0.0, 0.0],
             "obj_cmp.obj": [0.0],
             "d2.y2": [0.0],
-            "px.x": [0.0]
+            "_auto_ivc.v1": [0.0]
         }
 
         expected_data = ((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
@@ -810,10 +810,10 @@ class TestSqliteRecorder(unittest.TestCase):
             "con_cmp1.con1": [0.0],
             "d1.y1": [2.60769184e-12],
             "con_cmp2.con2": [0.0],
-            "pz.z": [0.0, 0.0],
+            "_auto_ivc.v0": [0.0, 0.0],
             "obj_cmp.obj": [0.0],
             "d2.y2": [0.0],
-            "px.x": [0.0]
+            "_auto_ivc.v1": [0.0]
         }
 
         expected_data = ((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
@@ -988,10 +988,10 @@ class TestSqliteRecorder(unittest.TestCase):
             "con_cmp1.con1": [-22.42830237],
             "d1.y1": [25.58830237],
             "con_cmp2.con2": [-11.941511849],
-            "pz.z": [5.0, 2.0],
+            "_auto_ivc.v0": [5.0, 2.0],
             "obj_cmp.obj": [28.588308165],
             "d2.y2": [12.058488150],
-            "px.x": [1.0]
+            "_auto_ivc.v1": [1.0]
         }
 
         expected_solver_residuals = None
@@ -1042,8 +1042,8 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_rel_error = 3.6299074030587596e-12
 
         expected_solver_output = {
-            'px.x': [1.],
-            'pz.z': [5., 2.],
+            '_auto_ivc.v1': [1.],
+            '_auto_ivc.v0': [5., 2.],
             'd1.y1': [25.58830237],
             'd2.y2': [12.05848815],
             'obj_cmp.obj': [28.58830817],
@@ -1052,8 +1052,8 @@ class TestSqliteRecorder(unittest.TestCase):
         }
 
         expected_solver_residuals = {
-            'px.x': [0.],
-            'pz.z': [0., 0.],
+            '_auto_ivc.v1': [0.],
+            '_auto_ivc.v0': [0., 0.],
             'd1.y1': [-1.31880284e-10],
             'd2.y2': [0.],
             'obj_cmp.obj': [0.],
@@ -1081,8 +1081,8 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_rel_error = 1.991112651729199e-08
 
         expected_solver_output = {
-            'px.x': [1.],
-            'pz.z': [5., 2.],
+            '_auto_ivc.v1': [1.],
+            '_auto_ivc.v0': [5., 2.],
             'd1.y1': [25.58830237],
             'd2.y2': [12.05848815],
             'obj_cmp.obj': [28.58830817],
@@ -1113,8 +1113,8 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_rel_error = 5.966657077752565e-12
 
         expected_solver_output = {
-            'px.x': [1.],
-            'pz.z': [5., 2.],
+            '_auto_ivc.v1': [1.],
+            '_auto_ivc.v0': [5., 2.],
             'd1.y1': [25.58830237],
             'd2.y2': [12.05848815],
             'obj_cmp.obj': [28.58830817],
@@ -1145,8 +1145,8 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_rel_error = None
 
         expected_solver_output = {
-            'px.x': [1.],
-            'pz.z': [5., 2.],
+            '_auto_ivc.v1': [1.],
+            '_auto_ivc.v0': [5., 2.],
             'd1.y1': [27.8],
             'd2.y2': [12.27257053],
             'obj_cmp.obj': [30.80000468],
@@ -1571,7 +1571,7 @@ class TestSqliteRecorder(unittest.TestCase):
         # Do a simple test to see if recording second time was OK
         coordinate = [0, 'Driver', (0, )]
 
-        expected_outputs = {"px.x": [1.0, ], "pz.z": [5.0, 2.0]}
+        expected_outputs = {"x": [1.0, ], "z": [5.0, 2.0]}
 
         expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
         assertDriverIterDataRecorded(self, expected_data, self.eps)
@@ -2297,15 +2297,15 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         self.assertEqual('\n'.join([conn['src']+'\t'+conn['tgt'] for conn in connections]),
                          '\n'.join(["d1.y1\tcon_cmp1.y1",
                                     "d2.y2\tcon_cmp2.y2",
-                                    "px.x\td1.x",
+                                    "_auto_ivc.v1\td1.x",
                                     "d2.y2\td1.y2",
-                                    "pz.z\td1.z",
+                                    "_auto_ivc.v0\td1.z",
                                     "d1.y1\td2.y1",
-                                    "pz.z\td2.z",
-                                    "px.x\tobj_cmp.x",
+                                    "_auto_ivc.v0\td2.z",
+                                    "_auto_ivc.v1\tobj_cmp.x",
                                     "d1.y1\tobj_cmp.y1",
                                     "d2.y2\tobj_cmp.y2",
-                                    "pz.z\tobj_cmp.z"]))
+                                    "_auto_ivc.v0\tobj_cmp.z"]))
 
         # access the model tree stored in metadata
         self.assertEqual(set(cr.problem_metadata['tree'].keys()),
@@ -2314,7 +2314,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
                           'expressions'})
         self.assertEqual(cr.problem_metadata['tree']['name'], 'root')
         self.assertEqual(sorted([child["name"] for child in cr.problem_metadata['tree']["children"]]),
-                         ['con_cmp1', 'con_cmp2', 'd1', 'd2', 'obj_cmp', 'px', 'pz'])
+                         ['_auto_ivc', 'con_cmp1', 'con_cmp2', 'd1', 'd2', 'obj_cmp'])
 
     def test_feature_problem_metadata_with_driver_information(self):
         import openmdao.api as om
@@ -2423,7 +2423,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         metadata = cr.system_options
 
         self.assertEqual(sorted(metadata.keys()),
-                         sorted(['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']))
+                         sorted(['root', '_auto_ivc', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']))
 
         # options for system 'd1', with second option excluded
         self.assertEqual(metadata['d1']['component_options']['distributed'], False)
