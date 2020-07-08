@@ -15,7 +15,8 @@ from openmdao.utils.general_utils import simple_warning, warn_deprecation, prom2
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 import openmdao.utils.coloring as coloring_mod
-from openmdao.vectors.vector import INT_DTYPE
+from openmdao.utils.array_utils import sizes2offsets, convert_neg
+from openmdao.vectors.vector import INT_DTYPE, _full_slice
 
 
 def _check_debug_print_opts_valid(name, opts):
@@ -278,7 +279,7 @@ class Driver(object):
 
         self._remote_dvs = remote_dv_dict = {}
         self._remote_cons = remote_con_dict = {}
-        self._dist_driver_vars = dist_resp_dict = {}
+        self._dist_driver_vars = dist_dict = {}
         self._remote_objs = remote_obj_dict = {}
 
         src_design_vars = prom2ivc_src_dict(self._designvars)
@@ -305,57 +306,52 @@ class Driver(object):
             owning_ranks = model._owning_rank
             sizes = model._var_sizes['nonlinear']['output']
             abs2meta = model._var_allprocs_abs2meta
+            rank = model.comm.rank
+            nprocs = model.comm.size
             for i, vname in enumerate(model._var_allprocs_abs_names['output']):
-                distributed = abs2meta[vname]['distributed']
+                if vname in responses:
+                    indices = responses[vname].get('indices')
+                elif vname in src_design_vars:
+                    indices = src_design_vars[vname].get('indices')
+                else:
+                    continue
 
-                # Note that design vars are not distributed.
-                if distributed:
-
-                    if vname in responses:
-                        idx_dict = responses[vname]
-                    elif vname in src_design_vars:
-                        idx_dict = src_design_vars[vname]
-                    else:
-                        continue
+                if abs2meta[vname]['distributed']:
 
                     idx = model._var_allprocs_abs2idx['nonlinear'][vname]
                     dist_sizes = model._var_sizes['nonlinear']['output'][:, idx]
+                    total_dist_size = np.sum(dist_sizes)
 
                     # Determine which indices are on our proc.
-                    rank = model.comm.rank
-                    size = dist_sizes.size
-                    offsets = np.cumsum(dist_sizes)
-
-                    indices = idx_dict.get('indices')
+                    offsets = sizes2offsets(dist_sizes)
 
                     if indices is not None:
-                        local_indices = []
-                        true_sizes = np.zeros(size, dtype=INT_DTYPE)
-                        for index in indices:
-                            if index < 0:
-                                # Support for negative indices. Convert to positive index.
-                                index = index + np.sum(dist_sizes)
-                            irank = np.argwhere(offsets > index)[0][0]
-                            true_sizes[irank] += 1
-                            if rank == irank:
-                                new_index = index - offsets[irank] + dist_sizes[irank]
-                                local_indices.append(new_index)
+                        indices = convert_neg(indices, total_dist_size)
+                        true_sizes = np.zeros(nprocs, dtype=INT_DTYPE)
+                        for irank in range(nprocs):
+                            dist_inds = indices[np.logical_and(indices >= offsets[irank],
+                                                               indices < (offsets[irank] +
+                                                                          dist_sizes[irank]))]
+                            if irank == rank:
+                                local_indices = dist_inds - offsets[rank]
+                                distrib_indices = dist_inds
 
-                        indices = local_indices
-                        dist_sizes = true_sizes
-
-                    dist_resp_dict[vname] = (indices, dist_sizes)
+                            true_sizes[irank] = dist_inds.size
+                        dist_dict[vname] = (local_indices, true_sizes, distrib_indices)
+                    else:
+                        dist_dict[vname] = (_full_slice, dist_sizes,
+                                            slice(offsets[rank], offsets[rank] + dist_sizes[rank]))
 
                 else:
                     owner = owning_ranks[vname]
                     sz = sizes[owner, i]
 
-                if vname in dv_set:
-                    remote_dv_dict[vname] = (owner, sz)
-                if vname in con_set:
-                    remote_con_dict[vname] = (owner, sz)
-                if vname in obj_set:
-                    remote_obj_dict[vname] = (owner, sz)
+                    if vname in dv_set:
+                        remote_dv_dict[vname] = (owner, sz)
+                    if vname in con_set:
+                        remote_con_dict[vname] = (owner, sz)
+                    if vname in obj_set:
+                        remote_obj_dict[vname] = (owner, sz)
 
         self._remote_responses = self._remote_cons.copy()
         self._remote_responses.update(self._remote_objs)
@@ -531,7 +527,7 @@ class Driver(object):
 
         elif distributed:
             local_val = model.get_val(src_name, flat=True)
-            local_indices, sizes = distributed_vars[src_name]
+            local_indices, sizes, _ = distributed_vars[src_name]
             if local_indices is not None:
                 local_val = local_val[local_indices]
             offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
@@ -606,7 +602,7 @@ class Driver(object):
 
         indices = meta['indices']
         if indices is None:
-            indices = slice(None)
+            indices = _full_slice
 
         if name in self._designvars_discrete:
 
@@ -624,19 +620,25 @@ class Driver(object):
 
             problem.model._discrete_outputs[src_name] = value
 
-        else:
+        elif src_name in problem.model._outputs._views_flat:
             desvar = problem.model._outputs._views_flat[src_name]
-            desvar[indices] = value
+            if src_name in self._dist_driver_vars:
+                loc_idxs, _, dist_idxs = self._dist_driver_vars[src_name]
+            else:
+                loc_idxs = indices
+                dist_idxs = _full_slice
+
+            desvar[loc_idxs] = np.atleast_1d(value)[dist_idxs]
 
             # Undo driver scaling when setting design var values into model.
             if self._has_scaling:
                 scaler = meta['total_scaler']
                 if scaler is not None:
-                    desvar[indices] *= 1.0 / scaler
+                    desvar[loc_idxs] *= 1.0 / scaler
 
                 adder = meta['total_adder']
                 if adder is not None:
-                    desvar[indices] -= adder
+                    desvar[loc_idxs] -= adder
 
     def get_objective_values(self, driver_scaling=True):
         """

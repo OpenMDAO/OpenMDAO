@@ -225,7 +225,8 @@ class pyOptSparseDriver(Driver):
 
         # Handle deprecated option.
         if self.options._dict['user_teriminate_signal']['value'] is not None:
-            self.options['user_terminate_signal'] = self.options._dict['user_teriminate_signal']['value']
+            self.options['user_terminate_signal'] = \
+                self.options._dict['user_teriminate_signal']['value']
 
     def run(self):
         """
