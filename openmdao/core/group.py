@@ -1220,7 +1220,7 @@ class Group(System):
                     inds_size = None
                     if _is_slice(src_indices):
                         if MPI:
-                            val = self._abs_get_val(abs_out, get_remote=True)
+                            val = self._var_allprocs_abs2meta[abs_out]
                         else:
                             val = self._abs_get_val(abs_out)
                         src_indices = _slice_indices(src_indices, val.size, val.shape)

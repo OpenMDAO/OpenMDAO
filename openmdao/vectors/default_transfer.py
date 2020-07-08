@@ -8,7 +8,7 @@ import numpy as np
 from openmdao.vectors.vector import INT_DTYPE
 from openmdao.vectors.transfer import Transfer
 from openmdao.utils.array_utils import convert_neg, _global2local_offsets, _flatten_src_indices
-from openmdao.utils.general_utils import _is_slice
+from openmdao.utils.general_utils import _is_slice, _slice_indices
 from openmdao.utils.mpi import MPI
 
 _empty_idx_array = np.array([], dtype=INT_DTYPE)
@@ -99,8 +99,8 @@ class DefaultTransfer(Transfer):
                                      (isinstance(src_indices, np.ndarray) and
                                       src_indices.dtype == object):
                             if _is_slice(src_indices):
-                                indices = np.arange(meta_out['size'], dtype=int).reshape(
-                                    meta_out['shape'])[tuple(src_indices)]
+                                indices = _slice_indices(src_indices, meta_out['size'],
+                                                         meta_out['shape'])
                                 src_indices = convert_neg(indices, meta_out['global_size'])
                         else:
                             src_indices = convert_neg(src_indices, meta_out['global_size'])
