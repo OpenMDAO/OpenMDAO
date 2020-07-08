@@ -18,7 +18,6 @@ class N2Matrix {
      * Render the matrix of visible elements in the model.
      * @param {ModelData} model The pre-processed model data.
      * @param {N2Layout} layout Pre-computed layout of the diagram.
-     * @param {N2MatrixCell[][]} grid N2MatrixCell objects in row,col order.
      * @param {Object} n2Groups References to <g> SVG elements created by N2Diagram.
      * @param {Boolean} lastClickWasLeft
      * @param {function} findRootOfChangeFunction
@@ -30,6 +29,7 @@ class N2Matrix {
             'height': 0
         }) {
 
+        this.model = model;
         this.layout = layout;
         this.diagNodes = layout.visibleNodes;
         this.n2Groups = n2Groups;
@@ -50,7 +50,7 @@ class N2Matrix {
         this.updateLevelOfDetailThreshold(layout.size.n2matrix.height);
 
         startTimer('N2Matrix._buildGrid');
-        this._buildGrid(model);
+        this._buildGrid();
         stopTimer('N2Matrix._buildGrid');
 
         startTimer('N2Matrix._setupComponentBoxesAndGridLines');
@@ -136,7 +136,7 @@ class N2Matrix {
      * @param {N2MatrixCell} newCell Cell created in _buildGrid().
      */
     _addCell(row, col, newCell) {
-        if (modelData.options.use_declare_partial_info &&
+        if (this.model.useDeclarePartialsList &&
             newCell.symbolType.potentialDeclaredPartial &&
             !newCell.symbolType.declaredPartial) {
 
@@ -185,9 +185,8 @@ class N2Matrix {
      * Set up N2MatrixCell arrays resembling a two-dimensional grid as the
      * matrix, but not an actual two dimensional array because most of
      * it would be unused.
-     * @param {ModelData} model Reference to the model, for creating cell objects.
      */
-    _buildGrid(model) {
+    _buildGrid() {
         this.visibleCells = [];
         this.grid = {};
 
@@ -200,7 +199,7 @@ class N2Matrix {
             if (!this.grid.propExists(srcIdx)) this.grid[srcIdx] = {};
 
             // On the diagonal
-            let newDiagCell = new N2MatrixCell(srcIdx, srcIdx, diagNode, diagNode, model);
+            let newDiagCell = new N2MatrixCell(srcIdx, srcIdx, diagNode, diagNode, this.model);
             this._addCell(srcIdx, srcIdx, newDiagCell);
             this._findUnseenCycleSources(newDiagCell);
 
@@ -208,11 +207,11 @@ class N2Matrix {
                 let tgtIdx = indexFor(this.diagNodes, tgt);
 
                 if (tgtIdx != -1) {
-                    let newCell = new N2MatrixCell(srcIdx, tgtIdx, diagNode, tgt, model);
+                    let newCell = new N2MatrixCell(srcIdx, tgtIdx, diagNode, tgt, this.model);
                     this._addCell(srcIdx, tgtIdx, newCell);
                 }
                 // Make sure tgt isn't descendant of zoomedElement, otherwise it's
-                // visiable at least as a collapsed node
+                // visible at least as a collapsed node
                 else if (tgt.isConnectable() && !this.layout.zoomedElement.hasNode(tgt)) {
                     newDiagCell.addOffScreenConn(diagNode, tgt);
                 }
@@ -238,7 +237,7 @@ class N2Matrix {
 
                     if (tgtObj.isUnknown()) {
                         let tgtIdx = j;
-                        let newCell = new N2MatrixCell(srcIdx, tgtIdx, diagNode, tgtObj, model);
+                        let newCell = new N2MatrixCell(srcIdx, tgtIdx, diagNode, tgtObj, this.model);
                         this._addCell(srcIdx, tgtIdx, newCell);
                     }
                 }
@@ -324,13 +323,15 @@ class N2Matrix {
             .attr('class', 'n2cell')
             .attr('transform', function (d) {
                 if (self.lastClickWasLeft) {
-                    return 'translate(' +
+                    let tranStr = 'translate(' +
                         (self.prevCellDims.size.width *
                             (d.col - enterIndex) +
                             self.prevCellDims.bottomRight.x) + ',' +
                         (self.prevCellDims.size.height *
                             (d.row - enterIndex) +
                             self.prevCellDims.bottomRight.y) + ')';
+
+                    return tranStr;
                 }
 
                 let roc = (d.obj && self.findRootOfChangeFunction) ?
@@ -339,10 +340,12 @@ class N2Matrix {
                 if (roc) {
                     let prevIdx = roc.prevRootIndex -
                         self.layout.zoomedElement.prevRootIndex;
-                    return 'translate(' + (self.prevCellDims.size.width * prevIdx +
+                    let tranStr = 'translate(' + (self.prevCellDims.size.width * prevIdx +
                         self.prevCellDims.bottomRight.x) + ',' +
                         (self.prevCellDims.size.height * prevIdx +
                             self.prevCellDims.bottomRight.y) + ')';
+
+                    return tranStr;
                 }
                 throw ('Enter transform not found');
             })
@@ -358,10 +361,12 @@ class N2Matrix {
         gEnter.merge(selection)
             .transition(sharedTransition)
             .attr('transform', function (d) {
-                return 'translate(' + (self.cellDims.size.width * d.col +
+                let tranStr = 'translate(' + (self.cellDims.size.width * d.col +
                     self.cellDims.bottomRight.x) + ',' +
                     (self.cellDims.size.height * d.row +
                         self.cellDims.bottomRight.y) + ')';
+
+                return(tranStr);
             })
             // "this" refers to the element here, so leave it alone:
             .each(function (d) {
@@ -371,11 +376,13 @@ class N2Matrix {
         selection.exit()
             .transition(sharedTransition)
             .attr('transform', function (d) {
-                if (self.lastClickWasLeft)
-                    return 'translate(' + (self.cellDims.size.width *
+                if (self.lastClickWasLeft) {
+                    let tranStr = 'translate(' + (self.cellDims.size.width *
                         (d.col - exitIndex) + self.cellDims.bottomRight.x) + ',' +
                         (self.cellDims.size.height * (d.row - exitIndex) +
                             self.cellDims.bottomRight.y) + ')';
+                    return tranStr;
+                }
 
                 let roc = (d.obj && self.findRootOfChangeFunction) ?
                     self.findRootOfChangeFunction(d.obj) : null;
@@ -563,7 +570,6 @@ class N2Matrix {
     /** Add all the visible elements to the matrix. */
     draw() {
         startTimer('N2Matrix.draw');
-        // debugInfo("maxDepth: ", this.layout.model.maxDepth, " zoomedElement depth: ", this.layout.zoomedElement.depth)
 
         let size = this.layout.size;
         d3.select("#n2MatrixClip > rect")

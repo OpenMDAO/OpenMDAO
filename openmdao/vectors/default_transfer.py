@@ -26,7 +26,7 @@ class DefaultTransfer(Transfer):
     """
 
     @staticmethod
-    def _setup_transfers(group, recurse=True):
+    def _setup_transfers(group):
         """
         Compute all transfers that are owned by our parent group.
 
@@ -34,15 +34,12 @@ class DefaultTransfer(Transfer):
         ----------
         group : <Group>
             Parent group.
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         iproc = group.comm.rank
         rev = group._mode == 'rev' or group._mode == 'auto'
 
-        if recurse:
-            for subsys in group._subgroups_myproc:
-                subsys._setup_transfers(recurse)
+        for subsys in group._subgroups_myproc:
+            subsys._setup_transfers()
 
         abs2meta = group._var_abs2meta
         allprocs_abs2meta = group._var_allprocs_abs2meta
@@ -102,6 +99,7 @@ class DefaultTransfer(Transfer):
                         src_indices = _flatten_src_indices(src_indices, meta_in['shape'],
                                                            meta_out['global_shape'],
                                                            meta_out['global_size'])
+                        meta_in['src_indices'] = src_indices
 
                     # 1. Compute the output indices
                     offset = offsets_out[iproc, idx_out]
@@ -169,7 +167,7 @@ class DefaultTransfer(Transfer):
             transfers['nonlinear'] = transfers['linear']
 
     @staticmethod
-    def _setup_discrete_transfers(group, recurse=True):
+    def _setup_discrete_transfers(group):
         """
         Compute all transfers that are owned by our parent group.
 
@@ -177,8 +175,6 @@ class DefaultTransfer(Transfer):
         ----------
         group : <Group>
             Parent group.
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         group._discrete_transfers = transfers = defaultdict(list)
         name_offset = len(group.pathname) + 1 if group.pathname else 0

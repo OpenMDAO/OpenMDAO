@@ -114,7 +114,7 @@ class TestSystem(unittest.TestCase):
         p.set_solver_print(level=0)
         p.run_model()
 
-        msg = "Incompatible shape for '.*': Expected (.*) but got (.*)"
+        msg = "Group (.*): Failed to set value of '.*': could not broadcast input array from shape (.*) into shape (.*)."
 
         num_val = -10
         arr_val = -10*np.ones((5, 1))

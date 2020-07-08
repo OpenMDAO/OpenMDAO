@@ -81,9 +81,6 @@ class ImplicitComponent(Component):
         """
         Compute outputs. The model is assumed to be in a scaled state.
         """
-        # Reconfigure if needed.
-        super(ImplicitComponent, self)._solve_nonlinear()
-
         self._inputs.read_only = True
 
         try:

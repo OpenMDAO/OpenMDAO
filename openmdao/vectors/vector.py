@@ -86,12 +86,14 @@ class Vector(object):
         When True, values in the vector cannot be changed via the user __setitem__ API.
     _under_complex_step : bool
         When True, self._data is replaced with self._cplx_data.
+    _len : int
+        Total length of data vector (including shared memory parts).
     """
 
     # Listing of relevant citations that should be referenced when
     cite = ""
 
-    def __init__(self, name, kind, system, root_vector=None, resize=False, alloc_complex=False,
+    def __init__(self, name, kind, system, root_vector=None, alloc_complex=False,
                  ncol=1, relevant=None):
         """
         Initialize all attributes.
@@ -106,8 +108,6 @@ class Vector(object):
             Pointer to the owning system.
         root_vector : <Vector>
             Pointer to the vector owned by the root system.
-        resize : bool
-            If true, resize the root vector.
         alloc_complex : bool
             Whether to allocate any imaginary storage to perform complex step. Default is False.
         ncol : int
@@ -122,6 +122,7 @@ class Vector(object):
         self._ncol = ncol
         self._icol = None
         self._relevant = relevant
+        self._len = 0
 
         self._system = weakref.ref(system)
 
@@ -155,13 +156,6 @@ class Vector(object):
         else:
             self._root_vector = root_vector
 
-        if resize:
-            if root_vector is None:
-                raise RuntimeError(
-                    'Cannot resize the vector because the root vector has not yet '
-                    'been created in system %s' % system.pathname)
-            self._update_root_data()
-
         self._initialize_data(root_vector)
         self._initialize_views()
 
@@ -190,7 +184,7 @@ class Vector(object):
         int
             Total flattened length of this vector.
         """
-        return self._data.size
+        return self._len
 
     def _clone(self, initialize_views=False):
         """
@@ -264,11 +258,13 @@ class Vector(object):
             Absolute variable name if unique abs_name found or None otherwise.
         """
         system = self._system()
-        abs_name = prom_name2abs_name(system, name, self._typ)
+
+        # try relative name first
+        abs_name = name if system.pathname == '' else '.'.join((system.pathname, name))
         if abs_name in self._names:
             return abs_name
 
-        abs_name = rel_name2abs_name(system, name)
+        abs_name = prom_name2abs_name(system, name, self._typ)
         if abs_name in self._names:
             return abs_name
 
@@ -338,7 +334,7 @@ class Vector(object):
             else:
                 return self._views[abs_name][:, self._icol]
         else:
-            raise KeyError('Variable name "{}" not found.'.format(name))
+            raise KeyError(f"{self._system().msginfo}: Variable name '{name}' not found.")
 
     def __setitem__(self, name, value):
         """
@@ -351,30 +347,7 @@ class Vector(object):
         value : float or list or tuple or ndarray
             variable value to set
         """
-        abs_name = self.name2abs_name(name)
-        if abs_name is not None:
-            if self.read_only:
-                msg = "Attempt to set value of '{}' in {} vector when it is read only."
-                raise ValueError(msg.format(name, self._kind))
-
-            if self._icol is None:
-                slc = _full_slice
-                oldval = self._views[abs_name]
-            else:
-                slc = (_full_slice, self._icol)
-                oldval = self._views[abs_name][slc]
-
-            value = np.asarray(value)
-            if value.shape != () and value.shape != (1,) and oldval.shape != value.shape:
-                raise ValueError("Incompatible shape for '%s': "
-                                 "Expected %s but got %s." %
-                                 (name, oldval.shape, value.shape))
-
-            self._views[abs_name][slc] = value
-
-        else:
-            msg = 'Variable name "{}" not found.'
-            raise KeyError(msg.format(name))
+        self.set_var(name, value)
 
     def _initialize_data(self, root_vector):
         """
@@ -406,15 +379,6 @@ class Vector(object):
         - _views_flat
         """
         raise NotImplementedError('_initialize_views not defined for vector type %s' %
-                                  type(self).__name__)
-
-    def _clone_data(self):
-        """
-        For each item in _data, replace it with a copy of the data.
-
-        Must be implemented by the subclass.
-        """
-        raise NotImplementedError('_clone_data not defined for vector type %s' %
                                   type(self).__name__)
 
     def __iadd__(self, vec):
@@ -508,19 +472,57 @@ class Vector(object):
         raise NotImplementedError('set_vec not defined for vector type %s' %
                                   type(self).__name__)
 
-    def set_const(self, val):
+    def set_val(self, val, idxs=_full_slice):
         """
-        Set the value of this vector to a constant scalar value.
+        Set the data array of this vector to a scalar or array value, with optional indices.
 
         Must be implemented by the subclass.
 
         Parameters
         ----------
-        val : int or float
-            scalar to set self to.
+        val : float or ndarray
+            scalar or array to set data array to.
+        idxs : int or slice or tuple of ints and/or slices.
+            The locations where the data array should be updated.
         """
-        raise NotImplementedError('set_const not defined for vector type %s' %
+        raise NotImplementedError('set_arr not defined for vector type %s' %
                                   type(self).__name__)
+
+    def set_var(self, name, val, idxs=_full_slice):
+        """
+        Set the array view corresponding to the named variable, with optional indexing.
+
+        Parameters
+        ----------
+        name : str
+            The name of the variable.
+        val : float or ndarray
+            Scalar or array to set data array to.
+        idxs : int or slice or tuple of ints and/or slices.
+            The locations where the data array should be updated.
+        """
+        abs_name = self.name2abs_name(name)
+        if abs_name is None:
+            raise KeyError(f"{self._system().msginfo}: Variable name '{name}' not found.")
+
+        if self.read_only:
+            raise ValueError(f"{self._system().msginfo}: Attempt to set value of '{name}' in "
+                             f"{self._kind} vector when it is read only.")
+
+        if self._icol is not None:
+            idxs = (idxs, self._icol)
+
+        value = np.asarray(val)
+
+        try:
+            self._views[abs_name][idxs] = value
+        except Exception as err:
+            try:
+                value = value.reshape(self._views[abs_name][idxs].shape)
+            except Exception:
+                raise ValueError(f"{self._system().msginfo}: Failed to set value of "
+                                 f"'{name}': {str(err)}.")
+            self._views[abs_name][idxs] = value
 
     def dot(self, vec):
         """
@@ -568,12 +570,16 @@ class Vector(object):
             need to do this when temporarily disabling complex step for guess_nonlinear.
         """
         if active:
-            self._cplx_data[:] = self._data
-
+            arr = self._data
         elif keep_real:
-            self._cplx_data[:] = self._data.real
+            arr = self._data.real
+        else:
+            arr = None
 
         self._data, self._cplx_data = self._cplx_data, self._data
         self._views, self._cplx_views = self._cplx_views, self._views
         self._views_flat, self._cplx_views_flat = self._cplx_views_flat, self._views_flat
         self._under_complex_step = active
+
+        if arr is not None:
+            self.set_const(arr)

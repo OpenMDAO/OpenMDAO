@@ -27,6 +27,15 @@ and the output :math:`a_mag`, as well as specifying their units.
     VectorMagnitudeComp
     options
 
+VectorMagnitudeComp Constructor
+-------------------------------
+
+The call signature for the `VectorMagnitudeComp` constructor is:
+
+.. automethod:: openmdao.components.vector_magnitude_comp.VectorMagnitudeComp.__init__
+    :noindex:
+
+
 VectorMagnitudeComp Example
 ---------------------------
 

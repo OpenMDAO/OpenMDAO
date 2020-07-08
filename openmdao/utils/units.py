@@ -1077,6 +1077,9 @@ def _has_val_mismatch(units1, val1, units2, val2):
         val1 = convert_units(val1, units1, new_units=units2)
 
     rtol = 1e-10
+    val1 = np.asarray(val1)
+    val2 = np.asarray(val2)
+
     norm1 = np.linalg.norm(val1)
     if norm1 == 0.:
         return np.linalg.norm(val2) > rtol

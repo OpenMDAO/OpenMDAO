@@ -32,8 +32,6 @@ class NonlinearRunOnce(NonlinearSolver):
                     for subsys in system._subsystems_myproc:
                         subsys._solve_nonlinear()
 
-                system._check_child_reconf()
-
             # If this is not a parallel group, transfer for each subsystem just prior to running it.
             else:
                 self._gs_iter()

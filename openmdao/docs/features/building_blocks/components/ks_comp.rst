@@ -25,6 +25,14 @@ KSComp Options
     KSComp
     options
 
+KSComp Constructor
+------------------
+
+The call signature for the `KSComp` constructor is:
+
+.. automethod:: openmdao.components.ks_comp.KSComp.__init__
+    :noindex:
+
 
 KSComp Example
 --------------
@@ -86,5 +94,14 @@ conservative.
 .. embed-code::
     openmdao.components.tests.test_ks_comp.TestKSFunctionFeatures.test_add_constraint
     :layout: code, plot
+
+**units**
+
+Finally, note that you can pass a units option to the KSComp that will define units on its input and output variables.
+There is only one unit, shared between both inputs and outputs.
+
+.. embed-code::
+    openmdao.components.tests.test_ks_comp.TestKSFunctionFeatures.test_units
+    :layout: interleave
 
 .. tags:: KSComp, Component, Constraints, Optimization

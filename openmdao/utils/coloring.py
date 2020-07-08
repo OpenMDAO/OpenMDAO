@@ -21,7 +21,7 @@ from scipy.sparse.compressed import get_index_dtype
 
 from openmdao.jacobians.jacobian import Jacobian
 from openmdao.utils.array_utils import array_viz
-from openmdao.utils.general_utils import simple_warning
+from openmdao.utils.general_utils import simple_warning, prom2ivc_src_dict
 import openmdao.utils.hooks as hooks
 from openmdao.utils.mpi import MPI
 from openmdao.utils.file_utils import _load_and_exec
@@ -406,8 +406,8 @@ class Coloring(object):
         info = {'coloring': None, 'wrt_patterns': self._meta['wrt_patterns']}
         system._update_wrt_matches(info)
         if system.pathname:
-            wrt_matches = ['.'.join((system.pathname, n))
-                           for n in info['wrt_matches_prom']]
+            wrt_matches = set(['.'.join((system.pathname, n))
+                              for n in info['wrt_matches_prom']])
             # for partial and semi-total derivs, convert to promoted names
             ordered_of_info = system._jac_var_info_abs2prom(system._jacobian_of_iter())
             ordered_wrt_info = \
@@ -490,8 +490,11 @@ class Coloring(object):
             direction = 'fwd'
         else:
             direction = 'rev'
-        return 'Coloring (direction: %s, ncolors: %d, shape: %s' % (direction, self.total_solves(),
-                                                                    shape)
+
+        return (
+            f"Coloring (direction: {direction}, ncolors: {self.total_solves()}, shape: {shape}"
+            f", pct nonzero: {self._pct_nonzero:.2f}, tol: {self._meta.get('good_tol')}"
+        )
 
     def summary(self):
         """
@@ -1430,7 +1433,8 @@ def _get_bool_total_jac(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_ja
         prob.run_model(reset_iter_counts=False)
 
     if of is None or wrt is None:
-        driver_wrt = list(driver._designvars)
+        desvars = prom2ivc_src_dict(driver._designvars)
+        driver_wrt = list(desvars)
         driver_of = driver._get_ordered_nl_responses()
         if not driver_wrt or not driver_of:
             raise RuntimeError("When computing total jacobian sparsity, either 'of' and 'wrt' "
@@ -1560,7 +1564,8 @@ def _write_sparsity(sparsity, stream):
 
 
 def _get_desvar_info(driver, names=None, use_abs_names=True):
-    desvars = driver._designvars
+    desvars = prom2ivc_src_dict(driver._designvars)
+
     if names is None:
         abs_names = list(desvars)
         return abs_names, [desvars[n]['size'] for n in abs_names]
@@ -2190,10 +2195,12 @@ def _initialize_model_approx(model, driver, of=None, wrt=None):
     """
     Set up internal data structures needed for computing approx totals.
     """
+    design_vars = driver._designvars
+
     if of is None:
         of = driver._get_ordered_nl_responses()
     if wrt is None:
-        wrt = list(driver._designvars)
+        wrt = list(design_vars)
 
     # Initialization based on driver (or user) -requested "of" and "wrt".
     if (not model._owns_approx_jac or model._owns_approx_of is None or
@@ -2205,7 +2212,7 @@ def _initialize_model_approx(model, driver, of=None, wrt=None):
         # Support for indices defined on driver vars.
         if MPI and model.comm.size > 1:
             of_idx = model._owns_approx_of_idx
-            driver_resp = driver._distributed_resp
+            driver_resp = driver._dist_driver_vars
             for key, val in driver._responses.items():
                 if val['indices'] is not None:
                     if val['distributed'] and key in driver_resp:
@@ -2218,7 +2225,7 @@ def _initialize_model_approx(model, driver, of=None, wrt=None):
                 if val['indices'] is not None
             }
         model._owns_approx_wrt_idx = {
-            key: val['indices'] for key, val in driver._designvars.items()
+            key: val['indices'] for key, val in design_vars.items()
             if val['indices'] is not None
         }
 

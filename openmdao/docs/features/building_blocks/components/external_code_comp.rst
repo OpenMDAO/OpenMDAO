@@ -28,6 +28,14 @@ ExternalCodeComp Options
     ExternalCodeComp
     options
 
+ExternalCodeComp Constructor
+----------------------------
+
+The call signature for the `ExternalCodeComp` constructor is:
+
+.. automethod:: openmdao.components.external_code_comp.ExternalCodeComp.__init__
+    :noindex:
+
 
 ExternalCodeComp Example
 ------------------------

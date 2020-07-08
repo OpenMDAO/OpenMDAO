@@ -27,6 +27,14 @@ All options can be passed in as arguments or set later by accessing the `options
     KrigingSurrogate
     options
 
+KrigingSurrogate Constructor
+----------------------------
+
+The call signature for the `KrigingSurrogate` constructor is:
+
+.. automethod:: openmdao.surrogate_models.kriging.KrigingSurrogate.__init__
+    :noindex:
+
 
 KrigingSurrogate Option Examples
 --------------------------------

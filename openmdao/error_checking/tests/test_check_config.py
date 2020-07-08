@@ -19,38 +19,6 @@ class MyComp(ExecComp):
 
 class TestCheckConfig(unittest.TestCase):
 
-    def test_hanging_inputs(self):
-        p = Problem()
-        root = p.model
-
-        G1 = root.add_subsystem("G1", Group(), promotes=['*'])
-        G2 = G1.add_subsystem("G2", Group(), promotes=['*'])
-        G2.add_subsystem("C2", IndepVarComp('x', 1.0), promotes=['*'])
-        G2.add_subsystem("C1", ExecComp('y=x*2.0+w'), promotes=['*'])
-
-        G3 = root.add_subsystem("G3", Group())
-        G4 = G3.add_subsystem("G4", Group())
-        G4.add_subsystem("C3", ExecComp('y=x*2.0+u'), promotes=['*'])
-        G4.add_subsystem("C4", ExecComp('y=x*2.0+v'))
-
-        testlogger = TestLogger()
-        p.setup(check='all', logger=testlogger)
-        p.final_setup()
-
-        expected = (
-            "The following inputs are not connected:\n"
-            "   G3.G4.C4.v     [ 1.]\n"
-            "   G3.G4.C4.x     [ 1.]\n"
-            "   G3.G4.u  (p):\n"
-            "      G3.G4.C3.u  [ 1.]\n"
-            "   G3.G4.x  (p):\n"
-            "      G3.G4.C3.x  [ 1.]\n"
-            "   w  (p):\n"
-            "      G1.G2.C1.w  [ 1.]\n"
-        )
-
-        testlogger.find_in('warning', expected)
-
     def test_dataflow_1_level(self):
         p = Problem()
         root = p.model
@@ -413,22 +381,8 @@ class TestCheckConfig(unittest.TestCase):
             "   System 'G1.C3' executes out-of-order with respect to its source systems ['G1.C11']\n"
         )
 
-        expected_warning_2 = (
-            'The following inputs are not connected:\n'
-            '   G1.C1.b      [ 1.]\n'
-            '   G1.C11.b     [ 1.]\n'
-            '   G1.C13.b     [ 1.]\n'
-            '   G1.C22.b     [ 1.]\n'
-            '   G1.C23.b     [ 1.]\n'
-            '   G1.N1.a      [ 1.]\n'
-            '   G1.N1.b      [ 1.]\n'
-            '   G1.N2.a      [ 1.]\n'
-            '   G1.N3.a      [ 1.]\n'
-        )
-
         testlogger.find_in('info', expected_info)
         testlogger.find_in('warning', expected_warning_1)
-        testlogger.find_in('warning', expected_warning_2)
 
     def test_comp_has_no_outputs(self):
         p = Problem()

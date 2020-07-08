@@ -223,6 +223,7 @@ class ScipyOptimizeDriver(Driver):
                     d['global_size'] = meta['global_size']
                     d['distributed'] = meta['distributed']
                     d['linear'] = True
+                    d['ivc_source'] = meta['ivc_source']
                     self._cons[name] = d
 
     def run(self):

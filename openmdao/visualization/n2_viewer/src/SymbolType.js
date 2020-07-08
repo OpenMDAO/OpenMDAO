@@ -13,109 +13,87 @@ class SymbolType {
      */
     constructor(cell, model) {
         this.name = null;
+
+        // Indicates that the type of symbol CAN be a declared partial
+        // AND both source and target objects are part of the same component.
         this.potentialDeclaredPartial = false;
+
         this.declaredPartial = false;
 
         // Update properties based on the the referenced node.
         this.getType(cell, model);
     }
 
+    /**
+     * For symbols types that CAN be a declared partial, check whether they're
+     * part of the same component and that they're in the declared partial list.
+     * @param {N2TreeNode} cell The cell to operate on.
+     * @param {ModelData} model Reference to the entire model.
+     */
+    _setDeclaredPartialInfo(cell, model) {
+        if (cell.tgtObj.parentComponent === cell.srcObj.parentComponent) {
+            this.potentialDeclaredPartial = true;
+            this.declaredPartial = model.isDeclaredPartial(cell.srcObj, cell.tgtObj);
+        }
+    }
+
     /** 
      * Decide what object the cell will be drawn as, based on its position
      * in the matrix, type, source, target, and/or other conditions.
-    */
+     * @param {N2MatrixCell} cell The cell to operate on.
+     * @param {ModelData} model Reference to the entire model.
+     */
     getType(cell, model) {
         if (cell.onDiagonal()) {
-            if (cell.srcObj.isSubsystem()) {
-                this.name = 'group';
-                return;
+            if (cell.srcObj.isSubsystem()) this.name = 'group';
+            else if (cell.srcObj.isParamOrUnknown()) {
+                if (cell.srcObj.dtype == "ndarray") this.name = 'vector';
+                else this.name = 'scalar';
             }
-
-            if (cell.srcObj.isParamOrUnknown()) {
-                if (cell.srcObj.dtype == "ndarray") {
-                    this.name = 'vector';
-                    return;
-                }
-
-                this.name = 'scalar';
-                return;
+            else {
+                throw ("Unknown symbol type '" + cell.srcObj.type + "' for cell on diagonal.");
             }
-
-            throw ("Unknown symbol type for cell on diagonal.");
         }
-
-        if (cell.srcObj.isSubsystem()) {
-            if (cell.tgtObj.isSubsystem()) {
-                this.name = 'groupGroup';
-                return;
+        else if (cell.srcObj.isSubsystem()) {
+            if (cell.tgtObj.isSubsystem()) this.name = 'groupGroup';
+            else if (cell.tgtObj.isParamOrUnknown()) {
+                if (cell.tgtObj.dtype == "ndarray") this.name = 'groupVector';
+                else this.name = 'groupScalar';
             }
-
-            if (cell.tgtObj.isParamOrUnknown()) {
-                if (cell.tgtObj.dtype == "ndarray") {
-                    this.name = 'groupVector';
-                    return;
-                }
-
-                this.name = 'groupScalar';
-                return;
-            }
-
-            throw ("Unknown group symbol type.");
+            else throw ("Unknown group symbol type.");
         }
-
-        if (cell.srcObj.isParamOrUnknown()) {
+        else if (cell.srcObj.isParamOrUnknown()) {
             if (cell.srcObj.dtype == "ndarray") {
                 if (cell.tgtObj.isParamOrUnknown()) {
                     if (cell.tgtObj.dtype == "ndarray" || cell.tgtObj.isParam()) {
                         this.name = 'vectorVector';
-                        this.potentialDeclaredPartial = true;
-                        this.declaredPartial =
-                            model.isDeclaredPartial(cell.srcObj, cell.tgtObj);
-
-                        return;
+                        this._setDeclaredPartialInfo(cell, model);
                     }
-
-                    this.name = 'vectorScalar';
-                    this.potentialDeclaredPartial = true;
-                    this.declaredPartial =
-                        model.isDeclaredPartial(cell.srcObj, cell.tgtObj);
-                    return;
+                    else {
+                        this.name = 'vectorScalar';
+                        this._setDeclaredPartialInfo(cell, model);
+                    }
                 }
 
-                if (cell.tgtObj.isSubsystem()) {
-                    this.name = 'vectorGroup';
-                    return;
-                }
-
-                throw ("Unknown vector symbol type.");
+                else if (cell.tgtObj.isSubsystem()) this.name = 'vectorGroup';
+                else throw ("Unknown vector symbol type.");
             }
 
-            if (cell.tgtObj.isParamOrUnknown()) {
+            else if (cell.tgtObj.isParamOrUnknown()) {
                 if (cell.tgtObj.dtype == "ndarray") {
                     this.name = 'scalarVector';
-                    this.potentialDeclaredPartial = true;
-                    this.declaredPartial =
-                        model.isDeclaredPartial(cell.srcObj, cell.tgtObj);
-
-                    return;
+                    this._setDeclaredPartialInfo(cell, model);
                 }
-
-                this.name = 'scalarScalar';
-                this.potentialDeclaredPartial = true;
-                this.declaredPartial =
-                    model.isDeclaredPartial(cell.srcObj, cell.tgtObj);
-
-                return;
+                else {
+                    this.name = 'scalarScalar';
+                    this._setDeclaredPartialInfo(cell, model);
+                }
             }
 
-            if (cell.tgtObj.isSubsystem()) {
-                this.name = 'scalarGroup';
-                return;
-            }
+            else if (cell.tgtObj.isSubsystem()) this.name = 'scalarGroup';
 
-            throw ("Unknown vector or scalar symbol type.");
+            else throw ("Unknown vector or scalar symbol type.");
         }
-
-        throw ("Completely unrecognized symbol type.")
+        else throw ("Completely unrecognized symbol type.")
     }
 }
