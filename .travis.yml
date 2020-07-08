@@ -1,6 +1,7 @@
 branches:
   only:
   - master
+  - auto_ivc
 
 group: deprecated-2017Q4
 
@@ -50,7 +51,7 @@ before_install:
 # Travis unhelpfully creates it, which then causes "dir already exists"
 # errors when you go to actually install the thing, so we must non-intuitively
 # delete the file before re-creating it later.
-- if  [ "$TRAVIS_REPO_SLUG" = "OpenMDAO/OpenMDAO" ] && [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
+- if  [ "$TRAVIS_REPO_SLUG" = "OpenMDAO/OpenMDAO" ] && [ "$TRAVIS_BRANCH" = "master" ] && [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
     echo "building master";
     MASTER_BUILD=1;
     rm -rf $HOME/miniconda;
