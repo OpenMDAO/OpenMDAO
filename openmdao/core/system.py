@@ -664,14 +664,6 @@ class System(object):
 
         self.set_initial_values()
 
-        # Tell all subsystems to record their metadata if they have recorders attached
-        for sub in self.system_iter(recurse=True, include_self=True):
-            sub._rec_mgr.record_metadata(sub)
-
-            # Also, record to the recorders attached to this System,
-            #   the system metadata for all the subsystems
-            self._rec_mgr.record_metadata(sub)
-
     def use_fixed_coloring(self, coloring=_STD_COLORING_FNAME, recurse=True):
         """
         Use a precomputed coloring for this System.
