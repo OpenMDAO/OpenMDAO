@@ -29,6 +29,8 @@ from openmdao.solvers.solver import Solver
 """
 SQL case database version history.
 ----------------------------------
+11-- OpenMDAO 3.2
+     IndepVarComps are created automatically, so this changes some bookkeeping.
 10-- OpenMDAO 3.0
      Added abs_err and rel_err recording to Problem recording
 9 -- OpenMDAO 3.0
@@ -52,7 +54,7 @@ SQL case database version history.
 1 -- Through OpenMDAO 2.3
      Original implementation.
 """
-format_version = 10
+format_version = 11
 
 
 def array_to_blob(array):
@@ -189,7 +191,8 @@ class SqliteRecorder(CaseRecorder):
             self.connection = sqlite3.connect(filepath)
             with self.connection as c:
                 c.execute("CREATE TABLE metadata(format_version INT, "
-                          "abs2prom TEXT, prom2abs TEXT, abs2meta TEXT, var_settings TEXT)")
+                          "abs2prom TEXT, prom2abs TEXT, abs2meta TEXT, var_settings TEXT,"
+                          "conns TEXT)")
                 c.execute("INSERT INTO metadata(format_version, abs2prom, prom2abs) "
                           "VALUES(?,?,?)", (format_version, None, None))
 
@@ -296,7 +299,7 @@ class SqliteRecorder(CaseRecorder):
         if self.connection:
 
             if driver is None:
-                desvars = system.get_design_vars(True, get_sizes=False)
+                desvars = system.get_design_vars(True, get_sizes=False, use_prom_ivc=False)
                 responses = system.get_responses(True, get_sizes=False)
                 objectives = OrderedDict()
                 constraints = OrderedDict()
@@ -344,6 +347,11 @@ class SqliteRecorder(CaseRecorder):
 
             for var_set, var_type in full_var_set:
                 for name in var_set:
+
+                    # Design variables can be requested by input name.
+                    if var_type == 'desvar':
+                        name = var_set[name]['ivc_source']
+
                     if name not in self._abs2meta:
                         try:
                             self._abs2meta[name] = real_meta[name].copy()
@@ -374,6 +382,7 @@ class SqliteRecorder(CaseRecorder):
             abs2prom = json.dumps(self._abs2prom)
             prom2abs = json.dumps(self._prom2abs)
             abs2meta = json.dumps(self._abs2meta)
+            conns = json.dumps(system._problem_meta.get('connections', {}))
 
             var_settings = {}
             var_settings.update(desvars)
@@ -384,8 +393,9 @@ class SqliteRecorder(CaseRecorder):
             var_settings_json = json.dumps(var_settings)
 
             with self.connection as c:
-                c.execute("UPDATE metadata SET abs2prom=?, prom2abs=?, abs2meta=?, var_settings=?",
-                          (abs2prom, prom2abs, abs2meta, var_settings_json))
+                c.execute("UPDATE metadata SET " +
+                          "abs2prom=?, prom2abs=?, abs2meta=?, var_settings=?, conns=?",
+                          (abs2prom, prom2abs, abs2meta, var_settings_json, conns))
 
     def record_iteration_driver(self, recording_requester, data, metadata):
         """

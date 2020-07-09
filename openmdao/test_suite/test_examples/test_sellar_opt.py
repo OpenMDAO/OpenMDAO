@@ -33,11 +33,11 @@ class TestSellarOpt(unittest.TestCase):
         prob.run_driver()
 
         print('minimum found at')
-        assert_near_equal(prob['x'][0], 0., 1e-5)
-        assert_near_equal(prob['z'], [1.977639, 0.], 1e-5)
+        assert_near_equal(prob.get_val('x')[0], 0., 1e-5)
+        assert_near_equal(prob.get_val('z'), [1.977639, 0.], 1e-5)
 
         print('minumum objective')
-        assert_near_equal(prob['obj'][0], 3.18339395045, 1e-5)
+        assert_near_equal(prob.get_val('obj')[0], 3.18339395045, 1e-5)
 
 
 if __name__ == "__main__":

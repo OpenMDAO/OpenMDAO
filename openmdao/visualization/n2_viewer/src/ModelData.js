@@ -3,11 +3,12 @@ class ModelData {
 
     /** Do some discovery in the tree and rearrange & enhance where necessary. */
     constructor(modelJSON) {
-        debugInfo(modelJSON);
+
         modelJSON.tree.name = 'model'; // Change 'root' to 'model'
         this.conns = modelJSON.connections_list;
         this.abs2prom = modelJSON.abs2prom; // May be undefined.
         this.declarePartialsList = modelJSON.declare_partials_list;
+        this.useDeclarePartialsList = (this.declarePartialsList.length > 0);
         this.sysPathnamesList = modelJSON.sys_pathnames_list;
 
         this.maxDepth = 1;
@@ -15,10 +16,6 @@ class ModelData {
         this.unconnectedParams = 0;
         this.nodePaths = {};
 
-        if (modelJSON.options.use_declare_partial_info &&
-            this.declarePartialsList.length == 0) {
-            console.warn("Declare partial list is empty, but --use_declare_partial_info specified.")
-        }
 
         startTimer('ModelData._convertToN2TreeNodes');
         this.root = this.tree = modelJSON.tree = this._convertToN2TreeNodes(modelJSON.tree);
@@ -41,6 +38,12 @@ class ModelData {
 
         debugInfo("New model: ", this);
         // this.errorCheck();
+    }
+
+    static uncompressModel(b64str) {
+        const compressedData = atob(b64str);
+        const jsonStr = window.pako.inflate(compressedData, { to: 'string' });
+        return JSON.parse(jsonStr);
     }
 
     /**
@@ -130,14 +133,14 @@ class ModelData {
         if (node.hasChildren()) {
             node.numDescendants = node.children.length;
             for (let child of node.children) {
-            
+
                 let implicit = this._setParentsAndDepth(child, node, depth + 1);
                 if (implicit) node.implicit = true;
 
                 node.numDescendants += child.numDescendants;
 
                 // Add absolute pathnames of children to a set for quick searching
-                if (! node.isRoot()) { // All nodes are children of the model root 
+                if (!node.isRoot()) { // All nodes are children of the model root 
                     node.childNames.add(child.absPathName);
                     for (let childName of child.childNames) {
                         node.childNames.add(childName);
@@ -230,9 +233,9 @@ class ModelData {
      * @return {Boolean} True if the string was found.
      */
     isDeclaredPartial(srcObj, tgtObj) {
-        let partialsString = tgtObj.absPathName + " > " + srcObj.absPathName;
+        let partialsStr = tgtObj.absPathName + " > " + srcObj.absPathName;
 
-        return this.declarePartialsList.includes(partialsString);
+        return this.declarePartialsList.includes(partialsStr);
     }
 
     /**

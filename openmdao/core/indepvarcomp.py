@@ -157,3 +157,66 @@ class IndepVarComp(ExplicitComponent):
         """
         # define this as empty for IndepVarComp to avoid overhead of ExplicitComponent._linearize.
         pass
+
+
+class _AutoIndepVarComp(IndepVarComp):
+    """
+    Class to use when all output variables are independent.
+
+    Attributes
+    ----------
+    _remotes : set
+        Set of var names connected to remote inputs.
+    """
+
+    def __init__(self, name=None, val=1.0, **kwargs):
+        """
+        Initialize all attributes.
+
+        Parameters
+        ----------
+        name : str or None
+            name of the variable.
+            If None, variables should be defined external to this class by calling add_output.
+        val : float or ndarray
+            value of the variable if a single variable is being defined.
+        **kwargs : dict
+            keyword arguments.
+        """
+        super(_AutoIndepVarComp, self).__init__(name, val, **kwargs)
+        self._remotes = set()
+
+    def _add_remote(self, name):
+        self._remotes.add(name)
+
+    def _set_vector_class(self):
+        if self.comm.size > 1:
+            all_remotes = set()
+            for remotes in self.comm.allgather(self._remotes):
+                all_remotes.update(remotes)
+
+            if all_remotes:
+                self.options['distributed'] = True
+
+            self._remotes = all_remotes
+
+        super(_AutoIndepVarComp, self)._set_vector_class()
+
+    def _setup_var_data(self):
+        """
+        Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
+
+        Parameters
+        ----------
+        recurse : bool (ignored)
+            Whether to call this method in subsystems.
+        """
+        super(_AutoIndepVarComp, self)._setup_var_data()
+        if self.comm.size > 1:
+            all_abs2meta = self._var_allprocs_abs2meta
+            abs2meta = self._var_abs2meta
+
+            for name in self._remotes:
+                if name in abs2meta:
+                    abs2meta[name]['distributed'] = True
+                all_abs2meta[name]['distributed'] = True

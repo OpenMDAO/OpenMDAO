@@ -1,6 +1,7 @@
 branches:
   only:
   - master
+  - auto_ivc
 
 group: deprecated-2017Q4
 
@@ -13,11 +14,13 @@ language: generic
 
 env:
   matrix:
-    # test with the latest version of Python 3.x
-    - PY=3   NUMPY=1.18 SCIPY=1.4 PETSc=3.12 UPLOAD_DOCS=1 SNOPT_VERSION=7.7 PYOPTSPARSE_VERSION=v2.1.0
-    - PY=3 NUMPY=1.17 SCIPY=1.3 SNOPT_VERSION=7.2 PYOPTSPARSE_VERSION=v1.2
-    - PY=3.7 NUMPY=1.17 SCIPY=1.3 SNOPT_VERSION=7.7 PYOPTSPARSE_VERSION=v2.1.0
-    - PY=3.6 NUMPY=1.16 SCIPY=1.2 PETSc=3.10.2 SNOPT_VERSION=7.7 PYOPTSPARSE_VERSION=v2.1.0
+    # latest versions
+    - PY=3   NUMPY=1    SCIPY=1   PYOPTSPARSE=v2.1.0 SNOPT=7.7 PETSc=3
+    # baseline versions
+    - PY=3.8 NUMPY=1.18 SCIPY=1.4 PYOPTSPARSE=v2.1.0 SNOPT=7.7 PETSc=3.12 UPLOAD_DOCS=1
+    # older versions
+    - PY=3.7 NUMPY=1.17 SCIPY=1.3 PYOPTSPARSE=v2.1.0 SNOPT=7.7
+    - PY=3.6 NUMPY=1.16 SCIPY=1.2 PYOPTSPARSE=v1.2   SNOPT=7.2 PETSc=3.10.2
 
 git:
   depth: 99999
@@ -48,7 +51,7 @@ before_install:
 # Travis unhelpfully creates it, which then causes "dir already exists"
 # errors when you go to actually install the thing, so we must non-intuitively
 # delete the file before re-creating it later.
-- if  [ "$TRAVIS_REPO_SLUG" = "OpenMDAO/OpenMDAO" ] && [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
+- if  [ "$TRAVIS_REPO_SLUG" = "OpenMDAO/OpenMDAO" ] && [ "$TRAVIS_BRANCH" = "master" ] && [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
     echo "building master";
     MASTER_BUILD=1;
     rm -rf $HOME/miniconda;
@@ -72,7 +75,7 @@ install:
     echo "KEY NOT FOUND";
   fi
 
-# if we don't have a cached conda environment then build one, otherwise just activate the cached one
+# build Python environment
 - |
   echo ">>> Building python environment";
   echo " >> Installing conda";
@@ -87,46 +90,42 @@ install:
   conda create --yes -n PY$PY python=$PY numpy=$NUMPY scipy=$SCIPY cython swig;
   source $HOME/miniconda/bin/activate PY$PY;
 
-  echo " >> Installing non-pure Python dependencies from conda";
+  pip install --upgrade pip;
 
   if [ "$PETSc" ]; then
-    echo "Installing PETSc";
+    echo " >> Installing PETSc";
     conda install -c anaconda mpi4py --yes;
     conda install -c conda-forge petsc=$PETSc petsc4py --yes;
   fi
 
-  pip install --upgrade pip;
+  if [ "$PYOPTSPARSE" ]; then
+    echo " >> Installing pyOptSparse";
+    git clone -q https://github.com/OpenMDAO/build_pyoptsparse;
 
-  echo " >> Installing forked python packages";
-  pip install git+https://github.com/swryan/coveralls-python@work;
+    cd build_pyoptsparse;
+    chmod 755 ./build_pyoptsparse.sh;
 
-  echo " >> Installing pyOptSparse";
-  git clone https://github.com/OpenMDAO/build_pyoptsparse;
-  cd build_pyoptsparse;
-  chmod 755 ./build_pyoptsparse.sh;
-
-  echo " >> Checking SNOPT and PyoptSparse version"
-  if [[ "$SNOPT_VERSION" == "7.7" && "$PYOPTSPARSE_VERSION" == "v2.1.0" ]] || [[ "$SNOPT_VERSION" == "7.2" && "$PYOPTSPARSE_VERSION" == "v1.2" ]]; then
-    echo " >> Found SNOPT and PyoptSparse"
-    if [ "$SNOPT_VERSION" == "7.7" ] && [ "$SNOPT_LOCATION_77" ]; then
+    if [ "$SNOPT" == "7.7" ] && [ "$SNOPT_LOCATION_77" ]; then
       echo "  > Secure copying SNOPT 7.7 over SSH";
       mkdir SNOPT;
-      scp -r "$SNOPT_LOCATION_77" SNOPT;
-      ./build_pyoptsparse.sh -s SNOPT/src -b "$PYOPTSPARSE_VERSION";
+      scp -qr "$SNOPT_LOCATION_77" SNOPT;
+      ./build_pyoptsparse.sh -b "$PYOPTSPARSE" -s SNOPT/src;
 
-    elif [ "$SNOPT_VERSION" == "7.2" ]  && [ "$SNOPT_LOCATION_72" ]; then
+    elif [ "$SNOPT" == "7.2" ] && [ "$SNOPT_LOCATION_72" ]; then
       echo "  > Secure copying SNOPT 7.2 over SSH";
       mkdir SNOPT;
-      scp -r "$SNOPT_LOCATION_72" SNOPT;
-      ./build_pyoptsparse.sh -s SNOPT/source -b "$PYOPTSPARSE_VERSION";
+      scp -qr "$SNOPT_LOCATION_72" SNOPT;
+      ./build_pyoptsparse.sh -b "$PYOPTSPARSE" -s SNOPT/source;
 
     else
-      ./build_pyoptsparse.sh -b "$PYOPTSPARSE_VERSION";
+      if [ "$SNOPT" ]; then
+        echo "SNOPT version $SNOPT was requested but source is not available";
+      fi
+      ./build_pyoptsparse.sh -b "$PYOPTSPARSE";
     fi
-  else
-    echo "Incompatible versions of SNOPT and PyoptSparse"
+
+    cd ..;
   fi
-  cd ..;
 
   echo " >> Installing optional packages for test coverage";
   pip install psutil objgraph git+https://github.com/mdolab/pyxdsm;
@@ -145,7 +144,7 @@ script:
 - export OMPI_MCA_btl=^openib
 # newer versions of OpenMPI require this
 - export OMPI_MCA_rmaps_base_oversubscribe=1
-# IPOPT Requires
+# IPOpt requires this
 - export LD_LIBRARY_PATH=/home/travis/ipopt/lib
 
 # make docs first
@@ -166,6 +165,9 @@ after_success:
 # again, only run coverage operations on the upload machine after success.
 # strip the site-package path so that links works on coveralls.io
 - if [ "$UPLOAD_DOCS" ]; then
+    echo " >> Installing forked version of coveralls";
+    pip install git+https://github.com/swryan/coveralls-python@work;
+
     coveralls --rcfile=../../.coveragerc --output=coveralls.json;
     SITE=`python -c 'import site; print(site.getsitepackages()[0])'`;
     sed "s/${SITE//\//\\/}\///g" < coveralls.json > coveralls-upd.json;

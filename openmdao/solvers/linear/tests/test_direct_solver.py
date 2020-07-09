@@ -802,6 +802,10 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
             p.run_model()
 
         expected = "Jacobian in '' is not full rank. The following set of states/residuals contains one or more equations that is a linear combination of the others: \n"
+        expected += " '_auto_ivc.v0' index 0.\n"
+        expected += " '_auto_ivc.v1' index 0.\n"
+        expected += " '_auto_ivc.v2' index 0.\n"
+        expected += " '_auto_ivc.v4' index 0.\n"
         expected += " 'sub1.x' ('sub1.e1.x') index 0.\n"
         expected += " 'sub1.y' ('sub1.e2.y') index 0.\n"
         expected += " 'sub1.z' ('sub1.e3.z') index 0.\n"
@@ -999,10 +1003,10 @@ class TestDirectSolverMPI(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_near_equal(prob['g1.y1'], 0.64, .00001)
-        assert_near_equal(prob['g1.y2'], 0.80, .00001)
-        assert_near_equal(prob['g2.y1'], 0.64, .00001)
-        assert_near_equal(prob['g2.y2'], 0.80, .00001)
+        assert_near_equal(prob['g1.y1'], 0.64, 1.0e-5)
+        assert_near_equal(prob['g1.y2'], 0.80, 1.0e-5)
+        assert_near_equal(prob['g2.y1'], 0.64, 1.0e-5)
+        assert_near_equal(prob['g2.y2'], 0.80, 1.0e-5)
 
 
 if __name__ == "__main__":

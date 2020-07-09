@@ -493,6 +493,9 @@ class N2UserInterface {
      * @param {N2TreeNode} node The targetted node.
      */
     leftClick(node) {
+        // Don't do it if the node is already zoomed
+        if (node === this.n2Diag.zoomedElement) return;
+
         testThis(this, 'N2UserInterface', 'leftClick');
         d3.event.preventDefault();
         d3.event.stopPropagation();
@@ -747,6 +750,8 @@ class N2UserInterface {
     /** Any collapsed nodes are expanded, starting with the specified node. */
     expandAll(startNode) {
         testThis(this, 'N2UserInterface', 'expandAll');
+
+        this.n2Diag.showWaiter();
 
         this.addBackButtonHistory();
         this.n2Diag.manuallyExpandAll(startNode);
