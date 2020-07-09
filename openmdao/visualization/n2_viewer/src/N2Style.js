@@ -238,7 +238,7 @@ N2Style.color = {
     'greenArrow': 'seagreen',
     'output': 'seagreen',
     'declaredPartial': 'black',
-    'autoivcParam': 'darkorange'
+    'autoivcParam': '#F42F0D'
 };
 
 Object.freeze(N2Style.color); // Make it the equivalent of a constant
