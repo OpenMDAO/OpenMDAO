@@ -28,11 +28,6 @@ from openmdao.utils.mpi import MPI
 from openmdao.visualization.html_utils import read_files, write_script, DiagramWriter
 from openmdao.utils.general_utils import warn_deprecation
 
-# Toolbar settings
-_FONT_SIZES = [8, 9, 10, 11, 12, 13, 14]
-_MODEL_HEIGHTS = [600, 650, 700, 750, 800,
-                  850, 900, 950, 1000, 2000, 3000, 4000]
-
 _IND = 4  # HTML indentation (spaces)
 
 

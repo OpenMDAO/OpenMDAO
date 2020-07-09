@@ -14,6 +14,7 @@ class ModelData {
         this.maxDepth = 1;
         this.idCounter = 0;
         this.unconnectedParams = 0;
+        this.autoivcSources = 0;
         this.nodePaths = {};
 
 
@@ -199,6 +200,18 @@ class ModelData {
 
         debugInfo(elementPath + " has no connections.");
         this.unconnectedParams++;
+
+        return false;
+    }
+
+    hasAutoIvcSrc(elementPath) {
+        for (let conn of this.conns) {
+            if (conn.tgt == elementPath && conn.src.match(/^_auto_ivc.*$/)) {
+                debugInfo(elementPath + " source is an auto-ivc output.");
+                this.autoivcSources++;
+                return true;
+            }
+        }
 
         return false;
     }
@@ -422,8 +435,12 @@ class ModelData {
             console.warn("identifyUnconnectedParam error: absPathName not set for ", node);
         }
         else {
-            if (node.isParam() && !node.hasChildren() && !this.hasAnyConnection(node.absPathName))
-                node.type = "unconnected_param";
+            if (node.isParam()) {
+                if (!node.hasChildren() && !this.hasAnyConnection(node.absPathName))
+                    node.type = "unconnected_param";
+                else if (this.hasAutoIvcSrc(node.absPathName))
+                    node.type = "autoivc_param";
+            }
         }
     }
 
