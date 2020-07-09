@@ -1217,14 +1217,15 @@ class Group(System):
                             simple_warning(msg)
 
                 elif src_indices is not None:
-                    inds_size = None
+                    shape = None
                     if _is_slice(src_indices):
                         if MPI:
-                            val = self._var_allprocs_abs2meta[abs_out]
+                            global_size = self._var_allprocs_abs2meta[abs_out].global_size
+                            shape = self._var_allprocs_abs2meta[abs_out].shape
                         else:
-                            val = self._abs_get_val(abs_out)
-                        src_indices = _slice_indices(src_indices, val.size, val.shape)
-                        inds_size = val.size
+                            global_size = self._abs_get_val(abs_out).size
+                            shape = self._abs_get_val(abs_out).shape
+                        src_indices = _slice_indices(src_indices, global_size, shape)
                     else:
                         src_indices = np.atleast_1d(src_indices)
 
@@ -1301,8 +1302,8 @@ class Group(System):
                             arr = src_indices[..., d]
                             if np.any(arr >= d_size) or np.any(arr <= -d_size):
                                 for i in arr.flat:
-                                    if inds_size:
-                                        size_check = abs(i) >= val.size
+                                    if shape:
+                                        size_check = abs(i) >= global_size
                                     else:
                                         size_check = abs(i) >= d_size
                                     if size_check:

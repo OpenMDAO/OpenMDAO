@@ -99,8 +99,8 @@ class DefaultTransfer(Transfer):
                                      (isinstance(src_indices, np.ndarray) and
                                       src_indices.dtype == object):
                             if _is_slice(src_indices):
-                                indices = _slice_indices(src_indices, meta_out['size'],
-                                                         meta_out['shape'])
+                                indices = _slice_indices(src_indices, meta_out['global_size'],
+                                                         meta_out['global_shape'])
                                 src_indices = convert_neg(indices, meta_out['global_size'])
                         else:
                             src_indices = convert_neg(src_indices, meta_out['global_size'])
