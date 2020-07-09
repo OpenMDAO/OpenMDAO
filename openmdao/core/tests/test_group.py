@@ -2534,6 +2534,7 @@ class TestFeatureGuessNonlinear(unittest.TestCase):
 
     def test_guess_nonlinear(self):
         import openmdao.api as om
+        import numpy as np
 
         class Discipline(om.Group):
 
@@ -2554,14 +2555,16 @@ class TestFeatureGuessNonlinear(unittest.TestCase):
                 self.linear_solver = om.DirectSolver()
 
             def guess_nonlinear(self, inputs, outputs, residuals):
-                # inputs are addressed using full path name, regardless of promotion
-                external_input = inputs['comp1.external_input']
+                # Check residuals
+                if np.abs(residuals['x']) > 1.0E-2:
+                    # inputs are addressed using full path name, regardless of promotion
+                    external_input = inputs['comp1.external_input']
 
-                # balance drives x**2 = 2*external_input
-                x_guess = (2*external_input)**.5
+                    # balance drives x**2 = 2*external_input
+                    x_guess = (2*external_input)**.5
 
-                # outputs are addressed by the their promoted names
-                outputs['x'] = x_guess # perfect guess should converge in 0 iterations
+                    # outputs are addressed by the their promoted names
+                    outputs['x'] = x_guess # perfect guess should converge in 0 iterations
 
         p = om.Problem()
 
