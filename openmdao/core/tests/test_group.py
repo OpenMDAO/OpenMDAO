@@ -984,6 +984,33 @@ class TestGroup(unittest.TestCase):
         for key, val in totals.items():
             assert_near_equal(val['rel error'][0], 0.0, 1e-15)
 
+class TestGroupMPISlice(unittest.TestCase):
+    N_PROCS = 2
+
+    def test_om_slice_2d_mpi(self):
+        class MyComp1(om.ExplicitComponent):
+            def initialize(self):
+                self.options['distributed'] = False
+
+            def setup(self):
+                self.add_input('x', np.ones(4), src_indices=om.slicer[:, 2])
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])*2.0
+
+        arr = np.array([[1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4]])
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
+        p.model.add_subsystem('C1', MyComp1())
+        p.model.connect('indep.x', 'C1.x')
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['C1.x'], np.array([3, 3, 3, 3]))
 
 class TestGroupPromotes(unittest.TestCase):
 
