@@ -1326,13 +1326,9 @@ class Group(System):
                 elif src_indices is not None:
                     shape = None
                     if _is_slice(src_indices):
-                        if MPI:
-                            global_size = self._var_allprocs_abs2meta[abs_out]['global_size']
-                            shape = self._var_allprocs_abs2meta[abs_out]['shape']
-                        else:
-                            global_size = self._abs_get_val(abs_out).size
-                            shape = self._abs_get_val(abs_out).shape
-                        src_indices = _slice_indices(src_indices, global_size, shape)
+                        global_size = self._var_allprocs_abs2meta[abs_out]['global_size']
+                        global_shape = self._var_allprocs_abs2meta[abs_out]['global_shape']
+                        src_indices = _slice_indices(src_indices, global_size, global_shape)
                     else:
                         src_indices = np.atleast_1d(src_indices)
 
@@ -1396,8 +1392,9 @@ class Group(System):
                                 else:
                                     simple_warning(msg)
                         if src_indices.ndim > 1:
-                            abs2meta[abs_in]['src_indices'] = \
-                                abs2meta[abs_in]['src_indices'].ravel()
+                            abs2meta[abs_in]['src_indices'] = src_indices.ravel()
+                        else:
+                            abs2meta[abs_in]['src_indices'] = src_indices
                     else:
                         for d in range(source_dimensions):
                             if allprocs_abs2meta[abs_out]['distributed'] is True or \
