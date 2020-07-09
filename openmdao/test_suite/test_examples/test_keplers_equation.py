@@ -16,25 +16,14 @@ class TestKeplersEquation(unittest.TestCase):
 
         prob = om.Problem()
 
-        ivc = om.IndepVarComp()
-
-        ivc.add_output(name='M',
-                       val=0.0,
-                       units='deg',
-                       desc='Mean anomaly')
-
-        ivc.add_output(name='ecc',
-                       val=0.0,
-                       units=None,
-                       desc='orbit eccentricity')
-
         bal = om.BalanceComp()
 
         bal.add_balance(name='E', val=0.0, units='rad', eq_units='rad', rhs_name='M')
 
         # Use M (mean anomaly) as the initial guess for E (eccentric anomaly)
         def guess_function(inputs, outputs, residuals):
-            outputs['E'] = inputs['M']
+            if np.abs(residuals['E']) > 1.0E-2:
+                outputs['E'] = inputs['M']
 
         bal.options['guess_func'] = guess_function
 
@@ -44,8 +33,8 @@ class TestKeplersEquation(unittest.TestCase):
                                E={'value': 0.0, 'units': 'rad'},
                                ecc={'value': 0.0})
 
-        prob.model.add_subsystem(name='ivc', subsys=ivc,
-                                 promotes_outputs=['M', 'ecc'])
+        prob.model.set_input_defaults('M', 85.0, units='deg')
+        prob.model.set_input_defaults('ecc', 0.6)
 
         prob.model.add_subsystem(name='balance', subsys=bal,
                                  promotes_inputs=['M'],
@@ -59,12 +48,9 @@ class TestKeplersEquation(unittest.TestCase):
 
         # Set up solvers
         prob.model.linear_solver = om.DirectSolver()
-        prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=100, iprint=0)
+        prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=100, iprint=2)
 
         prob.setup()
-
-        prob['M'] = 85.0
-        prob['ecc'] = 0.6
 
         prob.run_model()
 

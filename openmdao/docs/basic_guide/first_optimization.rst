@@ -69,11 +69,10 @@ the variable can be the output of any component (including an :code:`IndepVarCom
 
 .. code::
 
-        prob.model.add_design_var('indeps.x', lower=-50, upper=50)
-        prob.model.add_design_var('indeps.y', lower=-50, upper=50)
-        prob.model.add_objective('paraboloid.f_xy')
-        prob.model.add_constraint('const.g', lower=0, upper 10.)
-        #prob.model.add_constraint('const.g', equals=0.)
+        prob.model.add_design_var('x', lower=-50, upper=50)
+        prob.model.add_design_var('y', lower=-50, upper=50)
+        prob.model.add_objective('parab.f_xy')
+        prob.model.add_constraint('const.g', lower=0, upper=10.)
 
 .. note::
 

@@ -266,6 +266,8 @@ class ImplCompTwoStatesAE(om.ImplicitComponent):
         """
         Don't solve; just calculate the residual.
         """
+        self.upper = 1
+        self.lower = 0
 
         x = inputs['x']
         y = outputs['y']
@@ -275,7 +277,7 @@ class ImplCompTwoStatesAE(om.ImplicitComponent):
         residuals['z'] = x*z + z - 4.0
 
         self.counter += 1
-        if self.counter > 5 and self.counter < 11:
+        if self.counter > self.lower and self.counter < self.upper:
             raise om.AnalysisError('catch me')
 
     def linearize(self, inputs, outputs, jac):
@@ -292,12 +294,10 @@ class ImplCompTwoStatesAE(om.ImplicitComponent):
         jac[('z', 'z')] = -inputs['x'] + 1.0
         jac[('z', 'x')] = -outputs['z']
 
-
 class ImplCompTwoStatesGuess(ImplCompTwoStatesAE):
 
     def guess_nonlinear(self, inputs, outputs, residuals):
         outputs['z'] = 3.0
-
 
 class TestAnalysisErrorImplicit(unittest.TestCase):
 
@@ -308,6 +308,8 @@ class TestAnalysisErrorImplicit(unittest.TestCase):
 
         sub = top.model.add_subsystem('sub', om.Group())
         sub.add_subsystem('comp', ImplCompTwoStatesAE())
+        sub.upper = 5
+        sub.lower = 11
 
         top.model.connect('px.x', 'sub.comp.x')
 
@@ -358,7 +360,9 @@ class TestAnalysisErrorImplicit(unittest.TestCase):
         top.model.add_subsystem('px', om.IndepVarComp('x', 7.0))
 
         sub = top.model.add_subsystem('sub', om.Group())
-        sub.add_subsystem('comp', ImplCompTwoStatesGuess())
+        sub.add_subsystem('comp', ImplCompTwoStatesAE())
+        sub.upper = 20
+        sub.lower = 25
 
         top.model.connect('px.x', 'sub.comp.x')
 

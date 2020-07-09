@@ -3,6 +3,7 @@ import base64
 import inspect
 import json
 import os
+import zlib
 from collections import OrderedDict
 from itertools import chain
 import networkx as nx
@@ -171,7 +172,8 @@ def _get_declare_partials(system):
         if isinstance(system, Component):
             subjacs = system._subjacs_info
             for abs_key, meta in subjacs.items():
-                dpl.append("{} > {}".format(abs_key[0], abs_key[1]))
+                if abs_key[0] != abs_key[1]:
+                    dpl.append("{} > {}".format(abs_key[0], abs_key[1]))
         elif isinstance(system, Group):
             for s in system._subsystems_myproc:
                 recurse_get_partials(s, dpl)
@@ -296,7 +298,7 @@ def _get_viewer_data(data_source):
 
     data_dict['driver'] = {'name': driver_name, 'type': driver_type,
                            'options': driver_options, 'opt_settings': driver_opt_settings}
-    data_dict['design_vars'] = root_group.get_design_vars()
+    data_dict['design_vars'] = root_group.get_design_vars(use_prom_ivc=False)
     data_dict['responses'] = root_group.get_responses()
 
     data_dict['declare_partials_list'] = _get_declare_partials(root_group)
@@ -349,8 +351,9 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
         warn_deprecation("'use_declare_partial_info' is now the"
                          " default and the option is ignored.")
 
-    model_data = 'var modelData = %s' % json.dumps(
-        model_data, default=make_serializable)
+    raw_data = json.dumps(model_data, default=make_serializable).encode('utf8')
+    b64_data = str(base64.b64encode(zlib.compress(raw_data)).decode("ascii"))
+    model_data = 'var compressedModel = "%s";' % b64_data
 
     import openmdao
     openmdao_dir = os.path.dirname(inspect.getfile(openmdao))
@@ -361,8 +364,12 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     assets_dir = os.path.join(vis_dir, "assets")
 
     # grab the libraries, src and style
-    lib_dct = {'d3': 'd3.v5.min', 'awesomplete': 'awesomplete',
-               'vk_beautify': 'vkBeautify'}
+    lib_dct = {
+        'd3': 'd3.v5.min',
+        'awesomplete': 'awesomplete',
+        'vk_beautify': 'vkBeautify',
+        'pako_inflate': 'pako_inflate.min'
+    }
     libs = read_files(lib_dct.values(), libs_dir, 'js')
     src_names = \
         'modal', \
@@ -401,6 +408,9 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     with open(os.path.join(style_dir, "logo_png.b64"), "r") as f:
         logo_png = str(f.read())
 
+    with open(os.path.join(assets_dir, "spinner.png"), "rb") as f:
+        waiting_icon = str(base64.b64encode(f.read()).decode("ascii"))
+
     if title:
         title = "OpenMDAO Model Hierarchy and N2 diagram: %s" % title
     else:
@@ -415,8 +425,8 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
 
     # put all style and JS into index
     h.insert('{{fontello}}', encoded_font)
-
     h.insert('{{logo_png}}', logo_png)
+    h.insert('{{waiting_icon}}', waiting_icon)
 
     for k, v in lib_dct.items():
         h.insert('{{{}_lib}}'.format(k), write_script(libs[v], indent=_IND))

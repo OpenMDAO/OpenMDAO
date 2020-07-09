@@ -63,8 +63,8 @@ class ExplicitComponent(Component):
         tuple(list, list)
             'of' and 'wrt' variable lists.
         """
-        of = list(self._var_allprocs_prom2abs_list['output'])
-        wrt = list(self._var_allprocs_prom2abs_list['input'])
+        of = list(self._var_rel_names['output'])
+        wrt = list(self._var_rel_names['input'])
         return of, wrt
 
     def _get_partials_var_sizes(self):

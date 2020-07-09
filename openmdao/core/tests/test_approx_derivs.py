@@ -2108,7 +2108,9 @@ class ApproxTotalsFeature(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
-        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
+
+        model.set_input_defaults('x', 0.0)
+
         model.add_subsystem('comp1', CompOne(), promotes=['x', 'y'])
         comp2 = model.add_subsystem('comp2', CompTwo(), promotes=['y', 'z'])
 
@@ -2156,7 +2158,8 @@ class ApproxTotalsFeature(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
-        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
+        model.set_input_defaults('x', 0.0)
+
         model.add_subsystem('comp1', CompOne(), promotes=['x', 'y'])
         model.add_subsystem('comp2', CompTwo(), promotes=['y', 'z'])
 

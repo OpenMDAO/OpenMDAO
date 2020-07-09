@@ -47,7 +47,7 @@ class TestConnections(unittest.TestCase):
         self.p['G3.G4.C3.x'] = 222.
         self.p['G3.G4.C4.x'] = 333.
 
-        self.p.final_setup()
+        self.p.run_model()
 
         self.assertEqual(self.C1._inputs['x'], 111.)
         self.assertEqual(self.C3._inputs['x'], 222.)
@@ -177,31 +177,6 @@ class TestConnections(unittest.TestCase):
 
 
 class TestConnectionsPromoted(unittest.TestCase):
-
-    def test_inp_inp_promoted_no_src(self):
-
-        p = om.Problem()
-        root = p.model
-
-        G1 = root.add_subsystem("G1", om.Group())
-        G2 = G1.add_subsystem("G2", om.Group())
-        G2.add_subsystem("C1", om.ExecComp('y=x*2.0'))
-        G2.add_subsystem("C2", om.ExecComp('y=x*2.0'))
-
-        G3 = root.add_subsystem("G3", om.Group())
-        G4 = G3.add_subsystem("G4", om.Group(), promotes=['x'])
-        G4.add_subsystem("C3", om.ExecComp('y=x*2.0'), promotes=['x'])
-        G4.add_subsystem("C4", om.ExecComp('y=x*2.0'), promotes=['x'])
-
-        p.setup()
-        p.final_setup()
-
-        # setting promoted name should set both inputs mapped to that name
-        with self.assertRaises(Exception) as context:
-            p['G3.x'] = 999.
-        self.assertEqual(str(context.exception),
-                         "The promoted name G3.x is invalid because it refers to multiple inputs: "
-                         "[G3.G4.C3.x, G3.G4.C4.x] that are not connected to an output variable.")
 
     def test_inp_inp_promoted_w_prom_src(self):
         p = om.Problem()
@@ -567,14 +542,14 @@ class TestConnectionsDistrib(unittest.TestCase):
         model.add_subsystem('c3', TestComp())
         model.connect("p1.x", "c3.x")
 
-        expected = "Group (<model>): The source indices do not specify a valid index " + \
+        expected = "ValueError: Group (<model>): The source indices do not specify a valid index " + \
                    "for the connection 'p1.x' to 'c3.x'. " + \
                    "Index '2' is out of range for source dimension of size 2."
-
+        
         try:
             prob.setup()
-        except ValueError as err:
-            self.assertEqual(str(err), expected)
+        except Exception as err:
+            self.assertEqual(str(err).splitlines()[-1], expected)
         else:
             self.fail('Exception expected.')
 
@@ -602,14 +577,14 @@ class TestConnectionsDistrib(unittest.TestCase):
         model.add_subsystem('c3', TestComp())
         model.connect("p1.x", "c3.x")
 
-        expected = "Group (<model>): The source indices do not specify a valid index " + \
+        expected = "ValueError: Group (<model>): The source indices do not specify a valid index " + \
                    "for the connection 'p1.x' to 'c3.x'. " + \
-                   "Index '2' is out of range for a flat source of size 2."
+                   "Index '2' is out of range for source dimension of size 2."
 
         try:
             prob.setup()
-        except ValueError as err:
-            self.assertEqual(str(err), expected)
+        except Exception as err:
+            self.assertEqual(str(err).splitlines()[-1], expected)
         else:
             self.fail('Exception expected.')
 

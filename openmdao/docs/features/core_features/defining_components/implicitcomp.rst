@@ -90,7 +90,9 @@ The implementation of each method will be illustrated using a simple implicit co
   [Optional] This method allows the user to calculate and specify an initial guess for implicit states.
   It is called at the start of the solve loop from certain nonlinear solvers (i.e. NewtonSolver and BroydenSolver),
   so it is useful for when you would like to "reset" the initial conditions on an inner-nested solve whenever an
-  outer loop solver or driver changes other values.
+  outer loop solver or driver changes other values. However if you include this function without checking the
+  residuals, you will be starting the solvers from scratch during each `run_model` during an optimization. Add a check
+  of your residuals and you can skip it when the system is converged.
 
   Since it is a hook for custom code, you could also use it to monitor variables in the input, output, or residual
   vectors and change the initial guess when some condition is met.

@@ -82,25 +82,22 @@ The start of the run script is denoted by the following statement:
 :code:`if __name__ == '__main__':`
 
 All OpenMDAO models are built up from a hierarchy of :ref:`Group <openmdao.core.group.py>` instances that organize the components.
-In this example, the hierarchy is very simple, consisting of a single root group that holds two components.
-The first component is an :ref:`IndepVarComp <openmdao.core.indepvarcomp.py>` instance.
-This is a special component that OpenMDAO provides for you to specify the independent variables in your problem.
-The second component is an instance of the `Paraboloid` class that we just defined.
-
-As part of the model hierarchy, you will also define any connections to move data between components in the relevant group.
-Here, we connect the independent variables to the inputs on the paraboloid component.
+In this example, the hierarchy is very simple, consisting of a single root group that holds a single component that is an
+instance of the `Paraboloid` class that we just defined.
 
 Once the model hierarchy is defined,
 we pass it to the constructor of the :ref:`Problem <openmdao.core.problem.py>` class.
 Then we call the `setup()` method on that problem, which tells the framework to do some initial work to get the data structures in place for execution.
-In this case, we call `run_model()` to actually perform the computation. Later, we'll see how to explicitly set drivers and will be calling `run_driver()` instead.
+In this case, we call `run_model()` to actually perform the computation. Later, we'll see how to explicitly set drivers and
+will be calling `run_driver()` instead.
 
 Here we called run_model twice.
 The first time `x` and `y` have the initial values of 3.0 and -4.0 respectively.
-The second time we changed those values and then re-ran.
+The second time we changed those values to 5.0 and -2.0 and then re-ran.
 There are a few details to note here.
-First, notice the way we printed the outputs via :code:`prob['parab_comp.f_xy']` and similarly how we set the new values for `x` and `y`.
-You can both get and set values using the problem, which works with dimensional values in the units of the source variable.
+First, notice the way we printed the outputs via :code:`prob.get_val('parab_comp.f_xy')` and similarly how we set the new values for `x` and `y`.
+You can get and set values using the "get_val" and "set_val" methods on problem. By default, these methods will set and get values defined in
+the dimensional units of the specified input or output.
 In this case, there are no units on the source (i.e. `des_vars.x`).
 
 .. note::
@@ -109,22 +106,21 @@ In this case, there are no units on the source (i.e. `des_vars.x`).
 .. code::
 
     if __name__ == "__main__":
-        model = om.Group()
-        ivc = om.IndepVarComp()
-        ivc.add_output('x', 3.0)
-        ivc.add_output('y', -4.0)
-        model.add_subsystem('des_vars', ivc)
-        model.add_subsystem('parab_comp', Paraboloid())
 
-        model.connect('des_vars.x', 'parab_comp.x')
-        model.connect('des_vars.y', 'parab_comp.y')
+        model = om.Group()
+        model.add_subsystem('parab_comp', Paraboloid())
 
         prob = om.Problem(model)
         prob.setup()
+
+        prob.set_val('parab_comp.x', 3.0)
+        prob.set_val('parab_comp.y', -4.0)
+
         prob.run_model()
         print(prob['parab_comp.f_xy'])
 
-        prob['des_vars.x'] = 5.0
-        prob['des_vars.y'] = -2.0
+        prob.set_val('parab_comp.x', 5.0)
+        prob.set_val('parab_comp.y', -2.0)
+
         prob.run_model()
         print(prob['parab_comp.f_xy'])
