@@ -934,6 +934,7 @@ def _is_slice(indices):
 
     return contains_slice
 
+
 def _slice_indices(slicer, out_size, out_shape):
     """
     Check if an array of indices contains a slice object.
