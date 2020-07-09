@@ -545,7 +545,6 @@ class TestConnectionsDistrib(unittest.TestCase):
         expected = "ValueError: Group (<model>): The source indices do not specify a valid index " + \
                    "for the connection 'p1.x' to 'c3.x'. " + \
                    "Index '2' is out of range for source dimension of size 2."
-        
         try:
             prob.setup()
         except Exception as err:
