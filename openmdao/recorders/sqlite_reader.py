@@ -208,7 +208,7 @@ class SqliteCaseReader(BaseCaseReader):
                                 auto_ivc_map[output] = abs2prom_in[input_name]
                                 break
                     else:
-                        auto_ivc_map[output] = input_list[0]
+                        auto_ivc_map[output] = abs2prom_in[input_list[0]]
 
         elif version in (1, 2):
             abs2prom = row['abs2prom']
