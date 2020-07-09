@@ -1220,8 +1220,8 @@ class Group(System):
                     shape = None
                     if _is_slice(src_indices):
                         if MPI:
-                            global_size = self._var_allprocs_abs2meta[abs_out].global_size
-                            shape = self._var_allprocs_abs2meta[abs_out].shape
+                            global_size = self._var_allprocs_abs2meta[abs_out]['global_size']
+                            shape = self._var_allprocs_abs2meta[abs_out]['shape']
                         else:
                             global_size = self._abs_get_val(abs_out).size
                             shape = self._abs_get_val(abs_out).shape
