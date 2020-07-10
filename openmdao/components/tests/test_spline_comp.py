@@ -502,8 +502,6 @@ class SplineCompFeatureTestCase(unittest.TestCase):
         tt = np.linspace(0, 3.0*np.pi, n_point)
         x = np.sin(t)
 
-        # model.add_subsystem('px', om.IndepVarComp('x', val=x))
-
         # Set options specific to bsplines
         bspline_options = {'order': 3}
 
@@ -514,8 +512,6 @@ class SplineCompFeatureTestCase(unittest.TestCase):
         prob.model.add_subsystem('interp', comp, promotes_inputs=[('h_cp', 'x')])
 
         comp.add_spline(y_cp_name='h_cp', y_interp_name='h', y_cp_val=x, y_units=None)
-
-        # model.connect('px.x', 'interp.h_cp')
 
         prob.setup(force_alloc_complex=True)
         prob.run_model()

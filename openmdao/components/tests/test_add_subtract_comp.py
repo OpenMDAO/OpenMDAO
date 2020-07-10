@@ -406,7 +406,8 @@ class TestFeature(unittest.TestCase):
                            vec_size=n, length=2, scaling_factors=[1, -1, 1, -1], units='kN')
         # Note the scaling factors. we assume all forces are positive sign upstream
 
-        p.model.add_subsystem(name='totalforcecomp', subsys=adder, promotes_inputs=['thrust', 'drag', 'lift', 'weight'])
+        p.model.add_subsystem(name='totalforcecomp', subsys=adder,
+                              promotes_inputs=['thrust', 'drag', 'lift', 'weight'])
 
         p.setup()
 
