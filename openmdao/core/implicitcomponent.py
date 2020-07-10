@@ -103,6 +103,7 @@ class ImplicitComponent(Component):
         Provide initial guess for states.
         """
         if self._has_guess:
+            self._apply_nonlinear()
             self._inputs.read_only = self._residuals.read_only = True
             complex_step = self._inputs._under_complex_step
 

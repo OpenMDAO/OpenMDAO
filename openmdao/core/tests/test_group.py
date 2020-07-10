@@ -514,6 +514,213 @@ class TestGroup(unittest.TestCase):
                          "Group (<model>): src_indices has been defined in both "
                          "connect('indep.x', 'C1.x') and add_input('C1.x', ...).")
 
+    def test_om_slice_in_connect(self):
+        class MyComp1(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones(4))
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])*2.0
+
+        arr = np.array([[1, 5, 3, 4], [1, 3, 3, 4], [1, 2, 3, 4], [1, 1, 3, 4]])
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
+        p.model.add_subsystem('C1', MyComp1())
+        p.model.connect('indep.x', 'C1.x', src_indices=om.slicer[:, 1])
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['C1.x'], np.array([5, 3, 2, 1]))
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
+        p.model.add_subsystem('C1', MyComp1())
+        p.model.connect('indep.x', 'C1.x', src_indices=om.slicer[:, 1], flat_src_indices=True)
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['C1.x'], np.array([5, 3, 2, 1]))
+
+    def test_om_slice_in_promotes(self):
+
+        arr = np.array([[1, 2, 3], [1, 12, 3], [1, 15, 3]])
+
+        p = om.Problem()
+
+        model = p.model
+        model.add_subsystem('indep', om.IndepVarComp('a', arr), promotes=['*'])
+        model.add_subsystem('comp1', om.ExecComp('b=2*a', a=np.ones(3), b=np.ones(3)))
+        model.promotes('comp1', inputs=['a'], src_indices=om.slicer[:, 1])
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['comp1.a'], [2., 12, 15])
+
+        p = om.Problem()
+
+        model = p.model
+        model.add_subsystem('indep', om.IndepVarComp('a', arr), promotes=['*'])
+        model.add_subsystem('comp1', om.ExecComp('b=2*a', a=np.ones(3), b=np.ones(3)))
+        model.promotes('comp1', inputs=['a'], src_indices=om.slicer[:, 1], flat_src_indices=True)
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['comp1.a'], [2., 12, 15])
+
+    def test_desvar_indice_slice(self):
+
+        class MyComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones(4))
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])**2.0
+
+        p = om.Problem()
+
+        arr = np.array([1, 2, 3, 4])
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
+        p.model.add_subsystem('C1', MyComp())
+        p.model.connect('indep.x', 'C1.x')
+        p.model.add_design_var('indep.x', indices=om.slicer[2:])
+
+        p.model.add_objective('C1.y')
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(arr[p.model._design_vars['indep.x']['indices']], np.array([3., 4]))
+
+    def test_om_slice_in_add_response(self):
+
+        class MyComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones(4))
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])**2.0
+
+        p = om.Problem()
+
+        arr = np.array([1, 2, 3, 4])
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
+        p.model.add_subsystem('C1', MyComp())
+        p.model.connect('indep.x', 'C1.x')
+        p.model.add_response('indep.x', type_='con', indices=om.slicer[2:])
+
+        p.model.add_objective('C1.y')
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(arr[tuple(p.model._responses['indep.x']['indices'])], np.array([3, 4]))
+        self.assertTrue(p.model._responses['indep.x']['indices'][0], slice(2, None, None))
+
+    def test_om_slice_in_add_constraint(self):
+
+        class MyComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones(4))
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])**2.0
+
+        p = om.Problem()
+
+        arr = np.array([1, 2, 3, 4])
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
+        p.model.add_subsystem('C1', MyComp())
+        p.model.connect('indep.x', 'C1.x')
+        p.model.add_constraint('indep.x', indices=om.slicer[2:])
+
+        p.model.add_objective('C1.y')
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(arr[tuple(p.model._responses['indep.x']['indices'])], np.array([3, 4]))
+        self.assertTrue(p.model._responses['indep.x']['indices'][0], slice(2, None, None))
+
+    def test_om_slice_in_add_input(self):
+        class MyComp1(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones(4), src_indices=om.slicer[:, 2])
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])*2.0
+
+        arr = np.array([[1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4]])
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
+        p.model.add_subsystem('C1', MyComp1())
+        p.model.connect('indep.x', 'C1.x')
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['C1.x'], np.array([3, 3, 3, 3]))
+
+    def test_om_slice_negative_stop(self):
+        class MyComp1(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones(4), src_indices=om.slicer[:,-1])
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])*2.0
+
+        arr = np.array([[1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4]])
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
+        p.model.add_subsystem('C1', MyComp1())
+        p.model.connect('indep.x', 'C1.x')
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['C1.x'], np.array([4, 4, 4, 4]))
+
+    def test_om_slice_3d(self):
+        class MyComp1(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones(4), src_indices=om.slicer[:, 1, 2])
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])*2.0
+
+        arr = np.arange(64, dtype=int).reshape(4, 4, 4)
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
+        p.model.add_subsystem('C1', MyComp1())
+        p.model.connect('indep.x', 'C1.x')
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['C1.x'], np.array([6, 22, 38, 54]))
+
     def test_promote_not_found1(self):
         p = om.Problem()
         p.model.add_subsystem('indep', om.IndepVarComp('x', np.ones(5)),
@@ -810,6 +1017,84 @@ class TestGroup(unittest.TestCase):
         for key, val in totals.items():
             assert_near_equal(val['rel error'][0], 0.0, 1e-15)
 
+@unittest.skipUnless(MPI, "MPI is required.")
+class TestGroupMPISlice(unittest.TestCase):
+    N_PROCS = 2
+
+    def test_om_slice_2d_mpi(self):
+        class MyComp1(om.ExplicitComponent):
+            def initialize(self):
+                self.options['distributed'] = True
+
+            def setup(self):
+                self.add_input('x', np.ones(4), src_indices=om.slicer[:, 2])
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])*2.0
+
+        arr = np.array([[1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4]])
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
+        p.model.add_subsystem('C1', MyComp1())
+        p.model.connect('indep.x', 'C1.x')
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['C1.x'], np.array([3, 3, 3, 3]))
+
+    def test_om_slice_3d_mpi(self):
+        class MyComp1(om.ExplicitComponent):
+            def initialize(self):
+                self.options['distributed'] = True
+
+            def setup(self):
+                self.add_input('x', np.ones(4), src_indices=om.slicer[:, 1, 2])
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])*2.0
+
+        arr = np.arange(64, dtype=int).reshape(4, 4, 4)
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
+        p.model.add_subsystem('C1', MyComp1())
+        p.model.connect('indep.x', 'C1.x')
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['C1.x'], np.array([6, 22, 38, 54]))
+
+    def test_om_slice_negative_stop_mpi(self):
+        class MyComp1(om.ExplicitComponent):
+            def initialize(self):
+                self.options['distributed'] = True
+
+            def setup(self):
+                self.add_input('x', np.ones(4), src_indices=om.slicer[:,-1])
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])*2.0
+
+        arr = np.array([[1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4]])
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
+        p.model.add_subsystem('C1', MyComp1())
+        p.model.connect('indep.x', 'C1.x')
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['C1.x'], np.array([4, 4, 4, 4]))
 
 class TestGroupPromotes(unittest.TestCase):
 
@@ -1971,11 +2256,6 @@ class TestGroupAddInput(unittest.TestCase):
         self.assertEqual(cm.exception.args[0], "Groups 'G1' and 'G1.G2' added the input 'x' with conflicting 'value'.")
 
 
-@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-class TestGroupAddInputMPI(TestGroupAddInput):
-    N_PROCS = 2
-
-
 #
 # Feature Tests
 #
@@ -2534,6 +2814,7 @@ class TestFeatureGuessNonlinear(unittest.TestCase):
 
     def test_guess_nonlinear(self):
         import openmdao.api as om
+        import numpy as np
 
         class Discipline(om.Group):
 
@@ -2554,14 +2835,16 @@ class TestFeatureGuessNonlinear(unittest.TestCase):
                 self.linear_solver = om.DirectSolver()
 
             def guess_nonlinear(self, inputs, outputs, residuals):
-                # inputs are addressed using full path name, regardless of promotion
-                external_input = inputs['comp1.external_input']
+                # Check residuals
+                if np.abs(residuals['x']) > 1.0E-2:
+                    # inputs are addressed using full path name, regardless of promotion
+                    external_input = inputs['comp1.external_input']
 
-                # balance drives x**2 = 2*external_input
-                x_guess = (2*external_input)**.5
+                    # balance drives x**2 = 2*external_input
+                    x_guess = (2*external_input)**.5
 
-                # outputs are addressed by the their promoted names
-                outputs['x'] = x_guess # perfect guess should converge in 0 iterations
+                    # outputs are addressed by the their promoted names
+                    outputs['x'] = x_guess # perfect guess should converge in 0 iterations
 
         p = om.Problem()
 
@@ -2606,7 +2889,7 @@ class TestNaturalNaming(unittest.TestCase):
             self.assertEqual(p[name], 7.)
 
         self.assertEqual(g3.get_val('x', get_remote=True), 7.)
-        
+
         # we allow 'g1.g3.x' here even though it isn't relative to g3,
         # because it maps to an absolute name that is contained in g3.
         self.assertEqual(g3.get_val('g1.g3.x', get_remote=True), 7.)

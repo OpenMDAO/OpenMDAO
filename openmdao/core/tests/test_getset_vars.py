@@ -389,6 +389,7 @@ class TestGetSetVariables(unittest.TestCase):
         np.testing.assert_allclose(p['C2.y'], np.ones(3) * 9.)
 
 
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class ParTestCase(unittest.TestCase):
     N_PROCS = 2
 
@@ -414,7 +415,6 @@ class ParTestCase(unittest.TestCase):
         np.testing.assert_allclose(p.get_val('par.C1.y', get_remote=True), (np.arange(7) + 1.) * 4.)
         np.testing.assert_allclose(p.get_val('par.C2.y', get_remote=True), (np.arange(7,10) + 1.) * 9.)
 
-    @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
     @unittest.expectedFailure
     def test_par_multi_src_inds_fail(self):
         p = Problem()

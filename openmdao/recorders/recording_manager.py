@@ -3,6 +3,8 @@ RecordingManager class definition.
 """
 import time
 
+from openmdao.utils.general_utils import simple_warning
+
 try:
     from openmdao.utils.mpi import MPI
 except ImportError:
@@ -217,6 +219,12 @@ def _get_all_viewer_data_recorders(problem):
                 yield r
 
 
+def _get_all_recorders(problem):
+    for req in _get_all_requesters(problem):
+        for r in req._rec_mgr._recorders:
+            yield r
+
+
 def record_viewer_data(problem):
     """
     Record model viewer data for all recorders that have that option enabled.
@@ -240,3 +248,26 @@ def record_viewer_data(problem):
         viewer_data.pop('abs2prom', None)  # abs2prom already recorded in metadata table
         for recorder in recorders:
             recorder.record_viewer_data(viewer_data)
+
+
+def record_system_options(problem):
+    """
+    Record the system options for all systems in the model.
+
+    Parameters
+    ----------
+    problem : Problem
+        The problem for which all its systems' options are to be recorded.
+    """
+    # get all recorders in the problem
+    recorders = set(_get_all_recorders(problem))
+    if recorders:
+        if problem._system_options_recorded:
+            simple_warning("The model is being run again, if the options or scaling of any "
+                           "components has changed then only their new values will be recorded.")
+        else:
+            problem._system_options_recorded = True
+
+        for recorder in recorders:
+            for sub in problem.model.system_iter(recurse=True, include_self=True):
+                recorder.record_metadata_system(sub)
