@@ -991,9 +991,7 @@ def _is_slice(indices):
     bool
         Returns True if indices contains a slice.
     """
-    contains_slice = any(isinstance(i, slice) for i in indices)
-
-    return contains_slice
+    return any(isinstance(i, slice) for i in indices)
 
 
 def _slice_indices(slicer, out_size, out_shape):
@@ -1014,9 +1012,7 @@ def _slice_indices(slicer, out_size, out_shape):
     array
         Returns the sliced indices.
     """
-    sliced_inds = np.arange(out_size, dtype=int).reshape(out_shape)[tuple(slicer)]
-
-    return sliced_inds
+    return np.arange(out_size, dtype=int).reshape(out_shape)[tuple(slicer)]
 
 
 def prom2ivc_src_dict(prom_dict):

@@ -677,6 +677,28 @@ class TestGroup(unittest.TestCase):
 
         assert_near_equal(p['C1.x'], np.array([3, 3, 3, 3]))
 
+    def test_om_slice_negative_stop(self):
+        class MyComp1(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones(4), src_indices=om.slicer[:,-1])
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])*2.0
+
+        arr = np.array([[1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4]])
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
+        p.model.add_subsystem('C1', MyComp1())
+        p.model.connect('indep.x', 'C1.x')
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['C1.x'], np.array([4, 4, 4, 4]))
+
     def test_om_slice_3d(self):
         class MyComp1(om.ExplicitComponent):
             def setup(self):
@@ -995,6 +1017,7 @@ class TestGroup(unittest.TestCase):
         for key, val in totals.items():
             assert_near_equal(val['rel error'][0], 0.0, 1e-15)
 
+@unittest.skipUnless(MPI, "MPI is required.")
 class TestGroupMPISlice(unittest.TestCase):
     N_PROCS = 2
 
@@ -1047,6 +1070,31 @@ class TestGroupMPISlice(unittest.TestCase):
         p.run_model()
 
         assert_near_equal(p['C1.x'], np.array([6, 22, 38, 54]))
+
+    def test_om_slice_negative_stop_mpi(self):
+        class MyComp1(om.ExplicitComponent):
+            def initialize(self):
+                self.options['distributed'] = True
+
+            def setup(self):
+                self.add_input('x', np.ones(4), src_indices=om.slicer[:,-1])
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])*2.0
+
+        arr = np.array([[1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4]])
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
+        p.model.add_subsystem('C1', MyComp1())
+        p.model.connect('indep.x', 'C1.x')
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['C1.x'], np.array([4, 4, 4, 4]))
 
 class TestGroupPromotes(unittest.TestCase):
 
@@ -2208,11 +2256,6 @@ class TestGroupAddInput(unittest.TestCase):
         self.assertEqual(cm.exception.args[0], "Groups 'G1' and 'G1.G2' added the input 'x' with conflicting 'value'.")
 
 
-@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-class TestGroupAddInputMPI(TestGroupAddInput):
-    N_PROCS = 2
-
-
 #
 # Feature Tests
 #
@@ -2846,7 +2889,7 @@ class TestNaturalNaming(unittest.TestCase):
             self.assertEqual(p[name], 7.)
 
         self.assertEqual(g3.get_val('x', get_remote=True), 7.)
-        
+
         # we allow 'g1.g3.x' here even though it isn't relative to g3,
         # because it maps to an absolute name that is contained in g3.
         self.assertEqual(g3.get_val('g1.g3.x', get_remote=True), 7.)
