@@ -181,7 +181,7 @@ class Component(System):
         self._set_vector_class()
 
     def _set_vector_class(self):
-        if self.options['distributed'] and self.comm.size > 1:
+        if self.options['distributed']:
             dist_vec_class = self._problem_meta['distributed_vector_class']
             if dist_vec_class is not None:
                 self._vector_class = dist_vec_class
