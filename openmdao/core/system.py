@@ -31,7 +31,7 @@ from openmdao.utils.coloring import _compute_coloring, Coloring, \
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, ContainsAll, all_ancestors, \
-    simple_warning, make_set, match_includes_excludes, ensure_compatible
+    simple_warning, make_set, match_includes_excludes, ensure_compatible, _is_slice
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.utils.units import unit_conversion
@@ -1783,7 +1783,11 @@ class System(object):
                                            (self.msginfo, name, str(flat_src_indices),
                                             str(meta['flat_src_indices'])))
 
-                meta['src_indices'] = np.asarray(src_indices, dtype=INT_DTYPE)
+                if src_indices.dtype == object:
+                    meta['src_indices'] = src_indices
+                else:
+                    meta['src_indices'] = np.asarray(src_indices, dtype=INT_DTYPE)
+
                 meta['flat_src_indices'] = flat_src_indices
 
         def resolve(to_match, io_types, matches, proms):
@@ -2426,14 +2430,17 @@ class System(object):
         dvs['cache_linear_solution'] = cache_linear_solution
 
         if indices is not None:
+
+            if isinstance(indices, slice):
+                pass
             # If given, indices must be a sequence
-            if not (isinstance(indices, Iterable) and
-                    all([isinstance(i, Integral) for i in indices])):
+            elif not (isinstance(indices, Iterable) and
+                      all([isinstance(i, Integral) for i in indices])):
                 raise ValueError("{}: If specified, design var indices must be a sequence of "
                                  "integers.".format(self.msginfo))
-
-            indices = np.atleast_1d(indices)
-            dvs['size'] = size = len(indices)
+            else:
+                indices = np.atleast_1d(indices)
+                dvs['size'] = size = len(indices)
 
             # All refs: check the shape if necessary
             for item, item_name in zip([ref, ref0, scaler, adder, upper, lower],
@@ -2535,8 +2542,10 @@ class System(object):
             msg = "{}: Constraint '{}' cannot be both equality and inequality."
             raise ValueError(msg.format(self.msginfo, name))
 
+        if isinstance(indices, slice):
+            pass
         # If given, indices must be a sequence
-        if (indices is not None and not (
+        elif (indices is not None and not (
                 isinstance(indices, Iterable) and all([isinstance(i, Integral) for i in indices]))):
             raise ValueError("{}: If specified, response indices must be a sequence of "
                              "integers.".format(self.msginfo))
@@ -2591,8 +2600,8 @@ class System(object):
             resp['equals'] = equals
             resp['linear'] = linear
             if indices is not None:
-                resp['size'] = len(indices)
                 indices = np.atleast_1d(indices)
+                resp['size'] = len(indices)
             resp['indices'] = indices
         else:  # 'obj'
             if index is not None:
