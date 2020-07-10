@@ -1394,10 +1394,15 @@ class System(object):
             typ = "response"
 
         pro2abs = self._var_allprocs_prom2abs_list['output']
+        pro2abs_in = self._var_allprocs_prom2abs_list['input']
         try:
             for prom_name, data in vois.items():
                 if data['parallel_deriv_color'] is not None or data['vectorize_derivs']:
-                    yield pro2abs[prom_name][0], data
+                    if prom_name in pro2abs:
+                        yield pro2abs[prom_name][0], data
+                    else:
+                        yield pro2abs_in[prom_name][0], data
+
         except KeyError as err:
             raise RuntimeError(f"{self.msginfo}: Output not found for {typ} {str(err)}.")
 
