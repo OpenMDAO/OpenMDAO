@@ -171,21 +171,14 @@ class TestFeature(unittest.TestCase):
 
         p = om.Problem()
 
-        ivc = om.IndepVarComp()
-        ivc.add_output(name='force', shape=(n, 3))
-        ivc.add_output(name='vel', shape=(n, 3))
-
-        p.model.add_subsystem(name='ivc',
-                              subsys=ivc,
-                              promotes_outputs=['force', 'vel'])
+        p.model.set_input_defaults('force')
+        p.model.set_input_defaults('vel')
 
         dp_comp = om.DotProductComp(vec_size=n, length=3, a_name='F', b_name='v', c_name='P',
                                     a_units='N', b_units='m/s', c_units='W')
 
-        p.model.add_subsystem(name='dot_prod_comp', subsys=dp_comp)
-
-        p.model.connect('force', 'dot_prod_comp.F')
-        p.model.connect('vel', 'dot_prod_comp.v')
+        p.model.add_subsystem(name='dot_prod_comp', subsys=dp_comp,
+                             promotes_inputs=[('F', 'force'), ('v', 'vel')])
 
         p.setup()
 
