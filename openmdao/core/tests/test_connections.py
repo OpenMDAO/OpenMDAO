@@ -542,7 +542,8 @@ class TestConnectionsDistrib(unittest.TestCase):
         model.add_subsystem('c3', TestComp())
         model.connect("p1.x", "c3.x")
 
-        expected = "ValueError: Group (<model>): The source indices do not specify a valid index " + \
+        rank = prob.comm.rank
+        expected = f"Exception raised on rank {rank}: Group (<model>): The source indices do not specify a valid index " + \
                    "for the connection 'p1.x' to 'c3.x'. " + \
                    "Index '2' is out of range for source dimension of size 2."
 
@@ -577,7 +578,8 @@ class TestConnectionsDistrib(unittest.TestCase):
         model.add_subsystem('c3', TestComp())
         model.connect("p1.x", "c3.x")
 
-        expected = "ValueError: Group (<model>): The source indices do not specify a valid index " + \
+        rank = prob.comm.rank
+        expected = f"Exception raised on rank {rank}: Group (<model>): The source indices do not specify a valid index " + \
                    "for the connection 'p1.x' to 'c3.x'. " + \
                    "Index '2' is out of range for source dimension of size 2."
 
@@ -625,7 +627,9 @@ class TestConnectionsError(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        if self.comm.rank == 0:
+        rank = prob.comm.rank
+
+        if rank == 0:
             setval = np.array([2.0, 3.0])
         else:
             setval = np.array([10.0, 20.0])
@@ -635,14 +639,13 @@ class TestConnectionsError(unittest.TestCase):
         model.add_subsystem('c3', TestComp())
         model.add_subsystem('c4', TestCompDist())
         model.connect("p1.x", "c3.x")
-
-        if self.comm.rank == 0:
-            with self.assertRaises(ValueError) as context:
-                prob.setup(check=False, mode='fwd')
-            self.assertEqual(str(context.exception),
-                            "Group (<model>): The source indices do not specify a valid index for "
-                            "the connection 'p1.x' to 'c3.x'. Index '2' is out of range for source "
-                            "dimension of size 2.")
+        
+        with self.assertRaises(ValueError) as context:
+            prob.setup(check=False, mode='fwd')
+        self.assertEqual(str(context.exception),
+                         f"Exception raised on rank {rank}: Group (<model>): The source indices do not specify a valid index for "
+                         "the connection 'p1.x' to 'c3.x'. Index '2' is out of range for source "
+                         "dimension of size 2.")
 
 
 if __name__ == "__main__":
