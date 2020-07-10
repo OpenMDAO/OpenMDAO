@@ -315,6 +315,9 @@ class ModelData {
         let throwLbl = 'ModelData._computeConnections: ';
 
         for (let conn of this.conns) {
+            // Ignore connections from _auto_ivc, which is intentionally not included.
+            if (conn.src.match(/^_auto_ivc.*$/)) continue;
+
             // Process sources
             let srcObj = this.nodePaths[conn.src];
 
@@ -337,7 +340,6 @@ class ModelData {
             for (let obj = srcObj.parent; obj != null; obj = obj.parent) {
                 srcObjParents.push(obj);
             }
-
 
             // Process targets
             let tgtObj = this.nodePaths[conn.tgt];
