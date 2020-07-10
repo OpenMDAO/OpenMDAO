@@ -101,21 +101,22 @@ class DotProductComp(ExplicitComponent):
         """
         Declare inputs, outputs, and derivatives for the dot product component.
         """
-        products = self._products
-
-        # prepend the product specified in component options
-        opts = self.options
-
-        products.insert(0, {
-            'a_name': opts['a_name'],
-            'b_name': opts['b_name'],
-            'c_name': opts['c_name'],
-            'a_units': opts['a_units'],
-            'b_units': opts['b_units'],
-            'c_units': opts['c_units'],
-            'vec_size': opts['vec_size'],
-            'length': opts['length']
-        })
+        if len(self._products) == 0:
+            products = self._products = [self.options]
+        else:
+            # prepend the product specified in component options
+            opts = self.options
+            products = self._products
+            products.insert(0, {
+                'a_name': opts['a_name'],
+                'b_name': opts['b_name'],
+                'c_name': opts['c_name'],
+                'a_units': opts['a_units'],
+                'b_units': opts['b_units'],
+                'c_units': opts['c_units'],
+                'vec_size': opts['vec_size'],
+                'length': opts['length']
+            })
 
         # add inputs and outputs for all products
         var_rel2meta = self._var_rel2meta

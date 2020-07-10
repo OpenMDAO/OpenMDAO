@@ -216,7 +216,7 @@ class TestMultipleUnits(unittest.TestCase):
         mvp = om.MatrixVectorProductComp(vec_size=self.nn, A_shape=(5, 3),
                                          A_units='m', x_units='N', b_units='N*m')
 
-        mvp.add_product(A_name='B', x_name='y', b_name='c', vec_size=self.nn, shape=(5, 3),
+        mvp.add_product('B', 'y', 'c', A_shape=(5, 3), vec_size=self.nn,
                         A_units='m', x_units='N', b_units='N*m')
 
         model = om.Group()
@@ -288,7 +288,7 @@ class TestMultipleCommonMatrix(unittest.TestCase):
         mvp = om.MatrixVectorProductComp(vec_size=self.nn, A_shape=(5, 3),
                                          A_units='m', x_units='N', b_units='N*m')
 
-        mvp.add_product(b_name='c', A_name='A', x_name='y', vec_size=self.nn, shape=(5, 3),
+        mvp.add_product(A_name='A', x_name='y', b_name='c', vec_size=self.nn, A_shape=(5, 3),
                         b_units='N*m', A_units='m', x_units='N')
 
         model = om.Group()
@@ -357,7 +357,7 @@ class TestMultipleCommonVector(unittest.TestCase):
         mvp = om.MatrixVectorProductComp(vec_size=self.nn, A_shape=(5, 3),
                                          A_units='m', x_units='N', b_units='N*m')
 
-        mvp.add_product(A_name='B', x_name='x', b_name='c', vec_size=self.nn, shape=(7, 3),
+        mvp.add_product(A_name='B', x_name='x', b_name='c', vec_size=self.nn, A_shape=(7, 3),
                         A_units='m', x_units='N', b_units='N*m')
 
         model = om.Group()
@@ -445,7 +445,7 @@ class TestMultipleErrors(unittest.TestCase):
 
     def test_shape_mismatch(self):
         mvp = om.MatrixVectorProductComp()
-        mvp.add_product('A', 'y', 'c', shape=(5, 5))
+        mvp.add_product('A', 'y', 'c', A_shape=(5, 5))
 
         model = om.Group()
         model.add_subsystem('mvp', mvp)

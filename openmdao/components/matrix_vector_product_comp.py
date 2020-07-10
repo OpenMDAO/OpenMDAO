@@ -71,7 +71,7 @@ class MatrixVectorProductComp(ExplicitComponent):
                              desc='The units of the output vector.')
 
     def add_product(self, A_name, x_name, b_name, A_units=None, x_units=None, b_units=None,
-                    vec_size=1, shape=(3, 3)):
+                    vec_size=1, A_shape=(3, 3)):
         """
         Add a new output product to the matrix vector product component.
 
@@ -92,7 +92,7 @@ class MatrixVectorProductComp(ExplicitComponent):
         vec_size : int
             The number of points at which the matrix vector product
             should be computed simultaneously.
-        shape : tuple of (int, int)
+        A_shape : tuple of (int, int)
             The shape of the matrix at each point.
             The first element also specifies the size of the output at each point.
             The second element specifies the size of the input vector at each point.
@@ -102,97 +102,97 @@ class MatrixVectorProductComp(ExplicitComponent):
             the output vector will have shape of (10, 5).
         """
         self._products.append({
-            'output': b_name,
-            'matrix': A_name,
-            'vector': x_name,
-            'output_units': b_units,
-            'matrix_units': A_units,
-            'vector_units': x_units,
-            'output_shape': (vec_size, shape[0]) if vec_size > 1 else (shape[0], ),
-            'matrix_shape': (vec_size, ) + shape,
-            'vector_shape': (vec_size, shape[1])
+            'A_name': A_name,
+            'x_name': x_name,
+            'b_name': b_name,
+            'A_units': A_units,
+            'x_units': x_units,
+            'b_units': b_units,
+            'A_shape': A_shape,
+            'vec_size': vec_size
         })
 
     def setup(self):
         """
         Declare inputs, outputs, and derivatives for the matrix vector product component.
         """
-        products = self._products
-
-        # prepend the product specified in component options
-        opts = self.options
-        vec_size = opts['vec_size']
-        n_rows, n_cols = opts['A_shape']
-
-        products.insert(0, {
-            'output': opts['b_name'],
-            'matrix': opts['A_name'],
-            'vector': opts['x_name'],
-            'output_units': opts['b_units'],
-            'matrix_units': opts['A_units'],
-            'vector_units': opts['x_units'],
-            'output_shape': (vec_size, n_rows) if vec_size > 1 else (n_rows, ),
-            'matrix_shape': (vec_size, n_rows, n_cols),
-            'vector_shape': (vec_size, n_cols)
-        })
+        if len(self._products) == 0:
+            products = self._products = [self.options]
+        else:
+            # prepend the product specified in component options
+            opts = self.options
+            products = self._products
+            products.insert(0, {
+                'A_name': opts['A_name'],
+                'b_name': opts['b_name'],
+                'x_name': opts['x_name'],
+                'b_units': opts['b_units'],
+                'A_units': opts['A_units'],
+                'x_units': opts['x_units'],
+                'A_shape': opts['A_shape'],
+                'vec_size': opts['vec_size']
+            })
 
         # add inputs and outputs for all products
         var_rel2meta = self._var_rel2meta
 
         for product in products:
-            output = product['output']
-            matrix = product['matrix']
-            vector = product['vector']
+            b_name = product['b_name']
+            A_name = product['A_name']
+            x_name = product['x_name']
 
-            output_units = product['output_units']
-            matrix_units = product['matrix_units']
-            vector_units = product['vector_units']
+            b_units = product['b_units']
+            A_units = product['A_units']
+            x_units = product['x_units']
 
-            output_shape = product['output_shape']
-            matrix_shape = product['matrix_shape']
-            vector_shape = product['vector_shape']
+            vec_size = product['vec_size']
+            n_rows, n_cols = product['A_shape']
 
-            if output not in var_rel2meta:
-                self.add_output(name=output, shape=output_shape, units=output_units)
+            A_shape = (vec_size, n_rows, n_cols)
+            b_shape = (vec_size, n_rows) if vec_size > 1 else (n_rows, )
+            x_shape = (vec_size, n_cols)
+
+            if b_name not in var_rel2meta:
+                self.add_output(name=b_name, shape=b_shape, units=b_units)
             else:
-                raise NameError(f"{self.msginfo}: Multiple definition of output '{output}'.")
+                raise NameError(f"{self.msginfo}: Multiple definition of output '{b_name}'.")
 
-            if matrix not in var_rel2meta:
-                self.add_input(name=matrix, shape=matrix_shape, units=matrix_units)
+            if A_name not in var_rel2meta:
+                self.add_input(name=A_name, shape=A_shape, units=A_units)
             else:
-                meta = var_rel2meta[matrix]
-                if matrix_shape != meta['shape']:
+                meta = var_rel2meta[A_name]
+                if A_shape != meta['shape']:
                     raise ValueError(f"{self.msginfo}: Conflicting shapes specified for matrix "
-                                     f"'{matrix}', {meta['shape']} and {matrix_shape}.")
+                                     f"'{A_name}', {meta['shape']} and {A_shape}.")
 
-                elif matrix_units != meta['units']:
+                elif A_units != meta['units']:
                     raise ValueError(f"{self.msginfo}: Conflicting units specified for matrix "
-                                     f"'{matrix}', '{meta['units']}' and '{matrix_units}'.")
+                                     f"'{A_name}', '{meta['units']}' and '{A_units}'.")
 
-            if vector not in var_rel2meta:
-                self.add_input(name=vector, shape=vector_shape, units=vector_units)
+            if x_name not in var_rel2meta:
+                self.add_input(name=x_name, shape=x_shape, units=x_units)
             else:
-                meta = var_rel2meta[vector]
-                if vector_shape != meta['shape']:
+                meta = var_rel2meta[x_name]
+                if x_shape != meta['shape']:
                     raise ValueError(f"{self.msginfo}: Conflicting shapes specified for vector "
-                                     f"'{vector}', {meta['shape']} and {vector_shape}.")
+                                     f"'{x_name}', {meta['shape']} and {x_shape}.")
 
-                elif vector_units != meta['units']:
+                elif x_units != meta['units']:
                     raise ValueError(f"{self.msginfo}: Conflicting units specified for vector "
-                                     f"'{vector}', '{meta['units']}' and '{vector_units}'.")
+                                     f"'{x_name}', '{meta['units']}' and '{x_units}'.")
 
             # Make a dummy version of A so we can figure out the nonzero indices
-            A = np.ones(product['matrix_shape'])
-            x = np.ones(product['vector_shape'])
+            A = np.ones(A_shape)
+            x = np.ones(x_shape)
             bd_A = spla.block_diag(*A)
             x_repeat = np.repeat(x, A.shape[1], axis=0)
             bd_x_repeat = spla.block_diag(*x_repeat)
             db_dx_rows, db_dx_cols = np.nonzero(bd_A)
             db_dA_rows, db_dA_cols = np.nonzero(bd_x_repeat)
 
-            self.declare_partials(of=product['output'], wrt=product['matrix'],
+            self.declare_partials(of=b_name, wrt=A_name,
                                   rows=db_dA_rows, cols=db_dA_cols)
-            self.declare_partials(of=product['output'], wrt=product['vector'],
+            self.declare_partials(of=b_name, wrt=x_name,
                                   rows=db_dx_rows, cols=db_dx_cols)
 
     def compute(self, inputs, outputs):
@@ -207,11 +207,11 @@ class MatrixVectorProductComp(ExplicitComponent):
             unscaled, dimensional output variables read via outputs[key]
         """
         for product in self._products:
-            A = inputs[product['matrix']]
-            x = inputs[product['vector']]
+            A = inputs[product['A_name']]
+            x = inputs[product['x_name']]
 
             # ... here allows b to be shaped either (n, i) or (i,)
-            outputs[product['output']][...] = np.einsum('nij,nj->ni', A, x)
+            outputs[product['b_name']][...] = np.einsum('nij,nj->ni', A, x)
 
     def compute_partials(self, inputs, partials):
         """
@@ -225,9 +225,9 @@ class MatrixVectorProductComp(ExplicitComponent):
             sub-jac components written to partials[output_name, input_name]
         """
         for product in self._products:
-            A_name = product['matrix']
-            x_name = product['vector']
-            b_name = product['output']
+            A_name = product['A_name']
+            x_name = product['x_name']
+            b_name = product['b_name']
 
             A = inputs[A_name]
             x = inputs[x_name]
