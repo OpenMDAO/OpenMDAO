@@ -4230,8 +4230,8 @@ class System(object):
             offset = len(self.pathname) + 1 if self.pathname else 0
 
             if self.comm.size == 1:
+                vdict = {}
                 if discrete_vec:
-                    vdict = {}
                     for n in variables:
                         if n in views:
                             vdict[n] = views[n]
@@ -4244,10 +4244,11 @@ class System(object):
                         else:
                             ivc_path = conns[prom2abs_in[name][0]]
                             vdict[ivc_path] = views[ivc_path]
+                            print(name, views_flat[ivc_path].size)
 
             elif parallel:
+                vdict = {}
                 if discrete_vec:
-                    vdict = {}
                     for n in variables:
                         if n in views:
                             if views_flat[n].size > 0:
@@ -4255,7 +4256,16 @@ class System(object):
                         elif n[offset:] in discrete_vec and self._owning_rank[n] == rank:
                             vdict[n] = discrete_vec[n[offset:]]['value']
                 else:
-                    vdict = {n: views[n] for n in variables if views_flat[n].size > 0}
+                    for name in variables:
+                        if name in views:
+                            if views_flat[name].size > 0:
+                                vdict[name] = views[name]
+                        else:
+                            ivc_path = conns[prom2abs_in[name][0]]
+                            if views_flat[ivc_path].size > 0:
+                                vdict[ivc_path] = views[ivc_path]
+                            print(name, views_flat[ivc_path].size)
+
             else:
                 meta = self._var_allprocs_abs2meta
                 for name in variables:
