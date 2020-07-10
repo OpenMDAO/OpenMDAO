@@ -27,7 +27,7 @@ class DotProductComp(ExplicitComponent):
 
     def __init__(self, **kwargs):
         """
-        Initialize the Matrix Vector Product component.
+        Initialize the Dot Product component.
 
         Parameters
         ----------
