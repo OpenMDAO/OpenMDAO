@@ -588,7 +588,6 @@ class TestConnectionsDistrib(unittest.TestCase):
         else:
             self.fail('Exception expected.')
 
-import wingdbstub
 @unittest.skipUnless(MPI, "MPI is required.")
 class TestConnectionsError(unittest.TestCase):
     N_PROCS = 2
