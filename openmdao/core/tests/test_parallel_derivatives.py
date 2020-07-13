@@ -118,6 +118,10 @@ class ParDerivTestCase(unittest.TestCase):
 
         prob = om.Problem()
         prob.model = FanInGrouped()
+
+        # An extra unconnected desvar was in the original test.
+        prob.model.add_subsystem('p', om.IndepVarComp('x3', 0.0), promotes=['x3'])
+
         prob.model.linear_solver = om.LinearBlockGS()
         prob.model.sub.linear_solver = om.LinearBlockGS()
 
@@ -140,6 +144,10 @@ class ParDerivTestCase(unittest.TestCase):
 
         prob = om.Problem()
         prob.model = FanInGrouped()
+
+        # An extra unconnected desvar was in the original test.
+        prob.model.add_subsystem('p', om.IndepVarComp('x3', 0.0), promotes=['x3'])
+
         prob.model.linear_solver = om.LinearBlockGS()
         prob.model.sub.linear_solver = om.LinearBlockGS()
 
@@ -171,7 +179,7 @@ class ParDerivTestCase(unittest.TestCase):
         if not prob.comm.rank:
             self.assertTrue('Solving color: par_dv (x1, x2)' in output)
             self.assertTrue('In mode: fwd, Solving variable(s) using simul coloring:' in output)
-            self.assertTrue("('x3', [2])" in output)
+            self.assertTrue("('p.x3', [2])" in output)
 
     def test_fan_out_parallel_sets_rev(self):
 

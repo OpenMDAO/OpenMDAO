@@ -615,6 +615,25 @@ class System(object):
         if self.pathname == '':
             self._top_level_setup(mode)
 
+        # Now that connections are setup, we need to convert relevant vector names into their
+        # auto_ivc source where applicable.
+        new_names = []
+        conns = self._conn_global_abs_in2out
+        for vec_name in self._vec_names:
+            if vec_name in conns:
+                new_names.append(conns[vec_name])
+            else:
+                new_names.append(vec_name)
+        self._problem_meta['vec_names'] = new_names
+
+        new_names = []
+        for vec_name in self._lin_vec_names:
+            if vec_name in conns:
+                new_names.append(conns[vec_name])
+            else:
+                new_names.append(vec_name)
+        self._problem_meta['lin_vec_names'] = new_names
+
         self._setup_relevance(mode, self._relevant)
         self._setup_var_index_ranges()
         self._setup_var_sizes()
@@ -4250,7 +4269,6 @@ class System(object):
                         else:
                             ivc_path = conns[prom2abs_in[name][0]]
                             vdict[ivc_path] = views[ivc_path]
-                            print(name, views_flat[ivc_path].size)
 
             elif parallel:
                 vdict = {}
@@ -4270,7 +4288,6 @@ class System(object):
                             ivc_path = conns[prom2abs_in[name][0]]
                             if views_flat[ivc_path].size > 0:
                                 vdict[ivc_path] = views[ivc_path]
-                            print(name, views_flat[ivc_path].size)
 
             else:
                 meta = self._var_allprocs_abs2meta

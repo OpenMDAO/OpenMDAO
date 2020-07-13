@@ -608,10 +608,9 @@ class TestExternalCodeImplicitCompFeature(unittest.TestCase):
 
         prob.setup()
 
-        prob.set_val('area_ratio', 0.5)
         area_ratio = 1.3
         super_sonic = False
-        prob['area_ratio'] = area_ratio
+        prob.set_val('area_ratio', area_ratio)
         mach_comp.options['super_sonic'] = super_sonic
         prob.run_model()
         assert_near_equal(prob['mach'], mach_solve(area_ratio, super_sonic=super_sonic), 1e-8)
