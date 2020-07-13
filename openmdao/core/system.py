@@ -4269,7 +4269,6 @@ class System(object):
                         else:
                             ivc_path = conns[prom2abs_in[name][0]]
                             vdict[ivc_path] = views[ivc_path]
-                            print(name, views_flat[ivc_path].size)
 
             elif parallel:
                 vdict = {}
@@ -4289,7 +4288,6 @@ class System(object):
                             ivc_path = conns[prom2abs_in[name][0]]
                             if views_flat[ivc_path].size > 0:
                                 vdict[ivc_path] = views[ivc_path]
-                            print(name, views_flat[ivc_path].size)
 
             else:
                 meta = self._var_allprocs_abs2meta
