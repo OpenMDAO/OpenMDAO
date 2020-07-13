@@ -1077,15 +1077,11 @@ class MetaModelUnstructuredSurrogatesFeatureTestCase(unittest.TestCase):
 
         prob = om.Problem()
 
-        prob.model.add_subsystem('p', om.IndepVarComp('x', 2.1))
-
         sin_mm = om.MetaModelUnStructuredComp()
-        sin_mm.add_input('x', 0.)
+        sin_mm.add_input('x', 2.1)
         sin_mm.add_output('f_x', 0., surrogate=om.KrigingSurrogate())
 
         prob.model.add_subsystem('sin_mm', sin_mm)
-
-        prob.model.connect('p.x', 'sin_mm.x')
 
         prob.setup(check=True)
 
@@ -1164,15 +1160,11 @@ class MetaModelUnstructuredSurrogatesFeatureTestCase(unittest.TestCase):
 
         prob = om.Problem()
 
-        prob.model.add_subsystem('p', om.IndepVarComp('x', 2.1))
-
         sin_mm = om.MetaModelUnStructuredComp()
-        sin_mm.add_input('x', 0.)
+        sin_mm.add_input('x', 2.1)
         sin_mm.add_output('f_x', 0., surrogate=om.KrigingSurrogate(eval_rmse=True))
 
         prob.model.add_subsystem('sin_mm', sin_mm)
-
-        prob.model.connect('p.x', 'sin_mm.x')
 
         prob.setup(check=True)
 
