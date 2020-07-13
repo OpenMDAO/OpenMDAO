@@ -33,7 +33,7 @@ flow of data in an OpenMDAO model is a special component,
 :ref:`IndepVarComp <openmdao.core.indepvarcomp.py>`, that does not have any inputs.  You can
 leave some of your inputs unconnected and OpenMDAO will automatically create an
 :ref:`IndepVarComp <openmdao.core.indepvarcomp.py>` called `_auto_ivc` with an output that connects
-to each input, or you can create your own :ref:`IndepVarComp <openmdao.core.indepvarcomp.py>`s manually.
+to each input, or you can create your own :ref:`IndepVarComp <openmdao.core.indepvarcomp.py>` manually.
 For example, consider our paraboloid tutorial problem which has two independent
 variables: `x` and `y`.
 

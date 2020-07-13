@@ -23,7 +23,7 @@ from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import convert_neg, array_connection_compatible, \
     _flatten_src_indices
 from openmdao.utils.general_utils import ContainsAll, all_ancestors, simple_warning, \
-    common_subpath, conditional_error
+    common_subpath, conditional_error, _is_slice, _slice_indices
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 from openmdao.utils.coloring import Coloring, _STD_COLORING_FNAME
@@ -1324,7 +1324,13 @@ class Group(System):
                             simple_warning(msg)
 
                 elif src_indices is not None:
-                    src_indices = np.atleast_1d(src_indices)
+                    shape = None
+                    if _is_slice(src_indices):
+                        global_size = self._var_allprocs_abs2meta[abs_out]['global_size']
+                        global_shape = self._var_allprocs_abs2meta[abs_out]['global_shape']
+                        src_indices = _slice_indices(src_indices, global_size, global_shape)
+                    else:
+                        src_indices = np.atleast_1d(src_indices)
 
                     if np.prod(src_indices.shape) == 0:
                         continue
@@ -1386,8 +1392,9 @@ class Group(System):
                                 else:
                                     simple_warning(msg)
                         if src_indices.ndim > 1:
-                            abs2meta[abs_in]['src_indices'] = \
-                                abs2meta[abs_in]['src_indices'].ravel()
+                            abs2meta[abs_in]['src_indices'] = src_indices.ravel()
+                        else:
+                            abs2meta[abs_in]['src_indices'] = src_indices
                     else:
                         for d in range(source_dimensions):
                             if allprocs_abs2meta[abs_out]['distributed'] is True or \
@@ -1398,7 +1405,11 @@ class Group(System):
                             arr = src_indices[..., d]
                             if np.any(arr >= d_size) or np.any(arr <= -d_size):
                                 for i in arr.flat:
-                                    if abs(i) >= d_size:
+                                    if shape:
+                                        size_check = abs(i) >= global_size
+                                    else:
+                                        size_check = abs(i) >= d_size
+                                    if size_check:
                                         msg = f"{self.msginfo}: The source indices " + \
                                               f"do not specify a valid index for the " + \
                                               f"connection '{abs_out}' to '{abs_in}'. " + \
@@ -1743,7 +1754,11 @@ class Group(System):
             raise TypeError("%s: src_indices must be an index array, did you mean"
                             " connect('%s', %s)?" % (self.msginfo, src_name, tgt_name))
 
-        if isinstance(src_indices, Iterable):
+        if isinstance(src_indices, tuple):
+            if not _is_slice(src_indices):
+                src_indices = np.atleast_1d(src_indices)
+
+        elif isinstance(src_indices, list):
             src_indices = np.atleast_1d(src_indices)
 
         if isinstance(src_indices, np.ndarray):
