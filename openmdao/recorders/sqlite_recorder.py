@@ -327,8 +327,8 @@ class SqliteRecorder(CaseRecorder):
                             (objectives, 'objective'), (constraints, 'constraint')]
 
             # merge current abs2prom and prom2abs with this system's version
-            self._abs2prom['input'].update(system._var_abs2prom['input'])
-            self._abs2prom['output'].update(system._var_abs2prom['output'])
+            self._abs2prom['input'].update(system._var_allprocs_abs2prom['input'])
+            self._abs2prom['output'].update(system._var_allprocs_abs2prom['output'])
             for v, abs_names in system._var_allprocs_prom2abs_list['input'].items():
                 if v not in self._prom2abs['input']:
                     self._prom2abs['input'][v] = abs_names
@@ -373,8 +373,8 @@ class SqliteRecorder(CaseRecorder):
 
             # merge current abs2meta with this system's version
             for name, meta in self._abs2meta.items():
-                if name in system._var_abs2meta:
-                    meta.update(system._var_abs2meta[name])
+                if name in system._var_allprocs_abs2meta:
+                    meta.update(system._var_allprocs_abs2meta[name])
 
             self._cleanup_abs2meta()
 

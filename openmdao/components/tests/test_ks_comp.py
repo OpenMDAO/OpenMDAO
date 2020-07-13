@@ -342,11 +342,8 @@ class TestKSFunctionFeatures(unittest.TestCase):
 
         model = om.Group()
 
-        # model.add_subsystem('indep', om.IndepVarComp('x', val=range(n), units='ft'))
         model.set_input_defaults('x', range(n), units='ft')
         model.add_subsystem('ks', om.KSComp(width=n, units='m'), promotes_inputs=[('g', 'x')])
-
-        # model.connect('indep.x', 'ks.g')
 
         prob = om.Problem(model=model)
         prob.setup()

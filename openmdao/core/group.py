@@ -2724,7 +2724,7 @@ class Group(System):
         with multi_proc_exception_check(self.comm):
             for src, tgts in auto2tgt.items():
                 tgt, sz, val, remote = self._get_auto_ivc_out_val(tgts, remote_vars, all_abs2meta,
-                                                                abs2meta)
+                                                                  abs2meta)
                 prom = abs2prom[tgt]
                 if prom not in self._group_inputs:
                     self._group_inputs[prom] = {'use_tgt': tgt}
