@@ -503,6 +503,49 @@ class TestGroup(unittest.TestCase):
                          "Group (<model>): src_indices has been defined in both "
                          "connect('indep.x', 'C1.x') and add_input('C1.x', ...).")
 
+    def test_src_indice_mismatch_error(self):
+        class ControlInterpComp(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_output('x', shape=(3, 1))
+
+            def compute(self, inputs, outputs):
+                pass
+
+            def compute_partials(self, inputs, partials):
+                pass
+
+        class CollocationComp(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_input('x', shape=(1, 2))
+
+            def compute(self, inputs, outputs):
+                pass
+
+            def compute_partials(self, inputs, partials):
+                pass
+
+        class Phase(om.Group):
+
+            def setup(self):
+                self.add_subsystem('comp1', ControlInterpComp())
+                self.add_subsystem('comp2', CollocationComp())
+
+                self.connect('comp1.x', 'comp2.x', src_indices=[1])
+
+
+        p = om.Problem()
+
+        p.model.add_subsystem('phase', Phase())
+
+        # An error should be raised trying to connect a (1, 2) to a (3, 1) with src_indices [1]
+        # the shape of the source indices does not match the shape of the target input.
+        with self.assertRaises(Exception) as context:
+            p.setup()
+        self.assertEqual(str(context.exception),
+                         "Error message here")
+
     def test_promote_not_found1(self):
         p = om.Problem()
         p.model.add_subsystem('indep', om.IndepVarComp('x', np.ones(5)),
