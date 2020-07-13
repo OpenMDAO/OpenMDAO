@@ -22,7 +22,8 @@ class TestKeplersEquation(unittest.TestCase):
 
         # Use M (mean anomaly) as the initial guess for E (eccentric anomaly)
         def guess_function(inputs, outputs, residuals):
-            outputs['E'] = inputs['M']
+            if np.abs(residuals['E']) > 1.0E-2:
+                outputs['E'] = inputs['M']
 
         bal.options['guess_func'] = guess_function
 
@@ -47,7 +48,7 @@ class TestKeplersEquation(unittest.TestCase):
 
         # Set up solvers
         prob.model.linear_solver = om.DirectSolver()
-        prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=100, iprint=0)
+        prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=100, iprint=2)
 
         prob.setup()
 
