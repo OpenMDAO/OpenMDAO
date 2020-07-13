@@ -153,19 +153,12 @@ class TestFeature(unittest.TestCase):
 
         p = om.Problem()
 
-        ivc = om.IndepVarComp()
-        ivc.add_output(name='pos', shape=(n, 3), units='m')
-
-        p.model.add_subsystem(name='ivc',
-                              subsys=ivc,
-                              promotes_outputs=['pos'])
+        p.model.set_input_defaults('pos', units='m')
 
         dp_comp = om.VectorMagnitudeComp(vec_size=n, length=3, in_name='r', mag_name='r_mag',
                                          units='km')
 
-        p.model.add_subsystem(name='vec_mag_comp', subsys=dp_comp)
-
-        p.model.connect('pos', 'vec_mag_comp.r')
+        p.model.add_subsystem(name='vec_mag_comp', subsys=dp_comp, promotes_inputs=[('r', 'pos')])
 
         p.setup()
 
@@ -176,7 +169,7 @@ class TestFeature(unittest.TestCase):
         # Verify the results against numpy.dot in a for loop.
         for i in range(n):
             a_i = p['pos'][i, :]
-            expected_i = np.sqrt(np.dot(a_i, a_i)) / 1000.0
+            expected_i = np.sqrt(np.dot(a_i, a_i))
             assert_near_equal(p.get_val('vec_mag_comp.r_mag')[i], expected_i)
 
 

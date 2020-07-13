@@ -546,7 +546,6 @@ class TestConnectionsDistrib(unittest.TestCase):
         expected = f"Exception raised on rank {rank}: Group (<model>): The source indices do not specify a valid index " + \
                    "for the connection 'p1.x' to 'c3.x'. " + \
                    "Index '2' is out of range for source dimension of size 2."
-
         try:
             prob.setup()
         except Exception as err:
@@ -639,7 +638,7 @@ class TestConnectionsError(unittest.TestCase):
         model.add_subsystem('c3', TestComp())
         model.add_subsystem('c4', TestCompDist())
         model.connect("p1.x", "c3.x")
-        
+
         with self.assertRaises(ValueError) as context:
             prob.setup(check=False, mode='fwd')
         self.assertEqual(str(context.exception),
