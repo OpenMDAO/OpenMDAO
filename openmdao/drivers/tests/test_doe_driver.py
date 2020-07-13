@@ -1356,7 +1356,7 @@ class TestParallelDOE(unittest.TestCase):
 
                 for name in ('x1', 'x2', 'c3.y'):
 
-                    # TODO - Remove this when issue __ is fixed.
+                    # TODO - Remove this when issue 1498 is fixed.
                     if name in ['x1', 'x2']:
                         continue
 
@@ -1812,10 +1812,10 @@ class TestParallelDOEFeature2(unittest.TestCase):
             for case in cases:
                 outputs = cr.get_case(case).outputs
 
-                # TODO - Restore this when issue __ is fixed.
+                # TODO - Restore this when issue 1498 is fixed.
                 #values.append((outputs['x1'], outputs['x2'], outputs['c3.y']))
 
-            # TODO - Restore this when issue __ is fixed.
+            # TODO - Restore this when issue 1498 is fixed.
             #self.assertEqual("\n"+"\n".join(["x1: %5.2f, x2: %5.2f, c3.y: %6.2f" % (x1, x2, y) for x1, x2, y in values]),
             #    self.expect_text)
 
