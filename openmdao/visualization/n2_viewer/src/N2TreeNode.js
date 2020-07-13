@@ -106,11 +106,14 @@ class N2TreeNode {
         return this.type.match(paramRegex);
     }
 
-    /** True if this is a parameter and connected. */
+    /** True if this is an input and connected. */
     isConnectedParam() { return (this.type == 'param'); }
 
-    /** True if this a paramater and unconnected. */
+    /** True if this an input and unconnected. */
     isUnconnectedParam() { return (this.type == 'unconnected_param'); }
+
+    /** True if this is an input whose source is an auto-ivc'd output */
+    isAutoIvcParam() { return (this.type == 'autoivc_param');}
 
     /** True if this.type is 'unknown'. */
     isUnknown() { return (this.type == 'unknown'); }

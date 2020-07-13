@@ -438,7 +438,7 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_problem_metadata = {
             'connections_list_length': 11,
             'tree_length': 10,
-            'tree_children_length': 6,
+            'tree_children_length': 5,
             'abs2prom': abs2prom,
         }
         assertViewerDataRecorded(self, expected_problem_metadata)
@@ -2360,7 +2360,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
                           'expressions'})
         self.assertEqual(cr.problem_metadata['tree']['name'], 'root')
         self.assertEqual(sorted([child["name"] for child in cr.problem_metadata['tree']["children"]]),
-                         ['_auto_ivc', 'con_cmp1', 'con_cmp2', 'd1', 'd2', 'obj_cmp'])
+                         ['con_cmp1', 'con_cmp2', 'd1', 'd2', 'obj_cmp'])
 
     def test_feature_problem_metadata_with_driver_information(self):
         import openmdao.api as om
