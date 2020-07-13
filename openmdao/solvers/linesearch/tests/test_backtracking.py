@@ -879,9 +879,8 @@ class TestFeatureLineSearch(unittest.TestCase):
         from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
         top = om.Problem()
-        top.model.add_subsystem('px', om.IndepVarComp('x', np.ones((3, 1))))
-        top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
-        top.model.connect('px.x', 'comp.x')
+        top.model.set_input_defaults('x')
+        top.model.add_subsystem('comp', ImplCompTwoStatesArrays(),promotes_inputs=['x'])
 
         top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         top.model.nonlinear_solver.options['maxiter'] = 10
@@ -907,9 +906,8 @@ class TestFeatureLineSearch(unittest.TestCase):
         from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
         top = om.Problem()
-        top.model.add_subsystem('px', om.IndepVarComp('x', np.ones((3, 1))))
-        top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
-        top.model.connect('px.x', 'comp.x')
+        top.model.set_input_defaults('x')
+        top.model.add_subsystem('comp', ImplCompTwoStatesArrays(),promotes_inputs=['x'])
 
         top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         top.model.nonlinear_solver.options['maxiter'] = 10
@@ -935,9 +933,8 @@ class TestFeatureLineSearch(unittest.TestCase):
         from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
         top = om.Problem()
-        top.model.add_subsystem('px', om.IndepVarComp('x', np.ones((3, 1))))
-        top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
-        top.model.connect('px.x', 'comp.x')
+        top.model.set_input_defaults('x')
+        top.model.add_subsystem('comp', ImplCompTwoStatesArrays(),promotes_inputs=['x'])
 
         top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         top.model.nonlinear_solver.options['maxiter'] = 10
@@ -964,9 +961,8 @@ class TestFeatureLineSearch(unittest.TestCase):
         from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
         top = om.Problem()
-        top.model.add_subsystem('px', om.IndepVarComp('x', np.ones((3, 1))))
-        top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
-        top.model.connect('px.x', 'comp.x')
+        top.model.set_input_defaults('x')
+        top.model.add_subsystem('comp', ImplCompTwoStatesArrays(),promotes_inputs=['x'])
 
         top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         top.model.nonlinear_solver.options['maxiter'] = 10
