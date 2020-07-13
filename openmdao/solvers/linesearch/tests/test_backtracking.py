@@ -856,7 +856,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
         top = om.Problem()
-        top.model.set_input_defaults('x')
+        top.model.set_input_defaults('x', 2.0)
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays(), promotes_inputs=['x'])
 
         top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
@@ -868,7 +868,6 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.setup()
 
         # Test lower bounds: should go to the lower bound and stall
-        top['x'] = 2.0
         top['comp.y'] = 0.
         top['comp.z'] = 1.6
         top.run_model()
@@ -883,7 +882,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
         top = om.Problem()
-        top.model.set_input_defaults('x')
+        top.model.set_input_defaults('x', 2.0)
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays(),promotes_inputs=['x'])
 
         top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
@@ -895,7 +894,6 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.setup()
 
         # Test lower bounds: should go to the lower bound and stall
-        top['x'] = 2.0
         top['comp.y'] = 0.
         top['comp.z'] = 1.6
         top.run_model()
@@ -910,7 +908,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
         top = om.Problem()
-        top.model.set_input_defaults('x')
+        top.model.set_input_defaults('x', 2.0)
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays(),promotes_inputs=['x'])
 
         top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
@@ -922,7 +920,6 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.setup()
 
         # Test lower bounds: should go to the lower bound and stall
-        top['x'] = 2.0
         top['comp.y'] = 0.
         top['comp.z'] = 1.6
         top.run_model()
