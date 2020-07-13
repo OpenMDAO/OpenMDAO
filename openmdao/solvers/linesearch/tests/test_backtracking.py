@@ -937,7 +937,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
         top = om.Problem()
-        top.model.set_input_defaults('x')
+        top.model.set_input_defaults('x', 0.5)
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays(),promotes_inputs=['x'])
 
         top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
@@ -949,7 +949,6 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.setup()
 
         # Test upper bounds: should go to the upper bound and stall
-        top['x'] = 0.5
         top['comp.y'] = 0.
         top['comp.z'] = 2.4
         top.run_model()
@@ -965,7 +964,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
         top = om.Problem()
-        top.model.set_input_defaults('x')
+        top.model.set_input_defaults('x', 2.0)
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays(),promotes_inputs=['x'])
 
         top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
@@ -978,7 +977,6 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.run_model()
 
         # Test lower bounds: should stop just short of the lower bound
-        top['x'] = 2.0
         top['comp.y'] = 0.
         top['comp.z'] = 1.6
         top.run_model()
@@ -990,7 +988,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
         top = om.Problem()
-        top.model.set_input_defaults('x')
+        top.model.set_input_defaults('x', 2.0)
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays(),promotes_inputs=['x'])
 
         newt = top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
@@ -1004,7 +1002,6 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.setup()
 
         # Test lower bounds: should go to the lower bound and stall
-        top['x'] = 2.0
         top['comp.y'] = 0.
         top['comp.z'] = 1.6
         top.run_model()
@@ -1019,7 +1016,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
         top = om.Problem()
-        top.model.set_input_defaults('x')
+        top.model.set_input_defaults('x', 2.0)
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays(),promotes_inputs=['x'])
 
         top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
@@ -1031,7 +1028,6 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.setup()
 
         # Test lower bounds: should go to the lower bound and stall
-        top['x'] = 2.0
         top['comp.y'] = 0.
         top['comp.z'] = 1.6
         top.run_model()
@@ -1046,7 +1042,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
         top = om.Problem()
-        top.model.set_input_defaults('x')
+        top.model.set_input_defaults('x', 0.5)
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays(),promotes_inputs=['x'])
 
         top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
@@ -1058,7 +1054,6 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.setup()
 
         # Test upper bounds: should go to the upper bound and stall
-        top['x'] = 0.5
         top['comp.y'] = 0.
         top['comp.z'] = 2.4
         top.run_model()
@@ -1074,7 +1069,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
         top = om.Problem()
-        top.model.set_input_defaults('x')
+        top.model.set_input_defaults('x', 2.0)
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays(),promotes_inputs=['x'])
 
         top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
@@ -1087,7 +1082,6 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.run_model()
 
         # Test lower bounds: should stop just short of the lower bound
-        top['x'] = 2.0
         top['comp.y'] = 0.
         top['comp.z'] = 1.6
         top.run_model()
