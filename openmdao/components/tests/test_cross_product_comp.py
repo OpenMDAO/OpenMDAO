@@ -232,21 +232,14 @@ class TestFeature(unittest.TestCase):
 
         p = om.Problem()
 
-        ivc = om.IndepVarComp()
-        ivc.add_output(name='r', shape=(n, 3))
-        ivc.add_output(name='F', shape=(n, 3))
-
-        p.model.add_subsystem(name='ivc',
-                              subsys=ivc,
-                              promotes_outputs=['r', 'F'])
+        p.model.set_input_defaults('r')
+        p.model.set_input_defaults('F')
 
         p.model.add_subsystem(name='cross_prod_comp',
                               subsys=om.CrossProductComp(vec_size=n,
                                                          a_name='r', b_name='F', c_name='torque',
-                                                         a_units='m', b_units='N', c_units='N*m'))
-
-        p.model.connect('r', 'cross_prod_comp.r')
-        p.model.connect('F', 'cross_prod_comp.F')
+                                                         a_units='m', b_units='N', c_units='N*m'),
+                              promotes_inputs=['r', 'F'])
 
         p.setup()
 
