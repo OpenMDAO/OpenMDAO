@@ -795,10 +795,8 @@ class TestFeatureLineSearch(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('px', om.IndepVarComp('x', -100.0))
-        model.add_subsystem('comp', CompAtan())
-
-        model.connect('px.x', 'comp.x')
+        model.set_input_defaults('x', -100.0)
+        model.add_subsystem('comp', CompAtan(), promotes_inputs=['x'])
 
         prob.setup()
 
