@@ -35,6 +35,29 @@ and the output :math:`c`, as well as specifying their units.
     CrossProductComp
     options
 
+
+CrossProductComp Constructor
+----------------------------
+
+The call signature for the `CrossProductComp` constructor is:
+
+.. automethod:: openmdao.components.cross_product_comp.CrossProductComp.__init__
+    :noindex:
+
+
+CrossProductComp Usage
+----------------------
+
+There are often situations when numerous products need to be computed, essentially in parallel.
+You can reduce the number of components required by having one `CrossProductComp` perform multiple operations.
+This is also convenient when the different operations have common inputs.
+
+The ``add_product`` method is used to create additional products after instantiation.
+
+.. automethod:: openmdao.components.cross_product_comp.CrossProductComp.add_product
+   :noindex:
+
+
 CrossProductComp Example
 ------------------------
 
@@ -47,5 +70,21 @@ with `a_units` and `b_units`.
 
 .. embed-code::
     openmdao.components.tests.test_cross_product_comp.TestFeature.test
+    :layout: interleave
+
+
+DotProductComp Example with Multiple Products
+---------------------------------------------
+
+When defining multiple products:
+
+- An input name in one call to `add_product` may not be an output name in another call, and vice-versa.
+- The units and shape of variables used across multiple products must be the same in each one.
+
+
+.. embed-code::
+    openmdao.components.tests.test_cross_product_comp.TestFeature.test_multiple
+    :layout: interleave
+
 
 .. tags:: CrossProductComp, Component

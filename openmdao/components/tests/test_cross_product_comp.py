@@ -538,13 +538,13 @@ class TestFeature(unittest.TestCase):
 
         import openmdao.api as om
 
-        n = 100
+        n = 24
 
         p = om.Problem()
 
         ivc = om.IndepVarComp()
-        ivc.add_output(name='r', shape=(n, 3))
-        ivc.add_output(name='F', shape=(n, 3))
+        ivc.add_output(name='r', shape=(n, 3), units='m')
+        ivc.add_output(name='F', shape=(n, 3), units='N')
 
         p.model.add_subsystem(name='ivc',
                               subsys=ivc,
@@ -566,13 +566,78 @@ class TestFeature(unittest.TestCase):
         p.run_model()
 
         # Check the output in units of ft*lbf to ensure that our units work as expected.
+        expected = []
         for i in range(n):
             a_i = p['r'][i, :]
             b_i = p['F'][i, :]
-            expected_i = np.cross(a_i, b_i) * 0.73756215
-            assert_near_equal(
-                             p.get_val('cross_prod_comp.torque', units='ft*lbf')[i, :],
-                             expected_i, tolerance=1.0E-8)
+            expected.append(np.cross(a_i, b_i) * 0.73756215)
+
+            actual_i = p.get_val('cross_prod_comp.torque', units='ft*lbf')[i]
+            rel_error = np.abs(expected[i] - actual_i)/actual_i
+            assert np.all(rel_error < 1e-8), f"Relative error: {rel_error}"
+
+        assert_near_equal(p.get_val('cross_prod_comp.torque', units='ft*lbf'), np.array(expected), tolerance=1e-8)
+
+    def test_multiple(self):
+        import numpy as np
+
+        import openmdao.api as om
+
+        n = 24
+
+        p = om.Problem()
+
+        ivc = om.IndepVarComp()
+        ivc.add_output(name='r', shape=(n, 3), units='m')
+        ivc.add_output(name='F', shape=(n, 3), units='N')
+        ivc.add_output(name='p', shape=(n, 3), units='kg*m/s')
+
+        p.model.add_subsystem(name='ivc',
+                              subsys=ivc,
+                              promotes_outputs=['r', 'F', 'p'])
+
+        cpc = p.model.add_subsystem('cross_prod_comp',
+                                    om.CrossProductComp(vec_size=n,
+                                                        a_name='r', b_name='F', c_name='torque',
+                                                        a_units='m', b_units='N', c_units='N*m'))
+        cpc.add_product(vec_size=n,
+                        a_name='r', b_name='p', c_name='L',
+                        a_units='m', b_units='kg*m/s', c_units='kg*m**2/s')
+
+
+        p.model.connect('r', 'cross_prod_comp.r')
+        p.model.connect('F', 'cross_prod_comp.F')
+        p.model.connect('p', 'cross_prod_comp.p')
+
+        p.setup()
+
+        p['r'] = np.random.rand(n, 3)
+        p['F'] = np.random.rand(n, 3)
+        p['p'] = np.random.rand(n, 3)
+
+        p.run_model()
+
+        # Check the output.
+        expected_T = []
+        expected_L = []
+        for i in range(n):
+            a_i = p['r'][i, :]
+            b_i = p['F'][i, :]
+            expected_T.append(np.cross(a_i, b_i))
+
+            actual_i = p.get_val('cross_prod_comp.torque')[i]
+            rel_error = np.abs(expected_T[i] - actual_i)/actual_i
+            assert np.all(rel_error < 1e-8), f"Relative error: {rel_error}"
+
+            b_i = p['p'][i, :]
+            expected_L.append(np.cross(a_i, b_i))
+
+            actual_i = p.get_val('cross_prod_comp.L')[i]
+            rel_error = np.abs(expected_L[i] - actual_i)/actual_i
+            assert np.all(rel_error < 1e-8), f"Relative error: {rel_error}"
+
+        assert_near_equal(p.get_val('cross_prod_comp.torque'), np.array(expected_T), tolerance=1e-8)
+        assert_near_equal(p.get_val('cross_prod_comp.L'), np.array(expected_L), tolerance=1e-8)
 
 
 if __name__ == "__main__":

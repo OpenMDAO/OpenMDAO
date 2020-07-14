@@ -618,6 +618,65 @@ class TestFeature(unittest.TestCase):
         expected_i = np.dot(Mat_i, x_i) * 3.2808399
         assert_near_equal(p.get_val('mat_vec_product_comp.y', units='ft')[1, :], expected_i, tolerance=1.0E-8)
 
+    def test_multiple(self):
+        import numpy as np
+        import openmdao.api as om
+
+        nn = 2
+
+        p = om.Problem()
+
+        ivc = om.IndepVarComp()
+        ivc.add_output(name='Mat', shape=(nn, 3, 3))
+        ivc.add_output(name='x', shape=(nn, 3), units='m')
+        ivc.add_output(name='w', shape=(nn, 3), units='m')
+
+        p.model.add_subsystem(name='ivc',
+                              subsys=ivc,
+                              promotes_outputs=['Mat', 'x', 'w'])
+
+        mvc = p.model.add_subsystem(name='mat_vec_product_comp',
+                                    subsys=om.MatrixVectorProductComp(A_name='Mat', vec_size=nn,
+                                                                      b_name='y', b_units='m',
+                                                                      x_units='m'))
+        mvc.add_product(A_name='Mat', vec_size=nn,
+                        b_name='z', b_units='m',
+                        x_name='w', x_units='m')
+
+        p.model.connect('Mat', 'mat_vec_product_comp.Mat')
+        p.model.connect('x', 'mat_vec_product_comp.x')
+        p.model.connect('w', 'mat_vec_product_comp.w')
+
+        p.setup()
+
+        p['Mat'] = np.random.rand(nn, 3, 3)
+        p['x'] = np.random.rand(nn, 3)
+        p['w'] = np.random.rand(nn, 3)
+
+        p.run_model()
+
+        Mat_i = p['Mat'][0, :, :]
+        x_i = p['x'][0, :]
+
+        expected_i = np.dot(Mat_i, x_i) * 3.2808399
+        assert_near_equal(p.get_val('mat_vec_product_comp.y', units='ft')[0, :], expected_i, tolerance=1.0E-8)
+
+        w_i = p['w'][0, :]
+
+        expected_i = np.dot(Mat_i, w_i) * 3.2808399
+        assert_near_equal(p.get_val('mat_vec_product_comp.z', units='ft')[0, :], expected_i, tolerance=1.0E-8)
+
+        Mat_i = p['Mat'][1, :, :]
+        x_i = p['x'][1, :]
+
+        expected_i = np.dot(Mat_i, x_i) * 3.2808399
+        assert_near_equal(p.get_val('mat_vec_product_comp.y', units='ft')[1, :], expected_i, tolerance=1.0E-8)
+
+        w_i = p['w'][1, :]
+
+        expected_i = np.dot(Mat_i, w_i) * 3.2808399
+        assert_near_equal(p.get_val('mat_vec_product_comp.z', units='ft')[1, :], expected_i, tolerance=1.0E-8)
+
 
 if __name__ == "__main__":
     unittest.main()

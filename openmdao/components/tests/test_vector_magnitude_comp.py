@@ -323,10 +323,73 @@ class TestFeature(unittest.TestCase):
         p.run_model()
 
         # Verify the results against numpy.dot in a for loop.
+        expected = []
         for i in range(n):
             a_i = p['pos'][i, :]
-            expected_i = np.sqrt(np.dot(a_i, a_i)) / 1000.0
-            assert_near_equal(p.get_val('vec_mag_comp.r_mag')[i], expected_i)
+            expected.append(np.sqrt(np.dot(a_i, a_i)) / 1000.0)
+
+            actual_i = p.get_val('vec_mag_comp.r_mag')[i]
+            rel_error = np.abs(expected[i] - actual_i)/actual_i
+            assert rel_error < 1e-9, f"Relative error: {rel_error}"
+
+        assert_near_equal(p.get_val('vec_mag_comp.r_mag'), np.array(expected))
+
+    def test_multiple(self):
+        """
+        A simple example to compute the magnitude of 3-vectors at at 100 points simultaneously.
+        """
+        import numpy as np
+        import openmdao.api as om
+
+        n = 100
+
+        p = om.Problem()
+
+        ivc = om.IndepVarComp()
+        ivc.add_output(name='pos', shape=(n, 3), units='m')
+        ivc.add_output(name='b', shape=(n, 3), units='ft')
+
+        p.model.add_subsystem(name='ivc',
+                              subsys=ivc,
+                              promotes_outputs=['pos', 'b'])
+
+        dp_comp = om.VectorMagnitudeComp(vec_size=n, length=3,
+                                         in_name='r', mag_name='r_mag', units='km')
+
+        dp_comp.add_magnitude(vec_size=n, length=3,
+                              in_name='b', mag_name='b_mag', units='ft')
+
+        p.model.add_subsystem(name='vec_mag_comp', subsys=dp_comp)
+
+        p.model.connect('pos', 'vec_mag_comp.r')
+        p.model.connect('b', 'vec_mag_comp.b')
+
+        p.setup()
+
+        p['pos'] = 1.0 + np.random.rand(n, 3)
+
+        p.run_model()
+
+        # Verify the results against numpy.dot in a for loop.
+        expected_r = []
+        expected_b = []
+        for i in range(n):
+            a_i = p['pos'][i, :]
+            expected_r.append(np.sqrt(np.dot(a_i, a_i))/1000.)
+
+            actual_i = p.get_val('vec_mag_comp.r_mag')[i]
+            rel_error = np.abs(expected_r[i] - actual_i)/actual_i
+            assert rel_error < 1e-9, f"Relative error: {rel_error}"
+
+            b_i = p['b'][i, :]
+            expected_b.append(np.sqrt(np.dot(b_i, b_i)))
+
+            actual_i = p.get_val('vec_mag_comp.b_mag')[i]
+            rel_error = np.abs(expected_b[i] - actual_i)/actual_i
+            assert rel_error < 1e-9, f"Relative error: {rel_error}"
+
+        assert_near_equal(p.get_val('vec_mag_comp.r_mag'), np.array(expected_r))
+        assert_near_equal(p.get_val('vec_mag_comp.b_mag'), np.array(expected_b))
 
 
 if __name__ == '__main__':
