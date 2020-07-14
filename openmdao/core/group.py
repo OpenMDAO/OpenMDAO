@@ -1109,6 +1109,16 @@ class Group(System):
                             if out_path not in self._local_system_set:
                                 self._vector_class = self._distributed_vector_class
 
+            # # Check the connection shapes
+            # if self._var_allprocs_abs2meta[abs_in]['global_shape'][0] != \
+            #     self._var_allprocs_abs2meta[abs_out]['global_shape'][0]:
+            #     in_shape = self._var_allprocs_abs2meta[abs_in]['global_shape']
+            #     out_shape = self._var_allprocs_abs2meta[abs_out]['global_shape']
+            #     msg = f"{self.msginfo}: {abs_in} shape {in_shape} does not match {abs_out} shape " + \
+            #           f"{out_shape}."
+            #     raise ValueError(msg)
+
+
             # if connected output has scaling then we need input scaling
             if not self._has_input_scaling and not (abs_in in allprocs_discrete_in or
                                                     abs_out in allprocs_discrete_out):
@@ -1252,6 +1262,19 @@ class Group(System):
                                 continue
                     else:
                         source_dimensions = 1
+
+                    # if src_indices.shape != in_shape:
+                    #     msg = f"{self.msginfo}: src_indices shape {src_indices.shape} does not " + \
+                    #           f"match {abs_in} shape {in_shape}."
+                    #     raise ValueError(msg)
+
+                    if self._var_allprocs_abs2meta[abs_in]['global_shape'][0] != \
+                        self._var_allprocs_abs2meta[abs_out]['global_shape'][0]:
+                        in_shape = self._var_allprocs_abs2meta[abs_in]['global_shape']
+                        out_shape = self._var_allprocs_abs2meta[abs_out]['global_shape']
+                        msg = f"{self.msginfo}: {abs_in} shape {in_shape} does not match {abs_out} shape " + \
+                            f"{out_shape}."
+                        raise ValueError(msg)
 
                     # check all indices are in range of the source dimensions
                     if flat:
