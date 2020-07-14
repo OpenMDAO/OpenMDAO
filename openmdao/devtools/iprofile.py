@@ -192,6 +192,8 @@ def _finalize_profile():
             else:
                 _obj_map[fname] = "<%s:%d.%s>" % (qfile, line, qname)
         else:
+            if name is None:
+                name = '%s#%d' % (qclass, ident)
             _obj_map[fname] = '.'.join((name, "<%s.%s>" % (qclass, qname)))
 
     _obj_map['$total'] = '$total'

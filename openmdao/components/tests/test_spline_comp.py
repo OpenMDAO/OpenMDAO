@@ -276,7 +276,7 @@ class SplineCompTestCase(unittest.TestCase):
 
         derivs = prob.check_partials(out_stream=None, method='cs')
         assert_check_partials(derivs, atol=1e-14, rtol=1e-14)
-        
+
     def test_bspline_bug(self):
         # Tests a bug fix where the interp_options weren't passed into
         # the bspline interp comp
@@ -289,7 +289,7 @@ class SplineCompTestCase(unittest.TestCase):
         comp.add_spline(y_cp_name='alt_cp', y_interp_name='alt', y_cp_val=self.y_cp, y_units='kft')
 
         self.prob.setup(force_alloc_complex=True)
-        
+
         # If we set the bspline order to 3, then k should internally be 4
         self.assertEqual(comp.interps['alt'].table.k, 4)
 
@@ -502,19 +502,16 @@ class SplineCompFeatureTestCase(unittest.TestCase):
         tt = np.linspace(0, 3.0*np.pi, n_point)
         x = np.sin(t)
 
-        model.add_subsystem('px', om.IndepVarComp('x', val=x))
-
         # Set options specific to bsplines
         bspline_options = {'order': 3}
 
+        model.set_input_defaults('x', x)
         comp = om.SplineComp(method='bsplines', x_interp_val=tt, num_cp=n_cp,
                             interp_options=bspline_options)
 
-        prob.model.add_subsystem('interp', comp)
+        prob.model.add_subsystem('interp', comp, promotes_inputs=[('h_cp', 'x')])
 
         comp.add_spline(y_cp_name='h_cp', y_interp_name='h', y_cp_val=x, y_units=None)
-
-        model.connect('px.x', 'interp.h_cp')
 
         prob.setup(force_alloc_complex=True)
         prob.run_model()
