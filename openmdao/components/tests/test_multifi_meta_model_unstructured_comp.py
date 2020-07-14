@@ -375,6 +375,23 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         expected = ("mm: Multiple input features cannot have the same value.")
         self.assertEqual(str(cm.exception), expected)
 
+    def test_om_slice_in_add_input(self):
+
+        mm = om.MultiFiMetaModelUnStructuredComp(nfi=2)
+        mm.add_input('x', np.ones(3), src_indices=om.slicer[:, 1])
+        mm.add_output('y', np.zeros((1, )))
+
+        mm.options['default_surrogate'] = om.MultiFiCoKrigingSurrogate(normalize=False)
+
+        arr = np.array([[1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4]])
+
+        prob = om.Problem()
+        prob.model.add_subsystem('mm', mm)
+        prob.model.add_subsystem('indep', om.IndepVarComp('x', arr))
+        prob.model.connect('indep.x', 'mm.x')
+        prob.setup()
+
+        assert_near_equal(prob['mm.x'], np.array([[1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4]]))
 
 class MultiFiMetaModelFeatureTestCase(unittest.TestCase):
 

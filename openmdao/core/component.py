@@ -15,14 +15,14 @@ from openmdao.utils.units import valid_units
 from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key, rel_name2abs_name
 from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
-    find_matches, simple_warning, make_set
+    find_matches, simple_warning, make_set, _is_slice
 import openmdao.utils.coloring as coloring_mod
 
 
 # the following metadata will be accessible for vars on all procs
 global_meta_names = {
-    'input': ('units', 'shape', 'size', 'distributed', 'tags'),
-    'output': ('units', 'shape', 'size',
+    'input': ('units', 'shape', 'size', 'distributed', 'tags', 'desc'),
+    'output': ('units', 'shape', 'size', 'desc',
                'ref', 'ref0', 'res_ref', 'distributed', 'lower', 'upper', 'tags'),
 }
 
@@ -181,7 +181,7 @@ class Component(System):
         self._set_vector_class()
 
     def _set_vector_class(self):
-        if self.options['distributed'] and self.comm.size > 1:
+        if self.options['distributed']:
             dist_vec_class = self._problem_meta['distributed_vector_class']
             if dist_vec_class is not None:
                 self._vector_class = dist_vec_class
@@ -477,7 +477,10 @@ class Component(System):
         }
 
         if src_indices is not None:
-            metadata['src_indices'] = np.asarray(src_indices, dtype=INT_DTYPE)
+            if _is_slice(src_indices):
+                metadata['src_indices'] = src_indices
+            else:
+                metadata['src_indices'] = np.asarray(src_indices, dtype=INT_DTYPE)
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:

@@ -426,16 +426,15 @@ class TestExternalCodeCompFeature(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        # create and connect inputs
-        model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
-        model.add_subsystem('p2', om.IndepVarComp('y', -4.0))
-        model.add_subsystem('p', ParaboloidExternalCodeComp())
-
-        model.connect('p1.x', 'p.x')
-        model.connect('p2.y', 'p.y')
+        model.add_subsystem('p', ParaboloidExternalCodeComp(), promotes_inputs=['x', 'y'])
 
         # run the ExternalCodeComp Component
         prob.setup()
+
+        # Set input values
+        prob.set_val('p.x', 3.0)
+        prob.set_val('p.y', -4.0)
+
         prob.run_model()
 
         # print the output
@@ -448,21 +447,15 @@ class TestExternalCodeCompFeature(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        # create and connect inputs
-        model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
-        model.add_subsystem('p2', om.IndepVarComp('y', -4.0))
         model.add_subsystem('p', ParaboloidExternalCodeCompFD())
-
-        model.connect('p1.x', 'p.x')
-        model.connect('p2.y', 'p.y')
 
         # find optimal solution with SciPy optimize
         # solution (minimum): x = 6.6667; y = -7.3333
         prob.driver = om.ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
 
-        prob.model.add_design_var('p1.x', lower=-50, upper=50)
-        prob.model.add_design_var('p2.y', lower=-50, upper=50)
+        prob.model.add_design_var('p.x', lower=-50, upper=50)
+        prob.model.add_design_var('p.y', lower=-50, upper=50)
 
         prob.model.add_objective('p.f_xy')
 
@@ -470,10 +463,15 @@ class TestExternalCodeCompFeature(unittest.TestCase):
         prob.driver.options['disp'] = True
 
         prob.setup()
+
+        # Set input values
+        prob.set_val('p.x', 3.0)
+        prob.set_val('p.y', -4.0)
+
         prob.run_driver()
 
-        assert_near_equal(prob['p1.x'], 6.66666667, 1e-6)
-        assert_near_equal(prob['p2.y'], -7.3333333, 1e-6)
+        assert_near_equal(prob['p.x'], 6.66666667, 1e-6)
+        assert_near_equal(prob['p.y'], -7.3333333, 1e-6)
 
     def test_optimize_derivs(self):
         import openmdao.api as om
@@ -482,21 +480,15 @@ class TestExternalCodeCompFeature(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        # create and connect inputs
-        model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
-        model.add_subsystem('p2', om.IndepVarComp('y', -4.0))
         model.add_subsystem('p', ParaboloidExternalCodeCompDerivs())
-
-        model.connect('p1.x', 'p.x')
-        model.connect('p2.y', 'p.y')
 
         # find optimal solution with SciPy optimize
         # solution (minimum): x = 6.6667; y = -7.3333
         prob.driver = om.ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
 
-        prob.model.add_design_var('p1.x', lower=-50, upper=50)
-        prob.model.add_design_var('p2.y', lower=-50, upper=50)
+        prob.model.add_design_var('p.x', lower=-50, upper=50)
+        prob.model.add_design_var('p.y', lower=-50, upper=50)
 
         prob.model.add_objective('p.f_xy')
 
@@ -504,10 +496,15 @@ class TestExternalCodeCompFeature(unittest.TestCase):
         prob.driver.options['disp'] = True
 
         prob.setup()
+
+        # Set input values
+        prob.set_val('p.x', 3.0)
+        prob.set_val('p.y', -4.0)
+
         prob.run_driver()
 
-        assert_near_equal(prob['p1.x'], 6.66666667, 1e-6)
-        assert_near_equal(prob['p2.y'], -7.3333333, 1e-6)
+        assert_near_equal(prob['p.x'], 6.66666667, 1e-6)
+        assert_near_equal(prob['p.y'], -7.3333333, 1e-6)
 
 
 class TestExternalCodeImplicitCompFeature(unittest.TestCase):
@@ -601,7 +598,6 @@ class TestExternalCodeImplicitCompFeature(unittest.TestCase):
                 outputs['mach'] = mach
 
         group = om.Group()
-        group.add_subsystem('ar', om.IndepVarComp('area_ratio', 0.5))
         mach_comp = group.add_subsystem('comp', MachExternalCodeComp(), promotes=['*'])
         prob = om.Problem(model=group)
         group.nonlinear_solver = om.NewtonSolver()
@@ -614,7 +610,7 @@ class TestExternalCodeImplicitCompFeature(unittest.TestCase):
 
         area_ratio = 1.3
         super_sonic = False
-        prob['area_ratio'] = area_ratio
+        prob.set_val('area_ratio', area_ratio)
         mach_comp.options['super_sonic'] = super_sonic
         prob.run_model()
         assert_near_equal(prob['mach'], mach_solve(area_ratio, super_sonic=super_sonic), 1e-8)

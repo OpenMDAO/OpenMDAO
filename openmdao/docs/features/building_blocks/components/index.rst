@@ -23,5 +23,4 @@ Components
     dot_product_comp.rst
     matrix_vector_product_comp.rst
     vector_magnitude_comp.rst
-    spline_comp.rst
 

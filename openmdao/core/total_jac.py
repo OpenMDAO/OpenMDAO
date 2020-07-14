@@ -80,6 +80,9 @@ class _TotalJacInfo(object):
         Map of absolute var name to the MPI process that owns it.
     par_deriv : dict
         Cache containing names of desvars or responses for each parallel derivative color.
+    par_deriv_printnames : dict
+        Companion to par_deriv cache with auto_ivc names mapped to their promoted inputs.
+        This is used for debug printing.
     return_format : str
         Indicates the desired return format of the total jacobian. Can have value of
         'array', 'dict', or 'flat_dict'.
@@ -130,6 +133,7 @@ class _TotalJacInfo(object):
         self.lin_sol_cache = {}
         self.debug_print = debug_print
         self.par_deriv = {}
+        self.par_deriv_printnames = {}
 
         if isinstance(wrt, str):
             wrt = [wrt]
@@ -502,7 +506,17 @@ class _TotalJacInfo(object):
                     if parallel_deriv_color:
                         if parallel_deriv_color not in self.par_deriv:
                             self.par_deriv[parallel_deriv_color] = []
+                            self.par_deriv_printnames[parallel_deriv_color] = []
                         self.par_deriv[parallel_deriv_color].append(name)
+
+                        print_name = name
+                        if name.startswith('_auto_ivc'):
+                            conns = model._problem_meta['connections']
+                            for src, tgt in conns.items():
+                                if tgt == name:
+                                    print_name = model._var_allprocs_abs2prom['input'][src]
+
+                        self.par_deriv_printnames[parallel_deriv_color].append(print_name)
 
                 in_idxs = meta['indices'] if 'indices' in meta else None
 
@@ -1324,6 +1338,7 @@ class _TotalJacInfo(object):
         """
         debug_print = self.debug_print
         par_deriv = self.par_deriv
+        par_print = self.par_deriv_printnames
 
         has_lin_cons = self.has_lin_cons
 
@@ -1355,7 +1370,7 @@ class _TotalJacInfo(object):
 
                     if debug_print:
                         if par_deriv and key in par_deriv:
-                            varlist = '(' + ', '.join([name for name in par_deriv[key]]) + ')'
+                            varlist = '(' + ', '.join([name for name in par_print[key]]) + ')'
                             print('Solving color:', key, varlist)
                         else:
                             print('In mode: %s, Solving variable(s) using simul coloring:' % mode)

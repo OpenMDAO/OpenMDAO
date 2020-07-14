@@ -438,7 +438,7 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_problem_metadata = {
             'connections_list_length': 11,
             'tree_length': 10,
-            'tree_children_length': 6,
+            'tree_children_length': 5,
             'abs2prom': abs2prom,
         }
         assertViewerDataRecorded(self, expected_problem_metadata)
@@ -463,43 +463,89 @@ class TestSqliteRecorder(unittest.TestCase):
         value = cr.system_options['root']['component_options']['assembled_jac_type']
         self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
 
-    def test_driver_record_model_metadata(self):
+    def test_record_system_options(self):
+        # Regardless what object the case recorder is attached to, system options
+        #  should be recorded for all systems in the model
+
+        expected_system_options_keys = ['root', '_auto_ivc', 'd1', 'd2', 'obj_cmp', 'con_cmp1',
+                                        'con_cmp2']
+
+        # Recorder on Driver
         prob = om.Problem(model=SellarDerivatives())
         prob.setup()
-
-        recorder = om.SqliteRecorder("cases.sql")
+        recorder = om.SqliteRecorder("cases_driver.sql")
         prob.driver.add_recorder(recorder)
-
         prob.set_solver_print(level=0)
         prob.run_model()
         prob.cleanup()
-
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader("cases_driver.sql")
         # Quick check to see that keys and values were recorded
-        for key in ['root', '_auto_ivc', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']:
+        for key in expected_system_options_keys:
             self.assertTrue(key in cr.system_options.keys())
-
         value = cr.system_options['root']['component_options']['assembled_jac_type']
-        self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
+        self.assertEqual('csc', value)  # quick check only. Too much to check exhaustively
 
-    def test_driver_record_metadata(self):
+        # Recorder on Problem
         prob = om.Problem(model=SellarDerivatives())
         prob.setup()
-
-        recorder = om.SqliteRecorder("cases.sql")
-        prob.driver.add_recorder(recorder)
-
+        recorder = om.SqliteRecorder("cases_problem.sql")
+        prob.add_recorder(recorder)
         prob.set_solver_print(level=0)
         prob.run_model()
         prob.cleanup()
-
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader("cases_problem.sql")
         # Quick check to see that keys and values were recorded
-        for key in ['root', '_auto_ivc', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']:
+        for key in expected_system_options_keys:
             self.assertTrue(key in cr.system_options.keys())
-
         value = cr.system_options['root']['component_options']['assembled_jac_type']
         self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
+
+        # Recorder on a subsystem
+        prob = om.Problem(model=SellarDerivatives())
+        prob.setup()
+        recorder = om.SqliteRecorder("cases_subsystem.sql")
+        prob.model.d1.add_recorder(recorder)
+        prob.set_solver_print(level=0)
+        prob.run_model()
+        prob.cleanup()
+        cr = om.CaseReader("cases_subsystem.sql")
+        # Quick check to see that keys and values were recorded
+        for key in expected_system_options_keys:
+            self.assertTrue(key in cr.system_options.keys())
+        value = cr.system_options['root']['component_options']['assembled_jac_type']
+        self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
+
+        # Recorder on a solver
+        prob = om.Problem(model=SellarDerivatives())
+        prob.setup()
+        recorder = om.SqliteRecorder("cases_solver.sql")
+        prob.model.nonlinear_solver.add_recorder(recorder)
+        prob.set_solver_print(level=0)
+        prob.run_model()
+        prob.cleanup()
+        cr = om.CaseReader("cases_solver.sql")
+        # Quick check to see that keys and values were recorded
+        for key in expected_system_options_keys:
+            self.assertTrue(key in cr.system_options.keys())
+        value = cr.system_options['root']['component_options']['assembled_jac_type']
+        self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
+
+    def test_warning_system_options_overwriting(self):
+
+        prob = ParaboloidProblem()
+        prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
+        prob.add_recorder(self.recorder)
+        prob.setup()
+        prob.set_solver_print(0)
+        prob.run_driver()
+        prob.record('final')
+
+        prob.setup()
+        msg = "The model is being run again, if the options or scaling of any components " \
+              "has changed then only their new values will be recorded."
+
+        with assert_warning(UserWarning, msg):
+            prob.run_driver()
 
     def test_without_n2_data(self):
         prob = SellarProblem()
@@ -2314,7 +2360,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
                           'expressions'})
         self.assertEqual(cr.problem_metadata['tree']['name'], 'root')
         self.assertEqual(sorted([child["name"] for child in cr.problem_metadata['tree']["children"]]),
-                         ['_auto_ivc', 'con_cmp1', 'con_cmp2', 'd1', 'd2', 'obj_cmp'])
+                         ['con_cmp1', 'con_cmp2', 'd1', 'd2', 'obj_cmp'])
 
     def test_feature_problem_metadata_with_driver_information(self):
         import openmdao.api as om

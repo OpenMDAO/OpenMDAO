@@ -92,6 +92,11 @@ class N2Style {
                 'fill-opacity': '.8',
                 'fill': N2Style.color.collapsed,
             },
+            '#tree > g.autoivc_param > rect': {
+                'cursor': 'pointer',
+                'fill-opacity': '.8',
+                'fill': N2Style.color.autoivcParam,
+            },
             'text': {
                 //'dominant-baseline: middle',
                 //'dy: .35em',
@@ -190,6 +195,9 @@ class N2Style {
                 if (Array.isPopulatedArray(element.children)) return 'param_group';
                 return 'unconnected_param';
 
+            case 'autoivc_param':
+                return 'autoivc_param';
+
             case 'unknown':
                 if (Array.isPopulatedArray(element.children)) return 'unknown_group';
                 if (element.implicit) return 'unknown_implicit';
@@ -229,7 +237,8 @@ N2Style.color = {
     'input': 'salmon',
     'greenArrow': 'seagreen',
     'output': 'seagreen',
-    'declaredPartial': 'black'
+    'declaredPartial': 'black',
+    'autoivcParam': '#F42F0D'
 };
 
 Object.freeze(N2Style.color); // Make it the equivalent of a constant
