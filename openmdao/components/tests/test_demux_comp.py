@@ -157,15 +157,10 @@ class TestFeature(unittest.TestCase):
 
         p = om.Problem()
 
-        ivc = om.IndepVarComp()
-        ivc.add_output(name='pos_ecef', shape=(m, 3), units='km')
+        p.model.set_input_defaults('pos_ecef', units='km')
 
-        p.model.add_subsystem(name='ivc',
-                              subsys=ivc,
-                              promotes_outputs=['pos_ecef'])
-
-        mux_comp = p.model.add_subsystem(name='demux',
-                                         subsys=om.DemuxComp(vec_size=n))
+        mux_comp = p.model.add_subsystem(name='demux', subsys=om.DemuxComp(vec_size=n),
+                                         promotes_inputs=[('pos', 'pos_ecef')])
 
         mux_comp.add_var('pos', shape=(m, n), axis=1, units='km')
 
@@ -177,7 +172,6 @@ class TestFeature(unittest.TestCase):
 
         p.model.connect('demux.pos_0', 'longitude_comp.x')
         p.model.connect('demux.pos_1', 'longitude_comp.y')
-        p.model.connect('pos_ecef', 'demux.pos')
 
         p.setup()
 

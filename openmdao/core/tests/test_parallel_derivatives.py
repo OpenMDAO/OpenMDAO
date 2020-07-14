@@ -37,19 +37,19 @@ class ParDerivTestCase(unittest.TestCase):
         prob.model.linear_solver = om.LinearBlockGS()
         prob.model.sub.linear_solver = om.LinearBlockGS()
 
-        prob.model.add_design_var('iv.x1')
-        prob.model.add_design_var('iv.x2')
+        prob.model.add_design_var('x1')
+        prob.model.add_design_var('x2')
         prob.model.add_objective('c3.y')
 
         prob.setup(check=False, mode='rev')
         prob.run_driver()
 
-        indep_list = ['iv.x1', 'iv.x2']
+        indep_list = ['x1', 'x2']
         unknown_list = ['c3.y']
 
         J = prob.compute_totals(unknown_list, indep_list, return_format='dict')
-        assert_near_equal(J['c3.y']['iv.x1'][0][0], -6.0, 1e-6)
-        assert_near_equal(J['c3.y']['iv.x2'][0][0], 35.0, 1e-6)
+        assert_near_equal(J['c3.y']['x1'][0][0], -6.0, 1e-6)
+        assert_near_equal(J['c3.y']['x2'][0][0], 35.0, 1e-6)
 
     def test_fan_in_serial_sets_fwd(self):
 
@@ -58,19 +58,19 @@ class ParDerivTestCase(unittest.TestCase):
         prob.model.linear_solver = om.LinearBlockGS()
         prob.model.sub.linear_solver = om.LinearBlockGS()
 
-        prob.model.add_design_var('iv.x1')
-        prob.model.add_design_var('iv.x2')
+        prob.model.add_design_var('x1')
+        prob.model.add_design_var('x2')
         prob.model.add_objective('c3.y')
 
         prob.setup(check=False, mode='fwd')
         prob.run_driver()
 
-        indep_list = ['iv.x1', 'iv.x2']
+        indep_list = ['x1', 'x2']
         unknown_list = ['c3.y']
 
         J = prob.compute_totals(unknown_list, indep_list, return_format='flat_dict')
-        assert_near_equal(J['c3.y', 'iv.x1'][0][0], -6.0, 1e-6)
-        assert_near_equal(J['c3.y', 'iv.x2'][0][0], 35.0, 1e-6)
+        assert_near_equal(J['c3.y', 'x1'][0][0], -6.0, 1e-6)
+        assert_near_equal(J['c3.y', 'x2'][0][0], 35.0, 1e-6)
 
     def test_fan_out_serial_sets_fwd(self):
 
@@ -118,34 +118,42 @@ class ParDerivTestCase(unittest.TestCase):
 
         prob = om.Problem()
         prob.model = FanInGrouped()
+
+        # An extra unconnected desvar was in the original test.
+        prob.model.add_subsystem('p', om.IndepVarComp('x3', 0.0), promotes=['x3'])
+
         prob.model.linear_solver = om.LinearBlockGS()
         prob.model.sub.linear_solver = om.LinearBlockGS()
 
-        prob.model.add_design_var('iv.x1', parallel_deriv_color='par_dv')
-        prob.model.add_design_var('iv.x2', parallel_deriv_color='par_dv')
-        prob.model.add_design_var('iv.x3')
+        prob.model.add_design_var('x1', parallel_deriv_color='par_dv')
+        prob.model.add_design_var('x2', parallel_deriv_color='par_dv')
+        prob.model.add_design_var('x3')
         prob.model.add_objective('c3.y')
 
         prob.setup(check=False, mode='fwd')
         prob.run_driver()
 
-        indep_list = ['iv.x1', 'iv.x2']
+        indep_list = ['x1', 'x2']
         unknown_list = ['c3.y']
 
         J = prob.compute_totals(unknown_list, indep_list, return_format='flat_dict')
-        assert_near_equal(J['c3.y', 'iv.x1'][0][0], -6.0, 1e-6)
-        assert_near_equal(J['c3.y', 'iv.x2'][0][0], 35.0, 1e-6)
+        assert_near_equal(J['c3.y', 'x1'][0][0], -6.0, 1e-6)
+        assert_near_equal(J['c3.y', 'x2'][0][0], 35.0, 1e-6)
 
     def test_debug_print_option_totals_color(self):
 
         prob = om.Problem()
         prob.model = FanInGrouped()
+
+        # An extra unconnected desvar was in the original test.
+        prob.model.add_subsystem('p', om.IndepVarComp('x3', 0.0), promotes=['x3'])
+
         prob.model.linear_solver = om.LinearBlockGS()
         prob.model.sub.linear_solver = om.LinearBlockGS()
 
-        prob.model.add_design_var('iv.x1', parallel_deriv_color='par_dv')
-        prob.model.add_design_var('iv.x2', parallel_deriv_color='par_dv')
-        prob.model.add_design_var('iv.x3')
+        prob.model.add_design_var('x1', parallel_deriv_color='par_dv')
+        prob.model.add_design_var('x2', parallel_deriv_color='par_dv')
+        prob.model.add_design_var('x3')
         prob.model.add_objective('c3.y')
 
         prob.driver.options['debug_print'] = ['totals']
@@ -154,7 +162,7 @@ class ParDerivTestCase(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_driver()
 
-        indep_list = ['iv.x1', 'iv.x2', 'iv.x3']
+        indep_list = ['x1', 'x2', 'x3']
         unknown_list = ['c3.y']
 
         stdout = sys.stdout
@@ -169,9 +177,9 @@ class ParDerivTestCase(unittest.TestCase):
         output = strout.getvalue()
 
         if not prob.comm.rank:
-            self.assertTrue('Solving color: par_dv (iv.x1, iv.x2)' in output)
+            self.assertTrue('Solving color: par_dv (x1, x2)' in output)
             self.assertTrue('In mode: fwd, Solving variable(s) using simul coloring:' in output)
-            self.assertTrue("('iv.x3', [2])" in output)
+            self.assertTrue("('p.x3', [2])" in output)
 
     def test_fan_out_parallel_sets_rev(self):
 
@@ -781,7 +789,7 @@ class CheckParallelDerivColoringEfficiency(unittest.TestCase):
     # these tests check that redudant calls to compute_jacvec_product
     # are not performed when running parallel derivatives
     # ref issue 1405
-    
+
     N_PROCS = 3
 
     def setup_model(self, size):

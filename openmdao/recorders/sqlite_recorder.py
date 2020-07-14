@@ -327,8 +327,8 @@ class SqliteRecorder(CaseRecorder):
                             (objectives, 'objective'), (constraints, 'constraint')]
 
             # merge current abs2prom and prom2abs with this system's version
-            self._abs2prom['input'].update(system._var_abs2prom['input'])
-            self._abs2prom['output'].update(system._var_abs2prom['output'])
+            self._abs2prom['input'].update(system._var_allprocs_abs2prom['input'])
+            self._abs2prom['output'].update(system._var_allprocs_abs2prom['output'])
             for v, abs_names in system._var_allprocs_prom2abs_list['input'].items():
                 if v not in self._prom2abs['input']:
                     self._prom2abs['input'][v] = abs_names
@@ -373,8 +373,8 @@ class SqliteRecorder(CaseRecorder):
 
             # merge current abs2meta with this system's version
             for name, meta in self._abs2meta.items():
-                if name in system._var_abs2meta:
-                    meta.update(system._var_abs2meta[name])
+                if name in system._var_allprocs_abs2meta:
+                    meta.update(system._var_allprocs_abs2meta[name])
 
             self._cleanup_abs2meta()
 
@@ -659,11 +659,11 @@ class SqliteRecorder(CaseRecorder):
             scaling_factors = sqlite3.Binary(scaling_factors)
             pickled_metadata = sqlite3.Binary(pickled_metadata)
 
+            # Need to use OR IGNORE in here because if the user does run_driver more than once
+            #   the current OpenMDAO code will call this function each time and there will be
+            #   SQL errors for "UNIQUE constraint failed: system_metadata.id"
+            # Future versions of OpenMDAO will handle this better.
             with self.connection as c:
-                # Because we can have a recorder attached to multiple Systems,
-                #   and because we are now recording System metadata recursively,
-                #   we can store System metadata multiple times. Need to ignore when that happens
-                #   so we don't get database errors. So use OR IGNORE
                 c.execute("INSERT OR IGNORE INTO system_metadata"
                           "(id, scaling_factors, component_metadata) "
                           "VALUES(?,?,?)", (path, scaling_factors, pickled_metadata))

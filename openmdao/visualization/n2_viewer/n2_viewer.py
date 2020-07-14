@@ -28,11 +28,6 @@ from openmdao.utils.mpi import MPI
 from openmdao.visualization.html_utils import read_files, write_script, DiagramWriter
 from openmdao.utils.general_utils import warn_deprecation
 
-# Toolbar settings
-_FONT_SIZES = [8, 9, 10, 11, 12, 13, 14]
-_MODEL_HEIGHTS = [600, 650, 700, 750, 800,
-                  850, 900, 950, 1000, 2000, 3000, 4000]
-
 _IND = 4  # HTML indentation (spaces)
 
 
@@ -100,9 +95,13 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
         tree_dict['component_type'] = None
         tree_dict['subsystem_type'] = 'group'
         tree_dict['is_parallel'] = is_parallel
-        children = [_get_tree_dict(s, component_execution_orders, component_execution_index,
-                                   is_parallel)
-                    for s in system._subsystems_myproc]
+
+        children = []
+        for s in system._subsystems_myproc:
+            if (s.name != '_auto_ivc'):
+                children.append(_get_tree_dict(s, component_execution_orders,
+                                component_execution_index, is_parallel))
+
         if system.comm.size > 1:
             if system._subsystems_myproc:
                 sub_comm = system._subsystems_myproc[0].comm

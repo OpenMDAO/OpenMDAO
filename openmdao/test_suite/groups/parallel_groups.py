@@ -78,22 +78,20 @@ class FanInGrouped(om.Group):
     def __init__(self):
         super(FanInGrouped, self).__init__()
 
-        iv = self.add_subsystem('iv', om.IndepVarComp())
-        iv.add_output('x1', 1.0)
-        iv.add_output('x2', 1.0)
-        iv.add_output('x3', 1.0)
+        self.set_input_defaults('x1', 1.0)
+        self.set_input_defaults('x2', 1.0)
 
-        self.sub = self.add_subsystem('sub', om.ParallelGroup())
-        self.sub.add_subsystem('c1', om.ExecComp(['y=-2.0*x']))
-        self.sub.add_subsystem('c2', om.ExecComp(['y=5.0*x']))
+        self.sub = self.add_subsystem('sub', om.ParallelGroup(),
+                                      promotes_inputs=['x1', 'x2'])
+        self.sub.add_subsystem('c1', om.ExecComp(['y=-2.0*x']),
+                               promotes_inputs=[('x', 'x1')])
+        self.sub.add_subsystem('c2', om.ExecComp(['y=5.0*x']),
+                               promotes_inputs=[('x', 'x2')])
 
         self.add_subsystem('c3', om.ExecComp(['y=3.0*x1+7.0*x2']))
 
         self.connect("sub.c1.y", "c3.x1")
         self.connect("sub.c2.y", "c3.x2")
-
-        self.connect("iv.x1", "sub.c1.x")
-        self.connect("iv.x2", "sub.c2.x")
 
 
 class FanInGrouped2(om.Group):

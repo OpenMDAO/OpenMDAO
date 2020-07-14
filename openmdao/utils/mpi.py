@@ -179,16 +179,18 @@ def multi_proc_exception_check(comm):
         try:
             yield
         except Exception:
-            msg = traceback.format_exc()
+            exc = sys.exc_info()
+            fail = 1
         else:
-            msg = ''
+            fail = 0
 
-        fails = [(i, f) for i, f in enumerate(comm.allgather(msg)) if f]
-        if fails:
-            others = [i for i, f in fails[1:]]
-            also = f" (also in ranks {str(others)})" if others else ''
-            raise RuntimeError(f"Exception raised in rank {fails[0][0]}{also}: traceback follows\n"
-                               f"{fails[0][1]}")
+        failed = comm.allreduce(fail)
+        if failed:
+            if fail:
+                msg = f"Exception raised on rank {comm.rank}: {exc[1]}"
+                raise exc[0](msg).with_traceback(exc[2])
+            else:
+                raise exc[0]("Exception raised on other rank.")
 
 
 if MPI:

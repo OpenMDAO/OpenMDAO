@@ -542,10 +542,10 @@ class TestConnectionsDistrib(unittest.TestCase):
         model.add_subsystem('c3', TestComp())
         model.connect("p1.x", "c3.x")
 
-        expected = "ValueError: Group (<model>): The source indices do not specify a valid index " + \
+        rank = prob.comm.rank
+        expected = f"Exception raised on rank {rank}: Group (<model>): The source indices do not specify a valid index " + \
                    "for the connection 'p1.x' to 'c3.x'. " + \
                    "Index '2' is out of range for source dimension of size 2."
-        
         try:
             prob.setup()
         except Exception as err:
@@ -577,7 +577,8 @@ class TestConnectionsDistrib(unittest.TestCase):
         model.add_subsystem('c3', TestComp())
         model.connect("p1.x", "c3.x")
 
-        expected = "ValueError: Group (<model>): The source indices do not specify a valid index " + \
+        rank = prob.comm.rank
+        expected = f"Exception raised on rank {rank}: Group (<model>): The source indices do not specify a valid index " + \
                    "for the connection 'p1.x' to 'c3.x'. " + \
                    "Index '2' is out of range for source dimension of size 2."
 
@@ -587,6 +588,64 @@ class TestConnectionsDistrib(unittest.TestCase):
             self.assertEqual(str(err).splitlines()[-1], expected)
         else:
             self.fail('Exception expected.')
+
+@unittest.skipUnless(MPI, "MPI is required.")
+class TestConnectionsError(unittest.TestCase):
+    N_PROCS = 2
+
+    def test_incompatible_src_indices(self):
+        class TestCompDist(om.ExplicitComponent):
+        # this comp is distributed and forces PETScTransfer
+            def initialize(self):
+                self.options['distributed'] = True
+
+            def setup(self):
+                self.add_input('x', shape=2)
+                self.add_output('y', shape=1)
+                self.declare_partials('y', 'x', val=1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])
+
+        class TestComp(om.ExplicitComponent):
+            def initialize(self):
+                self.options['distributed'] = False
+
+            def setup(self):
+                # read SRC_INDICES on each proc
+                self.add_input('x', shape=2, src_indices=[1, 2], val=-2038.0)
+                self.add_output('y', shape=1)
+                self.declare_partials('y', 'x')
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])
+
+            def compute_partials(self, inputs, J):
+                J['y', 'x'] = np.ones((2,))
+
+        prob = om.Problem()
+        model = prob.model
+
+        rank = prob.comm.rank
+
+        if rank == 0:
+            setval = np.array([2.0, 3.0])
+        else:
+            setval = np.array([10.0, 20.0])
+
+        # no parallel or distributed comps, so default_vector is used (local xfer only)
+        model.add_subsystem('p1', om.IndepVarComp('x', setval))
+        model.add_subsystem('c3', TestComp())
+        model.add_subsystem('c4', TestCompDist())
+        model.connect("p1.x", "c3.x")
+
+        with self.assertRaises(ValueError) as context:
+            prob.setup(check=False, mode='fwd')
+        self.assertEqual(str(context.exception),
+                         f"Exception raised on rank {rank}: Group (<model>): The source indices do not specify a valid index for "
+                         "the connection 'p1.x' to 'c3.x'. Index '2' is out of range for source "
+                         "dimension of size 2.")
+
 
 if __name__ == "__main__":
     unittest.main()

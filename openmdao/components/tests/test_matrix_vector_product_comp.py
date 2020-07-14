@@ -211,21 +211,14 @@ class TestFeature(unittest.TestCase):
 
         p = om.Problem()
 
-        ivc = om.IndepVarComp()
-        ivc.add_output(name='Mat', shape=(nn, 3, 3))
-        ivc.add_output(name='x', shape=(nn, 3), units='m')
-
-        p.model.add_subsystem(name='ivc',
-                              subsys=ivc,
-                              promotes_outputs=['Mat', 'x'])
+        p.model.set_input_defaults('Mat')
+        p.model.set_input_defaults('x', units='m')
 
         p.model.add_subsystem(name='mat_vec_product_comp',
                               subsys=om.MatrixVectorProductComp(A_name='Mat', vec_size=nn,
                                                                 b_name='y', b_units='m',
-                                                                x_units='m'))
-
-        p.model.connect('Mat', 'mat_vec_product_comp.Mat')
-        p.model.connect('x', 'mat_vec_product_comp.x')
+                                                                x_units='m'),
+                              promotes_inputs=['Mat', 'x'])
 
         p.setup()
 

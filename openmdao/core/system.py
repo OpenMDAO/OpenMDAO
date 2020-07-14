@@ -31,7 +31,7 @@ from openmdao.utils.coloring import _compute_coloring, Coloring, \
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, ContainsAll, all_ancestors, \
-    simple_warning, make_set, match_includes_excludes, ensure_compatible
+    simple_warning, make_set, match_includes_excludes, ensure_compatible, _is_slice
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.utils.units import unit_conversion
@@ -615,6 +615,25 @@ class System(object):
         if self.pathname == '':
             self._top_level_setup(mode)
 
+        # Now that connections are setup, we need to convert relevant vector names into their
+        # auto_ivc source where applicable.
+        new_names = []
+        conns = self._conn_global_abs_in2out
+        for vec_name in self._vec_names:
+            if vec_name in conns:
+                new_names.append(conns[vec_name])
+            else:
+                new_names.append(vec_name)
+        self._problem_meta['vec_names'] = new_names
+
+        new_names = []
+        for vec_name in self._lin_vec_names:
+            if vec_name in conns:
+                new_names.append(conns[vec_name])
+            else:
+                new_names.append(vec_name)
+        self._problem_meta['lin_vec_names'] = new_names
+
         self._setup_relevance(mode, self._relevant)
         self._setup_var_index_ranges()
         self._setup_var_sizes()
@@ -663,14 +682,6 @@ class System(object):
         self._setup_recording()
 
         self.set_initial_values()
-
-        # Tell all subsystems to record their metadata if they have recorders attached
-        for sub in self.system_iter(recurse=True, include_self=True):
-            sub._rec_mgr.record_metadata(sub)
-
-            # Also, record to the recorders attached to this System,
-            #   the system metadata for all the subsystems
-            self._rec_mgr.record_metadata(sub)
 
     def use_fixed_coloring(self, coloring=_STD_COLORING_FNAME, recurse=True):
         """
@@ -1394,10 +1405,15 @@ class System(object):
             typ = "response"
 
         pro2abs = self._var_allprocs_prom2abs_list['output']
+        pro2abs_in = self._var_allprocs_prom2abs_list['input']
         try:
             for prom_name, data in vois.items():
                 if data['parallel_deriv_color'] is not None or data['vectorize_derivs']:
-                    yield pro2abs[prom_name][0], data
+                    if prom_name in pro2abs:
+                        yield pro2abs[prom_name][0], data
+                    else:
+                        yield pro2abs_in[prom_name][0], data
+
         except KeyError as err:
             raise RuntimeError(f"{self.msginfo}: Output not found for {typ} {str(err)}.")
 
@@ -1791,7 +1807,11 @@ class System(object):
                                            (self.msginfo, name, str(flat_src_indices),
                                             str(meta['flat_src_indices'])))
 
-                meta['src_indices'] = np.asarray(src_indices, dtype=INT_DTYPE)
+                if src_indices.dtype == object:
+                    meta['src_indices'] = src_indices
+                else:
+                    meta['src_indices'] = np.asarray(src_indices, dtype=INT_DTYPE)
+
                 meta['flat_src_indices'] = flat_src_indices
 
         def resolve(to_match, io_types, matches, proms):
@@ -2434,14 +2454,17 @@ class System(object):
         dvs['cache_linear_solution'] = cache_linear_solution
 
         if indices is not None:
+
+            if isinstance(indices, slice):
+                pass
             # If given, indices must be a sequence
-            if not (isinstance(indices, Iterable) and
-                    all([isinstance(i, Integral) for i in indices])):
+            elif not (isinstance(indices, Iterable) and
+                      all([isinstance(i, Integral) for i in indices])):
                 raise ValueError("{}: If specified, design var indices must be a sequence of "
                                  "integers.".format(self.msginfo))
-
-            indices = np.atleast_1d(indices)
-            dvs['size'] = size = len(indices)
+            else:
+                indices = np.atleast_1d(indices)
+                dvs['size'] = size = len(indices)
 
             # All refs: check the shape if necessary
             for item, item_name in zip([ref, ref0, scaler, adder, upper, lower],
@@ -2543,8 +2566,10 @@ class System(object):
             msg = "{}: Constraint '{}' cannot be both equality and inequality."
             raise ValueError(msg.format(self.msginfo, name))
 
+        if isinstance(indices, slice):
+            pass
         # If given, indices must be a sequence
-        if (indices is not None and not (
+        elif (indices is not None and not (
                 isinstance(indices, Iterable) and all([isinstance(i, Integral) for i in indices]))):
             raise ValueError("{}: If specified, response indices must be a sequence of "
                              "integers.".format(self.msginfo))
@@ -2599,8 +2624,8 @@ class System(object):
             resp['equals'] = equals
             resp['linear'] = linear
             if indices is not None:
-                resp['size'] = len(indices)
                 indices = np.atleast_1d(indices)
+                resp['size'] = len(indices)
             resp['indices'] = indices
         else:  # 'obj'
             if index is not None:
@@ -4230,8 +4255,8 @@ class System(object):
             offset = len(self.pathname) + 1 if self.pathname else 0
 
             if self.comm.size == 1:
+                vdict = {}
                 if discrete_vec:
-                    vdict = {}
                     for n in variables:
                         if n in views:
                             vdict[n] = views[n]
@@ -4246,8 +4271,8 @@ class System(object):
                             vdict[ivc_path] = views[ivc_path]
 
             elif parallel:
+                vdict = {}
                 if discrete_vec:
-                    vdict = {}
                     for n in variables:
                         if n in views:
                             if views_flat[n].size > 0:
@@ -4255,7 +4280,15 @@ class System(object):
                         elif n[offset:] in discrete_vec and self._owning_rank[n] == rank:
                             vdict[n] = discrete_vec[n[offset:]]['value']
                 else:
-                    vdict = {n: views[n] for n in variables if views_flat[n].size > 0}
+                    for name in variables:
+                        if name in views:
+                            if views_flat[name].size > 0:
+                                vdict[name] = views[name]
+                        else:
+                            ivc_path = conns[prom2abs_in[name][0]]
+                            if views_flat[ivc_path].size > 0:
+                                vdict[ivc_path] = views[ivc_path]
+
             else:
                 meta = self._var_allprocs_abs2meta
                 for name in variables:
