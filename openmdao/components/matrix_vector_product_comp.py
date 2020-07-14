@@ -169,13 +169,20 @@ class MatrixVectorProductComp(ExplicitComponent):
                                 "but it has already been defined as an output.")
             else:
                 meta = var_rel2meta[A_name]
-                if A_shape != meta['shape']:
-                    raise ValueError(f"{self.msginfo}: Conflicting shapes specified for matrix "
-                                     f"'{A_name}', {meta['shape']} and {A_shape}.")
+                if vec_size != meta['shape'][0]:
+                    raise ValueError(f"{self.msginfo}: Conflicting vec_size={x_shape[0]} "
+                                     f"specified for matrix '{A_name}', which has already "
+                                     f"been defined with vec_size={meta['shape'][0]}.")
+
+                elif (n_rows, n_cols) != meta['shape'][1:]:
+                    raise ValueError(f"{self.msginfo}: Conflicting shape {A_shape[1:]} specified "
+                                     f"for matrix '{A_name}', which has already been defined "
+                                     f"with shape {meta['shape'][1:]}.")
 
                 elif A_units != meta['units']:
-                    raise ValueError(f"{self.msginfo}: Conflicting units specified for matrix "
-                                     f"'{A_name}', '{meta['units']}' and '{A_units}'.")
+                    raise ValueError(f"{self.msginfo}: Conflicting units '{A_units}' specified "
+                                     f"for matrix '{A_name}', which has already been defined "
+                                     f"with units '{meta['units']}'.")
 
             if x_name not in var_rel2meta:
                 self.add_input(name=x_name, shape=x_shape, units=x_units)
@@ -184,13 +191,20 @@ class MatrixVectorProductComp(ExplicitComponent):
                                 "but it has already been defined as an output.")
             else:
                 meta = var_rel2meta[x_name]
-                if x_shape != meta['shape']:
-                    raise ValueError(f"{self.msginfo}: Conflicting shapes specified for vector "
-                                     f"'{x_name}', {meta['shape']} and {x_shape}.")
+                if vec_size != meta['shape'][0]:
+                    raise ValueError(f"{self.msginfo}: Conflicting vec_size={x_shape[0]} "
+                                     f"specified for vector '{x_name}', which has already "
+                                     f"been defined with vec_size={meta['shape'][0]}.")
+
+                elif n_cols != meta['shape'][1]:
+                    raise ValueError(f"{self.msginfo}: Matrix shape {A_shape[1:]} is incompatible "
+                                     f"with vector '{x_name}', which has already been defined "
+                                     f"with {meta['shape'][1]} column(s).")
 
                 elif x_units != meta['units']:
-                    raise ValueError(f"{self.msginfo}: Conflicting units specified for vector "
-                                     f"'{x_name}', '{meta['units']}' and '{x_units}'.")
+                    raise ValueError(f"{self.msginfo}: Conflicting units '{x_units}' specified "
+                                     f"for vector '{x_name}', which has already been defined "
+                                     f"with units '{meta['units']}'.")
 
             # Make a dummy version of A so we can figure out the nonzero indices
             A = np.ones(A_shape)

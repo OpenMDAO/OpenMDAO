@@ -440,8 +440,9 @@ class TestMultipleErrors(unittest.TestCase):
         with self.assertRaises(NameError) as ctx:
             p.setup()
 
-        self.assertEqual(str(ctx.exception), "MatrixVectorProductComp (mvp): 'x' specified as"
-                         " an output, but it has already been defined as an input.")
+        self.assertEqual(str(ctx.exception), "MatrixVectorProductComp (mvp): "
+                         "'x' specified as an output, but it has already been "
+                         "defined as an input.")
 
     def test_output_as_input_A(self):
         mvp = om.MatrixVectorProductComp()
@@ -455,8 +456,9 @@ class TestMultipleErrors(unittest.TestCase):
         with self.assertRaises(NameError) as ctx:
             p.setup()
 
-        self.assertEqual(str(ctx.exception), "MatrixVectorProductComp (mvp): 'b' specified as"
-                         " an input, but it has already been defined as an output.")
+        self.assertEqual(str(ctx.exception), "MatrixVectorProductComp (mvp): "
+                         "'b' specified as an input, but it has already been "
+                         "defined as an output.")
 
     def test_output_as_input_x(self):
         mvp = om.MatrixVectorProductComp()
@@ -470,10 +472,11 @@ class TestMultipleErrors(unittest.TestCase):
         with self.assertRaises(NameError) as ctx:
             p.setup()
 
-        self.assertEqual(str(ctx.exception), "MatrixVectorProductComp (mvp): 'b' specified as"
-                         " an input, but it has already been defined as an output.")
+        self.assertEqual(str(ctx.exception), "MatrixVectorProductComp (mvp): "
+                         "'b' specified as an input, but it has already been "
+                         "defined as an output.")
 
-    def test_vec_size_mismatch(self):
+    def test_A_vec_size_mismatch(self):
         mvp = om.MatrixVectorProductComp()
         mvp.add_product('c', 'A', 'y', vec_size=10)
 
@@ -486,9 +489,10 @@ class TestMultipleErrors(unittest.TestCase):
             p.setup()
 
         self.assertEqual(str(ctx.exception), "MatrixVectorProductComp (mvp): "
-                         "Conflicting shapes specified for matrix 'A', (1, 3, 3) and (10, 3, 3).")
+                         "Conflicting vec_size=10 specified for matrix 'A', "
+                         "which has already been defined with vec_size=1.")
 
-    def test_shape_mismatch(self):
+    def test_A_shape_mismatch(self):
         mvp = om.MatrixVectorProductComp()
         mvp.add_product('c', 'A', 'y', A_shape=(5, 5))
 
@@ -501,7 +505,8 @@ class TestMultipleErrors(unittest.TestCase):
             p.setup()
 
         self.assertEqual(str(ctx.exception), "MatrixVectorProductComp (mvp): "
-                         "Conflicting shapes specified for matrix 'A', (1, 3, 3) and (1, 5, 5).")
+                         "Conflicting shape (5, 5) specified for matrix 'A', "
+                         "which has already been defined with shape (3, 3).")
 
     def test_A_units_mismatch(self):
         mvp = om.MatrixVectorProductComp()
@@ -516,7 +521,40 @@ class TestMultipleErrors(unittest.TestCase):
             p.setup()
 
         self.assertEqual(str(ctx.exception), "MatrixVectorProductComp (mvp): "
-                         "Conflicting units specified for matrix 'A', 'None' and 'ft'.")
+                         "Conflicting units 'ft' specified for matrix 'A', "
+                         "which has already been defined with units 'None'.")
+
+    def test_x_vec_size_mismatch(self):
+        mvp = om.MatrixVectorProductComp()
+        mvp.add_product('c', 'B', 'x', vec_size=10)
+
+        model = om.Group()
+        model.add_subsystem('mvp', mvp)
+
+        p = om.Problem(model)
+
+        with self.assertRaises(ValueError) as ctx:
+            p.setup()
+
+        self.assertEqual(str(ctx.exception), "MatrixVectorProductComp (mvp): "
+                         "Conflicting vec_size=10 specified for vector 'x', "
+                         "which has already been defined with vec_size=1.")
+
+    def test_x_vec_size_mismatch(self):
+        mvp = om.MatrixVectorProductComp()
+        mvp.add_product('c', 'B', 'x', A_shape=(5, 5))
+
+        model = om.Group()
+        model.add_subsystem('mvp', mvp)
+
+        p = om.Problem(model)
+
+        with self.assertRaises(ValueError) as ctx:
+            p.setup()
+
+        self.assertEqual(str(ctx.exception), "MatrixVectorProductComp (mvp): "
+                         "Matrix shape (5, 5) is incompatible with vector 'x', "
+                         "which has already been defined with 3 column(s).")
 
     def test_x_units_mismatch(self):
         mvp = om.MatrixVectorProductComp()
@@ -531,7 +569,8 @@ class TestMultipleErrors(unittest.TestCase):
             p.setup()
 
         self.assertEqual(str(ctx.exception), "MatrixVectorProductComp (mvp): "
-                         "Conflicting units specified for vector 'x', 'None' and 'ft'.")
+                         "Conflicting units 'ft' specified for vector 'x', "
+                         "which has already been defined with units 'None'.")
 
 
 class TestFeature(unittest.TestCase):

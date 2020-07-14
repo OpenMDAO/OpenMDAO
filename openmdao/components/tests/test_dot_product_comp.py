@@ -404,9 +404,9 @@ class TestMultipleErrors(unittest.TestCase):
         self.assertEqual(str(ctx.exception), "DotProductComp (dpc): 'c' specified as"
                          " an input, but it has already been defined as an output.")
 
-    def test_b_vec_size_mismatch(self):
+    def test_a_vec_size_mismatch(self):
         dpc = om.DotProductComp()
-        dpc.add_product('z', 'x', 'y', vec_size=10)
+        dpc.add_product('z', 'a', 'y', vec_size=10)
 
         model = om.Group()
         model.add_subsystem('dpc', dpc)
@@ -417,7 +417,8 @@ class TestMultipleErrors(unittest.TestCase):
             p.setup()
 
         self.assertEqual(str(ctx.exception), "DotProductComp (dpc): "
-                         "Conflicting vec_size specified for input 'a', 1 versus 10.")
+                         "Conflicting vec_size=10 specified for input 'a', "
+                         "which has already been defined with vec_size=1.")
 
     def test_a_length_mismatch(self):
         dpc = om.DotProductComp()
@@ -432,7 +433,8 @@ class TestMultipleErrors(unittest.TestCase):
             p.setup()
 
         self.assertEqual(str(ctx.exception), "DotProductComp (dpc): "
-                         "Conflicting length specified for input 'a', 3 versus 10.")
+                         "Conflicting length=10 specified for input 'a', "
+                         "which has already been defined with length=3.")
 
     def test_a_units_mismatch(self):
         dpc = om.DotProductComp()
@@ -447,7 +449,8 @@ class TestMultipleErrors(unittest.TestCase):
             p.setup()
 
         self.assertEqual(str(ctx.exception), "DotProductComp (dpc): "
-                         "Conflicting units specified for input 'a', 'None' and 'ft'.")
+                         "Conflicting units 'ft' specified for input 'a', "
+                         "which has already been defined with units 'None'.")
 
     def test_b_vec_size_mismatch(self):
         dpc = om.DotProductComp()
@@ -462,7 +465,8 @@ class TestMultipleErrors(unittest.TestCase):
             p.setup()
 
         self.assertEqual(str(ctx.exception), "DotProductComp (dpc): "
-                         "Conflicting vec_size specified for input 'b', 1 versus 10.")
+                         "Conflicting vec_size=10 specified for input 'b', "
+                         "which has already been defined with vec_size=1.")
 
     def test_b_length_mismatch(self):
         dpc = om.DotProductComp()
@@ -477,7 +481,8 @@ class TestMultipleErrors(unittest.TestCase):
             p.setup()
 
         self.assertEqual(str(ctx.exception), "DotProductComp (dpc): "
-                         "Conflicting length specified for input 'b', 3 versus 10.")
+                         "Conflicting length=10 specified for input 'b', "
+                         "which has already been defined with length=3.")
 
     def test_b_units_mismatch(self):
         dpc = om.DotProductComp()
@@ -492,7 +497,8 @@ class TestMultipleErrors(unittest.TestCase):
             p.setup()
 
         self.assertEqual(str(ctx.exception), "DotProductComp (dpc): "
-                         "Conflicting units specified for input 'b', 'None' and 'ft'.")
+                         "Conflicting units 'ft' specified for input 'b', "
+                         "which has already been defined with units 'None'.")
 
 
 class TestFeature(unittest.TestCase):

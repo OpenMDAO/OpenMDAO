@@ -149,14 +149,17 @@ class DotProductComp(ExplicitComponent):
             else:
                 meta = var_rel2meta[a_name]
                 if a_units != meta['units']:
-                    raise ValueError(f"{self.msginfo}: Conflicting units specified for input "
-                                     f"'{a_name}', '{meta['units']}' and '{a_units}'.")
+                    raise ValueError(f"{self.msginfo}: Conflicting units '{a_units}' specified "
+                                     f"for input '{a_name}', which has already been defined "
+                                     f"with units '{meta['units']}'.")
                 if vec_size != meta['shape'][0]:
-                    raise ValueError(f"{self.msginfo}: Conflicting vec_size specified for input "
-                                     f"'{a_name}', {meta['shape'][0]} versus {vec_size}.")
+                    raise ValueError(f"{self.msginfo}: Conflicting vec_size={vec_size} specified "
+                                     f"for input '{a_name}', which has already been defined "
+                                     f"with vec_size={meta['shape'][0]}.")
                 if length != meta['shape'][1]:
-                    raise ValueError(f"{self.msginfo}: Conflicting length specified for input "
-                                     f"'{a_name}', {meta['shape'][1]} versus {length}.")
+                    raise ValueError(f"{self.msginfo}: Conflicting length={length} specified "
+                                     f"for input '{a_name}', which has already been defined "
+                                     f"with length={meta['shape'][1]}.")
 
             if b_name not in var_rel2meta:
                 self.add_input(name=b_name, shape=(vec_size, length), units=b_units)
@@ -166,14 +169,17 @@ class DotProductComp(ExplicitComponent):
             else:
                 meta = var_rel2meta[b_name]
                 if b_units != meta['units']:
-                    raise ValueError(f"{self.msginfo}: Conflicting units specified for input "
-                                     f"'{b_name}', '{meta['units']}' and '{b_units}'.")
+                    raise ValueError(f"{self.msginfo}: Conflicting units '{b_units}' specified "
+                                     f"for input '{b_name}', which has already been defined "
+                                     f"with units '{meta['units']}'.")
                 if vec_size != meta['shape'][0]:
-                    raise ValueError(f"{self.msginfo}: Conflicting vec_size specified for input "
-                                     f"'{b_name}', {meta['shape'][0]} versus {vec_size}.")
+                    raise ValueError(f"{self.msginfo}: Conflicting vec_size={vec_size} specified "
+                                     f"for input '{b_name}', which has already been defined "
+                                     f"with vec_size={meta['shape'][0]}.")
                 if length != meta['shape'][1]:
-                    raise ValueError(f"{self.msginfo}: Conflicting length specified for input "
-                                     f"'{b_name}', {meta['shape'][1]} versus {length}.")
+                    raise ValueError(f"{self.msginfo}: Conflicting length={length} specified "
+                                     f"for input '{b_name}', which has already been defined "
+                                     f"with length={meta['shape'][1]}.")
 
             row_idxs = np.repeat(np.arange(vec_size), length)
             col_idxs = np.arange(vec_size * length)
