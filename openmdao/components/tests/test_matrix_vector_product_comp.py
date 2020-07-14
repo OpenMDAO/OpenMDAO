@@ -216,7 +216,7 @@ class TestMultipleUnits(unittest.TestCase):
         mvp = om.MatrixVectorProductComp(vec_size=self.nn, A_shape=(5, 3),
                                          A_units='m', x_units='N', b_units='N*m')
 
-        mvp.add_product('B', 'y', 'c', A_shape=(5, 3), vec_size=self.nn,
+        mvp.add_product('c', A_name='B', x_name='y', A_shape=(5, 3), vec_size=self.nn,
                         A_units='m', x_units='N', b_units='N*m')
 
         model = om.Group()
@@ -415,7 +415,7 @@ class TestMultipleErrors(unittest.TestCase):
 
     def test_duplicate_outputs(self):
         mvp = om.MatrixVectorProductComp()
-        mvp.add_product('B', 'y', 'b')
+        mvp.add_product('b', 'B', 'y')
 
         model = om.Group()
         model.add_subsystem('mvp', mvp)
@@ -428,9 +428,54 @@ class TestMultipleErrors(unittest.TestCase):
         self.assertEqual(str(ctx.exception), "MatrixVectorProductComp (mvp): "
                          "Multiple definition of output 'b'.")
 
+    def test_input_as_output(self):
+        mvp = om.MatrixVectorProductComp()
+        mvp.add_product('x', 'A', 'b')
+
+        model = om.Group()
+        model.add_subsystem('mvp', mvp)
+
+        p = om.Problem(model)
+
+        with self.assertRaises(NameError) as ctx:
+            p.setup()
+
+        self.assertEqual(str(ctx.exception), "MatrixVectorProductComp (mvp): 'x' specified as"
+                         " an output, but it has already been defined as an input.")
+
+    def test_output_as_input_A(self):
+        mvp = om.MatrixVectorProductComp()
+        mvp.add_product('c', 'b', 'A')
+
+        model = om.Group()
+        model.add_subsystem('mvp', mvp)
+
+        p = om.Problem(model)
+
+        with self.assertRaises(NameError) as ctx:
+            p.setup()
+
+        self.assertEqual(str(ctx.exception), "MatrixVectorProductComp (mvp): 'b' specified as"
+                         " an input, but it has already been defined as an output.")
+
+    def test_output_as_input_x(self):
+        mvp = om.MatrixVectorProductComp()
+        mvp.add_product('c', 'A', 'b')
+
+        model = om.Group()
+        model.add_subsystem('mvp', mvp)
+
+        p = om.Problem(model)
+
+        with self.assertRaises(NameError) as ctx:
+            p.setup()
+
+        self.assertEqual(str(ctx.exception), "MatrixVectorProductComp (mvp): 'b' specified as"
+                         " an input, but it has already been defined as an output.")
+
     def test_vec_size_mismatch(self):
         mvp = om.MatrixVectorProductComp()
-        mvp.add_product('A', 'y', 'c', vec_size=10)
+        mvp.add_product('c', 'A', 'y', vec_size=10)
 
         model = om.Group()
         model.add_subsystem('mvp', mvp)
@@ -445,7 +490,7 @@ class TestMultipleErrors(unittest.TestCase):
 
     def test_shape_mismatch(self):
         mvp = om.MatrixVectorProductComp()
-        mvp.add_product('A', 'y', 'c', A_shape=(5, 5))
+        mvp.add_product('c', 'A', 'y', A_shape=(5, 5))
 
         model = om.Group()
         model.add_subsystem('mvp', mvp)
@@ -460,7 +505,7 @@ class TestMultipleErrors(unittest.TestCase):
 
     def test_A_units_mismatch(self):
         mvp = om.MatrixVectorProductComp()
-        mvp.add_product('A', 'y', 'c', A_units='ft')
+        mvp.add_product('c', 'A', 'y', A_units='ft')
 
         model = om.Group()
         model.add_subsystem('mvp', mvp)
@@ -475,7 +520,7 @@ class TestMultipleErrors(unittest.TestCase):
 
     def test_x_units_mismatch(self):
         mvp = om.MatrixVectorProductComp()
-        mvp.add_product('A', 'x', 'c', x_units='ft')
+        mvp.add_product('c', 'A', 'x', x_units='ft')
 
         model = om.Group()
         model.add_subsystem('mvp', mvp)

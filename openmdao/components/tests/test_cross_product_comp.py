@@ -212,13 +212,323 @@ class TestUnits(unittest.TestCase):
 
     def test_partials(self):
         np.set_printoptions(linewidth=1024)
-        cpd = self.p.check_partials(compact_print=True)
+        cpd = self.p.check_partials(compact_print=True, out_stream=None)
 
         for comp in cpd:
             for (var, wrt) in cpd[comp]:
                 np.testing.assert_almost_equal(actual=cpd[comp][var, wrt]['J_fwd'],
                                                desired=cpd[comp][var, wrt]['J_fd'],
                                                decimal=6)
+
+
+class TestMultipleUnits(unittest.TestCase):
+
+    def setUp(self):
+        self.nn = 5
+
+        ivc = om.IndepVarComp()
+        ivc.add_output(name='a', shape=(self.nn, 3), units='ft')
+        ivc.add_output(name='b', shape=(self.nn, 3), units='lbf')
+        ivc.add_output(name='x', shape=(self.nn, 3), units='ft')
+        ivc.add_output(name='y', shape=(self.nn, 3), units='lbf')
+
+        cpc = om.CrossProductComp(vec_size=self.nn,
+                                  a_units='m', b_units='N', c_units='N*m')
+
+        cpc.add_product('z', a_name='x', b_name='y', vec_size=self.nn,
+                        a_units='m', b_units='N', c_units='N*m')
+
+        model = om.Group()
+        model.add_subsystem('ivc', subsys=ivc, promotes_outputs=['a', 'b', 'x', 'y'])
+
+        model.add_subsystem('cross_prod_comp', subsys=cpc)
+
+        model.connect('a', 'cross_prod_comp.a')
+        model.connect('b', 'cross_prod_comp.b')
+        model.connect('x', 'cross_prod_comp.x')
+        model.connect('y', 'cross_prod_comp.y')
+
+        p = self.p = om.Problem(model)
+        p.setup()
+
+        p['a'] = np.random.rand(self.nn, 3)
+        p['b'] = np.random.rand(self.nn, 3)
+
+        p.run_model()
+
+    def test_results(self):
+
+        for i in range(self.nn):
+            a_i = self.p['a'][i, :]
+            b_i = self.p['b'][i, :]
+            c_i = self.p.get_val('cross_prod_comp.c', units='ft*lbf')[i, :]
+            expected_i = np.cross(a_i, b_i)
+
+            assert_near_equal(c_i, expected_i, tolerance=1.0E-12)
+
+            x_i = self.p['x'][i, :]
+            y_i = self.p['y'][i, :]
+            z_i = self.p.get_val('cross_prod_comp.z', units='ft*lbf')[i, :]
+            expected_i = np.cross(x_i, y_i)
+
+            assert_near_equal(z_i, expected_i, tolerance=1.0E-12)
+
+    def test_partials(self):
+        np.set_printoptions(linewidth=1024)
+        cpd = self.p.check_partials(compact_print=True, out_stream=None)
+
+        for comp in cpd:
+            for (var, wrt) in cpd[comp]:
+                np.testing.assert_almost_equal(actual=cpd[comp][var, wrt]['J_fwd'],
+                                               desired=cpd[comp][var, wrt]['J_fd'],
+                                               decimal=6)
+
+
+class TestMultipleCommonA(unittest.TestCase):
+
+    def setUp(self):
+        self.nn = 5
+
+        ivc = om.IndepVarComp()
+        ivc.add_output(name='a', shape=(self.nn, 3), units='lbf')
+        ivc.add_output(name='b', shape=(self.nn, 3), units='ft/s')
+        ivc.add_output(name='y', shape=(self.nn, 3), units='ft/s')
+
+        cpc = om.CrossProductComp(vec_size=self.nn,
+                                a_units='N', b_units='m/s', c_units='W')
+
+        cpc.add_product('z', b_name='y', vec_size=self.nn,
+                        a_units='N', b_units='m/s', c_units='W')
+
+        model = om.Group()
+        model.add_subsystem(name='ivc', subsys=ivc,
+                            promotes_outputs=['a', 'b', 'y'])
+
+        model.add_subsystem(name='cross_prod_comp', subsys=cpc)
+
+        model.connect('a', 'cross_prod_comp.a')
+        model.connect('b', 'cross_prod_comp.b')
+        model.connect('y', 'cross_prod_comp.y')
+
+        p = self.p = om.Problem(model)
+        p.setup()
+
+        p['a'] = np.random.rand(self.nn, 3)
+        p['b'] = np.random.rand(self.nn, 3)
+        p['y'] = np.random.rand(self.nn, 3)
+
+        p.run_model()
+
+    def test_results(self):
+
+        for i in range(self.nn):
+            a_i = self.p['a'][i, :]
+            b_i = self.p['b'][i, :]
+            c_i = self.p.get_val('cross_prod_comp.c', units='hp')[i]
+            expected_i = np.cross(a_i, b_i) / 550.
+
+            np.testing.assert_almost_equal(c_i, expected_i)
+
+            y_i = self.p['y'][i, :]
+            z_i = self.p.get_val('cross_prod_comp.z', units='hp')[i]
+            expected_i = np.cross(a_i, y_i) / 550.
+            np.testing.assert_almost_equal(z_i, expected_i)
+
+    def test_partials(self):
+        np.set_printoptions(linewidth=1024)
+        cpd = self.p.check_partials(compact_print=True, out_stream=None)
+
+        for comp in cpd:
+            for (var, wrt) in cpd[comp]:
+                np.testing.assert_almost_equal(actual=cpd[comp][var, wrt]['J_fwd'],
+                                               desired=cpd[comp][var, wrt]['J_fd'],
+                                               decimal=6)
+
+
+class TestMultipleCommonB(unittest.TestCase):
+
+    def setUp(self):
+        self.nn = 5
+
+        ivc = om.IndepVarComp()
+        ivc.add_output(name='a', shape=(self.nn, 3), units='lbf')
+        ivc.add_output(name='b', shape=(self.nn, 3), units='ft/s')
+        ivc.add_output(name='x', shape=(self.nn, 3), units='lbf')
+
+        cpc = om.CrossProductComp(vec_size=self.nn,
+                                a_units='N', b_units='m/s', c_units='W')
+
+        cpc.add_product('z', a_name='x', vec_size=self.nn,
+                        a_units='N', b_units='m/s', c_units='W')
+
+        model = om.Group()
+        model.add_subsystem(name='ivc', subsys=ivc,
+                            promotes_outputs=['a', 'b', 'x'])
+
+        model.add_subsystem(name='cross_prod_comp', subsys=cpc)
+
+        model.connect('a', 'cross_prod_comp.a')
+        model.connect('b', 'cross_prod_comp.b')
+        model.connect('x', 'cross_prod_comp.x')
+
+        p = self.p = om.Problem(model)
+        p.setup()
+
+        p['a'] = np.random.rand(self.nn, 3)
+        p['b'] = np.random.rand(self.nn, 3)
+        p['x'] = np.random.rand(self.nn, 3)
+
+        p.run_model()
+
+    def test_results(self):
+
+        for i in range(self.nn):
+            a_i = self.p['a'][i, :]
+            b_i = self.p['b'][i, :]
+            c_i = self.p.get_val('cross_prod_comp.c', units='hp')[i]
+            expected_i = np.cross(a_i, b_i) / 550.
+
+            np.testing.assert_almost_equal(c_i, expected_i)
+
+            x_i = self.p['x'][i, :]
+            z_i = self.p.get_val('cross_prod_comp.z', units='hp')[i]
+            expected_i = np.cross(x_i, b_i) / 550.
+            np.testing.assert_almost_equal(z_i, expected_i)
+
+    def test_partials(self):
+        np.set_printoptions(linewidth=1024)
+        cpd = self.p.check_partials(compact_print=True, out_stream=None)
+
+        for comp in cpd:
+            for (var, wrt) in cpd[comp]:
+                np.testing.assert_almost_equal(actual=cpd[comp][var, wrt]['J_fwd'],
+                                               desired=cpd[comp][var, wrt]['J_fd'],
+                                               decimal=6)
+
+
+class TestMultipleErrors(unittest.TestCase):
+
+    def test_duplicate_outputs(self):
+        cpc = om.CrossProductComp()
+        cpc.add_product('c')
+
+        model = om.Group()
+        model.add_subsystem('cpc', cpc)
+
+        p = om.Problem(model)
+
+        with self.assertRaises(NameError) as ctx:
+            p.setup()
+
+        self.assertEqual(str(ctx.exception), "CrossProductComp (cpc): "
+                         "Multiple definition of output 'c'.")
+
+    def test_input_as_output(self):
+        cpc = om.CrossProductComp()
+        cpc.add_product('a', 'b', 'c')
+
+        model = om.Group()
+        model.add_subsystem('cpc', cpc)
+
+        p = om.Problem(model)
+
+        with self.assertRaises(NameError) as ctx:
+            p.setup()
+
+        self.assertEqual(str(ctx.exception), "CrossProductComp (cpc): 'a' specified as"
+                         " an output, but it has already been defined as an input.")
+
+    def test_output_as_input_a(self):
+        cpc = om.CrossProductComp()
+        cpc.add_product('z', 'c', 'b')
+
+        model = om.Group()
+        model.add_subsystem('cpc', cpc)
+
+        p = om.Problem(model)
+
+        with self.assertRaises(NameError) as ctx:
+            p.setup()
+
+        self.assertEqual(str(ctx.exception), "CrossProductComp (cpc): 'c' specified as"
+                         " an input, but it has already been defined as an output.")
+
+    def test_output_as_input_b(self):
+        cpc = om.CrossProductComp()
+        cpc.add_product('z', 'a', 'c')
+
+        model = om.Group()
+        model.add_subsystem('cpc', cpc)
+
+        p = om.Problem(model)
+
+        with self.assertRaises(NameError) as ctx:
+            p.setup()
+
+        self.assertEqual(str(ctx.exception), "CrossProductComp (cpc): 'c' specified as"
+                         " an input, but it has already been defined as an output.")
+
+    def test_a_vec_size_mismatch(self):
+        cpc = om.CrossProductComp(vec_size=7)
+        cpc.add_product('z', 'a', 'y', vec_size=42)
+
+        model = om.Group()
+        model.add_subsystem('cpc', cpc)
+
+        p = om.Problem(model)
+
+        with self.assertRaises(ValueError) as ctx:
+            p.setup()
+
+        self.assertEqual(str(ctx.exception), "CrossProductComp (cpc): "
+                         "Conflicting vec_size=42 specified for input 'a', "
+                         "which has already been defined with vec_size=7.")
+
+    def test_a_units_mismatch(self):
+        cpc = om.CrossProductComp()
+        cpc.add_product('z', 'a', 'b',a_units='ft')
+
+        model = om.Group()
+        model.add_subsystem('cpc', cpc)
+
+        p = om.Problem(model)
+
+        with self.assertRaises(ValueError) as ctx:
+            p.setup()
+
+        self.assertEqual(str(ctx.exception), "CrossProductComp (cpc): "
+                         "Conflicting units specified for input 'a', 'None' and 'ft'.")
+
+    def test_b_vec_size_mismatch(self):
+        cpc = om.CrossProductComp()
+        cpc.add_product('z', 'x', 'b', vec_size=10)
+
+        model = om.Group()
+        model.add_subsystem('cpc', cpc)
+
+        p = om.Problem(model)
+
+        with self.assertRaises(ValueError) as ctx:
+            p.setup()
+
+        self.assertEqual(str(ctx.exception), "CrossProductComp (cpc): "
+                         "Conflicting vec_size=10 specified for input 'b', "
+                         "which has already been defined with vec_size=1.")
+
+    def test_b_units_mismatch(self):
+        cpc = om.CrossProductComp()
+        cpc.add_product('z', 'a', 'b', b_units='ft')
+
+        model = om.Group()
+        model.add_subsystem('cpc', cpc)
+
+        p = om.Problem(model)
+
+        with self.assertRaises(ValueError) as ctx:
+            p.setup()
+
+        self.assertEqual(str(ctx.exception), "CrossProductComp (cpc): "
+                         "Conflicting units specified for input 'b', 'None' and 'ft'.")
 
 
 class TestFeature(unittest.TestCase):

@@ -70,7 +70,7 @@ class MatrixVectorProductComp(ExplicitComponent):
         self.options.declare('b_units', types=str, default=None, allow_none=True,
                              desc='The units of the output vector.')
 
-    def add_product(self, A_name, x_name, b_name, A_units=None, x_units=None, b_units=None,
+    def add_product(self, b_name, A_name='A', x_name='x', A_units=None, x_units=None, b_units=None,
                     vec_size=1, A_shape=(3, 3)):
         """
         Add a new output product to the matrix vector product component.
@@ -135,6 +135,8 @@ class MatrixVectorProductComp(ExplicitComponent):
 
         # add inputs and outputs for all products
         var_rel2meta = self._var_rel2meta
+        var_outputs = self._var_rel_names['output']
+        var_inputs = self._var_rel_names['input']
 
         for product in products:
             b_name = product['b_name']
@@ -154,11 +156,17 @@ class MatrixVectorProductComp(ExplicitComponent):
 
             if b_name not in var_rel2meta:
                 self.add_output(name=b_name, shape=b_shape, units=b_units)
+            elif b_name in var_inputs:
+                raise NameError(f"{self.msginfo}: '{b_name}' specified as an output, "
+                                "but it has already been defined as an input.")
             else:
                 raise NameError(f"{self.msginfo}: Multiple definition of output '{b_name}'.")
 
             if A_name not in var_rel2meta:
                 self.add_input(name=A_name, shape=A_shape, units=A_units)
+            elif A_name in var_outputs:
+                raise NameError(f"{self.msginfo}: '{A_name}' specified as an input, "
+                                "but it has already been defined as an output.")
             else:
                 meta = var_rel2meta[A_name]
                 if A_shape != meta['shape']:
@@ -171,6 +179,9 @@ class MatrixVectorProductComp(ExplicitComponent):
 
             if x_name not in var_rel2meta:
                 self.add_input(name=x_name, shape=x_shape, units=x_units)
+            elif x_name in var_outputs:
+                raise NameError(f"{self.msginfo}: '{x_name}' specified as an input, "
+                                "but it has already been defined as an output.")
             else:
                 meta = var_rel2meta[x_name]
                 if x_shape != meta['shape']:

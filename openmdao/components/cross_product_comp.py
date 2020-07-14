@@ -67,25 +67,26 @@ class CrossProductComp(ExplicitComponent):
                             [0, 1, 0, 0, -1, 0],
                             [-1, 0, 1, 0, 0, 0]], dtype=np.float64)
 
-    def add_product(self, a_name, b_name, c_name, a_units=None, b_units=None, c_units=None,
+    def add_product(self, c_name, a_name='a', b_name='b',
+                    c_units=None, a_units=None, b_units=None,
                     vec_size=1):
         """
-        Add a new output product to the dot product component.
+        Add a new output product to the cross product component.
 
         Parameters
         ----------
+        c_name : str
+            The name of the vector product output.
         a_name : str
             The name of the first vector input.
         b_name : str
-            The name of the second input.
-        c_name : str
-            The name of the vector product output.
+            The name of the second vector input.
+        c_units : str or None
+            The units of the output.
         a_units : str or None
             The units of input a.
         b_units : str or None
             The units of input b.
-        c_units : str or None
-            The units of the output.
         vec_size : int
             The number of points at which the dot vector product
             should be computed simultaneously.  The shape of
@@ -123,6 +124,8 @@ class CrossProductComp(ExplicitComponent):
 
         # add inputs and outputs for all products
         var_rel2meta = self._var_rel2meta
+        var_outputs = self._var_rel_names['output']
+        var_inputs = self._var_rel_names['input']
 
         for product in products:
             a_name = product['a_name']
@@ -135,32 +138,47 @@ class CrossProductComp(ExplicitComponent):
 
             shape = (vec_size, 3) if vec_size > 1 else (3,)
 
+            if c_name not in var_rel2meta:
+                self.add_output(name=c_name, val=np.ones(shape=shape), units=c_units)
+            elif c_name in var_inputs:
+                raise NameError(f"{self.msginfo}: '{c_name}' specified as an output, "
+                                "but it has already been defined as an input.")
+            else:
+                raise NameError(f"{self.msginfo}: Multiple definition of output '{c_name}'.")
+
             if a_name not in var_rel2meta:
                 self.add_input(name=a_name, shape=shape, units=a_units)
+            elif a_name in var_outputs:
+                raise NameError(f"{self.msginfo}: '{a_name}' specified as an input, "
+                                "but it has already been defined as an output.")
             else:
                 meta = var_rel2meta[a_name]
                 if a_units != meta['units']:
                     raise ValueError(f"{self.msginfo}: Conflicting units specified for input "
                                      f"'{a_name}', '{meta['units']}' and '{a_units}'.")
-                if shape != meta['shape']:
-                    raise ValueError(f"{self.msginfo}: Conflicting shape specified for input "
-                                     f"'{a_name}', {meta['shape']} versus {shape}.")
+
+                meta_shape = meta['shape']
+                if shape != meta_shape:
+                    raise ValueError(f"{self.msginfo}: Conflicting vec_size={vec_size} specified "
+                                     f"for input '{a_name}', which has already been defined with "
+                                     f"vec_size={meta_shape[0] if len(meta_shape) > 1 else 1}.")
 
             if b_name not in var_rel2meta:
                 self.add_input(name=b_name, shape=shape, units=b_units)
+            elif b_name in var_outputs:
+                raise NameError(f"{self.msginfo}: '{b_name}' specified as an input, "
+                                "but it has already been defined as an output.")
             else:
                 meta = var_rel2meta[b_name]
                 if b_units != meta['units']:
                     raise ValueError(f"{self.msginfo}: Conflicting units specified for input "
                                      f"'{b_name}', '{meta['units']}' and '{b_units}'.")
-                if shape != meta['shape']:
-                    raise ValueError(f"{self.msginfo}: Conflicting shape specified for input "
-                                     f"'{b_name}', {meta['shape']} versus {shape}.")
 
-            if c_name not in var_rel2meta:
-                self.add_output(name=c_name, val=np.ones(shape=shape), units=c_units)
-            else:
-                raise NameError(f"{self.msginfo}: Multiple definition of output '{c_name}'.")
+                meta_shape = meta['shape']
+                if shape != meta_shape:
+                    raise ValueError(f"{self.msginfo}: Conflicting vec_size={vec_size} specified "
+                                     f"for input '{b_name}', which has already been defined with "
+                                     f"vec_size={meta_shape[0] if len(meta_shape) > 1 else 1}.")
 
             row_idxs = np.repeat(np.arange(vec_size * 3, dtype=int), 2)
             col_idxs = np.empty((0,), dtype=int)

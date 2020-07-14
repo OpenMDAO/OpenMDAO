@@ -46,22 +46,22 @@ class VectorMagnitudeComp(ExplicitComponent):
         self.options.declare('in_name', types=str, default='a',
                              desc='The variable name for input vector.')
         self.options.declare('units', types=str, default=None, allow_none=True,
-                             desc='The units for vector a.')
+                             desc='The units of the input vector.')
         self.options.declare('mag_name', types=str, default='a_mag',
                              desc='The variable name for output vector magnitude.')
 
-    def add_magnitude(self, in_name, mag_name, units=None, vec_size=1, length=3):
+    def add_magnitude(self, mag_name, in_name, units=None, vec_size=1, length=3):
         """
-        Add a new output product to the dot product component.
+        Add a new output magnitude to the vector magnitude component.
 
         Parameters
         ----------
-        in_name : str
-            The name of the first vector input.
         mag_name : str
-            The name of the second input.
+            The name of the output vector magnitude.
+        in_name : str
+            The name of the input vector.
         units : str or None
-            The units of input a.
+            The units of the input vector.
         vec_size : int
             The number of points at which the dot vector product
             should be computed simultaneously.  The shape of
@@ -98,35 +98,46 @@ class VectorMagnitudeComp(ExplicitComponent):
 
         # add inputs and outputs for all products
         var_rel2meta = self._var_rel2meta
+        var_outputs = self._var_rel_names['output']
+        var_inputs = self._var_rel_names['input']
 
         for magnitude in magnitudes:
             in_name = magnitude['in_name']
             mag_name = magnitude['mag_name']
             units = magnitude['units']
             vec_size = magnitude['vec_size']
-            m = magnitude['length']
+            length = magnitude['length']
+
+            if mag_name not in var_rel2meta:
+                self.add_output(name=mag_name, shape=(vec_size,), units=units)
+            elif mag_name in var_inputs:
+                raise NameError(f"{self.msginfo}: '{mag_name}' specified as an output, "
+                                "but it has already been defined as an input.")
+            else:
+                raise NameError(f"{self.msginfo}: Multiple definition of output '{mag_name}'.")
 
             if in_name not in var_rel2meta:
-                self.add_input(name=in_name, shape=(vec_size, m), units=units)
+                self.add_input(name=in_name, shape=(vec_size, length), units=units)
+            elif in_name in var_outputs:
+                raise NameError(f"{self.msginfo}: '{in_name}' specified as an input, "
+                                "but it has already been defined as an output.")
             else:
+                # declaring a duplicate magnitude with a different output name?  okay...
                 meta = var_rel2meta[in_name]
                 if units != meta['units']:
                     raise ValueError(f"{self.msginfo}: Conflicting units specified for input "
                                      f"'{in_name}', '{meta['units']}' and '{units}'.")
                 if vec_size != meta['shape'][0]:
-                    raise ValueError(f"{self.msginfo}: Conflicting vec_size specified for input "
-                                     f"'{in_name}', {meta['shape'][0]} versus {vec_size}.")
-                if m != meta['shape'][1]:
-                    raise ValueError(f"{self.msginfo}: Conflicting length specified for input "
-                                     f"'{in_name}', {meta['shape'][1]} versus {m}.")
+                    raise ValueError(f"{self.msginfo}: Conflicting vec_size={vec_size} specified "
+                                     f"for input '{in_name}', which has already been defined with "
+                                     f"vec_size={meta['shape'][0]}.")
+                if length != meta['shape'][1]:
+                    raise ValueError(f"{self.msginfo}: Conflicting length={length} specified "
+                                     f"for input '{in_name}', which has already been defined with "
+                                     f"length={meta['shape'][0]}.")
 
-            if mag_name not in var_rel2meta:
-                self.add_output(name=mag_name, shape=(vec_size,), units=units)
-            else:
-                raise NameError(f"{self.msginfo}: Multiple definition of output '{mag_name}'.")
-
-            row_idxs = np.repeat(np.arange(vec_size), m)
-            col_idxs = np.arange(vec_size * m)
+            row_idxs = np.repeat(np.arange(vec_size), length)
+            col_idxs = np.arange(vec_size * length)
             self.declare_partials(of=mag_name, wrt=in_name,
                                   rows=row_idxs, cols=col_idxs)
 
