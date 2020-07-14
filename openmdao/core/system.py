@@ -31,7 +31,7 @@ from openmdao.utils.coloring import _compute_coloring, Coloring, \
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, ContainsAll, all_ancestors, \
-    simple_warning, make_set, match_includes_excludes, ensure_compatible
+    simple_warning, make_set, match_includes_excludes, ensure_compatible, _is_slice
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.utils.units import unit_conversion
@@ -612,6 +612,25 @@ class System(object):
         if self.pathname == '':
             self._top_level_setup(mode)
 
+        # Now that connections are setup, we need to convert relevant vector names into their
+        # auto_ivc source where applicable.
+        new_names = []
+        conns = self._conn_global_abs_in2out
+        for vec_name in self._vec_names:
+            if vec_name in conns:
+                new_names.append(conns[vec_name])
+            else:
+                new_names.append(vec_name)
+        self._problem_meta['vec_names'] = new_names
+
+        new_names = []
+        for vec_name in self._lin_vec_names:
+            if vec_name in conns:
+                new_names.append(conns[vec_name])
+            else:
+                new_names.append(vec_name)
+        self._problem_meta['lin_vec_names'] = new_names
+
         self._setup_relevance(mode, self._relevant)
         self._setup_var_index_ranges()
         self._setup_var_sizes()
@@ -660,14 +679,6 @@ class System(object):
         self._setup_recording()
 
         self.set_initial_values()
-
-        # Tell all subsystems to record their metadata if they have recorders attached
-        for sub in self.system_iter(recurse=True, include_self=True):
-            sub._rec_mgr.record_metadata(sub)
-
-            # Also, record to the recorders attached to this System,
-            #   the system metadata for all the subsystems
-            self._rec_mgr.record_metadata(sub)
 
     def use_fixed_coloring(self, coloring=_STD_COLORING_FNAME, recurse=True):
         """
@@ -1389,10 +1400,15 @@ class System(object):
             typ = "response"
 
         pro2abs = self._var_allprocs_prom2abs_list['output']
+        pro2abs_in = self._var_allprocs_prom2abs_list['input']
         try:
             for prom_name, data in vois.items():
                 if data['parallel_deriv_color'] is not None or data['vectorize_derivs']:
-                    yield pro2abs[prom_name][0], data
+                    if prom_name in pro2abs:
+                        yield pro2abs[prom_name][0], data
+                    else:
+                        yield pro2abs_in[prom_name][0], data
+
         except KeyError as err:
             raise RuntimeError(f"{self.msginfo}: Output not found for {typ} {str(err)}.")
 
@@ -1411,7 +1427,7 @@ class System(object):
             The relevance dictionary.
         """
         if self._use_derivatives:
-            desvars = self.get_design_vars(recurse=True, get_sizes=False)
+            desvars = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
             responses = self.get_responses(recurse=True, get_sizes=False)
             return get_relevant_vars(self._conn_global_abs_in2out, desvars, responses,
                                      mode)
@@ -1786,7 +1802,11 @@ class System(object):
                                            (self.msginfo, name, str(flat_src_indices),
                                             str(meta['flat_src_indices'])))
 
-                meta['src_indices'] = np.asarray(src_indices, dtype=INT_DTYPE)
+                if src_indices.dtype == object:
+                    meta['src_indices'] = src_indices
+                else:
+                    meta['src_indices'] = np.asarray(src_indices, dtype=INT_DTYPE)
+
                 meta['flat_src_indices'] = flat_src_indices
 
         def resolve(to_match, io_types, matches, proms):
@@ -2429,14 +2449,17 @@ class System(object):
         dvs['cache_linear_solution'] = cache_linear_solution
 
         if indices is not None:
+
+            if isinstance(indices, slice):
+                pass
             # If given, indices must be a sequence
-            if not (isinstance(indices, Iterable) and
-                    all([isinstance(i, Integral) for i in indices])):
+            elif not (isinstance(indices, Iterable) and
+                      all([isinstance(i, Integral) for i in indices])):
                 raise ValueError("{}: If specified, design var indices must be a sequence of "
                                  "integers.".format(self.msginfo))
-
-            indices = np.atleast_1d(indices)
-            dvs['size'] = size = len(indices)
+            else:
+                indices = np.atleast_1d(indices)
+                dvs['size'] = size = len(indices)
 
             # All refs: check the shape if necessary
             for item, item_name in zip([ref, ref0, scaler, adder, upper, lower],
@@ -2538,8 +2561,10 @@ class System(object):
             msg = "{}: Constraint '{}' cannot be both equality and inequality."
             raise ValueError(msg.format(self.msginfo, name))
 
+        if isinstance(indices, slice):
+            pass
         # If given, indices must be a sequence
-        if (indices is not None and not (
+        elif (indices is not None and not (
                 isinstance(indices, Iterable) and all([isinstance(i, Integral) for i in indices]))):
             raise ValueError("{}: If specified, response indices must be a sequence of "
                              "integers.".format(self.msginfo))
@@ -2594,8 +2619,8 @@ class System(object):
             resp['equals'] = equals
             resp['linear'] = linear
             if indices is not None:
-                resp['size'] = len(indices)
                 indices = np.atleast_1d(indices)
+                resp['size'] = len(indices)
             resp['indices'] = indices
         else:  # 'obj'
             if index is not None:
@@ -2782,7 +2807,7 @@ class System(object):
                           vectorize_derivs=vectorize_derivs,
                           cache_linear_solution=cache_linear_solution)
 
-    def get_design_vars(self, recurse=True, get_sizes=True):
+    def get_design_vars(self, recurse=True, get_sizes=True, use_prom_ivc=True):
         """
         Get the DesignVariable settings from this system.
 
@@ -2796,6 +2821,8 @@ class System(object):
             all design vars relative to the this system.
         get_sizes : bool, optional
             If True, compute the size of each design variable.
+        use_prom_ivc : bool
+            Translate auto_ivc_names to their promoted input names.
 
         Returns
         -------
@@ -2813,10 +2840,24 @@ class System(object):
         try:
             for name, data in self._design_vars.items():
                 if name in pro2abs_out:
-                    out[pro2abs_out[name][0]] = data
+
+                    # This is an output name, most likely a manual indepvarcomp.
+                    abs_name = pro2abs_out[name][0]
+                    out[abs_name] = data
+                    out[abs_name]['ivc_source'] = abs_name
+
                 else:  # assume an input name else KeyError
+
+                    # Design variable on an auto_ivc input, so use connected output name.
                     in_abs = pro2abs_in[name][0]
-                    out[conns[in_abs]] = data  # use connected output name
+                    ivc_path = conns[in_abs]
+                    if use_prom_ivc:
+                        out[name] = data
+                        out[name]['ivc_source'] = ivc_path
+                    else:
+                        out[ivc_path] = data
+                        out[ivc_path]['ivc_source'] = ivc_path
+
         except KeyError as err:
             msg = "{}: Output not found for design variable {}."
             raise RuntimeError(msg.format(self.msginfo, str(err)))
@@ -2826,20 +2867,26 @@ class System(object):
             sizes = self._var_sizes['nonlinear']['output']
             abs2idx = self._var_allprocs_abs2idx['nonlinear']
             for name, meta in out.items():
+
+                src_name = name
+                if meta['ivc_source'] is not None:
+                    src_name = meta['ivc_source']
+
                 if 'size' not in meta:
-                    if name in abs2idx:
-                        meta['size'] = sizes[self._owning_rank[name], abs2idx[name]]
+                    if src_name in abs2idx:
+                        meta['size'] = sizes[self._owning_rank[src_name], abs2idx[src_name]]
                     else:
                         meta['size'] = 0  # discrete var, don't know size
 
-                if name in abs2idx:
-                    meta = self._var_allprocs_abs2meta[name]
+                if src_name in abs2idx:
+                    meta = self._var_allprocs_abs2meta[src_name]
                     out[name]['distributed'] = meta['distributed']
                     out[name]['global_size'] = meta['global_size']
 
         if recurse:
             for subsys in self._subsystems_myproc:
-                out.update(subsys.get_design_vars(recurse=recurse, get_sizes=get_sizes))
+                out.update(subsys.get_design_vars(recurse=recurse, get_sizes=get_sizes,
+                                                  use_prom_ivc=False))
 
             if self.comm.size > 1 and self._subsystems_allprocs:
                 allouts = self.comm.allgather(out)
@@ -2849,7 +2896,7 @@ class System(object):
 
         return out
 
-    def get_responses(self, recurse=True, get_sizes=True):
+    def get_responses(self, recurse=True, get_sizes=True, use_prom_ivc=False):
         """
         Get the response variable settings from this system.
 
@@ -2863,6 +2910,8 @@ class System(object):
             all responses relative to the this system.
         get_sizes : bool, optional
             If True, compute the size of each response.
+        use_prom_ivc : bool
+            Translate auto_ivc_names to their promoted input names.
 
         Returns
         -------
@@ -2872,11 +2921,30 @@ class System(object):
 
         """
         prom2abs = self._var_allprocs_prom2abs_list['output']
+        prom2abs_in = self._var_allprocs_prom2abs_list['input']
+        conns = self._problem_meta.get('connections', {})
 
         # Human readable error message during Driver setup.
         try:
-            out = OrderedDict((prom2abs[name][0], data) for name, data in
-                              self._responses.items())
+            out = {}
+            for name, data in self._responses.items():
+                if name in prom2abs:
+                    abs_name = prom2abs[name][0]
+                    out[abs_name] = data
+                    out[abs_name]['ivc_source'] = abs_name
+
+                else:
+                    # A constraint can actaully be on an auto_ivc input, so use connected
+                    # output name.
+                    in_abs = prom2abs_in[name][0]
+                    ivc_path = conns[in_abs]
+                    if use_prom_ivc:
+                        out[name] = data
+                        out[name]['ivc_source'] = ivc_path
+                    else:
+                        out[ivc_path] = data
+                        out[ivc_path]['ivc_source'] = ivc_path
+
         except KeyError as err:
             msg = "{}: Output not found for response {}."
             raise RuntimeError(msg.format(self.msginfo, str(err)))
@@ -2885,8 +2953,8 @@ class System(object):
             # Size them all
             sizes = self._var_sizes['nonlinear']['output']
             abs2idx = self._var_allprocs_abs2idx['nonlinear']
-            for name in out:
-                response = out[name]
+            for prom_name, response in out.items():
+                name = response['ivc_source']
 
                 # Discrete vars
                 if name not in abs2idx:
@@ -4176,41 +4244,54 @@ class System(object):
         dict
             Variable values keyed on absolute name.
         """
+        prom2abs_in = self._var_allprocs_prom2abs_list['input']
+        conns = self._problem_meta.get('connections', {})
         vdict = {}
         variables = filtered_vars.get(kind)
         if variables:
             vec = self._vectors[kind][vec_name]
+            srcvec = self._vectors['output'][vec_name]
             get = vec._abs_get_val
             rank = self.comm.rank
             discrete_vec = None if kind == 'residual' else self._var_discrete[kind]
             offset = len(self.pathname) + 1 if self.pathname else 0
 
             if self.comm.size == 1:
+                vdict = {}
                 if discrete_vec:
-                    vdict = {}
-                    for n in variables:
-                        if vec._contains_abs(n):
-                            vdict[n] = get(n, False)
+                    for name in variables:
+                        if vec._contains_abs(name):
+                            vdict[name] = get(name, False)
                         else:  # discrete
-                            vdict[n] = discrete_vec[n[offset:]]['value']
+                            vdict[name] = discrete_vec[name[offset:]]['value']
                 else:
-                    vdict = {n: get(n, False) for n in variables}
+                    for name in variables:
+                        if vec._contains_abs(name):
+                            vdict[name] = get(name, False)
+                        else:
+                            ivc_path = conns[prom2abs_in[name][0]]
+                            vdict[ivc_path] = srcvec._abs_get_val(ivc_path, False)
             elif parallel:
+                vdict = {}
                 if discrete_vec:
-                    vdict = {}
-                    for n in variables:
-                        if vec._contains_abs(n):
-                            val = get(n, False)
+                    for name in variables:
+                        if vec._contains_abs(name):
+                            val = get(name, False)
                             if val.size > 0:
-                                vdict[n] = val
-                        elif n[offset:] in discrete_vec and self._owning_rank[n] == rank:
-                            vdict[n] = discrete_vec[n[offset:]]['value']
+                                vdict[name] = val
+                        elif name[offset:] in discrete_vec and self._owning_rank[name] == rank:
+                            vdict[name] = discrete_vec[name[offset:]]['value']
                 else:
-                    vdict = {}
-                    for n in variables:
-                        val = get(n, False)
-                        if val.size > 0:
-                            vdict[n] = val
+                    for name in variables:
+                        if vec._contains_abs(name):
+                            val = get(name, False)
+                            if val.size > 0:
+                                vdict[name] = val
+                        else:
+                            ivc_path = conns[prom2abs_in[name][0]]
+                            val = srcvec._abs_get_val(ivc_path, False)
+                            if val.size > 0:
+                                vdict[ivc_path] = val
             else:
                 meta = self._var_allprocs_abs2meta
                 for name in variables:

@@ -164,7 +164,7 @@ def check_path(path, includes, excludes, include_all_path=False):
     return include_all_path
 
 
-def deserialize(json_data, abs2meta):
+def deserialize(json_data, abs2meta, prom2abs, conns):
     """
     Deserialize recorded data from a JSON formatted string.
 
@@ -177,6 +177,11 @@ def deserialize(json_data, abs2meta):
         JSON encoded data
     abs2meta : dict
         Dictionary mapping absolute variable names to variable metadata
+    prom2abs : dict
+        Dictionary mapping promoted input names to absolute. Needed to resolve auto_ivc outputs
+        that are recorded with their promoted input name.
+    conns : dict
+        Dictionary of all model connections.
 
     Returns
     -------
@@ -190,7 +195,14 @@ def deserialize(json_data, abs2meta):
     all_array = True
 
     for name, value in values.items():
-        if isinstance(value, list) and 'shape' in abs2meta[name]:
+        try:
+            has_shape = 'shape' in abs2meta[name]
+        except KeyError:
+            abs_name = prom2abs['input'][name]
+            src_name = conns[abs_name[0]]
+            has_shape = 'shape' in abs2meta[src_name]
+
+        if isinstance(value, list) and has_shape:
             values[name] = np.asarray(value)  # array will be proper shape based on list structure
         else:
             all_array = False

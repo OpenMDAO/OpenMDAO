@@ -524,7 +524,7 @@ class TestProblem(unittest.TestCase):
         prob.run_model()
 
         of = ['obj', 'con1']
-        wrt = ['x', 'z']
+        wrt = ['_auto_ivc.v1', '_auto_ivc.v0']
 
         if mode == 'fwd':
             seed_names = wrt
@@ -1933,7 +1933,7 @@ class TestProblem(unittest.TestCase):
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
         self.assertEquals(output[1], r'Design Variables')
-        self.assertRegex(output[5], r'^pz.z +\|[0-9. e+-]+\| +2')
+        self.assertRegex(output[5], r'^z +\|[0-9. e+-]+\| +2')
         self.assertEquals(output[9], r'Constraints')
         self.assertRegex(output[14], r'^con_cmp2.con2 +\[[0-9. e+-]+\] +1')
         self.assertEquals(output[17], r'Objectives')
@@ -1982,7 +1982,7 @@ class TestProblem(unittest.TestCase):
                     r'indices\s+adder\s+scaler\s+parallel_deriv_color\s+'
                     r'vectorize_derivs\s+cache_linear_solution')
         self.assertRegex(output[5],
-                    r'^pz.z\s+\|[0-9.e+-]+\|\s+2\s+\|10.0\|\s+\|[0-9.e+-]+\|\s+None\s+'
+                    r'^z\s+\|[0-9.e+-]+\|\s+2\s+\|10.0\|\s+\|[0-9.e+-]+\|\s+None\s+'
                     r'None\s+None\s+None\s+None\s+None\s+False\s+False')
 
         # With all the optional columns and print_arrays

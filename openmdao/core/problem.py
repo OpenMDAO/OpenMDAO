@@ -25,7 +25,8 @@ from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.solvers.solver import SolverInfo
 from openmdao.error_checking.check_config import _default_checks, _all_checks
 from openmdao.recorders.recording_iteration_stack import _RecIteration
-from openmdao.recorders.recording_manager import RecordingManager, record_viewer_data
+from openmdao.recorders.recording_manager import RecordingManager, record_viewer_data, \
+    record_system_options
 from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.general_utils import ContainsAll, pad_name, simple_warning, warn_deprecation
 
@@ -117,6 +118,8 @@ class Problem(object):
         Object for logging config checks if _check is True.
     _name : str
         Problem name.
+    _system_options_recorded : bool
+        A flag to indicate whether the system options for all the systems have been recorded
     """
 
     def __init__(self, model=None, driver=None, comm=None, name=None, **options):
@@ -175,6 +178,7 @@ class Problem(object):
         # 2 -- The `final_setup` has been run, everything ready to run.
         self._setup_status = 0
 
+        self._system_options_recorded = False
         self._rec_mgr = RecordingManager()
 
         # General options
@@ -899,6 +903,7 @@ class Problem(object):
             driver._setup_recording()
             self._setup_recording()
             record_viewer_data(self)
+            record_system_options(self)
 
         if self._setup_status < 2:
             self._setup_status = 2
@@ -1623,6 +1628,7 @@ class Problem(object):
         # Get the values for all the elements in the tables
         rows = []
         for name, meta in meta.items():
+
             row = {}
             for col_name in col_names:
                 if col_name == 'name':
@@ -1631,8 +1637,12 @@ class Problem(object):
                     else:
                         if name in abs2prom['input']:
                             row[col_name] = abs2prom['input'][name]
-                        else:
+                        elif name in abs2prom['output']:
                             row[col_name] = abs2prom['output'][name]
+                        else:
+                            # Promoted auto_ivc name. Keep it promoted
+                            row[col_name] = name
+
                 elif col_name == 'value':
                     row[col_name] = vals[name]
                 else:

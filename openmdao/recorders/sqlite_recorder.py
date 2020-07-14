@@ -29,6 +29,8 @@ from openmdao.solvers.solver import Solver
 """
 SQL case database version history.
 ----------------------------------
+11-- OpenMDAO 3.2
+     IndepVarComps are created automatically, so this changes some bookkeeping.
 10-- OpenMDAO 3.0
      Added abs_err and rel_err recording to Problem recording
 9 -- OpenMDAO 3.0
@@ -52,7 +54,7 @@ SQL case database version history.
 1 -- Through OpenMDAO 2.3
      Original implementation.
 """
-format_version = 10
+format_version = 11
 
 
 def array_to_blob(array):
@@ -189,7 +191,8 @@ class SqliteRecorder(CaseRecorder):
             self.connection = sqlite3.connect(filepath)
             with self.connection as c:
                 c.execute("CREATE TABLE metadata(format_version INT, "
-                          "abs2prom TEXT, prom2abs TEXT, abs2meta TEXT, var_settings TEXT)")
+                          "abs2prom TEXT, prom2abs TEXT, abs2meta TEXT, var_settings TEXT,"
+                          "conns TEXT)")
                 c.execute("INSERT INTO metadata(format_version, abs2prom, prom2abs) "
                           "VALUES(?,?,?)", (format_version, None, None))
 
@@ -296,7 +299,7 @@ class SqliteRecorder(CaseRecorder):
         if self.connection:
 
             if driver is None:
-                desvars = system.get_design_vars(True, get_sizes=False)
+                desvars = system.get_design_vars(True, get_sizes=False, use_prom_ivc=False)
                 responses = system.get_responses(True, get_sizes=False)
                 objectives = OrderedDict()
                 constraints = OrderedDict()
@@ -324,8 +327,8 @@ class SqliteRecorder(CaseRecorder):
                             (objectives, 'objective'), (constraints, 'constraint')]
 
             # merge current abs2prom and prom2abs with this system's version
-            self._abs2prom['input'].update(system._var_abs2prom['input'])
-            self._abs2prom['output'].update(system._var_abs2prom['output'])
+            self._abs2prom['input'].update(system._var_allprocs_abs2prom['input'])
+            self._abs2prom['output'].update(system._var_allprocs_abs2prom['output'])
             for v, abs_names in system._var_allprocs_prom2abs_list['input'].items():
                 if v not in self._prom2abs['input']:
                     self._prom2abs['input'][v] = abs_names
@@ -344,6 +347,11 @@ class SqliteRecorder(CaseRecorder):
 
             for var_set, var_type in full_var_set:
                 for name in var_set:
+
+                    # Design variables can be requested by input name.
+                    if var_type == 'desvar':
+                        name = var_set[name]['ivc_source']
+
                     if name not in self._abs2meta:
                         try:
                             self._abs2meta[name] = real_meta[name].copy()
@@ -365,8 +373,8 @@ class SqliteRecorder(CaseRecorder):
 
             # merge current abs2meta with this system's version
             for name, meta in self._abs2meta.items():
-                if name in system._var_abs2meta:
-                    meta.update(system._var_abs2meta[name])
+                if name in system._var_allprocs_abs2meta:
+                    meta.update(system._var_allprocs_abs2meta[name])
 
             self._cleanup_abs2meta()
 
@@ -374,6 +382,7 @@ class SqliteRecorder(CaseRecorder):
             abs2prom = json.dumps(self._abs2prom)
             prom2abs = json.dumps(self._prom2abs)
             abs2meta = json.dumps(self._abs2meta)
+            conns = json.dumps(system._problem_meta.get('connections', {}))
 
             var_settings = {}
             var_settings.update(desvars)
@@ -384,8 +393,9 @@ class SqliteRecorder(CaseRecorder):
             var_settings_json = json.dumps(var_settings)
 
             with self.connection as c:
-                c.execute("UPDATE metadata SET abs2prom=?, prom2abs=?, abs2meta=?, var_settings=?",
-                          (abs2prom, prom2abs, abs2meta, var_settings_json))
+                c.execute("UPDATE metadata SET " +
+                          "abs2prom=?, prom2abs=?, abs2meta=?, var_settings=?, conns=?",
+                          (abs2prom, prom2abs, abs2meta, var_settings_json, conns))
 
     def record_iteration_driver(self, recording_requester, data, metadata):
         """
@@ -649,11 +659,11 @@ class SqliteRecorder(CaseRecorder):
             scaling_factors = sqlite3.Binary(scaling_factors)
             pickled_metadata = sqlite3.Binary(pickled_metadata)
 
+            # Need to use OR IGNORE in here because if the user does run_driver more than once
+            #   the current OpenMDAO code will call this function each time and there will be
+            #   SQL errors for "UNIQUE constraint failed: system_metadata.id"
+            # Future versions of OpenMDAO will handle this better.
             with self.connection as c:
-                # Because we can have a recorder attached to multiple Systems,
-                #   and because we are now recording System metadata recursively,
-                #   we can store System metadata multiple times. Need to ignore when that happens
-                #   so we don't get database errors. So use OR IGNORE
                 c.execute("INSERT OR IGNORE INTO system_metadata"
                           "(id, scaling_factors, component_metadata) "
                           "VALUES(?,?,?)", (path, scaling_factors, pickled_metadata))

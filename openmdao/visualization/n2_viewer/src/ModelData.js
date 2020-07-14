@@ -3,7 +3,7 @@ class ModelData {
 
     /** Do some discovery in the tree and rearrange & enhance where necessary. */
     constructor(modelJSON) {
-        debugInfo(modelJSON);
+
         modelJSON.tree.name = 'model'; // Change 'root' to 'model'
         this.conns = modelJSON.connections_list;
         this.abs2prom = modelJSON.abs2prom; // May be undefined.
@@ -14,6 +14,7 @@ class ModelData {
         this.maxDepth = 1;
         this.idCounter = 0;
         this.unconnectedParams = 0;
+        this.autoivcSources = 0;
         this.nodePaths = {};
 
 
@@ -38,6 +39,12 @@ class ModelData {
 
         debugInfo("New model: ", this);
         // this.errorCheck();
+    }
+
+    static uncompressModel(b64str) {
+        const compressedData = atob(b64str);
+        const jsonStr = window.pako.inflate(compressedData, { to: 'string' });
+        return JSON.parse(jsonStr);
     }
 
     /**
@@ -197,6 +204,18 @@ class ModelData {
         return false;
     }
 
+    hasAutoIvcSrc(elementPath) {
+        for (let conn of this.conns) {
+            if (conn.tgt == elementPath && conn.src.match(/^_auto_ivc.*$/)) {
+                debugInfo(elementPath + " source is an auto-ivc output.");
+                this.autoivcSources++;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /**
      * Create an array in each node containing references to its
      * children that are subsystems. Runs recursively over the node's
@@ -296,6 +315,9 @@ class ModelData {
         let throwLbl = 'ModelData._computeConnections: ';
 
         for (let conn of this.conns) {
+            // Ignore connections from _auto_ivc, which is intentionally not included.
+            if (conn.src.match(/^_auto_ivc.*$/)) continue;
+
             // Process sources
             let srcObj = this.nodePaths[conn.src];
 
@@ -318,7 +340,6 @@ class ModelData {
             for (let obj = srcObj.parent; obj != null; obj = obj.parent) {
                 srcObjParents.push(obj);
             }
-
 
             // Process targets
             let tgtObj = this.nodePaths[conn.tgt];
@@ -416,8 +437,12 @@ class ModelData {
             console.warn("identifyUnconnectedParam error: absPathName not set for ", node);
         }
         else {
-            if (node.isParam() && !node.hasChildren() && !this.hasAnyConnection(node.absPathName))
-                node.type = "unconnected_param";
+            if (node.isParam()) {
+                if (!node.hasChildren() && !this.hasAnyConnection(node.absPathName))
+                    node.type = "unconnected_param";
+                else if (this.hasAutoIvcSrc(node.absPathName))
+                    node.type = "autoivc_param";
+            }
         }
     }
 
