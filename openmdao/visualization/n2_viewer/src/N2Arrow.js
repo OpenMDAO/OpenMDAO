@@ -8,9 +8,11 @@ class N2Arrow {
      * @param {Object} attribs.start Coordinates of the starting node
      * @param {number} attribs.start.row
      * @param {number} attribs.start.col
+     * @param {string} attribs.start.id ID of the start node
      * @param {Object} attribs.end Coordinates of the ending node, which the arrow points to
      * @param {number} attribs.end.row
      * @param {number} attribs.end.col
+     * @param {string} attribs.end.id ID of the end node
      * @param {string} attribs.color Color of the line/circle (arrow is black)
      * @param {number} attribs.width Width of the line
      * @param {Object} n2Groups References to <g> SVG elements.
@@ -19,12 +21,25 @@ class N2Arrow {
     constructor(attribs, n2Groups, nodeSize) {
         this.color = attribs.color;
         this.width = attribs.width;
-        this.arrowsGrp = n2Groups.arrows;
-        this.dotsGrp = n2Groups.dots;
-        this.elementsGrp = n2Groups.elements;
+        // this.arrowsGrp = n2Groups.arrows;
+        // this.dotsGrp = n2Groups.dots;
         this.nodeSize = nodeSize;
         this.attribs = attribs;
         this._genPath = this._angledPath;
+
+        const existingArrow = d3.select('g#' + this.id);
+        if (existingArrow.empty()) {
+            debugInfo("Creating new arrow " + this.id);
+            this.doTransition = false;
+            this.group = n2Groups.arrows.append('g')
+                .attr('id', this.id)
+                .attr('class', 'n2_hover_elements')
+        }
+        else {
+            debugInfo("Using existing arrow " + this.id, existingArrow);
+            this.doTransition = true;
+            this.group = existingArrow;
+        }
     }
 
     get offsetAbsX() {
@@ -35,6 +50,9 @@ class N2Arrow {
         return this.nodeSize.height * N2Arrow.cellOverlap + 3;  // + to account for the arrow size
     }
 
+    get id() {
+        return 'arrow_' + this.attribs.start.id + '_to_' + this.attribs.end.id;
+    }
 }
 
 N2Arrow.cellOverlap = .125;
@@ -85,7 +103,7 @@ class N2BentArrow extends N2Arrow {
 
     /** Create a path string with a quadratic curve at the bend. */
     _curvedPath() {
-        const dir = (this.offsetX > 0)? 1 : -1;
+        const dir = (this.offsetX > 0) ? 1 : -1;
         const s = this.nodeSize.width * .5 * dir;
 
         return "M" + this.pts.start.x + " " + this.pts.start.y +
@@ -101,18 +119,51 @@ class N2BentArrow extends N2Arrow {
             " L" + this.pts.end.x + " " + this.pts.end.y;
     }
 
+    /** Set up for a black/gray dot covered by a colored dot at the arrow bend. */
+    _createDots() {
+        this.bottomCircle = this.group.append("circle")
+            .attr('id', 'bottom-circle')
+            .attr("class", "n2_hover_elements");
+
+        this.topCircle = this.group.append("circle")
+            .attr('id', 'top-circle')
+            .attr("class", "n2_hover_elements")
+    }
+
     /** Use SVG to draw the line segments and an arrow at the end-point. */
     draw() {
-        this.path = this.arrowsGrp.insert("path")
-            .attr("class", "n2_hover_elements")
+        if (this.doTransition) {
+            // Arrow already exists, size and/or shape needs updated
+            this.path = this.group.select('path#arrow-path').transition(sharedTransition);
+
+            if (this.group.classed('off-grid-arrow')) {
+                // The arrow was previously going offscreen but now is fully onscreen
+                this._createDots();
+            }
+            else {
+                this.bottomCircle = this.group.select('circle#bottom-circle').transition(sharedTransition);
+                this.topCircle = this.group.select('circle#top-circle').transition(sharedTransition);
+            }
+        }
+        else {
+            // This is an entirely new arrow
+            this.path = this.group.insert("path")
+                .attr('id', 'arrow-path')
+                .attr("class", "n2_hover_elements");
+
+            this._createDots();
+        }
+
+        this.group.classed('off-grid-arrow', false);
+
+        this.path
             .attr("marker-end", "url(#arrow)")
             .attr("d", this._genPath())
             .attr("fill", "none")
             .style("stroke-width", this.width)
             .style("stroke", this.color);
 
-        this.dotsGrp.append("circle")
-            .attr("class", "n2_hover_elements")
+        this.bottomCircle
             .attr("cx", this.pts.mid.x)
             .attr("cy", this.pts.mid.y)
             .attr("r", this.width * 1.0)
@@ -120,8 +171,7 @@ class N2BentArrow extends N2Arrow {
             .style("fill-opacity", 1)
             .style("fill", N2Style.color.connection);
 
-        this.dotsGrp.append("circle")
-            .attr("class", "n2_hover_elements")
+        this.topCircle
             .attr("cx", this.pts.mid.x)
             .attr("cy", this.pts.mid.y)
             .attr("r", this.width * 1.0)
@@ -199,9 +249,23 @@ class N2OffGridArrow extends N2Arrow {
         debugInfo('Adding offscreen ' + this.attribs.direction +
             ' arrow connected to ' + this.label.text);
 
-        this.path = this.arrowsGrp.insert('path')
+        if (this.doTransition) {
+            if (! this.group.classed('off-grid-arrow') ) {
+                // If it was previously a bent arrow, remove the dots.
+                this.group.selectAll('circle').remove();
+            }
+
+            this.path = this.group.select('path');
+        }
+        else {
+            this.path = this.group.insert('path')
+                .attr('class', 'n2_hover_elements');
+        }
+
+        this.group.classed('off-grid-arrow', true);
+
+        this.path
             .attr('marker-end', 'url(#arrow)')
-            .attr('class', 'n2_hover_elements')
             .attr('stroke-dasharray', '5,5')
             .attr('d', 'M' + this.pts.start.x + ' ' + this.pts.start.y +
                 ' L' + this.pts.end.x + ' ' + this.pts.end.y)
@@ -222,7 +286,6 @@ class N2OffGridArrow extends N2Arrow {
 class N2OffGridUpArrow extends N2OffGridArrow {
     constructor(attribs, n2Groups, nodeSize, markerSize = null) {
         super(attribs, n2Groups, nodeSize, markerSize);
-
         this.label.ref = d3.select("div#left.offgrid");
         this.attribs.direction = 'up';
         this.color = N2Style.color.redArrow;
@@ -231,6 +294,10 @@ class N2OffGridUpArrow extends N2OffGridArrow {
             this._computePts();
             this.draw();
         }
+    }
+
+    get id() {
+        return 'arrow_' + this.attribs.offscreenId + '_to_' + this.attribs.cell.tgtId;
     }
 
     /**
@@ -273,6 +340,10 @@ class N2OffGridDownArrow extends N2OffGridArrow {
         }
     }
 
+    get id() {
+        return 'arrow_' + this.attribs.offscreenId + '_to_' + this.attribs.cell.tgtId;
+    }
+
     /**
      * Use the start coordinates and the direction of the arrow to determine
      * the starting coordinates and location of the arrowhead.
@@ -310,6 +381,10 @@ class N2OffGridLeftArrow extends N2OffGridArrow {
             this._computePts();
             this.draw();
         }
+    }
+
+    get id() {
+        return 'arrow_' + this.cell.srcObj.id + '_to_' + this.attribs.offscreenId;
     }
 
     /**
@@ -350,6 +425,10 @@ class N2OffGridRightArrow extends N2OffGridArrow {
             this._computePts();
             this.draw();
         }
+    }
+
+    get id() {
+        return 'arrow_' + this.cell.srcObj.id + '_to_' + this.attribs.offscreenId;
     }
 
     /**

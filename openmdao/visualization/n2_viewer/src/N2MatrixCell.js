@@ -451,7 +451,7 @@ class N2MatrixCell {
         this.col = col;
         this.srcObj = this.obj = srcObj;
         this.tgtObj = tgtObj;
-        this.id = srcObj.id + "_" + tgtObj.id;
+        this.id = srcObj.id + "_to_" + tgtObj.id;
 
         this.symbolType = new SymbolType(this, model);
         this.renderer = this._newRenderer();
@@ -494,7 +494,7 @@ class N2MatrixCell {
     }
 
     /**
-     * Select the mouseover callback depending on whether we"re on the diagonal.
+     * Select the mouseover callback depending on whether we're on the diagonal.
      * TODO: Remove these globals
      */
     mouseover() {
@@ -503,7 +503,7 @@ class N2MatrixCell {
     }
 
     /**
-    * Select the mousemove callback depending on whether we"re on the diagonal.
+    * Select the mousemove callback depending on whether we're on the diagonal.
     * TODO: Remove these globals
     */
     mousemove() {
@@ -531,7 +531,7 @@ class N2MatrixCell {
 
 
     /**
-     * An connection going "off-screen" was detected between two nodes.
+     * A connection going "off-screen" was detected between two nodes.
      * Determine whether the arrow should be in the top or bottom section of the
      * matrix based on rootIndex, and add to the appropriate array of
      * tracked offscreen connections.

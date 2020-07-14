@@ -636,6 +636,25 @@ class N2Diagram {
         this.dom.highlightBar.selectAll('rect').remove();
     }
 
+    /**
+     * Iterate through the pinned arrow cache and update the connections
+     * for each visible cell.
+     */
+    transitionCachedArrows() {
+        for (const arrow of this.arrowCache) {
+            const cell = this.matrix.findCellById(arrow.id);
+            if (cell) {
+                debugInfo("Drawing arrows for visible cell.")
+                this.matrix.drawConnectionArrows(cell, true);
+            }
+            else {
+                debugInfo("Removing arrows from offscreen node.")
+                arrow.element.remove();
+            }
+            // TODO: Handle arrows that are coming in from offscreen cells
+        }
+    }
+
     clearArrows() {
         this.dom.n2OuterGroup.selectAll("[class^=n2_hover_elements]").remove();
         this.clearHighlights();
@@ -688,7 +707,7 @@ class N2Diagram {
 
         // Compute the new tree layout if necessary.
         if (computeNewTreeLayout) {
-            this.clearArrows();
+            // this.clearArrows();
 
             this.layout = new N2Layout(this.model, this.zoomedElement,
                 this.showLinearSolverNames, this.dims);
@@ -711,6 +730,7 @@ class N2Diagram {
         this._setupSolverTransition(d3SolverRefs);
         this._runSolverTransition(d3SolverRefs.selection);
 
+        this.transitionCachedArrows();        
         this.matrix.draw();
 
         if (!d3.selection.prototype.transitionAllowed) this.hideWaiter();
@@ -808,30 +828,39 @@ class N2Diagram {
 
     /**
      * When the mouse is left-clicked on a cell, change their CSS class
-     * so they're not removed when the mouse moves out.
+     * so they're not removed when the mouse moves out. Or, if in info panel
+     * mode, pin the info panel.
      * @param {N2MatrixCell} cell The cell the event occured on.
      */
     mouseClick(cell) {
-        if (this.ui.nodeInfoBox.hidden) { // If not in info panel mode
-            let newClassName = "n2_hover_elements_" + cell.row + "_" + cell.col;
+        if (this.ui.nodeInfoBox.hidden) { // If not in info-panel mode, pin/unpin arrows
+            const newClassName = "n2_hover_elements_" + cell.id;
             let selection = this.dom.n2OuterGroup.selectAll("." + newClassName);
             if (selection.size() > 0) {
+                // Connections of the clicked cell were already pinned,
+                // so unpin them and remove from cache
                 selection.remove();
-                const arrow = this.arrowCache.find(o => o.cell.row === cell.row && o.cell.col === cell.col);
+                const arrow = this.arrowCache.find(o => o.cell.id == cell.id);
                 const arrowIndex = this.arrowCache.indexOf(arrow);
                 this.arrowCache.splice(arrowIndex, 1);
             }
             else {
+                debugInfo("Pinning arrows from cell " + cell.id)
+                // Connections of the clicked cell are already visible,
+                // now pin them and add them to the cache
                 const arrow = {
+                    'id': cell.id,
                     'cell': cell,
-                    'element': this.dom.n2OuterGroup
-                        .selectAll("path.n2_hover_elements, circle.n2_hover_elements"),
+                    // This selectAll works b/c only hovered cell's arrows have these classes:
+                    'element': this.dom.n2OuterGroup 
+                        .selectAll(".n2_hover_elements"),
                     'className': newClassName
                 }
                 this.arrowCache.push(arrow);
                 this.dom.n2OuterGroup
-                    .selectAll("path.n2_hover_elements, circle.n2_hover_elements")
-                    .attr("class", newClassName);
+                    .selectAll(".n2_hover_elements")
+                    .classed('n2_hover_elements', false)
+                    .classed(newClassName, true);
             }
         }
         else { // Pin/unpin the info panel
@@ -841,7 +870,7 @@ class N2Diagram {
     }
 
     mouseClickAll(cell) {
-        let newClassName = "n2_hover_elements_" + cell.row + "_" + cell.col;
+        let newClassName = "n2_hover_elements_" + cell.id;
         let selection = this.dom.n2OuterGroup.selectAll("." + newClassName);
         if (selection.size() > 0) {
             selection.remove();
