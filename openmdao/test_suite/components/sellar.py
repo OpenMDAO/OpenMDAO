@@ -210,8 +210,8 @@ class SellarNoDerivatives(om.Group):
                              desc='Iteration limit for linear solver.')
 
     def setup(self):
-        self.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
-        self.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+        self.set_input_defaults('x', 1.0)
+        self.set_input_defaults('z', np.array([5.0, 2.0]))
 
         cycle = self.add_subsystem('cycle', om.Group(), promotes=['x', 'z', 'y1', 'y2'])
         cycle.add_subsystem('d1', SellarDis1(), promotes=['x', 'z', 'y1', 'y2'])
@@ -310,8 +310,8 @@ class SellarDerivativesPreAutoIVC(om.Group):
                              desc='Iteration limit for linear solver.')
 
     def setup(self):
-        self.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
-        self.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+        self.set_input_defaults('x', 1.0)
+        self.set_input_defaults('z', np.array([5.0, 2.0]))
 
         self.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         self.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
@@ -346,8 +346,8 @@ class SellarDerivativesConnected(om.Group):
     """
 
     def setup(self):
-        self.add_subsystem('px', om.IndepVarComp('x', 1.0))
-        self.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])))
+        self.set_input_defaults('x', 1.0)
+        self.set_input_defaults('z', np.array([5.0, 2.0]))
 
         self.add_subsystem('d1', SellarDis1withDerivatives())
         self.add_subsystem('d2', SellarDis2withDerivatives())
@@ -358,8 +358,8 @@ class SellarDerivativesConnected(om.Group):
         self.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'))
         self.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'))
 
-        self.connect('px.x', ['d1.x', 'obj_cmp.x'])
-        self.connect('pz.z', ['d1.z', 'd2.z', 'obj_cmp.z'])
+        self.connect('x', ['d1.x', 'obj_cmp.x'])
+        self.connect('z', ['d1.z', 'd2.z', 'obj_cmp.z'])
         self.connect('d1.y1', ['d2.y1', 'obj_cmp.y1', 'con_cmp1.y1'])
         self.connect('d2.y2', ['d1.y2', 'obj_cmp.y2', 'con_cmp2.y2'])
 
@@ -480,8 +480,8 @@ class SellarStateConnection(om.Group):
                              desc='Iteration limit for linear solver.')
 
     def setup(self):
-        self.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
-        self.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+        self.set_input_defaults('x', 1.0)
+        self.set_input_defaults('z', np.array([5.0, 2.0]))
 
         sub = self.add_subsystem('sub', om.Group(),
                                  promotes=['x', 'z', 'y1',
