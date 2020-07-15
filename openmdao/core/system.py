@@ -4260,8 +4260,14 @@ class System(object):
                     for n in variables:
                         if n in views:
                             vdict[n] = views[n]
-                        else:  # discrete
+                        elif n[offset:] in discrete_vec:
                             vdict[n] = discrete_vec[n[offset:]]['value']
+                        else:
+                            ivc_path = conns[prom2abs_in[n][0]]
+                            if ivc_path in views:
+                                vdict[ivc_path] = views[ivc_path]
+                            elif n[offset:] in discrete_vec:
+                                vdict[ivc_path] = discrete_vec[ivc_path[offset:]]['value']
                 else:
                     for name in variables:
                         if name in views:
