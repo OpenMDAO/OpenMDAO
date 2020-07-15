@@ -4266,7 +4266,7 @@ class System(object):
                             ivc_path = conns[prom2abs_in[n][0]]
                             if ivc_path in views:
                                 vdict[ivc_path] = views[ivc_path]
-                            elif n[offset:] in discrete_vec:
+                            elif ivc_path[offset:] in discrete_vec:
                                 vdict[ivc_path] = discrete_vec[ivc_path[offset:]]['value']
                 else:
                     for name in variables:
