@@ -2094,8 +2094,8 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.set_input_defaults('x', 50.0)
+        model.set_input_defaults('y', 50.0)
 
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
@@ -2134,8 +2134,8 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.set_input_defaults('x', 50.0)
+        model.set_input_defaults('y', 50.0)
 
         model.add_subsystem('comp', ParaboloidApplyLinear(), promotes=['*'])
 
@@ -2232,9 +2232,9 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
 
         class SellarMDAAE(om.Group):
             def setup(self):
-                indeps = self.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
-                indeps.add_output('x', 1.0)
-                indeps.add_output('z', np.array([5.0, 2.0]))
+
+                model.set_input_defaults('x', 1.0)
+                model.set_input_defaults('z', np.array([5.0, 2.0]))
 
                 cycle = self.add_subsystem('cycle', om.Group(), promotes=['*'])
 
