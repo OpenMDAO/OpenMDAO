@@ -687,9 +687,9 @@ class ProbRemoteTests(unittest.TestCase):
         par = top.add_subsystem('par', om.ParallelGroup())
         C1 = par.add_subsystem("C1", DistribInputDistribOutputComp(arr_size=size))
         C2 = par.add_subsystem("C2", DistribInputDistribOutputComp(arr_size=size))
-        
+
         #import wingdbstub
-        
+
         p.setup()
 
         # Conclude setup but don't run model.
@@ -887,6 +887,7 @@ class TestGroupMPI(unittest.TestCase):
                               promotes_inputs=['x'])
 
         p.setup()
+        p.set_val('x', np.arange(5, dtype=float))
         p.run_model()
 
         # each rank holds the assigned portion of the input array

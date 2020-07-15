@@ -2270,8 +2270,8 @@ class TestFeatureAddSubsystem(unittest.TestCase):
 
         p.setup()
 
-        self.assertEqual(p['comp1.a'], 3.0)
-        self.assertEqual(p['comp1.b'], 6.0)
+        self.assertEqual(p.get_val('comp1.a'), 3.0)
+        self.assertEqual(p.get_val('comp1.b'), 6.0)
 
     def test_group_simple_promoted(self):
         import openmdao.api as om
@@ -2285,8 +2285,8 @@ class TestFeatureAddSubsystem(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        self.assertEqual(p['a'], 3.0)
-        self.assertEqual(p['comp1.b'], 6.0)
+        self.assertEqual(p.get_val('a'), 3.0)
+        self.assertEqual(p.get_val('comp1.b'), 6.0)
 
     def test_group_nested(self):
         import openmdao.api as om
@@ -2298,10 +2298,10 @@ class TestFeatureAddSubsystem(unittest.TestCase):
 
         p.setup()
 
-        self.assertEqual(p['G1.comp1.a'], 3.0)
-        self.assertEqual(p['G1.comp1.b'], 6.0)
-        self.assertEqual(p['G1.comp2.a'], 4.0)
-        self.assertEqual(p['G1.comp2.b'], 12.0)
+        self.assertEqual(p.get_val('G1.comp1.a'), 3.0)
+        self.assertEqual(p.get_val('G1.comp1.b'), 6.0)
+        self.assertEqual(p.get_val('G1.comp2.a'), 4.0)
+        self.assertEqual(p.get_val('G1.comp2.b'), 12.0)
 
     def test_group_nested_promoted1(self):
         import openmdao.api as om
@@ -2317,13 +2317,13 @@ class TestFeatureAddSubsystem(unittest.TestCase):
         p.setup()
 
         # output G1.comp1.b is promoted
-        self.assertEqual(p['G1.b'], 6.0)
+        self.assertEqual(p.get_val('G1.b'), 6.0)
         # output G1.comp2.b is not promoted
-        self.assertEqual(p['G1.comp2.b'], 12.0)
+        self.assertEqual(p.get_val('G1.comp2.b'), 12.0)
 
         # use unpromoted names for the following 2 promoted inputs
-        self.assertEqual(p['G1.comp1.a'], 3.5)
-        self.assertEqual(p['G1.comp2.a'], 3.5)
+        self.assertEqual(p.get_val('G1.comp1.a'), 3.5)
+        self.assertEqual(p.get_val('G1.comp2.a'), 3.5)
 
     def test_group_nested_promoted2(self):
         import openmdao.api as om
@@ -2342,13 +2342,13 @@ class TestFeatureAddSubsystem(unittest.TestCase):
         p.setup()
 
         # output G1.comp1.b is promoted
-        self.assertEqual(p['comp1.b'], 6.0)
+        self.assertEqual(p.get_val('comp1.b'), 6.0)
         # output G1.comp2.b is promoted
-        self.assertEqual(p['comp2.b'], 12.0)
+        self.assertEqual(p.get_val('comp2.b'), 12.0)
 
         # access both promoted inputs using unpromoted names.
-        self.assertEqual(p['G1.comp1.a'], 3.0)
-        self.assertEqual(p['G1.comp2.a'], 4.0)
+        self.assertEqual(p.get_val('G1.comp1.a'), 3.0)
+        self.assertEqual(p.get_val('G1.comp2.a'), 4.0)
 
     def test_group_rename_connect(self):
         import openmdao.api as om
@@ -2367,8 +2367,8 @@ class TestFeatureAddSubsystem(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        self.assertEqual(p['comp1.b'], 6.0)
-        self.assertEqual(p['comp2.b'], 9.0)
+        self.assertEqual(p.get_val('comp1.b'), 6.0)
+        self.assertEqual(p.get_val('comp2.b'), 9.0)
 
     def test_promotes_any(self):
         import openmdao.api as om
@@ -2385,7 +2385,7 @@ class TestFeatureAddSubsystem(unittest.TestCase):
         top = om.Problem(model=SimpleGroup())
         top.setup()
 
-        self.assertEqual(top['x'], 5)
+        self.assertEqual(top.get_val('x'), 5)
 
     def test_promotes_inputs_and_outputs(self):
         import openmdao.api as om
@@ -2402,8 +2402,8 @@ class TestFeatureAddSubsystem(unittest.TestCase):
         top = om.Problem(model=SimpleGroup())
         top.setup()
 
-        self.assertEqual(top['a'], 1)
-        self.assertEqual(top['b'], 1)
+        self.assertEqual(top.get_val('a'), 1)
+        self.assertEqual(top.get_val('b'), 1)
 
 
 class TestFeatureConnect(unittest.TestCase):
@@ -2456,16 +2456,42 @@ class TestFeatureConnect(unittest.TestCase):
 
         p = om.Problem()
 
-        p.model.add_subsystem('C', om.ExecComp('y=x', x=np.ones(5), y=np.ones(5)))
+        p.model.add_subsystem('indep', om.IndepVarComp('x', np.ones(5)))
         p.model.add_subsystem('C1', om.ExecComp('y=sum(x)*2.0', x=np.zeros(3)))
         p.model.add_subsystem('C2', om.ExecComp('y=sum(x)*4.0', x=np.zeros(2)))
 
         # connect C1.x to the first 3 entries of indep.x
-        p.model.connect('C.y', 'C1.x', src_indices=[0, 1, 2])
+        p.model.connect('indep.x', 'C1.x', src_indices=[0, 1, 2])
 
         # connect C2.x to the last 2 entries of indep.x
         # use -2 (same as 3 in this case) to show that negative indices work.
-        p.model.connect('C.y', 'C2.x', src_indices=[-2, 4])
+        p.model.connect('indep.x', 'C2.x', src_indices=[-2, 4])
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['C1.x'], np.ones(3))
+        assert_near_equal(p['C1.y'], 6.)
+        assert_near_equal(p['C2.x'], np.ones(2))
+        assert_near_equal(p['C2.y'], 8.)
+
+    def test_connect_src_indices_auto_ivc_fail(self):
+        import numpy as np
+
+        import openmdao.api as om
+
+        p = om.Problem()
+
+        p.model.set_input_defaults('x', np.ones(5))
+        p.model.add_subsystem('C1', om.ExecComp('y=sum(x)*2.0', x=np.zeros(3)))
+        p.model.add_subsystem('C2', om.ExecComp('y=sum(x)*4.0', x=np.zeros(2)))
+
+        # connect C1.x to the first 3 entries of indep.x
+        p.model.connect('x', 'C1.x', src_indices=[0, 1, 2])
+
+        # connect C2.x to the last 2 entries of indep.x
+        # use -2 (same as 3 in this case) to show that negative indices work.
+        p.model.connect('x', 'C2.x', src_indices=[-2, 4])
 
         p.setup()
         p.run_model()
@@ -2533,18 +2559,17 @@ class TestFeatureSrcIndices(unittest.TestCase):
 
         # by promoting the following output and inputs to 'x', they will
         # be automatically connected
-        p.model.add_subsystem('indep', om.IndepVarComp('x', np.ones(5)),
-                              promotes_outputs=['x'])
         p.model.add_subsystem('C1', MyComp1(), promotes_inputs=['x'])
         p.model.add_subsystem('C2', MyComp2(), promotes_inputs=['x'])
 
         p.setup()
+        p.set_val('x', np.ones(5))
         p.run_model()
 
-        assert_near_equal(p['C1.x'], np.ones(3))
-        assert_near_equal(p['C1.y'], 6.)
-        assert_near_equal(p['C2.x'], np.ones(2))
-        assert_near_equal(p['C2.y'], 8.)
+        assert_near_equal(p.get_val('C1.x'), np.ones(3))
+        assert_near_equal(p.get_val('C1.y'), 6.)
+        assert_near_equal(p.get_val('C2.x'), np.ones(2))
+        assert_near_equal(p.get_val('C2.y'), 8.)
 
     def test_promote_src_indices_nonflat(self):
         import numpy as np
