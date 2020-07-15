@@ -1313,22 +1313,22 @@ class TestFeatureSimpleGA(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('xC', 7.5))
-        model.add_subsystem('p2', om.IndepVarComp('xI', 0.0))
-        model.add_subsystem('comp', Branin())
+        model.add_subsystem('comp', Branin(),
+                            promotes_inputs=[('x0', 'xI'), ('x1', 'xC')])
 
-        model.connect('p2.xI', 'comp.x0')
-        model.connect('p1.xC', 'comp.x1')
-
-        model.add_design_var('p2.xI', lower=-5.0, upper=10.0)
-        model.add_design_var('p1.xC', lower=0.0, upper=15.0)
+        model.add_design_var('xI', lower=-5.0, upper=10.0)
+        model.add_design_var('xC', lower=0.0, upper=15.0)
         model.add_objective('comp.f')
 
         prob.driver = om.SimpleGADriver()
-        prob.driver.options['bits'] = {'p1.xC': 8}
+        prob.driver.options['bits'] = {'xC': 8}
         prob.driver.options['max_gen'] = 5
 
         prob.setup()
+
+        prob.set_val('xC', 7.5)
+        prob.set_val('xI', 0.0)
+
         prob.run_driver()
 
     def test_option_pop_size(self):
@@ -1338,22 +1338,22 @@ class TestFeatureSimpleGA(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('xC', 7.5))
-        model.add_subsystem('p2', om.IndepVarComp('xI', 0.0))
-        model.add_subsystem('comp', Branin())
+        model.add_subsystem('comp', Branin(),
+                            promotes_inputs=[('x0', 'xI'), ('x1', 'xC')])
 
-        model.connect('p2.xI', 'comp.x0')
-        model.connect('p1.xC', 'comp.x1')
-
-        model.add_design_var('p2.xI', lower=-5.0, upper=10.0)
-        model.add_design_var('p1.xC', lower=0.0, upper=15.0)
+        model.add_design_var('xI', lower=-5.0, upper=10.0)
+        model.add_design_var('xC', lower=0.0, upper=15.0)
         model.add_objective('comp.f')
 
         prob.driver = om.SimpleGADriver()
-        prob.driver.options['bits'] = {'p1.xC': 8}
+        prob.driver.options['bits'] = {'xC': 8}
         prob.driver.options['pop_size'] = 10
 
         prob.setup()
+
+        prob.set_val('xC', 7.5)
+        prob.set_val('xI', 0.0)
+
         prob.run_driver()
 
     def test_constrained_with_penalty(self):
