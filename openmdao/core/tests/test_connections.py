@@ -541,9 +541,8 @@ class TestMultiConns(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             prob.setup()
 
-        msg = 'The following inputs [c1.x, c2.x] are defined using src_indices. These cannot be '
-        msg += 'connected to an automatic IndepVarComp because the source size is '
-        msg += 'undetermined.  Please add one manually and connect it.'
+        msg = 'The following inputs [c1.x, c2.x] are defined using src_indices but the total source '
+        msg += 'size is undetermined.  Please add an IndepVarComp as the source.'
 
         err_msg = str(context.exception).split(':')[-1]
         self.assertEqual(err_msg, msg)

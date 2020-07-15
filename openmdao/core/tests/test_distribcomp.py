@@ -679,8 +679,7 @@ class MPITests(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             prob.setup()
 
-        msg = ' Distributed component input "C.invec" cannot be connected to an automatic '
-        msg += 'IndepVarComp.  Please add one manually and connect it.'
+        msg = ' Distributed component input "C.invec" requires an IndepVarComp.'
 
         err_msg = str(context.exception).split(':')[-1]
         self.assertEqual(err_msg, msg)

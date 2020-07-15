@@ -2606,8 +2606,7 @@ class Group(System):
             elif dist:  # distributed and local everywhere
                 # OpenMDAO currently can't create an automatic IndepVarComp for inputs on
                 # distributed components.
-                msg = 'Distributed component input "{}" cannot be connected to an automatic '
-                msg += 'IndepVarComp.  Please add one manually and connect it.'
+                msg = 'Distributed component input "{}" requires an IndepVarComp.'
                 raise RuntimeError(msg.format(tgt))
 
             elif has_src_inds:  # local with non-distrib src_indices
@@ -2618,9 +2617,8 @@ class Group(System):
 
         if src_idx_found:  # auto_ivc connected to local vars with src_indices
             tgts = ', '.join(src_idx_found)
-            msg = 'The following inputs [{}] are defined using src_indices. These cannot be '
-            msg += 'connected to an automatic IndepVarComp because the source size is '
-            msg += 'undetermined.  Please add one manually and connect it.'
+            msg = 'The following inputs [{}] are defined using src_indices but the total source '
+            msg += 'size is undetermined.  Please add an IndepVarComp as the source.'
             raise RuntimeError(msg.format(tgts))
 
         # return max sized tgt, size, value
