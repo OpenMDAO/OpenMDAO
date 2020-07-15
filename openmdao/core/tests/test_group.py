@@ -520,22 +520,10 @@ class TestGroup(unittest.TestCase):
             def setup(self):
                 self.add_output('x', shape=(3, 1))
 
-            def compute(self, inputs, outputs):
-                pass
-
-            def compute_partials(self, inputs, partials):
-                pass
-
         class CollocationComp(om.ExplicitComponent):
 
             def setup(self):
                 self.add_input('x', shape=(1, 2))
-
-            def compute(self, inputs, outputs):
-                pass
-
-            def compute_partials(self, inputs, partials):
-                pass
 
         class Phase(om.Group):
 
