@@ -503,7 +503,7 @@ class TestGroup(unittest.TestCase):
                          "Group (<model>): src_indices has been defined in both "
                          "connect('indep.x', 'C1.x') and add_input('C1.x', ...).")
 
-    def test_src_indices_mismatch_error(self):
+    def test_incompatible_src_indices_error(self):
         class ControlInterpComp(om.ExplicitComponent):
 
             def setup(self):
@@ -539,10 +539,17 @@ class TestGroup(unittest.TestCase):
 
         p.model.add_subsystem('phase', Phase())
 
+        msg = "Phase (phase): src_indices shape (1, 1) does not match phase.comp2.x shape (1, 2)."
+
         with self.assertRaises(ValueError) as context:
             p.setup()
-        self.assertEqual(str(context.exception),
-                         "Phase (phase): src_indices shape (1, 1) does not match phase.comp2.x shape (1, 2).")
+
+        self.assertEqual(str(context.exception), msg)
+
+        p.model._raise_connection_errors = False
+
+        with assert_warning(UserWarning, msg):
+            p.setup()
 
     def test_promote_not_found1(self):
         p = om.Problem()
