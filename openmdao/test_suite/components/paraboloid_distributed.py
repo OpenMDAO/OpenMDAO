@@ -56,7 +56,6 @@ class DistParab(om.ExplicitComponent):
         x = inputs['x']
         y = inputs['y']
         a = inputs['a']
-        print('parab', x, y, a)
 
         outputs['f_xy'] = (x + a)**2 + x * y + (y + 4.0)**2 - 3.0
 
