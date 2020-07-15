@@ -124,12 +124,10 @@ class TestProblem(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
-        model.add_subsystem('p2', om.IndepVarComp('y', -4.0))
         model.add_subsystem('comp', Paraboloid())
 
-        model.connect('p1.x', 'comp.x')
-        model.connect('p2.y', 'comp.y')
+        model.set_input_defaults('comp.x', 3.0)
+        model.set_input_defaults('comp.y', -4.0)
 
         prob.setup()
         prob.run_model()
@@ -143,14 +141,11 @@ class TestProblem(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
-
         # promote the two inputs to the same name
         model.add_subsystem('comp1', Paraboloid(), promotes_inputs=['x'])
         model.add_subsystem('comp2', Paraboloid(), promotes_inputs=['x'])
 
-        # connect the source to the common name
-        model.connect('p1.x', 'x')
+        model.set_input_defaults('x', 3.0)
 
         prob.setup()
         prob.run_model()
@@ -167,10 +162,10 @@ class TestProblem(unittest.TestCase):
 
         model.add_subsystem('comp', Paraboloid())
 
-        prob.setup()
+        model.set_input_defaults('comp.x', 3.0)
+        model.set_input_defaults('comp.y', -4.0)
 
-        prob.set_val('comp.x', 3.0)
-        prob.set_val('comp.y', -4.0)
+        prob.setup()
 
         prob.run_model()
 
@@ -191,14 +186,14 @@ class TestProblem(unittest.TestCase):
 
         model.add_subsystem('comp', Paraboloid())
 
+        model.set_input_defaults('comp.x', 3.0)
+        model.set_input_defaults('comp.y', -4.0)
+
         model.add_design_var('comp.x', 3.0, ref0=50.0)
         model.add_design_var('comp.y', -4.0)
         model.add_objective('comp.f_xy')
 
         prob.setup()
-
-        prob.set_val('comp.x', 3.0)
-        prob.set_val('comp.y', -4.0)
 
         prob.run_model()
 
@@ -213,12 +208,10 @@ class TestProblem(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
-        model.add_subsystem('p2', om.IndepVarComp('y', -4.0))
         model.add_subsystem('comp', Paraboloid())
 
-        model.connect('p1.x', 'comp.x')
-        model.connect('p2.y', 'comp.y')
+        model.set_input_defaults('comp.x', 3.0)
+        model.set_input_defaults('comp.y', -4.0)
 
         prob.setup(mode='rev')
         # prob.setup(mode='fwd')
@@ -226,7 +219,7 @@ class TestProblem(unittest.TestCase):
 
         assert_near_equal(prob['comp.f_xy'], -15.0)
 
-        prob.compute_totals(of=['comp.f_xy'], wrt=['p1.x', 'p2.y'])
+        prob.compute_totals(of=['comp.f_xy'], wrt=['comp.x', 'comp.y'])
 
     def test_single_string_wrt_of(self):
 
