@@ -2415,23 +2415,20 @@ class TestFeatureConnect(unittest.TestCase):
 
         p = om.Problem()
 
-        indep_comp = om.IndepVarComp()
-        indep_comp.add_output('x', np.ones(5), units='ft')
+        p.model.set_input_defaults('x', np.ones(5), units='ft')
 
         exec_comp = om.ExecComp('y=sum(x)',
                                 x={'value': np.zeros(5), 'units': 'inch'},
                                 y={'units': 'inch'})
 
-        p.model.add_subsystem('indep', indep_comp)
-        p.model.add_subsystem('comp1', exec_comp)
-        p.model.connect('indep.x', 'comp1.x')
+        p.model.add_subsystem('comp1', exec_comp, promotes_inputs=['x'])
 
         p.setup()
         p.run_model()
 
-        assert_near_equal(p['indep.x'], np.ones(5))
-        assert_near_equal(p['comp1.x'], np.ones(5)*12.)
-        assert_near_equal(p['comp1.y'], 60.)
+        assert_near_equal(p.get_val('x', units='ft'), np.ones(5))
+        assert_near_equal(p.get_val('comp1.x'), np.ones(5)*12.)
+        assert_near_equal(p.get_val('comp1.y'), 60.)
 
     def test_connect_1_to_many(self):
         import numpy as np
@@ -2440,19 +2437,17 @@ class TestFeatureConnect(unittest.TestCase):
 
         p = om.Problem()
 
-        p.model.add_subsystem('indep', om.IndepVarComp('x', np.ones(5)))
-        p.model.add_subsystem('C1', om.ExecComp('y=sum(x)*2.0', x=np.zeros(5)))
-        p.model.add_subsystem('C2', om.ExecComp('y=sum(x)*4.0', x=np.zeros(5)))
-        p.model.add_subsystem('C3', om.ExecComp('y=sum(x)*6.0', x=np.zeros(5)))
-
-        p.model.connect('indep.x', ['C1.x', 'C2.x', 'C3.x'])
+        p.model.add_subsystem('C1', om.ExecComp('y=sum(x)*2.0', x=np.zeros(5)), promotes_inputs=['x'])
+        p.model.add_subsystem('C2', om.ExecComp('y=sum(x)*4.0', x=np.zeros(5)), promotes_inputs=['x'])
+        p.model.add_subsystem('C3', om.ExecComp('y=sum(x)*6.0', x=np.zeros(5)), promotes_inputs=['x'])
 
         p.setup()
+        p.set_val('x', np.ones(5))
         p.run_model()
 
-        assert_near_equal(p['C1.y'], 10.)
-        assert_near_equal(p['C2.y'], 20.)
-        assert_near_equal(p['C3.y'], 30.)
+        assert_near_equal(p.get_val('C1.y'), 10.)
+        assert_near_equal(p.get_val('C2.y'), 20.)
+        assert_near_equal(p.get_val('C3.y'), 30.)
 
     def test_connect_src_indices(self):
         import numpy as np
@@ -2461,24 +2456,24 @@ class TestFeatureConnect(unittest.TestCase):
 
         p = om.Problem()
 
-        p.model.add_subsystem('indep', om.IndepVarComp('x', np.ones(5)))
+        p.model.add_subsystem('C', om.ExecComp('y=x', x=np.ones(5), y=np.ones(5)))
         p.model.add_subsystem('C1', om.ExecComp('y=sum(x)*2.0', x=np.zeros(3)))
         p.model.add_subsystem('C2', om.ExecComp('y=sum(x)*4.0', x=np.zeros(2)))
 
         # connect C1.x to the first 3 entries of indep.x
-        p.model.connect('indep.x', 'C1.x', src_indices=[0, 1, 2])
+        p.model.connect('C.y', 'C1.x', src_indices=[0, 1, 2])
 
         # connect C2.x to the last 2 entries of indep.x
         # use -2 (same as 3 in this case) to show that negative indices work.
-        p.model.connect('indep.x', 'C2.x', src_indices=[-2, 4])
+        p.model.connect('C.y', 'C2.x', src_indices=[-2, 4])
 
         p.setup()
         p.run_model()
 
-        assert_near_equal(p['C1.x'], np.ones(3))
-        assert_near_equal(p['C1.y'], 6.)
-        assert_near_equal(p['C2.x'], np.ones(2))
-        assert_near_equal(p['C2.y'], 8.)
+        assert_near_equal(p.get_val('C1.x'), np.ones(3))
+        assert_near_equal(p.get_val('C1.y'), 6.)
+        assert_near_equal(p.get_val('C2.x'), np.ones(2))
+        assert_near_equal(p.get_val('C2.y'), 8.)
 
     def test_connect_src_indices_noflat(self):
         import numpy as np
