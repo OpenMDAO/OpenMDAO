@@ -11,8 +11,18 @@ AddSubtractComp
 
     result = a * \textrm{scaling factor}_a + b * \textrm{scaling factor}_b + c * \textrm{scaling factor}_c + ...
 
+
+AddSubtractComp Constructor
+---------------------------
+
+The call signature for the `AddSubtractComp` constructor is:
+
+.. automethod:: openmdao.components.add_subtract_comp.AddSubtractComp.__init__
+    :noindex:
+
+
 Using the AddSubtractComp
----------------------------------------------------
+-------------------------
 
 The `add_equation` method is used to set up a system of inputs to be added/subtracted (with scaling factors).
 Each time the user adds an equation, all of the inputs and outputs must be of identical shape (this is a requirement for element-wise addition/subtraction).
@@ -25,7 +35,7 @@ Method Signature
     :noindex:
 
 AddSubtractComp Example
----------------------------------------------------
+-----------------------
 
 In the following example AddSubtractComp is used to add thrust, drag, lift, and weight forces. Note the scaling factor of -1 for the drag force and weight force.
 

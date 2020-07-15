@@ -477,6 +477,13 @@ class NodeInfo {
             }
         }
 
+        if (DebugFlags.info && obj.hasChildren()) {
+            this._addPropertyRow('Children', obj.children.length);
+            this._addPropertyRow('Descendants', obj.numDescendants);
+            this._addPropertyRow('Leaves', obj.numLeaves);
+            this._addPropertyRow('Manually Expanded', obj.manuallyExpanded.toString())
+        }
+
         for (const prop of this.propList) {
             // if (obj.propExists(prop.key) && obj[prop.key] != '') {
             if (prop.key === 'value') {
@@ -752,7 +759,7 @@ class N2UserInterface {
 
             N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
             this.lastClickWasLeft = false;
-            node.toggleMinimize();
+            node.minimize();
             this.n2Diag.update();
         }
     }
@@ -770,6 +777,7 @@ class N2UserInterface {
         if (node.isMinimized) {
             this.rightClickedNode = node;
             this.addBackButtonHistory();
+            node.manuallyExpanded = true;
             this._uncollapse(node);
             this.n2Diag.update();
         }
@@ -778,6 +786,7 @@ class N2UserInterface {
             node.collapsable = true;
 
             this.addBackButtonHistory();
+            node.manuallyExpanded = false;
             this.collapse();
         }
     }
@@ -805,6 +814,9 @@ class N2UserInterface {
      * @param {N2TreeNode} node The targetted node.
      */
     leftClick(node) {
+        // Don't do it if the node is already zoomed
+        if (node === this.n2Diag.zoomedElement) return;
+
         testThis(this, 'N2UserInterface', 'leftClick');
         d3.event.preventDefault();
         d3.event.stopPropagation();
@@ -812,6 +824,8 @@ class N2UserInterface {
         if (!node.hasChildren() || node.isParam()) return;
         if (d3.event.button != 0) return;
         this.addBackButtonHistory();
+        node.expand();
+        node.manuallyExpanded = true;
         this._setupLeftClick(node);
 
         this.n2Diag.update();
@@ -822,16 +836,16 @@ class N2UserInterface {
      */
     updateClickedIndices() {
         enterIndex = exitIndex = 0;
+
         if (this.lastClickWasLeft) {
+            let lcRootIndex = (! this.leftClickedNode || ! this.leftClickedNode.rootIndex)? 0 :
+                this.leftClickedNode.rootIndex;
+
             if (this.leftClickIsForward) {
-                exitIndex =
-                    this.leftClickedNode.rootIndex -
-                    this.n2Diag.zoomedElementPrev.rootIndex;
+                exitIndex = lcRootIndex - this.n2Diag.zoomedElementPrev.rootIndex;
             }
             else {
-                enterIndex =
-                    this.n2Diag.zoomedElementPrev.rootIndex -
-                    this.leftClickedNode.rootIndex;
+                enterIndex = this.n2Diag.zoomedElementPrev.rootIndex - lcRootIndex;
             }
         }
     }
@@ -984,9 +998,13 @@ class N2UserInterface {
     homeButtonClick() {
         testThis(this, 'N2UserInterface', 'homeButtonClick');
 
+        this.leftClickedNode = this.n2Diag.model.root;
+        this.lastClickWasLeft = true;
+        this.leftClickIsForward = false;
+        this.findRootOfChangeFunction = this.findRootOfChangeForCollapseUncollapseOutputs;
         this.addBackButtonHistory();
-        this._setupLeftClick(this.n2Diag.model.root);
-        this.uncollapseButtonClick(this.n2Diag.model.root);
+
+        this.n2Diag.reset();
     }
 
     /**
@@ -1024,7 +1042,7 @@ class N2UserInterface {
      * @param {N2TreeNode} node The node to operate on.
      */
     _uncollapse(node) {
-        node.isMinimized = false;
+        node.expand();
         node.varIsHidden = false;
 
         if (node.hasChildren()) {
@@ -1046,26 +1064,36 @@ class N2UserInterface {
         N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
         this.lastClickWasLeft = false;
         this._uncollapse(startNode);
+        startNode.manuallyExpanded = true;
         this.n2Diag.update();
     }
 
-    /**
-     * Recursively minimize non-parameter nodes to the specified depth.
-     * @param {N2TreeNode} node The node to work on.
-     * @param {Number} depth If the node's depth is the same or more, collapse it.
-     */
-    _collapseToDepth(node, depth) {
-        if (node.isParamOrUnknown()) {
-            return;
-        }
+    /** Any collapsed nodes are expanded, starting with the specified node. */
+    expandAll(startNode) {
+        testThis(this, 'N2UserInterface', 'expandAll');
 
-        node.isMinimized = node.depth < depth ? false : true;
+        this.n2Diag.showWaiter();
 
-        if (node.hasChildren()) {
-            for (let child of node.children) {
-                this._collapseToDepth(child, depth);
-            }
-        }
+        this.addBackButtonHistory();
+        this.n2Diag.manuallyExpandAll(startNode);
+
+        this.findRootOfChangeFunction = this.findRootOfChangeForCollapseUncollapseOutputs;
+        N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
+        this.lastClickWasLeft = false;
+        this.n2Diag.update();
+    }
+
+    /** All nodes are collapsed, starting with the specified node. */
+    collapseAll(startNode) {
+        testThis(this, 'N2UserInterface', 'collapseAll');
+
+        this.addBackButtonHistory();
+        this.n2Diag.minimizeAll(startNode);
+
+        this.findRootOfChangeFunction = this.findRootOfChangeForCollapseUncollapseOutputs;
+        N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
+        this.lastClickWasLeft = false;
+        this.n2Diag.update();
     }
 
     /**
@@ -1076,13 +1104,7 @@ class N2UserInterface {
         testThis(this, 'N2UserInterface', 'collapseToDepthSelectChange');
 
         this.addBackButtonHistory();
-        this.n2Diag.chosenCollapseDepth = newChosenCollapseDepth;
-        if (this.n2Diag.chosenCollapseDepth > this.n2Diag.zoomedElement.depth) {
-            this._collapseToDepth(
-                this.n2Diag.model.root,
-                this.n2Diag.chosenCollapseDepth
-            );
-        }
+        this.n2Diag.minimizeToDepth(newChosenCollapseDepth);
         this.findRootOfChangeFunction = this.findRootOfChangeForCollapseDepth.bind(
             this
         );
@@ -1124,6 +1146,7 @@ class N2UserInterface {
             this.legend.hidden ? 'fas icon-key' : 'fas icon-key active-tab-icon');
     }
 
+    /** Show or hide the node info panel button */
     toggleNodeData() {
         testThis(this, 'N2UserInterface', 'toggleNodeData');
 

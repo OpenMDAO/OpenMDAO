@@ -34,6 +34,17 @@ SimpleGADriver Options
     SimpleGADriver
     options
 
+SimpleGADriver Constructor
+--------------------------
+
+The call signature for the `SimpleGADriver` constructor is:
+
+.. automethod:: openmdao.drivers.genetic_algorithm_driver.SimpleGADriver.__init__
+    :noindex:
+
+Using SimpleGADriver
+--------------------
+
 You can change the number of generations to run the genetic algorithm by setting the "max_gen" option.
 
 .. embed-code::
@@ -46,6 +57,15 @@ bits for all variables encoded.
 
 .. embed-code::
     openmdao.drivers.tests.test_genetic_algorithm_driver.TestFeatureSimpleGA.test_option_pop_size
+    :layout: interleave
+
+If you have more than one objective, you can use the `SimpleGADriver` to compute a set of non-dominated
+candidate optima by setting the "compute_pareto" option to True.  In this case, the final state of the
+model will only be one of the pareto-optimal designs. The full set can be accessed via the 'desvar_nd' and
+'obj_nd' attributes on the driver for the design variable values and their corresponding objectives.
+
+.. embed-code::
+    openmdao.drivers.tests.test_genetic_algorithm_driver.TestFeatureSimpleGA.test_pareto
     :layout: interleave
 
 Constrained Optimization

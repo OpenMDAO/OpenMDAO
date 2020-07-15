@@ -48,4 +48,13 @@ LinearUserDefined Options
     LinearUserDefined
     options
 
+LinearUserDefined Constructor
+-----------------------------
+
+The call signature for the `LinearUserDefined` constructor is:
+
+.. automethod:: openmdao.solvers.linear.user_defined.LinearUserDefined.__init__
+    :noindex:
+
+
 .. tags:: Solver, LinearSolver
