@@ -74,11 +74,11 @@ This example is run with two processes and a :code:`size` of 15:
 In this example, we introduce a new component called an ``IndepVarComp``. If you used OpenMDAO prior to
 version 3.2, then you have are familiar with this component. An IndepVarComp is used to define an
 independent variable. You no longer have to define these because OpenMDAO defines and uses them
-automatically for all inputs in your model. However, when we define a distributed input, we often
+automatically for all unconnected inputs in your model. However, when we define a distributed input, we often
 use the "src_indices" attribute to determine the allocation of that input to the processors that the
-component sees. For some sets of these indices, it isn't possible to easilly determine the full size
+component sees. For some sets of these indices, it isn't possible to easily determine the full size
 of the corresponding independent variable, the IndepVarComp cannot be created automatically.  So, for
-unconnected inputs on a distributed component, you must manuallly create one, as we did in this example.
+unconnected inputs on a distributed component, you must manually create one, as we did in this example.
 
 The call signature for the `IndepVarComp` constructor is:
 
