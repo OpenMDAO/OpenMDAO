@@ -516,22 +516,12 @@ class TestFeature(unittest.TestCase):
 
         p = om.Problem()
 
-        ivc = om.IndepVarComp()
-        ivc.add_output(name='force', shape=(n, 3), units='N')
-        ivc.add_output(name='vel', shape=(n, 3), units='m/s')
-
-        p.model.add_subsystem(name='ivc',
-                              subsys=ivc,
-                              promotes_outputs=['force', 'vel'])
-
         dp_comp = om.DotProductComp(vec_size=n, length=3,
                                     a_name='F', b_name='v', c_name='P',
                                     a_units='N', b_units='m/s', c_units='W')
 
-        p.model.add_subsystem(name='dot_prod_comp', subsys=dp_comp)
-
-        p.model.connect('force', 'dot_prod_comp.F')
-        p.model.connect('vel', 'dot_prod_comp.v')
+        p.model.add_subsystem(name='dot_prod_comp', subsys=dp_comp,
+                             promotes_inputs=[('F', 'force'), ('v', 'vel')])
 
         p.setup()
 
@@ -566,15 +556,6 @@ class TestFeature(unittest.TestCase):
 
         p = om.Problem()
 
-        ivc = om.IndepVarComp()
-        ivc.add_output(name='force', shape=(n, 3), units='N')
-        ivc.add_output(name='disp', shape=(n, 3), units='m')
-        ivc.add_output(name='vel', shape=(n, 3), units='m/s')
-
-        p.model.add_subsystem(name='ivc',
-                              subsys=ivc,
-                              promotes_outputs=['force', 'disp', 'vel'])
-
         dp_comp = om.DotProductComp(vec_size=n, length=3,
                                     a_name='F', b_name='d', c_name='W',
                                     a_units='N', b_units='m', c_units='J')
@@ -583,17 +564,14 @@ class TestFeature(unittest.TestCase):
                             a_name='F', b_name='v', c_name='P',
                             a_units='N', b_units='m/s', c_units='W')
 
-        p.model.add_subsystem(name='dot_prod_comp', subsys=dp_comp)
-
-        p.model.connect('force', 'dot_prod_comp.F')
-        p.model.connect('vel', 'dot_prod_comp.v')
-        p.model.connect('disp', 'dot_prod_comp.d')
+        p.model.add_subsystem(name='dot_prod_comp', subsys=dp_comp,
+                              promotes_inputs=[('F', 'force'), ('d', 'disp'), ('v', 'vel')])
 
         p.setup()
 
         p['force'] = np.random.rand(n, 3)
-        p['vel'] = np.random.rand(n, 3)
         p['disp'] = np.random.rand(n, 3)
+        p['vel'] = np.random.rand(n, 3)
 
         p.run_model()
 

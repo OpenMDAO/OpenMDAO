@@ -1116,10 +1116,8 @@ class TestMetaModelStructuredCompFeature(unittest.TestCase):
 
         # Set up the OpenMDAO model
         model = om.Group()
-        ivc = om.IndepVarComp()
-        ivc.add_output('x', 0.0)
-        ivc.add_output('y', 1.0)
-        model.add_subsystem('ivc', ivc, promotes=["*"])
+        model.set_input_defaults('x', 0)
+        model.set_input_defaults('x', 0)
         model.add_subsystem('comp', xor_interp, promotes=["*"])
         prob = om.Problem(model)
         prob.setup()

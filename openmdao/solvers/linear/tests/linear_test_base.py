@@ -289,19 +289,19 @@ class LinearSolverTests(object):
             prob.setup(check=False, mode='fwd')
             prob.run_model()
 
-            wrt = ['iv.x1', 'iv.x2']
+            wrt = ['x1', 'x2']
             of = ['c3.y']
 
             J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-            assert_near_equal(J['c3.y', 'iv.x1'], [[-6.0]], 1e-6)
-            assert_near_equal(J['c3.y', 'iv.x2'], [[35.0]], 1e-6)
+            assert_near_equal(J['c3.y', 'x1'], [[-6.0]], 1e-6)
+            assert_near_equal(J['c3.y', 'x2'], [[35.0]], 1e-6)
 
             prob.setup(check=False, mode='rev')
             prob.run_model()
 
             J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-            assert_near_equal(J['c3.y', 'iv.x1'], [[-6.0]], 1e-6)
-            assert_near_equal(J['c3.y', 'iv.x2'], [[35.0]], 1e-6)
+            assert_near_equal(J['c3.y', 'x1'], [[-6.0]], 1e-6)
+            assert_near_equal(J['c3.y', 'x2'], [[35.0]], 1e-6)
 
         def test_converge_diverge_flat(self):
             # Test derivatives for converge-diverge-flat topology.

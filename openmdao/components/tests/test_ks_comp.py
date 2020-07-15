@@ -212,13 +212,12 @@ class TestKSFunctionFeatures(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('px', om.IndepVarComp('x', val=np.array([5.0, 4.0])))
+        model.set_input_defaults('x', np.array([5.0, 4.0]))
         model.add_subsystem('comp', om.ExecComp('y = 3.0*x',
                                                 x=np.zeros((2, )),
-                                                y=np.zeros((2, ))))
+                                                y=np.zeros((2, ))), promotes_inputs=['x'])
         model.add_subsystem('ks', om.KSComp(width=2))
 
-        model.connect('px.x', 'comp.x')
         model.connect('comp.y', 'ks.g')
 
         prob.setup()
@@ -234,13 +233,12 @@ class TestKSFunctionFeatures(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('px', om.IndepVarComp('x', val=np.array([[5.0, 4.0], [10.0, 8.0]])))
+        model.set_input_defaults('x', np.array([[5.0, 4.0], [10.0, 8.0]]))
         model.add_subsystem('comp', om.ExecComp('y = 3.0*x',
                                                 x=np.zeros((2, 2)),
-                                                y=np.zeros((2, 2))))
+                                                y=np.zeros((2, 2))), promotes_inputs=['x'])
         model.add_subsystem('ks', om.KSComp(width=2, vec_size=2))
 
-        model.connect('px.x', 'comp.x')
         model.connect('comp.y', 'ks.g')
 
         prob.setup()
@@ -256,13 +254,12 @@ class TestKSFunctionFeatures(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('px', om.IndepVarComp('x', val=np.array([5.0, 4.0])))
+        model.set_input_defaults('x', np.array([5.0, 4.0]))
         model.add_subsystem('comp', om.ExecComp('y = 3.0*x',
                                                 x=np.zeros((2, )),
-                                                y=np.zeros((2, ))))
+                                                y=np.zeros((2, ))), promotes_inputs=['x'])
         model.add_subsystem('ks', om.KSComp(width=2))
 
-        model.connect('px.x', 'comp.x')
         model.connect('comp.y', 'ks.g')
 
         model.ks.options['upper'] = 16.0
@@ -279,13 +276,12 @@ class TestKSFunctionFeatures(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('px', om.IndepVarComp('x', val=np.array([5.0, 4.0])))
+        model.set_input_defaults('x', np.array([5.0, 4.0]))
         model.add_subsystem('comp', om.ExecComp('y = 3.0*x',
                                                 x=np.zeros((2, )),
-                                                y=np.zeros((2, ))))
+                                                y=np.zeros((2, ))), promotes_inputs=['x'])
         model.add_subsystem('ks', om.KSComp(width=2))
 
-        model.connect('px.x', 'comp.x')
         model.connect('comp.y', 'ks.g')
 
         model.ks.options['lower_flag'] = True
@@ -305,21 +301,18 @@ class TestKSFunctionFeatures(unittest.TestCase):
 
         prob.driver = om.ScipyOptimizeDriver()
 
-        ivc = model.add_subsystem('ivc', om.IndepVarComp())
-        ivc.add_output('x', val=np.linspace(-np.pi/2, np.pi/2, n))
-        ivc.add_output('k', val=5.0)
+        model.set_input_defaults('x', np.linspace(-np.pi/2, np.pi/2, n))
+        model.set_input_defaults('k', 5.)
 
         model.add_subsystem('comp', om.ExecComp('y = -3.0*x**2 + k',
                                                 x=np.zeros((n, )),
                                                 y=np.zeros((n, )),
-                                                k=0.0))
+                                                k=0.0), promotes_inputs=['x', 'k'])
         model.add_subsystem('ks', om.KSComp(width=n, upper=4.0, add_constraint=True))
 
-        model.add_design_var('ivc.k', lower=-10, upper=10)
-        model.add_objective('ivc.k', scaler=-1)
+        model.add_design_var('k', lower=-10, upper=10)
+        model.add_objective('k', scaler=-1)
 
-        model.connect('ivc.x', 'comp.x')
-        model.connect('ivc.k', 'comp.k')
         model.connect('comp.y', 'ks.g')
 
         prob.setup()
@@ -329,7 +322,7 @@ class TestKSFunctionFeatures(unittest.TestCase):
 
         fig, ax = plt.subplots()
 
-        x = prob.get_val('ivc.x')
+        x = prob.get_val('x')
         y = prob.get_val('comp.y')
 
         ax.plot(x, y, 'r.')
@@ -337,7 +330,7 @@ class TestKSFunctionFeatures(unittest.TestCase):
         ax.set_xlabel('x')
         ax.set_ylabel('y')
         ax.grid(True)
-        ax.text(-0.25, 0, f"k = {prob.get_val('ivc.k')[0]:6.3f}")
+        ax.text(-0.25, 0, f"k = {prob.get_val('k')[0]:6.3f}")
 
         plt.show()
 
@@ -349,21 +342,14 @@ class TestKSFunctionFeatures(unittest.TestCase):
 
         model = om.Group()
 
-        model.add_subsystem('indep', om.IndepVarComp('x', val=range(n), units='ft'))
-        model.add_subsystem('ks', om.KSComp(width=n, units='m'))
-
-        model.connect('indep.x', 'ks.g')
+        model.set_input_defaults('x', range(n), units='ft')
+        model.add_subsystem('ks', om.KSComp(width=n, units='m'), promotes_inputs=[('g', 'x')])
 
         prob = om.Problem(model=model)
         prob.setup()
         prob.run_model()
 
-        # KS is expressed in meters, while the independent variable 'x' is in feet
-        assert_near_equal(prob['ks.KS'][0], convert_units(max(prob['indep.x']), 'ft', 'm'),
-                          tolerance=1e-8)
-
-        assert_near_equal(convert_units(prob['ks.KS'][0], 'm', 'ft'), max(prob['indep.x']),
-                          tolerance=1e-8)
+        assert_near_equal(prob['ks.KS'][0], np.amax(prob['x']), tolerance=1e-8)
 
 
 if __name__ == "__main__":

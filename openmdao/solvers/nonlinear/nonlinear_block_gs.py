@@ -231,9 +231,9 @@ class NonlinearBlockGS(NonlinearSolver):
                 outputs_n = outputs._data.copy()
 
             self._solver_info.append_subsolver()
-            for isub, (subsys, local) in enumerate(system._all_subsystem_iter()):
+            for isub, subsys in enumerate(system._subsystems_allprocs):
                 system._transfer('nonlinear', 'fwd', isub)
-                if local:
+                if subsys._is_local:
                     subsys._solve_nonlinear()
 
             self._solver_info.pop()

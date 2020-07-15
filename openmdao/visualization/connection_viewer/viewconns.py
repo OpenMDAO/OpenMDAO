@@ -3,7 +3,6 @@
 import os
 import sys
 import json
-import contextlib
 from itertools import chain
 from collections import defaultdict
 
@@ -64,7 +63,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
     else:
         system = root
 
-    input_srcs = system._conn_global_abs_in2out
+    input_srcs = system._problem_meta['connections']
 
     connections = {
         tgt: src for tgt, src in input_srcs.items() if src is not None
@@ -86,18 +85,22 @@ def view_connections(root, outfile='connections.html', show_browser=True,
             tmeta = system._var_abs2meta[t]
             idxs = tmeta['src_indices']
 
-            if t in connections:
-                s = connections[t]
-                val = _get_output(show_values, system, s, idxs)
+            s = connections[t]
+            if show_values:
+                if s.startswith('_auto_ivc.'):
+                    val = system.get_val(t, indices=idxs, flat=True, get_remote=True,
+                                         from_src=False)
+                else:
+                    val = system.get_val(t, indices=idxs, flat=True, get_remote=True)
 
-                # if there's a unit conversion, express the value in the
-                # units of the target
-                if show_values and units[t] and s in system._outputs:
-                    val = convert_units(val, units[s], units[t])
+                    # if there's a unit conversion, express the value in the
+                    # units of the target
+                    if units[t] and s in system._outputs:
+                        val = convert_units(val, units[s], units[t])
+            else:
+                val = ''
 
-                src2tgts[s].append(t)
-            else:  # unconnected param
-                val = _get_input(show_values, system, t)
+            src2tgts[s].append(t)
 
             vals[t] = val
 
@@ -142,13 +145,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
         table.append(row)
         idx += 1
 
-    for t in system._var_abs_names['input']:
-        if t not in connections:
-            row = {'id': idx, 'src': NOCONN, 'sprom': NOCONN, 'sunits': '',
-                   'val': _val2str(vals[t]), 'tunits': units[t], 'tprom': tprom[t], 'tgt': t}
-            table.append(row)
-            idx += 1
-
+    # add rows for unconnected sources
     for src in system._var_abs_names['output']:
         if src not in src2tgts:
             if show_values:
@@ -194,30 +191,3 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
     if show_browser:
         webview(outfile)
-
-
-def _get_input(show_values, system, name):
-    """
-    Return the named value if it's local to the process, else "<on remote proc>".
-    """
-    if not show_values:
-        return ''
-
-    if name in system._inputs:
-        return system._inputs[name]
-    return "<on remote proc>"
-
-
-def _get_output(show_values, system, name, idxs=None):
-    """
-    Return the named value if it's local to the process, else "<on remote proc>".
-    """
-    if not show_values:
-        return ''
-
-    if name in system._outputs:
-        val = system._outputs[name]
-        if idxs is not None and isinstance(val, np.ndarray):
-            val = val.flatten()[idxs]
-        return val
-    return "<on remote proc>"

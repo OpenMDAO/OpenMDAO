@@ -302,19 +302,11 @@ class TestFeature(unittest.TestCase):
 
         p = om.Problem()
 
-        ivc = om.IndepVarComp()
-        ivc.add_output(name='pos', shape=(n, 3), units='m')
+        comp = om.VectorMagnitudeComp(vec_size=n, length=3,
+                                      in_name='r', mag_name='r_mag', units='km')
 
-        p.model.add_subsystem(name='ivc',
-                              subsys=ivc,
-                              promotes_outputs=['pos'])
-
-        dp_comp = om.VectorMagnitudeComp(vec_size=n, length=3, in_name='r', mag_name='r_mag',
-                                         units='km')
-
-        p.model.add_subsystem(name='vec_mag_comp', subsys=dp_comp)
-
-        p.model.connect('pos', 'vec_mag_comp.r')
+        p.model.add_subsystem(name='vec_mag_comp', subsys=comp,
+                              promotes_inputs=[('r', 'pos')])
 
         p.setup()
 
@@ -326,7 +318,7 @@ class TestFeature(unittest.TestCase):
         expected = []
         for i in range(n):
             a_i = p['pos'][i, :]
-            expected.append(np.sqrt(np.dot(a_i, a_i)) / 1000.0)
+            expected.append(np.sqrt(np.dot(a_i, a_i)))
 
             actual_i = p.get_val('vec_mag_comp.r_mag')[i]
             rel_error = np.abs(expected[i] - actual_i)/actual_i
@@ -345,28 +337,19 @@ class TestFeature(unittest.TestCase):
 
         p = om.Problem()
 
-        ivc = om.IndepVarComp()
-        ivc.add_output(name='pos', shape=(n, 3), units='m')
-        ivc.add_output(name='b', shape=(n, 3), units='ft')
+        comp = om.VectorMagnitudeComp(vec_size=n, length=3,
+                                      in_name='r', mag_name='r_mag', units='km')
 
-        p.model.add_subsystem(name='ivc',
-                              subsys=ivc,
-                              promotes_outputs=['pos', 'b'])
+        comp.add_magnitude(vec_size=n, length=3,
+                           in_name='b', mag_name='b_mag', units='ft')
 
-        dp_comp = om.VectorMagnitudeComp(vec_size=n, length=3,
-                                         in_name='r', mag_name='r_mag', units='km')
-
-        dp_comp.add_magnitude(vec_size=n, length=3,
-                              in_name='b', mag_name='b_mag', units='ft')
-
-        p.model.add_subsystem(name='vec_mag_comp', subsys=dp_comp)
-
-        p.model.connect('pos', 'vec_mag_comp.r')
-        p.model.connect('b', 'vec_mag_comp.b')
+        p.model.add_subsystem(name='vec_mag_comp', subsys=comp,
+                              promotes_inputs=['r', 'b'])
 
         p.setup()
 
-        p['pos'] = 1.0 + np.random.rand(n, 3)
+        p['r'] = 1.0 + np.random.rand(n, 3)
+        p['b'] = 1.0 + np.random.rand(n, 3)
 
         p.run_model()
 
@@ -374,8 +357,8 @@ class TestFeature(unittest.TestCase):
         expected_r = []
         expected_b = []
         for i in range(n):
-            a_i = p['pos'][i, :]
-            expected_r.append(np.sqrt(np.dot(a_i, a_i))/1000.)
+            a_i = p['r'][i, :]
+            expected_r.append(np.sqrt(np.dot(a_i, a_i)))
 
             actual_i = p.get_val('vec_mag_comp.r_mag')[i]
             rel_error = np.abs(expected_r[i] - actual_i)/actual_i

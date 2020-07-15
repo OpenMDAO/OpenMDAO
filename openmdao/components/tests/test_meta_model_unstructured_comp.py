@@ -895,19 +895,16 @@ class MetaModelTestCase(unittest.TestCase):
 
         # Testing explicitly setting fd inside of setup
         prob = om.Problem()
-        indep = om.IndepVarComp()
-        indep.add_output('x', 5.)
-        prob.model.add_subsystem('indep', indep)
+        prob.model.set_input_defaults('x', 5.)
         trig = TrigWithFdInSetup()
-        prob.model.add_subsystem('trig', trig)
-        prob.model.connect('indep.x', 'trig.x')
+        prob.model.add_subsystem('trig', trig, promotes_inputs=['x'])
         prob.setup(check=True)
-        prob['indep.x'] = 5.0
+        prob.set_val('x', 5.)
         trig.train = False
         prob.run_model()
-        J = prob.compute_totals(of=['trig.sin_x'], wrt=['indep.x'])
-        deriv_using_fd = J[('trig.sin_x', 'indep.x')]
-        assert_near_equal(deriv_using_fd[0], np.cos(prob['indep.x']), 1e-4)
+        J = prob.compute_totals(of=['trig.sin_x'], wrt=['x'])
+        deriv_using_fd = J[('trig.sin_x', 'x')]
+        assert_near_equal(deriv_using_fd[0], np.cos(prob['x']), 1e-4)
 
     def test_metamodel_setup_called_twice_bug(self):
         class Trig(om.MetaModelUnStructuredComp):
@@ -1080,15 +1077,11 @@ class MetaModelUnstructuredSurrogatesFeatureTestCase(unittest.TestCase):
 
         prob = om.Problem()
 
-        prob.model.add_subsystem('p', om.IndepVarComp('x', 2.1))
-
         sin_mm = om.MetaModelUnStructuredComp()
-        sin_mm.add_input('x', 0.)
+        sin_mm.add_input('x', 2.1)
         sin_mm.add_output('f_x', 0., surrogate=om.KrigingSurrogate())
 
         prob.model.add_subsystem('sin_mm', sin_mm)
-
-        prob.model.connect('p.x', 'sin_mm.x')
 
         prob.setup(check=True)
 
@@ -1109,15 +1102,11 @@ class MetaModelUnstructuredSurrogatesFeatureTestCase(unittest.TestCase):
 
         prob = om.Problem()
 
-        prob.model.add_subsystem('p', om.IndepVarComp('x', 2.1))
-
         sin_mm = om.MetaModelUnStructuredComp()
-        sin_mm.add_input('x', 0.)
+        sin_mm.add_input('x', 2.1)
         sin_mm.add_output('f_x', 0., surrogate=om.NearestNeighbor(interpolant_type='linear'))
 
         prob.model.add_subsystem('sin_mm', sin_mm)
-
-        prob.model.connect('p.x', 'sin_mm.x')
 
         prob.setup(check=True)
 
@@ -1138,15 +1127,11 @@ class MetaModelUnstructuredSurrogatesFeatureTestCase(unittest.TestCase):
 
         prob = om.Problem()
 
-        prob.model.add_subsystem('p', om.IndepVarComp('x', 2.1))
-
         sin_mm = om.MetaModelUnStructuredComp()
-        sin_mm.add_input('x', 0.)
+        sin_mm.add_input('x', 2.1)
         sin_mm.add_output('f_x', 0., surrogate=om.ResponseSurface())
 
         prob.model.add_subsystem('sin_mm', sin_mm)
-
-        prob.model.connect('p.x', 'sin_mm.x')
 
         prob.setup(check=True)
 
@@ -1167,15 +1152,11 @@ class MetaModelUnstructuredSurrogatesFeatureTestCase(unittest.TestCase):
 
         prob = om.Problem()
 
-        prob.model.add_subsystem('p', om.IndepVarComp('x', 2.1))
-
         sin_mm = om.MetaModelUnStructuredComp()
-        sin_mm.add_input('x', 0.)
+        sin_mm.add_input('x', 2.1)
         sin_mm.add_output('f_x', 0., surrogate=om.KrigingSurrogate(eval_rmse=True))
 
         prob.model.add_subsystem('sin_mm', sin_mm)
-
-        prob.model.connect('p.x', 'sin_mm.x')
 
         prob.setup(check=True)
 
@@ -1199,15 +1180,11 @@ class MetaModelUnstructuredSurrogatesFeatureTestCase(unittest.TestCase):
 
         prob = om.Problem()
 
-        prob.model.add_subsystem('p', om.IndepVarComp('x', 2.1))
-
         sin_mm = om.MetaModelUnStructuredComp()
-        sin_mm.add_input('x', 0.)
+        sin_mm.add_input('x', 2.1)
         sin_mm.add_output('f_x', 0., surrogate=om.NearestNeighbor(interpolant_type='rbf', num_neighbors=3))
 
         prob.model.add_subsystem('sin_mm', sin_mm)
-
-        prob.model.connect('p.x', 'sin_mm.x')
 
         prob.setup(check=True)
 

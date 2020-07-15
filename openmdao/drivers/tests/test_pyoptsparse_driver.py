@@ -170,8 +170,6 @@ class TestMPIScatter(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', DummyComp(), promotes=['*'])
 
@@ -198,12 +196,8 @@ class TestMPIScatter(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        ivc = om.IndepVarComp()
-        ivc.add_output('x', np.ones((size, )))
-        ivc.add_output('y', np.ones((size, )))
-        ivc.add_output('a', -3.0 + 0.6 * np.arange(size))
+        model.set_input_defaults('a', -3.0 + 0.6 * np.arange(size))
 
-        model.add_subsystem('p', ivc, promotes=['*'])
         model.add_subsystem("parab", DistParab(arr_size=size, deriv_type='dense'), promotes=['*'])
         model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
                                                f_sum=np.ones((size, )),
@@ -427,8 +421,9 @@ class TestPyoptSparse(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.set_input_defaults('x', 50.0)
+        model.set_input_defaults('y', 50.0)
+
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
 
@@ -607,9 +602,6 @@ class TestPyoptSparse(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 1.0))
-        model.add_subsystem('p2', om.IndepVarComp('x', 1.0))
-
         model.add_subsystem('comp1', om.ExecComp('y = 3.0*x'))
         model.add_subsystem('comp2', om.ExecComp('y = 5.0*x'))
 
@@ -618,8 +610,6 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_subsystem('con2', om.ExecComp('c = 15.0 - x'))
 
         # hook up explicitly
-        model.connect('p1.x', 'comp1.x')
-        model.connect('p2.x', 'comp2.x')
         model.connect('comp1.y', 'obj.i1')
         model.connect('comp2.y', 'obj.i2')
         model.connect('comp1.y', 'con1.x')
@@ -631,8 +621,8 @@ class TestPyoptSparse(unittest.TestCase):
         prob.driver.options['optimizer'] = OPTIMIZER
         prob.driver.options['print_results'] = False
 
-        model.add_design_var('p1.x', lower=-50.0, upper=50.0)
-        model.add_design_var('p2.x', lower=-50.0, upper=50.0)
+        model.add_design_var('comp1.x', lower=-50.0, upper=50.0)
+        model.add_design_var('comp2.x', lower=-50.0, upper=50.0)
         model.add_objective('obj.o')
         model.add_constraint('con1.c', equals=0.0)
         model.add_constraint('con2.c', equals=0.0)
@@ -649,9 +639,9 @@ class TestPyoptSparse(unittest.TestCase):
 
         # Verify that pyOpt has the correct wrt names
         con1 = prob.driver.pyopt_solution.constraints['con1.c']
-        self.assertEqual(con1.wrt, ['p1.x'])
+        self.assertEqual(con1.wrt, ['comp1.x'])
         con2 = prob.driver.pyopt_solution.constraints['con2.c']
-        self.assertEqual(con2.wrt, ['p2.x'])
+        self.assertEqual(con2.wrt, ['comp2.x'])
 
     def test_inf_as_desvar_bounds(self):
 
@@ -873,8 +863,9 @@ class TestPyoptSparse(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.set_input_defaults('x', 50.0)
+        model.set_input_defaults('y', 50.0)
+
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
 

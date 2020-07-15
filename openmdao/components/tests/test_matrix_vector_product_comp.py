@@ -583,21 +583,11 @@ class TestFeature(unittest.TestCase):
 
         p = om.Problem()
 
-        ivc = om.IndepVarComp()
-        ivc.add_output(name='Mat', shape=(nn, 3, 3))
-        ivc.add_output(name='x', shape=(nn, 3), units='m')
-
-        p.model.add_subsystem(name='ivc',
-                              subsys=ivc,
-                              promotes_outputs=['Mat', 'x'])
-
         p.model.add_subsystem(name='mat_vec_product_comp',
                               subsys=om.MatrixVectorProductComp(A_name='Mat', vec_size=nn,
                                                                 b_name='y', b_units='m',
-                                                                x_units='m'))
-
-        p.model.connect('Mat', 'mat_vec_product_comp.Mat')
-        p.model.connect('x', 'mat_vec_product_comp.x')
+                                                                x_units='m'),
+                              promotes_inputs=['Mat', 'x'])
 
         p.setup()
 
@@ -626,26 +616,17 @@ class TestFeature(unittest.TestCase):
 
         p = om.Problem()
 
-        ivc = om.IndepVarComp()
-        ivc.add_output(name='Mat', shape=(nn, 3, 3))
-        ivc.add_output(name='x', shape=(nn, 3), units='m')
-        ivc.add_output(name='w', shape=(nn, 3), units='m')
+        mvp = om.MatrixVectorProductComp(A_name='Mat', vec_size=nn,
+                                         b_name='y', b_units='m',
+                                         x_units='m')
 
-        p.model.add_subsystem(name='ivc',
-                              subsys=ivc,
-                              promotes_outputs=['Mat', 'x', 'w'])
-
-        mvc = p.model.add_subsystem(name='mat_vec_product_comp',
-                                    subsys=om.MatrixVectorProductComp(A_name='Mat', vec_size=nn,
-                                                                      b_name='y', b_units='m',
-                                                                      x_units='m'))
-        mvc.add_product(A_name='Mat', vec_size=nn,
+        mvp.add_product(A_name='Mat', vec_size=nn,
                         b_name='z', b_units='m',
                         x_name='w', x_units='m')
 
-        p.model.connect('Mat', 'mat_vec_product_comp.Mat')
-        p.model.connect('x', 'mat_vec_product_comp.x')
-        p.model.connect('w', 'mat_vec_product_comp.w')
+        p.model.add_subsystem(name='mat_vec_product_comp',
+                              subsys=mvp,
+                              promotes_inputs=['Mat', 'x', 'w'])
 
         p.setup()
 

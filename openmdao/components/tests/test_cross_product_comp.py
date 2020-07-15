@@ -542,21 +542,11 @@ class TestFeature(unittest.TestCase):
 
         p = om.Problem()
 
-        ivc = om.IndepVarComp()
-        ivc.add_output(name='r', shape=(n, 3), units='m')
-        ivc.add_output(name='F', shape=(n, 3), units='N')
-
-        p.model.add_subsystem(name='ivc',
-                              subsys=ivc,
-                              promotes_outputs=['r', 'F'])
-
         p.model.add_subsystem(name='cross_prod_comp',
                               subsys=om.CrossProductComp(vec_size=n,
                                                          a_name='r', b_name='F', c_name='torque',
-                                                         a_units='m', b_units='N', c_units='N*m'))
-
-        p.model.connect('r', 'cross_prod_comp.r')
-        p.model.connect('F', 'cross_prod_comp.F')
+                                                         a_units='m', b_units='N', c_units='N*m'),
+                              promotes_inputs=['r', 'F'])
 
         p.setup()
 
@@ -587,27 +577,16 @@ class TestFeature(unittest.TestCase):
 
         p = om.Problem()
 
-        ivc = om.IndepVarComp()
-        ivc.add_output(name='r', shape=(n, 3), units='m')
-        ivc.add_output(name='F', shape=(n, 3), units='N')
-        ivc.add_output(name='p', shape=(n, 3), units='kg*m/s')
+        cpc = om.CrossProductComp(vec_size=n,
+                                  a_name='r', b_name='F', c_name='torque',
+                                  a_units='m', b_units='N', c_units='N*m')
 
-        p.model.add_subsystem(name='ivc',
-                              subsys=ivc,
-                              promotes_outputs=['r', 'F', 'p'])
-
-        cpc = p.model.add_subsystem('cross_prod_comp',
-                                    om.CrossProductComp(vec_size=n,
-                                                        a_name='r', b_name='F', c_name='torque',
-                                                        a_units='m', b_units='N', c_units='N*m'))
         cpc.add_product(vec_size=n,
                         a_name='r', b_name='p', c_name='L',
                         a_units='m', b_units='kg*m/s', c_units='kg*m**2/s')
 
-
-        p.model.connect('r', 'cross_prod_comp.r')
-        p.model.connect('F', 'cross_prod_comp.F')
-        p.model.connect('p', 'cross_prod_comp.p')
+        p.model.add_subsystem(name='cross_prod_comp', subsys=cpc,
+                              promotes_inputs=['r', 'F', 'p'])
 
         p.setup()
 

@@ -2,10 +2,7 @@
 import numpy as np
 from scipy.sparse import csc_matrix
 
-from openmdao.jacobians.jacobian import Jacobian
-
-
-_full_slice = slice(None)
+from openmdao.jacobians.jacobian import Jacobian, _full_slice
 
 
 class DictionaryJacobian(Jacobian):

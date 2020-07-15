@@ -117,7 +117,8 @@ Promoting variables with the same name connects them
 ----------------------------------------------------
 
 The data connections in this model are made via promotion.
-OpenMDAO will look at each level of the hierarchy and connect all output-input pairs that have the same names.
+OpenMDAO will look at each level of the hierarchy and connect all output-input pairs that have the same names. When an
+input is promoted on multiple components, you can use "set_input_defaults" to define the common initial value.
 
 
 ExecComp is a helper component for quickly defining components for simple equations
