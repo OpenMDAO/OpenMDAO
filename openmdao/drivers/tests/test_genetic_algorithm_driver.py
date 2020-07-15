@@ -1546,9 +1546,9 @@ class MPIFeatureTests(unittest.TestCase):
         prob.run_driver()
 
         # Optimal solution
-        print('comp.f', prob.get_val('comp.f'))
-        print('xI', prob.get_val('xI'))
-        print('xC', prob.get_val('xC'))
+        assert_near_equal(prob.get_val('comp.f'), 1.25172426, 1e-6)
+        assert_near_equal(prob.get_val('xI'), 9.0, 1e-6)
+        assert_near_equal(prob.get_val('xC'), 2.11764706, 1e-6)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -1602,9 +1602,9 @@ class MPIFeatureTests4(unittest.TestCase):
         prob.run_driver()
 
         # Optimal solution
-        print('comp.f', prob.get_val('comp.f'))
-        print('xI', prob.get_val('xI'))
-        print('xC', prob.get_val('xC'))
+        assert_near_equal(prob.get_val('comp.f'), 0.98799098, 1e-6)
+        assert_near_equal(prob.get_val('xI'),-3.0, 1e-6)
+        assert_near_equal(prob.get_val('xC'), 11.94117647, 1e-6)
 
 
 if __name__ == "__main__":
