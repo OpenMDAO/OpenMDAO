@@ -550,7 +550,7 @@ class TestGroup(unittest.TestCase):
 
         p.model.add_subsystem('phase', Phase())
 
-        msg = "Phase (phase): src_indices shape (1, 1) does not match phase.comp2.x shape (1, 2)."
+        msg = "Phase (phase): src_indices shape (1,) does not match phase.comp2.x shape (1, 2)."
 
         with self.assertRaises(ValueError) as context:
             p.setup()
@@ -561,6 +561,7 @@ class TestGroup(unittest.TestCase):
 
         with assert_warning(UserWarning, msg):
             p.setup()
+
     def test_om_slice_in_connect(self):
         class MyComp1(om.ExplicitComponent):
             def setup(self):
