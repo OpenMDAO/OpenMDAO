@@ -14,6 +14,8 @@ class InfoPropDefault {
 
     /** Return the same message since this is the base class */
     output(msg) { return msg; }
+
+    canShow(obj) { return (obj.propExists(this.key) && obj[this.key] != '') }
 }
 
 /**
@@ -21,17 +23,20 @@ class InfoPropDefault {
  * @typedef InfoPropYesNo
  */
 class InfoPropYesNo extends InfoPropDefault {
-    constructor(key, desc, capitalize = false) {
+    constructor(key, desc, capitalize = false, showIfFalse = false) {
         super(key, desc, capitalize);
+        this.showIfFalse = showIfFalse;
     }
 
     /** Return Yes or No when given True or False */
     output(boolVal) { return boolVal ? 'Yes' : 'No'; }
+
+    canShow(obj) { return (obj.propExists(this.key) && obj[this.key] != '' && this.showIfFalse == false )}
 }
 
 /**
  * Rename params to inputs and unknowns to outputs. 
- * @typedef InfoPropYesNo
+ * @typedef InfoUpdateType
  */
 class InfoUpdateType extends InfoPropDefault {
     constructor(key, desc, capitalize = false) {
@@ -47,6 +52,230 @@ class InfoUpdateType extends InfoPropDefault {
     }
 }
 
+/** Convert an array to a string that is human readable.
+ * @param {array} arr The array to convert.
+ * @param {level} int The level of nesting in the display.
+ * @returns {str} the string of the converted array.
+ */
+function array_to_string(array, level=0){
+    let indent = ' '.repeat(level);
+    let s = indent + '[';
+    for (const element of array) {
+        if (Array.isArray(element)) {
+            s += array_to_string(element,level+1);
+        } else {
+            s += element.toString() ;
+        }
+        s += ' ';
+    }
+    if (array.length > 0) {
+        s = s.slice(0, -1); // chop off the last space
+    }
+    s += ']\n';
+    return s;
+}
+
+/** Convert an array to a string that can be used in code.
+ * @param {array} arr The array to convert.
+ * @returns {str} the string of the converted array.
+ */
+function array_to_copy_string(array){
+    let s = '[';
+    for (const element of array) {
+        if (Array.isArray(element)) {
+            s += array_to_copy_string(element);
+        } else {
+            s += element.toString() ;
+        }
+        s += ', ';
+    }
+    if (array.length > 0) {
+        s = s.slice(0, -2); // chop off the last comma and space
+    }
+    s += ']';
+    return s;
+}
+
+/**
+ * Handles properties that are arrays.
+ * @typedef InfoPropArray
+ */
+class InfoPropArray extends InfoPropDefault {
+    constructor(key, desc, capitalize = false) {
+        super(key, desc, capitalize);
+    }
+
+    /** Return Yes or No when given True or False */
+    output(array) {
+        return array;
+    }
+
+    canShow(obj) { return (obj.propExists(this.key) && obj[this.key] != '' )}
+}
+
+/**
+ * Manage a window for displaying the value of a variable.
+ * @typedef ValueInfo
+ */
+class ValueInfo {
+    /**
+     * Build a list of the properties we care about and set up
+     * references to the HTML elements.
+     * @param {Object} abs2prom Object containing promoted variable names.
+     */
+    constructor(abs2prom) {
+        this.abs2prom = abs2prom;
+        this.container = d3.select('#node-value-container');
+        this.table = d3.select('#node-value-table');
+        this.header = d3.select('#node-value-header');
+        this.title = d3.select('#node-value-title');
+        this.thead = this.table.select('thead');
+        this.tbody = this.table.select('tbody');
+        this.hidden = true;
+        this.pinned = false;
+
+        const self = this;
+        this.name = null;
+        this.TRUNCATE_LIMIT = 80; // if the string version of the variable is longer than this, truncate
+
+        d3.select('.close-value-window-button').on(
+            'click',
+            function () {
+                self.hide();
+            }
+        );
+
+        this._setupDrag();
+        this._setupResizerDrag();
+    }
+
+    show() {
+        this.container.style('visibility', 'visible');
+    }
+
+    hide() {
+        this.container.style('visibility', 'hidden');
+    }
+
+    showMoreButtonDisplayed(val) {  //
+        if (!val) return false; // if no value, cannot display! Need to check this
+
+        if (!Array.isArray(val)) return false ; // scalars don't need separate display
+
+        // Now we know it is an array
+
+        // Handle 1-D array
+        if (!Array.isArray(val[0])) {
+            // 1-D array
+            if (val.length < this.TRUNCATE_LIMIT) {
+                // too short to need separate window
+                return false;
+            }
+        }
+
+        // Handle 2-D array
+        if (!Array.isArray(val[0][0])) {
+            return true;
+        }
+
+        // More than 3-D array - punt for now
+        return false;
+    }
+
+    update(name, val) {
+        this.title.text("Initial value for " + name);
+
+        // Check to see if the data is a 2d array since the rest of the code assumes that it is an Array
+        // If only 1d, make it a 2d with one row
+        if (!Array.isArray(val[0])){
+            val = [val];
+        }
+
+        var tbody = this.table.append("tbody");
+        var rows = tbody.selectAll('tr').data(val).enter().append('tr')
+        var cells = rows.selectAll('td')
+            .data(function(row) {
+                return row;
+        })
+        .enter()
+        .append('td')
+        .text(function (d) {
+            return d;
+        })
+    }
+
+    clear() {
+        this.table.html('');
+    }
+
+        /** Listen for the event to begin dragging the legend */
+    _setupDrag() {
+        const self = this;
+
+        this.title.on('mousedown', function() {
+            d3.select('#node-value-title').style('cursor', 'grabbing');
+            let dragDiv = d3.select('#node-value-container');
+            dragDiv.style('cursor', 'grabbing')
+                // top style needs to be set explicitly before releasing bottom:
+                .style('top', dragDiv.style('top'))
+                .style('bottom', 'initial');
+
+            self._startPos = [d3.event.clientX, d3.event.clientY]
+            self._offset = [d3.event.clientX - parseInt(dragDiv.style('left')),
+                d3.event.clientY - parseInt(dragDiv.style('top'))];
+
+            let w = d3.select(window)
+                .on("mousemove", e => {
+                    dragDiv
+                        .style('top', (d3.event.clientY - self._offset[1]) + 'px')
+                        .style('left', (d3.event.clientX - self._offset[0]) + 'px');
+                })
+                .on("mouseup", e => {
+                    dragDiv.style('cursor', 'grab');
+                    w.on("mousemove", null).on("mouseup", null);
+
+                });
+
+            d3.event.preventDefault();
+        })
+    }
+
+        /** Set up event handlers for grabbing the bottom corner and dragging */
+    _setupResizerDrag() {
+        const handle = d3.select('#node-value-resizer-handle');
+        const body = d3.select('body');
+        const tableDiv = d3.select('#node-value-table-div');
+
+        handle.on('mousedown', e => {
+            const startPos = {
+                'x': d3.event.clientX,
+                'y': d3.event.clientY
+            };
+            const startDims = {
+                'width': parseInt(tableDiv.style('width')),
+                'height': parseInt(tableDiv.style('height'))
+            };
+            body.style('cursor', 'nwse-resize')
+                .on('mouseup', e => {
+                    // Get rid of the drag event handlers
+                    body.style('cursor', 'default')
+                        .on('mousemove', null)
+                        .on('mouseup', null);
+                })
+                .on('mousemove', e => {
+                    const newWidth = d3.event.clientX - startPos.x + startDims.width;
+                    const newHeight = d3.event.clientY - startPos.y + startDims.height;
+
+                    tableDiv.style('width', newWidth + 'px');
+                    tableDiv.style('height', newHeight + 'px');
+                });
+
+            d3.event.preventDefault();
+        });
+
+    }
+}
+
 /**
  * Manage a table containing all available metadata properties for
  * the currently active node, as well as whether the table is
@@ -59,18 +288,26 @@ class NodeInfo {
      * references to the HTML elements.
      * @param {Object} abs2prom Object containing promoted variable names.
      */
-    constructor(abs2prom) {
+    constructor(abs2prom, valueInfo) {
         this.propList = [
             new InfoPropDefault('absPathName', 'Absolute Name'),
             new InfoPropDefault('class', 'Class'),
             new InfoUpdateType('type', 'Type', true),
             new InfoPropDefault('dtype', 'DType'),
+
+            new InfoPropDefault('units', 'Units'),
+            new InfoPropDefault('shape', 'Shape'),
+            new InfoPropYesNo('is_discrete', 'Discrete'),
+            new InfoPropYesNo('distributed', 'Distributed'),
+            new InfoPropArray('value', 'Value'),
+
             new InfoPropDefault('subsystem_type', 'Subsystem Type', true),
             new InfoPropDefault('component_type', 'Component Type', true),
             new InfoPropYesNo('implicit', 'Implicit'),
             new InfoPropYesNo('is_parallel', 'Parallel'),
             new InfoPropDefault('linear_solver', 'Linear Solver'),
-            new InfoPropDefault('nonlinear_solver', 'Non-Linear Solver')
+            new InfoPropDefault('nonlinear_solver', 'Non-Linear Solver'),
+            new InfoPropDefault('options', 'Options')
         ];
 
         this.abs2prom = abs2prom;
@@ -85,6 +322,9 @@ class NodeInfo {
         const self = this;
         this.pinButton = d3.select('#node-info-pin')
             .on('click', e => { self.unpin(); })
+        this.name = null;
+
+        this.valueInfo = valueInfo;
     }
 
     /** Make the info box visible if it's hidden */
@@ -116,6 +356,12 @@ class NodeInfo {
         this.pinned = false;
         this.pinButton.attr('class', 'info-hidden');
         this.clear();
+
+        const d = d3.select("#node-value-div");
+        d.style('visibility', 'hidden');
+
+        this.valueInfo.clear();
+        this.valueInfo.hide();
     }
 
     togglePin() {
@@ -124,16 +370,81 @@ class NodeInfo {
     }
 
     _addPropertyRow(label, val, capitalize = false) {
-        const newRow = this.tbody.append('tr');
 
-        newRow.append('th')
-            .attr('scope', 'row')
-            .text(label);
+        if ( label != 'Options'){
+            const newRow = this.tbody.append('tr');
 
-        const td = newRow.append('td')
-            .text(val);
+            const th = newRow.append('th')
+                .attr('scope', 'row')
+                .text(label)
 
-        if (capitalize) td.attr('class', 'caps');
+            var nodeInfoVal = val ;
+            let td;
+            if ( label === 'Value') {
+                if ( val == null ) {
+                    td = newRow.append('td')
+                            .html("Value too large to include in N2" );
+                } else {
+                    var val_string = array_to_string(val)
+                    var max_length = this.valueInfo.TRUNCATE_LIMIT;
+                    var isTruncated = val_string.length > max_length ;
+                    var nodeInfoVal = isTruncated ?
+                        val_string.substring(0, max_length - 3) + "..." :
+                        val_string;
+
+                    let html = nodeInfoVal;
+                    // if ( this.valueInfo.showMoreButtonDisplayed(val) ){
+                    if ( isTruncated ){
+                        html += " <button type='button' class='show_value_button'>Show more</button>" ;
+                    }
+                    html += " <button type='button' class='copy_value_button'>Copy</button>" ;
+                    td = newRow.append('td').html(html);
+
+                    // if ( this.valueInfo.showMoreButtonDisplayed(val) ) {
+                    if ( isTruncated ) {
+                        var showValueButton = td.select('.show_value_button');
+                        const self = this;
+                        showValueButton.on('click', function () {
+                            self.valueInfo.update(self.name, val);
+                            self.valueInfo.show();
+                        });
+                    }
+                    // Copy value button
+                    var copyValueButton = td.select('.copy_value_button');
+                    copyValueButton.on('click',
+                           function () {
+                                // This is the strange way you can get something on the clipboard
+                                var copyText = document.querySelector("#input");
+                                copyText.value = 'array(' + array_to_copy_string(val)  + ')';
+                                copyText.select();
+                                document.execCommand("copy");
+                           }
+                    );
+                }
+            }
+            else {
+                td = newRow.append('td')
+                        .text(nodeInfoVal);
+
+            }
+            if (capitalize) td.attr('class', 'caps');
+        } else {
+            // Add Options to the Node Info table
+            if ( Object.keys(val).length !== 0 ){
+                const tr = this.tbody.append('th').text("Options").attr('colspan', '2').attr('class', 'options-header');
+                for (const key in val) {
+                    const tr = this.tbody.append('tr');
+                    const th = tr.append('th').text(key);
+                    let v;
+                    if (val[key] === null) {
+                        v = "None";
+                    } else {
+                        v = val[key];
+                    }
+                    const td = tr.append('td').text(v);
+                }
+            }
+        }
     }
 
     /**
@@ -152,6 +463,8 @@ class NodeInfo {
             .style('background-color', color)
             .text(obj.name);
 
+        this.name = obj.absPathName;
+
         this.table.select('tfoot th')
             .style('background-color', color);
 
@@ -165,8 +478,15 @@ class NodeInfo {
         }
 
         for (const prop of this.propList) {
-            if (obj.propExists(prop.key) && obj[prop.key] != '') {
-                this._addPropertyRow(prop.desc, prop.output(obj[prop.key]), prop.capitalize)
+            // if (obj.propExists(prop.key) && obj[prop.key] != '') {
+            if (prop.key === 'value') {
+                if (obj.hasOwnProperty('value')) {
+                    this._addPropertyRow(prop.desc, prop.output(obj[prop.key]), prop.capitalize)
+                }
+            } else {
+                if (prop.canShow(obj)) {
+                    this._addPropertyRow(prop.desc, prop.output(obj[prop.key]), prop.capitalize)
+                }
             }
         }
 
@@ -266,7 +586,8 @@ class N2UserInterface {
         this._setupWindowResizer();
 
         this.legend = new N2Legend(this.n2Diag.modelData);
-        this.nodeInfoBox = new NodeInfo(this.n2Diag.model.abs2prom);
+        this.valueInfoBox = new ValueInfo(this.n2Diag.model.abs2prom);
+        this.nodeInfoBox = new NodeInfo(this.n2Diag.model.abs2prom, this.valueInfoBox);
         this.toolbar = new N2Toolbar(this);
     }
 

@@ -6,6 +6,9 @@ import os
 from collections import OrderedDict
 from itertools import chain
 import networkx as nx
+import sys
+
+import numpy as np
 
 from openmdao.components.exec_comp import ExecComp
 from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
@@ -33,13 +36,16 @@ _MODEL_HEIGHTS = [600, 650, 700, 750, 800,
 
 _IND = 4  # HTML indentation (spaces)
 
+_MAX_ARRAY_SIZE_FOR_REPR_VAL = 1000  # If var has more elements than this do not pass to N2
 
 def _get_var_dict(system, typ, name):
     if name in system._var_discrete[typ]:
         meta = system._var_discrete[typ][name]
+        is_discrete = True
     else:
         meta = system._var_abs2meta[name]
         name = system._var_abs2prom[typ][name]
+        is_discrete = False
 
     var_dict = OrderedDict()
 
@@ -52,8 +58,27 @@ def _get_var_dict(system, typ, name):
         var_dict['implicit'] = isimplicit
 
     var_dict['dtype'] = type(meta['value']).__name__
-    return var_dict
+    if 'units' in meta:
+        if meta['units'] is None:
+            var_dict['units'] = 'None'
+        else:
+            var_dict['units'] = meta['units']
 
+    if 'shape' in meta:
+        var_dict['shape'] = str(meta['shape'])
+
+    if 'distributed' in meta:
+        var_dict['distributed'] = meta['distributed']
+
+    if meta['value'].size < _MAX_ARRAY_SIZE_FOR_REPR_VAL:
+        var_dict['value'] = meta['value']
+    else:
+        var_dict['value'] = None
+
+    if is_discrete:
+            var_dict['is_discrete'] = True
+
+    return var_dict
 
 def _get_tree_dict(system, component_execution_orders, component_execution_index,
                    is_parallel=False):
@@ -141,6 +166,9 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
             tree_dict['nonlinear_solver'] = ""
 
     tree_dict['children'] = children
+
+    options = {k: system.options[k] for k in system.options}
+    tree_dict['options'] = options
 
     if not tree_dict['name']:
         tree_dict['name'] = 'root'
