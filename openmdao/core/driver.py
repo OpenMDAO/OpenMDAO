@@ -600,7 +600,7 @@ class Driver(object):
         if indices is None:
             indices = _full_slice
 
-        if name in self._designvars_discrete:
+        if src_name in self._designvars_discrete:
 
             # Note, drivers set values here and generally should know it is setting an integer.
             # However, the DOEdriver may pull a non-integer value from its generator, so we
