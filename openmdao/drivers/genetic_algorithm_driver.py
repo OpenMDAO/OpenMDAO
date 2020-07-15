@@ -619,6 +619,7 @@ class GeneticAlgorithm(object):
             Pm = (self.lchrom + 1.0) / (2.0 * pop_size * np.sum(bits))
         elite = self.elite
 
+        self.rng = np.random.default_rng(random_state)
         new_gen = np.round(lhs(self.lchrom, self.npop, criterion='center',
                                random_state=random_state))
         new_gen[0] = self.encode(x0, vlb, vub, bits)
@@ -851,7 +852,7 @@ class GeneticAlgorithm(object):
         """
         new_gen = copy.deepcopy(old_gen)
         num_sites = self.npop // 2
-        sites = np.random.rand(num_sites, self.lchrom)
+        sites = self.rng.random([num_sites, self.lchrom])
         idx, idy = np.where(sites < Pc)
         for ii, jj in zip(idx, idy):
             i = 2 * ii
@@ -883,7 +884,7 @@ class GeneticAlgorithm(object):
         ndarray
             Current generation with mutations applied.
         """
-        temp = np.random.rand(self.npop, self.lchrom)
+        temp = self.rng.random([self.npop, self.lchrom])
         idx, idy = np.where(temp < Pm)
         current_gen[idx, idy] = 1 - current_gen[idx, idy]
         return current_gen
@@ -906,7 +907,7 @@ class GeneticAlgorithm(object):
         ndarray(dtype=np.int)
             Index array that maps the shuffle from old to new.
         """
-        temp = np.random.rand(self.npop)
+        temp = self.rng.random(self.npop)
         index = np.argsort(temp)
         return old_gen[index], index
 
