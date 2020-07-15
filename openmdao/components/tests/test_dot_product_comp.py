@@ -220,6 +220,75 @@ class TestMultipleUnits(unittest.TestCase):
                                                decimal=6)
 
 
+class TestMultipleConfigure(unittest.TestCase):
+
+    def setUp(self):
+
+        class MyModel(om.Group):
+
+            def setup(self):
+                ivc = om.IndepVarComp()
+                ivc.add_output(name='a', shape=(5, 3), units='lbf')
+                ivc.add_output(name='b', shape=(5, 3), units='ft/s')
+
+                dpc = om.DotProductComp(vec_size=5,  # default length=3
+                                        a_units='N', b_units='m/s', c_units='W')
+
+                self.add_subsystem('ivc', ivc, promotes_outputs=['*'])
+                self.add_subsystem('dpc', dpc)
+
+                self.connect('a', 'dpc.a')
+                self.connect('b', 'dpc.b')
+
+            def configure(self):
+                self.ivc.add_output(name='x', shape=(3, 7), units='N')
+                self.ivc.add_output(name='y', shape=(3, 7), units='m/s')
+
+                self.dpc.add_product(a_name='x', b_name='y', c_name='z', vec_size=3, length=7,
+                                     a_units='N', b_units='m/s', c_units='hp')
+
+
+                self.connect('x', 'dpc.x')
+                self.connect('y', 'dpc.y')
+
+        p = self.p = om.Problem(MyModel())
+        p.setup()
+
+        p['a'] = np.random.rand(5, 3)
+        p['b'] = np.random.rand(5, 3)
+        p['x'] = np.random.rand(3, 7)
+        p['y'] = np.random.rand(3, 7)
+
+        p.run_model()
+
+    def test_results(self):
+
+        for i in range(5):
+            a_i = self.p['a'][i, :]
+            b_i = self.p['b'][i, :]
+            c_i = self.p.get_val('dpc.c', units='hp')[i]
+            expected_i = np.dot(a_i, b_i) / 550.0
+
+            np.testing.assert_almost_equal(c_i, expected_i)
+
+        for i in range(3):
+            x_i = self.p['x'][i, :]
+            y_i = self.p['y'][i, :]
+            z_i = self.p.get_val('dpc.z', units='hp')[i]
+            expected_i = np.dot(x_i, y_i)
+            np.testing.assert_almost_equal(z_i, expected_i)
+
+    def test_partials(self):
+        np.set_printoptions(linewidth=1024)
+        cpd = self.p.check_partials(compact_print=True, out_stream=None)
+
+        for comp in cpd:
+            for (var, wrt) in cpd[comp]:
+                np.testing.assert_almost_equal(actual=cpd[comp][var, wrt]['J_fwd'],
+                                               desired=cpd[comp][var, wrt]['J_fd'],
+                                               decimal=6)
+
+
 class TestMultipleCommonA(unittest.TestCase):
 
     def setUp(self):

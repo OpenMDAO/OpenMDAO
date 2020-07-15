@@ -284,6 +284,71 @@ class TestMultipleUnits(unittest.TestCase):
                                                decimal=6)
 
 
+class TestMultipleConfigure(unittest.TestCase):
+
+    def setUp(self):
+
+        class MyModel(om.Group):
+
+            def setup(self):
+                ivc = om.IndepVarComp()
+                ivc.add_output(name='a', shape=(5, 3), units='ft')
+                ivc.add_output(name='b', shape=(5, 3), units='lbf')
+
+                cpc = om.CrossProductComp(vec_size=5, a_units='m', b_units='N', c_units='N*m')
+
+                self.add_subsystem('ivc', ivc, promotes_outputs=['*'])
+                self.add_subsystem('cpc', cpc)
+
+                self.connect('a', 'cpc.a')
+                self.connect('b', 'cpc.b')
+
+            def configure(self):
+                self.ivc.add_output(name='x', shape=(5, 3), units='ft')
+                self.ivc.add_output(name='y', shape=(5, 3), units='lbf')
+
+                self.cpc.add_product('z', a_name='x', b_name='y', vec_size=5,
+                                     a_units='m', b_units='N', c_units='N*m')
+
+                self.connect('x', 'cpc.x')
+                self.connect('y', 'cpc.y')
+
+        p = self.p = om.Problem(MyModel())
+        p.setup()
+
+        p['a'] = np.random.rand(5, 3)
+        p['b'] = np.random.rand(5, 3)
+
+        p.run_model()
+
+    def test_results(self):
+
+        for i in range(5):
+            a_i = self.p['a'][i, :]
+            b_i = self.p['b'][i, :]
+            c_i = self.p.get_val('cpc.c', units='ft*lbf')[i, :]
+            expected_i = np.cross(a_i, b_i)
+
+            assert_near_equal(c_i, expected_i, tolerance=1.0E-12)
+
+            x_i = self.p['x'][i, :]
+            y_i = self.p['y'][i, :]
+            z_i = self.p.get_val('cpc.z', units='ft*lbf')[i, :]
+            expected_i = np.cross(x_i, y_i)
+
+            assert_near_equal(z_i, expected_i, tolerance=1.0E-12)
+
+    def test_partials(self):
+        np.set_printoptions(linewidth=1024)
+        cpd = self.p.check_partials(compact_print=True, out_stream=None)
+
+        for comp in cpd:
+            for (var, wrt) in cpd[comp]:
+                np.testing.assert_almost_equal(actual=cpd[comp][var, wrt]['J_fwd'],
+                                               desired=cpd[comp][var, wrt]['J_fd'],
+                                               decimal=6)
+
+
 class TestMultipleCommonA(unittest.TestCase):
 
     def setUp(self):

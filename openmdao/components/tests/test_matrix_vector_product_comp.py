@@ -275,6 +275,78 @@ class TestMultipleUnits(unittest.TestCase):
                                                decimal=6)
 
 
+class TestMultipleConfigure(unittest.TestCase):
+
+    def setUp(self):
+
+        class MyModel(om.Group):
+
+            def setup(self):
+                ivc = om.IndepVarComp()
+                ivc.add_output(name='A', shape=(2, 5, 3), units='ft')
+                ivc.add_output(name='x', shape=(2, 3), units='lbf')
+
+                mvp = om.MatrixVectorProductComp(vec_size=2, A_shape=(5, 3),
+                                                 A_units='m', x_units='N', b_units='N*m')
+
+                self.add_subsystem('ivc', ivc, promotes_outputs=['*'])
+                self.add_subsystem('mvp', mvp, promotes=['*'])
+
+            def configure(self):
+                self.ivc.add_output(name='B', shape=(2, 5, 3), units='m')
+                self.ivc.add_output(name='y', shape=(2, 3), units='N')
+
+                self.mvp.add_product('c', A_name='B', x_name='y',
+                                     A_shape=(5, 3), vec_size=2,
+                                     A_units='m', x_units='N', b_units='N*m')
+
+        self.p = om.Problem(MyModel())
+        self.p.setup(force_alloc_complex=True)
+
+        A = np.random.rand(2, 5, 3)
+        x = np.random.rand(2, 3)
+
+        self.p['A'] = A
+        self.p['x'] = x
+
+        self.p['B'] = convert_units(A, 'ft', 'm')
+        self.p['y'] = convert_units(x, 'lbf', 'N')
+
+        self.p.run_model()
+
+    def test_results(self):
+
+        for i in range(2):
+            # b = Ax
+            A_i = self.p['A'][i, :, :]
+            x_i = self.p['x'][i, :]
+            b_i = self.p.get_val('mvp.b', units='ft*lbf')[i, :]
+
+            expected_i = np.dot(A_i, x_i)
+            np.testing.assert_almost_equal(b_i, expected_i)
+
+            # c = By
+            B_i = self.p['B'][i, :, :]
+            y_i = self.p['y'][i, :]
+            c_i = self.p.get_val('mvp.c', units='N*m')[i, :]
+
+            expected_i = np.dot(B_i, y_i)
+            np.testing.assert_almost_equal(c_i, expected_i)
+
+            # b & c should match after unit conversion
+            np.testing.assert_almost_equal(convert_units(b_i, 'ft*lbf', 'N*m'), c_i)
+
+    def test_partials(self):
+        np.set_printoptions(linewidth=1024)
+        cpd = self.p.check_partials(out_stream=None, method='cs')
+
+        for comp in cpd:
+            for (var, wrt) in cpd[comp]:
+                np.testing.assert_almost_equal(actual=cpd[comp][var, wrt]['J_fwd'],
+                                               desired=cpd[comp][var, wrt]['J_fd'],
+                                               decimal=6)
+
+
 class TestMultipleCommonMatrix(unittest.TestCase):
 
     def setUp(self):
