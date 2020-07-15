@@ -1277,8 +1277,6 @@ class Group(System):
                             abs2meta[abs_in]['src_indices'] = \
                                 abs2meta[abs_in]['src_indices'].ravel()
                     else:
-                        if len(src_indices.shape) != len(in_shape):
-                            raise ValueError
                         # For 1D source, we allow user to specify a flat list without setting
                         # flat_src_indices to True.
                         if src_indices.ndim == 1:
@@ -1303,6 +1301,12 @@ class Group(System):
                                             raise ValueError(msg)
                                         else:
                                             simple_warning(msg)
+                            else:
+                                for i in src_indices:
+                                    if len(i.shape) != len(in_shape) and src_indices.shape != in_shape:
+                                        msg = f"{self.msginfo}: src_indices shape {src_indices.shape} does not match {abs_in} shape " + \
+                                            f"{in_shape}."
+                                        raise ValueError(msg)
 
     def _set_subsys_connection_errors(self, val=True):
         """

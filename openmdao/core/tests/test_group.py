@@ -542,7 +542,7 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             p.setup()
         self.assertEqual(str(context.exception),
-                         "Phase (phase): src_indices shape (1,) does not match phase.comp2.x shape (1, 2).")
+                         "Phase (phase): src_indices shape (1, 1) does not match phase.comp2.x shape (1, 2).")
 
     def test_promote_not_found1(self):
         p = om.Problem()
