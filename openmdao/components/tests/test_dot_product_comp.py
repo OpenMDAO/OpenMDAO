@@ -346,157 +346,97 @@ class TestMultipleErrors(unittest.TestCase):
 
     def test_duplicate_outputs(self):
         dpc = om.DotProductComp()
-        dpc.add_product('c')
-
-        model = om.Group()
-        model.add_subsystem('dpc', dpc)
-
-        p = om.Problem(model)
 
         with self.assertRaises(NameError) as ctx:
-            p.setup()
+            dpc.add_product('c')
 
-        self.assertEqual(str(ctx.exception), "DotProductComp (dpc): "
+        self.assertEqual(str(ctx.exception), "DotProductComp: "
                          "Multiple definition of output 'c'.")
 
     def test_input_as_output(self):
         dpc = om.DotProductComp()
-        dpc.add_product('a', 'b', 'c')
-
-        model = om.Group()
-        model.add_subsystem('dpc', dpc)
-
-        p = om.Problem(model)
 
         with self.assertRaises(NameError) as ctx:
-            p.setup()
+            dpc.add_product('a', 'b', 'c')
 
-        self.assertEqual(str(ctx.exception), "DotProductComp (dpc): 'a' specified as"
-                         " an output, but it has already been defined as an input.")
+        self.assertEqual(str(ctx.exception), "DotProductComp: 'a' specified as "
+                         "an output, but it has already been defined as an input.")
 
     def test_output_as_input_a(self):
         dpc = om.DotProductComp()
-        dpc.add_product('z', 'c', 'b')
-
-        model = om.Group()
-        model.add_subsystem('dpc', dpc)
-
-        p = om.Problem(model)
 
         with self.assertRaises(NameError) as ctx:
-            p.setup()
+            dpc.add_product('z', 'c', 'b')
 
-        self.assertEqual(str(ctx.exception), "DotProductComp (dpc): 'c' specified as"
-                         " an input, but it has already been defined as an output.")
+        self.assertEqual(str(ctx.exception), "DotProductComp: 'c' specified as "
+                         "an input, but it has already been defined as an output.")
 
     def test_output_as_input_b(self):
         dpc = om.DotProductComp()
-        dpc.add_product('z', 'b', 'c')
-
-        model = om.Group()
-        model.add_subsystem('dpc', dpc)
-
-        p = om.Problem(model)
 
         with self.assertRaises(NameError) as ctx:
-            p.setup()
+            dpc.add_product('z', 'b', 'c')
 
-        self.assertEqual(str(ctx.exception), "DotProductComp (dpc): 'c' specified as"
-                         " an input, but it has already been defined as an output.")
+        self.assertEqual(str(ctx.exception), "DotProductComp: 'c' specified as "
+                         "an input, but it has already been defined as an output.")
 
     def test_a_vec_size_mismatch(self):
         dpc = om.DotProductComp()
-        dpc.add_product('z', 'a', 'y', vec_size=10)
-
-        model = om.Group()
-        model.add_subsystem('dpc', dpc)
-
-        p = om.Problem(model)
 
         with self.assertRaises(ValueError) as ctx:
-            p.setup()
+            dpc.add_product('z', 'a', 'y', vec_size=10)
 
-        self.assertEqual(str(ctx.exception), "DotProductComp (dpc): "
+        self.assertEqual(str(ctx.exception), "DotProductComp: "
                          "Conflicting vec_size=10 specified for input 'a', "
                          "which has already been defined with vec_size=1.")
 
     def test_a_length_mismatch(self):
         dpc = om.DotProductComp()
-        dpc.add_product('z', 'a', 'y', length=10)
-
-        model = om.Group()
-        model.add_subsystem('dpc', dpc)
-
-        p = om.Problem(model)
 
         with self.assertRaises(ValueError) as ctx:
-            p.setup()
+            dpc.add_product('z', 'a', 'y', length=10)
 
-        self.assertEqual(str(ctx.exception), "DotProductComp (dpc): "
+        self.assertEqual(str(ctx.exception), "DotProductComp: "
                          "Conflicting length=10 specified for input 'a', "
                          "which has already been defined with length=3.")
 
     def test_a_units_mismatch(self):
         dpc = om.DotProductComp()
-        dpc.add_product('z', 'a', 'b',a_units='ft')
-
-        model = om.Group()
-        model.add_subsystem('dpc', dpc)
-
-        p = om.Problem(model)
 
         with self.assertRaises(ValueError) as ctx:
-            p.setup()
+            dpc.add_product('z', 'a', 'b',a_units='ft')
 
-        self.assertEqual(str(ctx.exception), "DotProductComp (dpc): "
+        self.assertEqual(str(ctx.exception), "DotProductComp: "
                          "Conflicting units 'ft' specified for input 'a', "
                          "which has already been defined with units 'None'.")
 
     def test_b_vec_size_mismatch(self):
         dpc = om.DotProductComp()
-        dpc.add_product('z', 'x', 'b', vec_size=10)
-
-        model = om.Group()
-        model.add_subsystem('dpc', dpc)
-
-        p = om.Problem(model)
 
         with self.assertRaises(ValueError) as ctx:
-            p.setup()
+            dpc.add_product('z', 'x', 'b', vec_size=10)
 
-        self.assertEqual(str(ctx.exception), "DotProductComp (dpc): "
+        self.assertEqual(str(ctx.exception), "DotProductComp: "
                          "Conflicting vec_size=10 specified for input 'b', "
                          "which has already been defined with vec_size=1.")
 
     def test_b_length_mismatch(self):
         dpc = om.DotProductComp()
-        dpc.add_product('z', 'x', 'b', length=10)
-
-        model = om.Group()
-        model.add_subsystem('dpc', dpc)
-
-        p = om.Problem(model)
 
         with self.assertRaises(ValueError) as ctx:
-            p.setup()
+            dpc.add_product('z', 'x', 'b', length=10)
 
-        self.assertEqual(str(ctx.exception), "DotProductComp (dpc): "
+        self.assertEqual(str(ctx.exception), "DotProductComp: "
                          "Conflicting length=10 specified for input 'b', "
                          "which has already been defined with length=3.")
 
     def test_b_units_mismatch(self):
         dpc = om.DotProductComp()
-        dpc.add_product('z', 'a', 'b', b_units='ft')
-
-        model = om.Group()
-        model.add_subsystem('dpc', dpc)
-
-        p = om.Problem(model)
 
         with self.assertRaises(ValueError) as ctx:
-            p.setup()
+            dpc.add_product('z', 'a', 'b', b_units='ft')
 
-        self.assertEqual(str(ctx.exception), "DotProductComp (dpc): "
+        self.assertEqual(str(ctx.exception), "DotProductComp: "
                          "Conflicting units 'ft' specified for input 'b', "
                          "which has already been defined with units 'None'.")
 

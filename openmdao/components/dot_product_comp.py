@@ -38,6 +38,11 @@ class DotProductComp(ExplicitComponent):
 
         self._products = []
 
+        opt = self.options
+        self.add_product(c_name=opt['c_name'], a_name=opt['a_name'], b_name=opt['b_name'],
+                         c_units=opt['c_units'], a_units=opt['a_units'], b_units=opt['b_units'],
+                         vec_size=opt['vec_size'], length=opt['length'])
+
     def initialize(self):
         """
         Declare options.
@@ -97,95 +102,67 @@ class DotProductComp(ExplicitComponent):
             'length': length
         })
 
-    def setup(self):
-        """
-        Declare inputs, outputs, and derivatives for the dot product component.
-        """
-        if len(self._products) == 0:
-            products = self._products = [self.options]
-        else:
-            # prepend the product specified in component options
-            opts = self.options
-            products = self._products
-            products.insert(0, {
-                'a_name': opts['a_name'],
-                'b_name': opts['b_name'],
-                'c_name': opts['c_name'],
-                'a_units': opts['a_units'],
-                'b_units': opts['b_units'],
-                'c_units': opts['c_units'],
-                'vec_size': opts['vec_size'],
-                'length': opts['length']
-            })
-
         # add inputs and outputs for all products
-        var_rel2meta = self._var_rel2meta
-        var_outputs = self._var_rel_names['output']
-        var_inputs = self._var_rel_names['input']
+        if self._static_mode:
+            var_rel2meta = self._static_var_rel2meta
+            var_rel_names = self._static_var_rel_names
+        else:
+            var_rel2meta = self._var_rel2meta
+            var_rel_names = self._var_rel_names
 
-        for product in products:
-            a_name = product['a_name']
-            b_name = product['b_name']
-            c_name = product['c_name']
-            a_units = product['a_units']
-            b_units = product['b_units']
-            c_units = product['c_units']
-            vec_size = product['vec_size']
-            length = product['length']
+        if c_name not in var_rel2meta:
+            self.add_output(name=c_name, shape=(vec_size,), units=c_units)
+        elif c_name in var_rel_names['input']:
+            raise NameError(f"{self.msginfo}: '{c_name}' specified as an output, "
+                            "but it has already been defined as an input.")
+        else:
+            raise NameError(f"{self.msginfo}: Multiple definition of output '{c_name}'.")
 
-            if c_name not in var_rel2meta:
-                self.add_output(name=c_name, shape=(vec_size,), units=c_units)
-            elif c_name in var_inputs:
-                raise NameError(f"{self.msginfo}: '{c_name}' specified as an output, "
-                                "but it has already been defined as an input.")
-            else:
-                raise NameError(f"{self.msginfo}: Multiple definition of output '{c_name}'.")
+        if a_name not in var_rel2meta:
+            self.add_input(name=a_name, shape=(vec_size, length), units=a_units)
+        elif a_name in var_rel_names['output']:
+            raise NameError(f"{self.msginfo}: '{a_name}' specified as an input, "
+                            "but it has already been defined as an output.")
+        else:
+            meta = var_rel2meta[a_name]
+            if a_units != meta['units']:
+                raise ValueError(f"{self.msginfo}: Conflicting units '{a_units}' specified "
+                                 f"for input '{a_name}', which has already been defined "
+                                 f"with units '{meta['units']}'.")
+            if vec_size != meta['shape'][0]:
+                raise ValueError(f"{self.msginfo}: Conflicting vec_size={vec_size} specified "
+                                 f"for input '{a_name}', which has already been defined "
+                                 f"with vec_size={meta['shape'][0]}.")
+            if length != meta['shape'][1]:
+                raise ValueError(f"{self.msginfo}: Conflicting length={length} specified "
+                                 f"for input '{a_name}', which has already been defined "
+                                 f"with length={meta['shape'][1]}.")
 
-            if a_name not in var_rel2meta:
-                self.add_input(name=a_name, shape=(vec_size, length), units=a_units)
-            elif a_name in var_outputs:
-                raise NameError(f"{self.msginfo}: '{a_name}' specified as an input, "
-                                "but it has already been defined as an output.")
-            else:
-                meta = var_rel2meta[a_name]
-                if a_units != meta['units']:
-                    raise ValueError(f"{self.msginfo}: Conflicting units '{a_units}' specified "
-                                     f"for input '{a_name}', which has already been defined "
-                                     f"with units '{meta['units']}'.")
-                if vec_size != meta['shape'][0]:
-                    raise ValueError(f"{self.msginfo}: Conflicting vec_size={vec_size} specified "
-                                     f"for input '{a_name}', which has already been defined "
-                                     f"with vec_size={meta['shape'][0]}.")
-                if length != meta['shape'][1]:
-                    raise ValueError(f"{self.msginfo}: Conflicting length={length} specified "
-                                     f"for input '{a_name}', which has already been defined "
-                                     f"with length={meta['shape'][1]}.")
+        if b_name not in var_rel2meta:
+            self.add_input(name=b_name, shape=(vec_size, length), units=b_units)
+        elif b_name in var_rel_names['output']:
+            raise NameError(f"{self.msginfo}: '{b_name}' specified as an input, "
+                            "but it has already been defined as an output.")
+        else:
+            meta = var_rel2meta[b_name]
+            if b_units != meta['units']:
+                raise ValueError(f"{self.msginfo}: Conflicting units '{b_units}' specified "
+                                 f"for input '{b_name}', which has already been defined "
+                                 f"with units '{meta['units']}'.")
+            if vec_size != meta['shape'][0]:
+                raise ValueError(f"{self.msginfo}: Conflicting vec_size={vec_size} specified "
+                                 f"for input '{b_name}', which has already been defined "
+                                 f"with vec_size={meta['shape'][0]}.")
+            if length != meta['shape'][1]:
+                raise ValueError(f"{self.msginfo}: Conflicting length={length} specified "
+                                 f"for input '{b_name}', which has already been defined "
+                                 f"with length={meta['shape'][1]}.")
 
-            if b_name not in var_rel2meta:
-                self.add_input(name=b_name, shape=(vec_size, length), units=b_units)
-            elif b_name in var_outputs:
-                raise NameError(f"{self.msginfo}: '{b_name}' specified as an input, "
-                                "but it has already been defined as an output.")
-            else:
-                meta = var_rel2meta[b_name]
-                if b_units != meta['units']:
-                    raise ValueError(f"{self.msginfo}: Conflicting units '{b_units}' specified "
-                                     f"for input '{b_name}', which has already been defined "
-                                     f"with units '{meta['units']}'.")
-                if vec_size != meta['shape'][0]:
-                    raise ValueError(f"{self.msginfo}: Conflicting vec_size={vec_size} specified "
-                                     f"for input '{b_name}', which has already been defined "
-                                     f"with vec_size={meta['shape'][0]}.")
-                if length != meta['shape'][1]:
-                    raise ValueError(f"{self.msginfo}: Conflicting length={length} specified "
-                                     f"for input '{b_name}', which has already been defined "
-                                     f"with length={meta['shape'][1]}.")
+        row_idxs = np.repeat(np.arange(vec_size), length)
+        col_idxs = np.arange(vec_size * length)
 
-            row_idxs = np.repeat(np.arange(vec_size), length)
-            col_idxs = np.arange(vec_size * length)
-
-            self.declare_partials(of=c_name, wrt=a_name, rows=row_idxs, cols=col_idxs)
-            self.declare_partials(of=c_name, wrt=b_name, rows=row_idxs, cols=col_idxs)
+        self.declare_partials(of=c_name, wrt=a_name, rows=row_idxs, cols=col_idxs)
+        self.declare_partials(of=c_name, wrt=b_name, rows=row_idxs, cols=col_idxs)
 
     def compute(self, inputs, outputs):
         """

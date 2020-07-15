@@ -48,6 +48,11 @@ class MatrixVectorProductComp(ExplicitComponent):
 
         self._products = []
 
+        opt = self.options
+        self.add_product(b_name=opt['b_name'], A_name=opt['A_name'], x_name=opt['x_name'],
+                         b_units=opt['b_units'], A_units=opt['A_units'], x_units=opt['x_units'],
+                         vec_size=opt['vec_size'], A_shape=opt['A_shape'])
+
     def initialize(self):
         """
         Declare options.
@@ -112,113 +117,85 @@ class MatrixVectorProductComp(ExplicitComponent):
             'vec_size': vec_size
         })
 
-    def setup(self):
-        """
-        Declare inputs, outputs, and derivatives for the matrix vector product component.
-        """
-        if len(self._products) == 0:
-            products = self._products = [self.options]
-        else:
-            # prepend the product specified in component options
-            opts = self.options
-            products = self._products
-            products.insert(0, {
-                'A_name': opts['A_name'],
-                'b_name': opts['b_name'],
-                'x_name': opts['x_name'],
-                'b_units': opts['b_units'],
-                'A_units': opts['A_units'],
-                'x_units': opts['x_units'],
-                'A_shape': opts['A_shape'],
-                'vec_size': opts['vec_size']
-            })
-
         # add inputs and outputs for all products
-        var_rel2meta = self._var_rel2meta
-        var_outputs = self._var_rel_names['output']
-        var_inputs = self._var_rel_names['input']
+        if self._static_mode:
+            var_rel2meta = self._static_var_rel2meta
+            var_rel_names = self._static_var_rel_names
+        else:
+            var_rel2meta = self._var_rel2meta
+            var_rel_names = self._var_rel_names
 
-        for product in products:
-            b_name = product['b_name']
-            A_name = product['A_name']
-            x_name = product['x_name']
+        n_rows, n_cols = A_shape
 
-            b_units = product['b_units']
-            A_units = product['A_units']
-            x_units = product['x_units']
+        A_shape = (vec_size, n_rows, n_cols)
+        b_shape = (vec_size, n_rows) if vec_size > 1 else (n_rows, )
+        x_shape = (vec_size, n_cols)
 
-            vec_size = product['vec_size']
-            n_rows, n_cols = product['A_shape']
+        if b_name not in var_rel2meta:
+            self.add_output(name=b_name, shape=b_shape, units=b_units)
+        elif b_name in var_rel_names['input']:
+            raise NameError(f"{self.msginfo}: '{b_name}' specified as an output, "
+                            "but it has already been defined as an input.")
+        else:
+            raise NameError(f"{self.msginfo}: Multiple definition of output '{b_name}'.")
 
-            A_shape = (vec_size, n_rows, n_cols)
-            b_shape = (vec_size, n_rows) if vec_size > 1 else (n_rows, )
-            x_shape = (vec_size, n_cols)
+        if A_name not in var_rel2meta:
+            self.add_input(name=A_name, shape=A_shape, units=A_units)
+        elif A_name in var_rel_names['output']:
+            raise NameError(f"{self.msginfo}: '{A_name}' specified as an input, "
+                            "but it has already been defined as an output.")
+        else:
+            meta = var_rel2meta[A_name]
+            if vec_size != meta['shape'][0]:
+                raise ValueError(f"{self.msginfo}: Conflicting vec_size={x_shape[0]} "
+                                 f"specified for matrix '{A_name}', which has already "
+                                 f"been defined with vec_size={meta['shape'][0]}.")
 
-            if b_name not in var_rel2meta:
-                self.add_output(name=b_name, shape=b_shape, units=b_units)
-            elif b_name in var_inputs:
-                raise NameError(f"{self.msginfo}: '{b_name}' specified as an output, "
-                                "but it has already been defined as an input.")
-            else:
-                raise NameError(f"{self.msginfo}: Multiple definition of output '{b_name}'.")
+            elif (n_rows, n_cols) != meta['shape'][1:]:
+                raise ValueError(f"{self.msginfo}: Conflicting shape {A_shape[1:]} specified "
+                                 f"for matrix '{A_name}', which has already been defined "
+                                 f"with shape {meta['shape'][1:]}.")
 
-            if A_name not in var_rel2meta:
-                self.add_input(name=A_name, shape=A_shape, units=A_units)
-            elif A_name in var_outputs:
-                raise NameError(f"{self.msginfo}: '{A_name}' specified as an input, "
-                                "but it has already been defined as an output.")
-            else:
-                meta = var_rel2meta[A_name]
-                if vec_size != meta['shape'][0]:
-                    raise ValueError(f"{self.msginfo}: Conflicting vec_size={x_shape[0]} "
-                                     f"specified for matrix '{A_name}', which has already "
-                                     f"been defined with vec_size={meta['shape'][0]}.")
+            elif A_units != meta['units']:
+                raise ValueError(f"{self.msginfo}: Conflicting units '{A_units}' specified "
+                                 f"for matrix '{A_name}', which has already been defined "
+                                 f"with units '{meta['units']}'.")
 
-                elif (n_rows, n_cols) != meta['shape'][1:]:
-                    raise ValueError(f"{self.msginfo}: Conflicting shape {A_shape[1:]} specified "
-                                     f"for matrix '{A_name}', which has already been defined "
-                                     f"with shape {meta['shape'][1:]}.")
+        if x_name not in var_rel2meta:
+            self.add_input(name=x_name, shape=x_shape, units=x_units)
+        elif x_name in var_rel_names['output']:
+            raise NameError(f"{self.msginfo}: '{x_name}' specified as an input, "
+                            "but it has already been defined as an output.")
+        else:
+            meta = var_rel2meta[x_name]
+            if vec_size != meta['shape'][0]:
+                raise ValueError(f"{self.msginfo}: Conflicting vec_size={x_shape[0]} "
+                                 f"specified for vector '{x_name}', which has already "
+                                 f"been defined with vec_size={meta['shape'][0]}.")
 
-                elif A_units != meta['units']:
-                    raise ValueError(f"{self.msginfo}: Conflicting units '{A_units}' specified "
-                                     f"for matrix '{A_name}', which has already been defined "
-                                     f"with units '{meta['units']}'.")
+            elif n_cols != meta['shape'][1]:
+                raise ValueError(f"{self.msginfo}: Matrix shape {A_shape[1:]} is incompatible "
+                                 f"with vector '{x_name}', which has already been defined "
+                                 f"with {meta['shape'][1]} column(s).")
 
-            if x_name not in var_rel2meta:
-                self.add_input(name=x_name, shape=x_shape, units=x_units)
-            elif x_name in var_outputs:
-                raise NameError(f"{self.msginfo}: '{x_name}' specified as an input, "
-                                "but it has already been defined as an output.")
-            else:
-                meta = var_rel2meta[x_name]
-                if vec_size != meta['shape'][0]:
-                    raise ValueError(f"{self.msginfo}: Conflicting vec_size={x_shape[0]} "
-                                     f"specified for vector '{x_name}', which has already "
-                                     f"been defined with vec_size={meta['shape'][0]}.")
+            elif x_units != meta['units']:
+                raise ValueError(f"{self.msginfo}: Conflicting units '{x_units}' specified "
+                                 f"for vector '{x_name}', which has already been defined "
+                                 f"with units '{meta['units']}'.")
 
-                elif n_cols != meta['shape'][1]:
-                    raise ValueError(f"{self.msginfo}: Matrix shape {A_shape[1:]} is incompatible "
-                                     f"with vector '{x_name}', which has already been defined "
-                                     f"with {meta['shape'][1]} column(s).")
+        # Make a dummy version of A so we can figure out the nonzero indices
+        A = np.ones(A_shape)
+        x = np.ones(x_shape)
+        bd_A = spla.block_diag(*A)
+        x_repeat = np.repeat(x, A.shape[1], axis=0)
+        bd_x_repeat = spla.block_diag(*x_repeat)
+        db_dx_rows, db_dx_cols = np.nonzero(bd_A)
+        db_dA_rows, db_dA_cols = np.nonzero(bd_x_repeat)
 
-                elif x_units != meta['units']:
-                    raise ValueError(f"{self.msginfo}: Conflicting units '{x_units}' specified "
-                                     f"for vector '{x_name}', which has already been defined "
-                                     f"with units '{meta['units']}'.")
-
-            # Make a dummy version of A so we can figure out the nonzero indices
-            A = np.ones(A_shape)
-            x = np.ones(x_shape)
-            bd_A = spla.block_diag(*A)
-            x_repeat = np.repeat(x, A.shape[1], axis=0)
-            bd_x_repeat = spla.block_diag(*x_repeat)
-            db_dx_rows, db_dx_cols = np.nonzero(bd_A)
-            db_dA_rows, db_dA_cols = np.nonzero(bd_x_repeat)
-
-            self.declare_partials(of=b_name, wrt=A_name,
-                                  rows=db_dA_rows, cols=db_dA_cols)
-            self.declare_partials(of=b_name, wrt=x_name,
-                                  rows=db_dx_rows, cols=db_dx_cols)
+        self.declare_partials(of=b_name, wrt=A_name,
+                              rows=db_dA_rows, cols=db_dA_cols)
+        self.declare_partials(of=b_name, wrt=x_name,
+                              rows=db_dx_rows, cols=db_dx_cols)
 
     def compute(self, inputs, outputs):
         """
