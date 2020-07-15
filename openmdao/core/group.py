@@ -1301,15 +1301,15 @@ class Group(System):
                                             raise ValueError(msg)
                                         else:
                                             simple_warning(msg)
-                            else:
-                                for i in src_indices:
-                                    if len(i.shape) != len(in_shape) and src_indices.shape != in_shape:
-                                        msg = f"{self.msginfo}: src_indices shape {src_indices.shape} does not match {abs_in} shape " + \
-                                            f"{in_shape}."
-                                        if self._raise_connection_errors:
-                                            raise ValueError(msg)
-                                        else:
-                                            simple_warning(msg)
+
+                            for i in src_indices:
+                                if len(i.shape) != len(in_shape) and src_indices.shape != in_shape:
+                                    msg = f"{self.msginfo}: src_indices shape {src_indices.shape} does not match {abs_in} shape " + \
+                                        f"{in_shape}."
+                                    if self._raise_connection_errors:
+                                        raise ValueError(msg)
+                                    else:
+                                        simple_warning(msg)
 
     def _set_subsys_connection_errors(self, val=True):
         """
