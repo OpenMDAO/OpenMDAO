@@ -80,6 +80,7 @@ class DummyComp(om.ExecComp):
         partials['c', 'x'] = 2.0*x - 6.0 + y
         partials['c', 'y'] = 2.0*y + 8.0 + x
 
+
 @unittest.skipUnless(MPI, "MPI is required.")
 class TestMPIScatter(unittest.TestCase):
     N_PROCS = 2
@@ -89,8 +90,8 @@ class TestMPIScatter(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.set_input_defaults('x', 50.0)
+        model.set_input_defaults('y', 50.0)
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', DummyComp(), promotes=['*'])
 

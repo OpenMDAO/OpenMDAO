@@ -249,6 +249,7 @@ class ScipyOptimizeDriver(Driver):
             self.iter_count += 1
 
         self._con_cache = self.get_constraint_values()
+        print('initial cons', self._con_cache)
         desvar_vals = self.get_design_var_values()
         self._dvlist = list(self._designvars)
 
@@ -260,7 +261,8 @@ class ScipyOptimizeDriver(Driver):
         # Size Problem
         nparam = 0
         for param in self._designvars.values():
-            nparam += param['size']
+            size = param['global_size'] if param['distributed'] else param['size']
+            nparam += size
         x_init = np.empty(nparam)
 
         # Initial Design Vars
@@ -272,7 +274,7 @@ class ScipyOptimizeDriver(Driver):
             bounds = None
 
         for name, meta in self._designvars.items():
-            size = meta['size']
+            size = meta['global_size'] if meta['distributed'] else meta['size']
             x_init[i:i + size] = desvar_vals[name]
             i += size
 
@@ -591,9 +593,9 @@ class ScipyOptimizeDriver(Driver):
             self._exc_info = msg
             return 0
 
-        # print("Functions calculated")
-        # print('   xnew', x_new)
-        # print('   fnew', f_new)
+        print("Functions calculated")
+        print('   xnew', x_new)
+        print('   fnew', f_new)
 
         return f_new
 

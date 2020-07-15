@@ -2586,8 +2586,7 @@ class Group(System):
 
     def _get_auto_ivc_out_val(self, tgts, remote_vars, all_abs2meta, abs2meta):
         info = []
-        dist_ranges = []
-        loc_ranges = []
+        src_idx_found = []
         for tgt in tgts:
             all_meta = all_abs2meta[tgt]
             dist = all_meta['distributed']
@@ -2598,102 +2597,31 @@ class Group(System):
                     meta = abs2meta[tgt]
                     val = meta['value']
                     if has_src_inds:
-                        src_inds, sz = self._get_src_inds_max(tgt, meta)
-                        loc_ranges.append((tgt, sz, src_inds, val, False))
+                        src_idx_found.append(tgt)
                     else:
                         info.append((tgt, meta['size'], val, False))
                 else:
                     info.append((tgt, 0, np.zeros(0), True))
+
             elif dist:  # distributed and local everywhere
-                if has_src_inds:
-                    if tgt in abs2meta:
-                        src_indices = abs2meta[tgt]['src_indices']
-                        rnginfo = (np.min(src_indices), np.max(src_indices), len(src_indices))
-                        dist_ranges.append((tgt, self.comm.allgather(rnginfo)))
-                    else:
-                        # no part of distrib var is local, e.g., a distrib comp under a
-                        # parallel group
-                        dist_ranges.append((tgt, self.comm.allgather((0, 0, 0))))
-                else:  # assume default distrib layout
-                    if tgt in abs2meta:
-                        info.append((tgt, abs2meta[tgt]['size'], abs2meta[tgt]['value'], True))
-                    else:
-                        info.append((tgt, 0, np.zeros(0), True))
+                # OpenMDAO currently can't create an automatic IndepVarComp for inputs on
+                # distributed components.
+                msg = 'Distributed component input "{}" cannot be connected to an automatic '
+                msg += 'IndepVarComp.  Please add one manually and connect it.'
+                raise RuntimeError(msg.format(tgt))
+
             elif has_src_inds:  # local with non-distrib src_indices
-                meta = abs2meta[tgt]
-                src_inds, mx = self._get_src_inds_max(tgt, meta)
-                loc_ranges.append((tgt, mx, src_inds, meta['value'], False))
+                src_idx_found.append(tgt)
+
             else:  # duplicated variable with no src_indices.  Overrides any other conn sizing.
                 return tgt, abs2meta[tgt]['size'], abs2meta[tgt]['value'], False
 
-        if loc_ranges:  # auto_ivc connected to local vars with src_indices
-            totmax = np.max([t[1] for t in loc_ranges])
-            sval = np.zeros(totmax + 1)
-            remote = False
-            for tgt, _, src_inds, val, rem in loc_ranges:
-                sval[src_inds] = val
-                remote |= rem
-            # TODO: handle shape
-            # tgt here is only one of potentially multiple vars with src_indices connected
-            info.append((tgt, sval.size, sval, remote))
-
-        if dist_ranges:  # we have auto_ivc connected to distributed input
-            minstarts = []
-            maxends = []
-            sizes = []
-            fulls = []
-            for tgt, ranges in dist_ranges:
-                minstarts.append(np.min([start for start, _, _ in ranges]))
-                if minstarts[-1] < 0:
-                    raise RuntimeError(f"{self.msginfo}: Can't connect {tgt} to "
-                                       "_auto_ivc: _auto_ivc connections with negative "
-                                       "src_indices are not supported.")
-                maxends.append(np.max([end for _, end, _ in ranges]))
-                sizes.append(np.sum([sz for _, _, sz in ranges]))
-                fulls.append(np.all([sz == (end - start + 1) for start, end, sz in ranges]))
-
-            is_default = (np.all(fulls) and np.all([m == 0 for m in minstarts])
-                          and np.all([m + 1 == sizes[0] or m == 0 for m in maxends]))
-
-            if is_default:  # all src_indices are non-overlapping starting at 0
-                # just match local size of auto_ivc to local size of input(s)
-
-                # must check that values for different distrib inputs match
-                val = None
-                old_tgt = None
-                for tgt, _ in dist_ranges:
-                    if tgt in abs2meta:
-                        if val is None:
-                            val = abs2meta[tgt]['value']
-                            old_tgt = tgt
-                        elif np.linalg.norm(val - abs2meta[tgt]['value']) > 1e-40:
-                            raise RuntimeError(f"{self.msginfo}: Can't connect "
-                                               "_auto_ivc to distributed variables "
-                                               f"'{tgt}' and '{old_tgt}' because they "
-                                               "have different values in rank "
-                                               f"{self.comm.rank}.")
-
-                if val is None:
-                    val = np.zeros(0)
-            elif len(dist_ranges) > 1:
-                raise RuntimeError(f"{self.msginfo}: Can't connect _auto_ivc to distributed"
-                                   f" inputs {sorted(t[0] for t in dist_ranges)}.")
-            else:
-                # distributed size layout is undefined, so just take the total distrib
-                # size and chop it up evenly among procs where the input size > 0.
-                num_nz_divisions = len([t for t, rngs in dist_ranges if rngs[1][2] > 0])
-                total_size = np.max(maxends)
-                sizes, _ = evenly_distrib_idxs(num_nz_divisions, total_size)
-                tgt, ranges = dist_ranges[0]
-                nz_count = 0
-                for rank, (start, end, sz) in enumerate(ranges):
-                    if rank == myrank:
-                        val = np.ones(sizes[nz_count])
-                        break
-                    if sz > 0:
-                        nz_count += 1
-
-            info.append((tgt, val.size, val, True))
+        if src_idx_found:  # auto_ivc connected to local vars with src_indices
+            tgts = ', '.join(src_idx_found)
+            msg = 'The following inputs [{}] are defined using src_indices. These cannot be '
+            msg += 'connected to an automatic IndepVarComp because the source size is '
+            msg += 'undetermined.  Please add one manually and connect it.'
+            raise RuntimeError(msg.format(tgts))
 
         # return max sized tgt, size, value
         return sorted(info, key=lambda x: x[1])[-1]

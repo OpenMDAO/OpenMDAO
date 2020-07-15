@@ -451,6 +451,7 @@ class TestShapes(unittest.TestCase):
 
 
 class TestMultiConns(unittest.TestCase):
+
     def test_mult_conns(self):
 
         class SubGroup(om.Group):
@@ -511,6 +512,41 @@ class TestMultiConns(unittest.TestCase):
 
         with assert_warning(UserWarning, expected):
             prob.setup()
+
+    def test_auto_ivc_ambiguous_with_src_indices_msg(self):
+
+        class TComp(om.ExplicitComponent):
+
+            def initialize(self):
+                self.options.declare('src_idx', [0, 1])
+
+            def setup(self):
+                src = self.options['src_idx']
+                self.add_input('x', shape=2, src_indices=src, val=-2038.0)
+                self.add_output('y', shape=2)
+                self.declare_partials('y', 'x')
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = 2.0 * inputs['x']
+
+
+        prob = om.Problem()
+        model = prob.model
+
+        prob.model.add_subsystem('c1', TComp(src_idx=[0, 1]), promotes_inputs=['x'])
+        prob.model.add_subsystem('c2', TComp(src_idx=[2, 3]), promotes_inputs=['x'])
+        prob.model.add_subsystem('d1', TComp(src_idx=[0, 1]), promotes_inputs=[('x', 'zz')])
+        prob.model.add_subsystem('d2', TComp(src_idx=[1, 2]), promotes_inputs=[('x', 'zz')])
+
+        with self.assertRaises(RuntimeError) as context:
+            prob.setup()
+
+        msg = 'The following inputs [c1.x, c2.x] are defined using src_indices. These cannot be '
+        msg += 'connected to an automatic IndepVarComp because the source size is '
+        msg += 'undetermined.  Please add one manually and connect it.'
+
+        err_msg = str(context.exception).split(':')[-1]
+        self.assertEqual(err_msg, msg)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -638,6 +674,7 @@ class TestConnectionsError(unittest.TestCase):
         model.add_subsystem('c3', TestComp())
         model.add_subsystem('c4', TestCompDist())
         model.connect("p1.x", "c3.x")
+        model.connect("c3.y", "c4.x")
 
         with self.assertRaises(ValueError) as context:
             prob.setup(check=False, mode='fwd')

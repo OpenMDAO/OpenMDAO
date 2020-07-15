@@ -1106,6 +1106,10 @@ class TestProblem(unittest.TestCase):
                                             x={'value': 1.0, 'units': 'mm', 'src_indices': [1,2]},
                                             y={'value': np.zeros(2), 'units': 'mm'}),
                          promotes=['x'])
+        G1.add_subsystem('C3', om.ExecComp('y=x*4.',
+                                            x={'value': np.ones(3), 'units': 'mm'},
+                                            y={'value': np.zeros(3), 'units': 'mm'}),
+                         promotes=['x'])
 
         # units and value to use for the _auto_ivc output are ambiguous.  This fixes that.
         G1.set_input_defaults('x', units='m', val=np.ones(3))

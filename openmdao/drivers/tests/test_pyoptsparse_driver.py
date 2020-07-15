@@ -196,8 +196,12 @@ class TestMPIScatter(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.set_input_defaults('a', -3.0 + 0.6 * np.arange(size))
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', np.ones((size, )))
+        ivc.add_output('y', np.ones((size, )))
+        ivc.add_output('a', -3.0 + 0.6 * np.arange(size))
 
+        model.add_subsystem('p', ivc, promotes=['*'])
         model.add_subsystem("parab", DistParab(arr_size=size, deriv_type='dense'), promotes=['*'])
         model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
                                                f_sum=np.ones((size, )),
