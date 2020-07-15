@@ -11,7 +11,8 @@ import time
 import numpy as np
 
 from openmdao.vectors.vector import INT_DTYPE
-from openmdao.utils.general_utils import ContainsAll, simple_warning
+from openmdao.utils.general_utils import ContainsAll, simple_warning, prom2ivc_src_dict
+
 from openmdao.utils.mpi import MPI
 from openmdao.utils.coloring import _initialize_model_approx, Coloring
 
@@ -79,6 +80,9 @@ class _TotalJacInfo(object):
         Map of absolute var name to the MPI process that owns it.
     par_deriv : dict
         Cache containing names of desvars or responses for each parallel derivative color.
+    par_deriv_printnames : dict
+        Companion to par_deriv cache with auto_ivc names mapped to their promoted inputs.
+        This is used for debug printing.
     return_format : str
         Indicates the desired return format of the total jacobian. Can have value of
         'array', 'dict', or 'flat_dict'.
@@ -111,12 +115,14 @@ class _TotalJacInfo(object):
         driver_scaling : bool
             If True (default), scale derivative values by the quantities specified when the desvars
             and responses were added. If False, leave them unscaled.
-        _distributed_resp : dict
+        _dist_driver_vars : dict
             Dict of constraints that are distributed outputs. Key is rank, values are
             (local indices, local sizes).
         """
         driver = problem.driver
         prom2abs = problem.model._var_allprocs_prom2abs_list['output']
+        prom2abs_in = problem.model._var_allprocs_prom2abs_list['input']
+        conns = problem._metadata['connections']
 
         self.model = model = problem.model
         self.comm = problem.comm
@@ -127,7 +133,7 @@ class _TotalJacInfo(object):
         self.lin_sol_cache = {}
         self.debug_print = debug_print
         self.par_deriv = {}
-        self._recording_iter = driver._recording_iter
+        self.par_deriv_printnames = {}
 
         if isinstance(wrt, str):
             wrt = [wrt]
@@ -135,8 +141,8 @@ class _TotalJacInfo(object):
         if isinstance(of, str):
             of = [of]
 
-        design_vars = driver._designvars
-        responses = driver._responses
+        design_vars = prom2ivc_src_dict(driver._designvars)
+        responses = prom2ivc_src_dict(driver._responses)
 
         if not model._use_derivatives:
             raise RuntimeError("Derivative support has been turned off but compute_totals "
@@ -148,25 +154,45 @@ class _TotalJacInfo(object):
         # Convert of and wrt names from promoted to absolute
         if wrt is None:
             if driver_wrt:
-                wrt = prom_wrt = driver_wrt
+                prom_wrt = list(driver._designvars)
             else:
                 raise RuntimeError("Driver is not providing any design variables "
                                    "for compute_totals.")
         else:
+            # Convert wrt inputs to auto_ivc output names.\
             prom_wrt = wrt
-            if not use_abs_names:
-                wrt = [prom2abs[name][0] for name in prom_wrt]
+
+        wrt = []
+        for name in prom_wrt:
+            if not use_abs_names and name in prom2abs:
+                wrt_name = prom2abs[name][0]
+            elif name in prom2abs_in:
+                in_abs = prom2abs_in[name][0]
+                wrt_name = conns[in_abs]
+            else:
+                wrt_name = name
+            wrt.append(wrt_name)
 
         if of is None:
             if driver_of:
-                of = prom_of = driver_of
+                prom_of = driver_of
             else:
                 raise RuntimeError("Driver is not providing any response variables "
                                    "for compute_totals.")
         else:
             prom_of = of
-            if not use_abs_names:
-                of = [prom2abs[name][0] for name in prom_of]
+
+        of = []
+        for name in prom_of:
+            if not use_abs_names and name in prom2abs:
+                of_name = prom2abs[name][0]
+            elif name in prom2abs_in:
+                # An auto_ivc design var can be used as a response too.
+                in_abs = prom2abs_in[name][0]
+                of_name = conns[in_abs]
+            else:
+                of_name = name
+            of.append(of_name)
 
         # raise an exception if we depend on any discrete outputs
         if model._var_allprocs_discrete['output']:
@@ -192,13 +218,13 @@ class _TotalJacInfo(object):
         self.output_meta = {'fwd': responses, 'rev': design_vars}
         self.input_vec = {'fwd': model._vectors['residual'], 'rev': model._vectors['output']}
         self.output_vec = {'fwd': model._vectors['output'], 'rev': model._vectors['residual']}
-        self._distributed_resp = driver._distributed_resp
+        self._dist_driver_vars = driver._dist_driver_vars
 
         abs2meta = model._var_allprocs_abs2meta
 
         constraints = driver._cons
 
-        for name in of:
+        for name in prom_of:
             if name in constraints and constraints[name]['linear']:
                 has_lin_cons = True
                 self.simul_coloring = None
@@ -432,7 +458,6 @@ class _TotalJacInfo(object):
             dictionary of iterators.
         """
         iproc = self.comm.rank
-        owning_ranks = self.owning_ranks
         model = self.model
         relevant = model._relevant
         has_par_deriv_color = False
@@ -481,7 +506,17 @@ class _TotalJacInfo(object):
                     if parallel_deriv_color:
                         if parallel_deriv_color not in self.par_deriv:
                             self.par_deriv[parallel_deriv_color] = []
+                            self.par_deriv_printnames[parallel_deriv_color] = []
                         self.par_deriv[parallel_deriv_color].append(name)
+
+                        print_name = name
+                        if name.startswith('_auto_ivc'):
+                            conns = model._problem_meta['connections']
+                            for src, tgt in conns.items():
+                                if tgt == name:
+                                    print_name = model._var_allprocs_abs2prom['input'][src]
+
+                        self.par_deriv_printnames[parallel_deriv_color].append(print_name)
 
                 in_idxs = meta['indices'] if 'indices' in meta else None
 
@@ -679,8 +714,8 @@ class _TotalJacInfo(object):
                     slc = slices[name]
                     if MPI and meta['distributed'] and model.comm.size > 1:
                         if indices is not None:
-                            if name in self._distributed_resp:
-                                local_idx, sizes_idx = self._distributed_resp[name]
+                            if name in self._dist_driver_vars:
+                                local_idx, sizes_idx, _ = self._dist_driver_vars[name]
 
                             dist_offset = np.sum(sizes_idx[:myproc])
                             full_inds = np.arange(slc.start / ncols, slc.stop / ncols,
@@ -1303,6 +1338,7 @@ class _TotalJacInfo(object):
         """
         debug_print = self.debug_print
         par_deriv = self.par_deriv
+        par_print = self.par_deriv_printnames
 
         has_lin_cons = self.has_lin_cons
 
@@ -1334,7 +1370,7 @@ class _TotalJacInfo(object):
 
                     if debug_print:
                         if par_deriv and key in par_deriv:
-                            varlist = '(' + ', '.join([name for name in par_deriv[key]]) + ')'
+                            varlist = '(' + ', '.join([name for name in par_print[key]]) + ')'
                             print('Solving color:', key, varlist)
                         else:
                             print('In mode: %s, Solving variable(s) using simul coloring:' % mode)
@@ -1446,7 +1482,7 @@ class _TotalJacInfo(object):
         if return_format == 'flat_dict':
             for prom_out, output_name in zip(self.prom_of, of):
 
-                dist_resp = self._distributed_resp.get(output_name)
+                dist_resp = self._dist_driver_vars.get(output_name)
 
                 for prom_in, input_name in zip(self.prom_wrt, wrt):
 
@@ -1463,7 +1499,7 @@ class _TotalJacInfo(object):
             for prom_out, output_name in zip(self.prom_of, of):
                 tot = totals[prom_out]
 
-                dist_resp = self._distributed_resp.get(output_name)
+                dist_resp = self._dist_driver_vars.get(output_name)
 
                 for prom_in, input_name in zip(self.prom_wrt, wrt):
                     if output_name in wrt_meta and output_name != input_name:
@@ -1612,7 +1648,7 @@ class _TotalJacInfo(object):
         metadata : dict
             Dictionary containing execution metadata.
         """
-        self._recording_iter.push((requester._get_name(), requester.iter_count))
+        self.model._recording_iter.push((requester._get_name(), requester.iter_count))
 
         try:
             totals = self._get_dict_J(self.J, self.wrt, self.prom_wrt, self.of, self.prom_of,
@@ -1620,7 +1656,7 @@ class _TotalJacInfo(object):
             requester._rec_mgr.record_derivatives(requester, totals, metadata)
 
         finally:
-            self._recording_iter.pop()
+            self.model._recording_iter.pop()
 
 
 def _get_subjac(jac_meta, prom_out, prom_in, of_idx, wrt_idx, dist_resp, comm):
@@ -1662,7 +1698,7 @@ def _get_subjac(jac_meta, prom_out, prom_in, of_idx, wrt_idx, dist_resp, comm):
     if dist_resp:
         n_wrt = tot.shape[1]
         tot = tot.flatten()
-        _, sizes = dist_resp
+        _, sizes, _ = dist_resp
         n_of_global = np.sum(sizes)
 
         # Adjust sizes to account for wrt dimension in jacobian.

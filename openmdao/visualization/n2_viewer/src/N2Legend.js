@@ -19,6 +19,7 @@ class N2Legend {
             'component': false,
             'input': false,
             'unconnectedInput': false,
+            'autoivcInput': false,
             'outputExplicit': false,
             'outputImplicit': false,
             'collapsed': true,
@@ -148,6 +149,13 @@ class N2Legend {
                     this.sysAndVar.push({
                         'name': 'Implicit Output',
                         'color': N2Style.color.unknownImplicit
+                    })
+                }
+                else if (!this.showSysVar.autoivcInput && node.isAutoIvcParam()) {
+                    this.showSysVar.autoivcInput = true;
+                    this.sysAndVar.push({
+                        'name': 'Auto-IVC Input',
+                        'color': N2Style.color.autoivcParam
                     })
                 }
                 else if (!this.showSysVar.unconnectedInput && node.isUnconnectedParam()) {

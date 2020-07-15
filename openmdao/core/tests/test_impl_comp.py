@@ -498,7 +498,117 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
         totals = prob.check_totals(of=['fn.y'], wrt=['p.a'], method='cs', out_stream=None)
 
         for key, val in totals.items():
-            assert_near_equal(val['rel error'][0], 0.0, 1e-9)
+            assert_near_equal(val['rel error'][0], 0.0, 3e-9)
+
+    def test_guess_nonlinear_residuals(self):
+
+        class ImpWithInitial(om.ImplicitComponent):
+            """
+            An implicit component to solve the quadratic equation: x^2 - 4x + 3
+            (solutions at x=1 and x=3)
+            """
+            def setup(self):
+                self.add_input('a', val=1.)
+                self.add_input('b', val=-4.)
+                self.add_input('c', val=3.)
+
+                self.add_output('x', val=0.)
+
+                self.declare_partials(of='*', wrt='*')
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                a = inputs['a']
+                b = inputs['b']
+                c = inputs['c']
+                x = outputs['x']
+                residuals['x'] = a * x ** 2 + b * x + c
+
+            def linearize(self, inputs, outputs, partials):
+                a = inputs['a']
+                b = inputs['b']
+                c = inputs['c']
+                x = outputs['x']
+
+                partials['x', 'a'] = x ** 2
+                partials['x', 'b'] = x
+                partials['x', 'c'] = 1.0
+                partials['x', 'x'] = 2 * a * x + b
+
+            def guess_nonlinear(self, inputs, outputs, resids):
+                # Default initial state of zero for x takes us to x=1 solution.
+                # Here we set it to a value that will take us to the x=3 solution.
+                outputs['x'] = 5.0
+                assert(resids['x'] != 0.)
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp', ImpWithInitial())
+
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        model.linear_solver = om.ScipyKrylov()
+
+        prob.setup()
+        prob['comp.x'] = 10
+        prob.run_model()
+
+    def test_guess_nonlinear_group_residual(self):
+        # Test that data is transfered to a component before calling guess_nonlinear.
+
+        class ImpWithInitial(om.ImplicitComponent):
+            """
+            An implicit component to solve the quadratic equation: x^2 - 4x + 3
+            (solutions at x=1 and x=3)
+            """
+            def setup(self):
+                self.add_input('a', val=1.)
+                self.add_input('b', val=-4.)
+                self.add_input('c', val=3.)
+
+                self.add_output('x', val=0.)
+
+                self.declare_partials(of='*', wrt='*')
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                a = inputs['a']
+                b = inputs['b']
+                c = inputs['c']
+                x = outputs['x']
+                residuals['x'] = a * x ** 2 + b * x + c
+
+            def linearize(self, inputs, outputs, partials):
+                a = inputs['a']
+                b = inputs['b']
+                c = inputs['c']
+                x = outputs['x']
+
+                partials['x', 'a'] = x ** 2
+                partials['x', 'b'] = x
+                partials['x', 'c'] = 1.0
+                partials['x', 'x'] = 2 * a * x + b
+
+            def guess_nonlinear(self, inputs, outputs, resids):
+                # Default initial state of zero for x takes us to x=1 solution.
+                # Here we set it to a value that will take us to the x=3 solution.
+                outputs['x'] = 5.0
+                assert(resids['x'] != 0.)
+
+        group = om.Group()
+
+        group.add_subsystem('px', om.IndepVarComp('x', -1.0))
+        group.add_subsystem('comp1', ImpWithInitial())
+        group.add_subsystem('comp2', ImpWithInitial())
+        group.connect('px.x', 'comp1.a')
+        group.connect('comp1.x', 'comp2.a')
+
+        group.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        group.linear_solver = om.ScipyKrylov()
+
+        prob = om.Problem(model=group)
+        prob.set_solver_print(level=0)
+        prob.setup()
+
+        prob.run_model()
 
     def test_guess_nonlinear_transfer(self):
         # Test that data is transfered to a component before calling guess_nonlinear.
@@ -627,6 +737,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
 
     def test_guess_nonlinear_feature(self):
         import openmdao.api as om
+        import numpy as np
 
         class ImpWithInitial(om.ImplicitComponent):
             """
@@ -661,9 +772,11 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
                 partials['x', 'x'] = 2 * a * x + b
 
             def guess_nonlinear(self, inputs, outputs, resids):
-                # Default initial state of zero for x takes us to x=1 solution.
-                # Here we set it to a value that will take us to the x=3 solution.
-                outputs['x'] = 5.0
+                # Check residuals
+                if np.abs(resids['x']) > 1.0E-2:
+                    # Default initial state of zero for x takes us to x=1 solution.
+                    # Here we set it to a value that will take us to the x=3 solution.
+                    outputs['x'] = 5.0
 
         prob = om.Problem()
         model = prob.model
@@ -708,7 +821,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
             prob.run_model()
 
         self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'x' in input vector "
+                         "ImpWithInitial (comp1): Attempt to set value of 'x' in input vector "
                          "when it is read only.")
 
     def test_guess_nonlinear_inputs_read_only_reset(self):
@@ -772,7 +885,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
             prob.run_model()
 
         self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'y' in residual vector "
+                         "ImpWithInitial (comp1): Attempt to set value of 'y' in residual vector "
                          "when it is read only.")
 
 
@@ -794,7 +907,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
             prob.model.run_apply_nonlinear()
 
         self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'a' in input vector "
+                         "BadComp (bad): Attempt to set value of 'a' in input vector "
                          "when it is read only.")
 
     def test_apply_nonlinear_outputs_read_only(self):
@@ -813,7 +926,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
             prob.model.run_apply_nonlinear()
 
         self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'x' in output vector "
+                         "BadComp (bad): Attempt to set value of 'x' in output vector "
                          "when it is read only.")
 
     def test_apply_nonlinear_read_only_reset(self):
@@ -849,7 +962,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
             prob.run_model()
 
         self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'a' in input vector "
+                         "BadComp (bad): Attempt to set value of 'a' in input vector "
                          "when it is read only.")
 
     def test_solve_nonlinear_inputs_read_only_reset(self):
@@ -884,7 +997,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
             prob.model.run_linearize()
 
         self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'a' in input vector "
+                         "BadComp (bad): Attempt to set value of 'a' in input vector "
                          "when it is read only.")
 
     def test_linearize_outputs_read_only(self):
@@ -903,7 +1016,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
             prob.model.run_linearize()
 
         self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'x' in output vector "
+                         "BadComp (bad): Attempt to set value of 'x' in output vector "
                          "when it is read only.")
 
     def test_linearize_read_only_reset(self):
@@ -941,7 +1054,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
             prob.model.run_apply_linear(['linear'], 'fwd')
 
         self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'a' in input vector "
+                         "BadComp (bad): Attempt to set value of 'a' in input vector "
                          "when it is read only.")
 
     def test_apply_linear_outputs_read_only(self):
@@ -961,7 +1074,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
             prob.model.run_apply_linear(['linear'], 'fwd')
 
         self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'x' in output vector "
+                         "BadComp (bad): Attempt to set value of 'x' in output vector "
                          "when it is read only.")
 
     def test_apply_linear_dinputs_read_only(self):
@@ -981,7 +1094,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
             prob.model.run_apply_linear(['linear'], 'fwd')
 
         self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'a' in input vector "
+                         "BadComp (bad): Attempt to set value of 'a' in input vector "
                          "when it is read only.")
 
     def test_apply_linear_doutputs_read_only(self):
@@ -1001,7 +1114,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
             prob.model.run_apply_linear(['linear'], 'fwd')
 
         self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'x' in output vector "
+                         "BadComp (bad): Attempt to set value of 'x' in output vector "
                          "when it is read only.")
 
     def test_apply_linear_dresids_read_only(self):
@@ -1021,7 +1134,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
             prob.model.run_apply_linear(['linear'], 'rev')
 
         self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'x' in residual vector "
+                         "BadComp (bad): Attempt to set value of 'x' in residual vector "
                          "when it is read only.")
 
     def test_apply_linear_read_only_reset(self):
@@ -1061,7 +1174,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
             prob.model.run_solve_linear(['linear'], 'rev')
 
         self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'x' in output vector "
+                         "BadComp (bad): Attempt to set value of 'x' in output vector "
                          "when it is read only.")
 
     def test_solve_linear_dresids_read_only(self):
@@ -1081,7 +1194,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
             prob.model.run_solve_linear(['linear'], 'fwd')
 
         self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'x' in residual vector "
+                         "BadComp (bad): Attempt to set value of 'x' in residual vector "
                          "when it is read only.")
 
     def test_solve_linear_read_only_reset(self):

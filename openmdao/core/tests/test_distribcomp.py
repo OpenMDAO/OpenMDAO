@@ -335,7 +335,7 @@ class NOMPITests(unittest.TestCase):
         # Conclude setup but don't run model.
         p.final_setup()
 
-        C1._inputs['invec'] = np.array(range(size, 0, -1), float)
+        p['C1.invec'] = np.array(range(size, 0, -1), float)
 
         p.run_model()
 
@@ -361,11 +361,11 @@ class MPITests(unittest.TestCase):
         # Conclude setup but don't run model.
         p.final_setup()
 
-        C1._inputs['invec'] = np.ones(size, float) * 5.0
+        p['C1.invec'] = np.ones(size, float) * 5.0
 
         p.run_model()
 
-        self.assertTrue(all(C2._outputs['outvec'] == np.ones(size, float)*7.5))
+        np.testing.assert_allclose(C2._outputs['outvec'], np.ones(size, float)*7.5)
 
     def test_distrib_check_partials(self):
         # will produce uneven array sizes which we need for the test
@@ -388,7 +388,7 @@ class MPITests(unittest.TestCase):
         # this used to fail (bug #1279)
         cpd = p.check_partials(out_stream=None)
         for (of, wrt) in cpd['C2']:
-            np.testing.assert_almost_equal(cpd['C2'][of, wrt]['rel error'][0], 0.0, decimal=5)
+            np.testing.assert_allclose(cpd['C2'][of, wrt]['rel error'][0], 0.0, atol=1e-9)
 
     def test_list_inputs_outputs(self):
         size = 11
@@ -524,7 +524,7 @@ class MPITests(unittest.TestCase):
         # Conclude setup but don't run model.
         p.final_setup()
 
-        C1._inputs['invec'] = np.array(range(size, 0, -1), float)
+        p['C1.invec'] = np.array(range(size, 0, -1), float)
 
         p.run_model()
 
@@ -546,7 +546,7 @@ class MPITests(unittest.TestCase):
         # Conclude setup but don't run model.
         p.final_setup()
 
-        C1._inputs['invec'] = np.array(range(size, 0, -1), float)
+        p['C1.invec'] = np.array(range(size, 0, -1), float)
 
         p.run_model()
 
@@ -568,7 +568,7 @@ class MPITests(unittest.TestCase):
         # Conclude setup but don't run model.
         p.final_setup()
 
-        C1._inputs['invec'] = np.array(range(size, 0, -1), float)
+        p['C1.invec'] = np.array(range(size, 0, -1), float)
 
         p.run_model()
 
@@ -590,7 +590,7 @@ class MPITests(unittest.TestCase):
         # Conclude setup but don't run model.
         p.final_setup()
 
-        C1._inputs['invec'] = np.array(range(size), float)
+        p['C1.invec'] = np.array(range(size), float)
 
         p.run_model()
 
@@ -624,7 +624,7 @@ class MPITests(unittest.TestCase):
         p.final_setup()
 
         input_vec = np.array(range(size, 0, -1), float)
-        C1._inputs['invec'] = input_vec
+        p['C1.invec'] = input_vec
 
         # C1 (an InOutArrayComp) doubles the input_vec
         check_vec = input_vec * 2
@@ -663,7 +663,7 @@ class MPITests(unittest.TestCase):
         # Conclude setup but don't run model.
         p.final_setup()
 
-        C1._inputs['invec'] = np.array(range(size, 0, -1), float)
+        p['C1.invec'] = np.array(range(size, 0, -1), float)
 
         p.run_model()
 
@@ -687,16 +687,19 @@ class ProbRemoteTests(unittest.TestCase):
         par = top.add_subsystem('par', om.ParallelGroup())
         C1 = par.add_subsystem("C1", DistribInputDistribOutputComp(arr_size=size))
         C2 = par.add_subsystem("C2", DistribInputDistribOutputComp(arr_size=size))
+        
+        #import wingdbstub
+        
         p.setup()
 
         # Conclude setup but don't run model.
         p.final_setup()
 
         if C1 in p.model.par._subsystems_myproc:
-            C1._inputs['invec'] = np.array(range(C1._inputs._data.size, 0, -1), float)
+            p['par.C1.invec'] = np.array(range(C1._inputs.asarray().size, 0, -1), float)
 
         if C2 in p.model.par._subsystems_myproc:
-            C2._inputs['invec'] = np.array(range(C2._inputs._data.size, 0, -1), float) * 3
+            p['par.C2.invec'] = np.array(range(C2._inputs.asarray().size, 0, -1), float) * 3
 
         p.run_model()
 
@@ -723,12 +726,12 @@ class ProbRemoteTests(unittest.TestCase):
         p.final_setup()
 
         if C1 in p.model.par._subsystems_myproc:
-            C1._inputs['invec'] = np.array(range(C1._inputs._data.size, 0, -1), float)
-            C1._discrete_inputs['disc_in'] = 'C1foo'
+            p['par.C1.invec'] = np.array(range(C1._inputs.asarray().size, 0, -1), float)
+        p['par.C1.disc_in'] = 'C1foo'
 
         if C2 in p.model.par._subsystems_myproc:
-            C2._inputs['invec'] = np.array(range(C2._inputs._data.size, 0, -1), float) * 3
-            C2._discrete_inputs['disc_in'] = 'C2foo'
+            p['par.C2.invec'] = np.array(range(C2._inputs.asarray().size, 0, -1), float) * 3
+        p['par.C2.disc_in'] = 'C2foo'
 
         p.run_model()
 
@@ -776,8 +779,8 @@ class ProbRemoteTests(unittest.TestCase):
 
         rank = p.comm.rank
 
-        C1._inputs['invec'] = np.array(range(C1._inputs._data.size, 0, -1), float) * (rank + 1)
-        C1._discrete_inputs['disc_in'] = 'boo'
+        p['C1.invec'] = np.array(range(C1._inputs._data.size, 0, -1), float) * (rank + 1)
+        p['C1.disc_in'] = 'boo'
 
         p.run_model()
 

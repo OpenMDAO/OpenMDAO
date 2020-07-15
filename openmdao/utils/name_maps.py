@@ -142,26 +142,71 @@ def name2abs_name(system, name):
         The type ('input' or 'output') of the corresponding variable.
     """
     if name in system._var_allprocs_abs2prom['output']:
-        return (name, 'output')
+        return name
     if name in system._var_allprocs_abs2prom['input']:
-        return (name, 'input')
+        return name
 
     if name in system._var_allprocs_prom2abs_list['output']:
         abs_name = system._var_allprocs_prom2abs_list['output'][name][0]
-        return (abs_name, 'output')
+        return abs_name
 
-    # This will raise an exception if name is not unique
+    # This may raise an exception if name is not unique
     abs_name = prom_name2abs_name(system, name, 'input')
     if abs_name is not None:
-        return (abs_name, 'input')
+        return abs_name
 
     abs_name = rel_name2abs_name(system, name)
     if abs_name in system._var_allprocs_abs2prom['output']:
-        return (abs_name, 'output')
+        return abs_name
     elif abs_name in system._var_allprocs_abs2prom['input']:
-        return (abs_name, 'input')
+        return abs_name
 
-    return None, None
+
+def name2abs_names(system, name):
+    """
+    Map the given promoted, relative, or absolute name to any matching absolute names.
+
+    This will also match any buried promotes.
+
+    Parameters
+    ----------
+    system : <System>
+        System to which name is relative.
+    name : str
+        Promoted or relative variable name in the owning system's namespace.
+
+    Returns
+    -------
+    tuple or list of str
+        Tuple or list of absolute variable names found.
+    """
+    # first check relative promoted names
+    if name in system._var_allprocs_prom2abs_list['output']:
+        return system._var_allprocs_prom2abs_list['output'][name]
+
+    if name in system._var_allprocs_prom2abs_list['input']:
+        return system._var_allprocs_prom2abs_list['input'][name]
+
+    # then check absolute names
+    if name in system._var_allprocs_abs2prom['output']:
+        return (name,)
+    if name in system._var_allprocs_abs2prom['input']:
+        return (name,)
+
+    # then check global promoted names, including buried promotes
+    if name in system._problem_meta['prom2abs']['output']:
+        absnames = system._problem_meta['prom2abs']['output'][name]
+        # reduce scope to this system
+        if absnames[0] in system._var_allprocs_abs2prom['output']:
+            return absnames
+
+    if name in system._problem_meta['prom2abs']['input']:
+        absnames = system._problem_meta['prom2abs']['input'][name]
+        # reduce scope to this system
+        if absnames[0] in system._var_allprocs_abs2prom['input']:
+            return absnames
+
+    return ()
 
 
 def prom_key2abs_key(system, prom_key):

@@ -48,7 +48,7 @@ class COOMatrix(Matrix):
         """
         submats = self._submats
         metadata = self._metadata
-        pre_metadata = self._key_ranges = OrderedDict()
+        key_ranges = self._key_ranges = OrderedDict()
 
         start = end = 0
         for key, (info, loc, src_indices, shape, factor) in submats.items():
@@ -57,31 +57,32 @@ class COOMatrix(Matrix):
             rows = info['rows']
             dense = (rows is None and (val is None or isinstance(val, ndarray)))
 
+            shape = val.shape
             full_size = np.prod(shape)
             if dense:
                 if src_indices is None:
-                    delta = full_size
+                    end += full_size
                 else:
-                    delta = shape[0] * len(src_indices)
+                    end += shape[0] * len(src_indices)
 
             elif rows is None:  # sparse matrix
-                delta = val.data.size
-
+                end += val.data.size
             else:  # list sparse format
-                delta = len(rows)
+                end += len(rows)
 
-            end += delta
-            pre_metadata[key] = (start, end, dense, rows)
+            key_ranges[key] = (start, end, dense, rows)
             start = end
 
         data = np.zeros(end)
         rows = np.empty(end, dtype=int)
         cols = np.empty(end, dtype=int)
 
-        for key, (start, end, dense, jrows) in pre_metadata.items():
+        for key, (start, end, dense, jrows) in key_ranges.items():
             info, loc, src_indices, shape, factor = submats[key]
             irow, icol = loc
             val = info['value']
+            # _shape = val.shape
+            # assert _shape == shape
             idxs = None
 
             col_offset = row_offset = 0

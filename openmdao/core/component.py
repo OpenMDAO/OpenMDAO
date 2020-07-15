@@ -9,26 +9,23 @@ from numpy import ndarray, isscalar, atleast_1d, atleast_2d, promote_types
 from scipy.sparse import issparse
 
 from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_META
-from openmdao.approximation_schemes.complex_step import ComplexStep
-from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
-from openmdao.vectors.vector import INT_DTYPE
+from openmdao.vectors.vector import INT_DTYPE, _full_slice
 from openmdao.utils.units import valid_units
 from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key, rel_name2abs_name
 from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
-    find_matches, simple_warning, make_set
+    find_matches, simple_warning, make_set, _is_slice
 import openmdao.utils.coloring as coloring_mod
 
 
 # the following metadata will be accessible for vars on all procs
 global_meta_names = {
-    'input': ('units', 'shape', 'size', 'distributed', 'tags'),
-    'output': ('units', 'shape', 'size',
+    'input': ('units', 'shape', 'size', 'distributed', 'tags', 'desc'),
+    'output': ('units', 'shape', 'size', 'desc',
                'ref', 'ref0', 'res_ref', 'distributed', 'lower', 'upper', 'tags'),
 }
 
-_full_slice = slice(None)
 _forbidden_chars = ['.', '*', '?', '!', '[', ']']
 _whitespace = set([' ', '\t', '\r', '\n'])
 
@@ -127,7 +124,7 @@ class Component(System):
         """
         pass
 
-    def _setup_procs(self, pathname, comm, mode, prob_options):
+    def _setup_procs(self, pathname, comm, mode, prob_meta):
         """
         Execute first phase of the setup process.
 
@@ -139,17 +136,13 @@ class Component(System):
             Global name of the system, including the path.
         comm : MPI.Comm or <FakeComm>
             MPI communicator object.
-        mode : string
+        mode : str
             Derivatives calculation mode, 'fwd' for forward, and 'rev' for
             reverse (adjoint). Default is 'rev'.
-        prob_options : OptionsDictionary
-            Problem level options.
+        prob_meta : dict
+            Problem level metadata.
         """
-        self.pathname = pathname
-        self._problem_options = prob_options
-
-        self.options._parent_name = self.msginfo
-        self.recording_options._parent_name = self.msginfo
+        super(Component, self)._setup_procs(pathname, comm, mode, prob_meta)
 
         self._vectors = {}
 
@@ -163,22 +156,15 @@ class Component(System):
                 simple_warning(msg)
 
         self.comm = comm
-        self._mode = mode
-        self._subsystems_proc_range = []
-        self._first_call_to_linearize = True
 
         # Clear out old variable information so that we can call setup on the component.
         self._var_rel_names = {'input': [], 'output': []}
         self._var_rel2meta = {}
-        self._design_vars = OrderedDict()
-        self._responses = OrderedDict()
 
         self._static_mode = False
         self._var_rel2meta.update(self._static_var_rel2meta)
         for type_ in ['input', 'output']:
             self._var_rel_names[type_].extend(self._static_var_rel_names[type_])
-        self._design_vars.update(self._static_design_vars)
-        self._responses.update(self._static_responses)
         self.setup()
 
         # check to make sure that if num_par_fd > 1 that this system is actually doing FD.
@@ -192,17 +178,21 @@ class Component(System):
 
         self._static_mode = True
 
+        self._set_vector_class()
+
+    def _set_vector_class(self):
         if self.options['distributed']:
-            if self._distributed_vector_class is not None:
-                self._vector_class = self._distributed_vector_class
+            dist_vec_class = self._problem_meta['distributed_vector_class']
+            if dist_vec_class is not None:
+                self._vector_class = dist_vec_class
             else:
                 simple_warning("The 'distributed' option is set to True for Component %s, "
                                "but there is no distributed vector implementation (MPI/PETSc) "
                                "available. The default non-distributed vectors will be used."
-                               % pathname)
-                self._vector_class = self._local_vector_class
+                               % self.pathname)
+                self._vector_class = self._problem_meta['local_vector_class']
         else:
-            self._vector_class = self._local_vector_class
+            self._vector_class = self._problem_meta['local_vector_class']
 
     def _configure_check(self):
         """
@@ -261,6 +251,9 @@ class Component(System):
                     meta_name: metadata[meta_name]
                     for meta_name in global_meta_names[type_]
                 }
+                if type_ == 'input':
+                    src_indices = metadata['src_indices']
+                    allprocs_abs2meta[abs_name]['has_src_indices'] = src_indices is not None
 
                 # Compute abs2meta
                 abs2meta[abs_name] = metadata
@@ -484,7 +477,10 @@ class Component(System):
         }
 
         if src_indices is not None:
-            metadata['src_indices'] = np.asarray(src_indices, dtype=INT_DTYPE)
+            if _is_slice(src_indices):
+                metadata['src_indices'] = src_indices
+            else:
+                metadata['src_indices'] = np.asarray(src_indices, dtype=INT_DTYPE)
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:
@@ -671,12 +667,6 @@ class Component(System):
         else:
             self._has_resid_scaling |= np.any(res_ref != 1.0)
 
-        ref = format_as_float_or_array('ref', ref, flatten=True)
-        ref0 = format_as_float_or_array('ref0', ref0, flatten=True)
-        res_ref = format_as_float_or_array('res_ref', res_ref, flatten=True)
-
-        distributed = self.options['distributed']
-
         metadata = {
             'value': value,
             'shape': shape,
@@ -684,11 +674,11 @@ class Component(System):
             'units': units,
             'res_units': res_units,
             'desc': desc,
-            'distributed': distributed,
+            'distributed': self.options['distributed'],
             'tags': make_set(tags),
-            'ref': ref,
-            'ref0': ref0,
-            'res_ref': res_ref,
+            'ref': format_as_float_or_array('ref', ref, flatten=True),
+            'ref0': format_as_float_or_array('ref0', ref0, flatten=True),
+            'res_ref': format_as_float_or_array('res_ref', res_ref, flatten=True),
             'lower': lower,
             'upper': upper,
         }
@@ -761,7 +751,7 @@ class Component(System):
 
         return metadata
 
-    def _update_dist_src_indices(self, abs_in2out):
+    def _update_dist_src_indices(self, abs_in2out, all_abs2meta, all_abs2idx, all_sizes):
         """
         Set default src_indices on distributed components for any inputs where they aren't set.
 
@@ -769,28 +759,54 @@ class Component(System):
         ----------
         abs_in2out : dict
             Mapping of connected inputs to their source.  Names are absolute.
+        all_abs2meta : dict
+            Mapping of absolute names to metadata for all variables in the model.
+        all_abs2idx : dict
+            Dictionary mapping an absolute name to its allprocs variable index.
+        all_sizes : dict
+            Mapping of vec_names and types to sizes of each variable in all procs.
+
+        Returns
+        -------
+        set
+            Names of inputs where src_indices were added.
         """
-        if not self.options['distributed']:
-            return
+        if not self.options['distributed'] or self.comm.size == 1:
+            return set()
 
         iproc = self.comm.rank
         abs2meta = self._var_abs2meta
-        sizes = np.zeros(self.comm.size, dtype=INT_DTYPE)
-        tmp = np.zeros(1, dtype=INT_DTYPE)
 
-        for iname in self._var_allprocs_abs_names['input']:
-            if iname in abs2meta and iname in abs_in2out:
-                if abs2meta[iname]['src_indices'] is None:
-                    metadata = abs2meta[iname]
-                    tmp[0] = metadata['size']
-                    self.comm.Allgather(tmp, sizes)
-                    offset = np.sum(sizes[:iproc])
-                    end = offset + sizes[iproc]
-                    simple_warning("{}: Component is distributed but input '{}' was added without "
-                                   "src_indices. Setting "
-                                   "src_indices to range({}, {}).".format(self.msginfo, iname,
-                                                                          offset, end))
-                    metadata['src_indices'] = np.arange(offset, end, dtype=INT_DTYPE)
+        sizes_in = self._var_sizes['nonlinear']['input']
+        sizes_out = all_sizes['nonlinear']['output']
+        added_src_inds = set()
+        for i, iname in enumerate(self._var_allprocs_abs_names['input']):
+            if iname in abs2meta and abs2meta[iname]['src_indices'] is None:
+                src = abs_in2out[iname]
+                out_i = all_abs2idx[src]
+                nzs = np.nonzero(sizes_out[:, out_i])[0]
+                if (all_abs2meta[src]['global_size'] == all_abs2meta[iname]['global_size'] or
+                        nzs.size == self.comm.size):
+                    # This offset assumes a 'full' distributed output
+                    offset = np.sum(sizes_in[:iproc, i])
+                    end = offset + sizes_in[iproc, i]
+                else:  # distributed output (may have some zero size entries)
+                    if nzs.size == 1:
+                        offset = 0
+                        end = sizes_out[nzs[0], out_i]
+                    else:
+                        # total sizes differ and output is distributed, so can't determine mapping
+                        raise RuntimeError(f"{self.msginfo}: Can't determine src_indices "
+                                           f"automatically for input '{iname}'. They must be "
+                                           "supplied manually.")
+                simple_warning(f"{self.msginfo}: Component is distributed but input '{iname}' was "
+                               "added without src_indices. Setting src_indices to "
+                               f"range({offset}, {end}).")
+                abs2meta[iname]['src_indices'] = np.arange(offset, end, dtype=INT_DTYPE)
+                all_abs2meta[iname]['has_src_indices'] = True
+                added_src_inds.add(iname)
+
+        return added_src_inds
 
     def _approx_partials(self, of, wrt, method='fd', **kwargs):
         """

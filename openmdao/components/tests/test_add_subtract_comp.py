@@ -392,16 +392,13 @@ class TestFeature(unittest.TestCase):
         n = 3
 
         p = om.Problem()
+        model = p.model
 
-        ivc = om.IndepVarComp()
         # The vector represents forces at 3 time points (rows) in 2 dimensional plane (cols)
-        ivc.add_output(name='thrust', shape=(n, 2), units='kN')
-        ivc.add_output(name='drag', shape=(n, 2), units='kN')
-        ivc.add_output(name='lift', shape=(n, 2), units='kN')
-        ivc.add_output(name='weight', shape=(n, 2), units='kN')
-        p.model.add_subsystem(name='ivc',
-                              subsys=ivc,
-                              promotes_outputs=['thrust', 'drag', 'lift', 'weight'])
+        model.set_input_defaults('thrust', units='kN')
+        model.set_input_defaults('drag', units='kN')
+        model.set_input_defaults('lift', units='kN')
+        model.set_input_defaults('weight', units='kN')
 
         # Construct an adder/subtracter here. create a relationship through the add_equation method
         adder = om.AddSubtractComp()
@@ -409,12 +406,8 @@ class TestFeature(unittest.TestCase):
                            vec_size=n, length=2, scaling_factors=[1, -1, 1, -1], units='kN')
         # Note the scaling factors. we assume all forces are positive sign upstream
 
-        p.model.add_subsystem(name='totalforcecomp', subsys=adder)
-
-        p.model.connect('thrust', 'totalforcecomp.thrust')
-        p.model.connect('drag', 'totalforcecomp.drag')
-        p.model.connect('lift', 'totalforcecomp.lift')
-        p.model.connect('weight', 'totalforcecomp.weight')
+        p.model.add_subsystem(name='totalforcecomp', subsys=adder,
+                              promotes_inputs=['thrust', 'drag', 'lift', 'weight'])
 
         p.setup()
 

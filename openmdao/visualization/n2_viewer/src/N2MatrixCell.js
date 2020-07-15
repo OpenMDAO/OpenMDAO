@@ -519,6 +519,7 @@ class N2MatrixCell {
 
         if (this.onDiagonal()) {
             if (this.obj.isMinimized) return N2Style.color.collapsed;
+            if (this.obj.isAutoIvcParam()) return N2Style.color.autoivcParam;
             if (this.obj.isConnectedParam()) return N2Style.color.param;
             if (this.obj.isUnconnectedParam()) return N2Style.color.unconnectedParam;
             return (this.obj.implicit) ?

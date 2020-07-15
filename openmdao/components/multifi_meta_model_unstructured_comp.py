@@ -110,11 +110,27 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
         self.options.declare('nfi', types=int, default=1, lower=1,
                              desc='Number of levels of fidelity.')
 
-    def _setup_procs(self, pathname, comm, mode, prob_options):
+    def _setup_procs(self, pathname, comm, mode, prob_meta):
+        """
+        Execute first phase of the setup process.
+
+        Distribute processors, assign pathnames, and call setup on the component.
+
+        Parameters
+        ----------
+        pathname : str
+            Global name of the system, including the path.
+        comm : MPI.Comm or <FakeComm>
+            MPI communicator object.
+        mode : str
+            Derivatives calculation mode, 'fwd' for forward, and 'rev' for
+            reverse (adjoint).
+        prob_meta : dict
+            Problem level options.
+        """
         self._input_sizes = list(self._static_input_sizes)
 
-        super(MultiFiMetaModelUnStructuredComp, self)._setup_procs(pathname, comm, mode,
-                                                                   prob_options)
+        super(MultiFiMetaModelUnStructuredComp, self)._setup_procs(pathname, comm, mode, prob_meta)
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
                   units=None, desc=''):

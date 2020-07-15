@@ -33,7 +33,7 @@ class TestDriver(unittest.TestCase):
         prob.run_driver()
 
         designvars = prob.driver.get_design_var_values()
-        self.assertEqual(designvars['pz.z'][0], 5.0 )
+        self.assertEqual(designvars['z'][0], 5.0 )
 
         designvars = prob.driver.get_objective_values()
         self.assertEqual(designvars['obj_cmp.obj'], prob['obj'] )
@@ -57,10 +57,10 @@ class TestDriver(unittest.TestCase):
         prob.final_setup()
 
         dv = prob.driver.get_design_var_values()
-        self.assertEqual(dv['pz.z'][0], 1.0)
-        self.assertEqual(dv['pz.z'][1], -0.5)
+        self.assertEqual(dv['z'][0], 1.0)
+        self.assertEqual(dv['z'][1], -0.5)
 
-        prob.driver.set_design_var('pz.z', np.array((2.0, -2.0)))
+        prob.driver.set_design_var('z', np.array((2.0, -2.0)))
         self.assertEqual(prob['z'][0], 7.0)
         self.assertEqual(prob['z'][1], -1.0)
 
@@ -124,10 +124,10 @@ class TestDriver(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        derivs = prob.driver._compute_totals(of=['obj_cmp.obj', 'con_cmp1.con1'], wrt=['pz.z'],
+        derivs = prob.driver._compute_totals(of=['obj_cmp.obj', 'con_cmp1.con1'], wrt=['z'],
                                              return_format='dict')
-        assert_near_equal(base[('con1', 'z')][0], derivs['con_cmp1.con1']['pz.z'][0], 1e-5)
-        assert_near_equal(base[('obj', 'z')][0]*2.0, derivs['obj_cmp.obj']['pz.z'][0], 1e-5)
+        assert_near_equal(base[('con1', 'z')][0], derivs['con_cmp1.con1']['z'][0], 1e-5)
+        assert_near_equal(base[('obj', 'z')][0]*2.0, derivs['obj_cmp.obj']['z'][0], 1e-5)
 
     def test_vector_scaled_derivs(self):
 

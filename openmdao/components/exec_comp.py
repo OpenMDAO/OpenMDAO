@@ -434,7 +434,7 @@ class ExecComp(ExplicitComponent):
             Contains sub-jacobians.
         """
         step = self.complex_stepsize * 1j
-        out_names = self._var_allprocs_prom2abs_list['output']
+        out_names = self._var_rel_names['output']
         inv_stepsize = 1.0 / self.complex_stepsize
         has_diag_partials = self.options['has_diag_partials']
 
