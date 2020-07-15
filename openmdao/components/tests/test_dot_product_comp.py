@@ -525,16 +525,16 @@ class TestFeature(unittest.TestCase):
 
         p.setup()
 
-        p['force'] = np.random.rand(n, 3)
-        p['vel'] = np.random.rand(n, 3)
+        p.set_val('force', np.random.rand(n, 3))
+        p.set_val('vel', np.random.rand(n, 3))
 
         p.run_model()
 
         # Verify the results against numpy.dot in a for loop.
         expected = []
         for i in range(n):
-            a_i = p['force'][i, :]
-            b_i = p['vel'][i, :]
+            a_i = p.get_val('force')[i, :]
+            b_i = p.get_val('vel')[i, :]
             expected.append(np.dot(a_i, b_i))
 
             actual_i = p.get_val('dot_prod_comp.P')[i]
@@ -569,9 +569,9 @@ class TestFeature(unittest.TestCase):
 
         p.setup()
 
-        p['force'] = np.random.rand(n, 3)
-        p['disp'] = np.random.rand(n, 3)
-        p['vel'] = np.random.rand(n, 3)
+        p.set_val('force', np.random.rand(n, 3))
+        p.set_val('disp', np.random.rand(n, 3))
+        p.set_val('vel', np.random.rand(n, 3))
 
         p.run_model()
 
@@ -579,16 +579,16 @@ class TestFeature(unittest.TestCase):
         expected_P = []
         expected_W = []
         for i in range(n):
-            a_i = p['force'][i, :]
+            a_i = p.get_val('force')[i, :]
 
-            b_i = p['disp'][i, :]
+            b_i = p.get_val('disp')[i, :]
             expected_W.append(np.dot(a_i, b_i))
 
             actual_i = p.get_val('dot_prod_comp.W')[i]
             rel_error = np.abs(actual_i - expected_W[i])/actual_i
             assert rel_error < 1e-9, f"Relative error: {rel_error}"
 
-            b_i = p['vel'][i, :]
+            b_i = p.get_val('vel')[i, :]
             expected_P.append(np.dot(a_i, b_i))
 
             actual_i = p.get_val('dot_prod_comp.P')[i]

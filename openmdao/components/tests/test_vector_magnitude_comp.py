@@ -310,14 +310,14 @@ class TestFeature(unittest.TestCase):
 
         p.setup()
 
-        p['pos'] = 1.0 + np.random.rand(n, 3)
+        p.set_val('pos', 1.0 + np.random.rand(n, 3))
 
         p.run_model()
 
         # Verify the results against numpy.dot in a for loop.
         expected = []
         for i in range(n):
-            a_i = p['pos'][i, :]
+            a_i = p.get_val('pos')[i, :]
             expected.append(np.sqrt(np.dot(a_i, a_i)))
 
             actual_i = p.get_val('vec_mag_comp.r_mag')[i]
@@ -348,8 +348,8 @@ class TestFeature(unittest.TestCase):
 
         p.setup()
 
-        p['r'] = 1.0 + np.random.rand(n, 3)
-        p['b'] = 1.0 + np.random.rand(n, 3)
+        p.set_val('r', 1.0 + np.random.rand(n, 3))
+        p.set_val('b', 1.0 + np.random.rand(n, 3))
 
         p.run_model()
 
@@ -357,14 +357,14 @@ class TestFeature(unittest.TestCase):
         expected_r = []
         expected_b = []
         for i in range(n):
-            a_i = p['r'][i, :]
+            a_i = p.get_val('r')[i, :]
             expected_r.append(np.sqrt(np.dot(a_i, a_i)))
 
             actual_i = p.get_val('vec_mag_comp.r_mag')[i]
             rel_error = np.abs(expected_r[i] - actual_i)/actual_i
             assert rel_error < 1e-9, f"Relative error: {rel_error}"
 
-            b_i = p['b'][i, :]
+            b_i = p.get_val('b')[i, :]
             expected_b.append(np.sqrt(np.dot(b_i, b_i)))
 
             actual_i = p.get_val('vec_mag_comp.b_mag')[i]

@@ -591,8 +591,8 @@ class TestFeature(unittest.TestCase):
 
         p.setup()
 
-        p['Mat'] = np.random.rand(nn, 3, 3)
-        p['x'] = np.random.rand(nn, 3)
+        p.set_val('Mat', np.random.rand(nn, 3, 3))
+        p.set_val('x', np.random.rand(nn, 3))
 
         p.run_model()
 
@@ -626,9 +626,9 @@ class TestFeature(unittest.TestCase):
 
         p.setup()
 
-        p['Mat'] = np.random.rand(nn, 3, 3)
-        p['x'] = np.random.rand(nn, 3)
-        p['w'] = np.random.rand(nn, 3)
+        p.set_val('Mat', np.random.rand(nn, 3, 3))
+        p.set_val('x', np.random.rand(nn, 3))
+        p.set_val('w', np.random.rand(nn, 3))
 
         p.run_model()
 

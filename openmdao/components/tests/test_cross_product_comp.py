@@ -550,16 +550,16 @@ class TestFeature(unittest.TestCase):
 
         p.setup()
 
-        p['r'] = np.random.rand(n, 3)
-        p['F'] = np.random.rand(n, 3)
+        p.set_val('r', np.random.rand(n, 3))
+        p.set_val('F', np.random.rand(n, 3))
 
         p.run_model()
 
         # Check the output in units of ft*lbf to ensure that our units work as expected.
         expected = []
         for i in range(n):
-            a_i = p['r'][i, :]
-            b_i = p['F'][i, :]
+            a_i = p.get_val('r')[i, :]
+            b_i = p.get_val('F')[i, :]
             expected.append(np.cross(a_i, b_i) * 0.73756215)
 
             actual_i = p.get_val('cross_prod_comp.torque', units='ft*lbf')[i]
@@ -590,9 +590,9 @@ class TestFeature(unittest.TestCase):
 
         p.setup()
 
-        p['r'] = np.random.rand(n, 3)
-        p['F'] = np.random.rand(n, 3)
-        p['p'] = np.random.rand(n, 3)
+        p.set_val('r', np.random.rand(n, 3))
+        p.set_val('F', np.random.rand(n, 3))
+        p.set_val('p', np.random.rand(n, 3))
 
         p.run_model()
 
@@ -600,15 +600,15 @@ class TestFeature(unittest.TestCase):
         expected_T = []
         expected_L = []
         for i in range(n):
-            a_i = p['r'][i, :]
-            b_i = p['F'][i, :]
+            a_i = p.get_val('r')[i, :]
+            b_i = p.get_val('F')[i, :]
             expected_T.append(np.cross(a_i, b_i))
 
             actual_i = p.get_val('cross_prod_comp.torque')[i]
             rel_error = np.abs(expected_T[i] - actual_i)/actual_i
             assert np.all(rel_error < 1e-8), f"Relative error: {rel_error}"
 
-            b_i = p['p'][i, :]
+            b_i = p.get_val('p')[i, :]
             expected_L.append(np.cross(a_i, b_i))
 
             actual_i = p.get_val('cross_prod_comp.L')[i]
