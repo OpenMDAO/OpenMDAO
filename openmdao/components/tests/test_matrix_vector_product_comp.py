@@ -596,17 +596,13 @@ class TestFeature(unittest.TestCase):
 
         p.run_model()
 
-        Mat_i = p['Mat'][0, :, :]
-        x_i = p['x'][0, :]
+        assert_near_equal(p.get_val('mat_vec_product_comp.y', units='ft')[0, :],
+                          np.dot(p['Mat'][0, :, :], p['x'][0, :]) * 3.2808399,
+                          tolerance=1.0E-8)
 
-        expected_i = np.dot(Mat_i, x_i) * 3.2808399
-        assert_near_equal(p.get_val('mat_vec_product_comp.y', units='ft')[0, :], expected_i, tolerance=1.0E-8)
-
-        Mat_i = p['Mat'][1, :, :]
-        x_i = p['x'][1, :]
-
-        expected_i = np.dot(Mat_i, x_i) * 3.2808399
-        assert_near_equal(p.get_val('mat_vec_product_comp.y', units='ft')[1, :], expected_i, tolerance=1.0E-8)
+        assert_near_equal(p.get_val('mat_vec_product_comp.y', units='ft')[1, :],
+                          np.dot(p['Mat'][1, :, :], p['x'][1, :]) * 3.2808399,
+                          tolerance=1.0E-8)
 
     def test_multiple(self):
         import numpy as np
@@ -636,27 +632,21 @@ class TestFeature(unittest.TestCase):
 
         p.run_model()
 
-        Mat_i = p['Mat'][0, :, :]
-        x_i = p['x'][0, :]
+        assert_near_equal(p.get_val('mat_vec_product_comp.y', units='ft')[0, :],
+                          np.dot(p['Mat'][0, :, :], p['x'][0, :]) * 3.2808399,
+                          tolerance=1.0E-8)
 
-        expected_i = np.dot(Mat_i, x_i) * 3.2808399
-        assert_near_equal(p.get_val('mat_vec_product_comp.y', units='ft')[0, :], expected_i, tolerance=1.0E-8)
+        assert_near_equal(p.get_val('mat_vec_product_comp.y', units='ft')[1, :],
+                          np.dot(p['Mat'][1, :, :], p['x'][1, :]) * 3.2808399,
+                          tolerance=1.0E-8)
 
-        w_i = p['w'][0, :]
+        assert_near_equal(p.get_val('mat_vec_product_comp.z', units='ft')[0, :],
+                          np.dot(p['Mat'][0, :, :], p['w'][0, :]) * 3.2808399,
+                          tolerance=1.0E-8)
 
-        expected_i = np.dot(Mat_i, w_i) * 3.2808399
-        assert_near_equal(p.get_val('mat_vec_product_comp.z', units='ft')[0, :], expected_i, tolerance=1.0E-8)
-
-        Mat_i = p['Mat'][1, :, :]
-        x_i = p['x'][1, :]
-
-        expected_i = np.dot(Mat_i, x_i) * 3.2808399
-        assert_near_equal(p.get_val('mat_vec_product_comp.y', units='ft')[1, :], expected_i, tolerance=1.0E-8)
-
-        w_i = p['w'][1, :]
-
-        expected_i = np.dot(Mat_i, w_i) * 3.2808399
-        assert_near_equal(p.get_val('mat_vec_product_comp.z', units='ft')[1, :], expected_i, tolerance=1.0E-8)
+        assert_near_equal(p.get_val('mat_vec_product_comp.z', units='ft')[1, :],
+                          np.dot(p['Mat'][1, :, :], p['w'][1, :]) * 3.2808399,
+                          tolerance=1.0E-8)
 
 
 if __name__ == "__main__":
