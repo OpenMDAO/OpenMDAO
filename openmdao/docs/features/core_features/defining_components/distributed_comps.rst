@@ -14,9 +14,9 @@ that operates on distributed variables. A variable is distributed if each proces
 contains only a part of the whole variable.
 
 We've already seen that by using :ref:`src_indices <connect_src_indices>`
-we can connect an input to only a subset of an output variable.  
+we can connect an input to only a subset of an output variable.
 By giving different values for *src_indices* in each MPI process, we can
-distribute computations on a distributed output across the processes.  
+distribute computations on a distributed output across the processes.
 
 You tell the framework that a Component is a distributed component by setting its
 :code:`distributed` option to True:
@@ -38,10 +38,10 @@ Component Options
 Distributed Component Example
 -----------------------------
 
-The following example shows how to create a distributed component, `DistribComp`, 
-that distributes its computation evenly across the available processes. A second 
-component, `Summer`, sums the values from the distributed component into a scalar 
-output value.  
+The following example shows how to create a distributed component, `DistribComp`,
+that distributes its computation evenly across the available processes. A second
+component, `Summer`, sums the values from the distributed component into a scalar
+output value.
 
 These components can found in the OpenMDAO test suite:
 
@@ -62,7 +62,7 @@ These components can found in the OpenMDAO test suite:
 .. note::
 
     A component that takes a distributed output as input does not need to do anything
-    special as OpenMDAO performs the required MPI operations to make the full value 
+    special as OpenMDAO performs the required MPI operations to make the full value
     available.
 
 This example is run with two processes and a :code:`size` of 15:
@@ -70,6 +70,20 @@ This example is run with two processes and a :code:`size` of 15:
 .. embed-code::
     openmdao.core.tests.test_distribcomp.MPIFeatureTests.test_distribcomp_feature
     :layout: interleave
+
+In this example, we introduce a new component called an ``IndepVarComp``. If you used OpenMDAO prior to
+version 3.2, then you have are familiar with this component. An IndepVarComp is used to define an
+independent variable. You no longer have to define these because OpenMDAO defines and uses them
+automatically for all unconnected inputs in your model. However, when we define a distributed input, we often
+use the "src_indices" attribute to determine the allocation of that input to the processors that the
+component sees. For some sets of these indices, it isn't possible to easily determine the full size
+of the corresponding independent variable, the IndepVarComp cannot be created automatically.  So, for
+unconnected inputs on a distributed component, you must manually create one, as we did in this example.
+
+The call signature for the `IndepVarComp` constructor is:
+
+.. automethod:: openmdao.core.indepvarcomp.IndepVarComp.__init__()
+    :noindex:
 
 
 Distributed Component with Derivatives

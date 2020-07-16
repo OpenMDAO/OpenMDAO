@@ -494,6 +494,7 @@ class Problem(object):
         # Caching only needed if vectors aren't allocated yet.
         if self._setup_status == 1:
             if indices is not None:
+                self._get_cached_val(name)
                 try:
                     self._initial_condition_cache[name][indices] = value
                 except Exception as err:
@@ -675,15 +676,24 @@ class Problem(object):
 
         rvec.set_val(0.)
 
+        conns = self.model._conn_global_abs_in2out
+
         # set seed values into dresids (fwd) or doutputs (rev)
+        # seed may have keys that are inputs and must be converted into auto_ivcs
         try:
             seed[rnames[0]]
         except (IndexError, TypeError):
             for i, name in enumerate(rnames):
-                rvec[name] = seed[i]
+                if name in conns:
+                    rvec[conns[name]] = seed[i]
+                else:
+                    rvec[name] = seed[i]
         else:
             for name in rnames:
-                rvec[name] = seed[name]
+                if name in conns:
+                    rvec[conns[name]] = seed[name]
+                else:
+                    rvec[name] = seed[name]
 
         # We apply a -1 here because the derivative of the output is minus the derivative of
         # the residual in openmdao.
@@ -691,7 +701,11 @@ class Problem(object):
 
         self.model.run_solve_linear(['linear'], mode)
 
-        return {n: lvec[n].copy() for n in lnames}
+        if mode == 'fwd':
+            return {n: lvec[n].copy() for n in lnames}
+        else:
+            # may need to convert some lnames to auto_ivc names
+            return {n: lvec[conns[n] if n in conns else n].copy() for n in lnames}
 
     def _setup_recording(self):
         """

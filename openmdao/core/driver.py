@@ -266,8 +266,8 @@ class Driver(object):
         )
 
         # Determine if any design variables are discrete.
-        self._designvars_discrete = [dv for dv in self._designvars
-                                     if dv in model._discrete_outputs]
+        self._designvars_discrete = [name for name, meta in self._designvars.items()
+                                     if meta['ivc_source'] in model._discrete_outputs]
         if not self.supports['integer_design_vars'] and len(self._designvars_discrete) > 0:
             msg = "Discrete design variables are not supported by this driver: "
             msg += '.'.join(self._designvars_discrete)

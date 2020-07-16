@@ -4250,27 +4250,33 @@ class System(object):
         variables = filtered_vars.get(kind)
         if variables:
             vec = self._vectors[kind][vec_name]
-            srcvec = self._vectors['output'][vec_name]
+            srcget = self._vectors['output'][vec_name]._abs_get_val
             get = vec._abs_get_val
             rank = self.comm.rank
-            discrete_vec = None if kind == 'residual' else self._var_discrete[kind]
+            discrete_vec = () if kind == 'residual' else self._var_discrete[kind]
             offset = len(self.pathname) + 1 if self.pathname else 0
 
             if self.comm.size == 1:
                 vdict = {}
                 if discrete_vec:
-                    for name in variables:
-                        if vec._contains_abs(name):
-                            vdict[name] = get(name, False)
-                        else:  # discrete
-                            vdict[name] = discrete_vec[name[offset:]]['value']
+                    for n in variables:
+                        if vec._contains_abs(n):
+                            vdict[n] = get(n, False)
+                        elif n[offset:] in discrete_vec:
+                            vdict[n] = discrete_vec[n[offset:]]['value']
+                        else:
+                            ivc_path = conns[prom2abs_in[n][0]]
+                            if vec._contains_abs(ivc_path):
+                                vdict[ivc_path] = srcget(ivc_path, False)
+                            elif ivc_path[offset:] in discrete_vec:
+                                vdict[ivc_path] = discrete_vec[ivc_path[offset:]]['value']
                 else:
                     for name in variables:
                         if vec._contains_abs(name):
                             vdict[name] = get(name, False)
                         else:
                             ivc_path = conns[prom2abs_in[name][0]]
-                            vdict[ivc_path] = srcvec._abs_get_val(ivc_path, False)
+                            vdict[ivc_path] = srcget(ivc_path, False)
             elif parallel:
                 vdict = {}
                 if discrete_vec:
@@ -4289,7 +4295,7 @@ class System(object):
                                 vdict[name] = val
                         else:
                             ivc_path = conns[prom2abs_in[name][0]]
-                            val = srcvec._abs_get_val(ivc_path, False)
+                            val = srcget(ivc_path, False)
                             if val.size > 0:
                                 vdict[ivc_path] = val
             else:
