@@ -3575,7 +3575,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
 
         # Inputs with excludes
         inputs = case.list_inputs(excludes=['*length'], out_stream=None)
-        self.assertEqual(sorted(['rect.width']), sorted([outp[0] for outp in outputs]))
+        self.assertEqual(sorted(['rect.width']), sorted([inp[0] for inp in inputs]))
 
     def test_feature_get_val(self):
         import openmdao.api as om
