@@ -886,11 +886,11 @@ class TestProblem(unittest.TestCase):
 
         prob.setup()
 
-        prob.set_val('px.x', 2.75)
+        prob.set_val('x', 2.75)
 
         prob.run_model()
 
-        assert_near_equal(prob.get_val('px.x'), 2.75, 1e-6)
+        assert_near_equal(prob.get_val('x'), 2.75, 1e-6)
 
         assert_near_equal(prob.get_val('d1.y1'), 27.3049178437, 1e-6)
 
