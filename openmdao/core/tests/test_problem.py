@@ -166,6 +166,7 @@ class TestProblem(unittest.TestCase):
         model.set_input_defaults('comp.y', -4.0)
 
         prob.setup()
+
         prob.run_model()
 
         totals = prob.compute_totals(of=['comp.f_xy'], wrt=['comp.x', 'comp.y'])
@@ -193,6 +194,7 @@ class TestProblem(unittest.TestCase):
         model.add_objective('comp.f_xy')
 
         prob.setup()
+
         prob.run_model()
 
         totals = prob.compute_totals(of=['comp.f_xy'], wrt=['comp.x', 'comp.y'], driver_scaling=True)
@@ -820,11 +822,9 @@ class TestProblem(unittest.TestCase):
                 partials['y', 'x'] = 3.
 
         prob = om.Problem()
-        prob.model.add_subsystem('px', om.IndepVarComp('x', val=1.0))
         prob.model.add_subsystem('comp', SimpleComp())
-        prob.model.connect('px.x', 'comp.x')
 
-        prob.model.add_design_var('px.x', lower=-100, upper=100)
+        prob.model.add_design_var('comp.x', lower=-100, upper=100)
         prob.model.add_objective('comp.y')
 
         prob.setup(force_alloc_complex=True)
