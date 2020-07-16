@@ -108,25 +108,23 @@ if __name__ == "__main__":
     p = om.Problem()
     model = p.model
 
-    model.add_subsystem('ground', om.IndepVarComp('V', 0., units='V'))
-
     # replacing the fixed current source with a BalanceComp to represent a fixed Voltage source
-    # model.add_subsystem('source', IndepVarComp('I', 0.1, units='A'))
-    model.add_subsystem('batt', om.IndepVarComp('V', 1.5, units='V'))
-    bal = model.add_subsystem('batt_balance', om.BalanceComp())
+    model.set_input_defaults('ground.V', 0., units='V')
+    model.set_input_defaults('batt.V', 1.5, units='V')
+    bal = model.add_subsystem('batt_balance', om.BalanceComp(), promotes=[('rhs:I', 'batt.V')])
+
     bal.add_balance('I', units='A', eq_units='V')
 
-    model.add_subsystem('circuit', Circuit())
+    model.add_subsystem('circuit', Circuit(), promotes=[('Vg', 'ground.V')])
     model.add_subsystem('batt_deltaV', om.ExecComp('dV = V1 - V2', V1={'units':'V'},
-                                                   V2={'units':'V'}, dV={'units':'V'}))
+                                                   V2={'units':'V'}, dV={'units':'V'}),
+                        promotes=[('V2', 'ground.V')])
 
     # current into the circuit is now the output state from the batt_balance comp
     model.connect('batt_balance.I', 'circuit.I_in')
-    model.connect('ground.V', ['circuit.Vg','batt_deltaV.V2'])
     model.connect('circuit.n1.V', 'batt_deltaV.V1')
 
     # set the lhs and rhs for the battery residual
-    model.connect('batt.V', 'batt_balance.rhs:I')
     model.connect('batt_deltaV.dV', 'batt_balance.lhs:I')
 
     p.setup()

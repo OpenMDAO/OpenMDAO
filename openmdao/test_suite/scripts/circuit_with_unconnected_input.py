@@ -28,12 +28,10 @@ class Circuit(om.Group):
 p = om.Problem()
 model = p.model
 
-model.add_subsystem('ground', om.IndepVarComp('V', 0., units='V'))
-model.add_subsystem('source', om.IndepVarComp('I', 0.1, units='A'))
-model.add_subsystem('circuit', Circuit())
-
-model.connect('source.I', 'circuit.I_in')
-model.connect('ground.V', 'circuit.Vg')
+model.set_input_defaults('ground.V', 0., units='V')
+model.set_input_defaults('source.I', 0.1, units='A')
+model.add_subsystem('circuit', Circuit(),
+                    promotes_inputs=[('Vg', 'ground.V'), ('I_in', 'source.I')])
 
 model.add_design_var('ground.V')
 model.add_design_var('source.I')
