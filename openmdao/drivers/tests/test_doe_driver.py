@@ -1547,8 +1547,6 @@ class TestDOEDriverFeature(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
         model.add_design_var('x', lower=0.0, upper=1.0)
@@ -1556,6 +1554,9 @@ class TestDOEDriverFeature(unittest.TestCase):
         model.add_objective('f_xy')
 
         prob.setup()
+
+        prob.set_val('x', 0.0)
+        prob.set_val('y', 0.0)
 
         # this file contains design variable inputs in CSV format
         with open('cases.csv', 'r') as f:
@@ -1588,8 +1589,6 @@ class TestDOEDriverFeature(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
         model.add_design_var('x', lower=0.0, upper=1.0)
@@ -1597,6 +1596,9 @@ class TestDOEDriverFeature(unittest.TestCase):
         model.add_objective('f_xy')
 
         prob.setup()
+
+        prob.set_val('x', 0.0)
+        prob.set_val('y', 0.0)
 
         # load design variable inputs from JSON file and decode into list
         with open('cases.json', 'r') as f:

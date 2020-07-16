@@ -349,14 +349,18 @@ class TestGetSetVariables(unittest.TestCase):
         p.model.add_subsystem('C2', ExecComp('y=x*3.',
                                              x={'value': np.zeros(3),
                                                 'units': 'inch',
-                                                'src_indices': list(range(7,10))},
+                                                'src_indices': list(range(7, 10))},
                                              y={'value': np.zeros(3), 'units': 'inch'}),
                               promotes=['x'])
+        p.model.add_subsystem('C3', ExecComp('y=x*4.',
+                                             x={'value': np.zeros(10), 'units': 'mm'},
+                                             y={'value': np.zeros(10), 'units': 'mm'}),
+                         promotes=['x'])
 
         with self.assertRaises(RuntimeError) as cm:
             p.setup()
 
-        self.assertEqual(str(cm.exception), "Group (<model>): The following inputs, ['C1.x', 'C2.x'], promoted to 'x', are connected but the metadata entries ['units'] differ. Call <group>.set_input_defaults('x', units=?), where <group> is the Group named '' to remove the ambiguity.")
+        self.assertEqual(str(cm.exception), "Group (<model>): The following inputs, ['C1.x', 'C2.x', 'C3.x'], promoted to 'x', are connected but the metadata entries ['units'] differ. Call <group>.set_input_defaults('x', units=?), where <group> is the Group named '' to remove the ambiguity.")
 
     def test_serial_multi_src_inds_units_setval_promoted(self):
         p = Problem()
