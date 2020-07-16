@@ -670,6 +670,20 @@ class MPITests(unittest.TestCase):
         if MPI and self.comm.rank == 0:
             self.assertTrue(all(C3._outputs['outvec'] == np.array(range(size, 0, -1), float)*4))
 
+    def test_auto_ivc_error(self):
+        size = 2
+
+        prob = om.Problem()
+        C2 = prob.model.add_subsystem("C", DistribCompSimple(arr_size=size))
+
+        with self.assertRaises(RuntimeError) as context:
+            prob.setup()
+
+        msg = ' Distributed component input "C.invec" requires an IndepVarComp.'
+
+        err_msg = str(context.exception).split(':')[-1]
+        self.assertEqual(err_msg, msg)
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class ProbRemoteTests(unittest.TestCase):
@@ -685,21 +699,21 @@ class ProbRemoteTests(unittest.TestCase):
         p = om.Problem()
         top = p.model
         par = top.add_subsystem('par', om.ParallelGroup())
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('invec1', np.ones(size))
+        ivc.add_output('invec2', np.ones(size))
+        top.add_subsystem('P', ivc)
+        top.connect('P.invec1', 'par.C1.invec')
+        top.connect('P.invec2', 'par.C2.invec')
+
         C1 = par.add_subsystem("C1", DistribInputDistribOutputComp(arr_size=size))
         C2 = par.add_subsystem("C2", DistribInputDistribOutputComp(arr_size=size))
-        
-        #import wingdbstub
-        
+
         p.setup()
 
-        # Conclude setup but don't run model.
-        p.final_setup()
-
-        if C1 in p.model.par._subsystems_myproc:
-            p['par.C1.invec'] = np.array(range(C1._inputs.asarray().size, 0, -1), float)
-
-        if C2 in p.model.par._subsystems_myproc:
-            p['par.C2.invec'] = np.array(range(C2._inputs.asarray().size, 0, -1), float) * 3
+        p['P.invec1'] = np.array([2, 1, 1], float)
+        p['P.invec2'] = np.array([6, 3, 3], float)
 
         p.run_model()
 
@@ -718,20 +732,25 @@ class ProbRemoteTests(unittest.TestCase):
         p = om.Problem()
         top = p.model
         par = top.add_subsystem('par', om.ParallelGroup())
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('invec1', np.ones(size))
+        ivc.add_output('invec2', np.ones(size))
+        ivc.add_discrete_output('disc_in1', 'C1foo')
+        ivc.add_discrete_output('disc_in2', 'C2foo')
+        top.add_subsystem('P', ivc)
+        top.connect('P.invec1', 'par.C1.invec')
+        top.connect('P.invec2', 'par.C2.invec')
+        top.connect('P.disc_in1', 'par.C1.disc_in')
+        top.connect('P.disc_in2', 'par.C2.disc_in')
+
         C1 = par.add_subsystem("C1", DistribInputDistribOutputDiscreteComp(arr_size=size))
         C2 = par.add_subsystem("C2", DistribInputDistribOutputDiscreteComp(arr_size=size))
+
         p.setup()
 
-        # Conclude setup but don't run model.
-        p.final_setup()
-
-        if C1 in p.model.par._subsystems_myproc:
-            p['par.C1.invec'] = np.array(range(C1._inputs.asarray().size, 0, -1), float)
-        p['par.C1.disc_in'] = 'C1foo'
-
-        if C2 in p.model.par._subsystems_myproc:
-            p['par.C2.invec'] = np.array(range(C2._inputs.asarray().size, 0, -1), float) * 3
-        p['par.C2.disc_in'] = 'C2foo'
+        p['P.invec1'] = np.array([2, 1, 1], float)
+        p['P.invec2'] = np.array([6, 3, 3], float)
 
         p.run_model()
 
@@ -771,6 +790,14 @@ class ProbRemoteTests(unittest.TestCase):
         p = om.Problem()
 
         top = p.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('invec', np.ones(size))
+        ivc.add_discrete_output('disc_in', 'C1foo')
+        top.add_subsystem('P', ivc)
+        top.connect('P.invec', 'C1.invec')
+        top.connect('P.disc_in', 'C1.disc_in')
+
         C1 = top.add_subsystem("C1", DistribInputDistribOutputDiscreteComp(arr_size=size))
         p.setup()
 
@@ -779,8 +806,8 @@ class ProbRemoteTests(unittest.TestCase):
 
         rank = p.comm.rank
 
-        p['C1.invec'] = np.array(range(C1._inputs._data.size, 0, -1), float) * (rank + 1)
-        p['C1.disc_in'] = 'boo'
+        p['P.invec'] = np.array([[4, 3, 2, 1, 8, 6, 4, 2, 9, 6, 3, 12, 8, 4.0]])
+        p['P.disc_in'] = 'boo'
 
         p.run_model()
 

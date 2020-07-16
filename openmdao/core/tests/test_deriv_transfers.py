@@ -186,9 +186,10 @@ class TestParallelGroups(unittest.TestCase):
         assert_near_equal(J['par.C2.y', 'indep.x'][0][0], 7., 1e-6)
         assert_near_equal(prob.get_val('par.C2.y', get_remote=True), 7., 1e-6)
 
-    @parameterized.expand(itertools.product(['fwd', 'rev'], [True, False]),
+    @parameterized.expand(itertools.product(['fwd', 'rev'], [False]),
                           name_func=_test_func_name)
     def test_dup_dist(self, mode, auto):
+        # Note: Auto-ivc not supported for distributed inputs.
 
         # duplicated output, parallel input
         prob = om.Problem()
@@ -254,10 +255,11 @@ class TestParallelGroups(unittest.TestCase):
         assert_near_equal(J['C1.y', 'par.indep2.x'][0][0], 3.5, 1e-6)
         assert_near_equal(prob['C1.y'], 6., 1e-6)
 
-    @parameterized.expand(itertools.product(['fwd', 'rev'], [True, False]),
+    @parameterized.expand(itertools.product(['fwd', 'rev'], [False]),
                           name_func=_test_func_name)
     def test_dist_dup(self, mode, auto):
         # duplicated output, parallel input
+        # Note: Auto-ivc not supported for distributed inputs.
         prob = om.Problem()
         model = prob.model
         size = 3
@@ -274,7 +276,7 @@ class TestParallelGroups(unittest.TestCase):
         wrt=['x']
 
         prob.model.linear_solver = om.LinearRunOnce()
-        
+
         prob.setup(check=False, mode=mode)
         prob.set_solver_print(level=0)
         prob.run_model()
