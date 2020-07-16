@@ -724,7 +724,7 @@ class TestDriverFeature(unittest.TestCase):
         model = prob.model
 
         ivc = om.IndepVarComp()
-        ivc.add_output('x', 35.0, units='degF', lower=32.0, upper=212.0)
+        ivc.add_output('x', 35.0, units='degF')
 
         model.add_subsystem('p', ivc, promotes=['x'])
         model.add_subsystem('comp1', om.ExecComp('y1 = 2.0*x',
@@ -745,9 +745,9 @@ class TestDriverFeature(unittest.TestCase):
         prob.run_driver()
 
         print('Model variables')
-        assert_near_equal(prob['p.x'][0], 35.0, 1e-8)
-        assert_near_equal(prob['comp2.y2'][0], 105.0, 1e-8)
-        assert_near_equal(prob['comp1.y1'][0], 70.0, 1e-8)
+        assert_near_equal(prob.get_val('p.x', indices=[0]), 35.0, 1e-8)
+        assert_near_equal(prob.get_val('comp2.y2', indices=[0]), 105.0, 1e-8)
+        assert_near_equal(prob.get_val('comp1.y1', indices=[0]), 70.0, 1e-8)
 
         print('')
         print('Driver variables')

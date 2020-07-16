@@ -898,19 +898,18 @@ class TestGroup(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
         model.nonlinear_solver = om.NonlinearRunOnce()
-        model.add_subsystem('indeps', om.IndepVarComp('x', 1.))
-        model.add_subsystem('C1', ReportOrderComp(order_list))
+        model.add_subsystem('C1', ReportOrderComp(order_list), promotes_inputs=['x'])
         model.add_subsystem('C2', ReportOrderComp(order_list))
         model.add_subsystem('C3', ReportOrderComp(order_list))
-        model.connect('indeps.x', 'C1.x')
         model.connect('C1.y', 'C2.x')
         model.connect('C2.y', 'C3.x')
         prob.set_solver_print(level=0)
 
-        self.assertEqual(['indeps', 'C1', 'C2', 'C3'],
+        self.assertEqual(['C1', 'C2', 'C3'],
                          [s.name for s in model._static_subsystems_allprocs])
 
         prob.setup()
+        prob.set_val('x', 1.)
         prob.run_model()
 
         self.assertEqual(['C1', 'C2', 'C3'], order_list)
@@ -918,29 +917,30 @@ class TestGroup(unittest.TestCase):
         order_list[:] = []
 
         # Big boy rules
-        model.set_order(['indeps', 'C2', 'C1', 'C3'])
+        model.set_order(['C2', 'C1', 'C3'])
 
         prob.setup()
+        prob.set_val('x', 1.)
         prob.run_model()
         self.assertEqual(['C2', 'C1', 'C3'], order_list)
 
         # Extra
         with self.assertRaises(ValueError) as cm:
-            model.set_order(['indeps', 'C2', 'junk', 'C1', 'C3'])
+            model.set_order(['C2', 'junk', 'C1', 'C3'])
 
         self.assertEqual(str(cm.exception),
                          "Group (<model>): subsystem(s) ['junk'] found in subsystem order but don't exist.")
 
         # Missing
         with self.assertRaises(ValueError) as cm:
-            model.set_order(['indeps', 'C2', 'C3'])
+            model.set_order(['C2', 'C3'])
 
         self.assertEqual(str(cm.exception),
                          "Group (<model>): ['C1'] expected in subsystem order and not found.")
 
         # Extra and Missing
         with self.assertRaises(ValueError) as cm:
-            model.set_order(['indeps', 'C2', 'junk', 'C1', 'junk2'])
+            model.set_order(['C2', 'junk', 'C1', 'junk2'])
 
         self.assertEqual(str(cm.exception),
                          "Group (<model>): ['C3'] expected in subsystem order and not found.\n"
@@ -949,7 +949,7 @@ class TestGroup(unittest.TestCase):
 
         # Dupes
         with self.assertRaises(ValueError) as cm:
-            model.set_order(['indeps', 'C2', 'C1', 'C3', 'C1'])
+            model.set_order(['C2', 'C1', 'C3', 'C1'])
 
         self.assertEqual(str(cm.exception),
                          "Group (<model>): Duplicate name(s) found in subsystem order list: ['C1']")
@@ -2852,7 +2852,7 @@ class TestFeatureGuessNonlinear(unittest.TestCase):
 
         self.assertEqual(p.model.nonlinear_solver._iter_count, 0)
 
-        assert_near_equal(p['discipline.x'], 1.41421356, 1e-6)
+        assert_near_equal(p.get_val('discipline.x'), 1.41421356, 1e-6)
 
 
 class TestNaturalNaming(unittest.TestCase):
