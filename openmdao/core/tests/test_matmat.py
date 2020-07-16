@@ -570,10 +570,9 @@ class MatMatTestCase(unittest.TestCase):
 
         p = om.Problem()
 
-        dvs = p.model.add_subsystem('des_vars', om.IndepVarComp(), promotes=['*'])
-        dvs.add_output('x', 2*np.ones(SIZE))
-        dvs.add_output('y', 2*np.ones(SIZE))
 
+        p.model.set_input_defaults('x', val=2*np.ones(SIZE))
+        p.model.set_input_defaults('y', val=2*np.ones(SIZE))
         p.model.add_subsystem('obj', ExpensiveAnalysis(), promotes=['x', 'y', 'f'])
         p.model.add_subsystem('constraint', CheapConstraint(), promotes=['y', 'g'])
 

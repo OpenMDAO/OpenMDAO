@@ -175,9 +175,9 @@ class TestFeature(unittest.TestCase):
 
         p.setup()
 
-        p['pos_ecef'][:, 0] = 6378 * np.cos(np.linspace(0, 2*np.pi, m))
-        p['pos_ecef'][:, 1] = 6378 * np.sin(np.linspace(0, 2*np.pi, m))
-        p['pos_ecef'][:, 2] = 0.0
+        p.set_val('pos_ecef', 6378 * np.cos(np.linspace(0, 2*np.pi, m)), indices=om.slicer[:, 0])
+        p.set_val('pos_ecef', 6378 * np.sin(np.linspace(0, 2*np.pi, m)), indices=om.slicer[:, 1])
+        p.set_val('pos_ecef', 0.0, indices=om.slicer[:, 2])
 
         p.run_model()
 

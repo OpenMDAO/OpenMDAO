@@ -177,7 +177,8 @@ class MPITests2(unittest.TestCase):
         size = 3
         group = om.Group()
 
-        group.add_subsystem('P', om.IndepVarComp('x', np.arange(size)))
+        group.add_subsystem('P', om.IndepVarComp('x', np.arange(size)),
+                            promotes_outputs=['x'])
         group.add_subsystem('C1', DistribExecComp(['y=2.0*x', 'y=3.0*x'], arr_size=size,
                                                   x=np.zeros(size),
                                                   y=np.zeros(size)),

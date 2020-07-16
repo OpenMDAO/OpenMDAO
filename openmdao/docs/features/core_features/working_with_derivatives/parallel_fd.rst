@@ -66,8 +66,8 @@ of our 3 processes should compute 2 columns of the partial jacobian.
   :layout: interleave
 
 
-Next, let's compute the total derivatives of our MatMulComp outputs with respect to our
-IndepVarComp output.  Again, we'll be using a *num_par_fd* value of 3 and a matrix having
+Next, let's compute the total derivatives of our MatMulComp outputs with respect to its input.
+Again, we'll be using a *num_par_fd* value of 3 and a matrix having
 6 columns, so each process should compute 2 columns of the total jacobian.  This time, however,
 we set the *num_par_fd* on our model instead of on our MatMultComp.
 

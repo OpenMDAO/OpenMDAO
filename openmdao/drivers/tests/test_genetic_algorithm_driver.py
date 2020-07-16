@@ -1313,22 +1313,22 @@ class TestFeatureSimpleGA(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('xC', 7.5))
-        model.add_subsystem('p2', om.IndepVarComp('xI', 0.0))
-        model.add_subsystem('comp', Branin())
+        model.add_subsystem('comp', Branin(),
+                            promotes_inputs=[('x0', 'xI'), ('x1', 'xC')])
 
-        model.connect('p2.xI', 'comp.x0')
-        model.connect('p1.xC', 'comp.x1')
-
-        model.add_design_var('p2.xI', lower=-5.0, upper=10.0)
-        model.add_design_var('p1.xC', lower=0.0, upper=15.0)
+        model.add_design_var('xI', lower=-5.0, upper=10.0)
+        model.add_design_var('xC', lower=0.0, upper=15.0)
         model.add_objective('comp.f')
 
         prob.driver = om.SimpleGADriver()
-        prob.driver.options['bits'] = {'p1.xC': 8}
+        prob.driver.options['bits'] = {'xC': 8}
         prob.driver.options['max_gen'] = 5
 
         prob.setup()
+
+        prob.set_val('xC', 7.5)
+        prob.set_val('xI', 0.0)
+
         prob.run_driver()
 
     def test_option_pop_size(self):
@@ -1338,22 +1338,22 @@ class TestFeatureSimpleGA(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('xC', 7.5))
-        model.add_subsystem('p2', om.IndepVarComp('xI', 0.0))
-        model.add_subsystem('comp', Branin())
+        model.add_subsystem('comp', Branin(),
+                            promotes_inputs=[('x0', 'xI'), ('x1', 'xC')])
 
-        model.connect('p2.xI', 'comp.x0')
-        model.connect('p1.xC', 'comp.x1')
-
-        model.add_design_var('p2.xI', lower=-5.0, upper=10.0)
-        model.add_design_var('p1.xC', lower=0.0, upper=15.0)
+        model.add_design_var('xI', lower=-5.0, upper=10.0)
+        model.add_design_var('xC', lower=0.0, upper=15.0)
         model.add_objective('comp.f')
 
         prob.driver = om.SimpleGADriver()
-        prob.driver.options['bits'] = {'p1.xC': 8}
+        prob.driver.options['bits'] = {'xC': 8}
         prob.driver.options['pop_size'] = 10
 
         prob.setup()
+
+        prob.set_val('xC', 7.5)
+        prob.set_val('xI', 0.0)
+
         prob.run_driver()
 
     def test_constrained_with_penalty(self):
@@ -1526,30 +1526,29 @@ class MPIFeatureTests(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('xC', 7.5))
-        model.add_subsystem('p2', om.IndepVarComp('xI', 0.0))
-        model.add_subsystem('comp', Branin())
+        model.add_subsystem('comp', Branin(),
+                            promotes_inputs=[('x0', 'xI'), ('x1', 'xC')])
 
-        model.connect('p2.xI', 'comp.x0')
-        model.connect('p1.xC', 'comp.x1')
-
-        model.add_design_var('p2.xI', lower=-5.0, upper=10.0)
-        model.add_design_var('p1.xC', lower=0.0, upper=15.0)
+        model.add_design_var('xI', lower=-5.0, upper=10.0)
+        model.add_design_var('xC', lower=0.0, upper=15.0)
         model.add_objective('comp.f')
 
         prob.driver = om.SimpleGADriver()
-        prob.driver.options['bits'] = {'p1.xC': 8}
+        prob.driver.options['bits'] = {'xC': 8}
         prob.driver.options['max_gen'] = 10
         prob.driver.options['run_parallel'] = True
 
         prob.setup()
+
+        prob.set_val('xC', 7.5)
+        prob.set_val('xI', 0.0)
+
         prob.run_driver()
 
         # Optimal solution
-        if extra_prints:
-            print('comp.f', prob['comp.f'])
-            print('p2.xI', prob['p2.xI'])
-            print('p1.xC', prob['p1.xC'])
+        assert_near_equal(prob.get_val('comp.f'), 1.25172426, 1e-6)
+        assert_near_equal(prob.get_val('xI'), 9.0, 1e-6)
+        assert_near_equal(prob.get_val('xC'), 2.11764706, 1e-6)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -1570,28 +1569,24 @@ class MPIFeatureTests4(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('xC', 7.5))
-        model.add_subsystem('p2', om.IndepVarComp('xI', 0.0))
-        par = model.add_subsystem('par', om.ParallelGroup())
+        par = model.add_subsystem('par', om.ParallelGroup(),
+                                  promotes_inputs=['*'])
 
-        par.add_subsystem('comp1', Branin())
-        par.add_subsystem('comp2', Branin())
-
-        model.connect('p2.xI', 'par.comp1.x0')
-        model.connect('p1.xC', 'par.comp1.x1')
-        model.connect('p2.xI', 'par.comp2.x0')
-        model.connect('p1.xC', 'par.comp2.x1')
+        par.add_subsystem('comp1', Branin(),
+                          promotes_inputs=[('x0', 'xI'), ('x1', 'xC')])
+        par.add_subsystem('comp2', Branin(),
+                          promotes_inputs=[('x0', 'xI'), ('x1', 'xC')])
 
         model.add_subsystem('comp', om.ExecComp('f = f1 + f2'))
         model.connect('par.comp1.f', 'comp.f1')
         model.connect('par.comp2.f', 'comp.f2')
 
-        model.add_design_var('p2.xI', lower=-5.0, upper=10.0)
-        model.add_design_var('p1.xC', lower=0.0, upper=15.0)
+        model.add_design_var('xI', lower=-5.0, upper=10.0)
+        model.add_design_var('xC', lower=0.0, upper=15.0)
         model.add_objective('comp.f')
 
         prob.driver = om.SimpleGADriver()
-        prob.driver.options['bits'] = {'p1.xC': 8}
+        prob.driver.options['bits'] = {'xC': 8}
         prob.driver.options['max_gen'] = 10
         prob.driver.options['pop_size'] = 25
         prob.driver.options['run_parallel'] = True
@@ -1600,13 +1595,16 @@ class MPIFeatureTests4(unittest.TestCase):
         prob.driver._randomstate = 1
 
         prob.setup()
+
+        prob.set_val('xC', 7.5)
+        prob.set_val('xI', 0.0)
+
         prob.run_driver()
 
         # Optimal solution
-        if extra_prints:
-            print('comp.f', prob['comp.f'])
-            print('p2.xI', prob['p2.xI'])
-            print('p1.xC', prob['p1.xC'])
+        assert_near_equal(prob.get_val('comp.f'), 0.98799098, 1e-6)
+        assert_near_equal(prob.get_val('xI'),-3.0, 1e-6)
+        assert_near_equal(prob.get_val('xC'), 11.94117647, 1e-6)
 
 
 if __name__ == "__main__":
