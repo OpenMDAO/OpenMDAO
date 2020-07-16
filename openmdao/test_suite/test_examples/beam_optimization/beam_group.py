@@ -29,10 +29,6 @@ class BeamGroup(om.Group):
         force_vector = np.zeros(2 * num_nodes)
         force_vector[-2] = -1.
 
-        # inputs_comp = om.IndepVarComp()
-        # inputs_comp.add_output('h', shape=num_elements)
-        # self.add_subsystem('inputs_comp', inputs_comp)
-
         I_comp = MomentOfInertiaComp(num_elements=num_elements, b=b)
         self.add_subsystem('I_comp', I_comp, promotes_inputs=['h'])
 
@@ -52,8 +48,6 @@ class BeamGroup(om.Group):
         self.connect('local_stiffness_matrix_comp.K_local', 'states_comp.K_local')
         self.connect('states_comp.d', 'compliance_comp.displacements',
                      src_indices=np.arange(2 *num_nodes))
-        # self.connect('inputs_comp.h', 'volume_comp.h')
-        # self.connect('inputs_comp.h', 'I_comp.h')
 
         self.add_design_var('h', lower=1e-2, upper=10.)
         self.add_objective('compliance_comp.compliance')

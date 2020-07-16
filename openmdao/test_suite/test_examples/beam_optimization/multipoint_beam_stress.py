@@ -149,7 +149,6 @@ class MultipointBeamGroup(om.Group):
         comp = VolumeComp(num_elements=num_elements, b=b, L=L)
         self.add_subsystem('volume_comp', comp)
 
-        # self.connect('inputs_comp.h_cp', 'interp.h_cp')
         self.connect('interp.h', 'I_comp.h')
         self.connect('interp.h', 'volume_comp.h')
         self.connect('I_comp.I', 'local_stiffness_matrix_comp.I')
