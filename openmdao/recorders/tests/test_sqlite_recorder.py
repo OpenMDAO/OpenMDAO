@@ -1635,7 +1635,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.setup()
 
         driver = prob.driver
-        system = prob.model._auto_ivc
+        system = prob.model.sub
         solver = prob.model.nonlinear_solver.linesearch = om.BoundsEnforceLS()
 
         # create 3 different recorders
