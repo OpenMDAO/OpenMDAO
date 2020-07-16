@@ -514,6 +514,42 @@ class TestGroup(unittest.TestCase):
                          "Group (<model>): src_indices has been defined in both "
                          "connect('indep.x', 'C1.x') and add_input('C1.x', ...).")
 
+    def test_incompatible_src_indices_error(self):
+        class ControlInterpComp(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_output('x', shape=(3, 1))
+
+        class CollocationComp(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_input('x', shape=(1, 2))
+
+        class Phase(om.Group):
+
+            def setup(self):
+                self.add_subsystem('comp1', ControlInterpComp())
+                self.add_subsystem('comp2', CollocationComp())
+
+                self.connect('comp1.x', 'comp2.x', src_indices=[1])
+
+
+        p = om.Problem()
+
+        p.model.add_subsystem('phase', Phase())
+
+        msg = "Phase (phase): src_indices shape (1,) does not match phase.comp2.x shape (1, 2)."
+
+        with self.assertRaises(ValueError) as context:
+            p.setup()
+
+        self.assertEqual(str(context.exception), msg)
+
+        p.model._raise_connection_errors = False
+
+        with assert_warning(UserWarning, msg):
+            p.setup()
+
     def test_om_slice_in_connect(self):
         class MyComp1(om.ExplicitComponent):
             def setup(self):
