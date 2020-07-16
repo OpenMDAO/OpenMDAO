@@ -124,12 +124,10 @@ class TestProblem(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
-        model.add_subsystem('p2', om.IndepVarComp('y', -4.0))
         model.add_subsystem('comp', Paraboloid())
 
-        model.connect('p1.x', 'comp.x')
-        model.connect('p2.y', 'comp.y')
+        model.set_input_defaults('comp.x', 3.0)
+        model.set_input_defaults('comp.y', -4.0)
 
         prob.setup()
         prob.run_model()
@@ -143,14 +141,11 @@ class TestProblem(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
-
         # promote the two inputs to the same name
         model.add_subsystem('comp1', Paraboloid(), promotes_inputs=['x'])
         model.add_subsystem('comp2', Paraboloid(), promotes_inputs=['x'])
 
-        # connect the source to the common name
-        model.connect('p1.x', 'x')
+        model.set_input_defaults('x', 3.0)
 
         prob.setup()
         prob.run_model()
@@ -165,23 +160,22 @@ class TestProblem(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
-        model.add_subsystem('p2', om.IndepVarComp('y', -4.0))
         model.add_subsystem('comp', Paraboloid())
 
-        model.connect('p1.x', 'comp.x')
-        model.connect('p2.y', 'comp.y')
+        model.set_input_defaults('comp.x', 3.0)
+        model.set_input_defaults('comp.y', -4.0)
 
         prob.setup()
+
         prob.run_model()
 
-        totals = prob.compute_totals(of=['comp.f_xy'], wrt=['p1.x', 'p2.y'])
-        assert_near_equal(totals[('comp.f_xy', 'p1.x')][0][0], -4.0)
-        assert_near_equal(totals[('comp.f_xy', 'p2.y')][0][0], 3.0)
+        totals = prob.compute_totals(of=['comp.f_xy'], wrt=['comp.x', 'comp.y'])
+        assert_near_equal(totals[('comp.f_xy', 'comp.x')][0][0], -4.0)
+        assert_near_equal(totals[('comp.f_xy', 'comp.y')][0][0], 3.0)
 
-        totals = prob.compute_totals(of=['comp.f_xy'], wrt=['p1.x', 'p2.y'], return_format='dict')
-        assert_near_equal(totals['comp.f_xy']['p1.x'][0][0], -4.0)
-        assert_near_equal(totals['comp.f_xy']['p2.y'][0][0], 3.0)
+        totals = prob.compute_totals(of=['comp.f_xy'], wrt=['comp.x', 'comp.y'], return_format='dict')
+        assert_near_equal(totals['comp.f_xy']['comp.x'][0][0], -4.0)
+        assert_near_equal(totals['comp.f_xy']['comp.y'][0][0], 3.0)
 
     def test_feature_simple_run_once_compute_totals_scaled(self):
         import openmdao.api as om
@@ -190,23 +184,22 @@ class TestProblem(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
-        model.add_subsystem('p2', om.IndepVarComp('y', -4.0))
         model.add_subsystem('comp', Paraboloid())
 
-        model.connect('p1.x', 'comp.x')
-        model.connect('p2.y', 'comp.y')
+        model.set_input_defaults('comp.x', 3.0)
+        model.set_input_defaults('comp.y', -4.0)
 
-        model.add_design_var('p1.x', 3.0, ref0=50.0)
-        model.add_design_var('p2.y', -4.0)
+        model.add_design_var('comp.x', 3.0, ref0=50.0)
+        model.add_design_var('comp.y', -4.0)
         model.add_objective('comp.f_xy')
 
         prob.setup()
+
         prob.run_model()
 
-        totals = prob.compute_totals(of=['comp.f_xy'], wrt=['p1.x', 'p2.y'], driver_scaling=True)
-        assert_near_equal(totals[('comp.f_xy', 'p1.x')][0][0], 196.0)
-        assert_near_equal(totals[('comp.f_xy', 'p2.y')][0][0], 3.0)
+        totals = prob.compute_totals(of=['comp.f_xy'], wrt=['comp.x', 'comp.y'], driver_scaling=True)
+        assert_near_equal(totals[('comp.f_xy', 'comp.x')][0][0], 196.0)
+        assert_near_equal(totals[('comp.f_xy', 'comp.y')][0][0], 3.0)
 
     def test_feature_simple_run_once_set_deriv_mode(self):
         import openmdao.api as om
@@ -215,12 +208,10 @@ class TestProblem(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
-        model.add_subsystem('p2', om.IndepVarComp('y', -4.0))
         model.add_subsystem('comp', Paraboloid())
 
-        model.connect('p1.x', 'comp.x')
-        model.connect('p2.y', 'comp.y')
+        model.set_input_defaults('comp.x', 3.0)
+        model.set_input_defaults('comp.y', -4.0)
 
         prob.setup(mode='rev')
         # prob.setup(mode='fwd')
@@ -228,7 +219,7 @@ class TestProblem(unittest.TestCase):
 
         assert_near_equal(prob['comp.f_xy'], -15.0)
 
-        prob.compute_totals(of=['comp.f_xy'], wrt=['p1.x', 'p2.y'])
+        prob.compute_totals(of=['comp.f_xy'], wrt=['comp.x', 'comp.y'])
 
     def test_single_string_wrt_of(self):
 
@@ -831,11 +822,9 @@ class TestProblem(unittest.TestCase):
                 partials['y', 'x'] = 3.
 
         prob = om.Problem()
-        prob.model.add_subsystem('px', om.IndepVarComp('x', val=1.0))
         prob.model.add_subsystem('comp', SimpleComp())
-        prob.model.connect('px.x', 'comp.x')
 
-        prob.model.add_design_var('px.x', lower=-100, upper=100)
+        prob.model.add_design_var('comp.x', lower=-100, upper=100)
         prob.model.add_objective('comp.y')
 
         prob.setup(force_alloc_complex=True)

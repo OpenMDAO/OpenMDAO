@@ -675,15 +675,24 @@ class Problem(object):
 
         rvec._data[:] = 0.
 
+        conns = self.model._conn_global_abs_in2out
+
         # set seed values into dresids (fwd) or doutputs (rev)
+        # seed may have keys that are inputs and must be converted into auto_ivcs
         try:
             seed[rnames[0]]
         except (IndexError, TypeError):
             for i, name in enumerate(rnames):
-                rvec[name] = seed[i]
+                if name in conns:
+                    rvec[conns[name]] = seed[i]
+                else:
+                    rvec[name] = seed[i]
         else:
             for name in rnames:
-                rvec[name] = seed[name]
+                if name in conns:
+                    rvec[conns[name]] = seed[name]
+                else:
+                    rvec[name] = seed[name]
 
         # We apply a -1 here because the derivative of the output is minus the derivative of
         # the residual in openmdao.
@@ -691,7 +700,11 @@ class Problem(object):
 
         self.model.run_solve_linear(['linear'], mode)
 
-        return {n: lvec[n].copy() for n in lnames}
+        if mode == 'fwd':
+            return {n: lvec[n].copy() for n in lnames}
+        else:
+            # may need to convert some lnames to auto_ivc names
+            return {n: lvec[conns[n] if n in conns else n].copy() for n in lnames}
 
     def _setup_recording(self):
         """

@@ -632,9 +632,10 @@ class PartialDependGroup(om.Group):
     def setup(self):
         size = 4
 
-        Indep1 = self.add_subsystem('Indep1', om.IndepVarComp('x', np.arange(size, dtype=float)+1.0))
         Comp1 = self.add_subsystem('Comp1', SumComp(size))
         pargroup = self.add_subsystem('ParallelGroup1', om.ParallelGroup())
+
+        self.set_input_defaults('Comp1.x', val=np.arange(size, dtype=float)+1.0)
 
         self.linear_solver = om.LinearBlockGS()
         self.linear_solver.options['iprint'] = -1
@@ -645,12 +646,11 @@ class PartialDependGroup(om.Group):
         Con1 = pargroup.add_subsystem('Con1', SlowComp(delay=delay, size=2, mult=2.0))
         Con2 = pargroup.add_subsystem('Con2', SlowComp(delay=delay, size=2, mult=-3.0))
 
-        self.connect('Indep1.x', 'Comp1.x')
         self.connect('Comp1.y', 'ParallelGroup1.Con1.x')
         self.connect('Comp1.y', 'ParallelGroup1.Con2.x')
 
         color = 'parcon'
-        self.add_design_var('Indep1.x')
+        self.add_design_var('Comp1.x')
         self.add_constraint('ParallelGroup1.Con1.y', lower=0.0, parallel_deriv_color=color)
         self.add_constraint('ParallelGroup1.Con2.y', upper=0.0, parallel_deriv_color=color)
 
@@ -673,7 +673,7 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
         size = 4
 
         of = ['ParallelGroup1.Con1.y', 'ParallelGroup1.Con2.y']
-        wrt = ['Indep1.x']
+        wrt = ['Comp1.x']
 
         # run first in fwd mode
         p = om.Problem(model=PartialDependGroup())
@@ -682,8 +682,8 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
 
         J = p.compute_totals(of, wrt, return_format='dict')
 
-        assert_near_equal(J['ParallelGroup1.Con1.y']['Indep1.x'][0], np.ones(size)*2., 1e-6)
-        assert_near_equal(J['ParallelGroup1.Con2.y']['Indep1.x'][0], np.ones(size)*-3., 1e-6)
+        assert_near_equal(J['ParallelGroup1.Con1.y']['Comp1.x'][0], np.ones(size)*2., 1e-6)
+        assert_near_equal(J['ParallelGroup1.Con2.y']['Comp1.x'][0], np.ones(size)*-3., 1e-6)
 
     def test_fwd_vs_rev(self):
         import time
@@ -696,7 +696,7 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
         size = 4
 
         of = ['ParallelGroup1.Con1.y', 'ParallelGroup1.Con2.y']
-        wrt = ['Indep1.x']
+        wrt = ['Comp1.x']
 
         # run first in fwd mode
         p = om.Problem(model=PartialDependGroup())
@@ -707,8 +707,8 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
         J = p.compute_totals(of, wrt, return_format='dict')
         elapsed_fwd = time.time() - elapsed_fwd
 
-        assert_near_equal(J['ParallelGroup1.Con1.y']['Indep1.x'][0], np.ones(size)*2., 1e-6)
-        assert_near_equal(J['ParallelGroup1.Con2.y']['Indep1.x'][0], np.ones(size)*-3., 1e-6)
+        assert_near_equal(J['ParallelGroup1.Con1.y']['Comp1.x'][0], np.ones(size)*2., 1e-6)
+        assert_near_equal(J['ParallelGroup1.Con2.y']['Comp1.x'][0], np.ones(size)*-3., 1e-6)
 
         # now run in rev mode and compare times for deriv calculation
         p = om.Problem(model=PartialDependGroup())
@@ -720,8 +720,8 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
         J = p.compute_totals(of, wrt, return_format='dict')
         elapsed_rev = time.time() - elapsed_rev
 
-        assert_near_equal(J['ParallelGroup1.Con1.y']['Indep1.x'][0], np.ones(size)*2., 1e-6)
-        assert_near_equal(J['ParallelGroup1.Con2.y']['Indep1.x'][0], np.ones(size)*-3., 1e-6)
+        assert_near_equal(J['ParallelGroup1.Con1.y']['Comp1.x'][0], np.ones(size)*2., 1e-6)
+        assert_near_equal(J['ParallelGroup1.Con2.y']['Comp1.x'][0], np.ones(size)*-3., 1e-6)
 
         # make sure that rev mode is faster than fwd mode
         self.assertGreater(elapsed_fwd / elapsed_rev, 1.0)
