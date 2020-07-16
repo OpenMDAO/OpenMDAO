@@ -30,7 +30,8 @@ model = p.model
 
 model.set_input_defaults('ground.V', 0., units='V')
 model.set_input_defaults('source.I', 0.1, units='A')
-model.add_subsystem('circuit', Circuit(), promotes_inputs=[('Vg', 'ground.V'), ('I_in', 'source.I')])
+model.add_subsystem('circuit', Circuit(),
+                    promotes_inputs=[('Vg', 'ground.V'), ('I_in', 'source.I')])
 
 model.add_design_var('ground.V')
 model.add_design_var('source.I')

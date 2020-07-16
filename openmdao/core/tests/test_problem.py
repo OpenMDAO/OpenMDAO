@@ -897,11 +897,11 @@ class TestProblem(unittest.TestCase):
 
         prob.setup()
 
-        prob['px.x'] = 2.75
+        prob['x'] = 2.75
 
         prob.run_model()
 
-        assert_near_equal(prob['px.x'], 2.75, 1e-6)
+        assert_near_equal(prob['x'], 2.75, 1e-6)
 
         assert_near_equal(prob['d1.y1'], 27.3049178437, 1e-6)
 
