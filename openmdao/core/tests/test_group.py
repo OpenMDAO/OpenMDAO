@@ -514,42 +514,6 @@ class TestGroup(unittest.TestCase):
                          "Group (<model>): src_indices has been defined in both "
                          "connect('indep.x', 'C1.x') and add_input('C1.x', ...).")
 
-    def test_incompatible_src_indices_error(self):
-        class ControlInterpComp(om.ExplicitComponent):
-
-            def setup(self):
-                self.add_output('x', shape=(3, 1))
-
-        class CollocationComp(om.ExplicitComponent):
-
-            def setup(self):
-                self.add_input('x', shape=(1, 2))
-
-        class Phase(om.Group):
-
-            def setup(self):
-                self.add_subsystem('comp1', ControlInterpComp())
-                self.add_subsystem('comp2', CollocationComp())
-
-                self.connect('comp1.x', 'comp2.x', src_indices=[1])
-
-
-        p = om.Problem()
-
-        p.model.add_subsystem('phase', Phase())
-
-        msg = "Phase (phase): src_indices shape (1,) does not match phase.comp2.x shape (1, 2)."
-
-        with self.assertRaises(ValueError) as context:
-            p.setup()
-
-        self.assertEqual(str(context.exception), msg)
-
-        p.model._raise_connection_errors = False
-
-        with assert_warning(UserWarning, msg):
-            p.setup()
-
     def test_om_slice_in_connect(self):
         class MyComp1(om.ExplicitComponent):
             def setup(self):
@@ -2511,32 +2475,6 @@ class TestFeatureConnect(unittest.TestCase):
         assert_near_equal(p['C2.x'], np.ones(2))
         assert_near_equal(p['C2.y'], 8.)
 
-    def test_connect_src_indices_auto_ivc_fail(self):
-        import numpy as np
-
-        import openmdao.api as om
-
-        p = om.Problem()
-
-        p.model.set_input_defaults('x', np.ones(5))
-        p.model.add_subsystem('C1', om.ExecComp('y=sum(x)*2.0', x=np.zeros(3)))
-        p.model.add_subsystem('C2', om.ExecComp('y=sum(x)*4.0', x=np.zeros(2)))
-
-        # connect C1.x to the first 3 entries of indep.x
-        p.model.connect('x', 'C1.x', src_indices=[0, 1, 2])
-
-        # connect C2.x to the last 2 entries of indep.x
-        # use -2 (same as 3 in this case) to show that negative indices work.
-        p.model.connect('x', 'C2.x', src_indices=[-2, 4])
-
-        p.setup()
-        p.run_model()
-
-        assert_near_equal(p.get_val('C1.x'), np.ones(3))
-        assert_near_equal(p.get_val('C1.y'), 6.)
-        assert_near_equal(p.get_val('C2.x'), np.ones(2))
-        assert_near_equal(p.get_val('C2.y'), 8.)
-
     def test_connect_src_indices_noflat(self):
         import numpy as np
 
@@ -2595,11 +2533,12 @@ class TestFeatureSrcIndices(unittest.TestCase):
 
         # by promoting the following output and inputs to 'x', they will
         # be automatically connected
+        p.model.add_subsystem('indep', om.IndepVarComp('x', np.ones(5)),
+                              promotes_outputs=['x'])
         p.model.add_subsystem('C1', MyComp1(), promotes_inputs=['x'])
         p.model.add_subsystem('C2', MyComp2(), promotes_inputs=['x'])
 
         p.setup()
-        p.set_val('x', np.ones(5))
         p.run_model()
 
         assert_near_equal(p.get_val('C1.x'), np.ones(3))
@@ -2643,10 +2582,10 @@ class TestFeatureSrcIndices(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(p['C1.x'],
+        assert_near_equal(p.get_val('C1.x'),
                          np.array([[0., 10.],
                                    [7., 4.]]))
-        assert_near_equal(p['C1.y'], 21.)
+        assert_near_equal(p.get_val('C1.y'), 21.)
 
     def test_group_promotes_src_indices(self):
         import numpy as np
@@ -2682,19 +2621,20 @@ class TestFeatureSrcIndices(unittest.TestCase):
 
         p = om.Problem()
 
-        p.model.add_subsystem('indep', om.IndepVarComp('x', np.ones(5)),
-                              promotes_outputs=['x'])
+        # p.model.add_subsystem('indep', om.IndepVarComp('x', np.ones(5)),
+        #                       promotes_outputs=['x'])
+        p.model.set_input_defaults('x', np.ones(5))
         p.model.add_subsystem('G1', MyGroup(), promotes_inputs=['x'])
 
         p.setup()
-
-        p['x'] = inp = np.array(range(5))
+        p.set_val('x', np.array(range(5)))
+        inp = np.array(range(5))
         p.run_model()
 
-        assert_near_equal(p['G1.comp1.x'], inp[:3])
-        assert_near_equal(p['G1.comp2.x'], inp[3:])
-        assert_near_equal(p['G1.comp1.y'], np.sum(inp[:3]*2))
-        assert_near_equal(p['G1.comp2.y'], np.sum(inp[3:]*4))
+        assert_near_equal(p.get_val('G1.comp1.x'), inp[:3])
+        assert_near_equal(p.get_val('G1.comp2.x'), inp[3:])
+        assert_near_equal(p.get_val('G1.comp1.y'), np.sum(inp[:3]*2))
+        assert_near_equal(p.get_val('G1.comp2.y'), np.sum(inp[3:]*4))
 
 
 class TestFeatureSetOrder(unittest.TestCase):
@@ -2904,12 +2844,10 @@ class TestFeatureGuessNonlinear(unittest.TestCase):
 
         p = om.Problem()
 
-        p.model.add_subsystem('parameters', om.IndepVarComp('input_value', 1.))
-        p.model.add_subsystem('discipline', Discipline())
-
-        p.model.connect('parameters.input_value', 'discipline.external_input')
+        p.model.add_subsystem('discipline', Discipline(), promotes_inputs=['external_input'])
 
         p.setup()
+        p.set_val('external_input', 1.)
         p.run_model()
 
         self.assertEqual(p.model.nonlinear_solver._iter_count, 0)
