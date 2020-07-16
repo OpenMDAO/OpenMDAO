@@ -1395,6 +1395,15 @@ class Group(System):
                             abs2meta[abs_in]['src_indices'] = src_indices.ravel()
                         else:
                             abs2meta[abs_in]['src_indices'] = src_indices
+
+                        if src_indices.shape != in_shape:
+                            msg = f"{self.msginfo}: src_indices shape " + \
+                                  f"{src_indices.shape} does not match {abs_in} shape " + \
+                                  f"{in_shape}."
+                            if self._raise_connection_errors:
+                                raise ValueError(msg)
+                            else:
+                                simple_warning(msg)
                     else:
                         for d in range(source_dimensions):
                             if allprocs_abs2meta[abs_out]['distributed'] is True or \
