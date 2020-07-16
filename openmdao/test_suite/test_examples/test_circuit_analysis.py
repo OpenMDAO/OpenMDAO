@@ -43,18 +43,16 @@ class TestCircuit(unittest.TestCase):
         p = om.Problem()
         model = p.model
 
-        model.add_subsystem('ground', om.IndepVarComp('V', 0., units='V'))
-        model.add_subsystem('source', om.IndepVarComp('I', 0.1, units='A'))
         model.add_subsystem('circuit', Circuit())
-
-        model.connect('source.I', 'circuit.I_in')
-        model.connect('ground.V', 'circuit.Vg')
 
         p.setup()
 
+        p.set_val('circuit.I_in', 0.1)
+        p.set_val('circuit.Vg', 0.)
+
         # set some initial guesses
-        p['circuit.n1.V'] = 10.
-        p['circuit.n2.V'] = 1.
+        p.set_val('circuit.n1.V', 10.)
+        p.set_val('circuit.n2.V', 1.)
 
         p.run_model()
 
