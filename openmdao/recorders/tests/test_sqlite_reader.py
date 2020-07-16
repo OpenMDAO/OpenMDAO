@@ -3573,8 +3573,8 @@ class TestFeatureSqliteReader(unittest.TestCase):
         outputs = case.list_outputs(includes=['*area'], out_stream=None)
         self.assertEqual(sorted([outp[0] for outp in outputs]), ['rect.area',])
 
-        # Outputs with excludes
-        outputs = case.list_inputs(excludes=['*length'], out_stream=None)
+        # Inputs with excludes
+        inputs = case.list_inputs(excludes=['*length'], out_stream=None)
         self.assertEqual(sorted(['rect.width']), sorted([outp[0] for outp in outputs]))
 
     def test_feature_get_val(self):
