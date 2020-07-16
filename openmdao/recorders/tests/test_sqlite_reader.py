@@ -3311,11 +3311,11 @@ class TestFeatureSqliteReader(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.set_input_defaults('x', val=50.0)
-        model.set_input_defaults('y', val=50.0)
-
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
+
+        model.set_input_defaults('x', val=50.0)
+        model.set_input_defaults('y', val=50.0)
 
         prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
@@ -3509,12 +3509,13 @@ class TestFeatureSqliteReader(unittest.TestCase):
         prob = om.Problem(model)
         model.add_recorder(om.SqliteRecorder('cases.sql'))
 
-        model.set_input_defaults('length', val=100.)
-        model.set_input_defaults('width', val=60.)
-
         model.add_subsystem('rect', RectangleCompWithTags(), promotes=['length', 'width', 'area'])
 
         prob.setup(check=False)
+
+        prob.set_val('length', 100.0)
+        prob.set_val('width', 60.0)
+
         prob.run_model()
 
         prob.cleanup()
@@ -3544,12 +3545,13 @@ class TestFeatureSqliteReader(unittest.TestCase):
         prob = om.Problem(model)
         model.add_recorder(om.SqliteRecorder('cases.sql'))
 
-        model.set_input_defaults('length', val=100.)
-        model.set_input_defaults('width', val=60.0)
-
         model.add_subsystem('rect', RectangleComp(), promotes=['length', 'width', 'area'])
 
         prob.setup(check=False)
+
+        prob.set_val('length', 100.)
+        prob.set_val('width', 60.0)
+
         prob.run_model()
 
         prob.cleanup()
@@ -3581,15 +3583,16 @@ class TestFeatureSqliteReader(unittest.TestCase):
         model = om.Group()
         model.add_recorder(om.SqliteRecorder('cases.sql'))
 
-        model.set_input_defaults('x', val=100., units='m')
-        model.set_input_defaults('t', val=60., units='s')
-
         speed = om.ExecComp('v=x/t', x={'units': 'm'}, t={'units': 's'}, v={'units': 'm/s'})
 
         model.add_subsystem('speed', speed, promotes=['x', 't', 'v'])
 
         prob = om.Problem(model)
         prob.setup()
+
+        prob.set_val('x', 100., units='m')
+        prob.set_val('t', 60., units='s')
+
         prob.run_model()
         prob.cleanup()
 
@@ -3608,9 +3611,8 @@ class TestFeatureSqliteReader(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
-        model.set_input_defaults('x', val=50.0)
-        model.set_input_defaults('y', val=50.0)
-        model.add_subsystem('egg_crate', EggCrate(), promotes=['*'])
+
+        model.add_subsystem('egg_crate', EggCrate(), promotes=['x', 'y', 'f_xy'])
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
         model.add_objective('f_xy')
@@ -3621,19 +3623,22 @@ class TestFeatureSqliteReader(unittest.TestCase):
         prob.add_recorder(recorder)
 
         prob.setup()
+
         prob.set_solver_print(0)
 
-        prob['x'] = 2.5
-        prob['y'] = 2.5
+        prob.set_val('x', 2.5)
+        prob.set_val('y', 2.5)
+
         prob.run_driver()
-        print(prob['x'], prob['y'], prob['f_xy'])
+        print(prob.get_val('x'), prob.get_val('y'), prob.get_val('f_xy'))
         case_name_1 = "c1"
         prob.record(case_name_1)
 
-        prob['x'] = 0.1
-        prob['y'] = -0.1
+
+        prob.set_val('x', 0.1)
+        prob.set_val('y', -0.1)
         prob.run_driver()
-        print(prob['x'], prob['y'], prob['f_xy'])
+        print(prob.get_val('x'), prob.get_val('y'), prob.get_val('f_xy'))
         case_name_2 = "c2"
         prob.record(case_name_2)
         prob.cleanup()
