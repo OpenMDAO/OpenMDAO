@@ -494,6 +494,7 @@ class Problem(object):
         # Caching only needed if vectors aren't allocated yet.
         if self._setup_status == 1:
             if indices is not None:
+                self._get_cached_val(name)
                 try:
                     self._initial_condition_cache[name][indices] = value
                 except Exception as err:
