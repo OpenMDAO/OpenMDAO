@@ -177,7 +177,8 @@ class MPITests2(unittest.TestCase):
         size = 3
         group = om.Group()
 
-        group.add_subsystem('P', om.IndepVarComp('x', np.arange(size)))
+        group.add_subsystem('P', om.IndepVarComp('x', np.arange(size)),
+                            promotes_outputs=['x'])
         group.add_subsystem('C1', DistribExecComp(['y=2.0*x', 'y=3.0*x'], arr_size=size,
                                                   x=np.zeros(size),
                                                   y=np.zeros(size)),
@@ -1185,6 +1186,8 @@ class MPIFeatureTests(unittest.TestCase):
         size = 15
 
         model = om.Group()
+
+        # Distributed component "C2" requires an IndepVarComp to supply inputs.
         model.add_subsystem("indep", om.IndepVarComp('x', np.zeros(size)))
         model.add_subsystem("C2", DistribCompDerivs(size=size))
         model.add_subsystem("C3", SummerDerivs(size=size))
@@ -1195,14 +1198,14 @@ class MPIFeatureTests(unittest.TestCase):
         prob = om.Problem(model)
         prob.setup()
 
-        prob['indep.x'] = np.ones(size)
+        prob.set_val('indep.x', np.ones(size))
         prob.run_model()
 
-        assert_near_equal(prob['C2.invec'],
+        assert_near_equal(prob.get_val('C2.invec'),
                           np.ones(8) if model.comm.rank == 0 else np.ones(7))
-        assert_near_equal(prob['C2.outvec'],
+        assert_near_equal(prob.get_val('C2.outvec'),
                           2*np.ones(8) if model.comm.rank == 0 else -3*np.ones(7))
-        assert_near_equal(prob['C3.sum'], -5.)
+        assert_near_equal(prob.get_val('C3.sum'), -5.)
 
         assert_check_partials(prob.check_partials())
 
@@ -1295,6 +1298,7 @@ class ZeroLengthInputsOutputs(unittest.TestCase):
 
 
 class DistribCompDenseJac(om.ExplicitComponent):
+
     def initialize(self):
         self.options['distributed'] = True
         self.options.declare('size', default=7)
@@ -1307,7 +1311,6 @@ class DistribCompDenseJac(om.ExplicitComponent):
         self.add_output('y', shape=sizes[rank])
         # automatically infer dimensions without specifying rows, cols
         self.declare_partials('y', 'x')
-
 
     def compute(self, inputs, outputs):
         N = self.options['size']

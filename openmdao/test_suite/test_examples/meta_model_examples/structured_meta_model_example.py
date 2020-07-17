@@ -19,11 +19,6 @@ t_data = np.array([[308.12909601, 253.61567418, 204.6578079, 161.25549718, 123.4
                 [ 10.96088904,   3.72881146,   2.05228945,   5.93132298,  15.36591208, 30.35605673,  50.90175693,  77.00301269, 108.65982401, 145.87219088]])
 
 prob = om.Problem()
-ivc = om.IndepVarComp()
-ivc.add_output('x0', 0.0)
-ivc.add_output('x1', 0.0)
-
-prob.model.add_subsystem('p', ivc, promotes=['*'])
 mm = prob.model.add_subsystem('mm', om.MetaModelStructuredComp(method='slinear'),
                             promotes=['x0', 'x1'])
 mm.add_input('x0', 0.0, train_x0)
