@@ -211,14 +211,14 @@ class TestFeature(unittest.TestCase):
 
         p = om.Problem()
 
-        p.model.set_input_defaults('Mat')
-        p.model.set_input_defaults('x', units='m')
-
         p.model.add_subsystem(name='mat_vec_product_comp',
                               subsys=om.MatrixVectorProductComp(A_name='Mat', vec_size=nn,
                                                                 b_name='y', b_units='m',
                                                                 x_units='m'),
                               promotes_inputs=['Mat', 'x'])
+
+        p.model.set_input_defaults('Mat')
+        p.model.set_input_defaults('x', units='m')
 
         p.setup()
 

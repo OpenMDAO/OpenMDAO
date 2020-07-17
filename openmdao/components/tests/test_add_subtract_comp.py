@@ -394,17 +394,17 @@ class TestFeature(unittest.TestCase):
         p = om.Problem()
         model = p.model
 
-        # The vector represents forces at 3 time points (rows) in 2 dimensional plane (cols)
-        model.set_input_defaults('thrust', units='kN')
-        model.set_input_defaults('drag', units='kN')
-        model.set_input_defaults('lift', units='kN')
-        model.set_input_defaults('weight', units='kN')
-
         # Construct an adder/subtracter here. create a relationship through the add_equation method
         adder = om.AddSubtractComp()
         adder.add_equation('total_force', input_names=['thrust', 'drag', 'lift', 'weight'],
                            vec_size=n, length=2, scaling_factors=[1, -1, 1, -1], units='kN')
         # Note the scaling factors. we assume all forces are positive sign upstream
+
+        # The vector represents forces at 3 time points (rows) in 2 dimensional plane (cols)
+        model.set_input_defaults('thrust', units='kN')
+        model.set_input_defaults('drag', units='kN')
+        model.set_input_defaults('lift', units='kN')
+        model.set_input_defaults('weight', units='kN')
 
         p.model.add_subsystem(name='totalforcecomp', subsys=adder,
                               promotes_inputs=['thrust', 'drag', 'lift', 'weight'])

@@ -157,12 +157,10 @@ class TestFeature(unittest.TestCase):
 
         p = om.Problem()
 
-        p.model.set_input_defaults('pos_ecef', units='km')
+        demux_comp = p.model.add_subsystem(name='demux', subsys=om.DemuxComp(vec_size=n),
+                                         promotes_inputs=['pos_ecef'])
 
-        mux_comp = p.model.add_subsystem(name='demux', subsys=om.DemuxComp(vec_size=n),
-                                         promotes_inputs=[('pos', 'pos_ecef')])
-
-        mux_comp.add_var('pos', shape=(m, n), axis=1, units='km')
+        demux_comp.add_var('pos_ecef', shape=(m, n), axis=1, units='km')
 
         p.model.add_subsystem(name='longitude_comp',
                               subsys=om.ExecComp('long = atan(y/x)',
@@ -170,8 +168,9 @@ class TestFeature(unittest.TestCase):
                                                  y={'value': np.ones(m), 'units': 'km'},
                                                  long={'value': np.ones(m), 'units': 'rad'}))
 
-        p.model.connect('demux.pos_0', 'longitude_comp.x')
-        p.model.connect('demux.pos_1', 'longitude_comp.y')
+        p.model.connect('demux.pos_ecef_0', 'longitude_comp.x')
+        p.model.connect('demux.pos_ecef_1', 'longitude_comp.y')
+
 
         p.setup()
 
@@ -181,7 +180,9 @@ class TestFeature(unittest.TestCase):
 
         p.run_model()
 
-        expected = np.arctan(p['pos_ecef'][:, 1] / p['pos_ecef'][:, 0])
+        p.model.connect('indep.x', 'C1.x', src_indices=om.slicer[:, 1])
+
+        expected = np.arctan(p.get_val('pos_ecef', indices=om.slicer[:, 1]) / p.get_val('pos_ecef', indices=om.slicer[:, 0]))
         assert_near_equal(p.get_val('longitude_comp.long'), expected)
 
 

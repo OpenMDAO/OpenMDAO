@@ -47,19 +47,21 @@ class TestKSFunction(unittest.TestCase):
         x[1, :] = np.array([13.0, 11.0, 5.0, 17.0, 3.0])*2
         x[2, :] = np.array([11.0, 3.0, 17.0, 5.0, 13.0])*3
 
-        model.add_subsystem('px', om.IndepVarComp(name="x", val=x))
         model.add_subsystem('ks', om.KSComp(width=5, vec_size=3))
-        model.connect('px.x', 'ks.g')
 
-        model.add_design_var('px.x')
+        model.add_design_var('ks.g')
         model.add_constraint('ks.KS', upper=0.0)
 
+        # model.set_input_defaults('ks.g', x)
+
         prob.setup()
+        prob.set_val('ks.g', x)
         prob.run_driver()
 
-        assert_near_equal(prob['ks.KS'][0], 17.0)
-        assert_near_equal(prob['ks.KS'][1], 34.0)
-        assert_near_equal(prob['ks.KS'][2], 51.0)
+
+        assert_near_equal(prob.get_val('ks.KS', indices=0), 17.0)
+        assert_near_equal(prob.get_val('ks.KS', indices=1), 34.0)
+        assert_near_equal(prob.get_val('ks.KS', indices=2), 51.0)
 
         partials = prob.check_partials(includes=['ks'], out_stream=None)
 
@@ -170,36 +172,35 @@ class TestKSFunction(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('px', om.IndepVarComp('x', val=np.array([5.0, 4.0])))
         model.add_subsystem('comp', om.ExecComp('y = 3.0*x', x=np.zeros((2, )), y=np.zeros((2, ))))
+        model.set_input_defaults('comp.x', np.array([5.0, 4.0]))
         model.add_subsystem('ks', om.KSComp(width=2))
 
-        model.connect('px.x', 'comp.x')
         model.connect('comp.y', 'ks.g')
 
         model.ks.options['upper'] = 16.0
         prob.setup()
         prob.run_model()
 
-        assert_near_equal(prob['ks.KS'][0], -1.0)
+        assert_near_equal(prob.get_val('ks.KS', indices=0), -1.0)
 
     def test_lower_flag(self):
 
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('px', om.IndepVarComp('x', val=np.array([5.0, 4.0])))
         model.add_subsystem('comp', om.ExecComp('y = 3.0*x', x=np.zeros((2, )), y=np.zeros((2, ))))
+        model.set_input_defaults('comp.x', np.array([5.0, 4.0]))
+
         model.add_subsystem('ks', om.KSComp(width=2))
 
-        model.connect('px.x', 'comp.x')
         model.connect('comp.y', 'ks.g')
 
         model.ks.options['lower_flag'] = True
         prob.setup()
         prob.run_model()
 
-        assert_near_equal(prob['ks.KS'][0], -12.0)
+        assert_near_equal(prob.get_val('ks.KS', indices=0), -12.0)
 
 
 class TestKSFunctionFeatures(unittest.TestCase):
@@ -212,10 +213,11 @@ class TestKSFunctionFeatures(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.set_input_defaults('x', np.array([5.0, 4.0]))
         model.add_subsystem('comp', om.ExecComp('y = 3.0*x',
                                                 x=np.zeros((2, )),
                                                 y=np.zeros((2, ))), promotes_inputs=['x'])
+        model.set_input_defaults('x', np.array([5.0, 4.0]))
+
         model.add_subsystem('ks', om.KSComp(width=2))
 
         model.connect('comp.y', 'ks.g')
@@ -223,7 +225,7 @@ class TestKSFunctionFeatures(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_near_equal(prob['ks.KS'], [[15.0]])
+        assert_near_equal(prob.get_val('ks.KS'), [[15.0]])
 
     def test_vectorized(self):
         import numpy as np
@@ -233,10 +235,10 @@ class TestKSFunctionFeatures(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.set_input_defaults('x', np.array([[5.0, 4.0], [10.0, 8.0]]))
         model.add_subsystem('comp', om.ExecComp('y = 3.0*x',
                                                 x=np.zeros((2, 2)),
                                                 y=np.zeros((2, 2))), promotes_inputs=['x'])
+        model.set_input_defaults('x', np.array([[5.0, 4.0], [10.0, 8.0]]))
         model.add_subsystem('ks', om.KSComp(width=2, vec_size=2))
 
         model.connect('comp.y', 'ks.g')
@@ -244,7 +246,7 @@ class TestKSFunctionFeatures(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_near_equal(prob['ks.KS'], np.array([[15], [30]]))
+        assert_near_equal(prob.get_val('ks.KS'), np.array([[15], [30]]))
 
     def test_upper(self):
         import numpy as np
@@ -254,10 +256,10 @@ class TestKSFunctionFeatures(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.set_input_defaults('x', np.array([5.0, 4.0]))
         model.add_subsystem('comp', om.ExecComp('y = 3.0*x',
                                                 x=np.zeros((2, )),
                                                 y=np.zeros((2, ))), promotes_inputs=['x'])
+        model.set_input_defaults('x', np.array([5.0, 4.0]))
         model.add_subsystem('ks', om.KSComp(width=2))
 
         model.connect('comp.y', 'ks.g')
@@ -276,10 +278,12 @@ class TestKSFunctionFeatures(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.set_input_defaults('x', np.array([5.0, 4.0]))
         model.add_subsystem('comp', om.ExecComp('y = 3.0*x',
                                                 x=np.zeros((2, )),
                                                 y=np.zeros((2, ))), promotes_inputs=['x'])
+
+        model.set_input_defaults('x', np.array([5.0, 4.0]))
+
         model.add_subsystem('ks', om.KSComp(width=2))
 
         model.connect('comp.y', 'ks.g')
@@ -288,7 +292,7 @@ class TestKSFunctionFeatures(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_near_equal(prob['ks.KS'], [[-12.0]])
+        assert_near_equal(prob.get_val('ks.KS'), [[-12.0]])
 
     def test_add_constraint(self):
         import numpy as np
@@ -301,13 +305,14 @@ class TestKSFunctionFeatures(unittest.TestCase):
 
         prob.driver = om.ScipyOptimizeDriver()
 
-        model.set_input_defaults('x', np.linspace(-np.pi/2, np.pi/2, n))
-        model.set_input_defaults('k', 5.)
-
         model.add_subsystem('comp', om.ExecComp('y = -3.0*x**2 + k',
                                                 x=np.zeros((n, )),
                                                 y=np.zeros((n, )),
                                                 k=0.0), promotes_inputs=['x', 'k'])
+
+        model.set_input_defaults('x', np.linspace(-np.pi/2, np.pi/2, n))
+        model.set_input_defaults('k', 5.)
+
         model.add_subsystem('ks', om.KSComp(width=n, upper=4.0, add_constraint=True))
 
         model.add_design_var('k', lower=-10, upper=10)
@@ -336,20 +341,20 @@ class TestKSFunctionFeatures(unittest.TestCase):
 
     def test_units(self):
         import openmdao.api as om
-        from openmdao.utils.units import convert_units
 
         n = 10
 
         model = om.Group()
 
-        model.set_input_defaults('x', range(n), units='ft')
         model.add_subsystem('ks', om.KSComp(width=n, units='m'), promotes_inputs=[('g', 'x')])
+        model.set_input_defaults('x', range(n), units='ft')
 
         prob = om.Problem(model=model)
         prob.setup()
         prob.run_model()
 
-        assert_near_equal(prob['ks.KS'][0], np.amax(prob['x']), tolerance=1e-8)
+        # assert_near_equal(prob.get_val('ks.KS')[0], np.amax(prob.get_val('x')), tolerance=1e-8)
+        assert_near_equal(prob.get_val('ks.KS', indices=0), np.amax(prob.get_val('x')), tolerance=1e-8)
 
 
 if __name__ == "__main__":

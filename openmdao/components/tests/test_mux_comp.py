@@ -235,14 +235,14 @@ class TestFeature(unittest.TestCase):
 
         p = om.Problem()
 
-        ivc = om.IndepVarComp()
-        ivc.add_output(name='x', shape=(m,), units='m')
-        ivc.add_output(name='y', shape=(m,), units='m')
-        ivc.add_output(name='z', shape=(m,), units='m')
-
-        p.model.add_subsystem(name='ivc',
-                              subsys=ivc,
-                              promotes_outputs=['x', 'y', 'z'])
+        # ivc = om.IndepVarComp()
+        # ivc.add_output(name='x', shape=(m,), units='m')
+        # ivc.add_output(name='y', shape=(m,), units='m')
+        # ivc.add_output(name='z', shape=(m,), units='m')
+        #
+        # p.model.add_subsystem(name='ivc',
+        #                       subsys=ivc,
+        #                       promotes_outputs=['x', 'y', 'z'])
 
         mux_comp = p.model.add_subsystem(name='mux', subsys=om.MuxComp(vec_size=n))
 
@@ -252,22 +252,26 @@ class TestFeature(unittest.TestCase):
                               subsys=om.VectorMagnitudeComp(vec_size=m, length=n, in_name='r',
                                                             mag_name='r_mag', units='m'))
 
-        p.model.connect('x', 'mux.r_0')
-        p.model.connect('y', 'mux.r_1')
-        p.model.connect('z', 'mux.r_2')
+        # p.model.connect('x', 'mux.r_0')
+        # p.model.connect('y', 'mux.r_1')
+        # p.model.connect('z', 'mux.r_2')
         p.model.connect('mux.r', 'vec_mag_comp.r')
 
         p.setup()
 
-        p['x'] = 1 + np.random.rand(m)
-        p['y'] = 1 + np.random.rand(m)
-        p['z'] = 1 + np.random.rand(m)
+        # p['x'] = 1 + np.random.rand(m)
+        # p['y'] = 1 + np.random.rand(m)
+        # p['z'] = 1 + np.random.rand(m)
+        p['mux.r_0'] = 1 + np.random.rand(m)
+        p['mux.r_1'] = 1 + np.random.rand(m)
+        p['mux.r_2'] = 1 + np.random.rand(m)
 
         p.run_model()
 
         # Verify the results against numpy.dot in a for loop.
         for i in range(n):
-            r_i = [p['x'][i], p['y'][i], p['z'][i]]
+            r_i = [p['mux.r_0'][i], p['mux.r_1'][i], p['mux.r_2'][i]]
+            # r_i = [p['x'][i], p['y'][i], p['z'][i]]
             expected_i = np.sqrt(np.dot(r_i, r_i))
             assert_near_equal(p.get_val('vec_mag_comp.r_mag')[i], expected_i)
 

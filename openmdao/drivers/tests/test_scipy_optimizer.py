@@ -2011,8 +2011,8 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         prob.set_val('x', np.ones(size))
         prob.run_driver()
 
-        assert_near_equal(prob['x'], np.zeros(size), 1e-6)
-        assert_near_equal(prob['f'], 0.0, 1e-6)
+        assert_near_equal(prob.get_val('x'), np.zeros(size), 1e-6)
+        assert_near_equal(prob.get_val('f'), 0.0, 1e-6)
 
 
 if __name__ == "__main__":

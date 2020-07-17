@@ -153,22 +153,22 @@ class TestFeature(unittest.TestCase):
 
         p = om.Problem()
 
-        p.model.set_input_defaults('pos', units='m')
 
         dp_comp = om.VectorMagnitudeComp(vec_size=n, length=3, in_name='r', mag_name='r_mag',
                                          units='km')
 
         p.model.add_subsystem(name='vec_mag_comp', subsys=dp_comp, promotes_inputs=[('r', 'pos')])
+        p.model.set_input_defaults('pos', units='m')
 
         p.setup()
 
-        p['pos'] = 1.0 + np.random.rand(n, 3)
+        p.set_val('pos', 1.0 + np.random.rand(n, 3))
 
         p.run_model()
 
         # Verify the results against numpy.dot in a for loop.
         for i in range(n):
-            a_i = p['pos'][i, :]
+            a_i = p.get_val('pos', indices=om.slicer[i, :])
             expected_i = np.sqrt(np.dot(a_i, a_i))
             assert_near_equal(p.get_val('vec_mag_comp.r_mag')[i], expected_i)
 

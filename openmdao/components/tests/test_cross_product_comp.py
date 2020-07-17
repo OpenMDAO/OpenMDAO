@@ -232,14 +232,14 @@ class TestFeature(unittest.TestCase):
 
         p = om.Problem()
 
-        p.model.set_input_defaults('r')
-        p.model.set_input_defaults('F')
-
         p.model.add_subsystem(name='cross_prod_comp',
                               subsys=om.CrossProductComp(vec_size=n,
                                                          a_name='r', b_name='F', c_name='torque',
                                                          a_units='m', b_units='N', c_units='N*m'),
                               promotes_inputs=['r', 'F'])
+
+        p.model.set_input_defaults('r')
+        p.model.set_input_defaults('F')
 
         p.setup()
 
