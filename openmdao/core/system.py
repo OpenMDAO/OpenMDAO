@@ -3372,6 +3372,10 @@ class System(object):
             disc_meta = self._discrete_outputs._dict
 
             for var_name, val in self._discrete_outputs.items():
+
+                if not list_autoivcs and var_name.startswith('_auto_ivc.'):
+                    continue
+
                 # Filter based on tags
                 if tags and not (make_set(tags) & disc_meta[var_name]['tags']):
                     continue

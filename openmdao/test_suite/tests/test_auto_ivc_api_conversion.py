@@ -19,7 +19,8 @@ class TestConversionGuideDoc(unittest.TestCase):
         indeps.add_output('x', 3.0)
         indeps.add_output('y', -4.0)
 
-        prob.model.add_subsystem('paraboloid', om.ExecComp('f = (x-3)**2 + x*y + (y+4)**2 - 3'))
+        prob.model.add_subsystem('paraboloid',
+                                 om.ExecComp('f = (x-3)**2 + x*y + (y+4)**2 - 3'))
 
         prob.model.connect('indeps.x', 'paraboloid.x')
         prob.model.connect('indeps.y', 'paraboloid.y')
