@@ -52,8 +52,6 @@ class TestKSFunction(unittest.TestCase):
         model.add_design_var('ks.g')
         model.add_constraint('ks.KS', upper=0.0)
 
-        # model.set_input_defaults('ks.g', x)
-
         prob.setup()
         prob.set_val('ks.g', x)
         prob.run_driver()
@@ -341,6 +339,7 @@ class TestKSFunctionFeatures(unittest.TestCase):
 
     def test_units(self):
         import openmdao.api as om
+        from openmdao.utils.units import convert_units
 
         n = 10
 
@@ -353,7 +352,6 @@ class TestKSFunctionFeatures(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        # assert_near_equal(prob.get_val('ks.KS')[0], np.amax(prob.get_val('x')), tolerance=1e-8)
         assert_near_equal(prob.get_val('ks.KS', indices=0), np.amax(prob.get_val('x')), tolerance=1e-8)
 
 

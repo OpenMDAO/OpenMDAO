@@ -601,9 +601,6 @@ class TestFeature(unittest.TestCase):
                                                                 x_units='m'),
                               promotes_inputs=['Mat', 'x'])
 
-        p.model.set_input_defaults('Mat')
-        p.model.set_input_defaults('x', units='m')
-
         p.setup()
 
         p.set_val('Mat', np.random.rand(nn, 3, 3))

@@ -531,9 +531,6 @@ class TestFeature(unittest.TestCase):
         p.model.add_subsystem(name='dot_prod_comp', subsys=dp_comp,
                              promotes_inputs=[('F', 'force'), ('v', 'vel')])
 
-        p.model.set_input_defaults('force')
-        p.model.set_input_defaults('vel')
-
         p.setup()
 
         p.set_val('force', np.random.rand(n, 3))

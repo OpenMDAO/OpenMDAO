@@ -567,9 +567,6 @@ class TestFeature(unittest.TestCase):
                                                          a_units='m', b_units='N', c_units='N*m'),
                               promotes_inputs=['r', 'F'])
 
-        p.model.set_input_defaults('r')
-        p.model.set_input_defaults('F')
-
         p.setup()
 
         p.set_val('r', np.random.rand(n, 3))

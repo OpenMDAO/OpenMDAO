@@ -818,7 +818,6 @@ class TestBalanceComp(unittest.TestCase):
 
         prob.setup()
 
-        prob['balance.x'] = np.random.rand(n)
         prob.set_val('balance.x', np.random.rand(n))
 
         prob.run_model()
