@@ -372,18 +372,19 @@ class DiscreteTestCase(unittest.TestCase):
         #
         stream = StringIO()
 
-        model.list_outputs(prom_name=True, out_stream=stream)
+        model.list_outputs(prom_name=True, out_stream=stream, list_autoivcs=True)
 
         text = stream.getvalue().split('\n')
 
         expected = [
-            "3 Explicit Output(s) in 'model'",
+            "4 Explicit Output(s) in 'model'",
             "-------------------------------",
             "",
             "varname  value  prom_name",
             "-------  -----  ---------",
             "model",
             "  _auto_ivc",
+            "    v0    [10.]  _auto_ivc.v0",
             "    v1    11     _auto_ivc.v1",
             "  expl",
             "    b    [20.]  expl.b",
