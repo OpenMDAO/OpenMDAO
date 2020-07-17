@@ -509,11 +509,11 @@ class SplineCompFeatureTestCase(unittest.TestCase):
                             interp_options=bspline_options)
 
         prob.model.add_subsystem('interp', comp, promotes_inputs=[('h_cp', 'x')])
-        model.set_input_defaults('x', x)
 
         comp.add_spline(y_cp_name='h_cp', y_interp_name='h', y_cp_val=x, y_units=None)
 
         prob.setup(force_alloc_complex=True)
+        prob.set_val('x', x)
         prob.run_model()
 
     def test_2to3doc_fixed_grid(self):
