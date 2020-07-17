@@ -800,9 +800,10 @@ class TestFeatureLineSearch(unittest.TestCase):
         model = prob.model
 
         model.add_subsystem('comp', CompAtan(), promotes_inputs=['x'])
-        model.set_input_defaults('x', -100.0)
 
         prob.setup()
+
+        prob.set_val('x', -100.0)
 
         # Initial value for the state:
         prob.set_val('comp.y', 12.0)
@@ -857,7 +858,6 @@ class TestFeatureLineSearch(unittest.TestCase):
 
         top = om.Problem()
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays(), promotes_inputs=['x'])
-        top.model.set_input_defaults('x', np.array([2., 2, 2]).reshape(3, 1))
 
         top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         top.model.nonlinear_solver.options['maxiter'] = 10
@@ -866,7 +866,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS()
 
         top.setup()
-
+        top.set_val('x', np.array([2., 2, 2]).reshape(3, 1))
         # Test lower bounds: should go to the lower bound and stall
         top.set_val('comp.y', 0.)
         top.set_val('comp.z', 1.6)
@@ -883,7 +883,6 @@ class TestFeatureLineSearch(unittest.TestCase):
 
         top = om.Problem()
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays(), promotes_inputs=['x'])
-        top.model.set_input_defaults('x', np.array([2., 2, 2]).reshape(3, 1))
 
         top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         top.model.nonlinear_solver.options['maxiter'] = 10
@@ -892,6 +891,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.nonlinear_solver.linesearch = om.BoundsEnforceLS()
 
         top.setup()
+        top.set_val('x', np.array([2., 2, 2]).reshape(3, 1))
 
         # Test lower bounds: should go to the lower bound and stall
         top.set_val('comp.y', 0.)
@@ -909,7 +909,6 @@ class TestFeatureLineSearch(unittest.TestCase):
 
         top = om.Problem()
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays(), promotes_inputs=['x'])
-        top.model.set_input_defaults('x', np.array([2., 2, 2]).reshape(3, 1))
 
         top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         top.model.nonlinear_solver.options['maxiter'] = 10
@@ -918,6 +917,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='vector')
 
         top.setup()
+        top.set_val('x', np.array([2., 2, 2]).reshape(3, 1))
 
         # Test lower bounds: should go to the lower bound and stall
         top.set_val('comp.y', 0.)
@@ -935,7 +935,6 @@ class TestFeatureLineSearch(unittest.TestCase):
 
         top = om.Problem()
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays(), promotes_inputs=['x'])
-        top.model.set_input_defaults('x', np.array([0.5, 0.5, 0.5]).reshape(3, 1))
 
         top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         top.model.nonlinear_solver.options['maxiter'] = 10
@@ -944,6 +943,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='wall')
 
         top.setup()
+        top.set_val('x', np.array([0.5, 0.5, 0.5]).reshape(3, 1))
 
         # Test upper bounds: should go to the upper bound and stall
         top.set_val('comp.y', 0.)
@@ -962,7 +962,6 @@ class TestFeatureLineSearch(unittest.TestCase):
 
         top = om.Problem()
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays(), promotes_inputs=['x'])
-        top.model.set_input_defaults('x', np.array([2., 2, 2]).reshape(3, 1))
 
         top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         top.model.nonlinear_solver.options['maxiter'] = 10
@@ -971,6 +970,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='scalar')
 
         top.setup()
+        top.set_val('x', np.array([2., 2, 2]).reshape(3, 1))
         top.run_model()
 
         # Test lower bounds: should stop just short of the lower bound
@@ -986,7 +986,6 @@ class TestFeatureLineSearch(unittest.TestCase):
 
         top = om.Problem()
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays(), promotes_inputs=['x'])
-        top.model.set_input_defaults('x', np.array([2., 2, 2]).reshape(3, 1))
 
         newt = top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         top.model.nonlinear_solver.options['maxiter'] = 2
@@ -996,7 +995,10 @@ class TestFeatureLineSearch(unittest.TestCase):
         ls.options['print_bound_enforce'] = True
 
         top.set_solver_print(level=2)
+
+
         top.setup()
+        top.set_val('x', np.array([2., 2, 2]).reshape(3, 1))
 
         # Test lower bounds: should go to the lower bound and stall
         top.set_val('comp.y', 0.)
@@ -1014,7 +1016,6 @@ class TestFeatureLineSearch(unittest.TestCase):
 
         top = om.Problem()
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays(), promotes_inputs=['x'])
-        top.model.set_input_defaults('x', np.array([2., 2, 2]).reshape(3, 1))
 
         top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         top.model.nonlinear_solver.options['maxiter'] = 10
@@ -1023,6 +1024,8 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='vector')
 
         top.setup()
+
+        top.set_val('x', np.array([2., 2, 2]).reshape(3, 1))
 
         # Test lower bounds: should go to the lower bound and stall
         top.set_val('comp.y', 0.)
@@ -1040,7 +1043,6 @@ class TestFeatureLineSearch(unittest.TestCase):
 
         top = om.Problem()
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays(), promotes_inputs=['x'])
-        top.model.set_input_defaults('x', np.array([0.5, 0.5, 0.5]).reshape(3, 1))
 
         top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         top.model.nonlinear_solver.options['maxiter'] = 10
@@ -1049,6 +1051,8 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='wall')
 
         top.setup()
+
+        top.set_val('x', np.array([0.5, 0.5, 0.5]).reshape(3, 1))
 
         # Test upper bounds: should go to the upper bound and stall
         top.set_val('comp.y', 0.)
@@ -1067,7 +1071,6 @@ class TestFeatureLineSearch(unittest.TestCase):
 
         top = om.Problem()
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays(), promotes_inputs=['x'])
-        top.model.set_input_defaults('x', np.array([2., 2, 2]).reshape(3, 1))
 
         top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         top.model.nonlinear_solver.options['maxiter'] = 10
@@ -1076,6 +1079,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         ls = top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='scalar')
 
         top.setup()
+        top.set_val('x', np.array([2., 2, 2]).reshape(3, 1))
         top.run_model()
 
         # Test lower bounds: should stop just short of the lower bound

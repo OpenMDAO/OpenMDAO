@@ -247,9 +247,9 @@ class TestFeature(unittest.TestCase):
 
         p.setup()
 
-        p['mux.r_0'] = 1 + np.random.rand(m)
-        p['mux.r_1'] = 1 + np.random.rand(m)
-        p['mux.r_2'] = 1 + np.random.rand(m)
+        p.set_val('mux.r_0', 1 + np.random.rand(m))
+        p.set_val('mux.r_1', 1 + np.random.rand(m))
+        p.set_val('mux.r_2', 1 + np.random.rand(m))
 
         p.run_model()
 

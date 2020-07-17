@@ -171,13 +171,13 @@ class TestKSFunction(unittest.TestCase):
         model = prob.model
 
         model.add_subsystem('comp', om.ExecComp('y = 3.0*x', x=np.zeros((2, )), y=np.zeros((2, ))))
-        model.set_input_defaults('comp.x', np.array([5.0, 4.0]))
         model.add_subsystem('ks', om.KSComp(width=2))
 
         model.connect('comp.y', 'ks.g')
 
         model.ks.options['upper'] = 16.0
         prob.setup()
+        prob.set_val('comp.x', np.array([5.0, 4.0]))
         prob.run_model()
 
         assert_near_equal(prob.get_val('ks.KS', indices=0), -1.0)
@@ -188,7 +188,6 @@ class TestKSFunction(unittest.TestCase):
         model = prob.model
 
         model.add_subsystem('comp', om.ExecComp('y = 3.0*x', x=np.zeros((2, )), y=np.zeros((2, ))))
-        model.set_input_defaults('comp.x', np.array([5.0, 4.0]))
 
         model.add_subsystem('ks', om.KSComp(width=2))
 
@@ -196,6 +195,7 @@ class TestKSFunction(unittest.TestCase):
 
         model.ks.options['lower_flag'] = True
         prob.setup()
+        prob.set_val('comp.x', np.array([5.0, 4.0]))
         prob.run_model()
 
         assert_near_equal(prob.get_val('ks.KS', indices=0), -12.0)
@@ -214,13 +214,13 @@ class TestKSFunctionFeatures(unittest.TestCase):
         model.add_subsystem('comp', om.ExecComp('y = 3.0*x',
                                                 x=np.zeros((2, )),
                                                 y=np.zeros((2, ))), promotes_inputs=['x'])
-        model.set_input_defaults('x', np.array([5.0, 4.0]))
 
         model.add_subsystem('ks', om.KSComp(width=2))
 
         model.connect('comp.y', 'ks.g')
 
         prob.setup()
+        prob.set_val('x', np.array([5.0, 4.0]))
         prob.run_model()
 
         assert_near_equal(prob.get_val('ks.KS'), [[15.0]])
@@ -236,12 +236,12 @@ class TestKSFunctionFeatures(unittest.TestCase):
         model.add_subsystem('comp', om.ExecComp('y = 3.0*x',
                                                 x=np.zeros((2, 2)),
                                                 y=np.zeros((2, 2))), promotes_inputs=['x'])
-        model.set_input_defaults('x', np.array([[5.0, 4.0], [10.0, 8.0]]))
         model.add_subsystem('ks', om.KSComp(width=2, vec_size=2))
 
         model.connect('comp.y', 'ks.g')
 
         prob.setup()
+        prob.set_val('x', np.array([[5.0, 4.0], [10.0, 8.0]]))
         prob.run_model()
 
         assert_near_equal(prob.get_val('ks.KS'), np.array([[15], [30]]))
@@ -257,13 +257,13 @@ class TestKSFunctionFeatures(unittest.TestCase):
         model.add_subsystem('comp', om.ExecComp('y = 3.0*x',
                                                 x=np.zeros((2, )),
                                                 y=np.zeros((2, ))), promotes_inputs=['x'])
-        model.set_input_defaults('x', np.array([5.0, 4.0]))
         model.add_subsystem('ks', om.KSComp(width=2))
 
         model.connect('comp.y', 'ks.g')
 
         model.ks.options['upper'] = 16.0
         prob.setup()
+        prob.set_val('x', np.array([5.0, 4.0]))
         prob.run_model()
 
         assert_near_equal(prob['ks.KS'], np.array([[-1.0]]))
@@ -280,14 +280,13 @@ class TestKSFunctionFeatures(unittest.TestCase):
                                                 x=np.zeros((2, )),
                                                 y=np.zeros((2, ))), promotes_inputs=['x'])
 
-        model.set_input_defaults('x', np.array([5.0, 4.0]))
-
         model.add_subsystem('ks', om.KSComp(width=2))
 
         model.connect('comp.y', 'ks.g')
 
         model.ks.options['lower_flag'] = True
         prob.setup()
+        prob.set_val('x', np.array([5.0, 4.0]))
         prob.run_model()
 
         assert_near_equal(prob.get_val('ks.KS'), [[-12.0]])
@@ -308,9 +307,6 @@ class TestKSFunctionFeatures(unittest.TestCase):
                                                 y=np.zeros((n, )),
                                                 k=0.0), promotes_inputs=['x', 'k'])
 
-        model.set_input_defaults('x', np.linspace(-np.pi/2, np.pi/2, n))
-        model.set_input_defaults('k', 5.)
-
         model.add_subsystem('ks', om.KSComp(width=n, upper=4.0, add_constraint=True))
 
         model.add_design_var('k', lower=-10, upper=10)
@@ -319,6 +315,9 @@ class TestKSFunctionFeatures(unittest.TestCase):
         model.connect('comp.y', 'ks.g')
 
         prob.setup()
+        prob.set_val('x', np.linspace(-np.pi/2, np.pi/2, n))
+        prob.set_val('k', 5.)
+
         prob.run_driver()
 
         self.assertTrue(max(prob.get_val('comp.y')) <= 4.0)

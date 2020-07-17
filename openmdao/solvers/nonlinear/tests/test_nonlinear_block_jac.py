@@ -27,9 +27,6 @@ class TestNLBlockJacobi(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.set_input_defaults('x', 1.)
-        model.set_input_defaults('z', np.array([5.0, 2.0]))
-
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
@@ -45,6 +42,9 @@ class TestNLBlockJacobi(unittest.TestCase):
 
         prob.setup()
 
+        prob.set_val('x', 1.)
+        prob.set_val('z', np.array([5.0, 2.0]))
+
         prob.run_model()
 
         assert_near_equal(prob['y1'], 25.58830273, .00001)
@@ -58,9 +58,6 @@ class TestNLBlockJacobi(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
-
-        model.set_input_defaults('x', 1.)
-        model.set_input_defaults('z', np.array([5.0, 2.0]))
 
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
@@ -79,6 +76,9 @@ class TestNLBlockJacobi(unittest.TestCase):
 
         prob.setup()
 
+        prob.set_val('x', 1.)
+        prob.set_val('z', np.array([5.0, 2.0]))
+
         prob.run_model()
 
         assert_near_equal(prob['y1'], 25.5723813937, .00001)
@@ -96,9 +96,6 @@ class TestNLBlockJacobi(unittest.TestCase):
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
-        model.set_input_defaults('x', 1.)
-        model.set_input_defaults('z', np.array([5.0, 2.0]))
-
         model.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
                                                    z=np.array([0.0, 0.0]), x=0.0),
                             promotes=['obj', 'x', 'z', 'y1', 'y2'])
@@ -113,6 +110,9 @@ class TestNLBlockJacobi(unittest.TestCase):
 
         prob.setup()
 
+        prob.set_val('x', 1.)
+        prob.set_val('z', np.array([5.0, 2.0]))
+
         prob.run_model()
 
         assert_near_equal(prob.get_val('y1'), 25.5891491526, .00001)
@@ -126,9 +126,6 @@ class TestNLBlockJacobi(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
-
-        model.set_input_defaults('x', 1.)
-        model.set_input_defaults('z', np.array([5.0, 2.0]))
 
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
@@ -146,6 +143,9 @@ class TestNLBlockJacobi(unittest.TestCase):
         nlbgs.options['atol'] = 1e-2
 
         prob.setup()
+
+        prob.set_val('x', 1.)
+        prob.set_val('z', np.array([5.0, 2.0]))
 
         prob.run_model()
 

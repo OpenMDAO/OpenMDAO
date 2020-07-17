@@ -1108,9 +1108,10 @@ class TestMetaModelStructuredCompFeature(unittest.TestCase):
         # Set up the OpenMDAO model
         model = om.Group()
         model.add_subsystem('comp', xor_interp, promotes=["*"])
-        model.set_input_defaults('x', 0)
         prob = om.Problem(model)
         prob.setup()
+
+        prob.set_val('x', 0)
 
         # Now test out a 'fuzzy' XOR
         prob.set_val('x', 0.9)

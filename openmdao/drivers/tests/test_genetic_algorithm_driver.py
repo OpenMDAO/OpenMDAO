@@ -1381,9 +1381,6 @@ class TestFeatureSimpleGA(unittest.TestCase):
         prob = om.Problem()
         prob.model.add_subsystem('cylinder', Cylinder(), promotes=['*'])
 
-        prob.model.set_input_defaults('radius', 2.)
-        prob.model.set_input_defaults('height', 3.)
-
         # setup the optimization
         prob.driver = om.SimpleGADriver()
         prob.driver.options['penalty_parameter'] = 3.
@@ -1397,6 +1394,10 @@ class TestFeatureSimpleGA(unittest.TestCase):
         prob.model.add_constraint('Volume', lower=10.)
 
         prob.setup()
+
+        prob.set_val('radius', 2.)
+        prob.set_val('height', 3.)
+
         prob.run_driver()
 
         # These go to 0.5 for unconstrained problem. With constraint and penalty, they

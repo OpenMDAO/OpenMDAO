@@ -952,10 +952,11 @@ class TestExecComp(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.set_input_defaults('x', 2.0)
         model.add_subsystem('comp', om.ExecComp(['y1=x+1.', 'y2=x-1.']), promotes=['x'])
 
         prob.setup()
+
+        prob.set_val('x', 2.0)
 
         prob.set_solver_print(level=0)
         prob.run_model()

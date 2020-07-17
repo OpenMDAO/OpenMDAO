@@ -38,7 +38,6 @@ class TestKeplersEquation(unittest.TestCase):
                                  promotes_outputs=['E'])
 
         prob.model.set_input_defaults('M', 85.0, units='deg')
-        prob.model.set_input_defaults('ecc', 0.6)
 
         prob.model.add_subsystem(name='lhs_comp', subsys=lhs_comp,
                                  promotes_inputs=['E', 'ecc'])
@@ -51,6 +50,8 @@ class TestKeplersEquation(unittest.TestCase):
         prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=100, iprint=2)
 
         prob.setup()
+
+        prob.set_val('ecc', 0.6)
 
         prob.run_model()
 

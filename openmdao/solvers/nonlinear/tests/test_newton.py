@@ -859,9 +859,6 @@ class TestNewtonFeatures(unittest.TestCase):
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
-        model.set_input_defaults('x', 1.)
-        model.set_input_defaults('z', np.array([5.0, 2.0]))
-
         model.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
                                                    z=np.array([0.0, 0.0]), x=0.0),
                             promotes=['obj', 'x', 'z', 'y1', 'y2'])
@@ -874,6 +871,9 @@ class TestNewtonFeatures(unittest.TestCase):
         model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
 
         prob.setup()
+        
+        prob.set_val('x', 1.)
+        prob.set_val('z', np.array([5.0, 2.0]))
 
         prob.run_model()
 
@@ -892,9 +892,6 @@ class TestNewtonFeatures(unittest.TestCase):
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
-        model.set_input_defaults('x', 1.)
-        model.set_input_defaults('z', np.array([5.0, 2.0]))
-
         model.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
                                                 z=np.array([0.0, 0.0]), x=0.0),
                             promotes=['obj', 'x', 'z', 'y1', 'y2'])
@@ -909,6 +906,9 @@ class TestNewtonFeatures(unittest.TestCase):
 
         prob.setup()
 
+        prob.set_val('x', 1.)
+        prob.set_val('z', np.array([5.0, 2.0]))
+        
         prob.run_model()
 
         assert_near_equal(prob.get_val('y1'), 25.5878516779, .00001)
@@ -926,9 +926,6 @@ class TestNewtonFeatures(unittest.TestCase):
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
-        model.set_input_defaults('x', 1.)
-        model.set_input_defaults('z', np.array([5.0, 2.0]))
-
         model.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
                                                 z=np.array([0.0, 0.0]), x=0.0),
                             promotes=['obj', 'x', 'z', 'y1', 'y2'])
@@ -942,6 +939,9 @@ class TestNewtonFeatures(unittest.TestCase):
         newton.options['rtol'] = 1e-3
 
         prob.setup()
+
+        prob.set_val('x', 1.)
+        prob.set_val('z', np.array([5.0, 2.0]))
 
         prob.run_model()
 
@@ -960,9 +960,6 @@ class TestNewtonFeatures(unittest.TestCase):
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
-        model.set_input_defaults('x', 1.)
-        model.set_input_defaults('z', np.array([5.0, 2.0]))
-
         model.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
                                                 z=np.array([0.0, 0.0]), x=0.0),
                             promotes=['obj', 'x', 'z', 'y1', 'y2'])
@@ -976,6 +973,9 @@ class TestNewtonFeatures(unittest.TestCase):
         newton.options['atol'] = 1e-4
 
         prob.setup()
+
+        prob.set_val('x', 1.)
+        prob.set_val('z', np.array([5.0, 2.0]))
 
         prob.run_model()
 
@@ -995,9 +995,6 @@ class TestNewtonFeatures(unittest.TestCase):
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
-        model.set_input_defaults('x', 1.)
-        model.set_input_defaults('z', np.array([5.0, 2.0]))
-
         model.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
                                                 z=np.array([0.0, 0.0]), x=0.0),
                             promotes=['obj', 'x', 'z', 'y1', 'y2'])
@@ -1012,6 +1009,9 @@ class TestNewtonFeatures(unittest.TestCase):
         newton.linear_solver = om.DirectSolver()
 
         prob.setup()
+
+        prob.set_val('x', 1.)
+        prob.set_val('z', np.array([5.0, 2.0]))
 
         prob.run_model()
 
@@ -1068,9 +1068,6 @@ class TestNewtonFeatures(unittest.TestCase):
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
-        model.set_input_defaults('x', 1.)
-        model.set_input_defaults('z', np.array([5.0, 2.0]))
-
         model.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
                                                 z=np.array([0.0, 0.0]), x=0.0),
                             promotes=['obj', 'x', 'z', 'y1', 'y2'])
@@ -1085,6 +1082,9 @@ class TestNewtonFeatures(unittest.TestCase):
         newton.options['err_on_non_converge'] = True
 
         prob.setup()
+
+        prob.set_val('x', 1.)
+        prob.set_val('z', np.array([5.0, 2.0]))
 
         try:
             prob.run_model()
