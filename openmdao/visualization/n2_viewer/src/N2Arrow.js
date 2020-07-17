@@ -158,6 +158,7 @@ class N2BentArrow extends N2Arrow {
 
         this.path
             .attr("marker-end", "url(#arrow)")
+            .attr('stroke-dasharray', null)
             .attr("d", this._genPath())
             .attr("fill", "none")
             .style("stroke-width", this.width)
@@ -384,7 +385,7 @@ class N2OffGridLeftArrow extends N2OffGridArrow {
     }
 
     get id() {
-        return 'arrow_' + this.cell.srcObj.id + '_to_' + this.attribs.offscreenId;
+        return 'arrow_' + this.attribs.cell.srcId + '_to_' + this.attribs.offscreenId;
     }
 
     /**
@@ -428,7 +429,7 @@ class N2OffGridRightArrow extends N2OffGridArrow {
     }
 
     get id() {
-        return 'arrow_' + this.cell.srcObj.id + '_to_' + this.attribs.offscreenId;
+        return 'arrow_' + this.attribs.cell.srcId + '_to_' + this.attribs.offscreenId;
     }
 
     /**
@@ -463,3 +464,45 @@ N2OffGridArrow.arrowDir = {
         'outgoing': N2OffGridLeftArrow
     }
 };
+
+class N2ArrowCache {
+    constructor() {
+        this.arrows = {};
+    }
+
+    add(arrow) {
+        if (this.arrows[arrow.id]) {
+            console.warn("Not adding arrow ${arrow.id} to cache since it already exists." )
+        }
+        else {
+            this.arrows[arrow.id] = arrow;
+        }
+    }
+
+    remove(arrow, erase = false) {
+        if (! this.arrows[arrow.id]) {
+            console.warn("Arrow ${arrow.id} doesn't exist in cache, can't remove." )
+        }
+        else {
+            this.arrows[arrow.id].group.remove();
+            if (erase) delete this.arrows[arrow.id];
+        }
+    }
+
+    /**
+     * Move an arrow from one cache to another and change its CSS classes.
+     * @param {N2Arrow} arrow The arrow to move.
+     * @param {N2ArrowCache} oldCache The cache to move the arrow from.
+     * @param {String} newClass The CSS class name to set.
+     */
+    migrate(arrow, oldCache, newClassName) {
+        this.add(arrow);
+        oldCache.remove(arrow);
+        arrow.group
+            .classed('n2_hover_elements', false)
+            .classed(newClassName, true)
+            .selectAll(".n2_hover_elements")
+            .classed('n2_hover_elements', false)
+            .classed(newClassName, true);
+    }
+}

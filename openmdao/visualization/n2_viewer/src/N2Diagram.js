@@ -37,6 +37,8 @@ class N2Diagram {
 
         // Keep track of arrows to show and hide them
         this.arrowCache = [];
+        this.hoverArrows = new N2ArrowCache();
+        this.pinnedArrows = new N2ArrowCache();
 
         this._referenceD3Elements();
         this.transitionStartDelay = N2TransitionDefaults.startDelay;
