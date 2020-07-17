@@ -23,7 +23,7 @@ class IndepVarComp(ExplicitComponent):
         **kwargs : dict
             keyword arguments.
         """
-        super(IndepVarComp, self).__init__()
+        super(IndepVarComp, self).__init__(**kwargs)
 
         if 'tags' not in kwargs:
             kwargs['tags'] = {'indep_var'}

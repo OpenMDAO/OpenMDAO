@@ -1,5 +1,6 @@
 """IndepVarComp tests used in the IndepVarComp feature doc."""
 import unittest
+import numpy as np
 
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal
@@ -183,6 +184,23 @@ class TestIndepVarComp(unittest.TestCase):
         prob.run_model()
 
         assert_near_equal(prob.get_val('p.x1')[0], 0.5)
+
+    def test_options(self):
+        class Parameters(om.IndepVarComp):
+            def initialize(self):
+                self.options.declare('num_x', default=0)
+                self.options.declare('val_y', default=0.)
+
+            def setup(self):
+                self.add_discrete_output('num_x', val = np.zeros(self.options['num_x']))
+                self.add_output('val_y',val = self.options['val_y'])
+
+        prob = om.Problem(model=Parameters(num_x=4, val_y=2.5))
+        prob.setup()
+        prob.run_model()
+
+        self.assertEqual(len(prob.get_val('num_x')), 4)
+        self.assertEqual(prob.get_val('val_y'), 2.5)
 
 
 if __name__ == '__main__':
