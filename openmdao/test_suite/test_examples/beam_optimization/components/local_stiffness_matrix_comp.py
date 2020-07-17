@@ -34,8 +34,6 @@ class LocalStiffnessMatrixComp(om.ExplicitComponent):
             val=self.mtx.reshape(16 * num_elements, num_elements))
 
     def compute(self, inputs, outputs):
-        num_elements = self.options['num_elements']
-
         outputs['K_local'] = 0
-        for ind in range(num_elements):
+        for ind in range(self.options['num_elements']):
             outputs['K_local'][ind, :, :] = self.mtx[ind, :, :, ind] * inputs['I'][ind]
