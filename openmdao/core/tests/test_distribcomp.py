@@ -916,6 +916,7 @@ class TestGroupMPI(unittest.TestCase):
                               promotes_inputs=['x'])
 
         p.setup()
+        p.set_val('x', np.arange(5, dtype=float))
         p.run_model()
 
         # each rank holds the assigned portion of the input array
