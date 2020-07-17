@@ -19,13 +19,15 @@ Declaring Design Variables
       openmdao.test_suite.tests.test_auto_ivc_api_conversion.TestConversionGuideDoc.test_tldr
       Problem
       run_driver
+      style2
 
     prob = om.Problem()
     indeps = prob.model.add_subsystem('indeps', om.IndepVarComp())
     indeps.add_output('x', 3.0)
     indeps.add_output('y', -4.0)
 
-    prob.model.add_subsystem('paraboloid', om.ExecComp('f = (x-3)**2 + x*y + (y+4)**2 - 3'))
+    prob.model.add_subsystem('paraboloid',
+                             om.ExecComp('f = (x-3)**2 + x*y + (y+4)**2 - 3'))
 
     prob.model.connect('indeps.x', 'paraboloid.x')
     prob.model.connect('indeps.y', 'paraboloid.y')
@@ -51,6 +53,7 @@ Declaring a Multi-Component Input as a Design Variable
       openmdao.test_suite.tests.test_auto_ivc_api_conversion.TestConversionGuideDoc.test_constrained
       Problem
       run_driver
+      style2
 
     prob = om.Problem()
     indeps = prob.model.add_subsystem('indeps', om.IndepVarComp())
@@ -79,6 +82,10 @@ Declaring a Multi-Component Input as a Design Variable
 
     prob.setup()
     prob.run_driver()
+
+
+Creating a Distributed Component with an Unconnected Inputs
+===========================================================
 
 
 Setting and Getting Inputs

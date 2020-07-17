@@ -1256,19 +1256,24 @@ class TestSqliteCaseReader(unittest.TestCase):
         model = om.Group()
 
         # TODO: Change x to an auto_ivc variable.
-        indep = model.add_subsystem('indep', om.IndepVarComp())
-        indep.add_discrete_output('x', 11)
+        #indep = model.add_subsystem('indep', om.IndepVarComp())
+        #indep.add_discrete_output('x', 11)
 
-        model.add_subsystem('expl', ModCompEx(3))
-        model.add_subsystem('impl', ModCompIm(3))
+        model.add_subsystem('expl', ModCompEx(3),
+                            promotes_inputs=['x'])
+        model.add_subsystem('impl', ModCompIm(3),
+                            promotes_inputs=['x'])
 
-        model.connect('indep.x', ['expl.x', 'impl.x'])
+        #model.connect('indep.x', ['expl.x', 'impl.x'])
 
         model.add_recorder(self.recorder)
 
         prob = om.Problem(model)
 
         prob.setup()
+
+        prob.set_val('x', 11)
+
         prob.run_model()
         prob.cleanup()
 
@@ -1309,12 +1314,11 @@ class TestSqliteCaseReader(unittest.TestCase):
         # list outputs, not hierarchical, with residuals
         #
         expected = [
-            "3 Explicit Output(s) in 'model'",
+            "2 Explicit Output(s) in 'model'",
             "-------------------------------",
             "",
             "varname  value  resids      ",
             "-------  -----  ------------",
-            "indep.x  11     Not Recorded",
             "expl.b   [20.]  [0.]        ",
             "expl.y   2      Not Recorded",
         ]
