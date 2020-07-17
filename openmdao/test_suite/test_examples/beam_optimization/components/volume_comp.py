@@ -22,9 +22,6 @@ class VolumeComp(om.ExplicitComponent):
         self.declare_partials('volume', 'h', val=b * L0)
 
     def compute(self, inputs, outputs):
-        num_elements = self.options['num_elements']
-        b = self.options['b']
-        L = self.options['L']
-        L0 = L / num_elements
+        L0 = self.options['L'] / self.options['num_elements']
 
-        outputs['volume'] = np.sum(inputs['h'] * b * L0)
+        outputs['volume'] = np.sum(inputs['h'] * self.options['b'] * L0)

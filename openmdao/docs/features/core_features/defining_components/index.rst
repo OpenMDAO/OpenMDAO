@@ -8,10 +8,10 @@ Working with Components
     :maxdepth: 1
 
     declaring_variables.rst
-    indepvarcomp.rst
     explicitcomp.rst
     implicitcomp.rst
     distributed_comps.rst
+    indepvarcomp.rst
     units.rst
     scaling.rst
     options.rst

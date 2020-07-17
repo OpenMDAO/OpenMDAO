@@ -180,9 +180,8 @@ class TestBetzLimit(unittest.TestCase):
 
         # build the model
         prob = om.Problem()
-
         prob.model.add_subsystem('a_disk', ActuatorDisc(),
-                                promotes_inputs=['a', 'Area', 'rho', 'Vu'])
+                                 promotes_inputs=['a', 'Area', 'rho', 'Vu'])
 
         # setup the optimization
         prob.driver = om.ScipyOptimizeDriver()
@@ -195,16 +194,16 @@ class TestBetzLimit(unittest.TestCase):
         prob.model.add_objective('a_disk.Cp', scaler=-1)
 
         prob.setup()
-        
+
         prob.set_val('a', .5)
         prob.set_val('Area', 10.0, units='m**2')
         prob.set_val('rho', 1.225, units='kg/m**3')
         prob.set_val('Vu', 10.0, units='m/s')
-        
+
         prob.run_driver()
 
-        prob.model.list_inputs(values=False, hierarchical=False)
-        prob.model.list_outputs(values=False, hierarchical=False)
+        prob.model.list_inputs(values = False, hierarchical=False)
+        prob.model.list_outputs(values = False, hierarchical=False)
 
         # minimum value
         assert_near_equal(prob['a_disk.Cp'], 16./27., 1e-4)
@@ -302,6 +301,11 @@ class TestBetzLimit(unittest.TestCase):
 
         # build the model
         prob = om.Problem()
+        indeps = prob.model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
+        indeps.add_output('a', .5, tags="advanced")
+        indeps.add_output('Area', 10.0, units='m**2', tags="basic")
+        indeps.add_output('rho', 1.225, units='kg/m**3', tags="advanced")
+        indeps.add_output('Vu', 10.0, units='m/s', tags="basic")
 
         prob.model.add_subsystem('a_disk', ActuatorDiscWithTags(),
                                 promotes_inputs=['a', 'Area', 'rho', 'Vu'])
@@ -316,12 +320,6 @@ class TestBetzLimit(unittest.TestCase):
         prob.model.add_objective('a_disk.Cp', scaler=-1)
 
         prob.setup()
-
-        prob.set_val('a', .5)
-        prob.set_val('Area', 10.0, units='m**2')
-        prob.set_val('rho', 1.225, units='kg/m**3')
-        prob.set_val('Vu', 10.0, units='m/s')
-
         prob.run_driver()
 
         prob.model.list_inputs(tags='basic', units=True, shape=True)
