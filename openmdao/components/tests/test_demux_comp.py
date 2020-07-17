@@ -171,7 +171,6 @@ class TestFeature(unittest.TestCase):
         p.model.connect('demux.pos_ecef_0', 'longitude_comp.x')
         p.model.connect('demux.pos_ecef_1', 'longitude_comp.y')
 
-
         p.setup()
 
         p.set_val('pos_ecef', 6378 * np.cos(np.linspace(0, 2*np.pi, m)), indices=om.slicer[:, 0])

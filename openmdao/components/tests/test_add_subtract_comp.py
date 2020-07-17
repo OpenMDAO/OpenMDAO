@@ -401,11 +401,6 @@ class TestFeature(unittest.TestCase):
         # Note the scaling factors. we assume all forces are positive sign upstream
 
         # The vector represents forces at 3 time points (rows) in 2 dimensional plane (cols)
-        model.set_input_defaults('thrust', units='kN')
-        model.set_input_defaults('drag', units='kN')
-        model.set_input_defaults('lift', units='kN')
-        model.set_input_defaults('weight', units='kN')
-
         p.model.add_subsystem(name='totalforcecomp', subsys=adder,
                               promotes_inputs=['thrust', 'drag', 'lift', 'weight'])
 
