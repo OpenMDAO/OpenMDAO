@@ -281,6 +281,10 @@ class ApproximationScheme(object):
 
     def _compute_approximations(self, system, jac, total, under_cs):
         from openmdao.core.component import Component
+
+        # Set system flag that we're under approximation to true
+        system._set_approx_mode(True)
+
         # Clean vector for results
         results_array = system._outputs._data.copy() if total else system._residuals._data.copy()
 
@@ -444,6 +448,9 @@ class ApproximationScheme(object):
                     jac._override_checks = False
                 else:
                     jac[key] = _from_dense(jacobian, key, oview, rows_reduced, cols_reduced)
+
+        # Set system flag that we're under approximation to false
+        system._set_approx_mode(False)
 
 
 def _from_dense(jac, key, subjac, reduced_rows=_full_slice, reduced_cols=_full_slice):
