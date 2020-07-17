@@ -4,13 +4,27 @@
 IndepVarComp
 ************
 
+An *IndepVarComp* is used to define independent variables. 
+
 Independent variables are those that are set externally to the model---therefore, they are called model inputs.
 From the perspective of a component, they are component outputs that do not depend on any component inputs.
-From the perspective of a model, they can be viewed as design variables or model parameters that are set by the user or driver, prior to running the model.
+From the perspective of a model, they can be viewed as design variables or model parameters that are set by 
+the user or driver, prior to running the model.
 
-Independent variables are defined via the *IndepVarComp* class.
+In general, you no longer have to define these because OpenMDAO defines and uses them automatically for all
+unconnected inputs in your model. However, there are some special cases where an *IndepVarComp* is required 
+(see :ref:`Distributed Components<distributed_indepvarcomp>`).
+
 The *IndepVarComp* class is instantiated directly (without defining a subclass).
-The name, initial value, and other options of the independent variable(s) to be declared can be either passed in during instantiation, or declared via the :code:`add_output` method.
+The name, initial value, and other options of the independent variable(s) to be declared
+can be either passed in during instantiation, or declared via the :code:`add_output` method.
+
+
+IndepVarComp Constructor
+------------------------
+
+.. automethod:: openmdao.core.indepvarcomp.IndepVarComp.__init__()
+    :noindex:
 
 Method Signature
 ----------------

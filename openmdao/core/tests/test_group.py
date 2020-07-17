@@ -934,19 +934,18 @@ class TestGroup(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
         model.nonlinear_solver = om.NonlinearRunOnce()
-        model.add_subsystem('indeps', om.IndepVarComp('x', 1.))
-        model.add_subsystem('C1', ReportOrderComp(order_list))
+        model.add_subsystem('C1', ReportOrderComp(order_list), promotes_inputs=['x'])
         model.add_subsystem('C2', ReportOrderComp(order_list))
         model.add_subsystem('C3', ReportOrderComp(order_list))
-        model.connect('indeps.x', 'C1.x')
         model.connect('C1.y', 'C2.x')
         model.connect('C2.y', 'C3.x')
         prob.set_solver_print(level=0)
 
-        self.assertEqual(['indeps', 'C1', 'C2', 'C3'],
+        self.assertEqual(['C1', 'C2', 'C3'],
                          [s.name for s in model._static_subsystems_allprocs])
 
         prob.setup()
+        prob.set_val('x', 1.)
         prob.run_model()
 
         self.assertEqual(['C1', 'C2', 'C3'], order_list)
@@ -954,29 +953,30 @@ class TestGroup(unittest.TestCase):
         order_list[:] = []
 
         # Big boy rules
-        model.set_order(['indeps', 'C2', 'C1', 'C3'])
+        model.set_order(['C2', 'C1', 'C3'])
 
         prob.setup()
+        prob.set_val('x', 1.)
         prob.run_model()
         self.assertEqual(['C2', 'C1', 'C3'], order_list)
 
         # Extra
         with self.assertRaises(ValueError) as cm:
-            model.set_order(['indeps', 'C2', 'junk', 'C1', 'C3'])
+            model.set_order(['C2', 'junk', 'C1', 'C3'])
 
         self.assertEqual(str(cm.exception),
                          "Group (<model>): subsystem(s) ['junk'] found in subsystem order but don't exist.")
 
         # Missing
         with self.assertRaises(ValueError) as cm:
-            model.set_order(['indeps', 'C2', 'C3'])
+            model.set_order(['C2', 'C3'])
 
         self.assertEqual(str(cm.exception),
                          "Group (<model>): ['C1'] expected in subsystem order and not found.")
 
         # Extra and Missing
         with self.assertRaises(ValueError) as cm:
-            model.set_order(['indeps', 'C2', 'junk', 'C1', 'junk2'])
+            model.set_order(['C2', 'junk', 'C1', 'junk2'])
 
         self.assertEqual(str(cm.exception),
                          "Group (<model>): ['C3'] expected in subsystem order and not found.\n"
@@ -985,7 +985,7 @@ class TestGroup(unittest.TestCase):
 
         # Dupes
         with self.assertRaises(ValueError) as cm:
-            model.set_order(['indeps', 'C2', 'C1', 'C3', 'C1'])
+            model.set_order(['C2', 'C1', 'C3', 'C1'])
 
         self.assertEqual(str(cm.exception),
                          "Group (<model>): Duplicate name(s) found in subsystem order list: ['C1']")
@@ -2306,8 +2306,8 @@ class TestFeatureAddSubsystem(unittest.TestCase):
 
         p.setup()
 
-        self.assertEqual(p['comp1.a'], 3.0)
-        self.assertEqual(p['comp1.b'], 6.0)
+        self.assertEqual(p.get_val('comp1.a'), 3.0)
+        self.assertEqual(p.get_val('comp1.b'), 6.0)
 
     def test_group_simple_promoted(self):
         import openmdao.api as om
@@ -2321,8 +2321,8 @@ class TestFeatureAddSubsystem(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        self.assertEqual(p['a'], 3.0)
-        self.assertEqual(p['comp1.b'], 6.0)
+        self.assertEqual(p.get_val('a'), 3.0)
+        self.assertEqual(p.get_val('comp1.b'), 6.0)
 
     def test_group_nested(self):
         import openmdao.api as om
@@ -2334,10 +2334,10 @@ class TestFeatureAddSubsystem(unittest.TestCase):
 
         p.setup()
 
-        self.assertEqual(p['G1.comp1.a'], 3.0)
-        self.assertEqual(p['G1.comp1.b'], 6.0)
-        self.assertEqual(p['G1.comp2.a'], 4.0)
-        self.assertEqual(p['G1.comp2.b'], 12.0)
+        self.assertEqual(p.get_val('G1.comp1.a'), 3.0)
+        self.assertEqual(p.get_val('G1.comp1.b'), 6.0)
+        self.assertEqual(p.get_val('G1.comp2.a'), 4.0)
+        self.assertEqual(p.get_val('G1.comp2.b'), 12.0)
 
     def test_group_nested_promoted1(self):
         import openmdao.api as om
@@ -2353,13 +2353,13 @@ class TestFeatureAddSubsystem(unittest.TestCase):
         p.setup()
 
         # output G1.comp1.b is promoted
-        self.assertEqual(p['G1.b'], 6.0)
+        self.assertEqual(p.get_val('G1.b'), 6.0)
         # output G1.comp2.b is not promoted
-        self.assertEqual(p['G1.comp2.b'], 12.0)
+        self.assertEqual(p.get_val('G1.comp2.b'), 12.0)
 
         # use unpromoted names for the following 2 promoted inputs
-        self.assertEqual(p['G1.comp1.a'], 3.5)
-        self.assertEqual(p['G1.comp2.a'], 3.5)
+        self.assertEqual(p.get_val('G1.comp1.a'), 3.5)
+        self.assertEqual(p.get_val('G1.comp2.a'), 3.5)
 
     def test_group_nested_promoted2(self):
         import openmdao.api as om
@@ -2378,13 +2378,13 @@ class TestFeatureAddSubsystem(unittest.TestCase):
         p.setup()
 
         # output G1.comp1.b is promoted
-        self.assertEqual(p['comp1.b'], 6.0)
+        self.assertEqual(p.get_val('comp1.b'), 6.0)
         # output G1.comp2.b is promoted
-        self.assertEqual(p['comp2.b'], 12.0)
+        self.assertEqual(p.get_val('comp2.b'), 12.0)
 
         # access both promoted inputs using unpromoted names.
-        self.assertEqual(p['G1.comp1.a'], 3.0)
-        self.assertEqual(p['G1.comp2.a'], 4.0)
+        self.assertEqual(p.get_val('G1.comp1.a'), 3.0)
+        self.assertEqual(p.get_val('G1.comp2.a'), 4.0)
 
     def test_group_rename_connect(self):
         import openmdao.api as om
@@ -2403,8 +2403,8 @@ class TestFeatureAddSubsystem(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        self.assertEqual(p['comp1.b'], 6.0)
-        self.assertEqual(p['comp2.b'], 9.0)
+        self.assertEqual(p.get_val('comp1.b'), 6.0)
+        self.assertEqual(p.get_val('comp2.b'), 9.0)
 
     def test_promotes_any(self):
         import openmdao.api as om
@@ -2421,7 +2421,7 @@ class TestFeatureAddSubsystem(unittest.TestCase):
         top = om.Problem(model=SimpleGroup())
         top.setup()
 
-        self.assertEqual(top['x'], 5)
+        self.assertEqual(top.get_val('x'), 5)
 
     def test_promotes_inputs_and_outputs(self):
         import openmdao.api as om
@@ -2438,8 +2438,8 @@ class TestFeatureAddSubsystem(unittest.TestCase):
         top = om.Problem(model=SimpleGroup())
         top.setup()
 
-        self.assertEqual(top['a'], 1)
-        self.assertEqual(top['b'], 1)
+        self.assertEqual(top.get_val('a'), 1)
+        self.assertEqual(top.get_val('b'), 1)
 
 
 class TestFeatureConnect(unittest.TestCase):
@@ -2451,23 +2451,20 @@ class TestFeatureConnect(unittest.TestCase):
 
         p = om.Problem()
 
-        indep_comp = om.IndepVarComp()
-        indep_comp.add_output('x', np.ones(5), units='ft')
+        p.model.set_input_defaults('x', np.ones(5), units='ft')
 
         exec_comp = om.ExecComp('y=sum(x)',
                                 x={'value': np.zeros(5), 'units': 'inch'},
                                 y={'units': 'inch'})
 
-        p.model.add_subsystem('indep', indep_comp)
-        p.model.add_subsystem('comp1', exec_comp)
-        p.model.connect('indep.x', 'comp1.x')
+        p.model.add_subsystem('comp1', exec_comp, promotes_inputs=['x'])
 
         p.setup()
         p.run_model()
 
-        assert_near_equal(p['indep.x'], np.ones(5))
-        assert_near_equal(p['comp1.x'], np.ones(5)*12.)
-        assert_near_equal(p['comp1.y'], 60.)
+        assert_near_equal(p.get_val('x', units='ft'), np.ones(5))
+        assert_near_equal(p.get_val('comp1.x'), np.ones(5)*12.)
+        assert_near_equal(p.get_val('comp1.y'), 60.)
 
     def test_connect_1_to_many(self):
         import numpy as np
@@ -2476,19 +2473,17 @@ class TestFeatureConnect(unittest.TestCase):
 
         p = om.Problem()
 
-        p.model.add_subsystem('indep', om.IndepVarComp('x', np.ones(5)))
-        p.model.add_subsystem('C1', om.ExecComp('y=sum(x)*2.0', x=np.zeros(5)))
-        p.model.add_subsystem('C2', om.ExecComp('y=sum(x)*4.0', x=np.zeros(5)))
-        p.model.add_subsystem('C3', om.ExecComp('y=sum(x)*6.0', x=np.zeros(5)))
-
-        p.model.connect('indep.x', ['C1.x', 'C2.x', 'C3.x'])
+        p.model.add_subsystem('C1', om.ExecComp('y=sum(x)*2.0', x=np.zeros(5)), promotes_inputs=['x'])
+        p.model.add_subsystem('C2', om.ExecComp('y=sum(x)*4.0', x=np.zeros(5)), promotes_inputs=['x'])
+        p.model.add_subsystem('C3', om.ExecComp('y=sum(x)*6.0', x=np.zeros(5)), promotes_inputs=['x'])
 
         p.setup()
+        p.set_val('x', np.ones(5))
         p.run_model()
 
-        assert_near_equal(p['C1.y'], 10.)
-        assert_near_equal(p['C2.y'], 20.)
-        assert_near_equal(p['C3.y'], 30.)
+        assert_near_equal(p.get_val('C1.y'), 10.)
+        assert_near_equal(p.get_val('C2.y'), 20.)
+        assert_near_equal(p.get_val('C3.y'), 30.)
 
     def test_connect_src_indices(self):
         import numpy as np
@@ -2582,10 +2577,10 @@ class TestFeatureSrcIndices(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(p['C1.x'], np.ones(3))
-        assert_near_equal(p['C1.y'], 6.)
-        assert_near_equal(p['C2.x'], np.ones(2))
-        assert_near_equal(p['C2.y'], 8.)
+        assert_near_equal(p.get_val('C1.x'), np.ones(3))
+        assert_near_equal(p.get_val('C1.y'), 6.)
+        assert_near_equal(p.get_val('C2.x'), np.ones(2))
+        assert_near_equal(p.get_val('C2.y'), 8.)
 
     def test_promote_src_indices_nonflat(self):
         import numpy as np
@@ -2623,10 +2618,10 @@ class TestFeatureSrcIndices(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(p['C1.x'],
+        assert_near_equal(p.get_val('C1.x'),
                          np.array([[0., 10.],
                                    [7., 4.]]))
-        assert_near_equal(p['C1.y'], 21.)
+        assert_near_equal(p.get_val('C1.y'), 21.)
 
     def test_group_promotes_src_indices(self):
         import numpy as np
@@ -2662,19 +2657,20 @@ class TestFeatureSrcIndices(unittest.TestCase):
 
         p = om.Problem()
 
-        p.model.add_subsystem('indep', om.IndepVarComp('x', np.ones(5)),
-                              promotes_outputs=['x'])
+        # p.model.add_subsystem('indep', om.IndepVarComp('x', np.ones(5)),
+        #                       promotes_outputs=['x'])
+        p.model.set_input_defaults('x', np.ones(5))
         p.model.add_subsystem('G1', MyGroup(), promotes_inputs=['x'])
 
         p.setup()
-
-        p['x'] = inp = np.array(range(5))
+        p.set_val('x', np.array(range(5)))
+        inp = np.array(range(5))
         p.run_model()
 
-        assert_near_equal(p['G1.comp1.x'], inp[:3])
-        assert_near_equal(p['G1.comp2.x'], inp[3:])
-        assert_near_equal(p['G1.comp1.y'], np.sum(inp[:3]*2))
-        assert_near_equal(p['G1.comp2.y'], np.sum(inp[3:]*4))
+        assert_near_equal(p.get_val('G1.comp1.x'), inp[:3])
+        assert_near_equal(p.get_val('G1.comp2.x'), inp[3:])
+        assert_near_equal(p.get_val('G1.comp1.y'), np.sum(inp[:3]*2))
+        assert_near_equal(p.get_val('G1.comp2.y'), np.sum(inp[3:]*4))
 
 
 class TestFeatureSetOrder(unittest.TestCase):
@@ -2884,17 +2880,15 @@ class TestFeatureGuessNonlinear(unittest.TestCase):
 
         p = om.Problem()
 
-        p.model.add_subsystem('parameters', om.IndepVarComp('input_value', 1.))
-        p.model.add_subsystem('discipline', Discipline())
-
-        p.model.connect('parameters.input_value', 'discipline.external_input')
+        p.model.add_subsystem('discipline', Discipline(), promotes_inputs=['external_input'])
 
         p.setup()
+        p.set_val('external_input', 1.)
         p.run_model()
 
         self.assertEqual(p.model.nonlinear_solver._iter_count, 0)
 
-        assert_near_equal(p['discipline.x'], 1.41421356, 1e-6)
+        assert_near_equal(p.get_val('discipline.x'), 1.41421356, 1e-6)
 
 
 class TestNaturalNaming(unittest.TestCase):

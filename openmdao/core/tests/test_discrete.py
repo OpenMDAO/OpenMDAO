@@ -153,7 +153,7 @@ class _DiscreteVal(object):
             val = val.getval()
         self._val *= val
         return self
-    
+
     def __eq__(self, val):
         if isinstance(val, _DiscreteVal):
             return self._val == val.getval()
@@ -814,6 +814,7 @@ class DiscretePromTestCase(unittest.TestCase):
 
 
 class DiscreteFeatureTestCase(unittest.TestCase):
+
     def test_feature_discrete(self):
         import numpy as np
         import openmdao.api as om
@@ -841,16 +842,15 @@ class DiscreteFeatureTestCase(unittest.TestCase):
 
         # build the model
         prob = om.Problem()
-        indeps = prob.model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
-        indeps.add_output('r_m', 3.2, units="ft")
-        indeps.add_output('chord', .3, units='ft')
 
         prob.model.add_subsystem('SolidityComp', BladeSolidity(),
                                  promotes_inputs=['r_m', 'chord', 'num_blades'])
 
         prob.setup()
 
-        prob['num_blades'] = 2
+        prob.set_val('num_blades', 2)
+        prob.set_val('r_m', 3.2)
+        prob.set_val('chord', .3)
 
         prob.run_model()
 
@@ -905,7 +905,7 @@ class DiscreteFeatureTestCase(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_near_equal(prob['comp.x'], 3., 1e-4)
+        assert_near_equal(prob.get_val('comp.x'), 3., 1e-4)
 
 
 if __name__ == "__main__":
