@@ -161,7 +161,6 @@ class Component(System):
         self._var_rel_names = {'input': [], 'output': []}
         self._var_rel2meta = {}
 
-        self._static_mode = False
         self._var_rel2meta.update(self._static_var_rel2meta)
         for type_ in ['input', 'output']:
             self._var_rel_names[type_].extend(self._static_var_rel_names[type_])
@@ -175,8 +174,6 @@ class Component(System):
         if self._num_par_fd > 1 and orig_comm.size > 1 and not (self._owns_approx_jac or
                                                                 self._approx_schemes):
             raise RuntimeError("%s: num_par_fd is > 1 but no FD is active." % self.msginfo)
-
-        self._static_mode = True
 
         self._set_vector_class()
 
@@ -488,6 +485,8 @@ class Component(System):
         var_rel2meta[name] = metadata
         var_rel_names['input'].append(name)
 
+        self._var_added(name)
+
         return metadata
 
     def add_discrete_input(self, name, val, desc='', tags=None):
@@ -539,6 +538,8 @@ class Component(System):
             raise ValueError("{}: Variable name '{}' already exists.".format(self.msginfo, name))
 
         var_rel2meta[name] = self._var_discrete['input'][name] = metadata
+
+        self._var_added(name)
 
         return metadata
 
@@ -689,6 +690,8 @@ class Component(System):
         var_rel2meta[name] = metadata
         var_rel_names['output'].append(name)
 
+        self._var_added(name)
+
         return metadata
 
     def add_discrete_output(self, name, val, desc='', tags=None):
@@ -740,7 +743,23 @@ class Component(System):
 
         var_rel2meta[name] = self._var_discrete['output'][name] = metadata
 
+        self._var_added(name)
+
         return metadata
+
+    def _var_added(self, name):
+        """
+        Notify config that a variable has been added.
+
+        Parameters
+        ----------
+        name : str
+            Name of the added variable.
+        """
+        if self._problem_meta is not None:
+            conf_info = self._problem_meta['config_info']
+            if conf_info is not None:
+                conf_info._var_added(self.pathname, name)
 
     def _update_dist_src_indices(self, abs_in2out, all_abs2meta, all_abs2idx, all_sizes):
         """

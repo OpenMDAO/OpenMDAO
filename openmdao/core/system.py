@@ -15,6 +15,7 @@ import numpy as np
 import networkx as nx
 
 import openmdao
+from openmdao.core.configinfo import _ConfigInfo
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.vectors.vector import INT_DTYPE, _full_slice
@@ -218,11 +219,6 @@ class System(object):
         dict of all driver responses added to the system.
     _rec_mgr : <RecordingManager>
         object that manages all recorders added to this system.
-    _static_mode : bool
-        If true, we are outside of setup.
-        In this case, add_input, add_output, and add_subsystem all add to the
-        '_static' versions of the respective data structures.
-        These data structures are never reset during setup.
     _static_subsystems_allprocs : [<System>, ...]
         List of subsystems that stores all subsystems added outside of setup.
     _static_design_vars : dict of dict
@@ -401,7 +397,6 @@ class System(object):
 
         self._conn_global_abs_in2out = {}
 
-        self._static_mode = True
         self._static_subsystems_allprocs = []
         self._static_design_vars = OrderedDict()
         self._static_responses = OrderedDict()
@@ -598,10 +593,13 @@ class System(object):
         # Besides setting up the processors, this method also builds the model hierarchy.
         self._setup_procs(self.pathname, comm, mode, self._problem_meta)
 
-        # Recurse model from the bottom to the top for configuring.
-        # Set static_mode to False in all subsystems because inputs & outputs may be created.
-        with self._static_mode_all(False):
+        prob_meta['config_info'] = _ConfigInfo()
+
+        try:
+            # Recurse model from the bottom to the top for configuring.
             self._configure()
+        finally:
+            prob_meta['config_info'] = None
 
         self._configure_check()
 
@@ -2022,19 +2020,6 @@ class System(object):
                 vec.scale('phys')
 
     @contextmanager
-    def _static_mode_all(self, static_mode):
-        """
-        Context manager that temporarily sets the static mode of all subsystems.
-        """
-        for system in self.system_iter(include_self=True, recurse=True):
-            system._static_mode = static_mode
-
-        yield
-
-        for system in self.system_iter(include_self=True, recurse=True):
-            system._static_mode = not static_mode
-
-    @contextmanager
     def _matvec_context(self, vec_name, scope_out, scope_in, mode, clear=True):
         """
         Context manager for vectors.
@@ -2220,6 +2205,21 @@ class System(object):
     @property
     def _recording_iter(self):
         return self._problem_meta['recording_iter']
+
+    @property
+    def _static_mode(self):
+        """
+        Return True if we are outside of setup.
+
+        In this case, add_input, add_output, and add_subsystem all add to the
+        '_static' versions of the respective data structures.
+        These data structures are never reset during setup.
+
+        Returns
+        -------
+        True if outside of setup.
+        """
+        return self._problem_meta is None or self._problem_meta['static_mode']
 
     def _set_solver_print(self, level=2, depth=1e99, type_='all'):
         """

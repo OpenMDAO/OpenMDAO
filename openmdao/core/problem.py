@@ -849,12 +849,18 @@ class Problem(object):
             'solver_info': SolverInfo(),
             'use_derivatives': derivatives,
             'force_alloc_complex': force_alloc_complex,
-            'connections': {},
+            'connections': {},  # all connections in the model (after setup)
             'remote_systems': {},
             'remote_vars': {},  # does not include distrib vars
-            'prom2abs': {'input': {}, 'output': {}}  # includes ALL promotes including buried ones
+            'prom2abs': {'input': {}, 'output': {}},  # includes ALL promotes including buried ones
+            'static_mode': False,
+            'config_info': None,  # used during config to determine if additional updates required
+            'parallel_groups': [],  # list of pathnames of parallel groups in this proc
         }
         model._setup(model_comm, mode, self._metadata)
+
+        # set static mode back to True in all systems in this Problem
+        self._metadata['static_mode'] = True
 
         # Cache all args for final setup.
         self._check = check

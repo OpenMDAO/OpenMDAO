@@ -314,15 +314,22 @@ class Group(System):
         """
         for subsys in self._subsystems_myproc:
             subsys._configure()
+            subsys._setup_var_data()
 
-            if subsys._has_guess:
-                self._has_guess = True
-            if subsys._has_bounds:
-                self._has_bounds = True
-            if subsys.matrix_free:
-                self.matrix_free = True
+            self._has_guess |= subsys._has_guess
+            self._has_bounds |= subsys._has_bounds
+            self.matrix_free |= subsys.matrix_free
+
+        conf_info = self._problem_meta['config_info']
+        conf_info._clear()
 
         self.configure()
+
+        # if our configure() has added or promoted any variables, we have to call
+        # _setup_var_data again on any modified systems and their ancestors (only those that
+        # are our descendents).
+        for s in conf_info._modified_system_iter(self):
+            s._setup_var_data()
 
     def _setup_procs(self, pathname, comm, mode, prob_meta):
         """
@@ -369,16 +376,16 @@ class Group(System):
         self._manual_connections = {}
         self._approx_subjac_keys = None
 
-        self._static_mode = False
         self._subsystems_allprocs.extend(self._static_subsystems_allprocs)
         self._manual_connections.update(self._static_manual_connections)
 
         # Call setup function for this group.
         self.setup()
 
-        self._static_mode = True
-
         if MPI:
+            if self._mpi_proc_allocator.parallel:
+                self._problem_meta['parallel_groups'].append(self.pathname)
+
             proc_info = [self._proc_info[s.name] for s in self._subsystems_allprocs]
 
             # Call the load balancing algorithm
@@ -431,6 +438,13 @@ class Group(System):
         self._subgroups_myproc = [s for s in self._subsystems_myproc if isinstance(s, Group)]
 
         self._loc_subsys_map = {s.name: s for s in self._subsystems_myproc}
+
+        if self._problem_meta['parallel_groups']:
+            prefix = self.pathname + '.' if self.pathname else ''
+            for par in self._problem_meta['parallel_groups']:
+                if par.startswith(prefix) and par != prefix:
+                    self._contains_parallel_group = True
+                    break
 
         self._setup_procs_finished = True
 
@@ -693,7 +707,6 @@ class Group(System):
             meta['path'] = self.pathname  # used for error reporting
 
         for subsys in self._subsystems_myproc:
-            subsys._setup_var_data()
             self._has_output_scaling |= subsys._has_output_scaling
             self._has_resid_scaling |= subsys._has_resid_scaling
 
@@ -855,7 +868,6 @@ class Group(System):
         vec_names = self._lin_rel_vec_name_list if self._use_derivatives else self._vec_names
 
         n_distrib_vars = 0
-        n_parallel_sub = 0
 
         # Compute _var_sizes
         for vec_name in vec_names:
@@ -872,8 +884,6 @@ class Group(System):
                             n_distrib_vars += 1
                     elif subsys._has_distrib_vars:
                         n_distrib_vars += 1
-                    elif subsys._contains_parallel_group or subsys._mpi_proc_allocator.parallel:
-                        n_parallel_sub += 1
 
                     if vec_name not in subsys._rel_vec_names:
                         continue
@@ -905,7 +915,6 @@ class Group(System):
                     self.comm.Allgather(sizes_in, sizes[type_])
 
             self._has_distrib_vars = self.comm.allreduce(n_distrib_vars) > 0
-            self._contains_parallel_group = self.comm.allreduce(n_parallel_sub) > 0
 
             if (self._has_distrib_vars or self._contains_parallel_group or
                 not np.all(self._var_sizes[vec_names[0]]['output']) or
@@ -1632,6 +1641,11 @@ class Group(System):
                 if original == original_inside and new != new_inside:
                     raise RuntimeError("%s: Trying to promote '%s' when it has been aliased to "
                                        "'%s'." % (self.msginfo, original_inside, new))
+
+        if self._problem_meta is not None:
+            conf_info = self._problem_meta['config_info']
+            if conf_info is not None:
+                conf_info._prom_added(self.pathname, any=any, inputs=inputs, outputs=outputs)
 
     def add_subsystem(self, name, subsys, promotes=None,
                       promotes_inputs=None, promotes_outputs=None,
@@ -2725,12 +2739,8 @@ class Group(System):
             return auto_ivc
 
         auto_ivc._setup_procs(auto_ivc.pathname, self.comm, mode, self._problem_meta)
-        auto_ivc._static_mode = False
-        try:
-            auto_ivc._configure()
-            auto_ivc._configure_check()
-        finally:
-            auto_ivc._static_mode = True
+        auto_ivc._configure()
+        auto_ivc._configure_check()
         auto_ivc._setup_var_data()
 
         # now update our own data structures based on the new auto_ivc component variables
