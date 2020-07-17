@@ -124,13 +124,7 @@ class TestProblemCheckPartials(unittest.TestCase):
     def test_incorrect_jacobian(self):
 
         prob = om.Problem()
-
-        prob.model.add_subsystem('p1', om.IndepVarComp('x1', 3.0))
-        prob.model.add_subsystem('p2', om.IndepVarComp('x2', 5.0))
         prob.model.add_subsystem('comp', MyComp())
-
-        prob.model.connect('p1.x1', 'comp.x1')
-        prob.model.connect('p2.x2', 'comp.x2')
 
         prob.set_solver_print(level=0)
 
@@ -1851,12 +1845,7 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         prob = om.Problem()
 
-        prob.model.add_subsystem('p1', om.IndepVarComp('x1', 3.0))
-        prob.model.add_subsystem('p2', om.IndepVarComp('x2', 5.0))
         prob.model.add_subsystem('comp', MyComp())
-
-        prob.model.connect('p1.x1', 'comp.x1')
-        prob.model.connect('p2.x2', 'comp.x2')
 
         prob.set_solver_print(level=0)
 
@@ -1898,12 +1887,7 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         prob = om.Problem()
 
-        prob.model.add_subsystem('p1', om.IndepVarComp('x1', 3.0))
-        prob.model.add_subsystem('p2', om.IndepVarComp('x2', 5.0))
         prob.model.add_subsystem('comp', MyComp())
-
-        prob.model.connect('p1.x1', 'comp.x1')
-        prob.model.connect('p2.x2', 'comp.x2')
 
         prob.set_solver_print(level=0)
 
@@ -1920,13 +1904,9 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         prob = om.Problem()
 
-        prob.model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
-        prob.model.add_subsystem('p2', om.IndepVarComp('y', 5.0))
         comp = prob.model.add_subsystem('comp', ParaboloidTricky())
         prob.model.add_subsystem('comp2', ParaboloidMatVec())
 
-        prob.model.connect('p1.x', 'comp.x')
-        prob.model.connect('p2.y', 'comp.y')
         prob.model.connect('comp.f_xy', 'comp2.x')
 
         prob.set_solver_print(level=0)
@@ -1945,13 +1925,9 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         prob = om.Problem()
 
-        prob.model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
-        prob.model.add_subsystem('p2', om.IndepVarComp('y', 5.0))
         prob.model.add_subsystem('comp', ParaboloidTricky())
         prob.model.add_subsystem('comp2', ParaboloidMatVec())
 
-        prob.model.connect('p1.x', 'comp.x')
-        prob.model.connect('p2.y', 'comp.y')
         prob.model.connect('comp.f_xy', 'comp2.x')
 
         prob.set_solver_print(level=0)
@@ -1968,13 +1944,9 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         prob = om.Problem()
 
-        prob.model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
-        prob.model.add_subsystem('p2', om.IndepVarComp('y', 5.0))
         comp = prob.model.add_subsystem('comp', ParaboloidTricky())
         prob.model.add_subsystem('comp2', ParaboloidMatVec())
 
-        prob.model.connect('p1.x', 'comp.x')
-        prob.model.connect('p2.y', 'comp.y')
         prob.model.connect('comp.f_xy', 'comp2.x')
 
         prob.set_solver_print(level=0)
@@ -1993,13 +1965,9 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         prob = om.Problem()
 
-        prob.model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
-        prob.model.add_subsystem('p2', om.IndepVarComp('y', 5.0))
         prob.model.add_subsystem('comp', ParaboloidTricky())
         prob.model.add_subsystem('comp2', ParaboloidMatVec())
 
-        prob.model.connect('p1.x', 'comp.x')
-        prob.model.connect('p2.y', 'comp.y')
         prob.model.connect('comp.f_xy', 'comp2.x')
 
         prob.set_solver_print(level=0)
@@ -2016,13 +1984,9 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         prob = om.Problem()
 
-        prob.model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
-        prob.model.add_subsystem('p2', om.IndepVarComp('y', 5.0))
         prob.model.add_subsystem('comp', ParaboloidTricky())
         prob.model.add_subsystem('comp2', ParaboloidMatVec())
 
-        prob.model.connect('p1.x', 'comp.x')
-        prob.model.connect('p2.y', 'comp.y')
         prob.model.connect('comp.f_xy', 'comp2.x')
 
         prob.set_solver_print(level=0)
@@ -2038,12 +2002,7 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         prob = om.Problem()
 
-        prob.model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
-        prob.model.add_subsystem('p2', om.IndepVarComp('y', 5.0))
         prob.model.add_subsystem('comp', ParaboloidTricky())
-
-        prob.model.connect('p1.x', 'comp.x')
-        prob.model.connect('p2.y', 'comp.y')
 
         prob.set_solver_print(level=0)
 
@@ -2089,15 +2048,10 @@ class TestCheckPartialsFeature(unittest.TestCase):
                 J['z', 'y2'] = np.array([40.0])
 
         prob = om.Problem()
-        prob.model.add_subsystem('p0', om.IndepVarComp('x1', 3.0))
-        prob.model.add_subsystem('p1', om.IndepVarComp('x2', 5.0))
-        prob.model.add_subsystem('p2', om.IndepVarComp('y2', 6.0))
         prob.model.add_subsystem('good', MyCompGoodPartials())
         prob.model.add_subsystem('bad', MyCompBadPartials())
-        prob.model.connect('p0.x1', 'good.x1')
-        prob.model.connect('p1.x2', 'good.x2')
         prob.model.connect('good.y', 'bad.y1')
-        prob.model.connect('p2.y2', 'bad.y2')
+
         prob.set_solver_print(level=0)
         prob.setup()
         prob.run_model()

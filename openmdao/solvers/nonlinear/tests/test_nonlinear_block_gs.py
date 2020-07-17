@@ -60,9 +60,6 @@ class TestNLBGaussSeidel(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
-
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
@@ -80,11 +77,12 @@ class TestNLBGaussSeidel(unittest.TestCase):
         nlbgs.options['rtol'] = 1e-6
 
         prob.setup()
-
+        prob.set_val('x', 1.)
+        prob.set_val('z', np.array([5.0, 2.0]))
         prob.run_model()
 
-        assert_near_equal(prob['y1'], 25.58830273, .00001)
-        assert_near_equal(prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob.get_val('y1'), 25.58830273, .00001)
+        assert_near_equal(prob.get_val('y2'), 12.05848819, .00001)
 
     def test_feature_basic(self):
         import numpy as np
@@ -95,8 +93,8 @@ class TestNLBGaussSeidel(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+        model.set_input_defaults('x', 1.)
+        model.set_input_defaults('z', np.array([5.0, 2.0]))
 
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
@@ -126,8 +124,8 @@ class TestNLBGaussSeidel(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+        model.set_input_defaults('x', 1.)
+        model.set_input_defaults('z', np.array([5.0, 2.0]))
 
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
@@ -158,8 +156,8 @@ class TestNLBGaussSeidel(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+        model.set_input_defaults('x', 1.)
+        model.set_input_defaults('z', np.array([5.0, 2.0]))
 
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
@@ -190,8 +188,8 @@ class TestNLBGaussSeidel(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+        model.set_input_defaults('x', 1.)
+        model.set_input_defaults('z', np.array([5.0, 2.0]))
 
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
@@ -219,8 +217,8 @@ class TestNLBGaussSeidel(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+        model.set_input_defaults('x', 1.)
+        model.set_input_defaults('z', np.array([5.0, 2.0]))
 
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
