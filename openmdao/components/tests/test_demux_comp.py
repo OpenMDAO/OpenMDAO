@@ -180,8 +180,6 @@ class TestFeature(unittest.TestCase):
 
         p.run_model()
 
-        p.model.connect('indep.x', 'C1.x', src_indices=om.slicer[:, 1])
-
         expected = np.arctan(p.get_val('pos_ecef', indices=om.slicer[:, 1]) / p.get_val('pos_ecef', indices=om.slicer[:, 0]))
         assert_near_equal(p.get_val('longitude_comp.long'), expected)
 
