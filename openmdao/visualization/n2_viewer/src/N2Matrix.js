@@ -19,10 +19,12 @@ class N2Matrix {
      * @param {ModelData} model The pre-processed model data.
      * @param {N2Layout} layout Pre-computed layout of the diagram.
      * @param {Object} n2Groups References to <g> SVG elements created by N2Diagram.
+     * @param {N2ArrowManager} arrowMgr Object to create and manage conn. arrows.
      * @param {Boolean} lastClickWasLeft
      * @param {function} findRootOfChangeFunction
      */
-    constructor(model, layout, n2Groups, lastClickWasLeft,
+    constructor(model, layout, n2Groups, arrowMgr,
+        lastClickWasLeft,
         findRootOfChangeFunction,
         prevNodeSize = {
             'width': 0,
@@ -33,6 +35,7 @@ class N2Matrix {
         this.layout = layout;
         this.diagNodes = layout.visibleNodes;
         this.n2Groups = n2Groups;
+        this.arrowMgr = arrowMgr;
         this.lastClickWasLeft = lastClickWasLeft;
         this.findRootOfChangeFunction = findRootOfChangeFunction;
 
@@ -41,6 +44,7 @@ class N2Matrix {
             'width': layout.size.n2matrix.width / this.diagNodes.length,
             'height': layout.size.n2matrix.height / this.diagNodes.length,
         }
+        this.arrowMgr.setNodeSize(this.nodeSize);
 
         let markerSize = Math.max(2, this.nodeSize.width * .04, this.nodeSize.height * .04);
         d3.select("#arrow").attr("markerWidth", markerSize).attr("markerHeight", markerSize);
@@ -608,26 +612,23 @@ class N2Matrix {
      * Iterate through all the offscreen connection sets of the
      * hovered cell and draw an arrow/add a tooltip for each.
      */
-    _drawOffscreenArrows(cell, lineWidth) {
+    _drawOffscreenArrows(cell) {
         if (!cell.offScreen.total) return;
 
         for (let side in cell.offScreen) {
             for (let dir in cell.offScreen[side]) {
                 for (let offscreenNode of cell.offScreen[side][dir]) {
-                    new (N2OffGridArrow.arrowDir[side][dir])(
-                        {
-                            'cell': {
-                                'col': cell.row,
-                                'row': cell.row,
-                                'srcId': cell.srcObj.id,
-                                'tgtId': cell.tgtObj.id
-                            },
-                            'width': lineWidth,
-                            'matrixSize': this.diagNodes.length,
-                            'label': offscreenNode.absPathName,
-                            'offscreenId': offscreenNode.id
+                    this.arrowMgr.addOffGridArrow(cell.id, side, dir, {
+                        'cell': {
+                            'col': cell.row,
+                            'row': cell.row,
+                            'srcId': cell.srcObj.id,
+                            'tgtId': cell.tgtObj.id
                         },
-                        this.n2Groups, this.nodeSize);
+                        'matrixSize': this.diagNodes.length,
+                        'label': offscreenNode.absPathName,
+                        'offscreenId': offscreenNode.id
+                    });
                 }
             }
         }
@@ -639,63 +640,55 @@ class N2Matrix {
      * @returns {Array} The highlights that can optionally be performed.
      */
     drawOnDiagonalArrows(cell) {
-        // Loop over all elements in the matrix looking for other cells in the same column as
-        let lineWidth = Math.min(4, this.nodeSize.width * .5, this.nodeSize.height * .5);
-
+        // Loop over all elements in the matrix looking for other cells in the same column
         this._drawOffscreenArrows(cell, lineWidth);
-
-        let highlights = [{'cell': cell, 'varType': 'self', 'direction': 'self'}];
+        let highlights = [{ 'cell': cell, 'varType': 'self', 'direction': 'self' }];
 
         for (let col = 0; col < this.layout.visibleNodes.length; ++col) {
             if (this.exists(cell.row, col)) {
                 if (col != cell.row) {
-
-                    new N2BentArrow(
-                        {
-                            'end': {
-                                'col': col,
-                                'row': col,
-                                'id': this.grid[col][col].srcObj.id
-                            },
-                            'start': {
-                                'col': cell.row,
-                                'row': cell.row,
-                                'id': cell.tgtObj.id
-                            },
-                            'color': N2Style.color.greenArrow,
-                            'width': lineWidth
+                    this.arrowMgr.addFullArrow(cell.id, {
+                        'end': {
+                            'col': col,
+                            'row': col,
+                            'id': this.grid[col][col].srcObj.id
                         },
-                        this.n2Groups, this.nodeSize);
+                        'start': {
+                            'col': cell.row,
+                            'row': cell.row,
+                            'id': cell.tgtObj.id
+                        },
+                        'color': N2Style.color.greenArrow,
+                    });
 
-                    highlights.push({'cell': this.cell(cell.row, col), 'varType': 'target', 'direction': 'output'});
-                    // this.cell(cell.row, col).highlight('target', 'output');
+                    highlights.push({
+                        'cell': this.cell(cell.row, col),
+                        'varType': 'target', 'direction': 'output'
+                    });
                 }
-
             }
 
             // Now swap row and col
             if (this.exists(col, cell.row)) {
                 if (col != cell.row) {
-
-                    new N2BentArrow(
-                        {
-                            'start': {
-                                'col': col,
-                                'row': col,
-                                'id': this.grid[col][col].srcObj.id
-                            },
-                            'end': {
-                                'col': cell.row,
-                                'row': cell.row,
-                                'id': cell.tgtObj.id
-                            },
-                            'color': N2Style.color.redArrow,
-                            'width': lineWidth
+                    this.arrowMgr.addFullArrow(cell.id, {
+                        'start': {
+                            'col': col,
+                            'row': col,
+                            'id': this.grid[col][col].srcObj.id
                         },
-                        this.n2Groups, this.nodeSize);
+                        'end': {
+                            'col': cell.row,
+                            'row': cell.row,
+                            'id': cell.tgtObj.id
+                        },
+                        'color': N2Style.color.redArrow,
+                    });
 
-                    highlights.push({'cell': this.cell(col, cell.row), 'varType': 'source', 'direction': 'input'});
-                    // this.cell(col, cell.row).highlight('source', 'input');
+                    highlights.push({
+                        'cell': this.cell(col, cell.row),
+                        'varType': 'source', 'direction': 'input'
+                    });
                 }
             }
         }
@@ -739,22 +732,20 @@ class N2Matrix {
         }
 
         for (let arrow of arrows) {
-            new N2BentArrow(
-                {
-                    'start': {
-                        'col': arrow.start,
-                        'row': arrow.start,
-                        'id': this.grid[arrow.start][arrow.start].srcObj.id
-                    },
-                    'end': {
-                        'col': arrow.end,
-                        'row': arrow.end,
-                        'id': this.grid[arrow.end][arrow.end].tgtObj.id
-                    },
-                    'color': (startIndex < endIndex) ?
-                        N2Style.color.greenArrow : N2Style.color.redArrow,
-                    'width': lineWidth
-                }, this.n2Groups, this.nodeSize);
+            this.arrowMgr.addFullArrow(cell.id, {
+                'start': {
+                    'col': arrow.start,
+                    'row': arrow.start,
+                    'id': this.grid[arrow.start][arrow.start].srcObj.id
+                },
+                'end': {
+                    'col': arrow.end,
+                    'row': arrow.end,
+                    'id': this.grid[arrow.end][arrow.end].tgtObj.id
+                },
+                'color': (startIndex < endIndex) ?
+                    N2Style.color.greenArrow : N2Style.color.redArrow,
+            });
         }
     }
 
@@ -763,25 +754,22 @@ class N2Matrix {
      * @param {N2MatrixCell} cell The off-diagonal cell to draw arrows for.
      */
     drawOffDiagonalArrows(cell) {
-        let lineWidth = Math.min(5, this.nodeSize.width * .5, this.nodeSize.height * .5);
         let src = this.diagNodes[cell.row];
         let tgt = this.diagNodes[cell.col];
 
-        new N2BentArrow(
-            {
-                'start': {
-                    'col': cell.row,
-                    'row': cell.row,
-                    'id': cell.srcObj.id
-                },
-                'end': {
-                    'col': cell.col,
-                    'row': cell.col,
-                    'id': cell.tgtObj.id
-                },
-                'color': N2Style.color.redArrow,
-                'width': lineWidth
-            }, this.n2Groups, this.nodeSize);
+        this.arrowMgr.addFullArrow(cell.id, {
+            'start': {
+                'col': cell.row,
+                'row': cell.row,
+                'id': cell.srcObj.id
+            },
+            'end': {
+                'col': cell.col,
+                'row': cell.col,
+                'id': cell.tgtObj.id
+            },
+            'color': N2Style.color.redArrow,
+        });
 
         if (cell.row > cell.col) {
             let targetsWithCycleArrows = tgt.getNodesWithCycleArrows();

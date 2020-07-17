@@ -35,11 +35,6 @@ class N2Diagram {
         // Assign this way because defaultDims is read-only.
         this.dims = JSON.parse(JSON.stringify(defaultDims));
 
-        // Keep track of arrows to show and hide them
-        this.arrowCache = [];
-        this.hoverArrows = new N2ArrowCache();
-        this.pinnedArrows = new N2ArrowCache();
-
         this._referenceD3Elements();
         this.transitionStartDelay = N2TransitionDefaults.startDelay;
         this.chosenCollapseDepth = -1;
@@ -50,8 +45,10 @@ class N2Diagram {
             this.showLinearSolverNames, this.dims);
         this.search = new N2Search(this.zoomedElement, this.model.root);
         this.ui = new N2UserInterface(this);
+        // Keep track of arrows to show and hide them
+        this.arrowMgr = new N2ArrowManager(this.dom.n2Groups);
         this.matrix = new N2Matrix(this.model, this.layout, this.dom.n2Groups,
-            true, this.ui.findRootOfChangeFunction);
+            this.arrowMgr, true, this.ui.findRootOfChangeFunction);
 
         // TODO: Move to N2Layout
         this.scales = {
@@ -578,8 +575,6 @@ class N2Diagram {
                     self.scales.solver.y(d.solverDims.y) + ")";
             });
 
-
-
         nodeUpdate.select("rect")
             .attr("width", function (d) {
                 return d.solverDims.width * self.transitCoords.solver.x;
@@ -636,25 +631,6 @@ class N2Diagram {
 
     clearHighlights() {
         this.dom.highlightBar.selectAll('rect').remove();
-    }
-
-    /**
-     * Iterate through the pinned arrow cache and update the connections
-     * for each visible cell.
-     */
-    transitionCachedArrows() {
-        for (const arrow of this.arrowCache) {
-            const cell = this.matrix.findCellById(arrow.id);
-            if (cell) {
-                debugInfo("Drawing arrows for visible cell.")
-                this.matrix.drawConnectionArrows(cell, true);
-            }
-            else {
-                debugInfo("Removing arrows from offscreen node.")
-                arrow.element.remove();
-            }
-            // TODO: Handle arrows that are coming in from offscreen cells
-        }
     }
 
     clearArrows() {
@@ -717,7 +693,7 @@ class N2Diagram {
             this.ui.updateClickedIndices();
 
             this.matrix = new N2Matrix(this.model, this.layout,
-                this.dom.n2Groups, this.ui.lastClickWasLeft,
+                this.dom.n2Groups, this.hoverArrows, this.ui.lastClickWasLeft,
                 this.ui.findRootOfChangeFunction, this.matrix.nodeSize);
         }
 
@@ -732,7 +708,7 @@ class N2Diagram {
         this._setupSolverTransition(d3SolverRefs);
         this._runSolverTransition(d3SolverRefs.selection);
 
-        this.transitionCachedArrows();        
+        this.arrowMgr.transition(this.matrix);
         this.matrix.draw();
 
         if (!d3.selection.prototype.transitionAllowed) this.hideWaiter();
@@ -819,9 +795,9 @@ class N2Diagram {
         }
     }
 
-    /** When the mouse leaves a cell, remove all temporary arrows. */
+    /** When the mouse leaves a cell, remove all temporary arrows and highlights. */
     mouseOut() {
-        this.dom.n2OuterGroup.selectAll(".n2_hover_elements").remove();
+        this.arrowMgr.removeAllHovered();
         this.clearHighlights();
         d3.selectAll("div.offgrid").style("visibility", "hidden").html('');
 
@@ -836,34 +812,7 @@ class N2Diagram {
      */
     mouseClick(cell) {
         if (this.ui.nodeInfoBox.hidden) { // If not in info-panel mode, pin/unpin arrows
-            const newClassName = "n2_hover_elements_" + cell.id;
-            let selection = this.dom.n2OuterGroup.selectAll("." + newClassName);
-            if (selection.size() > 0) {
-                // Connections of the clicked cell were already pinned,
-                // so unpin them and remove from cache
-                selection.remove();
-                const arrow = this.arrowCache.find(o => o.cell.id == cell.id);
-                const arrowIndex = this.arrowCache.indexOf(arrow);
-                this.arrowCache.splice(arrowIndex, 1);
-            }
-            else {
-                debugInfo("Pinning arrows from cell " + cell.id)
-                // Connections of the clicked cell are already visible,
-                // now pin them and add them to the cache
-                const arrow = {
-                    'id': cell.id,
-                    'cell': cell,
-                    // This selectAll works b/c only hovered cell's arrows have these classes:
-                    'element': this.dom.n2OuterGroup 
-                        .selectAll(".n2_hover_elements"),
-                    'className': newClassName
-                }
-                this.arrowCache.push(arrow);
-                this.dom.n2OuterGroup
-                    .selectAll(".n2_hover_elements")
-                    .classed('n2_hover_elements', false)
-                    .classed(newClassName, true);
-            }
+            this.arrowMgr.togglePin(cell.id);
         }
         else { // Pin/unpin the info panel
             this.ui.nodeInfoBox.togglePin();
