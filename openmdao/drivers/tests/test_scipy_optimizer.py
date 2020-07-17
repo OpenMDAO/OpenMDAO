@@ -1,7 +1,6 @@
 """ Unit tests for the ScipyOptimizeDriver."""
 
 import unittest
-import sys
 
 from distutils.version import LooseVersion
 
@@ -287,6 +286,9 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         model.add_objective('f_xy')
 
         prob.setup()
+
+        prob.set_val('x', 50.)
+        prob.set_val('y', 50.)
 
         failed = prob.run_driver()
 
@@ -1912,11 +1914,11 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.set_input_defaults('x', 50.0)
-        model.set_input_defaults('y', 50.0)
-
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
+
+        model.set_input_defaults('x', 50.0)
+        model.set_input_defaults('y', 50.0)
 
         prob.set_solver_print(level=0)
 
@@ -1944,11 +1946,11 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.set_input_defaults('x', 50.0)
-        model.set_input_defaults('y', 50.0)
-
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
+
+        model.set_input_defaults('x', 50.0)
+        model.set_input_defaults('y', 50.0)
 
         prob.set_solver_print(level=0)
 
