@@ -136,34 +136,21 @@ class TestHohmannTransfer(unittest.TestCase):
 
         model = prob.model
 
-        ivc = model.add_subsystem('ivc', om.IndepVarComp(), promotes_outputs=['*'])
-        ivc.add_output('mu', val=0.0, units='km**3/s**2')
-        ivc.add_output('r1', val=0.0, units='km')
-        ivc.add_output('r2', val=0.0, units='km')
-        ivc.add_output('dinc1', val=0.0, units='deg')
-        ivc.add_output('dinc2', val=0.0, units='deg')
+        model.add_subsystem('leo', subsys=VCircComp(), promotes_inputs=[('r', 'r1'), 'mu'])
+        model.add_subsystem('geo', subsys=VCircComp(), promotes_inputs=[('r', 'r2'), 'mu'])
 
-        model.add_subsystem('leo', subsys=VCircComp())
-        model.add_subsystem('geo', subsys=VCircComp())
+        model.add_subsystem('transfer', subsys=TransferOrbitComp(),
+                            promotes_inputs=[('rp', 'r1'), ('ra', 'r2'), 'mu'])
 
-        model.add_subsystem('transfer', subsys=TransferOrbitComp())
-
-        model.connect('r1', ['leo.r', 'transfer.rp'])
-        model.connect('r2', ['geo.r', 'transfer.ra'])
-
-        model.connect('mu', ['leo.mu', 'geo.mu', 'transfer.mu'])
-
-        model.add_subsystem('dv1', subsys=DeltaVComp())
+        model.add_subsystem('dv1', subsys=DeltaVComp(), promotes_inputs=[('dinc', 'dinc1')])
 
         model.connect('leo.vcirc', 'dv1.v1')
         model.connect('transfer.vp', 'dv1.v2')
-        model.connect('dinc1', 'dv1.dinc')
 
-        model.add_subsystem('dv2', subsys=DeltaVComp())
+        model.add_subsystem('dv2', subsys=DeltaVComp(), promotes_inputs=[('dinc', 'dinc2')])
 
         model.connect('transfer.va', 'dv2.v1')
         model.connect('geo.vcirc', 'dv2.v2')
-        model.connect('dinc2', 'dv2.dinc')
 
         model.add_subsystem('dv_total',
                             subsys=om.ExecComp('delta_v=dv1+dv2',
@@ -180,10 +167,7 @@ class TestHohmannTransfer(unittest.TestCase):
                                                dinc={'units': 'deg'},
                                                dinc1={'units': 'deg'},
                                                dinc2={'units': 'deg'}),
-                            promotes=['dinc'])
-
-        model.connect('dinc1', 'dinc_total.dinc1')
-        model.connect('dinc2', 'dinc_total.dinc2')
+                            promotes=['dinc', 'dinc1', 'dinc2'])
 
         prob.driver = om.ScipyOptimizeDriver()
 
@@ -192,16 +176,15 @@ class TestHohmannTransfer(unittest.TestCase):
         model.add_constraint('dinc', lower=28.5, upper=28.5, scaler=1.0)
         model.add_objective('delta_v', scaler=1.0)
 
+        # set defaults for our promoted variables to remove ambiguities in value and/or units
+        model.set_input_defaults('r1', val=42164.0)
+        model.set_input_defaults('r2', val=398600.4418)
+        model.set_input_defaults('mu', val=398600.4418)
+        model.set_input_defaults('dinc1', val=0., units='deg')
+        model.set_input_defaults('dinc2', val=28.5, units='deg')
+
         # Setup the problem
-
         prob.setup()
-
-        prob['mu'] = 398600.4418
-        prob['r1'] = 6778.137
-        prob['r2'] = 42164.0
-
-        prob['dinc1'] = 0
-        prob['dinc2'] = 28.5
 
         # Execute the model with the given inputs
         prob.run_model()

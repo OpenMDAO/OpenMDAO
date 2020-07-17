@@ -38,7 +38,7 @@ class TestCase(unittest.TestCase):
 
         prob.run_driver()
 
-        assert_near_equal(prob['inputs_comp.h'],
+        assert_near_equal(prob['h'],
                          [0.14915754,  0.14764328,  0.14611321,  0.14456715,  0.14300421,  0.14142417,
                           0.13982611,  0.13820976,  0.13657406,  0.13491866,  0.13324268,  0.13154528,
                           0.12982575,  0.12808305,  0.12631658,  0.12452477,  0.12270701,  0.12086183,
@@ -148,9 +148,9 @@ class TestCase(unittest.TestCase):
         prob.run_model()
 
         derivs = prob.check_totals(method='cs', out_stream=None)
-        assert_near_equal(derivs[('compliance_comp.compliance', 'inputs_comp.h')]['rel error'][0],
+        assert_near_equal(derivs[('compliance_comp.compliance', 'h')]['rel error'][0],
                          0.0, 1e-8)
-        assert_near_equal(derivs[('volume_comp.volume', 'inputs_comp.h')]['rel error'][0],
+        assert_near_equal(derivs[('volume_comp.volume', 'h')]['rel error'][0],
                          0.0, 1e-8)
 
         derivs = prob.check_partials(method='cs', out_stream=None)
@@ -182,9 +182,9 @@ class TestCase(unittest.TestCase):
         prob.run_model()
 
         derivs = prob.check_totals(method='cs', out_stream=None)
-        assert_near_equal(derivs[('obj_sum.obj', 'inputs_comp.h_cp')]['rel error'][0],
+        assert_near_equal(derivs[('obj_sum.obj', 'interp.h_cp')]['rel error'][0],
                          0.0, 1e-8)
-        assert_near_equal(derivs[('volume_comp.volume', 'inputs_comp.h_cp')]['rel error'][0],
+        assert_near_equal(derivs[('volume_comp.volume', 'interp.h_cp')]['rel error'][0],
                          0.0, 1e-8)
 
         derivs = prob.check_partials(method='cs', out_stream=None)

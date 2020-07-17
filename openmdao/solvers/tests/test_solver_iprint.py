@@ -38,8 +38,8 @@ class TestSolverPrint(unittest.TestCase):
         newton.options['maxiter'] = 2
 
         # use a real bad initial guess
-        prob['y1'] = 10000
-        prob['y2'] = -26
+        prob.set_val('y1', 10000)
+        prob.set_val('y2', -26)
 
         newton.options['iprint'] = -1
         scipy.options['iprint'] = -1
@@ -71,8 +71,8 @@ class TestSolverPrint(unittest.TestCase):
 
         newton.options['maxiter'] = 1
 
-        prob['y1'] = 10000
-        prob['y2'] = -26
+        prob.set_val('y1', 10000)
+        prob.set_val('y2', -26)
 
         newton.options['iprint'] = 0
         scipy.options['iprint'] = 0
@@ -107,8 +107,8 @@ class TestSolverPrint(unittest.TestCase):
 
         newton.options['maxiter'] = 20
 
-        prob['y1'] = 10000
-        prob['y2'] = -26
+        prob.set_val('y1', 10000)
+        prob.set_val('y2', -26)
 
         newton.options['iprint'] = 1
         scipy.options['iprint'] = 0
@@ -141,8 +141,8 @@ class TestSolverPrint(unittest.TestCase):
 
         newton.options['maxiter'] = 20
 
-        prob['y1'] = 10000
-        prob['y2'] = -20
+        prob.set_val('y1', 10000)
+        prob.set_val('y2', -26)
 
         newton.options['iprint'] = 2
         scipy.options['iprint'] = 1
@@ -279,14 +279,11 @@ class TestSolverPrint(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])))
-
-        sub1 = model.add_subsystem('sub1', om.Group())
-        sub2 = sub1.add_subsystem('sub2', om.Group())
-        g1 = sub2.add_subsystem('g1', SubSellar())
+        sub1 = model.add_subsystem('sub1', om.Group(), promotes_inputs=['z'])
+        sub2 = sub1.add_subsystem('sub2', om.Group(), promotes_inputs=['z'])
+        g1 = sub2.add_subsystem('g1', SubSellar(), promotes_inputs=['z'])
         g2 = model.add_subsystem('g2', SubSellar())
 
-        model.connect('pz.z', 'sub1.sub2.g1.z')
         model.connect('sub1.sub2.g1.y2', 'g2.x')
         model.connect('g2.y2', 'sub1.sub2.g1.x')
 
@@ -306,6 +303,7 @@ class TestSolverPrint(unittest.TestCase):
         prob.set_solver_print(level=2)
 
         prob.setup()
+        prob.set_val('z', np.array([5.0, 2.0]))
         prob.run_model()
 
     def test_set_solver_print1(self):
@@ -337,14 +335,11 @@ class TestSolverPrint(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])))
-
-        sub1 = model.add_subsystem('sub1', om.Group())
-        sub2 = sub1.add_subsystem('sub2', om.Group())
-        g1 = sub2.add_subsystem('g1', SubSellar())
+        sub1 = model.add_subsystem('sub1', om.Group(), promotes_inputs=['z'])
+        sub2 = sub1.add_subsystem('sub2', om.Group(), promotes_inputs=['z'])
+        g1 = sub2.add_subsystem('g1', SubSellar(), promotes_inputs=['z'])
         g2 = model.add_subsystem('g2', SubSellar())
 
-        model.connect('pz.z', 'sub1.sub2.g1.z')
         model.connect('sub1.sub2.g1.y2', 'g2.x')
         model.connect('g2.y2', 'sub1.sub2.g1.x')
 
@@ -365,6 +360,7 @@ class TestSolverPrint(unittest.TestCase):
         prob.set_solver_print(level=-1, type_='LN')
 
         prob.setup()
+        prob.set_val('z', np.array([5.0, 2.0]))
         prob.run_model()
 
     def test_set_solver_print2(self):
@@ -392,14 +388,11 @@ class TestSolverPrint(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])))
-
-        sub1 = model.add_subsystem('sub1', om.Group())
-        sub2 = sub1.add_subsystem('sub2', om.Group())
-        g1 = sub2.add_subsystem('g1', SubSellar())
+        sub1 = model.add_subsystem('sub1', om.Group(), promotes_inputs=['z'])
+        sub2 = sub1.add_subsystem('sub2', om.Group(), promotes_inputs=['z'])
+        g1 = sub2.add_subsystem('g1', SubSellar(), promotes_inputs=['z'])
         g2 = model.add_subsystem('g2', SubSellar())
 
-        model.connect('pz.z', 'sub1.sub2.g1.z')
         model.connect('sub1.sub2.g1.y2', 'g2.x')
         model.connect('g2.y2', 'sub1.sub2.g1.x')
 
@@ -420,6 +413,7 @@ class TestSolverPrint(unittest.TestCase):
         prob.set_solver_print(level=2, depth=2)
 
         prob.setup()
+        prob.set_val('z', np.array([5.0, 2.0]))
         prob.run_model()
 
     def test_set_solver_print3(self):
@@ -456,7 +450,6 @@ class TestSolverPrint(unittest.TestCase):
         g1 = sub2.add_subsystem('g1', SubSellar())
         g2 = model.add_subsystem('g2', SubSellar())
 
-        model.connect('pz.z', 'sub1.sub2.g1.z')
         model.connect('sub1.sub2.g1.y2', 'g2.x')
         model.connect('g2.y2', 'sub1.sub2.g1.x')
 

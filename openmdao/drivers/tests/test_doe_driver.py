@@ -1079,11 +1079,6 @@ class TestDOEDriver(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        # Add independent variables
-        indeps = model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
-        indeps.add_discrete_output('x', np.ones((2, ), dtype=np.int))
-        indeps.add_discrete_output('y', np.ones((2, ), dtype=np.int))
-
         # Add components
         model.add_subsystem('parab', ParaboloidDiscreteArray(), promotes=['*'])
 
@@ -1102,6 +1097,10 @@ class TestDOEDriver(unittest.TestCase):
         prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.setup()
+
+        prob.set_val('x', np.ones((2, ), dtype=np.int))
+        prob.set_val('y', np.ones((2, ), dtype=np.int))
+
         prob.run_driver()
         prob.cleanup()
 
