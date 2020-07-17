@@ -151,7 +151,7 @@ class TestFeatureVisualization(unittest.TestCase):
                                     [-1.0, 0.0, 8.0, 0.0],
                                     [0.0, 4.0, 0.0, 6.0]])
                 # Params
-                self.add_input('x1', np.zeros([4]))
+                self.add_input('x1', np.ones([4]))
                 # Unknowns
                 self.add_output('y1', np.zeros([4]))
                 self.declare_partials(of='*', wrt='*')
@@ -175,7 +175,6 @@ class TestFeatureVisualization(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
-        model.add_subsystem('x_param1', om.IndepVarComp('x1', np.ones((4))), promotes=['x1'])
         model.add_subsystem('mycomp', ArrayComp2D(), promotes=['x1', 'y1'])
         prob.setup(check=False, mode='fwd')
         check_partials_data = prob.check_partials(out_stream=None)
@@ -197,7 +196,7 @@ class TestFeatureVisualization(unittest.TestCase):
                                     [-1.0, 0.0, 8.0, 0.0],
                                     [0.0, 4.0, 0.0, 6.0]])
                 # Params
-                self.add_input('x1', np.zeros([4]))
+                self.add_input('x1', np.ones([4]))
                 # Unknowns
                 self.add_output('y1', np.zeros([4]))
                 self.declare_partials(of='*', wrt='*')
@@ -221,7 +220,6 @@ class TestFeatureVisualization(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
-        model.add_subsystem('x_param1', om.IndepVarComp('x1', np.ones((4))), promotes=['x1'])
         model.add_subsystem('mycomp', ArrayComp2D(), promotes=['x1', 'y1'])
         prob.setup(check=False, mode='fwd')
         check_partials_data = prob.check_partials(out_stream=None)
