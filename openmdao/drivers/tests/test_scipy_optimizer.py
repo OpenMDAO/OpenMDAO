@@ -1,7 +1,6 @@
 """ Unit tests for the ScipyOptimizeDriver."""
 
 import unittest
-import sys
 
 from distutils.version import LooseVersion
 
@@ -80,6 +79,7 @@ class DummyComp(om.ExecComp):
         partials['c', 'x'] = 2.0*x - 6.0 + y
         partials['c', 'y'] = 2.0*y + 8.0 + x
 
+
 @unittest.skipUnless(MPI, "MPI is required.")
 class TestMPIScatter(unittest.TestCase):
     N_PROCS = 2
@@ -89,8 +89,8 @@ class TestMPIScatter(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.set_input_defaults('x', 50.0)
+        model.set_input_defaults('y', 50.0)
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', DummyComp(), promotes=['*'])
 
@@ -286,6 +286,9 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         model.add_objective('f_xy')
 
         prob.setup()
+
+        prob.set_val('x', 50.)
+        prob.set_val('y', 50.)
 
         failed = prob.run_driver()
 
@@ -1795,6 +1798,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         assert_near_equal(prob['x'], np.ones(rosenbrock_size), 1e-2)
         assert_near_equal(prob['f'], 0.0, 1e-2)
 
+
 class TestScipyOptimizeDriverFeatures(unittest.TestCase):
 
     def test_feature_basic(self):
@@ -1804,8 +1808,6 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
         prob.driver = om.ScipyOptimizeDriver()
@@ -1819,10 +1821,13 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
 
         prob.setup()
 
+        prob.set_val('x', 50.0)
+        prob.set_val('y', 50.0)
+
         prob.run_driver()
 
-        assert_near_equal(prob['x'], 6.66666667, 1e-6)
-        assert_near_equal(prob['y'], -7.3333333, 1e-6)
+        assert_near_equal(prob.get_val('x'), 6.66666667, 1e-6)
+        assert_near_equal(prob.get_val('y'), -7.3333333, 1e-6)
 
     def test_feature_optimizer(self):
         import openmdao.api as om
@@ -1831,8 +1836,6 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
         prob.driver = om.ScipyOptimizeDriver(optimizer='COBYLA')
@@ -1843,10 +1846,13 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
 
         prob.setup()
 
+        prob.set_val('x', 50.0)
+        prob.set_val('y', 50.0)
+
         prob.run_driver()
 
-        assert_near_equal(prob['x'], 6.66666667, 1e-6)
-        assert_near_equal(prob['y'], -7.3333333, 1e-6)
+        assert_near_equal(prob.get_val('x'), 6.66666667, 1e-6)
+        assert_near_equal(prob.get_val('y'), -7.3333333, 1e-6)
 
     def test_feature_maxiter(self):
         import openmdao.api as om
@@ -1855,8 +1861,6 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
         prob.driver = om.ScipyOptimizeDriver()
@@ -1868,10 +1872,13 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
 
         prob.setup()
 
+        prob.set_val('x', 50.0)
+        prob.set_val('y', 50.0)
+
         prob.run_driver()
 
-        assert_near_equal(prob['x'], 6.66666667, 1e-6)
-        assert_near_equal(prob['y'], -7.3333333, 1e-6)
+        assert_near_equal(prob.get_val('x'), 6.66666667, 1e-6)
+        assert_near_equal(prob.get_val('y'), -7.3333333, 1e-6)
 
     def test_feature_tol(self):
         import openmdao.api as om
@@ -1880,8 +1887,6 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
         prob.driver = om.ScipyOptimizeDriver()
@@ -1893,10 +1898,13 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
 
         prob.setup()
 
+        prob.set_val('x', 50.0)
+        prob.set_val('y', 50.0)
+
         prob.run_driver()
 
-        assert_near_equal(prob['x'], 6.66666667, 1e-6)
-        assert_near_equal(prob['y'], -7.3333333, 1e-6)
+        assert_near_equal(prob.get_val('x'), 6.66666667, 1e-6)
+        assert_near_equal(prob.get_val('y'), -7.3333333, 1e-6)
 
     def test_feature_debug_print_option(self):
 
@@ -1906,10 +1914,11 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
+
+        model.set_input_defaults('x', 50.0)
+        model.set_input_defaults('y', 50.0)
 
         prob.set_solver_print(level=0)
 
@@ -1937,10 +1946,11 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
+
+        model.set_input_defaults('x', 50.0)
+        model.set_input_defaults('y', 50.0)
 
         prob.set_solver_print(level=0)
 
@@ -1987,7 +1997,6 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('indeps', om.IndepVarComp('x', np.ones(size)), promotes=['*'])
         model.add_subsystem('rastrigin', Rastrigin(), promotes=['*'])
 
         prob.driver = driver = om.ScipyOptimizeDriver()
@@ -2000,10 +2009,12 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         model.add_design_var('x', lower=-5.12*np.ones(size), upper=5.12*np.ones(size))
         model.add_objective('f')
         prob.setup()
+
+        prob.set_val('x', np.ones(size))
         prob.run_driver()
 
-        assert_near_equal(prob['x'], np.zeros(size), 1e-6)
-        assert_near_equal(prob['f'], 0.0, 1e-6)
+        assert_near_equal(prob.get_val('x'), np.zeros(size), 1e-6)
+        assert_near_equal(prob.get_val('f'), 0.0, 1e-6)
 
 
 if __name__ == "__main__":

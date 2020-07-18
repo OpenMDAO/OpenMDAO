@@ -223,6 +223,7 @@ class ScipyOptimizeDriver(Driver):
                     d['global_size'] = meta['global_size']
                     d['distributed'] = meta['distributed']
                     d['linear'] = True
+                    d['ivc_source'] = meta['ivc_source']
                     self._cons[name] = d
 
     def run(self):
@@ -259,7 +260,8 @@ class ScipyOptimizeDriver(Driver):
         # Size Problem
         nparam = 0
         for param in self._designvars.values():
-            nparam += param['size']
+            size = param['global_size'] if param['distributed'] else param['size']
+            nparam += size
         x_init = np.empty(nparam)
 
         # Initial Design Vars
@@ -271,7 +273,7 @@ class ScipyOptimizeDriver(Driver):
             bounds = None
 
         for name, meta in self._designvars.items():
-            size = meta['size']
+            size = meta['global_size'] if meta['distributed'] else meta['size']
             x_init[i:i + size] = desvar_vals[name]
             i += size
 

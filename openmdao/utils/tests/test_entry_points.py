@@ -59,7 +59,9 @@ class TestEntryPoints(unittest.TestCase):
 
         for epgroup in _allowed_types.values():
             reg = registered_eps.get(epgroup, set())
-            found = set(f.split('=', 1)[1].strip() for f in found_eps.get(epgroup, []))
+            found = [f.split('=', 1)[1].strip() for f in found_eps.get(epgroup, [])]
+            # exclude any private classes
+            found = set(f for f in found if not f.rsplit(':', 1)[-1].startswith('_'))
 
             missing = sorted(found - reg - skip)
             extra = sorted(reg - found - skip)

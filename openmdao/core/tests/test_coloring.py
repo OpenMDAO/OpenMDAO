@@ -177,7 +177,7 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True
 
         p.model.add_objective('circle.area', ref=-1)
 
-    # # setup coloring
+    # setup coloring
     if color_info is not None:
         p.driver.use_fixed_coloring(color_info)
 
@@ -433,7 +433,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
 
         # test __repr__
         rep = repr(p_color.driver._coloring_info['coloring'])
-        self.assertEqual(rep.replace('L', ''), 'Coloring (direction: fwd, ncolors: 5, shape: (22, 21)')
+        self.assertEqual(rep.replace('L', ''), 'Coloring (direction: fwd, ncolors: 5, shape: (22, 21), pct nonzero: 13.42, tol: 1e-15')
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_print_options_total_with_coloring_fwd(self):
@@ -599,23 +599,15 @@ class SimulColoringScipyTestCase(unittest.TestCase):
 
         p = om.Problem()
 
-        indeps = p.model.add_subsystem('indeps', om.IndepVarComp(), promotes_outputs=['*'])
-
-        # the following were randomly generated using np.random.random(10)*2-1 to randomly
-        # disperse them within a unit circle centered at the origin.
-        indeps.add_output('x', np.array([ 0.55994437, -0.95923447,  0.21798656, -0.02158783,  0.62183717,
-                                          0.04007379,  0.46044942, -0.10129622,  0.27720413, -0.37107886]))
-        indeps.add_output('y', np.array([ 0.52577864,  0.30894559,  0.8420792 ,  0.35039912, -0.67290778,
-                                          -0.86236787, -0.97500023,  0.47739414,  0.51174103,  0.10052582]))
-        indeps.add_output('r', .7)
-
         p.model.add_subsystem('arctan_yox', om.ExecComp('g=arctan(y/x)', has_diag_partials=True,
-                                                        g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)))
+                                                        g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)),
+                              promotes_inputs=['x', 'y'])
 
-        p.model.add_subsystem('circle', om.ExecComp('area=pi*r**2'))
+        p.model.add_subsystem('circle', om.ExecComp('area=pi*r**2'), promotes_inputs=['r'])
 
         p.model.add_subsystem('r_con', om.ExecComp('g=x**2 + y**2 - r', has_diag_partials=True,
-                                                   g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)))
+                                                   g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)),
+                              promotes_inputs=['r', 'x', 'y'])
 
         thetas = np.linspace(0, np.pi/4, SIZE)
         p.model.add_subsystem('theta_con', om.ExecComp('g = x - theta', has_diag_partials=True,
@@ -625,15 +617,13 @@ class SimulColoringScipyTestCase(unittest.TestCase):
                                                              g=np.ones(SIZE//2), even=np.ones(SIZE//2),
                                                              odd=np.ones(SIZE//2)))
 
-        p.model.add_subsystem('l_conx', om.ExecComp('g=x-1', has_diag_partials=True, g=np.ones(SIZE), x=np.ones(SIZE)))
+        p.model.add_subsystem('l_conx', om.ExecComp('g=x-1', has_diag_partials=True, g=np.ones(SIZE), x=np.ones(SIZE)),
+                              promotes_inputs=['x'])
 
         IND = np.arange(SIZE, dtype=int)
         ODD_IND = IND[1::2]  # all odd indices
         EVEN_IND = IND[0::2]  # all even indices
 
-        p.model.connect('r', ('circle.r', 'r_con.r'))
-        p.model.connect('x', ['r_con.x', 'arctan_yox.x', 'l_conx.x'])
-        p.model.connect('y', ['r_con.y', 'arctan_yox.y'])
         p.model.connect('arctan_yox.g', 'theta_con.x')
         p.model.connect('arctan_yox.g', 'delta_theta_con.even', src_indices=EVEN_IND)
         p.model.connect('arctan_yox.g', 'delta_theta_con.odd', src_indices=ODD_IND)
@@ -664,6 +654,15 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         p.model.add_objective('circle.area', ref=-1)
 
         p.setup(mode='fwd')
+
+        # the following were randomly generated using np.random.random(10)*2-1 to randomly
+        # disperse them within a unit circle centered at the origin.
+        p.set_val('x', np.array([ 0.55994437, -0.95923447,  0.21798656, -0.02158783,  0.62183717,
+                                  0.04007379,  0.46044942, -0.10129622,  0.27720413, -0.37107886]))
+        p.set_val('y', np.array([ 0.52577864,  0.30894559,  0.8420792 ,  0.35039912, -0.67290778,
+                                 -0.86236787, -0.97500023,  0.47739414,  0.51174103,  0.10052582]))
+        p.set_val('r', .7)
+
         p.run_driver()
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
@@ -698,47 +697,40 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         SIZE = 10
 
         p = om.Problem()
-
-        indeps = p.model.add_subsystem('indeps', om.IndepVarComp(), promotes_outputs=['*'])
-
-        # the following were randomly generated using np.random.random(10)*2-1 to randomly
-        # disperse them within a unit circle centered at the origin.
-        indeps.add_output('x', np.array([ 0.55994437, -0.95923447,  0.21798656, -0.02158783,  0.62183717,
-                                          0.04007379,  0.46044942, -0.10129622,  0.27720413, -0.37107886]))
-        indeps.add_output('y', np.array([ 0.52577864,  0.30894559,  0.8420792 ,  0.35039912, -0.67290778,
-                                          -0.86236787, -0.97500023,  0.47739414,  0.51174103,  0.10052582]))
-        indeps.add_output('r', .7)
+        model = p.model
 
         ########################################################################
         # DynamicPartialsComp is set up to do dynamic partial coloring
-        arctan_yox = p.model.add_subsystem('arctan_yox', DynamicPartialsComp(SIZE))
+        arctan_yox = model.add_subsystem('arctan_yox', DynamicPartialsComp(SIZE),
+                                         promotes_inputs=['x', 'y'])
         ########################################################################
 
-        p.model.add_subsystem('circle', om.ExecComp('area=pi*r**2'))
+        model.add_subsystem('circle', om.ExecComp('area=pi*r**2'),
+                            promotes_inputs=['r'])
 
-        p.model.add_subsystem('r_con', om.ExecComp('g=x**2 + y**2 - r', has_diag_partials=True,
-                                                   g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)))
+        model.add_subsystem('r_con', om.ExecComp('g=x**2 + y**2 - r', has_diag_partials=True,
+                                                 g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)),
+                            promotes_inputs=['x', 'y', 'r'])
 
         thetas = np.linspace(0, np.pi/4, SIZE)
-        p.model.add_subsystem('theta_con', om.ExecComp('g = x - theta', has_diag_partials=True,
+        model.add_subsystem('theta_con', om.ExecComp('g = x - theta', has_diag_partials=True,
                                                        g=np.ones(SIZE), x=np.ones(SIZE),
                                                        theta=thetas))
-        p.model.add_subsystem('delta_theta_con', om.ExecComp('g = even - odd', has_diag_partials=True,
+        model.add_subsystem('delta_theta_con', om.ExecComp('g = even - odd', has_diag_partials=True,
                                                              g=np.ones(SIZE//2), even=np.ones(SIZE//2),
                                                              odd=np.ones(SIZE//2)))
 
-        p.model.add_subsystem('l_conx', om.ExecComp('g=x-1', has_diag_partials=True, g=np.ones(SIZE), x=np.ones(SIZE)))
+        model.add_subsystem('l_conx', om.ExecComp('g=x-1', has_diag_partials=True,
+                                                  g=np.ones(SIZE), x=np.ones(SIZE)),
+                            promotes_inputs=['x'])
 
         IND = np.arange(SIZE, dtype=int)
         ODD_IND = IND[1::2]  # all odd indices
         EVEN_IND = IND[0::2]  # all even indices
 
-        p.model.connect('r', ('circle.r', 'r_con.r'))
-        p.model.connect('x', ['r_con.x', 'arctan_yox.x', 'l_conx.x'])
-        p.model.connect('y', ['r_con.y', 'arctan_yox.y'])
-        p.model.connect('arctan_yox.g', 'theta_con.x')
-        p.model.connect('arctan_yox.g', 'delta_theta_con.even', src_indices=EVEN_IND)
-        p.model.connect('arctan_yox.g', 'delta_theta_con.odd', src_indices=ODD_IND)
+        model.connect('arctan_yox.g', 'theta_con.x')
+        model.connect('arctan_yox.g', 'delta_theta_con.even', src_indices=EVEN_IND)
+        model.connect('arctan_yox.g', 'delta_theta_con.odd', src_indices=ODD_IND)
 
         p.driver = om.ScipyOptimizeDriver()
         p.driver.options['optimizer'] = 'SLSQP'
@@ -749,25 +741,33 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         p.driver.declare_coloring(show_summary=True, show_sparsity=True)
         #####################################
 
-        p.model.add_design_var('x')
-        p.model.add_design_var('y')
-        p.model.add_design_var('r', lower=.5, upper=10)
+        model.add_design_var('x')
+        model.add_design_var('y')
+        model.add_design_var('r', lower=.5, upper=10)
 
         # nonlinear constraints
-        p.model.add_constraint('r_con.g', equals=0)
+        model.add_constraint('r_con.g', equals=0)
 
-        p.model.add_constraint('theta_con.g', lower=-1e-5, upper=1e-5, indices=EVEN_IND)
-        p.model.add_constraint('delta_theta_con.g', lower=-1e-5, upper=1e-5)
+        model.add_constraint('theta_con.g', lower=-1e-5, upper=1e-5, indices=EVEN_IND)
+        model.add_constraint('delta_theta_con.g', lower=-1e-5, upper=1e-5)
 
         # this constrains x[0] to be 1 (see definition of l_conx)
-        p.model.add_constraint('l_conx.g', equals=0, linear=False, indices=[0,])
+        model.add_constraint('l_conx.g', equals=0, linear=False, indices=[0,])
 
         # linear constraint
-        p.model.add_constraint('y', equals=0, indices=[0,], linear=True)
+        model.add_constraint('y', equals=0, indices=[0,], linear=True)
 
-        p.model.add_objective('circle.area', ref=-1)
+        model.add_objective('circle.area', ref=-1)
 
         p.setup(mode='fwd')
+
+        # the following were randomly generated using np.random.random(10)*2-1 to randomly
+        # disperse them within a unit circle centered at the origin.
+        p.set_val('x', np.array([ 0.55994437, -0.95923447,  0.21798656, -0.02158783,  0.62183717,
+                                  0.04007379,  0.46044942, -0.10129622,  0.27720413, -0.37107886]))
+        p.set_val('y', np.array([ 0.52577864,  0.30894559,  0.8420792 ,  0.35039912, -0.67290778,
+                                  -0.86236787, -0.97500023,  0.47739414,  0.51174103,  0.10052582]))
+        p.set_val('r', .7)
 
         # coloring info will be displayed during run_driver.  The number of colors in the
         # partial coloring of arctan_yox should be 2 and the number of colors in the
@@ -824,12 +824,12 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
         p_color = run_opt(om.ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
         coloring = p_color.driver._coloring_info['coloring']
         rep = repr(coloring)
-        self.assertEqual(rep.replace('L', ''), 'Coloring (direction: fwd, ncolors: 5, shape: (22, 21)')
+        self.assertEqual(rep.replace('L', ''), 'Coloring (direction: fwd, ncolors: 5, shape: (22, 21), pct nonzero: 13.42, tol: 1e-15')
 
         dense_J = np.ones((50, 50), dtype=bool)
         coloring = _compute_coloring(dense_J, 'auto')
         rep = repr(coloring)
-        self.assertEqual(rep.replace('L', ''), 'Coloring (direction: fwd, ncolors: 50, shape: (50, 50)')
+        self.assertEqual(rep.replace('L', ''), 'Coloring (direction: fwd, ncolors: 50, shape: (50, 50), pct nonzero: 100.00, tol: None')
 
     def test_bad_mode(self):
         p_color_rev = run_opt(om.ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)

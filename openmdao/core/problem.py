@@ -5,7 +5,7 @@ import pprint
 import os
 import logging
 
-from collections import defaultdict, namedtuple
+from collections import defaultdict, namedtuple, OrderedDict
 from fnmatch import fnmatchcase
 from itertools import product
 
@@ -25,18 +25,19 @@ from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.solvers.solver import SolverInfo
 from openmdao.error_checking.check_config import _default_checks, _all_checks
 from openmdao.recorders.recording_iteration_stack import _RecIteration
-from openmdao.recorders.recording_manager import RecordingManager, record_viewer_data
+from openmdao.recorders.recording_manager import RecordingManager, record_viewer_data, \
+    record_system_options
 from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.general_utils import ContainsAll, pad_name, simple_warning, warn_deprecation
 
 from openmdao.utils.mpi import FakeComm
 from openmdao.utils.mpi import MPI
-from openmdao.utils.name_maps import prom_name2abs_name
+from openmdao.utils.name_maps import prom_name2abs_name, name2abs_names
 from openmdao.utils.options_dictionary import OptionsDictionary, _undefined
-from openmdao.utils.units import unit_conversion
+from openmdao.utils.units import convert_units
 from openmdao.utils import coloring as coloring_mod
 from openmdao.utils.name_maps import abs_key2rel_key
-from openmdao.vectors.vector import INT_DTYPE
+from openmdao.vectors.vector import _full_slice, INT_DTYPE
 from openmdao.vectors.default_vector import DefaultVector
 from openmdao.utils.logger_utils import get_logger, TestLogger
 import openmdao.utils.coloring as coloring_mod
@@ -111,18 +112,14 @@ class Problem(object):
         Object that manages all recorders added to this problem.
     _check : bool
         If True, call check_config at the end of final_setup.
-    _recording_iter : _RecIteration
-        Manages recording of iterations.
     _filtered_vars_to_record : dict
         Dictionary of lists of design vars, constraints, etc. to record.
     _logger : object or None
         Object for logging config checks if _check is True.
-    _force_alloc_complex : bool
-        Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
-        detect when you need to do this, but in some cases (e.g., complex step is used
-        after a reconfiguration) you may need to set this to True.
     _name : str
         Problem name.
+    _system_options_recorded : bool
+        A flag to indicate whether the system options for all the systems have been recorded
     """
 
     def __init__(self, model=None, driver=None, comm=None, name=None, **options):
@@ -181,6 +178,7 @@ class Problem(object):
         # 2 -- The `final_setup` has been run, everything ready to run.
         self._setup_status = 0
 
+        self._system_options_recorded = False
         self._rec_mgr = RecordingManager()
 
         # General options
@@ -287,17 +285,12 @@ class Problem(object):
             abs_name = self._get_var_abs_name(name)
         except KeyError:
             sub = self.model._get_subsystem(name)
-            if sub is None:  # either the sub is remote or there is no sub by that name
-                # TODO: raise exception if sub does not exist
-                return False
-            else:
-                # if system has been set up, _var_sizes will be initialized
-                return sub._var_sizes is not None
+            return sub is not None and sub._is_local
 
         # variable exists, but may be remote
         return abs_name in self.model._var_abs2meta
 
-    def _get_cached_val(self, name):
+    def _get_cached_val(self, name, get_remote=False):
         # We have set and cached already
         if name in self._initial_condition_cache:
             return self._initial_condition_cache[name]
@@ -306,45 +299,40 @@ class Problem(object):
         else:
             proms = self.model._var_allprocs_prom2abs_list
             meta = self.model._var_abs2meta
-            if name in meta:
-                if isinstance(self.model, Group) and name in self.model._conn_abs_in2out:
-                    src_name = self.model._conn_abs_in2out[name]
-                    val = meta[src_name]['value']
-                else:
-                    val = meta[name]['value']
+            try:
+                conns = self.model._conn_abs_in2out
+            except AttributeError:
+                conns = {}
 
-            elif name in proms['output']:
-                abs_name = prom_name2abs_name(self.model, name, 'output')
-                if abs_name in meta:
+            abs_names = name2abs_names(self.model, name)
+            if not abs_names:
+                raise KeyError('{}: Variable "{}" not found.'.format(self.model.msginfo, name))
+
+            abs_name = abs_names[0]
+            remote_vars = self._metadata['remote_vars']
+
+            if abs_name in meta:
+                if abs_name in conns:
+                    val = meta[conns[abs_name]]['value']
+                else:
                     val = meta[abs_name]['value']
 
-            elif name in proms['input']:
-                abs_name = proms['input'][name][0]
-                conn = self.model._conn_abs_in2out
-                if abs_name in meta:
-                    if isinstance(self.model, Group) and abs_name in conn:
-                        src_name = self.model._conn_abs_in2out[abs_name]
-                        # So, if the inputs and outputs are promoted to the same name, then we
-                        # allow getitem, but if they aren't, then we raise an error due to non
-                        # uniqueness.
-                        if name not in proms['output']:
-                            # This triggers a check for unconnected non-unique inputs, and
-                            # raises the same error as vector access.
-                            abs_name = prom_name2abs_name(self.model, name, 'input')
-                        val = meta[src_name]['value']
-                    else:
-                        # This triggers a check for unconnected non-unique inputs, and
-                        # raises the same error as vector access.
-                        abs_name = prom_name2abs_name(self.model, name, 'input')
-                        val = meta[abs_name]['value']
-            else:
-                raise KeyError('{}: Variable name "{}" not found.'.format(self.msginfo, name))
+            if get_remote and abs_name in remote_vars:
+                owner = remote_vars[abs_name]
+                if self.model.comm.rank == owner:
+                    self.model.comm.bcast(val, root=owner)
+                else:
+                    val = self.model.comm.bcast(None, root=owner)
 
             if val is not _undefined:
                 # Need to cache the "get" in case the user calls in-place numpy operations.
                 self._initial_condition_cache[name] = val
 
-        return val
+            return val
+
+    @property
+    def _recording_iter(self):
+        return self._metadata['recording_iter']
 
     def __getitem__(self, name):
         """
@@ -387,14 +375,15 @@ class Problem(object):
             The value of the requested output/input variable.
         """
         if self._setup_status == 1:
-            val = self._get_cached_val(name)
-            if indices is not None:
-                val = val[indices]
-            if units is not None:
-                val = self.model.convert2units(name, val, units)
-            return val
-
-        val = self.model._get_val(name, units=units, indices=indices, get_remote=get_remote)
+            val = self._get_cached_val(name, get_remote=get_remote)
+            if val is not _undefined:
+                if indices is not None:
+                    val = val[indices]
+                if units is not None:
+                    val = self.model.convert2units(name, val, units)
+        else:
+            val = self.model.get_val(name, units=units, indices=indices, get_remote=get_remote,
+                                     from_src=True)
 
         if val is _undefined:
             if get_remote:
@@ -419,34 +408,7 @@ class Problem(object):
         value : float or ndarray or any python object
             value to set this variable to.
         """
-        # Caching only needed if vectors aren't allocated yet.
-        if self._setup_status == 1:
-            self._initial_condition_cache[name] = value
-        else:
-            all_proms = self.model._var_allprocs_prom2abs_list
-
-            if name in all_proms['output']:
-                abs_name = all_proms['output'][name][0]
-            elif name in all_proms['input']:
-                abs_name = prom_name2abs_name(self.model, name, 'input')
-            else:
-                abs_name = name
-
-            if abs_name in self.model._outputs._views:
-                self.model._outputs[abs_name] = value
-            elif abs_name in self.model._inputs._views:
-                self.model._inputs[abs_name] = value
-            elif abs_name in self.model._discrete_outputs:
-                self.model._discrete_outputs[abs_name] = value
-            elif abs_name in self.model._discrete_inputs:
-                self.model._discrete_inputs[abs_name] = value
-            else:
-                # might be a remote var.  If so, just do nothing on this proc
-                if abs_name in self.model._var_allprocs_abs2meta:
-                    print("Variable '{}' is remote on rank {}.  "
-                          "Local assignment ignored.".format(name, self.comm.rank))
-                else:
-                    raise KeyError('{}: Variable "{}" not found.'.format(self.model.msginfo, name))
+        self.set_val(name, value)
 
     def set_val(self, name, value, units=None, indices=None):
         """
@@ -465,35 +427,147 @@ class Problem(object):
         indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
             Indices or slice to set to specified value.
         """
-        if units is not None:
-            base_units = self.model._get_var_meta(name)['units']
+        model = self.model
+        conns = self._metadata['connections']
+        all_meta = model._var_allprocs_abs2meta
+        n_proms = 0  # if nonzero, name given was promoted input name w/o a matching prom output
 
-            if base_units is None:
-                msg = "{}: Can't set variable '{}' with units 'None' to value with units '{}'."
-                raise TypeError(msg.format(self.msginfo, name, units))
+        try:
+            ginputs = model._group_inputs
+        except AttributeError:
+            ginputs = {}  # could happen if top level system is not a Group
 
-            try:
-                scale, offset = unit_conversion(units, base_units)
-            except TypeError:
-                msg = "{}: Can't set variable '{}' with units '{}' to value with units '{}'."
-                raise TypeError(msg.format(self.msginfo, name, base_units, units))
-
-            value = (value + offset) * scale
-
-        if indices is not None:
-            self[name][indices] = value
+        abs_names = name2abs_names(model, name)
+        if abs_names:
+            n_proms = len(abs_names)  # for output this will never be > 1
+            if n_proms > 1 and name in ginputs:
+                abs_name = ginputs[name].get('use_tgt', abs_names[0])
+            else:
+                abs_name = abs_names[0]
         else:
-            self[name] = value
+            raise KeyError(f'{model.msginfo}: Variable "{name}" not found.')
+
+        if abs_name in conns:
+            src = conns[abs_name]
+            if abs_name not in model._var_allprocs_discrete['input']:
+                value = np.asarray(value)
+                tmeta = all_meta[abs_name]
+                tunits = tmeta['units']
+                sunits = all_meta[src]['units']
+                if abs_name in model._var_abs2meta:
+                    tlocmeta = model._var_abs2meta[abs_name]
+                else:
+                    tlocmeta = None
+
+                gunits = ginputs[name].get('units') if name in ginputs else None
+                if n_proms > 1:  # promoted input name was used
+                    if gunits is None:
+                        tunit_list = [all_meta[n]['units'] for n in abs_names]
+                        tu0 = tunit_list[0]
+                        for tu in tunit_list:
+                            if tu != tu0:
+                                model._show_ambiguity_msg(name, ('units',),
+                                                          abs_names)
+
+                if units is None:
+                    if self._setup_status > 1:  # avoids double unit conversion
+                        ivalue = value
+                        if sunits is not None:
+                            if gunits is not None and gunits != tunits:
+                                value = model.convert_from_units(src, value, gunits)
+                            else:
+                                value = model.convert_from_units(src, value, tunits)
+                else:
+                    if gunits is None:
+                        ivalue = model.convert_from_units(abs_name, value, units)
+                    else:
+                        ivalue = model.convert_units(name, value, units, gunits)
+                    if self._setup_status == 1:
+                        value = ivalue
+                    else:
+                        value = model.convert_from_units(src, value, units)
+        else:
+            src = abs_name
+            if units is not None:
+                value = model.convert_from_units(abs_name, value, units)
+
+        # Caching only needed if vectors aren't allocated yet.
+        if self._setup_status == 1:
+            if indices is not None:
+                self._get_cached_val(name)
+                try:
+                    self._initial_condition_cache[name][indices] = value
+                except Exception as err:
+                    raise RuntimeError(f"Failed to set value of '{name}': {str(err)}.")
+            else:
+                self._initial_condition_cache[name] = value
+        else:
+            myrank = model.comm.rank
+
+            if indices is None:
+                indices = _full_slice
+
+            if abs_name in model._outputs._views:
+                model._outputs.set_var(abs_name, value, indices)
+            elif abs_name in conns:  # input name given. Set value into output
+                if src in model._outputs._views:  # src is local
+                    if (model._outputs._views_flat[src].size == 0 and
+                            src.rsplit('.', 1)[0] == '_auto_ivc' and all_meta[src]['distributed']):
+                        pass  # special case, auto_ivc dist var with 0 local size
+                    elif tmeta['has_src_indices'] and n_proms < 2:
+                        if tlocmeta:  # target is local
+                            src_indices = tlocmeta['src_indices']
+                            if tmeta['distributed']:
+                                ssizes = model._var_sizes['nonlinear']['output']
+                                sidx = model._var_allprocs_abs2idx['nonlinear'][src]
+                                ssize = ssizes[myrank, sidx]
+                                start = np.sum(ssizes[:myrank, sidx])
+                                end = start + ssize
+                                if np.any(src_indices < start) or np.any(src_indices >= end):
+                                    raise RuntimeError(f"{model.msginfo}: Can't set {name}: "
+                                                       "src_indices refer "
+                                                       "to out-of-process array entries.")
+                                if start > 0:
+                                    src_indices = src_indices - start
+                            model._outputs.set_var(src, value, src_indices[indices])
+                        else:
+                            raise RuntimeError(f"{model.msginfo}: Can't set {abs_name}: remote"
+                                               " connected inputs with src_indices currently not"
+                                               " supported.")
+                    else:
+                        value = np.asarray(value)
+                        model._outputs.set_var(src, value, indices)
+                elif src in model._discrete_outputs:
+                    model._discrete_outputs[src] = value
+                # also set the input
+                # TODO: maybe remove this if inputs are removed from case recording
+                if n_proms < 2:
+                    if abs_name in model._inputs._views:
+                        model._inputs.set_var(abs_name, ivalue, indices)
+                    elif abs_name in model._discrete_inputs:
+                        model._discrete_inputs[abs_name] = value
+                    else:
+                        # must be a remote var. so, just do nothing on this proc. We can't get here
+                        # unless abs_name is found in connections, so the variable must exist.
+                        if abs_name in model._var_allprocs_abs2meta:
+                            print(f"Variable '{name}' is remote on rank {self.comm.rank}.  "
+                                  "Local assignment ignored.")
+            elif abs_name in model._discrete_outputs:
+                model._discrete_outputs[abs_name] = value
+            elif abs_name in model._inputs._views:   # could happen if model is a component
+                model._inputs.set_var(abs_name, value, indices)
+            elif abs_name in model._discrete_inputs:   # could happen if model is a component
+                model._discrete_inputs[abs_name] = value
 
     def _set_initial_conditions(self):
         """
         Set all initial conditions that have been saved in cache after setup.
         """
         for name, value in self._initial_condition_cache.items():
-            self[name] = value
+            self.set_val(name, value)
 
         # Clean up cache
-        self._initial_condition_cache = {}
+        self._initial_condition_cache = OrderedDict()
 
     def run_model(self, case_prefix=None, reset_iter_counts=True):
         """
@@ -602,15 +676,24 @@ class Problem(object):
 
         rvec._data[:] = 0.
 
+        conns = self.model._conn_global_abs_in2out
+
         # set seed values into dresids (fwd) or doutputs (rev)
+        # seed may have keys that are inputs and must be converted into auto_ivcs
         try:
             seed[rnames[0]]
         except (IndexError, TypeError):
             for i, name in enumerate(rnames):
-                rvec[name] = seed[i]
+                if name in conns:
+                    rvec[conns[name]] = seed[i]
+                else:
+                    rvec[name] = seed[i]
         else:
             for name in rnames:
-                rvec[name] = seed[name]
+                if name in conns:
+                    rvec[conns[name]] = seed[name]
+                else:
+                    rvec[name] = seed[name]
 
         # We apply a -1 here because the derivative of the output is minus the derivative of
         # the residual in openmdao.
@@ -618,7 +701,11 @@ class Problem(object):
 
         self.model.run_solve_linear(['linear'], mode)
 
-        return {n: lvec[n].copy() for n in lnames}
+        if mode == 'fwd':
+            return {n: lvec[n].copy() for n in lnames}
+        else:
+            # may need to convert some lnames to auto_ivc names
+            return {n: lvec[conns[n] if n in conns else n].copy() for n in lnames}
 
     def _setup_recording(self):
         """
@@ -732,7 +819,6 @@ class Problem(object):
             this enables the user to instantiate and setup in one line.
         """
         model = self.model
-        model.force_alloc_complex = force_alloc_complex
         comm = self.comm
 
         # PETScVector is required for MPI
@@ -752,20 +838,27 @@ class Problem(object):
 
         self._mode = self._orig_mode = mode
 
-        # this will be shared by all Solvers in the model
-        model._solver_info = SolverInfo()
-        self._recording_iter = _RecIteration()
-        model._recording_iter = self._recording_iter
-
         model_comm = self.driver._setup_comm(comm)
 
-        model._setup(model_comm, mode, distributed_vector_class, local_vector_class,
-                     derivatives, self.options)
+        # this metadata will be shared by all Systems/Solvers in the system tree
+        self._metadata = {
+            'coloring_dir': self.options['coloring_dir'],
+            'recording_iter': _RecIteration(),
+            'local_vector_class': local_vector_class,
+            'distributed_vector_class': distributed_vector_class,
+            'solver_info': SolverInfo(),
+            'use_derivatives': derivatives,
+            'force_alloc_complex': force_alloc_complex,
+            'connections': {},
+            'remote_systems': {},
+            'remote_vars': {},  # does not include distrib vars
+            'prom2abs': {'input': {}, 'output': {}}  # includes ALL promotes including buried ones
+        }
+        model._setup(model_comm, mode, self._metadata)
 
         # Cache all args for final setup.
         self._check = check
         self._logger = logger
-        self._force_alloc_complex = force_alloc_complex
 
         self._setup_status = 1
 
@@ -793,8 +886,7 @@ class Problem(object):
             mode = self._orig_mode
 
         if self._setup_status < 2:
-            self.model._final_setup(self.comm,
-                                    force_alloc_complex=self._force_alloc_complex)
+            self.model._final_setup(self.comm)
 
         driver._setup_driver(self)
 
@@ -825,6 +917,7 @@ class Problem(object):
             driver._setup_recording()
             self._setup_recording()
             record_viewer_data(self)
+            record_system_options(self)
 
         if self._setup_status < 2:
             self._setup_status = 2
@@ -946,8 +1039,8 @@ class Problem(object):
         partials_data = defaultdict(lambda: defaultdict(dict))
 
         # Caching current point to restore after setups.
-        input_cache = model._inputs._clone()
-        output_cache = model._outputs._clone()
+        input_cache = model._inputs._data.copy()
+        output_cache = model._outputs._data.copy()
 
         # Keep track of derivative keys that are declared dependent so that we don't print them
         # unless they are in error.
@@ -959,8 +1052,8 @@ class Problem(object):
         # Analytic Jacobians
         print_reverse = False
         for mode in ('fwd', 'rev'):
-            model._inputs.set_vec(input_cache)
-            model._outputs.set_vec(output_cache)
+            model._inputs.set_const(input_cache)
+            model._outputs.set_const(output_cache)
             # Make sure we're in a valid state
             model.run_apply_nonlinear()
 
@@ -1137,8 +1230,8 @@ class Problem(object):
 
                             partials_data[c_name][rel_key][jac_key] = deriv_value.copy()
 
-        model._inputs.set_vec(input_cache)
-        model._outputs.set_vec(output_cache)
+        model._inputs.set_const(input_cache)
+        model._outputs.set_const(output_cache)
         model.run_apply_nonlinear()
 
         # Finite Difference to calculate Jacobian
@@ -1549,6 +1642,7 @@ class Problem(object):
         # Get the values for all the elements in the tables
         rows = []
         for name, meta in meta.items():
+
             row = {}
             for col_name in col_names:
                 if col_name == 'name':
@@ -1557,8 +1651,12 @@ class Problem(object):
                     else:
                         if name in abs2prom['input']:
                             row[col_name] = abs2prom['input'][name]
-                        else:
+                        elif name in abs2prom['output']:
                             row[col_name] = abs2prom['output'][name]
+                        else:
+                            # Promoted auto_ivc name. Keep it promoted
+                            row[col_name] = name
+
                 elif col_name == 'value':
                     row[col_name] = vals[name]
                 else:
@@ -1630,7 +1728,7 @@ class Problem(object):
         inputs = case.inputs if case.inputs is not None else None
         if inputs:
             for name in inputs.absolute_names():
-                if name not in self.model._var_abs_names['input']:
+                if name not in self.model._var_abs2prom['input']:
                     raise KeyError("{}: Input variable, '{}', recorded in the case is not "
                                    "found in the model".format(self.msginfo, name))
                 self[name] = inputs[name]
@@ -1638,12 +1736,10 @@ class Problem(object):
         outputs = case.outputs if case.outputs is not None else None
         if outputs:
             for name in outputs.absolute_names():
-                if name not in self.model._var_abs_names['output']:
+                if name not in self.model._var_abs2prom['output']:
                     raise KeyError("{}: Output variable, '{}', recorded in the case is not "
                                    "found in the model".format(self.msginfo, name))
                 self[name] = outputs[name]
-
-        return
 
     def check_config(self, logger=None, checks=None, out_file='openmdao_checks.out'):
         """

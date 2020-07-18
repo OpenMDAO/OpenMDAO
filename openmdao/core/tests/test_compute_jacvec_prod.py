@@ -33,13 +33,7 @@ class SubProbComp(om.ExplicitComponent):
         self.prob = p = om.Problem(comm=self.comm)
         model = self.prob.model
 
-        indep = model.add_subsystem('indep', om.IndepVarComp('x', val=np.zeros(self.size - 1)))
-        indep.add_output('inp', val=0.0)
-
         model.add_subsystem('comp', get_comp(self.size))
-
-        model.connect('indep.x', 'comp.x')
-        model.connect('indep.inp', 'comp.inp')
 
         p.setup()
         p.final_setup()
@@ -54,11 +48,11 @@ class SubProbComp(om.ExplicitComponent):
 
     def compute(self, inputs, outputs):
         p = self.prob
-        p['indep.x'] = inputs['x']
-        p['indep.inp'] = inputs['inp']
+        p['comp.x'] = inputs['x']
+        p['comp.inp'] = inputs['inp']
         inp = inputs['inp']
         for i in range(self.num_nodes):
-            p['indep.inp'] = inp
+            p['comp.inp'] = inp
             p.run_model()
             inp = p['comp.out']
 
@@ -67,32 +61,32 @@ class SubProbComp(om.ExplicitComponent):
     def _compute_partials_fwd(self, inputs, partials):
         p = self.prob
         x = inputs['x']
-        p['indep.x'] = x
-        p['indep.inp'] = inputs['inp']
+        p['comp.x'] = x
+        p['comp.inp'] = inputs['inp']
 
-        seed = {'indep.x':np.zeros(x.size), 'indep.inp': np.zeros(1)}
+        seed = {'comp.x':np.zeros(x.size), 'comp.inp': np.zeros(1)}
         p.run_model()
         p.model._linearize(None)
         for rhsname in seed:
             for rhs_i in range(seed[rhsname].size):
-                seed['indep.x'][:] = 0.0
-                seed['indep.inp'][:] = 0.0
+                seed['comp.x'][:] = 0.0
+                seed['comp.inp'][:] = 0.0
                 seed[rhsname][rhs_i] = 1.0
                 for i in range(self.num_nodes):
                     p.model._vectors['output']['linear'].set_const(0.0)
                     p.model._vectors['residual']['linear'].set_const(0.0)
-                    jvp = p.compute_jacvec_product(of=['comp.out'], wrt=['indep.x','indep.inp'], mode='fwd', seed=seed)
-                    seed['indep.inp'][:] = jvp['comp.out']
+                    jvp = p.compute_jacvec_product(of=['comp.out'], wrt=['comp.x','comp.inp'], mode='fwd', seed=seed)
+                    seed['comp.inp'][:] = jvp['comp.out']
 
-                if rhsname == 'indep.x':
+                if rhsname == 'comp.x':
                     partials[self.pathname + '.out', self.pathname +'.x'][0, rhs_i] = jvp[self.pathname + '.out']
                 else:
                     partials[self.pathname + '.out', self.pathname + '.inp'][0, 0] = jvp[self.pathname + '.out']
 
     def _compute_partials_rev(self, inputs, partials):
         p = self.prob
-        p['indep.x'] = inputs['x']
-        p['indep.inp'] = inputs['inp']
+        p['comp.x'] = inputs['x']
+        p['comp.inp'] = inputs['inp']
         seed = {'comp.out': np.ones(1)}
 
         stack = []
@@ -113,22 +107,22 @@ class SubProbComp(om.ExplicitComponent):
             comp._inputs['inp'] = stack.pop()
             comp._inputs['x'] = inputs['x']
             p.model._linearize(None)
-            jvp = p.compute_jacvec_product(of=['comp.out'], wrt=['indep.x','indep.inp'], mode='rev', seed=seed)
-            seed['comp.out'][:] = jvp['indep.inp']
+            jvp = p.compute_jacvec_product(of=['comp.out'], wrt=['comp.x','comp.inp'], mode='rev', seed=seed)
+            seed['comp.out'][:] = jvp['comp.inp']
 
-            # all of the comp.x's are connected to indep.x, so we have to accumulate their
-            # contributions together
-            partials[self.pathname + '.out', self.pathname + '.x'] += jvp['indep.x']
+            # all of the comp.x's are connected to the same indepvarcomp, so we have 
+            # to accumulate their contributions together
+            partials[self.pathname + '.out', self.pathname + '.x'] += jvp['comp.x']
 
             # this one doesn't get accumulated because each comp.inp contributes to the
-            # previous comp's .out (or to indep.inp in the case of the first comp) only.
+            # previous comp's .out (or to comp.inp in the case of the first comp) only.
             # Note that we have to handle this explicitly here because normally in OpenMDAO
             # we accumulate derivatives when we do reverse transfers.  We can't do that
             # here because we only have one instance of our component, so instead of
             # accumulating into separate 'comp.out' variables for each comp instance,
             # we would be accumulating into a single comp.out variable, which would make
             # our derivative too big.
-            partials[self.pathname + '.out', self.pathname + '.inp'] = jvp['indep.inp']
+            partials[self.pathname + '.out', self.pathname + '.inp'] = jvp['comp.inp']
 
     def compute_partials(self, inputs, partials):
         # note that typically you would only have to define partials for one direction,
@@ -144,15 +138,15 @@ class TestPComputeJacvecProd(unittest.TestCase):
     def _build_om_model(self, size):
         p = om.Problem()
         model = p.model
-        indep = model.add_subsystem('indep', om.IndepVarComp('x', val=np.zeros(size - 1)))
-        indep.add_output('inp', val=0.0)
+        comp = model.add_subsystem('comp', om.IndepVarComp('x', val=np.zeros(size - 1)))
+        comp.add_output('inp', val=0.0)
 
         C1 = model.add_subsystem('C1', get_comp(size))
         C2 = model.add_subsystem('C2', get_comp(size))
         C3 = model.add_subsystem('C3', get_comp(size))
 
-        model.connect('indep.x', ['C1.x', 'C2.x', 'C3.x'])
-        model.connect('indep.inp', 'C1.inp')
+        model.connect('comp.x', ['C1.x', 'C2.x', 'C3.x'])
+        model.connect('comp.inp', 'C1.inp')
         model.connect('C1.out', 'C2.inp')
         model.connect('C2.out', 'C3.inp')
 
@@ -160,12 +154,8 @@ class TestPComputeJacvecProd(unittest.TestCase):
 
     def _build_cjv_model(self, size, mode):
         p = om.Problem()
-        indep = p.model.add_subsystem('indep', om.IndepVarComp('x', val=np.zeros(size - 1)))
-        indep.add_output('inp', val=0.0)
 
         comp = p.model.add_subsystem('comp', SubProbComp(input_size=size, num_nodes=3, mode=mode))
-        p.model.connect('indep.x', 'comp.x')
-        p.model.connect('indep.inp', 'comp.inp')
 
         p.setup(mode=mode)
 
@@ -175,20 +165,20 @@ class TestPComputeJacvecProd(unittest.TestCase):
         size = 5
         p = self._build_om_model(size)
         p.setup(mode='fwd')
-        p['indep.x'] = np.arange(size-1, dtype=float) + 1. #np.random.random(size - 1)
-        p['indep.inp'] = np.array([7.])  #np.random.random(1)[0]
+        p['comp.x'] = np.arange(size-1, dtype=float) + 1. #np.random.random(size - 1)
+        p['comp.inp'] = np.array([7.])  #np.random.random(1)[0]
         p.final_setup()
 
         p2 = self._build_cjv_model(size, 'fwd')
 
-        p2['indep.x'] = p['indep.x']
-        p2['indep.inp'] = p['indep.inp']
+        p2['comp.x'] = p['comp.x']
+        p2['comp.inp'] = p['comp.inp']
 
         p2.run_model()
-        J2 = p2.compute_totals(of=['comp.out'], wrt=['indep.x', 'indep.inp'], return_format='array')
+        J2 = p2.compute_totals(of=['comp.out'], wrt=['comp.x', 'comp.inp'], return_format='array')
 
         p.run_model()
-        J = p.compute_totals(of=['C3.out'], wrt=['indep.x', 'indep.inp'], return_format='array')
+        J = p.compute_totals(of=['C3.out'], wrt=['comp.x', 'comp.inp'], return_format='array')
 
         self.assertEqual(p['C3.out'], p2['comp.out'])
         np.testing.assert_allclose(J2, J)
@@ -198,22 +188,22 @@ class TestPComputeJacvecProd(unittest.TestCase):
         size = 5
         p = self._build_om_model(size)
         p.setup(mode='rev')
-        p['indep.x'] = np.arange(size-1, dtype=float) + 1. #np.random.random(size - 1)
-        p['indep.inp'] = np.array([7.])  #np.random.random(1)[0]
+        p['comp.x'] = np.arange(size-1, dtype=float) + 1. #np.random.random(size - 1)
+        p['comp.inp'] = np.array([7.])  #np.random.random(1)[0]
         p.final_setup()
 
         p2 = self._build_cjv_model(size, 'rev')
 
-        p2['indep.x'] = p['indep.x']
-        p2['indep.inp'] = p['indep.inp']
+        p2['comp.x'] = p['comp.x']
+        p2['comp.inp'] = p['comp.inp']
 
         p.run_model()
-        J = p.compute_totals(of=['C3.out'], wrt=['indep.x', 'indep.inp'], return_format='array')
+        J = p.compute_totals(of=['C3.out'], wrt=['comp.x', 'comp.inp'], return_format='array')
 
         p2.run_model()
         self.assertEqual(p['C3.out'], p2['comp.out'])
 
-        J2 = p2.compute_totals(of=['comp.out'], wrt=['indep.x', 'indep.inp'], return_format='array')
+        J2 = p2.compute_totals(of=['comp.out'], wrt=['comp.x', 'comp.inp'], return_format='array')
 
         np.testing.assert_allclose(J2, J)
 

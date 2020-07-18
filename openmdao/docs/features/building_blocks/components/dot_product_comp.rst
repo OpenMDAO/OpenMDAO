@@ -30,6 +30,29 @@ and the output :math:`c`, as well as specifying their units.
     DotProductComp
     options
 
+
+DotProductComp Constructor
+--------------------------
+
+The call signature for the `DotProductComp` constructor is:
+
+.. automethod:: openmdao.components.dot_product_comp.DotProductComp.__init__
+    :noindex:
+
+
+DotProductComp Usage
+--------------------
+
+There are often situations when numerous products need to be computed, essentially in parallel.
+You can reduce the number of components required by having one `DotProductComp` perform multiple operations.
+This is also convenient when the different operations have common inputs.
+
+The ``add_product`` method is used to create additional products after instantiation.
+
+.. automethod:: openmdao.components.dot_product_comp.DotProductComp.add_product
+   :noindex:
+
+
 DotProductComp Example
 ----------------------
 
@@ -42,5 +65,20 @@ with `a_units` and `b_units`.
 
 .. embed-code::
     openmdao.components.tests.test_dot_product_comp.TestFeature.test
+    :layout: interleave
+
+
+DotProductComp Example with Multiple Products
+---------------------------------------------
+
+When defining multiple products:
+
+- An input name in one call to `add_product` may not be an output name in another call, and vice-versa.
+- The units and shape of variables used across multiple products must be the same in each one.
+
+
+.. embed-code::
+    openmdao.components.tests.test_dot_product_comp.TestFeature.test_multiple
+    :layout: interleave
 
 .. tags:: DotProductComp, Component

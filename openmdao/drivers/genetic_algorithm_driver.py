@@ -274,10 +274,10 @@ class SimpleGADriver(Driver):
         for name, meta in desvars.items():
             i, j = self._desvar_idx[name]
 
-            if name in self._designvars_discrete:
-                prom_name = name
-            else:
+            if name in abs2prom:
                 prom_name = abs2prom[name]
+            else:
+                prom_name = name
 
             if name in user_bits:
                 val = user_bits[name]

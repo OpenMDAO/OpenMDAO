@@ -57,6 +57,7 @@ Other Useful Docs
     other/citing.rst
     other/repo_guide/index.rst
     other/api_translation.rst
+    other/auto_ivc_api_translation.rst
     other/file_wrap.rst
     _srcdocs/index.rst
     developer_docs/index.rst

@@ -170,8 +170,6 @@ class TestMPIScatter(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', DummyComp(), promotes=['*'])
 
@@ -427,8 +425,9 @@ class TestPyoptSparse(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.set_input_defaults('x', 50.0)
+        model.set_input_defaults('y', 50.0)
+
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
 
@@ -607,9 +606,6 @@ class TestPyoptSparse(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 1.0))
-        model.add_subsystem('p2', om.IndepVarComp('x', 1.0))
-
         model.add_subsystem('comp1', om.ExecComp('y = 3.0*x'))
         model.add_subsystem('comp2', om.ExecComp('y = 5.0*x'))
 
@@ -618,8 +614,6 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_subsystem('con2', om.ExecComp('c = 15.0 - x'))
 
         # hook up explicitly
-        model.connect('p1.x', 'comp1.x')
-        model.connect('p2.x', 'comp2.x')
         model.connect('comp1.y', 'obj.i1')
         model.connect('comp2.y', 'obj.i2')
         model.connect('comp1.y', 'con1.x')
@@ -631,8 +625,8 @@ class TestPyoptSparse(unittest.TestCase):
         prob.driver.options['optimizer'] = OPTIMIZER
         prob.driver.options['print_results'] = False
 
-        model.add_design_var('p1.x', lower=-50.0, upper=50.0)
-        model.add_design_var('p2.x', lower=-50.0, upper=50.0)
+        model.add_design_var('comp1.x', lower=-50.0, upper=50.0)
+        model.add_design_var('comp2.x', lower=-50.0, upper=50.0)
         model.add_objective('obj.o')
         model.add_constraint('con1.c', equals=0.0)
         model.add_constraint('con2.c', equals=0.0)
@@ -649,9 +643,9 @@ class TestPyoptSparse(unittest.TestCase):
 
         # Verify that pyOpt has the correct wrt names
         con1 = prob.driver.pyopt_solution.constraints['con1.c']
-        self.assertEqual(con1.wrt, ['p1.x'])
+        self.assertEqual(con1.wrt, ['comp1.x'])
         con2 = prob.driver.pyopt_solution.constraints['con2.c']
-        self.assertEqual(con2.wrt, ['p2.x'])
+        self.assertEqual(con2.wrt, ['comp2.x'])
 
     def test_inf_as_desvar_bounds(self):
 
@@ -873,8 +867,9 @@ class TestPyoptSparse(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.set_input_defaults('x', 50.0)
+        model.set_input_defaults('y', 50.0)
+
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
 
@@ -1951,7 +1946,7 @@ class TestPyoptSparseFeature(unittest.TestCase):
         prob.setup(check=False, mode='rev')
         prob.run_driver()
 
-        assert_near_equal(prob['z'][0], 1.9776, 1e-3)
+        assert_near_equal(prob.get_val('z', indices=0), 1.9776, 1e-3)
 
     def test_settings_print(self):
         import numpy as np
@@ -1977,7 +1972,7 @@ class TestPyoptSparseFeature(unittest.TestCase):
         prob.setup(check=False, mode='rev')
         prob.run_driver()
 
-        assert_near_equal(prob['z'][0], 1.9776, 1e-3)
+        assert_near_equal(prob.get_val('z', indices=0), 1.9776, 1e-3)
 
     def test_slsqp_atol(self):
         import numpy as np
@@ -2004,7 +1999,7 @@ class TestPyoptSparseFeature(unittest.TestCase):
         prob.setup(check=False, mode='rev')
         prob.run_driver()
 
-        assert_near_equal(prob['z'][0], 1.9776, 1e-3)
+        assert_near_equal(prob.get_val('z', indices=0), 1.9776, 1e-3)
 
     def test_slsqp_maxit(self):
         import numpy as np
@@ -2031,7 +2026,7 @@ class TestPyoptSparseFeature(unittest.TestCase):
         prob.setup(check=False, mode='rev')
         prob.run_driver()
 
-        assert_near_equal(prob['z'][0], 1.98337708, 1e-3)
+        assert_near_equal(prob.get_val('z', indices=0), 1.98337708, 1e-3)
 
 
 class TestPyoptSparseSnoptFeature(unittest.TestCase):
@@ -2067,7 +2062,7 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
         prob.setup(check=False, mode='rev')
         prob.run_driver()
 
-        assert_near_equal(prob['z'][0], 1.9776, 1e-3)
+        assert_near_equal(prob.get_val('z', indices=0), 1.9776, 1e-3)
 
     def test_snopt_maxit(self):
         import numpy as np
@@ -2096,15 +2091,15 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
 
         prob.run_driver()
 
-        assert_near_equal(prob['z'][0], 1.9780247, 2e-3)
+        assert_near_equal(prob.get_val('z', indices=0), 1.9780247, 2e-3)
 
     def test_snopt_fd_solution(self):
 
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.set_input_defaults('x', 50.0)
+        model.set_input_defaults('y', 50.0)
 
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
@@ -2143,8 +2138,8 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.set_input_defaults('x', 50.0)
+        model.set_input_defaults('y', 50.0)
 
         model.add_subsystem('comp', ParaboloidApplyLinear(), promotes=['*'])
 
@@ -2241,9 +2236,9 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
 
         class SellarMDAAE(om.Group):
             def setup(self):
-                indeps = self.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
-                indeps.add_output('x', 1.0)
-                indeps.add_output('z', np.array([5.0, 2.0]))
+
+                model.set_input_defaults('x', 1.0)
+                model.set_input_defaults('z', np.array([5.0, 2.0]))
 
                 cycle = self.add_subsystem('cycle', om.Group(), promotes=['*'])
 

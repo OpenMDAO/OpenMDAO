@@ -54,6 +54,59 @@ def count_keys(d):
 
     return count
 
+class SellarDerivativesGroupedPreAutoIVC(om.Group):
+    """
+    This version is needed for testing backwards compatibility for load_case on pre-3.2
+    models.
+    """
+
+    def initialize(self):
+        self.options.declare('nonlinear_solver', default=om.NonlinearBlockGS,
+                             desc='Nonlinear solver (class or instance) for Sellar MDA')
+        self.options.declare('nl_atol', default=None,
+                             desc='User-specified atol for nonlinear solver.')
+        self.options.declare('nl_maxiter', default=None,
+                             desc='Iteration limit for nonlinear solver.')
+        self.options.declare('linear_solver', default=om.ScipyKrylov,
+                             desc='Linear solver (class or instance)')
+        self.options.declare('ln_atol', default=None,
+                             desc='User-specified atol for linear solver.')
+        self.options.declare('ln_maxiter', default=None,
+                             desc='Iteration limit for linear solver.')
+
+    def setup(self):
+        self.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
+        self.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        self.mda = mda = self.add_subsystem('mda', om.Group(), promotes=['x', 'z', 'y1', 'y2'])
+        mda.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        mda.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        self.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                  z=np.array([0.0, 0.0]), x=0.0, y1=0.0, y2=0.0),
+                           promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        self.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        self.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        nl = self.options['nonlinear_solver']
+        self.nonlinear_solver = nl()
+        if self.options['nl_atol']:
+            self.nonlinear_solver.options['atol'] = self.options['nl_atol']
+        if self.options['nl_maxiter']:
+            self.nonlinear_solver.options['maxiter'] = self.options['nl_maxiter']
+
+        ln = self.options['linear_solver']
+        self.linear_solver = ln()
+        if self.options['ln_atol']:
+            self.linear_solver.options['atol'] = self.options['ln_atol']
+        if self.options['ln_maxiter']:
+            self.linear_solver.options['maxiter'] = self.options['ln_maxiter']
+
+    def configure(self):
+        self.mda.linear_solver = om.ScipyKrylov()
+        self.mda.nonlinear_solver = om.NonlinearBlockGS()
+
 
 @use_tempdirs
 class TestSqliteCaseReader(unittest.TestCase):
@@ -217,7 +270,7 @@ class TestSqliteCaseReader(unittest.TestCase):
                                        [1.97846296, -2.21388305e-13], decimal=2)
 
         deriv_case = cr.get_case('rank0:ScipyOptimize_SLSQP|4')
-        np.testing.assert_almost_equal(deriv_case.derivatives['obj', 'pz.z'],
+        np.testing.assert_almost_equal(deriv_case.derivatives['obj', 'z'],
                                        [[3.8178954, 1.73971323]], decimal=2)
 
         # While thinking about derivatives, let's get them all.
@@ -403,62 +456,6 @@ class TestSqliteCaseReader(unittest.TestCase):
             self.assertEqual(iter_coord,
                              'rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|%d' % i)
 
-    def test_reading_metadata(self):
-        prob = om.Problem()
-        model = prob.model
-
-        # the Sellar problem but with units
-        model.add_subsystem('px', om.IndepVarComp('x', 1.0, units='m', lower=-1000, upper=1000),
-                            promotes=['x'])
-        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
-        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
-        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
-        model.add_subsystem('obj_cmp',
-                            om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                        z=np.array([0.0, 0.0]),
-                                        x={'value': 0.0, 'units': 'm'},
-                                        y1={'units': 'm'}, y2={'units': 'cm'}),
-                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
-
-        model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
-        model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
-
-        model.nonlinear_solver = om.NonlinearBlockGS(iprint=0)
-        model.linear_solver = om.LinearBlockGS(iprint=0)
-
-        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
-        model.add_design_var('x', lower=0.0, upper=10.0)
-        model.add_objective('obj')
-        model.add_constraint('con1', upper=0.0)
-        model.add_constraint('con2', upper=0.0)
-
-        prob.driver.add_recorder(self.recorder)
-
-        prob.setup()
-        prob.run_driver()
-        prob.cleanup()
-
-        cr = om.CaseReader(self.filename)
-
-        self.assertEqual(cr._output2meta['x']['units'], 'm')
-        self.assertEqual(cr._input2meta['obj_cmp.y1']['units'], 'm')
-        self.assertEqual(cr._input2meta['obj_cmp.y2']['units'], 'cm')
-
-        self.assertEqual(cr._input2meta['d1.x']['units'], None)
-        self.assertEqual(cr._input2meta['d1.y2']['units'], None)
-        self.assertEqual(cr._output2meta['d1.y1']['units'], None)
-
-        self.assertEqual(cr._output2meta['x']['explicit'], True)
-        self.assertEqual(cr._output2meta['x']['type'], ['output', 'desvar'])
-
-        self.assertEqual(cr._input2meta['obj_cmp.y1']['explicit'], True)
-        self.assertEqual(cr._input2meta['obj_cmp.y2']['explicit'], True)
-
-        self.assertEqual(cr._output2meta['x']['lower'], -1000.)
-        self.assertEqual(cr._output2meta['x']['upper'], 1000.)
-        self.assertEqual(cr._output2meta['y2']['upper'], 1000.)
-        self.assertEqual(cr._output2meta['y2']['lower'], 0.1)
-
     def test_reading_solver_metadata(self):
         prob = SellarProblem(linear_solver=om.LinearBlockGS())
         prob.setup()
@@ -502,8 +499,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         driver_cases = cr.list_cases('driver')
         last_case = cr.get_case(driver_cases[-1])
 
-        np.testing.assert_almost_equal(last_case.outputs['z'], prob['pz.z'])
-        np.testing.assert_almost_equal(last_case.outputs['x'], prob['px.x'])
+        np.testing.assert_almost_equal(last_case.outputs['z'], prob['z'])
+        np.testing.assert_almost_equal(last_case.outputs['x'], prob['x'])
         np.testing.assert_almost_equal(last_case.outputs['y2'], prob['mda.d2.y2'])
 
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
@@ -1258,19 +1255,19 @@ class TestSqliteCaseReader(unittest.TestCase):
     def test_list_discrete(self):
         model = om.Group()
 
-        indep = model.add_subsystem('indep', om.IndepVarComp())
-        indep.add_discrete_output('x', 11)
-
-        model.add_subsystem('expl', ModCompEx(3))
-        model.add_subsystem('impl', ModCompIm(3))
-
-        model.connect('indep.x', ['expl.x', 'impl.x'])
+        model.add_subsystem('expl', ModCompEx(3),
+                            promotes_inputs=['x'])
+        model.add_subsystem('impl', ModCompIm(3),
+                            promotes_inputs=['x'])
 
         model.add_recorder(self.recorder)
 
         prob = om.Problem(model)
 
         prob.setup()
+
+        prob.set_val('x', 11)
+
         prob.run_model()
         prob.cleanup()
 
@@ -1311,12 +1308,11 @@ class TestSqliteCaseReader(unittest.TestCase):
         # list outputs, not hierarchical, with residuals
         #
         expected = [
-            "3 Explicit Output(s) in 'model'",
+            "2 Explicit Output(s) in 'model'",
             "-------------------------------",
             "",
             "varname  value  resids      ",
             "-------  -----  ------------",
-            "indep.x  11     Not Recorded",
             "expl.b   [20.]  [0.]        ",
             "expl.y   2      Not Recorded",
         ]
@@ -1504,8 +1500,8 @@ class TestSqliteCaseReader(unittest.TestCase):
             "con1": -22.42830237,
             "con2": -11.94151185,
             # unpromoted output names
-            "px.x": 1.,
-            "pz.z": [5., 2.],
+            "_auto_ivc.v1": 1.,
+            "_auto_ivc.v0": [5., 2.],
             "obj_cmp.obj": 28.58830817,
             "con_cmp1.con1": -22.42830237,
             "con_cmp2.con2": -11.94151185,
@@ -2362,7 +2358,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         nl.add_recorder(self.recorder)
 
         # system
-        pz = prob.model.pz  # IndepVarComp which is an ExplicitComponent
+        pz = prob.model.obj_cmp
         pz.recording_options['record_inputs'] = True
         pz.recording_options['record_outputs'] = True
         pz.recording_options['record_residuals'] = True
@@ -2396,22 +2392,22 @@ class TestSqliteCaseReader(unittest.TestCase):
         #
 
         self.assertEqual(sorted(cr.list_sources(out_stream=None)), [
-            'driver', 'problem', 'root.mda.nonlinear_solver', 'root.nonlinear_solver', 'root.pz'
+            'driver', 'problem', 'root.mda.nonlinear_solver', 'root.nonlinear_solver', 'root.obj_cmp'
         ])
 
         #
         # check system cases
         #
 
-        system_cases = cr.list_cases('root.pz', recurse=False)
+        system_cases = cr.list_cases('root.obj_cmp', recurse=False)
         expected_cases = [
-            'rank0:ScipyOptimize_SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0|pz._solve_nonlinear|0',
-            'rank0:ScipyOptimize_SLSQP|1|root._solve_nonlinear|1|NLRunOnce|0|pz._solve_nonlinear|1',
-            'rank0:ScipyOptimize_SLSQP|2|root._solve_nonlinear|2|NLRunOnce|0|pz._solve_nonlinear|2',
-            'rank0:ScipyOptimize_SLSQP|3|root._solve_nonlinear|3|NLRunOnce|0|pz._solve_nonlinear|3',
-            'rank0:ScipyOptimize_SLSQP|4|root._solve_nonlinear|4|NLRunOnce|0|pz._solve_nonlinear|4',
-            'rank0:ScipyOptimize_SLSQP|5|root._solve_nonlinear|5|NLRunOnce|0|pz._solve_nonlinear|5',
-            'rank0:ScipyOptimize_SLSQP|6|root._solve_nonlinear|6|NLRunOnce|0|pz._solve_nonlinear|6'
+            'rank0:ScipyOptimize_SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0|obj_cmp._solve_nonlinear|0',
+            'rank0:ScipyOptimize_SLSQP|1|root._solve_nonlinear|1|NLRunOnce|0|obj_cmp._solve_nonlinear|1',
+            'rank0:ScipyOptimize_SLSQP|2|root._solve_nonlinear|2|NLRunOnce|0|obj_cmp._solve_nonlinear|2',
+            'rank0:ScipyOptimize_SLSQP|3|root._solve_nonlinear|3|NLRunOnce|0|obj_cmp._solve_nonlinear|3',
+            'rank0:ScipyOptimize_SLSQP|4|root._solve_nonlinear|4|NLRunOnce|0|obj_cmp._solve_nonlinear|4',
+            'rank0:ScipyOptimize_SLSQP|5|root._solve_nonlinear|5|NLRunOnce|0|obj_cmp._solve_nonlinear|5',
+            'rank0:ScipyOptimize_SLSQP|6|root._solve_nonlinear|6|NLRunOnce|0|obj_cmp._solve_nonlinear|6'
         ]
         self.assertEqual(len(system_cases), len(expected_cases))
         for i, coord in enumerate(system_cases):
@@ -2420,15 +2416,15 @@ class TestSqliteCaseReader(unittest.TestCase):
         # check inputs, outputs and residuals for last case
         case = cr.get_case(system_cases[-1])
 
-        self.assertEqual(case.inputs, None)
+        self.assertEqual(list(case.inputs.keys()), ['x', 'y1', 'y2', 'z'])
+        self.assertEqual(case.inputs['y1'], prob['y1'])
+        self.assertEqual(case.inputs['y2'], prob['y2'])
 
-        self.assertEqual(list(case.outputs.keys()), ['z'])
-        self.assertEqual(case.outputs['z'][0], prob['z'][0])
-        self.assertEqual(case.outputs['z'][1], prob['z'][1])
+        self.assertEqual(list(case.outputs.keys()), ['obj'])
+        self.assertEqual(case.outputs['obj'], prob['obj'])
 
-        self.assertEqual(list(case.residuals.keys()), ['z'])
-        self.assertEqual(case.residuals['z'][0], 0.)
-        self.assertEqual(case.residuals['z'][1], 0.)
+        self.assertEqual(list(case.residuals.keys()), ['obj'])
+        self.assertEqual(case.residuals['obj'][0], 0.)
 
         #
         # check solver cases
@@ -2552,8 +2548,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         case = cr.get_case(driver_cases[-1])
 
         expected_dvs = {
-            "z": prob['pz.z'],
-            "x": prob['px.x']
+            "z": prob['z'],
+            "x": prob['x']
         }
         expected_obj = {
             "obj": prob['obj_cmp.obj']
@@ -3262,7 +3258,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         self.assertEqual(('inputs:', sorted(model_vars['inputs']), 'outputs:', sorted(model_vars['outputs'])),
                          ('inputs:', ['x', 'y1', 'y2', 'z'], 'outputs:', ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z']))
 
-        solver_vars = cr.list_source_vars('root', out_stream=None)
+        solver_vars = cr.list_source_vars('root.nonlinear_solver', out_stream=None)
         self.assertEqual(('inputs:', sorted(solver_vars['inputs']), 'outputs:', sorted(solver_vars['outputs'])),
                          ('inputs:', ['x', 'y1', 'y2', 'z'], 'outputs:', ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z']))
 
@@ -3312,10 +3308,12 @@ class TestFeatureSqliteReader(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
+
+        model.set_input_defaults('x', val=50.0)
+        model.set_input_defaults('y', val=50.0)
 
         prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
@@ -3329,8 +3327,9 @@ class TestFeatureSqliteReader(unittest.TestCase):
 
         prob.driver.add_recorder(recorder)
         prob.driver.recording_options['record_desvars'] = True
+        prob.driver.recording_options['record_outputs'] = True
         prob.driver.recording_options['includes'] = []
-        prob.driver.recording_options['excludes'] = ['y']
+        prob.driver.recording_options['excludes'] = []
 
         prob.set_solver_print(0)
         prob.setup()
@@ -3347,6 +3346,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         recorder = om.SqliteRecorder(filename)
         prob.driver.add_recorder(recorder)
         prob.driver.recording_options['record_desvars'] = False
+        prob.driver.recording_options['record_outputs'] = True
         prob.driver.recording_options['includes'] = []
 
         prob.setup()
@@ -3362,6 +3362,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         recorder = om.SqliteRecorder(filename)
         prob.driver.add_recorder(recorder)
         prob.driver.recording_options['record_desvars'] = True
+        prob.driver.recording_options['record_outputs'] = True
         prob.driver.recording_options['includes'] = ['*']
 
         prob.setup()
@@ -3373,10 +3374,11 @@ class TestFeatureSqliteReader(unittest.TestCase):
 
         self.assertEqual(sorted(case.outputs.keys()), ['c', 'f_xy', 'x', 'y'])
 
-        # Fourth case with record_desvars = False and includes = ['*']
+        # Fourth case with record_desvars = False, record_outputs = True, and includes = ['*']
         recorder = om.SqliteRecorder(filename)
         prob.driver.add_recorder(recorder)
         prob.driver.recording_options['record_desvars'] = False
+        prob.driver.recording_options['record_outputs'] = True
         prob.driver.recording_options['includes'] = ['*']
 
         prob.setup()
@@ -3386,7 +3388,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         cr = om.CaseReader(filename)
         case = cr.get_case(0)
 
-        self.assertEqual(sorted(case.outputs.keys()), ['c', 'f_xy', 'x'])
+        self.assertEqual(sorted(case.outputs.keys()), ['c', 'f_xy', 'x', 'y'])
 
     def test_feature_driver_options_with_values(self):
         import openmdao.api as om
@@ -3436,16 +3438,16 @@ class TestFeatureSqliteReader(unittest.TestCase):
 
         # alternatively, you can get the absolute names
         self.assertEqual((sorted(objs.absolute_names()), sorted(cons.absolute_names()), sorted(dvs.absolute_names())),
-                         (['obj_cmp.obj'], ['con_cmp1.con1', 'con_cmp2.con2'], ['px.x', 'pz.z']))
+                         (['obj_cmp.obj'], ['con_cmp1.con1', 'con_cmp2.con2'], ['x', 'z']))
 
         # you can access variable values using either the promoted or the absolute name
         self.assertEqual((objs['obj'], objs['obj_cmp.obj']), (objs['obj_cmp.obj'], objs['obj']))
-        self.assertEqual((dvs['x'], dvs['px.x']), (dvs['px.x'], dvs['x']))
+        self.assertEqual((dvs['x'], dvs['_auto_ivc.v1']), (dvs['_auto_ivc.v1'], dvs['x']))
         self.assertEqual((rsps['obj'], rsps['obj_cmp.obj']), (rsps['obj_cmp.obj'], rsps['obj']))
 
         # you can also access the variables directly from the case object
         self.assertEqual((case['obj'], case['obj_cmp.obj']), (objs['obj_cmp.obj'], objs['obj']))
-        self.assertEqual((case['x'], case['px.x']), (dvs['px.x'], dvs['x']))
+        self.assertEqual((case['x'], case['_auto_ivc.v1']), (dvs['_auto_ivc.v1'], dvs['x']))
 
     def test_feature_list_inputs_and_outputs(self):
         import openmdao.api as om
@@ -3505,14 +3507,13 @@ class TestFeatureSqliteReader(unittest.TestCase):
         prob = om.Problem(model)
         model.add_recorder(om.SqliteRecorder('cases.sql'))
 
-        indep = om.IndepVarComp()
-        indep.add_output('length', val=100.)
-        indep.add_output('width', val=60.)
-
         model.add_subsystem('rect', RectangleCompWithTags(), promotes=['length', 'width', 'area'])
-        model.add_subsystem('indep', indep, promotes=['length', 'width'])
 
         prob.setup(check=False)
+
+        prob.set_val('length', 100.0)
+        prob.set_val('width', 60.0)
+
         prob.run_model()
 
         prob.cleanup()
@@ -3542,14 +3543,13 @@ class TestFeatureSqliteReader(unittest.TestCase):
         prob = om.Problem(model)
         model.add_recorder(om.SqliteRecorder('cases.sql'))
 
-        indep = om.IndepVarComp()
-        indep.add_output('length', val=100.)
-        indep.add_output('width', val=60.)
-
         model.add_subsystem('rect', RectangleComp(), promotes=['length', 'width', 'area'])
-        model.add_subsystem('indep', indep, promotes=['length', 'width'])
 
         prob.setup(check=False)
+
+        prob.set_val('length', 100.)
+        prob.set_val('width', 60.0)
+
         prob.run_model()
 
         prob.cleanup()
@@ -3571,9 +3571,9 @@ class TestFeatureSqliteReader(unittest.TestCase):
         outputs = case.list_outputs(includes=['*area'], out_stream=None)
         self.assertEqual(sorted([outp[0] for outp in outputs]), ['rect.area',])
 
-        # Outputs with excludes
-        outputs = case.list_outputs(excludes=['*area'], out_stream=None)
-        self.assertEqual(sorted([outp[0] for outp in outputs]), sorted(['indep.width', 'indep.length']))
+        # Inputs with excludes
+        inputs = case.list_inputs(excludes=['*length'], out_stream=None)
+        self.assertEqual(sorted(['rect.width']), sorted([inp[0] for inp in inputs]))
 
     def test_feature_get_val(self):
         import openmdao.api as om
@@ -3581,17 +3581,16 @@ class TestFeatureSqliteReader(unittest.TestCase):
         model = om.Group()
         model.add_recorder(om.SqliteRecorder('cases.sql'))
 
-        indep = om.IndepVarComp()
-        indep.add_output('x', val=100., units='m')
-        indep.add_output('t', val=60., units='s')
-
         speed = om.ExecComp('v=x/t', x={'units': 'm'}, t={'units': 's'}, v={'units': 'm/s'})
 
-        model.add_subsystem('indep', indep, promotes=['x', 't'])
         model.add_subsystem('speed', speed, promotes=['x', 't', 'v'])
 
         prob = om.Problem(model)
         prob.setup()
+
+        prob.set_val('x', 100., units='m')
+        prob.set_val('t', 60., units='s')
+
         prob.run_model()
         prob.cleanup()
 
@@ -3610,9 +3609,8 @@ class TestFeatureSqliteReader(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
-        model.add_subsystem('px', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('py', om.IndepVarComp('y', 50.0), promotes=['*'])
-        model.add_subsystem('egg_crate', EggCrate(), promotes=['*'])
+
+        model.add_subsystem('egg_crate', EggCrate(), promotes=['x', 'y', 'f_xy'])
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
         model.add_objective('f_xy')
@@ -3623,19 +3621,22 @@ class TestFeatureSqliteReader(unittest.TestCase):
         prob.add_recorder(recorder)
 
         prob.setup()
+
         prob.set_solver_print(0)
 
-        prob['x'] = 2.5
-        prob['y'] = 2.5
+        prob.set_val('x', 2.5)
+        prob.set_val('y', 2.5)
+
         prob.run_driver()
-        print(prob['x'], prob['y'], prob['f_xy'])
+        print(prob.get_val('x'), prob.get_val('y'), prob.get_val('f_xy'))
         case_name_1 = "c1"
         prob.record(case_name_1)
 
-        prob['x'] = 0.1
-        prob['y'] = -0.1
+
+        prob.set_val('x', 0.1)
+        prob.set_val('y', -0.1)
         prob.run_driver()
-        print(prob['x'], prob['y'], prob['f_xy'])
+        print(prob.get_val('x'), prob.get_val('y'), prob.get_val('f_xy'))
         case_name_2 = "c2"
         prob.record(case_name_2)
         prob.cleanup()
@@ -3659,8 +3660,8 @@ class TestFeatureSqliteReader(unittest.TestCase):
 @use_tempdirs
 class TestPromAbsDict(unittest.TestCase):
 
-    def test_dict_functionality(self):
-        prob = SellarProblem(SellarDerivativesGrouped)
+    def test_dict_functionality_pre_autoivc(self):
+        prob = SellarProblem(SellarDerivativesGroupedPreAutoIVC)
         driver = prob.driver = om.ScipyOptimizeDriver(disp=False)
 
         recorder = om.SqliteRecorder("cases.sql")
@@ -3691,7 +3692,7 @@ class TestPromAbsDict(unittest.TestCase):
 
         # verify that using absolute names works the same as using promoted names
         self.assertEqual(sorted(dvs.absolute_names()), ['px.x', 'pz.z'])
-        self.assertEqual(dvs['px.x'], dvs['x'])
+        self.assertEqual(dvs['x'], dvs['x'])
         self.assertEqual(dvs['pz.z'][0], dvs['z'][0])
         self.assertEqual(dvs['pz.z'][1], dvs['z'][1])
 
@@ -3745,6 +3746,85 @@ class TestPromAbsDict(unittest.TestCase):
         self.assertEqual(set(derivs.absolute_names()), set([
             ('obj_cmp.obj', 'pz.z'), ('con_cmp2.con2', 'pz.z'), ('con_cmp1.con1', 'px.x'),
             ('obj_cmp.obj', 'px.x'), ('con_cmp2.con2', 'px.x'), ('con_cmp1.con1', 'pz.z')
+        ]))
+
+    def test_dict_functionality(self):
+        prob = SellarProblem(SellarDerivativesGrouped)
+        driver = prob.driver = om.ScipyOptimizeDriver(disp=False)
+
+        recorder = om.SqliteRecorder("cases.sql")
+
+        driver.add_recorder(recorder)
+        driver.recording_options['includes'] = []
+        driver.recording_options['record_objectives'] = True
+        driver.recording_options['record_constraints'] = True
+        driver.recording_options['record_desvars'] = True
+        driver.recording_options['record_derivatives'] = True
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = om.CaseReader("cases.sql")
+
+        driver_cases = cr.list_cases('driver')
+        driver_case = cr.get_case(driver_cases[-1])
+
+        dvs = driver_case.get_design_vars()
+        derivs = driver_case.derivatives
+
+        # verify that map looks and acts like a regular dict
+        self.assertTrue(isinstance(dvs, dict))
+        self.assertEqual(sorted(dvs.keys()), ['x', 'z'])
+        self.assertEqual(sorted(dvs.items()), [('x', dvs['x']), ('z', dvs['z'])])
+
+        # verify that using absolute names works the same as using promoted names
+        self.assertEqual(sorted(dvs.absolute_names()), ['x', 'z'])
+        self.assertEqual(dvs['x'], dvs['x'])
+        self.assertEqual(dvs['z'][0], dvs['z'][0])
+        self.assertEqual(dvs['z'][1], dvs['z'][1])
+
+        dvs['x'] = 111.
+        self.assertEqual(dvs['x'], 111.)
+
+        dvs['x'] = 222.
+        self.assertEqual(dvs['x'], 222.)
+
+        # verify deriv keys are tuples as expected, both promoted and absolute
+        self.assertEqual(set(derivs.keys()), set([
+            ('obj', 'z'), ('con2', 'z'), ('con1', 'x'),
+            ('obj', 'x'), ('con2', 'x'), ('con1', 'z')
+        ]))
+        self.assertEqual(set(derivs.absolute_names()), set([
+            ('obj_cmp.obj', 'z'), ('con_cmp2.con2', 'z'), ('con_cmp1.con1', 'x'),
+            ('obj_cmp.obj', 'x'), ('con_cmp2.con2', 'x'), ('con_cmp1.con1', 'z')
+        ]))
+
+        # verify we can access derivs via tuple or string, with promoted or absolute names
+        J = prob.compute_totals(of=['obj'], wrt=['x'])
+        expected = J[('obj', 'x')]
+        np.testing.assert_almost_equal(derivs[('obj', 'x')], expected, decimal=6)
+        np.testing.assert_almost_equal(derivs[('obj_cmp.obj', 'x')], expected, decimal=6)
+        np.testing.assert_almost_equal(derivs['obj!x'], expected, decimal=6)
+        np.testing.assert_almost_equal(derivs['obj_cmp.obj!x'], expected, decimal=6)
+
+        # verify we can set derivs via tuple or string, with promoted or absolute names
+        # (although users wouldn't normally do this, it's used when copying)
+        for key, value in [(('obj', 'x'), 111.), ('obj_cmp.obj!x', 444.)]:
+            derivs[key] = value
+            self.assertEqual(derivs[('obj', 'x')], value)
+            self.assertEqual(derivs[('obj_cmp.obj', 'x')], value)
+            self.assertEqual(derivs['obj!x'], value)
+            self.assertEqual(derivs['obj_cmp.obj!x'], value)
+
+        # verify that we didn't mess up deriv keys by setting values
+        self.assertEqual(set(derivs.keys()), set([
+            ('obj', 'z'), ('con2', 'z'), ('con1', 'x'),
+            ('obj', 'x'), ('con2', 'x'), ('con1', 'z')
+        ]))
+        self.assertEqual(set(derivs.absolute_names()), set([
+            ('obj_cmp.obj', 'z'), ('con_cmp2.con2', 'z'), ('con_cmp1.con1', 'x'),
+            ('obj_cmp.obj', 'x'), ('con_cmp2.con2', 'x'), ('con_cmp1.con1', 'z')
         ]))
 
 
@@ -4173,7 +4253,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         Legacy case recording file generated using code from test_record_driver_system_solver
         test in test_sqlite_recorder.py
         """
-        prob = SellarProblem(SellarDerivativesGrouped)
+        prob = SellarProblem(SellarDerivativesGroupedPreAutoIVC)
         prob.driver = om.ScipyOptimizeDriver(tol=1e-9, disp=False)
         prob.setup()
         prob.run_driver()
@@ -4225,7 +4305,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
 
     def test_driver_v2(self):
         """ Backwards compatibility version 2. """
-        prob = SellarProblem(SellarDerivativesGrouped)
+        prob = SellarProblem(SellarDerivativesGroupedPreAutoIVC)
         prob.driver = om.ScipyOptimizeDriver(tol=1e-9, disp=False)
         prob.setup()
         prob.run_driver()
@@ -4333,18 +4413,9 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         for i, iter_coord in enumerate(system_cases):
             self.assertEqual(iter_coord, 'rank0:SLSQP|{}|root._solve_nonlinear|{}'.format(i, i))
 
-        # Test metadata read correctly
-        self.assertEqual(cr._output2meta['mda.d2.y2']['type'], {'output'})
-        self.assertEqual(cr._output2meta['mda.d2.y2']['size'], 1)
-        self.assertTrue(cr._output2meta['mda.d2.y2']['explicit'], {'output'})
-        self.assertEqual(cr._input2meta['mda.d1.z']['type'], {'input'})
-        self.assertEqual(cr._input2meta['mda.d1.z']['size'], 2)
-        self.assertIsNone(cr._input2meta['mda.d1.z']['units'])
-        self.assertTrue(cr._output2meta['mda.d2.y2']['explicit'], {'output'})
-
     def test_driver_v1(self):
         """ Backwards compatibility oldest version. """
-        prob = SellarProblem(SellarDerivativesGrouped)
+        prob = SellarProblem(SellarDerivativesGroupedPreAutoIVC)
         prob.driver = om.ScipyOptimizeDriver(tol=1e-9, disp=False)
         prob.setup()
         prob.run_driver()
@@ -4391,7 +4462,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
 
     def test_driver_v1_pre_problem(self):
         """ Backwards compatibility oldest version. """
-        prob = SellarProblem(SellarDerivativesGrouped)
+        prob = SellarProblem(SellarDerivativesGroupedPreAutoIVC)
         prob.driver = om.ScipyOptimizeDriver(tol=1e-9, disp=False)
         prob.setup()
         prob.run_driver()

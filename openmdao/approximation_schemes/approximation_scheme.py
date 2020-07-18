@@ -8,8 +8,7 @@ from openmdao.utils.array_utils import sub2full_indices, get_input_idx_split
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.mpi import MPI
 from openmdao.jacobians.jacobian import Jacobian
-
-_full_slice = slice(None)
+from openmdao.vectors.vector import _full_slice
 
 
 class ApproximationScheme(object):
@@ -47,6 +46,17 @@ class ApproximationScheme(object):
         self._j_data_offsets = None
         self._approx_groups_cached_under_cs = False
         self._exec_dict = defaultdict(list)
+
+    def __repr__(self):
+        """
+        Return a simple string representation.
+
+        Returns
+        -------
+        str
+            String containing class name and added approximation keys.
+        """
+        return f"{self.__class__.__name__}: {list(self._exec_dict.keys())}"
 
     def _reset(self):
         """
@@ -142,7 +152,6 @@ class ApproximationScheme(object):
         approx_wrt_idx = system._owns_approx_wrt_idx
 
         out_slices = outputs.get_slice_dict()
-        in_slices = inputs.get_slice_dict()
 
         is_total = isinstance(system, Group)
 
@@ -202,7 +211,7 @@ class ApproximationScheme(object):
 
         if len(full_wrts) != len(wrt_matches) or approx_wrt_idx:
             if is_total and system.pathname == '':  # top level approx totals
-                full_wrt_sizes = [abs2meta[wrt]['size'] for wrt in wrt_names]
+                full_wrt_sizes = [abs2meta[wrt]['size'] for wrt in full_wrts]
             else:
                 _, full_wrt_sizes = system._get_partials_var_sizes()
 

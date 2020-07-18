@@ -124,12 +124,10 @@ class TestProblem(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
-        model.add_subsystem('p2', om.IndepVarComp('y', -4.0))
         model.add_subsystem('comp', Paraboloid())
 
-        model.connect('p1.x', 'comp.x')
-        model.connect('p2.y', 'comp.y')
+        model.set_input_defaults('comp.x', 3.0)
+        model.set_input_defaults('comp.y', -4.0)
 
         prob.setup()
         prob.run_model()
@@ -143,14 +141,11 @@ class TestProblem(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
-
         # promote the two inputs to the same name
         model.add_subsystem('comp1', Paraboloid(), promotes_inputs=['x'])
         model.add_subsystem('comp2', Paraboloid(), promotes_inputs=['x'])
 
-        # connect the source to the common name
-        model.connect('p1.x', 'x')
+        model.set_input_defaults('x', 3.0)
 
         prob.setup()
         prob.run_model()
@@ -165,23 +160,22 @@ class TestProblem(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
-        model.add_subsystem('p2', om.IndepVarComp('y', -4.0))
         model.add_subsystem('comp', Paraboloid())
 
-        model.connect('p1.x', 'comp.x')
-        model.connect('p2.y', 'comp.y')
+        model.set_input_defaults('comp.x', 3.0)
+        model.set_input_defaults('comp.y', -4.0)
 
         prob.setup()
+
         prob.run_model()
 
-        totals = prob.compute_totals(of=['comp.f_xy'], wrt=['p1.x', 'p2.y'])
-        assert_near_equal(totals[('comp.f_xy', 'p1.x')][0][0], -4.0)
-        assert_near_equal(totals[('comp.f_xy', 'p2.y')][0][0], 3.0)
+        totals = prob.compute_totals(of=['comp.f_xy'], wrt=['comp.x', 'comp.y'])
+        assert_near_equal(totals[('comp.f_xy', 'comp.x')][0][0], -4.0)
+        assert_near_equal(totals[('comp.f_xy', 'comp.y')][0][0], 3.0)
 
-        totals = prob.compute_totals(of=['comp.f_xy'], wrt=['p1.x', 'p2.y'], return_format='dict')
-        assert_near_equal(totals['comp.f_xy']['p1.x'][0][0], -4.0)
-        assert_near_equal(totals['comp.f_xy']['p2.y'][0][0], 3.0)
+        totals = prob.compute_totals(of=['comp.f_xy'], wrt=['comp.x', 'comp.y'], return_format='dict')
+        assert_near_equal(totals['comp.f_xy']['comp.x'][0][0], -4.0)
+        assert_near_equal(totals['comp.f_xy']['comp.y'][0][0], 3.0)
 
     def test_feature_simple_run_once_compute_totals_scaled(self):
         import openmdao.api as om
@@ -190,23 +184,22 @@ class TestProblem(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
-        model.add_subsystem('p2', om.IndepVarComp('y', -4.0))
         model.add_subsystem('comp', Paraboloid())
 
-        model.connect('p1.x', 'comp.x')
-        model.connect('p2.y', 'comp.y')
+        model.set_input_defaults('comp.x', 3.0)
+        model.set_input_defaults('comp.y', -4.0)
 
-        model.add_design_var('p1.x', 3.0, ref0=50.0)
-        model.add_design_var('p2.y', -4.0)
+        model.add_design_var('comp.x', 3.0, ref0=50.0)
+        model.add_design_var('comp.y', -4.0)
         model.add_objective('comp.f_xy')
 
         prob.setup()
+
         prob.run_model()
 
-        totals = prob.compute_totals(of=['comp.f_xy'], wrt=['p1.x', 'p2.y'], driver_scaling=True)
-        assert_near_equal(totals[('comp.f_xy', 'p1.x')][0][0], 196.0)
-        assert_near_equal(totals[('comp.f_xy', 'p2.y')][0][0], 3.0)
+        totals = prob.compute_totals(of=['comp.f_xy'], wrt=['comp.x', 'comp.y'], driver_scaling=True)
+        assert_near_equal(totals[('comp.f_xy', 'comp.x')][0][0], 196.0)
+        assert_near_equal(totals[('comp.f_xy', 'comp.y')][0][0], 3.0)
 
     def test_feature_simple_run_once_set_deriv_mode(self):
         import openmdao.api as om
@@ -215,12 +208,10 @@ class TestProblem(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
-        model.add_subsystem('p2', om.IndepVarComp('y', -4.0))
         model.add_subsystem('comp', Paraboloid())
 
-        model.connect('p1.x', 'comp.x')
-        model.connect('p2.y', 'comp.y')
+        model.set_input_defaults('comp.x', 3.0)
+        model.set_input_defaults('comp.y', -4.0)
 
         prob.setup(mode='rev')
         # prob.setup(mode='fwd')
@@ -228,7 +219,7 @@ class TestProblem(unittest.TestCase):
 
         assert_near_equal(prob['comp.f_xy'], -15.0)
 
-        prob.compute_totals(of=['comp.f_xy'], wrt=['p1.x', 'p2.y'])
+        prob.compute_totals(of=['comp.f_xy'], wrt=['comp.x', 'comp.y'])
 
     def test_single_string_wrt_of(self):
 
@@ -341,7 +332,8 @@ class TestProblem(unittest.TestCase):
         # check bad scalar value
         bad_val = -10*np.ones((10))
         prob['indep.num'] = bad_val
-        with self.assertRaisesRegex(ValueError, msg):
+        with self.assertRaisesRegex(ValueError,
+                "Group (.*): Failed to set value of '.*': could not broadcast input array from shape (.*) into shape (.*)."):
             prob.final_setup()
         prob._initial_condition_cache = {}
 
@@ -356,8 +348,9 @@ class TestProblem(unittest.TestCase):
         prob['indep.arr'] = new_val
         assert_near_equal(prob['indep.arr'], new_val, 1e-10)
 
+        msg = "Group (.*): Failed to set value of '.*': could not broadcast input array from shape (.*) into shape (.*)."
         # check bad array value
-        bad_val = -10*np.ones((10))
+        bad_val = -10*np.ones((9,1))
         with self.assertRaisesRegex(ValueError, msg):
             prob['indep.arr'] = bad_val
 
@@ -522,7 +515,7 @@ class TestProblem(unittest.TestCase):
         prob.run_model()
 
         of = ['obj', 'con1']
-        wrt = ['x', 'z']
+        wrt = ['_auto_ivc.v1', '_auto_ivc.v0']
 
         if mode == 'fwd':
             seed_names = wrt
@@ -574,34 +567,49 @@ class TestProblem(unittest.TestCase):
         prob.run_model()
         assert_near_equal(prob['f_xy'], 214.0, 1e-6)
 
+    def test_feature_set_indeps_auto(self):
+        import openmdao.api as om
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        prob = om.Problem()
+
+        prob.model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+
+        prob.setup()
+
+        prob.set_val('x', 2.)
+        prob.set_val('y', 10.)
+        prob.run_model()
+        assert_near_equal(prob.get_val('f_xy'), 214.0, 1e-6)
+
     def test_feature_basic_setup(self):
         import openmdao.api as om
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = om.Problem()
         model = prob.model
-        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
+        # model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
+        # model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
         prob.setup()
 
-        prob['x'] = 2.
-        prob['y'] = 10.
+        prob.set_val('x', 2.)
+        prob.set_val('y', 10.)
         prob.run_model()
-        assert_near_equal(prob['f_xy'], 214.0, 1e-6)
+        assert_near_equal(prob.get_val('f_xy'), 214.0, 1e-6)
 
-        prob['x'] = 0.
-        prob['y'] = 0.
+        prob.set_val('x', 0.)
+        prob.set_val('y', 0.)
         prob.run_model()
-        assert_near_equal(prob['f_xy'], 22.0, 1e-6)
+        assert_near_equal(prob.get_val('f_xy'), 22.0, 1e-6)
 
         prob.setup()
-        prob['x'] = 4
-        prob['y'] = 8.
 
+        prob.set_val('x', 4.)
+        prob.set_val('y', 8.)
         prob.run_model()
-        assert_near_equal(prob['f_xy'], 174.0, 1e-6)
+        assert_near_equal(prob.get_val('f_xy'), 174.0, 1e-6)
 
     def test_feature_petsc_setup(self):
         import openmdao.api as om
@@ -764,7 +772,7 @@ class TestProblem(unittest.TestCase):
 
                 self.declare_partials(of='y', wrt='x')
 
-                if not self.force_alloc_complex:
+                if not self._force_alloc_complex:
                     raise RuntimeError('force_alloc_complex not set in component.')
 
             def compute(self, inputs, outputs):
@@ -804,7 +812,7 @@ class TestProblem(unittest.TestCase):
 
                 self.declare_partials(of='y', wrt='x')
 
-                if self.force_alloc_complex:
+                if self._force_alloc_complex:
                     print("Vectors allocated for complex step.")
 
             def compute(self, inputs, outputs):
@@ -814,11 +822,9 @@ class TestProblem(unittest.TestCase):
                 partials['y', 'x'] = 3.
 
         prob = om.Problem()
-        prob.model.add_subsystem('px', om.IndepVarComp('x', val=1.0))
         prob.model.add_subsystem('comp', SimpleComp())
-        prob.model.connect('px.x', 'comp.x')
 
-        prob.model.add_design_var('px.x', lower=-100, upper=100)
+        prob.model.add_design_var('comp.x', lower=-100, upper=100)
         prob.model.add_objective('comp.y')
 
         prob.setup(force_alloc_complex=True)
@@ -850,11 +856,11 @@ class TestProblem(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        assert_near_equal(prob['x'], 0.0, 1e-5)
-        assert_near_equal(prob['y1'], 3.160000, 1e-2)
-        assert_near_equal(prob['y2'], 3.755278, 1e-2)
-        assert_near_equal(prob['z'], [1.977639, 0.000000], 1e-2)
-        assert_near_equal(prob['obj'], 3.18339395, 1e-2)
+        assert_near_equal(prob.get_val('x'), 0.0, 1e-5)
+        assert_near_equal(prob.get_val('y1'), 3.160000, 1e-2)
+        assert_near_equal(prob.get_val('y2'), 3.755278, 1e-2)
+        assert_near_equal(prob.get_val('z'), [1.977639, 0.000000], 1e-2)
+        assert_near_equal(prob.get_val('obj'), 3.18339395, 1e-2)
 
     def test_feature_promoted_sellar_set_get_outputs(self):
         import openmdao.api as om
@@ -865,13 +871,11 @@ class TestProblem(unittest.TestCase):
 
         prob.setup()
 
-        prob['x'] = 2.75
+        prob.set_val('x', 2.75)
 
         prob.run_model()
 
-        assert_near_equal(prob['x'], 2.75, 1e-6)
-
-        assert_near_equal(prob['y1'], 27.3049178437, 1e-6)
+        assert_near_equal(prob.get_val('y1'), 27.3049178437, 1e-6)
 
     def test_feature_not_promoted_sellar_set_get_outputs(self):
         import openmdao.api as om
@@ -882,13 +886,13 @@ class TestProblem(unittest.TestCase):
 
         prob.setup()
 
-        prob['px.x'] = 2.75
+        prob.set_val('x', 2.75)
 
         prob.run_model()
 
-        assert_near_equal(prob['px.x'], 2.75, 1e-6)
+        assert_near_equal(prob.get_val('x'), 2.75, 1e-6)
 
-        assert_near_equal(prob['d1.y1'], 27.3049178437, 1e-6)
+        assert_near_equal(prob.get_val('d1.y1'), 27.3049178437, 1e-6)
 
     def test_feature_promoted_sellar_set_get_inputs(self):
         import openmdao.api as om
@@ -1025,6 +1029,182 @@ class TestProblem(unittest.TestCase):
         assert_near_equal(prob['axx'][0], 95.0, 1e-6)
         assert_near_equal(prob.get_val('axx', 'degC', indices=np.array([0])), 35.0, 1e-6)
 
+    def test_feature_get_set_with_units_diff_err(self):
+        import openmdao.api as om
+
+        prob = om.Problem()
+        prob.model.add_subsystem('C1', om.ExecComp('y=x*2.',
+                                                     x={'value': 1.0, 'units': 'ft'},
+                                                     y={'value': 0.0, 'units': 'ft'}),
+                                 promotes=['x'])
+        prob.model.add_subsystem('C2', om.ExecComp('y=x*3.',
+                                                     x={'value': 1.0, 'units': 'inch'},
+                                                     y={'value': 0.0, 'units': 'inch'}),
+                                 promotes=['x'])
+
+        try:
+            prob.setup()
+        except RuntimeError as err:
+            self.assertEqual(str(err), "Group (<model>): The following inputs, ['C1.x', 'C2.x'], promoted to 'x', are connected but the metadata entries ['units', 'value'] differ. Call <group>.set_input_defaults('x', units=?, value=?), where <group> is the Group named '' to remove the ambiguity.")
+        else:
+            self.fail("Exception expected.")
+
+    def test_feature_get_set_with_units_diff(self):
+        import openmdao.api as om
+
+        prob = om.Problem()
+        G1 = prob.model.add_subsystem('G1', om.Group())
+        G1.add_subsystem('C1', om.ExecComp('y=x*2.',
+                                            x={'value': 1.0, 'units': 'cm'},
+                                            y={'value': 0.0, 'units': 'cm'}),
+                         promotes=['x'])
+        G1.add_subsystem('C2', om.ExecComp('y=x*3.',
+                                            x={'value': 1.0, 'units': 'mm'},
+                                            y={'value': 0.0, 'units': 'mm'}),
+                         promotes=['x'])
+
+        # units and value to use for the _auto_ivc output are ambiguous.  This fixes that.
+        G1.set_input_defaults('x', units='m', val=1.0)
+
+        prob.setup()
+
+        # set G1.x to 2.0 m, based on the units we gave in the set_input_defaults call
+        prob.set_val('G1.x', 2.)
+
+        prob.run_model()
+
+        # we gave 'G1.x' units of 'm' in the set_input_defaults call
+        assert_near_equal(prob.get_val('G1.x'), 2.0, 1e-6)
+
+        # using absolute value will give us the value of the input C1.x, in its units of 'cm'
+        assert_near_equal(prob.get_val('G1.C1.x'), 200.0, 1e-6)
+
+        # using absolute value will give us the value of the input C2.x, in its units of 'mm'
+        assert_near_equal(prob.get_val('G1.C2.x'), 2000.0, 1e-6)
+
+    def test_feature_get_set_with_src_indices_diff(self):
+        import openmdao.api as om
+
+        prob = om.Problem()
+        G1 = prob.model.add_subsystem('G1', om.Group())
+        G1.add_subsystem('C1', om.ExecComp('y=x*2.',
+                                            x={'value': 1.0, 'units': 'cm', 'src_indices': [0]},
+                                            y={'value': 0.0, 'units': 'cm'}),
+                         promotes=['x'])
+        G1.add_subsystem('C2', om.ExecComp('y=x*3.',
+                                            x={'value': 1.0, 'units': 'mm', 'src_indices': [1,2]},
+                                            y={'value': np.zeros(2), 'units': 'mm'}),
+                         promotes=['x'])
+        G1.add_subsystem('C3', om.ExecComp('y=x*4.',
+                                            x={'value': np.ones(3), 'units': 'mm'},
+                                            y={'value': np.zeros(3), 'units': 'mm'}),
+                         promotes=['x'])
+
+        # units and value to use for the _auto_ivc output are ambiguous.  This fixes that.
+        G1.set_input_defaults('x', units='m', val=np.ones(3))
+
+        prob.setup()
+
+        # set G1.x to 2.0 m, based on the units we gave in the set_input_defaults call
+        prob['G1.x'] = 2.0
+
+        prob.run_model()
+
+        # we gave 'G1.x' units of 'm' in the set_input_defaults call
+        assert_near_equal(prob['G1.x'], 2.0, 1e-6)
+
+        # using absolute value will give us the value of the input C1.x, in its units of 'cm'
+        assert_near_equal(prob['G1.C1.x'], 200.0, 1e-6)
+
+        assert_near_equal(prob['G1.C1.y'], 400.0, 1e-6)
+
+        # using absolute value will give us the value of the input C2.x, in its units of 'mm'
+        assert_near_equal(prob['G1.C2.x'], np.ones(2) * 2000.0, 1e-6)
+
+        assert_near_equal(prob['G1.C2.y'], np.ones(2) * 6000.0, 1e-6)
+
+    def test_feature_get_set_with_units_prom_plus_explicit(self):
+        import openmdao.api as om
+
+        prob = om.Problem()
+        prob.model.add_subsystem('indeps', om.IndepVarComp('x', val=1.0, units='m'))
+        G1 = prob.model.add_subsystem('G1', om.Group())
+        G1.add_subsystem('C1', om.ExecComp('y=x*2.',
+                                            x={'value': 1.0, 'units': 'cm'},
+                                            y={'value': 0.0, 'units': 'cm'}),
+                         promotes=['x'])
+        G1.add_subsystem('C2', om.ExecComp('y=x*3.',
+                                            x={'value': 1.0, 'units': 'mm'},
+                                            y={'value': 0.0, 'units': 'mm'}),
+                         promotes=['x'])
+
+        # connect IVC to promoted inputs
+        prob.model.connect('indeps.x', 'G1.x')
+
+        # units and value to use for the _auto_ivc output are ambiguous.  This fixes that.
+        G1.set_input_defaults('x', units='dm', val=1.0)
+
+        prob.setup()
+
+        prob['indeps.x'] = 2.0
+
+        prob.run_model()
+
+        assert_near_equal(prob['indeps.x'], 2.0, 1e-6)
+
+        # using the promoted name of the inputs will give the value in the units set in set_input_defaults,
+        # which is 'dm'
+        assert_near_equal(prob['G1.x'], 20.0, 1e-6)
+
+        # test _get_val on lower level group
+        assert_near_equal( G1.get_val('x'), 20.0, 1e-6)
+
+        # using absolute value will give us the value of the input C1.x, in its units of 'inch'
+        assert_near_equal(prob['G1.C1.x'], 200.0, 1e-6)
+
+        # using absolute value will give us the value of the input C2.x, in its units of 'ft'
+        assert_near_equal(prob['G1.C2.x'], 2000.0, 1e-6)
+
+    def test_feature_get_set_with_units_prom_plus_explicit_err(self):
+        import openmdao.api as om
+
+        prob = om.Problem()
+        prob.model.add_subsystem('indeps', om.IndepVarComp('x', val=1.0, units='m'))
+        G1 = prob.model.add_subsystem('G1', om.Group())
+        G1.add_subsystem('C1', om.ExecComp('y=x*2.',
+                                            x={'value': 1.0, 'units': 'cm'},
+                                            y={'value': 0.0, 'units': 'cm'}),
+                         promotes=['x'])
+        G1.add_subsystem('C2', om.ExecComp('y=x*3.',
+                                            x={'value': 1.0, 'units': 'mm'},
+                                            y={'value': 0.0, 'units': 'mm'}),
+                         promotes=['x'])
+
+        # connect IVC to promoted inputs
+        prob.model.connect('indeps.x', 'G1.x')
+
+        prob.setup()
+
+        prob['indeps.x'] = 2.0
+
+        prob.run_model()
+
+        assert_near_equal(prob['indeps.x'], 2.0, 1e-6)
+
+        # using absolute value will give us the value of the input C1.x, in its units of 'inch'
+        assert_near_equal(prob['G1.C1.x'], 200.0, 1e-6)
+
+        # using absolute value will give us the value of the input C2.x, in its units of 'ft'
+        assert_near_equal(prob['G1.C2.x'], 2000.0, 1e-6)
+
+        # using the promoted name of the inputs will raise an exception because the two promoted
+        # inputs have different units and set_input_defaults was not called to disambiguate.
+        with self.assertRaises(RuntimeError) as cm:
+            x = prob['G1.x']
+
+        msg = "Group (<model>): The following inputs, ['G1.C1.x', 'G1.C2.x'], promoted to 'G1.x', are connected but the metadata entries ['units'] differ. Call <group>.set_input_defaults('x', units=?), where <group> is the Group named 'G1' to remove the ambiguity."
+        self.assertEqual(cm.exception.args[0], msg)
+
     def test_get_set_with_units_error_messages(self):
         import openmdao.api as om
 
@@ -1041,7 +1221,6 @@ class TestProblem(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, msg):
             prob.get_val('comp.x', 'degK')
 
-        msg = "Can't set variable 'comp.x' with units 'cm' to value with units 'degK'."
         with self.assertRaisesRegex(TypeError, msg):
             prob.set_val('comp.x', 55.0, 'degK')
 
@@ -1049,7 +1228,6 @@ class TestProblem(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, msg):
             prob.get_val('no_unit.x', 'degK')
 
-        msg = "Can't set variable 'no_unit.x' with units 'None' to value with units 'degK'."
         with self.assertRaisesRegex(TypeError, msg):
             prob.set_val('no_unit.x', 55.0, 'degK')
 
@@ -1127,27 +1305,27 @@ class TestProblem(unittest.TestCase):
         prob.setup()
 
         # default value from the class definition
-        assert_near_equal(prob['x'], 1.0, 1e-6)
+        assert_near_equal(prob.get_val('x'), 1.0, 1e-6)
 
-        prob['x'] = 2.75
-        assert_near_equal(prob['x'], 2.75, 1e-6)
+        prob.set_val('x', 2.75)
+        assert_near_equal(prob.get_val('x'), 2.75, 1e-6)
 
         # default value from the class definition
-        assert_near_equal(prob['z'], [5.0, 2.0], 1e-6)
+        assert_near_equal(prob.get_val('z'), [5.0, 2.0], 1e-6)
 
-        prob['z'] = [1.5, 1.5]  # for convenience we convert the list to an array.
-        assert_near_equal(prob['z'], [1.5, 1.5], 1e-6)
-
-        prob.run_model()
-        assert_near_equal(prob['y1'], 5.43379016853, 1e-6)
-        assert_near_equal(prob['y2'], 5.33104915618, 1e-6)
-
-        prob['z'] = np.array([2.5, 2.5])
-        assert_near_equal(prob['z'], [2.5, 2.5], 1e-6)
+        prob.set_val('z', [1.5, 1.5])
+        assert_near_equal(prob.get_val('z'), [1.5, 1.5], 1e-6)
 
         prob.run_model()
-        assert_near_equal(prob['y1'], 9.87161739688, 1e-6)
-        assert_near_equal(prob['y2'], 8.14191301549, 1e-6)
+        assert_near_equal(prob.get_val('y1'), 5.43379016853, 1e-6)
+        assert_near_equal(prob.get_val('y2'), 5.33104915618, 1e-6)
+
+        prob.set_val('z', np.array([2.5, 2.5])) # for convenience we convert the list to an array.
+        assert_near_equal(prob.get_val('z'), [2.5, 2.5], 1e-6)
+
+        prob.run_model()
+        assert_near_equal(prob.get_val('y1'), 9.87161739688, 1e-6)
+        assert_near_equal(prob.get_val('y2'), 8.14191301549, 1e-6)
 
     def test_feature_residuals(self):
         import openmdao.api as om
@@ -1158,7 +1336,7 @@ class TestProblem(unittest.TestCase):
 
         prob.setup()
 
-        prob['z'] = [1.5, 1.5]  # for convenience we convert the list to an array.
+        prob.set_val('z', [1.5, 1.5])
         prob.run_model()
 
         inputs, outputs, residuals = prob.model.get_nonlinear_vectors()
@@ -1748,7 +1926,7 @@ class TestProblem(unittest.TestCase):
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
         self.assertEquals(output[1], r'Design Variables')
-        self.assertRegex(output[5], r'^pz.z +\|[0-9. e+-]+\| +2')
+        self.assertRegex(output[5], r'^z +\|[0-9. e+-]+\| +2')
         self.assertEquals(output[9], r'Constraints')
         self.assertRegex(output[14], r'^con_cmp2.con2 +\[[0-9. e+-]+\] +1')
         self.assertEquals(output[17], r'Objectives')
@@ -1797,7 +1975,7 @@ class TestProblem(unittest.TestCase):
                     r'indices\s+adder\s+scaler\s+parallel_deriv_color\s+'
                     r'vectorize_derivs\s+cache_linear_solution')
         self.assertRegex(output[5],
-                    r'^pz.z\s+\|[0-9.e+-]+\|\s+2\s+\|10.0\|\s+\|[0-9.e+-]+\|\s+None\s+'
+                    r'^z\s+\|[0-9.e+-]+\|\s+2\s+\|10.0\|\s+\|[0-9.e+-]+\|\s+None\s+'
                     r'None\s+None\s+None\s+None\s+None\s+False\s+False')
 
         # With all the optional columns and print_arrays

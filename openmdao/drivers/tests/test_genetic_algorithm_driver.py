@@ -88,19 +88,18 @@ class TestSimpleGA(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('xC', 7.5))
-        model.add_subsystem('p2', om.IndepVarComp('xI', 0.0))
-        model.add_subsystem('comp', Branin())
+        model.set_input_defaults('xC', 7.5)
+        model.set_input_defaults('xI', 0.0)
 
-        model.connect('p2.xI', 'comp.x0')
-        model.connect('p1.xC', 'comp.x1')
+        model.add_subsystem('comp', Branin(),
+                            promotes_inputs=[('x0', 'xI'), ('x1', 'xC')])
 
-        model.add_design_var('p2.xI', lower=-5.0, upper=10.0)
-        model.add_design_var('p1.xC', lower=0.0, upper=15.0)
+        model.add_design_var('xI', lower=-5.0, upper=10.0)
+        model.add_design_var('xC', lower=0.0, upper=15.0)
         model.add_objective('comp.f')
 
         prob.driver = om.SimpleGADriver(max_gen=75, pop_size=25)
-        prob.driver.options['bits'] = {'p1.xC': 8}
+        prob.driver.options['bits'] = {'xC': 8}
 
         prob.driver._randomstate = 1
 
@@ -112,7 +111,7 @@ class TestSimpleGA(unittest.TestCase):
 
         # Optimal solution
         assert_near_equal(prob['comp.f'], 0.49399549, 1e-4)
-        self.assertTrue(int(prob['p2.xI']) in [3, -3])
+        self.assertTrue(int(prob['xI']) in [3, -3])
 
     def test_mixed_integer_branin_discrete(self):
         prob = om.Problem()
@@ -1261,21 +1260,21 @@ class TestFeatureSimpleGA(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('xC', 7.5))
-        model.add_subsystem('p2', om.IndepVarComp('xI', 0.0))
-        model.add_subsystem('comp', Branin())
+        model.add_subsystem('comp', Branin(),
+                            promotes_inputs=[('x0', 'xI'), ('x1', 'xC')])
 
-        model.connect('p2.xI', 'comp.x0')
-        model.connect('p1.xC', 'comp.x1')
-
-        model.add_design_var('p2.xI', lower=-5.0, upper=10.0)
-        model.add_design_var('p1.xC', lower=0.0, upper=15.0)
+        model.add_design_var('xI', lower=-5.0, upper=10.0)
+        model.add_design_var('xC', lower=0.0, upper=15.0)
         model.add_objective('comp.f')
 
         prob.driver = om.SimpleGADriver()
-        prob.driver.options['bits'] = {'p1.xC': 8}
+        prob.driver.options['bits'] = {'xC': 8}
 
         prob.setup()
+
+        prob.set_val('xC', 7.5)
+        prob.set_val('xI', 0.0)
+
         prob.run_driver()
 
     def test_basic_with_assert(self):
@@ -1285,23 +1284,23 @@ class TestFeatureSimpleGA(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('xC', 7.5))
-        model.add_subsystem('p2', om.IndepVarComp('xI', 0.0))
-        model.add_subsystem('comp', Branin())
+        model.add_subsystem('comp', Branin(),
+                            promotes_inputs=[('x0', 'xI'), ('x1', 'xC')])
 
-        model.connect('p2.xI', 'comp.x0')
-        model.connect('p1.xC', 'comp.x1')
-
-        model.add_design_var('p2.xI', lower=-5.0, upper=10.0)
-        model.add_design_var('p1.xC', lower=0.0, upper=15.0)
+        model.add_design_var('xI', lower=-5.0, upper=10.0)
+        model.add_design_var('xC', lower=0.0, upper=15.0)
         model.add_objective('comp.f')
 
         prob.driver = om.SimpleGADriver()
-        prob.driver.options['bits'] = {'p1.xC': 8}
+        prob.driver.options['bits'] = {'xC': 8}
 
         prob.driver._randomstate = 1
 
         prob.setup()
+
+        prob.set_val('xC', 7.5)
+        prob.set_val('xI', 0.0)
+
         prob.run_driver()
 
         # Optimal solution
@@ -1314,22 +1313,22 @@ class TestFeatureSimpleGA(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('xC', 7.5))
-        model.add_subsystem('p2', om.IndepVarComp('xI', 0.0))
-        model.add_subsystem('comp', Branin())
+        model.add_subsystem('comp', Branin(),
+                            promotes_inputs=[('x0', 'xI'), ('x1', 'xC')])
 
-        model.connect('p2.xI', 'comp.x0')
-        model.connect('p1.xC', 'comp.x1')
-
-        model.add_design_var('p2.xI', lower=-5.0, upper=10.0)
-        model.add_design_var('p1.xC', lower=0.0, upper=15.0)
+        model.add_design_var('xI', lower=-5.0, upper=10.0)
+        model.add_design_var('xC', lower=0.0, upper=15.0)
         model.add_objective('comp.f')
 
         prob.driver = om.SimpleGADriver()
-        prob.driver.options['bits'] = {'p1.xC': 8}
+        prob.driver.options['bits'] = {'xC': 8}
         prob.driver.options['max_gen'] = 5
 
         prob.setup()
+
+        prob.set_val('xC', 7.5)
+        prob.set_val('xI', 0.0)
+
         prob.run_driver()
 
     def test_option_pop_size(self):
@@ -1339,22 +1338,22 @@ class TestFeatureSimpleGA(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('xC', 7.5))
-        model.add_subsystem('p2', om.IndepVarComp('xI', 0.0))
-        model.add_subsystem('comp', Branin())
+        model.add_subsystem('comp', Branin(),
+                            promotes_inputs=[('x0', 'xI'), ('x1', 'xC')])
 
-        model.connect('p2.xI', 'comp.x0')
-        model.connect('p1.xC', 'comp.x1')
-
-        model.add_design_var('p2.xI', lower=-5.0, upper=10.0)
-        model.add_design_var('p1.xC', lower=0.0, upper=15.0)
+        model.add_design_var('xI', lower=-5.0, upper=10.0)
+        model.add_design_var('xC', lower=0.0, upper=15.0)
         model.add_objective('comp.f')
 
         prob.driver = om.SimpleGADriver()
-        prob.driver.options['bits'] = {'p1.xC': 8}
+        prob.driver.options['bits'] = {'xC': 8}
         prob.driver.options['pop_size'] = 10
 
         prob.setup()
+
+        prob.set_val('xC', 7.5)
+        prob.set_val('xI', 0.0)
+
         prob.run_driver()
 
     def test_constrained_with_penalty(self):
@@ -1382,10 +1381,6 @@ class TestFeatureSimpleGA(unittest.TestCase):
         prob = om.Problem()
         prob.model.add_subsystem('cylinder', Cylinder(), promotes=['*'])
 
-        indeps = prob.model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
-        indeps.add_output('radius', 2.)  # height
-        indeps.add_output('height', 3.)  # radius
-
         # setup the optimization
         prob.driver = om.SimpleGADriver()
         prob.driver.options['penalty_parameter'] = 3.
@@ -1399,12 +1394,16 @@ class TestFeatureSimpleGA(unittest.TestCase):
         prob.model.add_constraint('Volume', lower=10.)
 
         prob.setup()
+
+        prob.set_val('radius', 2.)
+        prob.set_val('height', 3.)
+
         prob.run_driver()
 
         # These go to 0.5 for unconstrained problem. With constraint and penalty, they
         # will be above 1.0 (actual values will vary.)
-        self.assertGreater(prob['radius'], 1.)
-        self.assertGreater(prob['height'], 1.)
+        self.assertGreater(prob.get_val('radius'), 1.)
+        self.assertGreater(prob.get_val('height'), 1.)
 
     def test_pareto(self):
         import openmdao.api as om
@@ -1433,11 +1432,6 @@ class TestFeatureSimpleGA(unittest.TestCase):
 
         prob = om.Problem()
 
-        indeps = prob.model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
-        indeps.add_output('length', 1.5)
-        indeps.add_output('width', 1.5)
-        indeps.add_output('height', 1.5)
-
         prob.model.add_subsystem('box', Box(), promotes=['*'])
 
         # setup the optimization
@@ -1455,6 +1449,11 @@ class TestFeatureSimpleGA(unittest.TestCase):
         prob.model.add_constraint('volume', upper=1.)
 
         prob.setup()
+
+        prob.set_val('length', 1.5)
+        prob.set_val('width', 1.5)
+        prob.set_val('height', 1.5)
+
         prob.run_driver()
 
         desvar_nd = prob.driver.desvar_nd
@@ -1527,30 +1526,29 @@ class MPIFeatureTests(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('xC', 7.5))
-        model.add_subsystem('p2', om.IndepVarComp('xI', 0.0))
-        model.add_subsystem('comp', Branin())
+        model.add_subsystem('comp', Branin(),
+                            promotes_inputs=[('x0', 'xI'), ('x1', 'xC')])
 
-        model.connect('p2.xI', 'comp.x0')
-        model.connect('p1.xC', 'comp.x1')
-
-        model.add_design_var('p2.xI', lower=-5.0, upper=10.0)
-        model.add_design_var('p1.xC', lower=0.0, upper=15.0)
+        model.add_design_var('xI', lower=-5.0, upper=10.0)
+        model.add_design_var('xC', lower=0.0, upper=15.0)
         model.add_objective('comp.f')
 
         prob.driver = om.SimpleGADriver()
-        prob.driver.options['bits'] = {'p1.xC': 8}
+        prob.driver.options['bits'] = {'xC': 8}
         prob.driver.options['max_gen'] = 10
         prob.driver.options['run_parallel'] = True
 
         prob.setup()
+
+        prob.set_val('xC', 7.5)
+        prob.set_val('xI', 0.0)
+
         prob.run_driver()
 
         # Optimal solution
-        if extra_prints:
-            print('comp.f', prob['comp.f'])
-            print('p2.xI', prob['p2.xI'])
-            print('p1.xC', prob['p1.xC'])
+        assert_near_equal(prob.get_val('comp.f'), 1.25172426, 1e-6)
+        assert_near_equal(prob.get_val('xI'), 9.0, 1e-6)
+        assert_near_equal(prob.get_val('xC'), 2.11764706, 1e-6)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -1571,28 +1569,24 @@ class MPIFeatureTests4(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('xC', 7.5))
-        model.add_subsystem('p2', om.IndepVarComp('xI', 0.0))
-        par = model.add_subsystem('par', om.ParallelGroup())
+        par = model.add_subsystem('par', om.ParallelGroup(),
+                                  promotes_inputs=['*'])
 
-        par.add_subsystem('comp1', Branin())
-        par.add_subsystem('comp2', Branin())
-
-        model.connect('p2.xI', 'par.comp1.x0')
-        model.connect('p1.xC', 'par.comp1.x1')
-        model.connect('p2.xI', 'par.comp2.x0')
-        model.connect('p1.xC', 'par.comp2.x1')
+        par.add_subsystem('comp1', Branin(),
+                          promotes_inputs=[('x0', 'xI'), ('x1', 'xC')])
+        par.add_subsystem('comp2', Branin(),
+                          promotes_inputs=[('x0', 'xI'), ('x1', 'xC')])
 
         model.add_subsystem('comp', om.ExecComp('f = f1 + f2'))
         model.connect('par.comp1.f', 'comp.f1')
         model.connect('par.comp2.f', 'comp.f2')
 
-        model.add_design_var('p2.xI', lower=-5.0, upper=10.0)
-        model.add_design_var('p1.xC', lower=0.0, upper=15.0)
+        model.add_design_var('xI', lower=-5.0, upper=10.0)
+        model.add_design_var('xC', lower=0.0, upper=15.0)
         model.add_objective('comp.f')
 
         prob.driver = om.SimpleGADriver()
-        prob.driver.options['bits'] = {'p1.xC': 8}
+        prob.driver.options['bits'] = {'xC': 8}
         prob.driver.options['max_gen'] = 10
         prob.driver.options['pop_size'] = 25
         prob.driver.options['run_parallel'] = True
@@ -1601,13 +1595,16 @@ class MPIFeatureTests4(unittest.TestCase):
         prob.driver._randomstate = 1
 
         prob.setup()
+
+        prob.set_val('xC', 7.5)
+        prob.set_val('xI', 0.0)
+
         prob.run_driver()
 
         # Optimal solution
-        if extra_prints:
-            print('comp.f', prob['comp.f'])
-            print('p2.xI', prob['p2.xI'])
-            print('p1.xC', prob['p1.xC'])
+        assert_near_equal(prob.get_val('comp.f'), 0.98799098, 1e-6)
+        assert_near_equal(prob.get_val('xI'),-3.0, 1e-6)
+        assert_near_equal(prob.get_val('xC'), 11.94117647, 1e-6)
 
 
 if __name__ == "__main__":

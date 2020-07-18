@@ -5,13 +5,10 @@ from collections import defaultdict
 import numpy as np
 
 from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme, \
-    _gather_jac_results, _get_wrt_subjacs
+    _gather_jac_results, _get_wrt_subjacs, _full_slice
 from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.array_utils import sub2full_indices
 from openmdao.utils.coloring import Coloring
-
-
-_full_slice = slice(None)
 
 
 class ComplexStep(ApproximationScheme):
@@ -62,11 +59,9 @@ class ComplexStep(ApproximationScheme):
         """
         options = self.DEFAULT_OPTIONS.copy()
         options.update(kwargs)
-
-        step = options['step']
         options['vector'] = vector
 
-        key = (abs_key[1], step, options['directional'])
+        key = (abs_key[1], options['step'], options['directional'])
         self._exec_dict[key].append((abs_key, options))
         self._reset()  # force later regen of approx_groups
 
@@ -188,20 +183,18 @@ class ComplexStep(ApproximationScheme):
         """
         for vec, idxs in idx_info:
             if vec is not None:
-                vec._data[idxs] += delta
+                vec.iadd(delta, idxs)
 
         if total:
             system.run_solve_nonlinear()
-            results_vec = system._outputs
+            result_array[:] = system._outputs._data
         else:
             system.run_apply_nonlinear()
-            results_vec = system._residuals
-
-        result_array[:] = results_vec._data
+            result_array[:] = system._residuals._data
 
         for vec, idxs in idx_info:
             if vec is not None:
-                vec._data[idxs] -= delta
+                vec.isub(delta, idxs)
 
         return result_array
 

@@ -335,7 +335,7 @@ class NOMPITests(unittest.TestCase):
         # Conclude setup but don't run model.
         p.final_setup()
 
-        C1._inputs['invec'] = np.array(range(size, 0, -1), float)
+        p['C1.invec'] = np.array(range(size, 0, -1), float)
 
         p.run_model()
 
@@ -361,11 +361,11 @@ class MPITests(unittest.TestCase):
         # Conclude setup but don't run model.
         p.final_setup()
 
-        C1._inputs['invec'] = np.ones(size, float) * 5.0
+        p['C1.invec'] = np.ones(size, float) * 5.0
 
         p.run_model()
 
-        self.assertTrue(all(C2._outputs['outvec'] == np.ones(size, float)*7.5))
+        np.testing.assert_allclose(C2._outputs['outvec'], np.ones(size, float)*7.5)
 
     def test_distrib_check_partials(self):
         # will produce uneven array sizes which we need for the test
@@ -388,7 +388,7 @@ class MPITests(unittest.TestCase):
         # this used to fail (bug #1279)
         cpd = p.check_partials(out_stream=None)
         for (of, wrt) in cpd['C2']:
-            np.testing.assert_almost_equal(cpd['C2'][of, wrt]['rel error'][0], 0.0, decimal=5)
+            np.testing.assert_allclose(cpd['C2'][of, wrt]['rel error'][0], 0.0, atol=1e-9)
 
     def test_list_inputs_outputs(self):
         size = 11
@@ -524,7 +524,7 @@ class MPITests(unittest.TestCase):
         # Conclude setup but don't run model.
         p.final_setup()
 
-        C1._inputs['invec'] = np.array(range(size, 0, -1), float)
+        p['C1.invec'] = np.array(range(size, 0, -1), float)
 
         p.run_model()
 
@@ -546,7 +546,7 @@ class MPITests(unittest.TestCase):
         # Conclude setup but don't run model.
         p.final_setup()
 
-        C1._inputs['invec'] = np.array(range(size, 0, -1), float)
+        p['C1.invec'] = np.array(range(size, 0, -1), float)
 
         p.run_model()
 
@@ -568,7 +568,7 @@ class MPITests(unittest.TestCase):
         # Conclude setup but don't run model.
         p.final_setup()
 
-        C1._inputs['invec'] = np.array(range(size, 0, -1), float)
+        p['C1.invec'] = np.array(range(size, 0, -1), float)
 
         p.run_model()
 
@@ -590,7 +590,7 @@ class MPITests(unittest.TestCase):
         # Conclude setup but don't run model.
         p.final_setup()
 
-        C1._inputs['invec'] = np.array(range(size), float)
+        p['C1.invec'] = np.array(range(size), float)
 
         p.run_model()
 
@@ -624,7 +624,7 @@ class MPITests(unittest.TestCase):
         p.final_setup()
 
         input_vec = np.array(range(size, 0, -1), float)
-        C1._inputs['invec'] = input_vec
+        p['C1.invec'] = input_vec
 
         # C1 (an InOutArrayComp) doubles the input_vec
         check_vec = input_vec * 2
@@ -663,12 +663,26 @@ class MPITests(unittest.TestCase):
         # Conclude setup but don't run model.
         p.final_setup()
 
-        C1._inputs['invec'] = np.array(range(size, 0, -1), float)
+        p['C1.invec'] = np.array(range(size, 0, -1), float)
 
         p.run_model()
 
         if MPI and self.comm.rank == 0:
             self.assertTrue(all(C3._outputs['outvec'] == np.array(range(size, 0, -1), float)*4))
+
+    def test_auto_ivc_error(self):
+        size = 2
+
+        prob = om.Problem()
+        C2 = prob.model.add_subsystem("C", DistribCompSimple(arr_size=size))
+
+        with self.assertRaises(RuntimeError) as context:
+            prob.setup()
+
+        msg = ' Distributed component input "C.invec" requires an IndepVarComp.'
+
+        err_msg = str(context.exception).split(':')[-1]
+        self.assertEqual(err_msg, msg)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -685,18 +699,21 @@ class ProbRemoteTests(unittest.TestCase):
         p = om.Problem()
         top = p.model
         par = top.add_subsystem('par', om.ParallelGroup())
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('invec1', np.ones(size))
+        ivc.add_output('invec2', np.ones(size))
+        top.add_subsystem('P', ivc)
+        top.connect('P.invec1', 'par.C1.invec')
+        top.connect('P.invec2', 'par.C2.invec')
+
         C1 = par.add_subsystem("C1", DistribInputDistribOutputComp(arr_size=size))
         C2 = par.add_subsystem("C2", DistribInputDistribOutputComp(arr_size=size))
+
         p.setup()
 
-        # Conclude setup but don't run model.
-        p.final_setup()
-
-        if C1 in p.model.par._subsystems_myproc:
-            C1._inputs['invec'] = np.array(range(C1._inputs._data.size, 0, -1), float)
-
-        if C2 in p.model.par._subsystems_myproc:
-            C2._inputs['invec'] = np.array(range(C2._inputs._data.size, 0, -1), float) * 3
+        p['P.invec1'] = np.array([2, 1, 1], float)
+        p['P.invec2'] = np.array([6, 3, 3], float)
 
         p.run_model()
 
@@ -715,20 +732,25 @@ class ProbRemoteTests(unittest.TestCase):
         p = om.Problem()
         top = p.model
         par = top.add_subsystem('par', om.ParallelGroup())
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('invec1', np.ones(size))
+        ivc.add_output('invec2', np.ones(size))
+        ivc.add_discrete_output('disc_in1', 'C1foo')
+        ivc.add_discrete_output('disc_in2', 'C2foo')
+        top.add_subsystem('P', ivc)
+        top.connect('P.invec1', 'par.C1.invec')
+        top.connect('P.invec2', 'par.C2.invec')
+        top.connect('P.disc_in1', 'par.C1.disc_in')
+        top.connect('P.disc_in2', 'par.C2.disc_in')
+
         C1 = par.add_subsystem("C1", DistribInputDistribOutputDiscreteComp(arr_size=size))
         C2 = par.add_subsystem("C2", DistribInputDistribOutputDiscreteComp(arr_size=size))
+
         p.setup()
 
-        # Conclude setup but don't run model.
-        p.final_setup()
-
-        if C1 in p.model.par._subsystems_myproc:
-            C1._inputs['invec'] = np.array(range(C1._inputs._data.size, 0, -1), float)
-            C1._discrete_inputs['disc_in'] = 'C1foo'
-
-        if C2 in p.model.par._subsystems_myproc:
-            C2._inputs['invec'] = np.array(range(C2._inputs._data.size, 0, -1), float) * 3
-            C2._discrete_inputs['disc_in'] = 'C2foo'
+        p['P.invec1'] = np.array([2, 1, 1], float)
+        p['P.invec2'] = np.array([6, 3, 3], float)
 
         p.run_model()
 
@@ -768,6 +790,14 @@ class ProbRemoteTests(unittest.TestCase):
         p = om.Problem()
 
         top = p.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('invec', np.ones(size))
+        ivc.add_discrete_output('disc_in', 'C1foo')
+        top.add_subsystem('P', ivc)
+        top.connect('P.invec', 'C1.invec')
+        top.connect('P.disc_in', 'C1.disc_in')
+
         C1 = top.add_subsystem("C1", DistribInputDistribOutputDiscreteComp(arr_size=size))
         p.setup()
 
@@ -776,8 +806,8 @@ class ProbRemoteTests(unittest.TestCase):
 
         rank = p.comm.rank
 
-        C1._inputs['invec'] = np.array(range(C1._inputs._data.size, 0, -1), float) * (rank + 1)
-        C1._discrete_inputs['disc_in'] = 'boo'
+        p['P.invec'] = np.array([[4, 3, 2, 1, 8, 6, 4, 2, 9, 6, 3, 12, 8, 4.0]])
+        p['P.disc_in'] = 'boo'
 
         p.run_model()
 
@@ -830,6 +860,8 @@ class MPIFeatureTests(unittest.TestCase):
         size = 15
 
         model = om.Group()
+
+        # Distributed component "C2" requires an IndepVarComp to supply inputs.
         model.add_subsystem("indep", om.IndepVarComp('x', np.zeros(size)))
         model.add_subsystem("C2", DistribComp(size=size))
         model.add_subsystem("C3", Summer(size=size))
@@ -840,14 +872,14 @@ class MPIFeatureTests(unittest.TestCase):
         prob = om.Problem(model)
         prob.setup()
 
-        prob['indep.x'] = np.ones(size)
+        prob.set_val('indep.x', np.ones(size))
         prob.run_model()
 
-        assert_near_equal(prob['C2.invec'],
+        assert_near_equal(prob.get_val('C2.invec'),
                           np.ones((8,)) if model.comm.rank == 0 else np.ones((7,)))
-        assert_near_equal(prob['C2.outvec'],
+        assert_near_equal(prob.get_val('C2.outvec'),
                           2*np.ones((8,)) if model.comm.rank == 0 else -3*np.ones((7,)))
-        assert_near_equal(prob['C3.sum'], -5.)
+        assert_near_equal(prob.get_val('C3.sum'), -5.)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -884,6 +916,7 @@ class TestGroupMPI(unittest.TestCase):
                               promotes_inputs=['x'])
 
         p.setup()
+        p.set_val('x', np.arange(5, dtype=float))
         p.run_model()
 
         # each rank holds the assigned portion of the input array
