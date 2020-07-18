@@ -935,17 +935,16 @@ class TestExecComp(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p', om.IndepVarComp('x', 2.0))
         model.add_subsystem('comp', om.ExecComp('y=x+1.'))
 
-        model.connect('p.x', 'comp.x')
+        model.set_input_defaults('comp.x', 2.0)
 
         prob.setup()
 
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        assert_near_equal(prob['comp.y'], 3.0, 0.00001)
+        assert_near_equal(prob.get_val('comp.y'), 3.0, 0.00001)
 
     def test_feature_multi_output(self):
         import openmdao.api as om
@@ -953,18 +952,17 @@ class TestExecComp(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p', om.IndepVarComp('x', 2.0))
-        model.add_subsystem('comp', om.ExecComp(['y1=x+1.', 'y2=x-1.']))
-
-        model.connect('p.x', 'comp.x')
+        model.add_subsystem('comp', om.ExecComp(['y1=x+1.', 'y2=x-1.']), promotes=['x'])
 
         prob.setup()
+
+        prob.set_val('x', 2.0)
 
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        assert_near_equal(prob['comp.y1'], 3.0, 0.00001)
-        assert_near_equal(prob['comp.y2'], 1.0, 0.00001)
+        assert_near_equal(prob.get_val('comp.y1'), 3.0, 0.00001)
+        assert_near_equal(prob.get_val('comp.y2'), 1.0, 0.00001)
 
     def test_feature_array(self):
         import numpy as np
@@ -983,7 +981,7 @@ class TestExecComp(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        assert_near_equal(prob['comp.y'], 2.0, 0.00001)
+        assert_near_equal(prob.get_val('comp.y'), 2.0, 0.00001)
 
     def test_feature_math(self):
         import numpy as np
@@ -1003,7 +1001,7 @@ class TestExecComp(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        assert_near_equal(prob['comp.z'], 1.0, 0.00001)
+        assert_near_equal(prob.get_val('comp.z'), 1.0, 0.00001)
 
     def test_feature_numpy(self):
         import numpy as np
@@ -1043,7 +1041,7 @@ class TestExecComp(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        assert_near_equal(prob['comp.z'], 24.0, 0.00001)
+        assert_near_equal(prob.get_val('comp.z'), 24.0, 0.00001)
 
     def test_feature_options(self):
         import openmdao.api as om
@@ -1061,7 +1059,7 @@ class TestExecComp(unittest.TestCase):
 
         prob.run_model()
 
-        assert_near_equal(prob['comp.y'], [2., 4.], 0.00001)
+        assert_near_equal(prob.get_val('comp.y'), [2., 4.], 0.00001)
 
 
 class TestExecCompParameterized(unittest.TestCase):

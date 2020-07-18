@@ -525,8 +525,7 @@ class TestFeature(unittest.TestCase):
 
         p = om.Problem()
 
-        dp_comp = om.DotProductComp(vec_size=n, length=3,
-                                    a_name='F', b_name='v', c_name='P',
+        dp_comp = om.DotProductComp(vec_size=n, length=3, a_name='F', b_name='v', c_name='P',
                                     a_units='N', b_units='m/s', c_units='W')
 
         p.model.add_subsystem(name='dot_prod_comp', subsys=dp_comp,
