@@ -87,6 +87,13 @@ Declaring a Multi-Component Input as a Design Variable
 Creating a Distributed Component with an Unconnected Inputs
 ===========================================================
 
+.. content-container ::
+
+  .. embed-compare::
+      openmdao.test_suite.tests.test_auto_ivc_api_conversion.TestConversionGuideDocMPI.test_prob_getval_dist_par
+      Problem
+      run_model
+
 
 Setting and Getting Inputs
 --------------------------

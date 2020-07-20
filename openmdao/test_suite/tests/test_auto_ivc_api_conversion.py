@@ -5,7 +5,13 @@ are tested here.
 import unittest
 
 import openmdao.api as om
+from openmdao.utils.mpi import MPI
 from openmdao.utils.assert_utils import assert_near_equal
+
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
 
 class TestConversionGuideDoc(unittest.TestCase):
@@ -87,6 +93,45 @@ class TestConversionGuideDoc(unittest.TestCase):
         # location of the minimum
         assert_near_equal(prob.get_val('x'), 7, 1e-4)
         assert_near_equal(prob.get_val('y'), -7, 1e-4)
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestConversionGuideDocMPI(unittest.TestCase):
+
+    N_PROCS = 4
+
+    def test_prob_getval_dist_par(self):
+        size = 3
+
+        p = om.Problem()
+        top = p.model
+        par = top.add_subsystem('par', om.ParallelGroup())
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('invec1', np.ones(size))
+        ivc.add_output('invec2', np.ones(size))
+        top.add_subsystem('P', ivc)
+        top.connect('P.invec1', 'par.C1.invec')
+        top.connect('P.invec2', 'par.C2.invec')
+
+        C1 = par.add_subsystem("C1", DistribInputDistribOutputComp(arr_size=size))
+        C2 = par.add_subsystem("C2", DistribInputDistribOutputComp(arr_size=size))
+
+        p.setup()
+
+        p['P.invec1'] = np.array([2, 1, 1], float)
+        p['P.invec2'] = np.array([6, 3, 3], float)
+
+        p.run_model()
+
+        ans = p.get_val('par.C2.invec', get_remote=True)
+        np.testing.assert_allclose(ans, np.array([6, 3,3], dtype=float))
+        ans = p.get_val('par.C2.outvec', get_remote=True)
+        np.testing.assert_allclose(ans, np.array([12, 6, 6], dtype=float))
+        ans = p.get_val('par.C1.invec', get_remote=True)
+        np.testing.assert_allclose(ans, np.array([2, 1, 1], dtype=float))
+        ans = p.get_val('par.C1.outvec', get_remote=True)
+        np.testing.assert_allclose(ans, np.array([4, 2, 2], dtype=float))
 
 
 if __name__ == "__main__":
