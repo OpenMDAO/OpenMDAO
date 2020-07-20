@@ -4,33 +4,34 @@
 July 20, 2020
 
 OpenMDAO 3.2.0 introduces significant changes in the way OpenMDAO works.
-
-The main feature of this release is that OpenMDAO now, under the hood,
-automatically creates IndepVarComps associated with each
-unconnected input variable.  We call this feature "AutoIVC".
+The primary change is that the manual creation IndepVarComp outputs is no longer required,
+because OpenMDAO will create them for you in the background.
+This was done in a backwards  compatible way so that old models will still run and you
+can still use IndepVarComps if you want to. However, in the vast majority of cases you
+don't need to manually create either the IndepVarComp component or add outputs
+to it any more.
 
 This feature aids in creating modular systems.  Previously, there was
 always debate as to whether a system should "own" its own IndepVarComp.
 Doing so, however, meant that the outputs of that IVC couldn't be passed
 in externally without changing the system. This is no longer the case.
-Now if they remain unconnected, they will be assigned as the outputs
-of a hidden IndepVarComp at the top of the model, and accessed by the
-expected path name.
+Now any inputs that remain unconnected at the end of the problem setup sequence
+will be connected to special automatic IndepVarComp outputs that are addressable using the path name of the inputs.
+We have updated the docs to use the new style where IndepVarComps are not manually created.
+We now consider it best practice not to manually create IndepVarComps in the vast majority of cases.
 
-Previously, IndepVarComp's were generally required for design variables.
-This is no longer the case.  The previous best-practice of testing groups
-by providing its inputs via an IndepVarComp is no longer the case.
-
-We're also moving to make use of `openmdao.api.slicer` when specifying
+Another new feature is the `openmdao.api.slicer` which helps specifying
 src_indices for connections or indices for design variables, objectives,  
 and constraints.  This is intended to allow the user to easily connect
 portions of an output to an input (such as selecting an individual column
-from a matrix, for instance).
+from a matrix, for instance). The old method of providing an explicit list of indicies should still work.
+However, the new slicer gives greater functionality since it allows for the use of general slicing syntax
+such as `[0:10:1, :]`.
 
+Using the slicer object is now considered the new best coding practice for giving src_indices or indices arguments.
 We hope these changes will reduce the development burden on our users.  As this is
 a significant change, some issues may have slipped through our testing and
 any feedback is always welcomed via issues on the github repository.
-
 
 ## Backwards Incompatible API Changes:
 
