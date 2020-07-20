@@ -1,4 +1,60 @@
 **********************************
+# Release Notes for OpenMDAO 3.2.0
+
+July 20, 2020
+
+OpenMDAO 3.2.0 introduces significant changes in the way OpenMDAO works.
+
+The main feature of this release is that OpenMDAO now, under the hood,
+automatically creates IndepVarComps associated with each
+unconnected input variable.  We call this feature "AutoIVC".
+
+This feature aids in creating modular systems.  Previously, there was
+always debate as to whether a system should "own" its own IndepVarComp.
+Doing so, however, meant that the outputs of that IVC couldn't be passed
+in externally without changing the system. This is no longer the case.
+Now if they remain unconnected, they will be assigned as the outputs
+of a hidden IndepVarComp at the top of the model, and accessed by the
+expected path name.
+
+Previously, IndepVarComp's were generally required for design variables.
+This is no longer the case.  The previous best-practice of testing groups
+by providing its inputs via an IndepVarComp is no longer the case.
+
+We hope this will reduce the development burden on our users.  As this is
+a significant change, some issues may have slipped through our testing and
+any feedback is always welcomed via issues on the github repository.
+
+
+## Backwards Incompatible API Changes:
+
+- Fix a typo in user_terminate_signal option, deprecated the old. #1469
+- Remove support for factorial function in ExecComp. #1483
+
+## Backwards Incompatible NON-API Changes:
+
+- _all_subsystem_iter has been removed.  Users should use _subsystems_allprocs
+
+## New Features:
+
+- N2 viewer changes to improve performance. #1475
+- Local table of contents (navigation) added to docs sidebar. #1477
+- N2 now uses coloring info by default to show dependence in each component. #1478
+- Added test from Ben Brelje to capture error message when running in parallel with non distributed components. #1484
+- N2 adds a spinner to give the user an indication when it isn't finished rendering. #1485
+- All case recorder files now always contain system options information about all systems in the model. #1486
+- Model data now compressed when saved in N2 HTML file. #1490
+- Added support for om.slicer as a way to pass in slices to src_indices/indices arguments in add_design_var, add_response, add_constraint, promotes, and connect. #1491
+- Added flag for `under_approx` to let the user know when a system is operating under any derivative approximation scheme, and a new counter `iter_count_without_approx`. #1492
+- Automatically add a single, user-hidden, top-level IndepVarComp to provide outputs for every unconnected input in the model.
+
+## Bug Fixes:
+
+- Fix bug where exception was raised with while printing bounds violations via "print_bound_enforce" option on linesearch if one side of an output was unbounded. #1466
+- Fixed an exception when using AddSubtractComp constructor instead of its add_equation method. #1474
+- Minor fixes for Appveyor CI. #1495
+
+**********************************
 # Release Notes for OpenMDAO 3.1.1
 
 June 12, 2020
