@@ -315,7 +315,7 @@ class BalanceComp(ImplicitComponent):
         self._state_vars[name] = options
 
         if val is not None:
-            options['kwargs'] = {'val': val}
+            options['kwargs']['val'] = val
 
         meta = self.add_output(name, **options['kwargs'])
 
