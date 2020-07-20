@@ -10,13 +10,16 @@ From your python environment (we recommend `Anaconda <https://www.anaconda.com/d
 
 .. code::
 
-    >> pip install openmdao[all]
+    >> pip install 'openmdao[all]'
 
 
 .. note::
 
     The [all] suffix to the install command ensures that you get all the optional dependencies
     (e.g. for testing and visualization).  You can omit this for a minimal installation.
+
+    The quotation marks are required to prevent some command shells (e.g. zsh) from trying to interpret
+    the square brackets.
 
 
 .. _paraboloid_min:
