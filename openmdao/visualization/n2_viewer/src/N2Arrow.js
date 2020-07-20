@@ -30,14 +30,17 @@ class N2Arrow {
         if (existingArrow.empty()) {
             debugInfo(`N2Arrow(): Creating new ${this.id}`);
             this.doTransition = false;
+            this.cssClass = 'n2_hover_elements';
             this.group = n2Groups.arrows.append('g')
                 .attr('id', this.id)
-                .attr('class', 'n2_hover_elements')
+                .attr('class', this.cssClass)
         }
         else {
-            debugInfo(`N2Arrow(): Using existing ${this.id}`);
             this.doTransition = true;
             this.group = existingArrow;
+            const cssClasses = this.group.attr('class').split(' ');
+            this.cssClass = cssClasses.find(o => o.match(/n2_hover_elements.*/));
+            debugInfo(`N2Arrow(): Using existing ${this.id} with class ${this.cssClass}`);
         }
     }
 
@@ -131,18 +134,18 @@ class N2BentArrow extends N2Arrow {
     _createDots() {
         this.bottomCircle = this.group.append("circle")
             .attr('id', 'bottom-circle')
-            .attr("class", "n2_hover_elements");
+            .attr("class", this.cssClass);
 
         this.topCircle = this.group.append("circle")
             .attr('id', 'top-circle')
-            .attr("class", "n2_hover_elements")
+            .attr("class", this.cssClass)
     }
 
     /** Use SVG to draw the line segments and an arrow at the end-point. */
     draw() {
         if (this.doTransition) {
             // Arrow already exists, size and/or shape needs updated
-            this.path = this.group.select('path#arrow-path').transition(sharedTransition);
+            this.path = this.group.select('path').transition(sharedTransition);
 
             if (this.group.classed('off-grid-arrow')) {
                 // The arrow was previously going offscreen but now is fully onscreen
@@ -155,9 +158,9 @@ class N2BentArrow extends N2Arrow {
         }
         else {
             // This is an entirely new arrow
-            this.path = this.group.insert("path")
+            this.path = this.group.append("path")
                 .attr('id', 'arrow-path')
-                .attr("class", "n2_hover_elements");
+                .attr("class", this.cssClass);
 
             this._createDots();
         }
@@ -195,8 +198,8 @@ class N2BentArrow extends N2Arrow {
  * offscreen node. Show a tooltip near the offscreen.
  */
 class N2OffGridArrow extends N2Arrow {
-    constructor(attribs, n2Groups, nodeSize, markerSize = null) {
-        super(attribs, n2Groups, nodeSize, markerSize);
+    constructor(attribs, n2Groups, nodeSize) {
+        super(attribs, n2Groups, nodeSize);
 
         this.cell = attribs.cell;
 
@@ -234,8 +237,11 @@ class N2OffGridArrow extends N2Arrow {
         // Prevent duplicate listings
         if (!firstEntry && tipHTML.match(this.label.text)) {
             debugInfo('Duplicate entry for label to ' + this.label.text);
+            this.newLabel = false;
             return false;
         }
+
+        this.newLabel = true;
 
         if (firstEntry) {
             this.label.ref
@@ -264,11 +270,12 @@ class N2OffGridArrow extends N2Arrow {
                 this.group.selectAll('circle').remove();
             }
 
-            this.path = this.group.select('path');
+            this.path = this.group.select('path').transition(sharedTransition);
         }
         else {
             this.path = this.group.insert('path')
-                .attr('class', 'n2_hover_elements');
+                .attr('id', 'arrow-path')
+                .attr('class', this.cssClass);
         }
 
         this.group.classed('off-grid-arrow', true);
@@ -293,22 +300,23 @@ class N2OffGridArrow extends N2Arrow {
  * the onscreen target cell from the offscreen source.
  */
 class N2OffGridUpArrow extends N2OffGridArrow {
-    constructor(attribs, n2Groups, nodeSize, markerSize = null) {
-        super(attribs, n2Groups, nodeSize, markerSize);
-        this.label.ref = d3.select("div#left.offgrid");
-        this.attribs.direction = 'up';
-        this.color = N2Style.color.redArrow;
+    constructor(attribs, n2Groups, nodeSize) {
+        super(Object.assign(attribs, {
+            'direction': 'up',
+            'color': N2Style.color.redArrow
+        }), n2Groups, nodeSize);
 
-        if (this._addToLabel()) {
-            this._computePts();
-            this.draw();
-        }
+        this.label.ref = d3.select("div#left.offgrid");
+
+        this._addToLabel();
+        this._computePts();
+        this.draw();
     }
 
     /** Override id to handle an off-screen node */
     get id() {
         return 'arrow-' + this.attribs.offscreenId + '-to-' +
-            this.attribs.cell.tgtId + '-' + this.attribs.color.replace(/#/, '')
+            this.attribs.cell.tgtId + '-' + this.color.replace(/#/, '')
     }
 
     /**
@@ -327,9 +335,11 @@ class N2OffGridUpArrow extends N2OffGridArrow {
             this.nodeSize.height * .5 + offsetY
 
         // Tooltip
-        this.label.pts.left = this.pts.start.x + this.bgRect.left -
-            this.label.rect.width / 2;
-        this.label.pts.top = this.bgRect.bottom + 2;
+        if (this.newLabel) {
+            this.label.pts.left = this.pts.start.x + this.bgRect.left -
+                this.label.rect.width / 2;
+            this.label.pts.top = this.bgRect.bottom + 2;
+        }
     }
 }
 
@@ -338,23 +348,23 @@ class N2OffGridUpArrow extends N2OffGridArrow {
  * onscreen target cell from the offscreen source.
  */
 class N2OffGridDownArrow extends N2OffGridArrow {
-    constructor(attribs, n2Groups, nodeSize, markerSize = null) {
-        super(attribs, n2Groups, nodeSize, markerSize);
+    constructor(attribs, n2Groups, nodeSize) {
+        super(Object.assign(attribs, {
+            'direction': 'down',
+            'color': N2Style.color.redArrow
+        }), n2Groups, nodeSize);
 
         this.label.ref = d3.select("div#bottom.offgrid");
-        this.attribs.direction = 'down';
-        this.color = N2Style.color.redArrow;
 
-        if (this._addToLabel()) {
-            this._computePts();
-            this.draw();
-        }
+        this._addToLabel();
+        this._computePts();
+        this.draw();
     }
 
     /** Override id to handle an off-screen node */
     get id() {
         return 'arrow-' + this.attribs.offscreenId + '-to-' +
-            this.attribs.cell.tgtId + '-' + this.attribs.color.replace(/#/, '');
+            this.attribs.cell.tgtId + '-' + this.color.replace(/#/, '');
     }
 
     /**
@@ -372,9 +382,11 @@ class N2OffGridDownArrow extends N2OffGridArrow {
             this.nodeSize.height * .5 - offsetY;
 
         // Tooltip
-        this.label.pts.left = this.pts.start.x + this.bgRect.left -
-            this.label.rect.width / 2;
-        this.label.pts.top = this.bgRect.top - this.label.rect.height - 2;
+        if (this.newLabel) {
+            this.label.pts.left = this.pts.start.x + this.bgRect.left -
+                this.label.rect.width / 2;
+            this.label.pts.top = this.bgRect.top - this.label.rect.height - 2;
+        }
     }
 }
 
@@ -383,23 +395,23 @@ class N2OffGridDownArrow extends N2OffGridArrow {
  * onscreen source cell to the offscreen target.
  */
 class N2OffGridLeftArrow extends N2OffGridArrow {
-    constructor(attribs, n2Groups, nodeSize, markerSize = null) {
-        super(attribs, n2Groups, nodeSize, markerSize);
+    constructor(attribs, n2Groups, nodeSize) {
+        super(Object.assign(attribs, {
+            'direction': 'left',
+            'color': N2Style.color.greenArrow
+        }), n2Groups, nodeSize);
 
         this.label.ref = d3.select("div#bottom.offgrid");
-        this.attribs.direction = 'left';
-        this.color = N2Style.color.greenArrow;
 
-        if (this._addToLabel()) {
-            this._computePts();
-            this.draw();
-        }
+        this._addToLabel();
+        this._computePts();
+        this.draw();
     }
 
     /** Override id to handle an off-screen node */
     get id() {
         return 'arrow-' + this.attribs.cell.srcId + '-to-' +
-            this.attribs.offscreenId + '-' + this.attribs.color.replace(/#/, '');
+            this.attribs.offscreenId + '-' + this.color.replace(/#/, '');
     }
 
     /**
@@ -417,10 +429,12 @@ class N2OffGridLeftArrow extends N2OffGridArrow {
         this.pts.end.x = 0;
 
         // Tooltip
-        this.label.pts.left = this.pts.end.x + this.bgRect.left -
-            this.label.rect.width * 0.667;
-        this.label.pts.top = this.pts.end.y + this.bgRect.top +
-            this.label.rect.height / 2;
+        if (this.newLabel) {
+            this.label.pts.left = this.pts.end.x + this.bgRect.left -
+                this.label.rect.width * 0.667;
+            this.label.pts.top = this.pts.end.y + this.bgRect.top +
+                this.label.rect.height / 2;
+        }
     }
 }
 
@@ -429,23 +443,23 @@ class N2OffGridLeftArrow extends N2OffGridArrow {
  * the onscreen source cell to the offscreen target.
  */
 class N2OffGridRightArrow extends N2OffGridArrow {
-    constructor(attribs, n2Groups, nodeSize, markerSize = null) {
-        super(attribs, n2Groups, nodeSize, markerSize);
+    constructor(attribs, n2Groups, nodeSize) {
+        super(Object.assign(attribs, {
+            'direction': 'right',
+            'color': N2Style.color.greenArrow
+        }), n2Groups, nodeSize);
 
         this.label.ref = d3.select("div#right.offgrid");
-        this.attribs.direction = 'right';
-        this.color = N2Style.color.greenArrow;
 
-        if (this._addToLabel()) {
-            this._computePts();
-            this.draw();
-        }
+        this._addToLabel();
+        this._computePts();
+        this.draw();
     }
 
     /** Override id to handle an off-screen node */
     get id() {
         return 'arrow-' + this.attribs.cell.srcId + '-to-' +
-            this.attribs.offscreenId + '-' + this.attribs.color.replace(/#/, '');
+            this.attribs.offscreenId + '-' + this.color.replace(/#/, '');
     }
 
     /**
@@ -463,10 +477,12 @@ class N2OffGridRightArrow extends N2OffGridArrow {
         this.pts.end.x = this.attribs.matrixSize * this.nodeSize.width;
 
         // Tooltip
-        this.label.pts.left = this.pts.end.x + this.bgRect.left -
-            this.label.rect.width / 3;
-        this.label.pts.top = this.pts.end.y + this.bgRect.top +
-            this.label.rect.height / 2;
+        if (this.newLabel) {
+            this.label.pts.left = this.pts.end.x + this.bgRect.left -
+                this.label.rect.width / 3;
+            this.label.pts.top = this.pts.end.y + this.bgRect.top +
+                this.label.rect.height / 2;
+        }
     }
 }
 
@@ -498,10 +514,12 @@ class N2ArrowCache {
      * Add an individual arrow to the cache.
      * @param {String} cellId The ID of the cell associated with the arrow.
      * @param {N2Arrow} arrow The arrow object to cache.
+     * @param {Boolean} [allowReplace = true] Replacing an existing arrow is OK.
      */
-    add(cellId, arrow) {
-        if (this.hasArrow(arrow.id)) {
-            console.warn(`Not adding arrow ${arrow.id} to cache since it already exists.`)
+    add(cellId, arrow, allowReplace = true) {
+        if (this.hasArrow(arrow.id) && !allowReplace) {
+            console.warn(`N2ArrowCache.add(): Not adding arrow ${arrow.id} to cache
+                    since it already exists.`)
         }
         else {
             this.arrows[arrow.id] = arrow;
@@ -595,6 +613,7 @@ class N2ArrowCache {
 
         debugInfo(`migrateArrow(): Moving ${arrowId} from class ${oldClassName} to ${newClassName}`);
 
+        arrow.cssClass = newClassName;
         arrow.group
             .classed(oldClassName, false)
             .classed(newClassName, true)
@@ -702,7 +721,7 @@ class N2ArrowManager {
     /**
      * Create a new N2BentArrow object. This may replace existing elements
      * on the screen with new dimensions and colors. However, the arrow may
-     * already exist in one of the caches, in which case it's not added again.
+     * already exist in one of the caches, in which case it's replaced.
      * @param {String} cellId The ID of the associated N2MatrixCell.
      * @param {Object} attribs Values to pass to the N2Arrow constructor.
      * @returns {N2BentArrow} The newly created arrow object.
@@ -710,7 +729,12 @@ class N2ArrowManager {
     addFullArrow(cellId, attribs) {
         attribs.width = this.lineWidth;
         const newArrow = new N2BentArrow(attribs, this.n2Groups, this.nodeSize);
-        if (!this.arrowExists(newArrow.id)) {
+
+        // Add or replace the cache entry with the new arrow
+        if (this.pinnedArrows.hasArrow(newArrow.id)) {
+            this.pinnedArrows.add(cellId, newArrow);
+        }
+        else {
             this.hoverArrows.add(cellId, newArrow);
         }
 
@@ -723,17 +747,22 @@ class N2ArrowManager {
      * arrow may already exist in one of the caches, in which case it's not
      * added again.
      * @param {String} cellId The ID of the associated N2MatrixCell.
-     * @param {String} side Wether the arrow is in the top or bottom.
-     * @param {String} dir Wether the arrow is incoming or outgoing.
+     * @param {String} side Whether the arrow is in the top or bottom.
+     * @param {String} dir Whether the arrow is incoming or outgoing.
      * @param {Object} attribs Values to pass to the N2Arrow constructor.
      * @returns {N2BentArrow} The newly created arrow object.
      */
     addOffGridArrow(cellId, side, dir, attribs) {
         attribs.width = this.lineWidth;
+        debugInfo("addOffGridArrow(): ", cellId, side, dir, attribs)
         const newArrow = new (this.arrowDirClasses[side][dir])(attribs,
             this.n2Groups, this.nodeSize);
 
-        if (!this.hoverArrows.hasArrow(newArrow.id)) {
+        // Add or replace the cache entry with the new arrow
+        if (this.pinnedArrows.hasArrow(newArrow.id)) {
+            this.pinnedArrows.add(cellId, newArrow);
+        }
+        else {
             this.hoverArrows.add(cellId, newArrow);
         }
 
