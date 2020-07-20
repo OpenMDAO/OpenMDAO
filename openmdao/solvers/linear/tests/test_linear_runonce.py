@@ -58,13 +58,14 @@ class TestLinearRunOnceSolver(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
         model.linear_solver = om.LinearRunOnce()
 
         prob.setup(check=False, mode='fwd')
+
+        prob.set_val('x', 0.0)
+        prob.set_val('y', 0.0)
 
         prob.run_model()
 

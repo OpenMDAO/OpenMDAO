@@ -1255,16 +1255,10 @@ class TestSqliteCaseReader(unittest.TestCase):
     def test_list_discrete(self):
         model = om.Group()
 
-        # TODO: Change x to an auto_ivc variable.
-        #indep = model.add_subsystem('indep', om.IndepVarComp())
-        #indep.add_discrete_output('x', 11)
-
         model.add_subsystem('expl', ModCompEx(3),
                             promotes_inputs=['x'])
         model.add_subsystem('impl', ModCompIm(3),
                             promotes_inputs=['x'])
-
-        #model.connect('indep.x', ['expl.x', 'impl.x'])
 
         model.add_recorder(self.recorder)
 
