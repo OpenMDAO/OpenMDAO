@@ -21,7 +21,13 @@ Previously, IndepVarComp's were generally required for design variables.
 This is no longer the case.  The previous best-practice of testing groups
 by providing its inputs via an IndepVarComp is no longer the case.
 
-We hope this will reduce the development burden on our users.  As this is
+We're also moving to make use of `openmdao.api.slicer` when specifying
+src_indices for connections or indices for design variables, objectives,  
+and constraints.  This is intended to allow the user to easily connect
+portions of an output to an input (such as selecting an individual column
+from a matrix, for instance).
+
+We hope these changes will reduce the development burden on our users.  As this is
 a significant change, some issues may have slipped through our testing and
 any feedback is always welcomed via issues on the github repository.
 
@@ -53,6 +59,9 @@ any feedback is always welcomed via issues on the github repository.
 - Fix bug where exception was raised with while printing bounds violations via "print_bound_enforce" option on linesearch if one side of an output was unbounded. #1466
 - Fixed an exception when using AddSubtractComp constructor instead of its add_equation method. #1474
 - Minor fixes for Appveyor CI. #1495
+- Problem.record() provides a useful error message if called before final_setup. #1545
+- Fixed a bug that was obliterating options passed to BalanceComp, and added tests for better coverage. #1546
+- Added quotes to install command in docs to prevent problems in some shell environments. #1547
 
 **********************************
 # Release Notes for OpenMDAO 3.1.1
