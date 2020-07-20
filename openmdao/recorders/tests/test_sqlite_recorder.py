@@ -2275,7 +2275,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
     def test_problem_record_before_final_setup(self):
         prob = om.Problem()
-
         prob.add_recorder(self.recorder)
         prob.setup()
 
@@ -2283,9 +2282,11 @@ class TestSqliteRecorder(unittest.TestCase):
             prob.record('initial')
 
         self.assertEqual(str(cm.exception),
-                         "Problem: Cannot record before final setup. "
-                         "You must call final_setup(), run_model() or run_driver() "
-                         "before calling record().")
+                         "Problem: Problem.record() cannot be called before "
+                         "`Problem.run_model()`, `Problem.run_driver()`, or "
+                         "`Problem.final_setup()`.")
+
+        prob.cleanup()
 
 
 @use_tempdirs
