@@ -330,7 +330,7 @@ class TestLinearSystemComp(unittest.TestCase):
 
         prob.run_model()
 
-        assert_near_equal(prob['lin.x'], np.array([0.36423841, -0.00662252, -0.4205298 ]), .0001)
+        assert_near_equal(prob.get_val('lin.x'), np.array([0.36423841, -0.00662252, -0.4205298 ]), .0001)
 
     def test_feature_vectorized(self):
         import numpy as np
@@ -355,7 +355,7 @@ class TestLinearSystemComp(unittest.TestCase):
 
         prob.run_model()
 
-        assert_near_equal(prob['lin.x'], np.array([[ 0.10596026, -0.16556291,  0.48675497],
+        assert_near_equal(prob.get_val('lin.x'), np.array([[ 0.10596026, -0.16556291,  0.48675497],
                                                         [ 0.19205298, -0.11258278, -0.14900662]]),
                          .0001)
 
@@ -383,7 +383,7 @@ class TestLinearSystemComp(unittest.TestCase):
 
         prob.run_model()
 
-        assert_near_equal(prob['lin.x'], np.array([[-0.78807947,  0.66887417,  0.47350993],
+        assert_near_equal(prob.get_val('lin.x'), np.array([[-0.78807947,  0.66887417,  0.47350993],
                                                         [ 0.7       , -1.8       ,  0.75      ]]),
                          .0001)
 

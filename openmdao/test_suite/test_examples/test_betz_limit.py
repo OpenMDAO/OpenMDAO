@@ -180,14 +180,8 @@ class TestBetzLimit(unittest.TestCase):
 
         # build the model
         prob = om.Problem()
-        indeps = prob.model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
-        indeps.add_output('a', .5)
-        indeps.add_output('Area', 10.0, units='m**2')
-        indeps.add_output('rho', 1.225, units='kg/m**3')
-        indeps.add_output('Vu', 10.0, units='m/s')
-
         prob.model.add_subsystem('a_disk', ActuatorDisc(),
-                                promotes_inputs=['a', 'Area', 'rho', 'Vu'])
+                                 promotes_inputs=['a', 'Area', 'rho', 'Vu'])
 
         # setup the optimization
         prob.driver = om.ScipyOptimizeDriver()
@@ -200,6 +194,12 @@ class TestBetzLimit(unittest.TestCase):
         prob.model.add_objective('a_disk.Cp', scaler=-1)
 
         prob.setup()
+
+        prob.set_val('a', .5)
+        prob.set_val('Area', 10.0, units='m**2')
+        prob.set_val('rho', 1.225, units='kg/m**3')
+        prob.set_val('Vu', 10.0, units='m/s')
+
         prob.run_driver()
 
         prob.model.list_inputs(values = False, hierarchical=False)

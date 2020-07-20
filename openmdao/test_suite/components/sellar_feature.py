@@ -189,15 +189,15 @@ class SellarMDAWithUnits(om.Group):
             outputs['y2'] = y1**.5 + z1 + z2
 
     def setup(self):
-        indeps = self.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
-        indeps.add_output('x', 1.0, units='degC')
-        indeps.add_output('z', np.array([5.0, 2.0]), units='degC')
 
         cycle = self.add_subsystem('cycle', om.Group(), promotes=['*'])
         cycle.add_subsystem('d1', self.SellarDis1Units(), promotes_inputs=['x', 'z', 'y2'],
                             promotes_outputs=['y1'])
         cycle.add_subsystem('d2', self.SellarDis2Units(), promotes_inputs=['z', 'y1'],
                             promotes_outputs=['y2'])
+
+        cycle.set_input_defaults('x', 1.0, units='degC')
+        cycle.set_input_defaults('z', np.array([5.0, 2.0]), units='degC')
 
         # Nonlinear Block Gauss Seidel is a gradient free solver
         cycle.nonlinear_solver = om.NonlinearBlockGS()

@@ -102,9 +102,14 @@ class System(object):
         Problem level metadata.
     under_complex_step : bool
         When True, this system is undergoing complex step.
+    under_approx : bool
+        When True, this system is undergoing approximation.
     iter_count : int
         Int that holds the number of times this system has iterated
         in a recording run.
+    iter_count_without_approx : int
+        Int that holds the number of times this system has iterated
+        in a recording run excluding any calls due to approximation schemes.
     cite : str
         Listing of relevant citations that should be referenced when
         publishing work that uses this class.
@@ -334,6 +339,7 @@ class System(object):
 
         # Case recording related
         self.iter_count = 0
+        self.iter_count_without_approx = 0
 
         self.cite = ""
 
@@ -382,6 +388,7 @@ class System(object):
         self._subjacs_info = {}
         self.matrix_free = False
 
+        self.under_approx = False
         self._owns_approx_jac = False
         self._owns_approx_jac_meta = {}
         self._owns_approx_wrt = None
@@ -3373,6 +3380,10 @@ class System(object):
             disc_meta = self._discrete_outputs._dict
 
             for var_name, val in self._discrete_outputs.items():
+
+                if not list_autoivcs and var_name.startswith('_auto_ivc.'):
+                    continue
+
                 # Filter based on tags
                 if tags and not (make_set(tags) & disc_meta[var_name]['tags']):
                     continue
@@ -3810,6 +3821,8 @@ class System(object):
             self._rec_mgr.record_iteration(self, data, metadata)
 
         self.iter_count += 1
+        if not self.under_approx:
+            self.iter_count_without_approx += 1
 
     def is_active(self):
         """
@@ -3877,6 +3890,20 @@ class System(object):
 
                 if sub._assembled_jac:
                     sub._assembled_jac.set_complex_step_mode(active)
+
+    def _set_approx_mode(self, active):
+        """
+        Turn on or off approx mode flag.
+
+        Recurses to turn on or off approx mode flag in all subsystems.
+
+        Parameters
+        ----------
+        active : bool
+            Approx mode flag; set to True prior to commencing approximation.
+        """
+        for sub in self.system_iter(include_self=True, recurse=True):
+            sub.under_approx = active
 
     def cleanup(self):
         """
