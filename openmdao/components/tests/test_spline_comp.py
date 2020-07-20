@@ -406,7 +406,7 @@ class SplineCompFeatureTestCase(unittest.TestCase):
                             20.96983509, 21.37579297, 21.94811407, 22.66809748, 23.51629844,
                             24.47327219, 25.51957398, 26.63575905, 27.80238264, 29.        ]])
 
-        assert_near_equal(akima_y.flatten(), prob['akima1.y_val'].flatten(), tolerance=1e-8)
+        assert_near_equal(akima_y.flatten(), prob.get_val('akima1.y_val').flatten(), tolerance=1e-8)
 
     def test_multi_splines(self):
 
@@ -458,7 +458,7 @@ class SplineCompFeatureTestCase(unittest.TestCase):
                              17.96032258, 20.14140712, 22.31181718, 24.40891577, 26.27368825, 27.74068235,
                              28.67782484, 29.        ]])
 
-        assert_near_equal(akima_y.flatten(), prob['akima1.y_val'].flatten(), tolerance=1e-8)
+        assert_near_equal(akima_y.flatten(), prob.get_val('akima1.y_val').flatten(), tolerance=1e-8)
 
     def test_akima_options(self):
         import numpy as np
@@ -505,7 +505,6 @@ class SplineCompFeatureTestCase(unittest.TestCase):
         # Set options specific to bsplines
         bspline_options = {'order': 3}
 
-        model.set_input_defaults('x', x)
         comp = om.SplineComp(method='bsplines', x_interp_val=tt, num_cp=n_cp,
                             interp_options=bspline_options)
 
@@ -514,6 +513,7 @@ class SplineCompFeatureTestCase(unittest.TestCase):
         comp.add_spline(y_cp_name='h_cp', y_interp_name='h', y_cp_val=x, y_units=None)
 
         prob.setup(force_alloc_complex=True)
+        prob.set_val('x', x)
         prob.run_model()
 
     def test_2to3doc_fixed_grid(self):

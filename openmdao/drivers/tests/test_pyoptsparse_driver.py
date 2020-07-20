@@ -1946,7 +1946,7 @@ class TestPyoptSparseFeature(unittest.TestCase):
         prob.setup(check=False, mode='rev')
         prob.run_driver()
 
-        assert_near_equal(prob['z'][0], 1.9776, 1e-3)
+        assert_near_equal(prob.get_val('z', indices=0), 1.9776, 1e-3)
 
     def test_settings_print(self):
         import numpy as np
@@ -1972,7 +1972,7 @@ class TestPyoptSparseFeature(unittest.TestCase):
         prob.setup(check=False, mode='rev')
         prob.run_driver()
 
-        assert_near_equal(prob['z'][0], 1.9776, 1e-3)
+        assert_near_equal(prob.get_val('z', indices=0), 1.9776, 1e-3)
 
     def test_slsqp_atol(self):
         import numpy as np
@@ -1999,7 +1999,7 @@ class TestPyoptSparseFeature(unittest.TestCase):
         prob.setup(check=False, mode='rev')
         prob.run_driver()
 
-        assert_near_equal(prob['z'][0], 1.9776, 1e-3)
+        assert_near_equal(prob.get_val('z', indices=0), 1.9776, 1e-3)
 
     def test_slsqp_maxit(self):
         import numpy as np
@@ -2026,7 +2026,7 @@ class TestPyoptSparseFeature(unittest.TestCase):
         prob.setup(check=False, mode='rev')
         prob.run_driver()
 
-        assert_near_equal(prob['z'][0], 1.98337708, 1e-3)
+        assert_near_equal(prob.get_val('z', indices=0), 1.98337708, 1e-3)
 
 
 class TestPyoptSparseSnoptFeature(unittest.TestCase):
@@ -2062,7 +2062,7 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
         prob.setup(check=False, mode='rev')
         prob.run_driver()
 
-        assert_near_equal(prob['z'][0], 1.9776, 1e-3)
+        assert_near_equal(prob.get_val('z', indices=0), 1.9776, 1e-3)
 
     def test_snopt_maxit(self):
         import numpy as np
@@ -2091,7 +2091,7 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
 
         prob.run_driver()
 
-        assert_near_equal(prob['z'][0], 1.9780247, 2e-3)
+        assert_near_equal(prob.get_val('z', indices=0), 1.9780247, 2e-3)
 
     def test_snopt_fd_solution(self):
 
