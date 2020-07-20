@@ -144,13 +144,16 @@ class ImplicitCompTestCase(unittest.TestCase):
 
     def test_list_inputs_before_run(self):
         # cannot list_inputs on a Group before running
-        msg = "Group (<model>): Unable to list inputs on a Group until model has been run."
-        try:
-            self.prob.model.list_inputs()
-        except Exception as err:
-            self.assertEqual(str(err), msg)
-        else:
-            self.fail("Exception expected")
+        model_inputs = self.prob.model.list_inputs(desc=True, out_stream=None)
+        expected = {
+            'comp1.a': {'value': [1.], 'desc': ''},
+            'comp1.b': {'value': [1.], 'desc': ''},
+            'comp1.c': {'value': [1.], 'desc': ''},
+            'comp2.a': {'value': [1.], 'desc': ''},
+            'comp2.b': {'value': [1.], 'desc': ''},
+            'comp2.c': {'value': [1.], 'desc': ''},
+        }
+        self.assertEqual(dict(model_inputs), expected)
 
         # list_inputs on a component before running is okay
         c2_inputs = self.prob.model.comp2.list_inputs(desc=True, out_stream=None)
@@ -186,13 +189,12 @@ class ImplicitCompTestCase(unittest.TestCase):
 
     def test_list_outputs_before_run(self):
         # cannot list_outputs on a Group before running
-        msg = "Group (<model>): Unable to list outputs on a Group until model has been run."
-        try:
-            self.prob.model.list_outputs()
-        except Exception as err:
-            self.assertEqual(str(err), msg)
-        else:
-            self.fail("Exception expected")
+        model_outputs = self.prob.model.list_outputs(out_stream=None)
+        expected = {
+            'comp1.x': {'value': [0.]},
+            'comp2.x': {'value': [0.]},
+        }
+        self.assertEqual(dict(model_outputs), expected)
 
         # list_outputs on a component before running is okay
         c2_outputs = self.prob.model.comp2.list_outputs(out_stream=None)

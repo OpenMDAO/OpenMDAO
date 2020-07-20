@@ -903,24 +903,23 @@ def match_includes_excludes(name, prom_name, includes, excludes):
     bool
         Return True if the name passes through the filtering of includes and excludes.
     """
-    # Process includes
-    if includes is not None:
-        for pattern in includes:
-            if fnmatchcase(name, pattern) or fnmatchcase(prom_name, pattern):
-                break
-        else:  # didn't find any match
-            return False
+    diff = name != prom_name
 
     # Process excludes
     if excludes is not None:
-        match = False
         for pattern in excludes:
-            if fnmatchcase(name, pattern) or fnmatchcase(prom_name, pattern):
-                match = True
-                break
-        return not match
+            if fnmatchcase(name, pattern) or (diff and fnmatchcase(prom_name, pattern)):
+                return False
 
-    return True
+    # Process includes
+    if includes is None:
+        return True
+    else:
+        for pattern in includes:
+            if fnmatchcase(name, pattern) or (diff and fnmatchcase(prom_name, pattern)):
+                return True
+
+    return False
 
 
 def env_truthy(env_var):

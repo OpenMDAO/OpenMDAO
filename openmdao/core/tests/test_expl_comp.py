@@ -98,21 +98,16 @@ class ExplCompTestCase(unittest.TestCase):
         prob = om.Problem(RectangleGroup())
         prob.setup()
 
-        msg = "RectangleGroup (<model>): Unable to list inputs on a Group until model has been run."
-        try:
-            prob.model.list_inputs()
-        except Exception as err:
-            self.assertEqual(str(err), msg)
-        else:
-            self.fail("Exception expected")
+        # list explicit outputs
+        outputs = prob.model.list_outputs(implicit=False, out_stream=None)
+        self.assertEqual(sorted(outputs), [
+            ('comp1.area',   {'value': [1.]}),
+            ('comp2.area',   {'value': [1.]}),
+        ])
 
-        msg = "RectangleGroup (<model>): Unable to list outputs on a Group until model has been run."
-        try:
-            prob.model.list_outputs()
-        except Exception as err:
-            self.assertTrue(msg == str(err))
-        else:
-            self.fail("Exception expected")
+        # list states
+        states = prob.model.list_outputs(explicit=False, out_stream=None)
+        self.assertEqual(states, [])
 
         prob.set_val('length', 3.)
         prob.set_val('width', 2.)
@@ -183,13 +178,13 @@ class ExplCompTestCase(unittest.TestCase):
         prob.setup()
 
         # list outputs before model has been run will raise an exception
-        msg = "Group (<model>): Unable to list outputs on a Group until model has been run."
-        try:
-            prob.model.list_outputs()
-        except Exception as err:
-            self.assertEqual(str(err), msg)
-        else:
-            self.fail("Exception expected")
+        outputs = prob.model.list_outputs(out_stream=None)
+        expected = {
+            'p1.x': {'value': 12.},
+            'p2.y': {'value': 1.},
+            'comp.z': {'value': 0.},
+        }
+        self.assertEqual(dict(outputs), expected)
 
         # list_inputs on a component before run is okay, using relative names
         expl_inputs = prob.model.comp.list_inputs(out_stream=None)
