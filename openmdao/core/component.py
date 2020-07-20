@@ -749,17 +749,15 @@ class Component(System):
 
     def _var_added(self, name):
         """
-        Notify config that a variable has been added.
+        Notify config that a variable has been added to this Component.
 
         Parameters
         ----------
         name : str
             Name of the added variable.
         """
-        if self._problem_meta is not None:
-            conf_info = self._problem_meta['config_info']
-            if conf_info is not None:
-                conf_info._var_added(self.pathname, name)
+        if self._problem_meta is not None and self._problem_meta['config_info'] is not None:
+            self._problem_meta['config_info']._var_added(self.pathname, name)
 
     def _update_dist_src_indices(self, abs_in2out, all_abs2meta, all_abs2idx, all_sizes):
         """

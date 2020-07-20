@@ -1642,10 +1642,11 @@ class Group(System):
                     raise RuntimeError("%s: Trying to promote '%s' when it has been aliased to "
                                        "'%s'." % (self.msginfo, original_inside, new))
 
+        # if this was called during configure(), make this group as modified
         if self._problem_meta is not None:
-            conf_info = self._problem_meta['config_info']
-            if conf_info is not None:
-                conf_info._prom_added(self.pathname, any=any, inputs=inputs, outputs=outputs)
+            if self._problem_meta['config_info'] is not None:
+                self._problem_meta['config_info']._prom_added(self.pathname, any=any,
+                                                              inputs=inputs, outputs=outputs)
 
     def add_subsystem(self, name, subsys, promotes=None,
                       promotes_inputs=None, promotes_outputs=None,
