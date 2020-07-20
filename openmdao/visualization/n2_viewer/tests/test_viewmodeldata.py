@@ -21,10 +21,10 @@ from openmdao.utils.assert_utils import assert_warning
 
 
 # Whether to pop up a browser window for each N2
-DEBUG_BROWSER = False
+DEBUG_BROWSER = True
 
 # set DEBUG_FILES to True if you want to view the generated HTML file(s)
-DEBUG_FILES = False
+DEBUG_FILES = True
 
 
 class TestViewModelData(unittest.TestCase):
@@ -761,6 +761,40 @@ class TestViewModelData(unittest.TestCase):
                         (self.conn_html_filename + " is not a valid file."))
         self.assertTrue('OpenMDAO Model Hierarchy and N2 diagram: Bad Connection'
                         in open(self.conn_html_filename).read())
+
+    def test_junk(self):
+        import numpy as np
+
+        from openmdao.api import Group, ScipyKrylov, LinearSystemComp
+
+        SIZE = 10
+
+        model = Group()
+
+        x = np.array([1, 2, -3])
+        A = np.array([[5.0, -3.0, 2.0], [1.0, 7.0, -4.0], [1.0, 0.0, 8.0]])
+
+        x = np.random.rand(SIZE) * 1e20
+        A = np.random.rand(SIZE, SIZE)
+
+        b = A.dot(x)
+
+        model.add_subsystem('p1', IndepVarComp('A', A))
+        model.add_subsystem('p2', IndepVarComp('b', b))
+
+        lingrp = model.add_subsystem('lingrp', Group(), promotes=['*'])
+        lingrp.add_subsystem('lin', LinearSystemComp(size=SIZE))
+
+        model.connect('p1.A', 'lin.A')
+        model.connect('p2.b', 'lin.b')
+
+        prob = Problem(model)
+        prob.setup()
+
+        lingrp.linear_solver = ScipyKrylov()
+
+        n2(prob, outfile="n2_node_value.html", show_browser=DEBUG_BROWSER)
+
 
 
 if __name__ == "__main__":

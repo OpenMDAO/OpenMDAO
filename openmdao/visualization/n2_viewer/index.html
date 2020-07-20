@@ -228,17 +228,31 @@
 
 <div class="node-value" id="node-value-container">
     <div id="node-value-header">
-        <span id="node-value-title"></span>
         <span class="close-value-window-button">&times;</span>
+        <span id="node-value-title"></span>
     </div>
     <div id="node-value-table-div">
         <table id="node-value-table" cellpadding='0' cellspacing='0'>
         </table>
     </div>
     <div id="node-value-footer">
+    </div>
+
+                <div id='node-value-resizer-box' class='inactive-resizer-box'>
+                    <p id='node-value-resizer-handle' class='inactive-resizer-handle'></p>
+                </div>
+
+    <!--
+    <div id="node-value-footer">
       <div id="node-value-resizer-handle"></div>
     </div>
+    -->
 </div>
+
+<div class="node-value" id="node-value-containers">
+</div>
+
+
 <!-- Need this off window element to put values that can then be put on the pastebuffer -->
 <textarea id="input"></textarea>
 

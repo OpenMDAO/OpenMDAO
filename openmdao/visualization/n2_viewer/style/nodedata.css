@@ -190,14 +190,20 @@
 	cursor: pointer;
 }
 
+#node-value-title {
+    display: block;
+    overflow: auto;
+    position: relative;
+}
+
 /* grabber bars on the node value title bar */
-#node-value-header::before {
+#node-value-title::before {
     content: '\A789\A789\A789\A789\A789\A789';
     color: black;
     padding-left: 5px;
     padding-right: 5px;
 }
-#node-value-header::after {
+#node-value-title::after {
     content: '\A789\A789\A789\A789\A789\A789';
     color: black;
     padding-left: 5px;
@@ -205,8 +211,19 @@
 }
 
 /****** resize ****/
+#node-value-resizer-box {
+    position: absolute;
+    right: -3px;
+}
+
+.inactive-resizer-box {
+    visibility: visible;
+    left: auto;
+    border: 3px solid transparent;
+    pointer-events: none;
+}
+
 #node-value-resizer-handle {
-    background: linear-gradient(135deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0) 54%, rgba(255,255,255,1) 55%, rgba(255,255,255,1) 100%);
     position: absolute;
     right: -2px;
     bottom: 0px;
@@ -217,8 +234,23 @@
     overflow: hidden;
 }
 
-#node-value-resizer-handle::before {
+.inactive-resizer-handle::before {
     content: '\25a8';
+}
+
+.inactive-resizer-handle {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0) 54%, rgba(255, 255, 255, 1) 55%, rgba(255, 255, 255, 1) 100%);
+    font-size: 20px;
+    border: 0;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    -moz-background-clip: text;
+    -moz-text-fill-color: transparent;
+    font-weight: bold;
+    text-align: right;
+    vertical-align: bottom;
+    width: 18px;
+    padding: 0;
 }
 
 /*
@@ -238,3 +270,9 @@
 }
 */
 
+#node-value-grabber{
+    /*display:block;*/
+    overflow:hidden;
+    width:100%;
+    height:100%;
+}
