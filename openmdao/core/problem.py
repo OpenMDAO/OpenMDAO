@@ -750,7 +750,12 @@ class Problem(object):
         case_name : str
             Name used to identify this Problem case.
         """
-        record_iteration(self, self, case_name)
+        if self._setup_status < 2:
+            raise RuntimeError(f"{self.msginfo}: Cannot record before final setup. "
+                               "You must call final_setup(), run_model() or run_driver() "
+                               "before calling record().")
+        else:
+            record_iteration(self, self, case_name)
 
     def record_iteration(self, case_name):
         """
