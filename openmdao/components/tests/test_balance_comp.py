@@ -59,12 +59,12 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
-    def test_balance_comp_with_units_kwarg(self):
+    def test_balance_comp_with_units_kwarg_and_eq_units(self):
 
         prob = om.Problem()
 
         bal = om.BalanceComp()
-        bal.add_balance('x', val=1.0, units='m')
+        bal.add_balance('x', val=1.0, eq_units='m', units='m')
 
         tgt = om.IndepVarComp(name='y_tgt', val=2)
 
@@ -82,28 +82,6 @@ class TestBalanceComp(unittest.TestCase):
 
         prob.run_model()
         self.assertEqual(prob._metadata['meta']['balance.x']['units'], 'm')
-
-    def test_balance_comp_with_eq_units(self):
-
-        prob = om.Problem()
-
-        bal = om.BalanceComp()
-        bal.add_balance('x', val=1.0, eq_units='m')
-
-        tgt = om.IndepVarComp(name='y_tgt', val=2)
-
-        exec_comp = om.ExecComp('y=x**2')
-
-        prob.model.add_subsystem(name='target', subsys=tgt, promotes_outputs=['y_tgt'])
-        prob.model.add_subsystem(name='exec', subsys=exec_comp)
-        prob.model.add_subsystem(name='balance', subsys=bal)
-
-        prob.model.connect('y_tgt', 'balance.rhs:x')
-        prob.model.connect('balance.x', 'exec.x')
-        prob.model.connect('exec.y', 'balance.lhs:x')
-
-        prob.setup()
-        prob.run_model()
         self.assertEqual(prob._metadata['meta']['balance.rhs:x']['units'], 'm')
         self.assertEqual(prob._metadata['meta']['balance.lhs:x']['units'], 'm')
 
