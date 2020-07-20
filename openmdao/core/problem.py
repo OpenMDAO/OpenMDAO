@@ -741,6 +741,10 @@ class Problem(object):
         """
         Record the variables at the Problem level.
 
+        Must be called after `final_setup` has been called. This can either
+        happen automatically through `run_driver` or `run_model`, or it can be
+        called manually.
+
         Parameters
         ----------
         case_name : str
