@@ -641,7 +641,7 @@ class N2Matrix {
      */
     drawOnDiagonalArrows(cell) {
         // Loop over all elements in the matrix looking for other cells in the same column
-        this._drawOffscreenArrows(cell, lineWidth);
+        this._drawOffscreenArrows(cell);
         let highlights = [{ 'cell': cell, 'varType': 'self', 'direction': 'self' }];
 
         for (let col = 0; col < this.layout.visibleNodes.length; ++col) {
@@ -708,8 +708,7 @@ class N2Matrix {
         for (const h of highlights) h.cell.highlight(h.varType, h.direction);
     }
 
-    drawArrowsParamView(cell, startIndex, endIndex, nodeSize) {
-        let lineWidth = Math.min(5, nodeSize.width * .5, nodeSize.height * .5);
+    drawArrowsParamView(cell, startIndex, endIndex) {
         let boxStart = this.boxInfo[startIndex];
         let boxEnd = this.boxInfo[endIndex];
 
@@ -806,8 +805,7 @@ class N2Matrix {
                             }
 
                             if (firstBeginIndex != firstEndIndex) {
-                                this.drawArrowsParamView(cell, firstBeginIndex, firstEndIndex,
-                                    this.nodeSize);
+                                this.drawArrowsParamView(cell, firstBeginIndex, firstEndIndex);
                             }
                         }
                     }

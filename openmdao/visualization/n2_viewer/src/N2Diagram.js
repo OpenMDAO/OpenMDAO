@@ -693,7 +693,7 @@ class N2Diagram {
             this.ui.updateClickedIndices();
 
             this.matrix = new N2Matrix(this.model, this.layout,
-                this.dom.n2Groups, this.hoverArrows, this.ui.lastClickWasLeft,
+                this.dom.n2Groups, this.arrowMgr, this.ui.lastClickWasLeft,
                 this.ui.findRootOfChangeFunction, this.matrix.nodeSize);
         }
 

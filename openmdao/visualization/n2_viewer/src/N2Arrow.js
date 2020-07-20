@@ -1,20 +1,21 @@
 /**
  * Base class for all types of N2 arrows.
+ * @typedef N2Arrow
+ * @prop {Number} attribs.start.row Row # of starting node
+ * @prop {Number} attribs.start.col Col # of starting ndoe
+ * @prop {String} attribs.start.id ID of the start node
+ * @prop {Number} attribs.end.row Row # of end node (arrow points to)
+ * @prop {Number} attribs.end.col Col # of end node (arrow points to)
+ * @prop {String} attribs.end.id ID of the end node
+ * @prop {String} color Color of the line/circle (arrowhead is black)
+ * @prop {Number} width Width of the arrow path
+ * @prop {Number} nodeSize.width Width of a matrix cell in pixels.
+ * @prop {Number} nodeSize.height Height of a matrix cell in pixels.
  */
 class N2Arrow {
     /**
-     * Setup and draw the arrow.
-     * @param {Object} attribs
-     * @param {Object} attribs.start Coordinates of the starting node
-     * @param {number} attribs.start.row
-     * @param {number} attribs.start.col
-     * @param {string} attribs.start.id ID of the start node
-     * @param {Object} attribs.end Coordinates of the ending node, which the arrow points to
-     * @param {number} attribs.end.row
-     * @param {number} attribs.end.col
-     * @param {string} attribs.end.id ID of the end node
-     * @param {string} attribs.color Color of the line/circle (arrow is black)
-     * @param {number} attribs.width Width of the line
+     * Determine whether arrow elements already exist, and create them if not.
+     * @param {Object} attribs All of the specific arrow properties.
      * @param {Object} n2Groups References to <g> SVG elements.
      * @param {Object} nodeSize The dimensions of each cell in the matrix.
      */
@@ -27,14 +28,14 @@ class N2Arrow {
 
         const existingArrow = d3.select('g#' + this.id);
         if (existingArrow.empty()) {
-            debugInfo("Creating new arrow " + this.id);
+            debugInfo(`N2Arrow(): Creating new ${this.id}`);
             this.doTransition = false;
             this.group = n2Groups.arrows.append('g')
                 .attr('id', this.id)
                 .attr('class', 'n2_hover_elements')
         }
         else {
-            debugInfo("Using existing arrow " + this.id, existingArrow);
+            debugInfo(`N2Arrow(): Using existing ${this.id}`);
             this.doTransition = true;
             this.group = existingArrow;
         }
@@ -48,8 +49,17 @@ class N2Arrow {
         return this.nodeSize.height * N2Arrow.cellOverlap + 3;  // + to account for the arrow size
     }
 
+    /**
+     * Generate a CSS id for the arrow. This is based on the ids of the
+     * N2TreeNodes it points to rather than the cells, so if it's pinned
+     * and the matrix is redrawn, we know whether to transition it. The color
+     * is included because there can be identical arrows of different colors
+     * stacked on each other. Derived arrow classes may need to redefine
+     * this based on how they find node ids.
+     */
     get id() {
-        return 'arrow_' + this.attribs.start.id + '_to_' + this.attribs.end.id;
+        return 'arrow-' + this.attribs.start.id + '-to-'
+            + this.attribs.end.id + '-' + this.attribs.color.replace(/#/, '');
     }
 }
 
@@ -295,8 +305,10 @@ class N2OffGridUpArrow extends N2OffGridArrow {
         }
     }
 
+    /** Override id to handle an off-screen node */
     get id() {
-        return 'arrow_' + this.attribs.offscreenId + '_to_' + this.attribs.cell.tgtId;
+        return 'arrow-' + this.attribs.offscreenId + '-to-' +
+            this.attribs.cell.tgtId + '-' + this.attribs.color.replace(/#/, '')
     }
 
     /**
@@ -339,8 +351,10 @@ class N2OffGridDownArrow extends N2OffGridArrow {
         }
     }
 
+    /** Override id to handle an off-screen node */
     get id() {
-        return 'arrow_' + this.attribs.offscreenId + '_to_' + this.attribs.cell.tgtId;
+        return 'arrow-' + this.attribs.offscreenId + '-to-' +
+            this.attribs.cell.tgtId + '-' + this.attribs.color.replace(/#/, '');
     }
 
     /**
@@ -382,8 +396,10 @@ class N2OffGridLeftArrow extends N2OffGridArrow {
         }
     }
 
+    /** Override id to handle an off-screen node */
     get id() {
-        return 'arrow_' + this.attribs.cell.srcId + '_to_' + this.attribs.offscreenId;
+        return 'arrow-' + this.attribs.cell.srcId + '-to-' +
+            this.attribs.offscreenId + '-' + this.attribs.color.replace(/#/, '');
     }
 
     /**
@@ -426,8 +442,10 @@ class N2OffGridRightArrow extends N2OffGridArrow {
         }
     }
 
+    /** Override id to handle an off-screen node */
     get id() {
-        return 'arrow_' + this.attribs.cell.srcId + '_to_' + this.attribs.offscreenId;
+        return 'arrow-' + this.attribs.cell.srcId + '-to-' +
+            this.attribs.offscreenId + '-' + this.attribs.color.replace(/#/, '');
     }
 
     /**
@@ -463,6 +481,7 @@ class N2ArrowCache {
      * Initialize with empty caches.
      */
     constructor() {
+        // All arrows will be referenced somewhere in both objects.
         this.arrows = {};
         this.cells = {};
     }
@@ -482,7 +501,7 @@ class N2ArrowCache {
      */
     add(cellId, arrow) {
         if (this.hasArrow(arrow.id)) {
-            console.warn("Not adding arrow ${arrow.id} to cache since it already exists.")
+            console.warn(`Not adding arrow ${arrow.id} to cache since it already exists.`)
         }
         else {
             this.arrows[arrow.id] = arrow;
@@ -497,7 +516,7 @@ class N2ArrowCache {
      */
     removeArrowFromScreen(arrowId) {
         if (!this.hasArrow(arrowId)) {
-            console.warn("removeArrowFromScreen: Arrow ${arrowId} doesn't exist.")
+            console.warn(`removeArrowFromScreen: Arrow ${arrowId} doesn't exist.`)
         }
         else {
             this.arrows[arrowId].group.remove();
@@ -511,7 +530,7 @@ class N2ArrowCache {
      */
     removeArrowFromCache(cellId, arrowId) {
         if (!this.hasArrow(arrowId)) {
-            console.warn("removeArrowFromCache: Arrow ${arrowId} doesn't exist.")
+            console.warn(`removeArrowFromCache: Arrow ${arrowId} doesn't exist.`)
         }
         else {
             delete this.cells[cellId][arrowId];
@@ -525,7 +544,7 @@ class N2ArrowCache {
      */
     removeCellFromScreen(cellId) {
         if (!this.hasCell(cellId)) {
-            console.warn("removeCellFromScreen: Cell ${cellId} doesn't exist in cache.")
+            console.warn(`removeCellFromScreen: Cell ${cellId} doesn't exist in cache.`)
         }
         else {
             for (const arrowId in this.cells[cellId]) {
@@ -541,7 +560,7 @@ class N2ArrowCache {
      */
     removeCellFromCache(cellId) {
         if (!this.hasCell(cellId)) {
-            console.warn("removeCellFromCache: Cell ${cellId} doesn't exist in cache.")
+            console.warn(`removeCellFromCache: Cell ${cellId} doesn't exist in cache.`)
         }
         else {
             for (const arrowId in this.cells[cellId]) {
@@ -574,6 +593,8 @@ class N2ArrowCache {
         this.add(cellId, arrow);
         oldCache.removeArrowFromCache(cellId, arrowId);
 
+        debugInfo(`migrateArrow(): Moving ${arrowId} from class ${oldClassName} to ${newClassName}`);
+
         arrow.group
             .classed(oldClassName, false)
             .classed(newClassName, true)
@@ -591,13 +612,13 @@ class N2ArrowCache {
      */
     migrateCell(cellId, oldCache, newClassName, oldClassName) {
         if (!oldCache.hasCell(cellId)) {
-            console.warn("Cell ${cellId} doesn't exist in old cache, can't migrate arrows.")
+            console.warn(`Cell ${cellId} doesn't exist in old cache, can't migrate arrows.`)
         }
         else {
             for (const arrowId in oldCache.cells[cellId]) {
                 this.migrateArrow(cellId, arrowId, oldCache, newClassName, oldClassName);
-                oldCache.removeCellFromCache(cellId);
             }
+            delete oldCache.cells[cellId];
         }
     }
 
@@ -654,7 +675,7 @@ class N2ArrowManager {
     /** Make sure _lineWidth has been manually set */
     get lineWidth() {
         if (this._lineWidth < 0) {
-            throw ("addFullArrow: this.lineWidth is unset")
+            throw ("addFullArrow: this._lineWidth is unset")
         }
 
         return this._lineWidth;
@@ -690,7 +711,7 @@ class N2ArrowManager {
         attribs.width = this.lineWidth;
         const newArrow = new N2BentArrow(attribs, this.n2Groups, this.nodeSize);
         if (!this.arrowExists(newArrow.id)) {
-            this.pinnedArrows.add(cellId, newArrow);
+            this.hoverArrows.add(cellId, newArrow);
         }
 
         return newArrow;
@@ -709,11 +730,11 @@ class N2ArrowManager {
      */
     addOffGridArrow(cellId, side, dir, attribs) {
         attribs.width = this.lineWidth;
-        const newArrow = new (this.arrowDirClasses[side][dir])(cellId,
-            attribs, this.n2Groups, this.nodeSize);
+        const newArrow = new (this.arrowDirClasses[side][dir])(attribs,
+            this.n2Groups, this.nodeSize);
 
-        if (!this.arrowExists(newArrow.id)) {
-            this.pinnedArrows.add(cellId, newArrow);
+        if (!this.hoverArrows.hasArrow(newArrow.id)) {
+            this.hoverArrows.add(cellId, newArrow);
         }
 
         return newArrow;
@@ -742,9 +763,21 @@ class N2ArrowManager {
                 cellClassName, 'n2_hover_elements');
         }
         else {
-            console.warn("togglePinning: No known arrows for cell ${cellId}.");
+            console.warn(`togglePin(): No known arrows for cell ${cellId}.`);
         }
     }
 
-    removeAllHovered() { this.hoverArrows.removeAll(); }
+    /** Remove all arrows in the hoverArrow cache */
+    removeAllHovered() {
+        const removedArrowIds = Object.keys(this.hoverArrows.arrows);
+        this.hoverArrows.removeAll();
+        debugInfo(`removeAllHovered(): Removed: ${removedArrowIds.length} arrows`)
+        for (const arrowId of removedArrowIds) {
+            if (this.pinnedArrows.hasArrow(arrowId)) {
+                debugInfo(`removeAllHovered(): Redrawing pinned arrow ${arrowId}.`)
+                this.pinnedArrows.arrows[arrowId].draw();
+                //TODO: The pinned N2Arrow now is pointing to a non-existant g
+            }
+        }
+    }
 }
