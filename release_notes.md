@@ -46,7 +46,7 @@ any feedback is always welcomed via issues on the github repository.
 - N2 viewer changes to improve performance. #1475
 - Local table of contents (navigation) added to docs sidebar. #1477
 - N2 now uses coloring info by default to show dependence in each component. #1478
-- Added test from Ben Brelje to capture error message when running in parallel with non distributed components. #1484
+- Added test to capture error message when running in parallel with non distributed components. #1484
 - N2 adds a spinner to give the user an indication when it isn't finished rendering. #1485
 - All case recorder files now always contain system options information about all systems in the model. #1486
 - Model data now compressed when saved in N2 HTML file. #1490
