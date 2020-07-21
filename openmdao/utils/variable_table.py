@@ -130,22 +130,23 @@ def write_var_table(pathname, var_list, var_type, var_dict,
 
         cur_sys_names = []
 
-        for varname in var_list:
+        for abs_name in var_list:
+            rel_name = abs_name[rel_idx:]
 
             # For hierarchical, need to display system levels in the rows above the
             #   actual row containing the var name and values. Want to make use
             #   of the hierarchies that have been written about this.
             existing_sys_names = []
-            varname_sys_names = varname[rel_idx:].split('.')[:-1]
-            for i, sys_name in enumerate(varname_sys_names):
-                if varname_sys_names[:i + 1] != cur_sys_names[:i + 1]:
+            sys_names = rel_name.split('.')[:-1]
+            for i, sys_name in enumerate(sys_names):
+                if sys_names[:i + 1] != cur_sys_names[:i + 1]:
                     break
                 else:
                     existing_sys_names = cur_sys_names[:i + 1]
 
             # What parts of the hierarchy for this varname need to be written that
             #   were not already written above this
-            remaining_sys_path_parts = varname_sys_names[len(existing_sys_names):]
+            remaining_sys_path_parts = sys_names[len(existing_sys_names):]
 
             # Write the Systems in the var name path
             indent = len(existing_sys_names) * indent_inc
@@ -154,17 +155,16 @@ def write_var_table(pathname, var_list, var_type, var_dict,
             for i, sys_name in enumerate(remaining_sys_path_parts):
                 out_stream.write(indent * ' ' + sys_name + '\n')
                 indent += indent_inc
-            cur_sys_names = varname_sys_names
+            cur_sys_names = sys_names
 
-            row = '{:{align}{width}}'.format(indent * ' ' + varname.split('.')[-1],
+            row = '{:{align}{width}}'.format(indent * ' ' + abs_name.split('.')[-1],
                                              align=align, width=max_varname_len)
-            _write_variable(out_stream, row, column_names, var_dict[varname],
-                            print_arrays)
+            _write_variable(out_stream, row, column_names, var_dict[abs_name], print_arrays)
     else:
         for name in var_list:
             row = '{:{align}{width}}'.format(name[rel_idx:], align=align, width=max_varname_len)
-            _write_variable(out_stream, row, column_names, var_dict[name],
-                            print_arrays)
+            _write_variable(out_stream, row, column_names, var_dict[name], print_arrays)
+
     out_stream.write('\n\n')
 
 
