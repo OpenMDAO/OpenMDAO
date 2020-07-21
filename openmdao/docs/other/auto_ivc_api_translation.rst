@@ -205,9 +205,9 @@ Creating a Distributed Component with Unconnected Inputs
 
         rank = prob.model.comm.rank
         if rank == 0:
-            prob['invec'] = np.array([1.0, 3.0])
+            prob.set_val('invec', np.array([1.0, 3.0]))
         else:
-            prob['invec'] = np.array([5.0, 7.0])
+            prob.set_val('invec', np.array([5.0, 7.0]))
 
         prob.run_model()
 

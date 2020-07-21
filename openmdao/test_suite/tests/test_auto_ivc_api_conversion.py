@@ -212,7 +212,7 @@ class TestConversionGuideDocMPI(unittest.TestCase):
 
         prob.setup()
 
-        prob['P.invec'] = np.array([1.0, 3.0, 5.0, 7.0])
+        prob.set_val('P.invec', np.array([1.0, 3.0, 5.0, 7.0]))
 
         prob.run_model()
 
