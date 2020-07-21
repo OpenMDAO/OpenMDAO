@@ -4,34 +4,23 @@
 July 20, 2020
 
 OpenMDAO 3.2.0 introduces significant changes in the way OpenMDAO works.
-The primary change is that the manual creation IndepVarComp outputs is no longer required,
-because OpenMDAO will create them for you in the background.
-This was done in a backwards  compatible way so that old models will still run and you
-can still use IndepVarComps if you want to. However, in the vast majority of cases you
-don't need to manually create either the IndepVarComp component or add outputs
-to it any more.
+The primary change is that the manual creation IndepVarComp outputs are no longer required because OpenMDAO will create them for you in the background.
+This was done in a backwards compatible way so that old models will still run and you can still use IndepVarComps if you want to.
+However, in the vast majority of cases, you don't need to manually create either the IndepVarComp component or add outputs to it anymore.
 
-This feature aids in creating modular systems.  Previously, there was
-always debate as to whether a system should "own" its own IndepVarComp.
-Doing so, however, meant that the outputs of that IVC couldn't be passed
-in externally without changing the system. This is no longer the case.
-Now any inputs that remain unconnected at the end of the problem setup sequence
-will be connected to special automatic IndepVarComp outputs that are addressable using the path name of the inputs.
-We have updated the docs to use the new style where IndepVarComps are not manually created.
-We now consider it best practice not to manually create IndepVarComps in the vast majority of cases.
+This feature aids in creating modular systems. Previously, there was always debate as to whether a system should "own" its own IndepVarComp.
+Doing so, however, meant that the outputs of that IVC couldn't be passed in externally without changing the system.
+This is no longer the case.
+Now any inputs that remain unconnected at the end of the problem setup sequence will be connected to special automatic IndepVarComp outputs that are addressable using the pathname of the inputs.
+We have updated the docs to use the new style where IndepVarComps are not manually created. We now consider it best practice not to manually create IndepVarComps in the vast majority of cases.
 
-Another new feature is the `openmdao.api.slicer` which helps specifying
-src_indices for connections or indices for design variables, objectives,  
-and constraints.  This is intended to allow the user to easily connect
-portions of an output to an input (such as selecting an individual column
-from a matrix, for instance). The old method of providing an explicit list of indicies should still work.
-However, the new slicer gives greater functionality since it allows for the use of general slicing syntax
-such as `[0:10:1, :]`.
-
+Another new feature is the openmdao.api.slicer which helps specify src_indices for connections or indices for design variables, objectives, and constraints.
+This is intended to allow the user to easily connect portions of an output to an input (such as selecting an individual column from a matrix, for instance).
+The old method of providing an explicit list of indices should still work. However, the new slicer gives greater functionality since it allows for the use of general slicing syntax such as `om.slicer[0:10:1, :]`.
 Using the slicer object is now considered the new best coding practice for giving src_indices or indices arguments.
-We hope these changes will reduce the development burden on our users.  As this is
-a significant change, some issues may have slipped through our testing and
-any feedback is always welcomed via issues on the github repository.
+
+We hope these changes will reduce the development burden on our users.
+As this is a significant change, some issues may have slipped through our testing, and any feedback is always welcomed via issues on the GitHub repository.
 
 ## Backwards Incompatible API Changes:
 
@@ -40,7 +29,7 @@ any feedback is always welcomed via issues on the github repository.
 
 ## Backwards Incompatible NON-API Changes:
 
-- _all_subsystem_iter has been removed.  Users should use _subsystems_allprocs
+- _all_subsystem_iter has been removed.  Users should use the systems_iter method instead.
 
 ## New Features:
 
