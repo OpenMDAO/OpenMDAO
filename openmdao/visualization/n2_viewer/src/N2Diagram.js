@@ -632,7 +632,8 @@ class N2Diagram {
     /** Remove all rects in the highlight bar */
     clearHighlights() {
         const selection = this.dom.highlightBar.selectAll('rect');
-        debugInfo(`clearHighlights: Removing ${selection.size} highlights`);
+        const size = selection.size();
+        debugInfo(`clearHighlights: Removing ${size} highlights`);
         selection.remove();
     }
 
@@ -644,8 +645,9 @@ class N2Diagram {
 
     /** Display connection arrows for all visible inputs/outputs */
     showAllArrows() {
-        for (const cell of this.matrix.visibleCells) {
-            this.matrix.drawConnectionArrows(cell);
+        for (const row in this.matrix.grid) {
+            const cell = this.matrix.grid[row][row]; // Diagonal cells only
+            this.matrix.drawOnDiagonalArrows(cell);
             this.arrowMgr.togglePin(cell.id, true);
         }
     }
@@ -813,19 +815,6 @@ class N2Diagram {
         else { // Pin/unpin the info panel
             this.ui.nodeInfoBox.togglePin();
             this.ui.nodeInfoBox.update(d3.event, cell.obj, cell.color());
-        }
-    }
-
-    mouseClickAll(cell) {
-        let newClassName = "n2_hover_elements_" + cell.id;
-        let selection = this.dom.n2OuterGroup.selectAll("." + newClassName);
-        if (selection.size() > 0) {
-            selection.remove();
-        }
-        else {
-            this.dom.n2OuterGroup
-                .selectAll("path.n2_hover_elements, circle.n2_hover_elements")
-                .attr("class", newClassName);
         }
     }
 

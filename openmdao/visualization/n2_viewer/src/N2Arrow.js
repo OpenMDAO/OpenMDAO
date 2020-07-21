@@ -621,6 +621,9 @@ class N2ArrowCache {
             this.removeArrowFromScreen(arrowId);
             this.removeArrowFromCache(arrowId);
         }
+
+        this.arrows = {};
+        this.eventCells = {};
     }
 
     /**
@@ -790,8 +793,13 @@ class N2ArrowManager {
             const startCell = matrix.findCellByNodeId(arrow.attribs.start.id);
             const endCell = matrix.findCellByNodeId(arrow.attribs.end.id);
 
-            if (startCell == endCell) { // Both undefined, or same cell
-                debugInfo(`transition: No visible endpoints for ${arrowId}`)
+            if (startCell === endCell) { // Both undefined, or same cell
+                if (startCell === undefined)
+                    debugInfo(`transition: No visible endpoints for ${arrowId}`)
+                else
+                    debugInfo(`transition: ${arrowId} points to and from` +
+                        ` collapsed cell ${startCell.id}`)
+
                 this.pinnedArrows.removeArrowFromScreen(arrowId);
             }
             else if (startCell && endCell) { // Both endpoint cells are visible
