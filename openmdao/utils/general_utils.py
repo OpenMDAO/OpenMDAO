@@ -247,9 +247,11 @@ def ensure_compatible(name, value, shape=None, indices=None):
     if indices is not None:
         indices = np.atleast_1d(indices)
         contains_slice = _is_slice(indices)
+        contains_ellipse = _is_ellipse(indices)
         ind_shape = indices.shape
     else:
         contains_slice = None
+        contains_ellipse = None
 
     # if shape is not given, infer from value (if not scalar) or indices
     if shape is not None:
@@ -284,7 +286,8 @@ def ensure_compatible(name, value, shape=None, indices=None):
                                  "Expected %s but got %s." %
                                  (name, shape, value.shape))
 
-    if indices is not None and shape != ind_shape[:len(shape)] and not contains_slice:
+    if indices is not None and shape != ind_shape[:len(shape)] and not contains_slice and \
+            not contains_ellipse:
         raise ValueError("Shape of indices does not match shape for '%s': "
                          "Expected %s but got %s." %
                          (name, shape, ind_shape[:len(shape)]))
@@ -993,6 +996,24 @@ def _is_slice(indices):
     """
     return any(isinstance(i, slice) for i in indices)
 
+def _is_ellipse(indices):
+    """
+    Check if an array of indices contains a slice object.
+
+    Parameters
+    ----------
+    indices : ndarray
+        Dotted pathnames of systems.
+
+    Returns
+    -------
+    bool
+        Returns True if indices contains a slice.
+    """
+    if indices.dtype == object:
+        return any(i == ... for i in indices)
+    else:
+        return False
 
 def _slice_indices(slicer, out_size, out_shape):
     """
