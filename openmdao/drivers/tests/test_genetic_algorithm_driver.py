@@ -1547,9 +1547,9 @@ class MPIFeatureTests(unittest.TestCase):
         prob.run_driver()
 
         # Optimal solution
-        assert_near_equal(prob.get_val('comp.f'), 1.25172426, 1e-6)
-        assert_near_equal(prob.get_val('xI'), 9.0, 1e-6)
-        assert_near_equal(prob.get_val('xC'), 2.11764706, 1e-6)
+        assert_near_equal(prob.get_val('comp.f'), 0.49398053, 1e-1)
+        assert_near_equal(prob.get_val('xI'), 3.0, 1e-6)
+        assert_near_equal(prob.get_val('xC'), 2.38801226, 1e-1)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
