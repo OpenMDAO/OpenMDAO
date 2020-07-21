@@ -26,6 +26,16 @@ class N2Arrow {
         this.attribs = attribs;
         this._genPath = this._angledPath;
 
+        /*
+         * Generate a CSS id for the arrow. This is based on the ids of the
+         * N2TreeNodes it points to rather than the cells, so if it's pinned
+         * and the matrix is redrawn, we know whether to transition it. The color
+         * is included because there can be identical arrows of different colors
+         * stacked on each other.
+         */
+        this.id = 'arrow-' + attribs.start.id + '-to-'
+            + attribs.end.id + '-' + this.color.replace(/#/, '');
+
         const existingArrow = d3.select('g#' + this.id);
         if (existingArrow.empty()) {
             debugInfo(`N2Arrow(): Creating new ${this.id}`);
@@ -38,10 +48,15 @@ class N2Arrow {
         else {
             this.doTransition = true;
             this.group = existingArrow;
-            const cssClasses = this.group.attr('class').split(' ');
+            const cssClasses = String(this.group.attr('class')).split(' ');
             this.cssClass = cssClasses.find(o => o.match(/n2_hover_elements.*/));
             debugInfo(`N2Arrow(): Using existing ${this.id} with class ${this.cssClass}`);
         }
+    }
+
+    connectsToCell(cellId) {
+        return (this.attribs.start.id == cellId ||
+            this.attribs.end.id == cellId);
     }
 
     get offsetAbsX() {
@@ -50,19 +65,6 @@ class N2Arrow {
 
     get offsetAbsY() {
         return this.nodeSize.height * N2Arrow.cellOverlap + 3;  // + to account for the arrow size
-    }
-
-    /**
-     * Generate a CSS id for the arrow. This is based on the ids of the
-     * N2TreeNodes it points to rather than the cells, so if it's pinned
-     * and the matrix is redrawn, we know whether to transition it. The color
-     * is included because there can be identical arrows of different colors
-     * stacked on each other. Derived arrow classes may need to redefine
-     * this based on how they find node ids.
-     */
-    get id() {
-        return 'arrow-' + this.attribs.start.id + '-to-'
-            + this.attribs.end.id + '-' + this.attribs.color.replace(/#/, '');
     }
 }
 
@@ -302,8 +304,10 @@ class N2OffGridArrow extends N2Arrow {
 class N2OffGridUpArrow extends N2OffGridArrow {
     constructor(attribs, n2Groups, nodeSize) {
         super(Object.assign(attribs, {
+            'start': { 'id': attribs.offscreenId },
+            'end': { 'id': attribs.cell.tgtId },
             'direction': 'up',
-            'color': N2Style.color.redArrow
+            'color': attribs.color ? attribs.color : N2Style.color.redArrow
         }), n2Groups, nodeSize);
 
         this.label.ref = d3.select("div#left.offgrid");
@@ -311,12 +315,6 @@ class N2OffGridUpArrow extends N2OffGridArrow {
         this._addToLabel();
         this._computePts();
         this.draw();
-    }
-
-    /** Override id to handle an off-screen node */
-    get id() {
-        return 'arrow-' + this.attribs.offscreenId + '-to-' +
-            this.attribs.cell.tgtId + '-' + this.color.replace(/#/, '')
     }
 
     /**
@@ -350,8 +348,10 @@ class N2OffGridUpArrow extends N2OffGridArrow {
 class N2OffGridDownArrow extends N2OffGridArrow {
     constructor(attribs, n2Groups, nodeSize) {
         super(Object.assign(attribs, {
+            'start': { 'id': attribs.offscreenId },
+            'end': { 'id': attribs.cell.tgtId },
             'direction': 'down',
-            'color': N2Style.color.redArrow
+            'color': attribs.color ? attribs.color : N2Style.color.redArrow
         }), n2Groups, nodeSize);
 
         this.label.ref = d3.select("div#bottom.offgrid");
@@ -359,12 +359,6 @@ class N2OffGridDownArrow extends N2OffGridArrow {
         this._addToLabel();
         this._computePts();
         this.draw();
-    }
-
-    /** Override id to handle an off-screen node */
-    get id() {
-        return 'arrow-' + this.attribs.offscreenId + '-to-' +
-            this.attribs.cell.tgtId + '-' + this.color.replace(/#/, '');
     }
 
     /**
@@ -397,8 +391,10 @@ class N2OffGridDownArrow extends N2OffGridArrow {
 class N2OffGridLeftArrow extends N2OffGridArrow {
     constructor(attribs, n2Groups, nodeSize) {
         super(Object.assign(attribs, {
+            'start': { 'id': attribs.cell.srcId },
+            'end': { 'id': attribs.offscreenId },
             'direction': 'left',
-            'color': N2Style.color.greenArrow
+            'color': attribs.color ? attribs.color : N2Style.color.greenArrow
         }), n2Groups, nodeSize);
 
         this.label.ref = d3.select("div#bottom.offgrid");
@@ -406,12 +402,6 @@ class N2OffGridLeftArrow extends N2OffGridArrow {
         this._addToLabel();
         this._computePts();
         this.draw();
-    }
-
-    /** Override id to handle an off-screen node */
-    get id() {
-        return 'arrow-' + this.attribs.cell.srcId + '-to-' +
-            this.attribs.offscreenId + '-' + this.color.replace(/#/, '');
     }
 
     /**
@@ -445,8 +435,10 @@ class N2OffGridLeftArrow extends N2OffGridArrow {
 class N2OffGridRightArrow extends N2OffGridArrow {
     constructor(attribs, n2Groups, nodeSize) {
         super(Object.assign(attribs, {
+            'start': { 'id': attribs.cell.srcId },
+            'end': { 'id': attribs.offscreenId },
             'direction': 'right',
-            'color': N2Style.color.greenArrow
+            'color': attribs.color ? attribs.color : N2Style.color.greenArrow
         }), n2Groups, nodeSize);
 
         this.label.ref = d3.select("div#right.offgrid");
@@ -454,12 +446,6 @@ class N2OffGridRightArrow extends N2OffGridArrow {
         this._addToLabel();
         this._computePts();
         this.draw();
-    }
-
-    /** Override id to handle an off-screen node */
-    get id() {
-        return 'arrow-' + this.attribs.cell.srcId + '-to-' +
-            this.attribs.offscreenId + '-' + this.color.replace(/#/, '');
     }
 
     /**
@@ -490,29 +476,43 @@ class N2OffGridRightArrow extends N2OffGridArrow {
  * Maintain a set of arrows, usually for pinning/unpinning.
  * @typedef N2ArrowCache
  * @property {Object} arrows Every individual arrow keyed by it's ID
- * @property {Object} cells  Arrows associated with cells, keyed by IDs
+ * @property {Object} eventCells Cells that triggered the arrows, with a Set
+ *   of associated arrow IDs.
  */
 class N2ArrowCache {
     /**
-     * Initialize with empty caches.
+     * Initialize with empty cache.
      */
     constructor() {
-        // All arrows will be referenced somewhere in both objects.
         this.arrows = {};
-        this.cells = {};
+        this.eventCells = {};
     }
 
+    /**
+     * Determine if the arrow exists in this cache.
+     * @param {String} arrowId The ID of the arrow to look for.
+     * @returns {Boolean} True if found.
+     */
     hasArrow(arrowId) {
         return exists(this.arrows[arrowId]);
     }
 
+    /**
+     * Find an arrow that is pointing to or from the specified cell.
+     * @param {String} cellId The ID of the cell to search for.
+     * @returns {String} True if any arrow found, otherwise false.
+     */
     hasCell(cellId) {
-        return exists(this.cells[cellId]);
+        for (const id in this.arrows) {
+            if (this.arrows[id].connectsToCell(cellId)) return true;
+        }
+
+        return false;
     }
 
     /**
      * Add an individual arrow to the cache.
-     * @param {String} cellId The ID of the cell associated with the arrow.
+     * @param {String} cellId The ID of the cell that triggered the event.
      * @param {N2Arrow} arrow The arrow object to cache.
      * @param {Boolean} [allowReplace = true] Replacing an existing arrow is OK.
      */
@@ -523,8 +523,58 @@ class N2ArrowCache {
         }
         else {
             this.arrows[arrow.id] = arrow;
-            if (!this.cells[cellId]) this.cells[cellId] = {};
-            this.cells[cellId][arrow.id] = arrow;
+            this.addEventCellArrow(cellId, arrow.id);
+        }
+    }
+
+    /**
+     * Associate a cell with an arrow that a mouse event triggered.
+     * @param {String} cellId The ID of the event-triggering cell.
+     * @param {String} arrowId The ID of the arrow.
+     */
+    addEventCellArrow(cellId, arrowId) {
+        if (!exists(this.eventCells[cellId])) this.eventCells[cellId] = new Set();
+        this.eventCells[cellId].add(arrowId);
+    }
+
+    /**
+     * Determine if the cell triggered any cached arrows.
+     * @param {String} cellId The ID of the cell to check.
+     * @returns {Boolean} True if the cellId is tracked.
+     */
+    hasEventCell(cellId) { return exists(this.eventCells[cellId]); }
+
+    /**
+     * Disassociate an arrow with a trigger cell. If the cell has no more arrows,
+     * remove the entry.
+     * @param {String} cellId The ID of the event-triggering cell.
+     * @param {String} arrowId The ID of the arrow.
+     */
+    removeEventCellArrow(cellId, arrowId) {
+        if (!exists(this.eventCells[cellId])) {
+            console.warn(`removeEventCellArrow: no tracked cell with ID ${cellId}`)
+        }
+        else if (!this.eventCells[cellId].has(arrowId)) {
+            console.warn(`removeEventCellArrow: no arrow with ID ${arrowId}
+                associated with cell ID ${cellId}`)
+        }
+        else {
+            this.eventCells[cellId].delete(arrowId)
+            if (this.eventCells[cellId].size == 0) delete this.eventCells[cellId];
+        }
+    }
+
+    /**
+     * Delete all associations for the cell and stop tracking it.
+     * @param {String} cellId The ID of the event-triggering cell.
+     */
+    removeEventCell(cellId) {
+        if (!exists(this.eventCells[cellId])) {
+            console.warn(`removeEventCellArrow: no tracked cell with ID ${cellId}`)
+        }
+        else {
+            this.eventCells[cellId].clear();
+            delete this.eventCells[cellId];
         }
     }
 
@@ -543,48 +593,18 @@ class N2ArrowCache {
 
     /**
      * Remove arrow info from cache, but leave the elements on the screen.
-     * @param {String} cellId The D of the cell associated with the arrow.
      * @param {String} arrowId The ID of the single arrow to remove.
      */
-    removeArrowFromCache(cellId, arrowId) {
+    removeArrowFromCache(arrowId) {
         if (!this.hasArrow(arrowId)) {
             console.warn(`removeArrowFromCache: Arrow ${arrowId} doesn't exist.`)
         }
         else {
-            delete this.cells[cellId][arrowId];
             delete this.arrows[arrowId];
-        }
-    }
-
-    /**
-     * Remove all arrow elements associated with the cell from the screen.
-     * @param {String} cellId The id of the cell to remove.
-     */
-    removeCellFromScreen(cellId) {
-        if (!this.hasCell(cellId)) {
-            console.warn(`removeCellFromScreen: Cell ${cellId} doesn't exist in cache.`)
-        }
-        else {
-            for (const arrowId in this.cells[cellId]) {
-                this.removeArrowFromScreen(arrowId);
+            for (const cellId in this.eventCells) {
+                if (this.eventCells[cellId].has(arrowId))
+                    this.eventCells[cellId].delete(arrowId);
             }
-        }
-    }
-
-    /**
-     * Remove all arrows associated with the cell and the cell itself
-     * from the cache.
-     * @param {String} cellId The id of the cell to remove.
-     */
-    removeCellFromCache(cellId) {
-        if (!this.hasCell(cellId)) {
-            console.warn(`removeCellFromCache: Cell ${cellId} doesn't exist in cache.`)
-        }
-        else {
-            for (const arrowId in this.cells[cellId]) {
-                this.removeArrowFromCache(cellId, arrowId);
-            }
-            delete this.cells[cellId];
         }
     }
 
@@ -592,15 +612,15 @@ class N2ArrowCache {
      * Remove everything we're tracking from screen and cache.
      */
     removeAll() {
-        for (const cellId in this.cells) {
-            this.removeCellFromScreen(cellId);
-            this.removeCellFromCache(cellId);
+        for (const arrowId in this.arrows) {
+            this.removeArrowFromScreen(arrowId);
+            this.removeArrowFromCache(arrowId);
         }
     }
 
     /**
      * Move an arrow from one cache to another and change its CSS classes.
-     * @param {String} cellId The ID of the associated cell.
+     * @param {String} cellId The cell ID that triggered the event.
      * @param {String} arrowId The ID of the single arrow.
      * @param {N2ArrowCache} oldCache The cache to move the arrow from.
      * @param {String} newClassName The CSS class to add to HTML elements.
@@ -609,7 +629,7 @@ class N2ArrowCache {
     migrateArrow(cellId, arrowId, oldCache, newClassName, oldClassName) {
         const arrow = oldCache.arrows[arrowId];
         this.add(cellId, arrow);
-        oldCache.removeArrowFromCache(cellId, arrowId);
+        oldCache.removeArrowFromCache(arrowId);
 
         debugInfo(`migrateArrow(): Moving ${arrowId} from class ${oldClassName} to ${newClassName}`);
 
@@ -630,31 +650,15 @@ class N2ArrowCache {
      * @param {String} oldClassName The CSS class to remove from HTML elements.
      */
     migrateCell(cellId, oldCache, newClassName, oldClassName) {
-        if (!oldCache.hasCell(cellId)) {
-            console.warn(`Cell ${cellId} doesn't exist in old cache, can't migrate arrows.`)
+        if (!oldCache.hasEventCell(cellId)) {
+            console.warn(`migrateCell: Event cell ${cellId} isn't tracked in
+                the old cache, can't migrate arrows.`)
         }
         else {
-            for (const arrowId in oldCache.cells[cellId]) {
+            for (const arrowId of oldCache.eventCells[cellId]) {
                 this.migrateArrow(cellId, arrowId, oldCache, newClassName, oldClassName);
             }
-            delete oldCache.cells[cellId];
-        }
-    }
-
-    /**
-     * Iterate through all tracked cells. If the cell is displayed in
-     * the matrix, draw its arrows, otherwise hide them.
-     * @param {N2Matrix} matrix The matrix to operate with.
-     */
-    transitionArrows(matrix) {
-        for (const cellId in this.cells) {
-            const cell = matrix.findCellById(cellId);
-            if (cell) {
-                matrix.drawConnectionArrows(cell, true);
-            }
-            else {
-                this.removeCellFromScreen(cellId);
-            }
+            delete oldCache.eventCells[cellId];
         }
     }
 }
@@ -722,7 +726,7 @@ class N2ArrowManager {
      * Create a new N2BentArrow object. This may replace existing elements
      * on the screen with new dimensions and colors. However, the arrow may
      * already exist in one of the caches, in which case it's replaced.
-     * @param {String} cellId The ID of the associated N2MatrixCell.
+     * @param {String} cellId The ID of the cell that triggered the event.
      * @param {Object} attribs Values to pass to the N2Arrow constructor.
      * @returns {N2BentArrow} The newly created arrow object.
      */
@@ -746,7 +750,7 @@ class N2ArrowManager {
      * elements on the screen with new dimensions and colors. However, the
      * arrow may already exist in one of the caches, in which case it's not
      * added again.
-     * @param {String} cellId The ID of the associated N2MatrixCell.
+     * @param {String} cellId The ID of the cell that triggered the event.
      * @param {String} side Whether the arrow is in the top or bottom.
      * @param {String} dir Whether the arrow is incoming or outgoing.
      * @param {Object} attribs Values to pass to the N2Arrow constructor.
@@ -754,7 +758,7 @@ class N2ArrowManager {
      */
     addOffGridArrow(cellId, side, dir, attribs) {
         attribs.width = this.lineWidth;
-        debugInfo("addOffGridArrow(): ", cellId, side, dir, attribs)
+        debugInfo("addOffGridArrow(): ", side, dir, attribs)
         const newArrow = new (this.arrowDirClasses[side][dir])(attribs,
             this.n2Groups, this.nodeSize);
 
@@ -770,11 +774,77 @@ class N2ArrowManager {
     }
 
     /**
-     * Draw all the visible arrows in the pinned arrow cache.
+     * Redraw all the visible arrows in the pinned arrow cache, and remove
+     * the ones for which neither endpoint is visible. Full arrows may
+     * need to transition to offgrid arrows and vice versa.
      * @param {N2Matrix} matrix The matrix to operate with.
      */
     transition(matrix) {
-        this.pinnedArrows.transitionArrows(matrix);
+        for (const arrowId in this.pinnedArrows.arrows) {
+            const arrow = this.pinnedArrows.arrows[arrowId];
+            const startCell = matrix.findCellById(
+                N2MatrixCell.makeId(arrow.attribs.start.id));
+            const endCell = matrix.findCellById(
+                N2MatrixCell.makeId(arrow.attribs.end.id));
+
+            if (startCell && endCell) { // Both endpoint cells are visible
+                debugInfo(`transition: Found both sides of ${arrowId}`)
+                let attribs = arrow.attribs;
+                attribs.start.col = startCell.col;
+                attribs.start.row = startCell.row;
+                attribs.end.col = endCell.col;
+                attribs.end.row = endCell.row;
+                attribs.width = this.lineWidth;
+                this.pinnedArrows.arrows[arrowId] =
+                    new N2BentArrow(attribs, this.n2Groups, this.nodeSize);
+            }
+            else if (startCell) { // Only the non-pointy end is visible
+                debugInfo(`transition: Only found start cell for ${arrowId}`)
+                const side = (arrow.attribs.start.id > arrow.attribs.end.id)?
+                    'bottom' : 'top';
+                const attribs = {
+                    'cell': {
+                        'col': startCell.col,
+                        'row': startCell.row,
+                        'srcId': startCell.srcObj.id,
+                        'tgtId': startCell.tgtObj.id
+                    },
+                    'width': this.lineWidth,
+                    'matrixSize': matrix.diagNodes.length,
+                    'offscreenId': arrow.attribs.end.id,
+                    'label': matrix.model.nodeIds[arrow.attribs.end.id].absPathName,
+                    'color': arrow.attribs.color
+                }
+                this.pinnedArrows.arrows[arrowId] =
+                    new (this.arrowDirClasses[side]['outgoing'])(attribs,
+                            this.n2Groups, this.nodeSize);
+            }
+            else if (endCell) { // Only the pointy end is visible
+                debugInfo(`transition: Only found end cell for ${arrowId}`)
+                const side = (arrow.attribs.start.id > arrow.attribs.end.id)?
+                    'bottom' : 'top';
+                const attribs = {
+                    'cell': {
+                        'col': endCell.col,
+                        'row': endCell.row,
+                        'srcId': endCell.srcObj.id,
+                        'tgtId': endCell.tgtObj.id
+                    },
+                    'width': this.lineWidth,
+                    'matrixSize': matrix.diagNodes.length,
+                    'offscreenId': arrow.attribs.start.id,
+                    'label': matrix.model.nodeIds[arrow.attribs.start.id].absPathName,
+                    'color': arrow.attribs.color
+                }
+                this.pinnedArrows.arrows[arrowId] =
+                    new (this.arrowDirClasses[side]['incoming'])(attribs,
+                        this.n2Groups, this.nodeSize);
+            }
+            else {
+                debugInfo(`transition: No visible endpoints for ${arrowId}`)
+                this.pinnedArrows.removeArrowFromScreen(arrowId);
+            }
+        }
     }
 
     /**
@@ -783,11 +853,13 @@ class N2ArrowManager {
      */
     togglePin(cellId) {
         const cellClassName = "n2_hover_elements_" + cellId;
-        if (this.pinnedArrows.hasCell(cellId)) { // Arrows already pinned
+        if (this.pinnedArrows.hasEventCell(cellId)) { // Arrows already pinned
+            debugInfo(`Unpinning ${cellId} arrows`)
             this.hoverArrows.migrateCell(cellId, this.pinnedArrows,
                 'n2_hover_elements', cellClassName);
         }
-        else if (this.hoverArrows.hasCell(cellId)) { // Arrows just "hovered"
+        else if (this.hoverArrows.hasEventCell(cellId)) { // Arrows just "hovered"
+            debugInfo(`Pinning ${cellId} arrows`)
             this.pinnedArrows.migrateCell(cellId, this.hoverArrows,
                 cellClassName, 'n2_hover_elements');
         }
@@ -800,13 +872,6 @@ class N2ArrowManager {
     removeAllHovered() {
         const removedArrowIds = Object.keys(this.hoverArrows.arrows);
         this.hoverArrows.removeAll();
-        debugInfo(`removeAllHovered(): Removed: ${removedArrowIds.length} arrows`)
-        for (const arrowId of removedArrowIds) {
-            if (this.pinnedArrows.hasArrow(arrowId)) {
-                debugInfo(`removeAllHovered(): Redrawing pinned arrow ${arrowId}.`)
-                this.pinnedArrows.arrows[arrowId].draw();
-                //TODO: The pinned N2Arrow now is pointing to a non-existant g
-            }
-        }
+        debugInfo(`removeAllHovered(): Removed ${removedArrowIds.length} arrows`)
     }
 }

@@ -451,7 +451,7 @@ class N2MatrixCell {
         this.col = col;
         this.srcObj = this.obj = srcObj;
         this.tgtObj = tgtObj;
-        this.id = srcObj.id + "_to_" + tgtObj.id;
+        this.id = N2MatrixCell.makeId(srcObj.id, tgtObj.id);
 
         this.symbolType = new SymbolType(this, model);
         this.renderer = this._newRenderer();
@@ -467,6 +467,12 @@ class N2MatrixCell {
             },
             "total": 0
         }
+    }
+
+    static makeId(srcId, tgtId = null) {
+        if (! tgtId || srcId == tgtId) return "node_" + srcId;
+        
+        return "conn_" + srcId + "_to_" + tgtId;
     }
 
     /**
