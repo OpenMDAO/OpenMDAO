@@ -438,7 +438,7 @@ class TestExternalCodeCompFeature(unittest.TestCase):
         prob.run_model()
 
         # print the output
-        self.assertEqual(prob['p.f_xy'], -15.0)
+        self.assertEqual(prob.get_val('p.f_xy'), -15.0)
 
     def test_optimize_fd(self):
         import openmdao.api as om
@@ -470,8 +470,8 @@ class TestExternalCodeCompFeature(unittest.TestCase):
 
         prob.run_driver()
 
-        assert_near_equal(prob['p.x'], 6.66666667, 1e-6)
-        assert_near_equal(prob['p.y'], -7.3333333, 1e-6)
+        assert_near_equal(prob.get_val('p.x'), 6.66666667, 1e-6)
+        assert_near_equal(prob.get_val('p.y'), -7.3333333, 1e-6)
 
     def test_optimize_derivs(self):
         import openmdao.api as om
@@ -503,8 +503,8 @@ class TestExternalCodeCompFeature(unittest.TestCase):
 
         prob.run_driver()
 
-        assert_near_equal(prob['p.x'], 6.66666667, 1e-6)
-        assert_near_equal(prob['p.y'], -7.3333333, 1e-6)
+        assert_near_equal(prob.get_val('p.x'), 6.66666667, 1e-6)
+        assert_near_equal(prob.get_val('p.y'), -7.3333333, 1e-6)
 
 
 class TestExternalCodeImplicitCompFeature(unittest.TestCase):
@@ -613,14 +613,14 @@ class TestExternalCodeImplicitCompFeature(unittest.TestCase):
         prob.set_val('area_ratio', area_ratio)
         mach_comp.options['super_sonic'] = super_sonic
         prob.run_model()
-        assert_near_equal(prob['mach'], mach_solve(area_ratio, super_sonic=super_sonic), 1e-8)
+        assert_near_equal(prob.get_val('mach'), mach_solve(area_ratio, super_sonic=super_sonic), 1e-8)
 
         area_ratio = 1.3
         super_sonic = True
-        prob['area_ratio'] = area_ratio
+        prob.set_val('area_ratio', area_ratio)
         mach_comp.options['super_sonic'] = super_sonic
         prob.run_model()
-        assert_near_equal(prob['mach'], mach_solve(area_ratio, super_sonic=super_sonic), 1e-8)
+        assert_near_equal(prob.get_val('mach'), mach_solve(area_ratio, super_sonic=super_sonic), 1e-8)
 
 if __name__ == "__main__":
     unittest.main()

@@ -19,7 +19,7 @@ Example
 -------
 
 In the following example, we create a model consisting of two instances of
-:code:`ImplicitComponent` and an :code:`IndepVarComp`.
+:code:`ImplicitComponent`.
 
 The implicit components are both instances of :code:`QuadraticComp`, defined
 as shown here.
@@ -29,8 +29,7 @@ as shown here.
 
 
 
-These two components are placed in a :code:`Group` with inputs provided by
-the :code:`IndepVarComp`.
+These two components are placed in a :code:`Group` with their common inputs promoted together.
 
 .. embed-code::
     openmdao.core.tests.test_impl_comp.ListFeatureTestCase.setUp

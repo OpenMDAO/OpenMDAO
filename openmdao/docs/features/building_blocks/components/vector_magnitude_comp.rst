@@ -66,7 +66,7 @@ the input.
 VectorMagnitudeComp Example with Multiple Magnitudes
 ----------------------------------------------------
 
-Note that, when defining multiple products, an input name in one call to `add_magnitude` may not be an 
+Note that, when defining multiple magnitudes, an input name in one call to `add_magnitude` may not be an
 output name in another call, and vice-versa.
 
 

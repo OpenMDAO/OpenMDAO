@@ -101,9 +101,14 @@ class System(object):
         Problem level metadata.
     under_complex_step : bool
         When True, this system is undergoing complex step.
+    under_approx : bool
+        When True, this system is undergoing approximation.
     iter_count : int
         Int that holds the number of times this system has iterated
         in a recording run.
+    iter_count_without_approx : int
+        Int that holds the number of times this system has iterated
+        in a recording run excluding any calls due to approximation schemes.
     cite : str
         Listing of relevant citations that should be referenced when
         publishing work that uses this class.
@@ -338,6 +343,7 @@ class System(object):
 
         # Case recording related
         self.iter_count = 0
+        self.iter_count_without_approx = 0
 
         self.cite = ""
 
@@ -386,6 +392,7 @@ class System(object):
         self._subjacs_info = {}
         self.matrix_free = False
 
+        self.under_approx = False
         self._owns_approx_jac = False
         self._owns_approx_jac_meta = {}
         self._owns_approx_wrt = None
@@ -1448,15 +1455,31 @@ class System(object):
         """
         abs2meta = self._var_abs2meta
         pro2abs = self._var_allprocs_prom2abs_list['output']
+        pro2abs_in = self._var_allprocs_prom2abs_list['input']
+        conns = self._problem_meta.get('connections', {})
+
         dv = self._design_vars
         for name, meta in dv.items():
+
             units = meta['units']
             dv[name]['total_adder'] = dv[name]['adder']
             dv[name]['total_scaler'] = dv[name]['scaler']
 
             if units is not None:
-                abs_name = pro2abs[name][0]
-                var_units = abs2meta[abs_name]['units']
+                # If derivatives are not being calculated, then you reach here before ivc_source
+                # is placed in the meta.
+                try:
+                    units_src = meta['ivc_source']
+                except KeyError:
+                    if name in abs2meta:
+                        units_src = name
+                    elif name in pro2abs:
+                        units_src = pro2abs[name][0]
+                    else:
+                        in_abs = pro2abs_in[name][0]
+                        units_src = conns[in_abs]
+
+                var_units = abs2meta[units_src]['units']
 
                 if var_units == units:
                     continue
@@ -1482,13 +1505,26 @@ class System(object):
         resp = self._responses
         type_dict = {'con': 'constraint', 'obj': 'objective'}
         for name, meta in resp.items():
+
             units = meta['units']
             resp[name]['total_scaler'] = resp[name]['scaler']
             resp[name]['total_adder'] = resp[name]['adder']
 
             if units is not None:
-                abs_name = pro2abs[name][0]
-                var_units = abs2meta[abs_name]['units']
+                # If derivatives are not being calculated, then you reach here before ivc_source
+                # is placed in the meta.
+                try:
+                    units_src = meta['ivc_source']
+                except KeyError:
+                    if name in abs2meta:
+                        units_src = name
+                    elif name in pro2abs:
+                        units_src = pro2abs[name][0]
+                    else:
+                        in_abs = pro2abs_in[name][0]
+                        units_src = conns[in_abs]
+
+                var_units = abs2meta[units_src]['units']
 
                 if var_units == units:
                     continue
@@ -3372,6 +3408,10 @@ class System(object):
             disc_meta = self._discrete_outputs._dict
 
             for var_name, val in self._discrete_outputs.items():
+
+                if not list_autoivcs and var_name.startswith('_auto_ivc.'):
+                    continue
+
                 # Filter based on tags
                 if tags and not (make_set(tags) & disc_meta[var_name]['tags']):
                     continue
@@ -3809,6 +3849,8 @@ class System(object):
             self._rec_mgr.record_iteration(self, data, metadata)
 
         self.iter_count += 1
+        if not self.under_approx:
+            self.iter_count_without_approx += 1
 
     def is_active(self):
         """
@@ -3876,6 +3918,20 @@ class System(object):
 
                 if sub._assembled_jac:
                     sub._assembled_jac.set_complex_step_mode(active)
+
+    def _set_approx_mode(self, active):
+        """
+        Turn on or off approx mode flag.
+
+        Recurses to turn on or off approx mode flag in all subsystems.
+
+        Parameters
+        ----------
+        active : bool
+            Approx mode flag; set to True prior to commencing approximation.
+        """
+        for sub in self.system_iter(include_self=True, recurse=True):
+            sub.under_approx = active
 
     def cleanup(self):
         """
