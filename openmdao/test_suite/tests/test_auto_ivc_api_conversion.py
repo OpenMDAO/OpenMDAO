@@ -5,7 +5,7 @@ are tested here.
 import unittest
 
 import openmdao.api as om
-from openmdao.core.tests.test_distribcomp import DistribInputDistribOutputComp
+from openmdao.core.tests.test_distribcomp import DistribNoncontiguousComp
 from openmdao.test_suite.components.unit_conv import TgtCompC, TgtCompF, TgtCompK
 from openmdao.utils.mpi import MPI
 from openmdao.utils.assert_utils import assert_near_equal
@@ -37,10 +37,10 @@ class TestConversionGuideDoc(unittest.TestCase):
         prob.model.add_objective('paraboloid.f')
 
         prob.setup()
-        
+
         prob['x'] = 3.0
         prob['y'] = -4.0
-        
+
         prob.run_driver()
 
         # minimum value
@@ -61,10 +61,10 @@ class TestConversionGuideDoc(unittest.TestCase):
                                  promotes_inputs=['x', 'y'])
 
         prob.setup()
-        
+
         x = prob.get_val('x')
         prob.set_val('y', 15.0)
-        
+
     def test_constrained(self):
         import openmdao.api as om
 
@@ -73,11 +73,11 @@ class TestConversionGuideDoc(unittest.TestCase):
 
         # build the model
         prob = om.Problem()
-        prob.model.add_subsystem('parab', Paraboloid(), 
+        prob.model.add_subsystem('parab', Paraboloid(),
                                  promotes_inputs=['x', 'y'])
 
         # define the component whose output will be constrained
-        prob.model.add_subsystem('const', om.ExecComp('g = x + y'), 
+        prob.model.add_subsystem('const', om.ExecComp('g = x + y'),
                                  promotes_inputs=['x', 'y'])
 
         # Design variables 'x' and 'y' span components, so we need to provide a common initial
@@ -105,11 +105,11 @@ class TestConversionGuideDoc(unittest.TestCase):
         # location of the minimum
         assert_near_equal(prob.get_val('x'), 7, 1e-4)
         assert_near_equal(prob.get_val('y'), -7, 1e-4)
-    
+
     def test_promote_new_name(self):
-         
+
         prob = om.Problem()
-        
+
         prob.model.add_subsystem('paraboloid',
                                  om.ExecComp('f = (x-3)**2 + x*y + (y+4)**2 - 3'),
                                  promotes_inputs=[('x', 'width'), ('y', 'length')])
@@ -117,35 +117,35 @@ class TestConversionGuideDoc(unittest.TestCase):
         # Could also set these after setup.
         prob.model.set_input_defaults('width', 3.0)
         prob.model.set_input_defaults('length', -4.0)
-        
+
         prob.setup()
         prob.run_model()
-        
+
         assert_near_equal(prob.get_val('width'), 3.0)
 
     def test_units(self):
-        
+
         prob = om.Problem()
-        
+
         # Input units in degF
-        prob.model.add_subsystem('tgtF', TgtCompF(), 
+        prob.model.add_subsystem('tgtF', TgtCompF(),
                                  promotes_inputs=['x2'])
 
         # Input units in degC
-        prob.model.add_subsystem('tgtC', TgtCompC(), 
+        prob.model.add_subsystem('tgtC', TgtCompC(),
                                  promotes_inputs=['x2'])
 
         # Input units in degK
-        prob.model.add_subsystem('tgtK', TgtCompK(), 
-                                 promotes_inputs=['x2'])        
-        
+        prob.model.add_subsystem('tgtK', TgtCompK(),
+                                 promotes_inputs=['x2'])
+
         prob.model.set_input_defaults('x2', 100.0, units='degC')
-        
+
         prob.setup()
         prob.run_model()
-        
+
         assert_near_equal(prob.get_val('x2', 'degF'), 212.0)
-        
+
     def test_promote_src_indices(self):
         import numpy as np
 
@@ -185,51 +185,39 @@ class TestConversionGuideDoc(unittest.TestCase):
         assert_near_equal(p.get_val('C1.y'), 6.)
         assert_near_equal(p.get_val('C2.x'), np.ones(2))
         assert_near_equal(p.get_val('C2.y'), 8.)
-        
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestConversionGuideDocMPI(unittest.TestCase):
 
-    N_PROCS = 4
+    N_PROCS = 2
 
     def test_prob_getval_dist_par(self):
         import numpy as np
 
         import openmdao.api as om
 
-        size = 3
+        size = 4
 
-        p = om.Problem()
-        top = p.model
-        par = top.add_subsystem('par', om.ParallelGroup())
+        prob = om.Problem()
 
         # An IndepVarComp is required on all unconnected distributed inputs.
         ivc = om.IndepVarComp()
-        ivc.add_output('invec1', np.ones(size))
-        ivc.add_output('invec2', np.ones(size))
-        top.add_subsystem('P', ivc)
-        top.connect('P.invec1', 'par.C1.invec')
-        top.connect('P.invec2', 'par.C2.invec')
+        ivc.add_output('invec', np.ones(size))
+        prob.model.add_subsystem('P', ivc,
+                                 promotes_outputs=['invec'])
 
-        C1 = par.add_subsystem("C1", DistribInputDistribOutputComp(arr_size=size))
-        C2 = par.add_subsystem("C2", DistribInputDistribOutputComp(arr_size=size))
+        prob.model.add_subsystem("C1", DistribNoncontiguousComp(arr_size=size),
+                                 promotes=['invec', 'outvec'])
 
-        p.setup()
+        prob.setup()
 
-        p['P.invec1'] = np.array([2, 1, 1], float)
-        p['P.invec2'] = np.array([6, 3, 3], float)
+        prob['P.invec'] = np.array([1.0, 3.0, 5.0, 7.0])
 
-        p.run_model()
+        prob.run_model()
 
-        ans = p.get_val('par.C2.invec', get_remote=True)
-        np.testing.assert_allclose(ans, np.array([6, 3,3], dtype=float))
-        ans = p.get_val('par.C2.outvec', get_remote=True)
-        np.testing.assert_allclose(ans, np.array([12, 6, 6], dtype=float))
-        ans = p.get_val('par.C1.invec', get_remote=True)
-        np.testing.assert_allclose(ans, np.array([2, 1, 1], dtype=float))
-        ans = p.get_val('par.C1.outvec', get_remote=True)
-        np.testing.assert_allclose(ans, np.array([4, 2, 2], dtype=float))
-
+        x = prob.get_val('outvec', get_remote=True)
+        assert_near_equal(x, np.array([2.0, 10.0, 6.0, 14.0]))
 
 if __name__ == "__main__":
 

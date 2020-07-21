@@ -84,7 +84,7 @@ Declaring a Multi-Component Input as a Design Variable
     prob.run_driver()
 
 
-Declaring a New Name for a Promoted Input 
+Declaring a New Name for a Promoted Input
 =========================================
 
 .. content-container ::
@@ -96,17 +96,17 @@ Declaring a New Name for a Promoted Input
       style2
 
         prob = om.Problem()
-        
+
         indeps = prob.model.add_subsystem('indeps', om.IndepVarComp())
         indeps.add_output('width', 3.0)
         indeps.add_output('length', -4.0)
-    
+
         prob.model.add_subsystem('paraboloid',
                                  om.ExecComp('f = (x-3)**2 + x*y + (y+4)**2 - 3'))
-    
+
         prob.model.connect('indeps.width', 'paraboloid.x')
         prob.model.connect('indeps.length', 'paraboloid.y')
-        
+
         prob.setup()
 
 Declare an Input Defined with Source Indices as a Design Variable
@@ -119,7 +119,7 @@ Declare an Input Defined with Source Indices as a Design Variable
       MyComp1
       run_model
       style2
-      
+
         class MyComp1(om.ExplicitComponent):
             def setup(self):
                 # this input will connect to entries 0, 1, and 2 of its source
@@ -148,9 +148,9 @@ Declare an Input Defined with Source Indices as a Design Variable
         p.model.add_design_var('x')
         p.setup()
         p.run_model()
-        
 
-Setting Default Units for an Input 
+
+Setting Default Units for an Input
 ==================================
 
 .. content-container ::
@@ -160,30 +160,30 @@ Setting Default Units for an Input
       Problem
       setup
       style2
-      
+
         prob = om.Problem()
-        
+
         ivc = om.IndepVarComp()
         ivc.add_output('x2', 100.0, units='degC')
         prob.model.add_subsystem('T1', ivc,
                                  promotes_outputs=['x2'])
-        
+
         # Input units in degF
-        prob.model.add_subsystem('tgtF', TgtCompF(), 
+        prob.model.add_subsystem('tgtF', TgtCompF(),
                                  promotes_inputs=['x2'])
 
         # Input units in degC
-        prob.model.add_subsystem('tgtC', TgtCompC(), 
+        prob.model.add_subsystem('tgtC', TgtCompC(),
                                  promotes_inputs=['x2'])
 
         # Input units in deg
-        prob.model.add_subsystem('tgtK', TgtCompK(), 
-                                 promotes_inputs=['x2'])        
-        
+        prob.model.add_subsystem('tgtK', TgtCompK(),
+                                 promotes_inputs=['x2'])
+
         prob.setup()
-        
-        
-        
+
+
+
 Creating a Distributed Component with Unconnected Inputs
 ========================================================
 
@@ -194,26 +194,24 @@ Creating a Distributed Component with Unconnected Inputs
       size
       run_model
 
-        size = 3
+        size = 4
 
-        p = om.Problem()
-        top = p.model
-        par = top.add_subsystem('par', om.ParallelGroup())
-        C1 = par.add_subsystem("C1", DistribInputDistribOutputComp(arr_size=size))
-        C2 = par.add_subsystem("C2", DistribInputDistribOutputComp(arr_size=size))
-        p.setup()
+        prob = om.Problem()
 
-        # Conclude setup but don't run model.
-        p.final_setup()
+        prob.model.add_subsystem("C1", DistribNoncontiguousComp(arr_size=size),
+                                 promotes=['invec', 'outvec'])
 
-        if C1 in p.model.par._subsystems_myproc:
-            p['par.C1.invec1'] = np.array([2, 1, 1], float)
-        if C2 in p.model.par._subsystems_myproc:
-            p['par.C1.invec2'] = np.array([6, 3, 3], float)
+        prob.setup()
 
-        p.run_model()
-        
-        
+        rank = prob.model.comm.rank
+        if rank == 0:
+            prob['invec'] = np.array([1.0, 3.0])
+        else:
+            prob['invec'] = np.array([5.0, 7.0])
+
+        prob.run_model()
+
+
 Setting and Getting Inputs
 --------------------------
 
@@ -224,7 +222,7 @@ Setting and Getting Inputs
       Problem
       set_val
       style2
-      
+
     prob = om.Problem()
     indeps = prob.model.add_subsystem('indeps', om.IndepVarComp())
     indeps.add_output('x', 3.0)
@@ -236,7 +234,7 @@ Setting and Getting Inputs
     prob.model.connect('indeps.x', 'paraboloid.x')
     prob.model.connect('indeps.y', 'paraboloid.y')
 
-    prob.setup()      
-    
+    prob.setup()
+
     x = prob.get_val('indeps.x')
-    prob.set_val('indeps.y', 15.0)    
+    prob.set_val('indeps.y', 15.0)
