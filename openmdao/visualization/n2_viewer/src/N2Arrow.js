@@ -282,11 +282,16 @@ class N2OffGridArrow extends N2Arrow {
 
         this.group.classed('off-grid-arrow', true);
 
+        const mid = {
+                'x': this.pts.start.x - (this.pts.start.x - this.pts.end.x)/2,
+                'y': this.pts.start.y - (this.pts.start.y - this.pts.end.y)/2
+            }
+
         this.path
             .attr('marker-end', 'url(#arrow)')
             .attr('stroke-dasharray', '5,5')
-            .attr('d', 'M' + this.pts.start.x + ' ' + this.pts.start.y +
-                ' L' + this.pts.end.x + ' ' + this.pts.end.y)
+            .attr('d', `M${this.pts.start.x},${this.pts.start.y} 
+                 L${mid.x},${mid.y} L${this.pts.end.x},${this.pts.end.y}`)
             .attr('fill', 'none')
             .style('stroke-width', this.width)
             .style('stroke', this.color);
