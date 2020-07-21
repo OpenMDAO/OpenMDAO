@@ -4,7 +4,7 @@
 July 20, 2020
 
 OpenMDAO 3.2.0 introduces significant changes in the way OpenMDAO works.
-The primary change is that the manual creation IndepVarComp outputs are no longer required because OpenMDAO will create them for you in the background.
+The primary change is that the manual creation IndepVarComp outputs is no longer required because OpenMDAO will create them for you in the background.
 This was done in a backwards compatible way so that old models will still run and you can still use IndepVarComps if you want to.
 However, in the vast majority of cases, you don't need to manually create either the IndepVarComp component or add outputs to it anymore.
 
@@ -42,13 +42,15 @@ As this is a significant change, some issues may have slipped through our testin
 - Model data now compressed when saved in N2 HTML file. #1490
 - Added support for om.slicer as a way to pass in slices to src_indices/indices arguments in add_design_var, add_response, add_constraint, promotes, and connect. #1491
 - Added flag for `under_approx` to let the user know when a system is operating under any derivative approximation scheme, and a new counter `iter_count_without_approx`. #1492
-- Automatically add a single, user-hidden, top-level IndepVarComp to provide outputs for every unconnected input in the model.
+- Allow the linear algebra components (DotProductComp, CrossProductComp, MatrixVectorProductComp, VectorMagnitudeComp) to each perform multiple calculations. #1503
+- Automatically add a single, user-hidden, top-level IndepVarComp to provide outputs for every unconnected input in the model. #1539
 
 ## Bug Fixes:
 
-- Fix bug where exception was raised with while printing bounds violations via "print_bound_enforce" option on linesearch if one side of an output was unbounded. #1466
+- Fix bug where exception was raised while printing bounds violations via "print_bound_enforce" option on linesearch if one side of an output was unbounded. #1466
 - Fixed an exception when using AddSubtractComp constructor instead of its add_equation method. #1474
 - Minor fixes for Appveyor CI. #1495
+- IndepVarComp did not use the options mechanism like other Components, which was an issue for a user that wanted to subclass it with additional options. #1536
 - Problem.record() provides a useful error message if called before final_setup. #1545
 - Fixed a bug that was obliterating options passed to BalanceComp, and added tests for better coverage. #1546
 - Added quotes to install command in docs to prevent problems in some shell environments. #1547
