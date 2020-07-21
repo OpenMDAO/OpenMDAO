@@ -4,7 +4,7 @@
 July 21, 2020
 
 OpenMDAO 3.2.0 introduces significant changes in the way OpenMDAO works.
-The primary change is that the manual creation IndepVarComp outputs is no longer required because OpenMDAO will create them for you in the background.
+The primary change is that the manual creation of IndepVarComp outputs is no longer required because OpenMDAO will create them for you in the background.
 This was done in a backwards compatible way so that old models will still run and you can still use IndepVarComps if you want to.
 However, in the vast majority of cases, you don't need to manually create either the IndepVarComp component or add outputs to it anymore.
 
