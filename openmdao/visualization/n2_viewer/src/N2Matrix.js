@@ -121,6 +121,28 @@ class N2Matrix {
     }
 
     /**
+     * Given the node ID, determine if one of the cells in the matrix
+     * represents it or contains it.
+     * @param {Number} nodeId The id of the N2TreeNode to search for
+     * @returns {N2MatrixCell} Reference to the cell if found, or undefined
+     */
+    findCellByNodeId(nodeId) {
+        const node = this.model.nodeIds[nodeId];
+
+        // Continue only if the node is a child of the zoomed element
+        if (node.hasParent(this.layout.zoomedElement)) {
+            for (const cell of this.visibleCells) {
+                // Found directly:
+                if (cell.id == N2MatrixCell.makeId(nodeId)) return cell;
+
+                if (cell.obj.hasNode(node)) return cell;
+            }
+        }
+
+        return undefined;
+    }
+
+    /**
      * Compute the new minimum element size when the diagram height changes.
      * @param {number} height In pixels.
      */

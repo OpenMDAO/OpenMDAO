@@ -787,12 +787,14 @@ class N2ArrowManager {
     transition(matrix) {
         for (const arrowId in this.pinnedArrows.arrows) {
             const arrow = this.pinnedArrows.arrows[arrowId];
-            const startCell = matrix.findCellById(
-                N2MatrixCell.makeId(arrow.attribs.start.id));
-            const endCell = matrix.findCellById(
-                N2MatrixCell.makeId(arrow.attribs.end.id));
+            const startCell = matrix.findCellByNodeId(arrow.attribs.start.id);
+            const endCell = matrix.findCellByNodeId(arrow.attribs.end.id);
 
-            if (startCell && endCell) { // Both endpoint cells are visible
+            if (startCell == endCell) { // Both undefined, or same cell
+                debugInfo(`transition: No visible endpoints for ${arrowId}`)
+                this.pinnedArrows.removeArrowFromScreen(arrowId);
+            }
+            else if (startCell && endCell) { // Both endpoint cells are visible
                 debugInfo(`transition: Found both sides of ${arrowId}`)
                 let attribs = arrow.attribs;
                 attribs.start.col = startCell.col;
@@ -844,10 +846,6 @@ class N2ArrowManager {
                 this.pinnedArrows.arrows[arrowId] =
                     new (this.arrowDirClasses[side]['incoming'])(attribs,
                         this.n2Groups, this.nodeSize);
-            }
-            else {
-                debugInfo(`transition: No visible endpoints for ${arrowId}`)
-                this.pinnedArrows.removeArrowFromScreen(arrowId);
             }
         }
     }
