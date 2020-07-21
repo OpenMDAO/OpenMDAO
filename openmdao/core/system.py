@@ -3114,34 +3114,13 @@ class System(object):
             list of input names and other optional information about those inputs
         """
         prefix = self.pathname + '.' if self.pathname else ''
+        rel_idx = len(prefix)
 
-        if self._inputs is None:
-            # final setup has not been performed (this covers calling during configure())
-            from openmdao.core.group import Group
-            if isinstance(self, Group):
-                rel_idx = len(prefix)
-                to_meta = {n[rel_idx:]: m for n, m in self._var_abs2meta.items()}
-                var_names = chain([n[rel_idx:] for n in self._var_abs_names['input']],
-                                  self._var_discrete['input'].keys())
-
-                def to_prom(rel_name):
-                    return self._var_abs2prom['input'][prefix + rel_name]
-            else:
-                # this is a component; use relative names, including discretes
-                to_meta = self._var_rel2meta
-                var_names = chain(self._var_rel_names['input'], self._var_discrete['input'].keys())
-
-                def to_prom(rel_name):
-                    return rel_name
-        else:
-            # final setup has been performed
-            # use absolute names, discretes handled separately
-            # Only gathering up values and metadata from this proc, if MPI
-            to_meta = self._var_abs2meta
-            var_names = self._inputs._abs_iter()
-
-            def to_prom(abs_name):
-                return self._var_abs2prom['input'][abs_name]
+        # use absolute names, discretes handled separately
+        # Only gathering up values and metadata from this proc, if MPI
+        to_meta = self._var_abs2meta
+        var_names = self._var_abs_names['input']
+        abs2prom = self._var_abs2prom['input']
 
         allprocs_meta = self._var_allprocs_abs2meta
         tagset = make_set(tags)
@@ -3154,7 +3133,7 @@ class System(object):
             if tags and not (tagset & meta['tags']):
                 continue
 
-            var_prom = to_prom(var_name)
+            var_prom = abs2prom[var_name]
 
             if not match_includes_excludes(var_name, var_prom, includes, excludes):
                 continue
@@ -3173,27 +3152,25 @@ class System(object):
             if shape:
                 var_meta['shape'] = meta['shape']
             if global_shape:
-                if var_name in allprocs_meta:
+                try:
                     var_meta['global_shape'] = allprocs_meta[var_name]['global_shape']
-                else:
+                except KeyError:
                     var_meta['global_shape'] = 'Unavailable'
             if desc:
                 var_meta['desc'] = meta['desc']
 
             inputs.append((var_name, var_meta))
 
-        if self._inputs is not None and self._discrete_inputs:
+        if self._discrete_inputs:
             disc_meta = self._discrete_inputs._dict
-
-            def to_prom(rel_name):
-                return self._var_abs2prom['input'][prefix + rel_name]
 
             for rel_name, val in self._discrete_inputs.items():
                 # Filter based on tags
                 if tags and not (tagset & disc_meta[rel_name]['tags']):
                     continue
 
-                var_prom = to_prom(rel_name)
+                abs_name = prefix + rel_name
+                var_prom = abs2prom[abs_name]
 
                 if not match_includes_excludes(rel_name, var_prom, includes, excludes):
                     continue
@@ -3210,13 +3187,17 @@ class System(object):
                 if shape:
                     var_meta['shape'] = ''
 
-                inputs.append((prefix + rel_name, var_meta))
+                inputs.append((abs_name, var_meta))
 
         if out_stream is _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
 
         if out_stream:
             self._write_table('input', inputs, hierarchical, print_arrays, all_procs, out_stream)
+
+        if self.name:  # if we're not the top system, convert names to relative
+            old = inputs
+            inputs = [(n[rel_idx:], meta) for n, meta in old]
 
         return inputs
 
@@ -3308,34 +3289,13 @@ class System(object):
             list of output names and other optional information about those outputs
         """
         prefix = self.pathname + '.' if self.pathname else ''
-        if self._outputs is None:
-            # final setup has not been performed (this covers calling during configure())
-            from openmdao.core.group import Group
-            if isinstance(self, Group):
-                rel_idx = len(prefix)
-                to_meta = {n[rel_idx:]: m for n, m in self._var_abs2meta.items()}
-                var_names = chain([n[rel_idx:] for n in self._var_abs_names['output']],
-                                  self._var_discrete['output'].keys())
+        rel_idx = len(prefix)
 
-                def to_prom(rel_name):
-                    return self._var_abs2prom['output'][prefix + rel_name]
-            else:
-                # this is a component; use relative names, including discretes
-                to_meta = self._var_rel2meta
-                var_names = chain(self._var_rel_names['output'],
-                                  self._var_discrete['output'].keys())
-
-                def to_prom(rel_name):
-                    return rel_name
-        else:
-            # final setup has been performed
-            # use absolute names, discretes handled separately
-            # Only gathering up values and metadata from this proc, if MPI
-            to_meta = self._var_abs2meta
-            var_names = self._outputs._abs_iter()
-
-            def to_prom(abs_name):
-                return self._var_abs2prom['output'][abs_name]
+        # use absolute names, discretes handled separately
+        # Only gathering up values and metadata from this proc, if MPI
+        to_meta = self._var_abs2meta
+        var_names = self._var_abs_names['output']
+        abs2prom = self._var_abs2prom['output']
 
         allprocs_meta = self._var_allprocs_abs2meta
         states = self._list_states()
@@ -3345,45 +3305,49 @@ class System(object):
         # If the System owns an output directly, show its output
         expl_outputs = []
         impl_outputs = []
-        for var_name in var_names:
-            meta = to_meta[var_name]
+        for abs_name in var_names:
+            meta = to_meta[abs_name]
+            rel_name = abs_name[rel_idx:]
 
             # Filter based on tags
             if tags and not (tagset & meta['tags']):
                 continue
 
-            var_prom = to_prom(var_name)
+            var_prom = abs2prom[abs_name]
 
-            if not list_autoivcs and var_name.startswith('_auto_ivc.'):
+            if not list_autoivcs and abs_name.startswith('_auto_ivc.'):
                 continue
 
-            if not match_includes_excludes(var_name, var_prom, includes, excludes):
+            if not match_includes_excludes(rel_name, var_prom, includes, excludes):
                 continue
 
             if residuals_tol and self._residuals and \
-               np.linalg.norm(self._residuals._abs_get_val(var_name)) < residuals_tol:
+               np.linalg.norm(self._residuals._abs_get_val(abs_name)) < residuals_tol:
                 continue
 
             var_meta = {}
             if values:
                 if self._outputs:
-                    var_meta['value'] = self._outputs._abs_get_val(var_name, False)
+                    var_meta['value'] = self._outputs._abs_get_val(abs_name, False)
                 else:
                     var_meta['value'] = meta['value']
 
             if prom_name:
                 var_meta['prom_name'] = var_prom
             if residuals and self._residuals:
-                var_meta['resids'] = self._residuals._abs_get_val(var_name, False)
+                var_meta['resids'] = self._residuals._abs_get_val(abs_name, False)
             if units:
                 var_meta['units'] = meta['units']
             if shape:
                 var_meta['shape'] = meta['shape']
             if global_shape:
-                if var_name in allprocs_meta:
-                    var_meta['global_shape'] = allprocs_meta[var_name]['global_shape']
-                else:
-                    var_meta['global_shape'] = 'Unavailable'
+                try:
+                    var_meta['global_shape'] = allprocs_meta[abs_name]['global_shape']
+                except KeyError:
+                    if meta['distributed']:
+                        var_meta['global_shape'] = 'Unavailable'
+                    else:
+                        var_meta['global_shape'] = meta['shape']
             if bounds:
                 var_meta['lower'] = meta['lower']
                 var_meta['upper'] = meta['upper']
@@ -3393,16 +3357,13 @@ class System(object):
                 var_meta['res_ref'] = meta['res_ref']
             if desc:
                 var_meta['desc'] = meta['desc']
-            if var_name in states:
-                impl_outputs.append((var_name, var_meta))
+            if abs_name in states:
+                impl_outputs.append((abs_name, var_meta))
             else:
-                expl_outputs.append((var_name, var_meta))
+                expl_outputs.append((abs_name, var_meta))
 
-        if self._outputs is not None and self._discrete_outputs and not residuals_tol:
+        if self._discrete_outputs and not residuals_tol:
             disc_meta = self._discrete_outputs._dict
-
-            def to_prom(rel_name):
-                return self._var_abs2prom['output'][prefix + rel_name]
 
             for rel_name, val in self._discrete_outputs.items():
 
@@ -3413,7 +3374,8 @@ class System(object):
                 if tags and not (tagset & disc_meta[rel_name]['tags']):
                     continue
 
-                var_prom = to_prom(rel_name)
+                abs_name = prefix + rel_name
+                var_prom = abs2prom[abs_name]
 
                 if not match_includes_excludes(rel_name, var_prom, includes, excludes):
                     continue
@@ -3439,7 +3401,6 @@ class System(object):
                     var_meta['ref0'] = ''
                     var_meta['res_ref'] = ''
 
-                abs_name = prefix + rel_name
                 if abs_name in states:
                     impl_outputs.append((abs_name, var_meta))
                 else:
@@ -3457,14 +3418,20 @@ class System(object):
                                   all_procs, out_stream)
 
         if explicit and implicit:
-            return expl_outputs + impl_outputs
+            final = expl_outputs + impl_outputs
         elif explicit:
-            return expl_outputs
+            final = expl_outputs
         elif implicit:
-            return impl_outputs
+            final = impl_outputs
         else:
             raise RuntimeError(self.msginfo +
                                ': You have excluded both Explicit and Implicit components.')
+
+        if self.name:  # if we're not the top system, convert names to relative
+            old = final
+            final = [(n[rel_idx:], meta) for n, meta in old]
+
+        return final
 
     def _write_table(self, var_type, var_data, hierarchical, print_arrays, all_procs, out_stream):
         """
@@ -3493,16 +3460,8 @@ class System(object):
         if out_stream is None:
             return
 
-        # determine whether setup has been performed
-        if self._outputs is not None:
-            after_final_setup = True
-        else:
-            after_final_setup = False
-
         # Make a dict of variables. Makes it easier to work with in this method
-        var_dict = OrderedDict()
-        for name, vals in var_data:
-            var_dict[name] = vals
+        var_dict = OrderedDict(var_data)
 
         # If parallel, gather up the vars.
         if MPI and self.comm.size > 1:
@@ -3514,11 +3473,7 @@ class System(object):
             if not all_procs and self.comm.rank > 0:
                 return
 
-            if after_final_setup:
-                meta = self._var_abs2meta
-            else:
-                meta = self._var_rel2meta
-
+            meta = self._var_abs2meta
             allprocs_meta = self._var_allprocs_abs2meta
 
             var_dict = all_var_dicts[self.comm.rank]  # start with metadata from current rank
@@ -3532,10 +3487,9 @@ class System(object):
                         var_dict[name] = proc_vars[name]
                     else:
                         try:
-                            is_distributed = meta[name]['distributed']
-                        except KeyError:
                             is_distributed = allprocs_meta[name]['distributed']
-
+                        except KeyError:
+                            is_distributed = False
                         if is_distributed and name in allprocs_meta:
                             # TODO no support for > 1D arrays
                             #   meta.src_indices has the info we need to piece together arrays
@@ -3559,14 +3513,14 @@ class System(object):
                                             if distrib[key][name].shape == global_shape:
                                                 var_dict[name][key] = distrib[key][name]
 
-        if after_final_setup:
+        if self._outputs is None:
+            var_list = var_dict.keys()
+            top_name = self.name
+        else:
             inputs = var_type == 'input'
             outputs = not inputs
             var_list = self._get_vars_exec_order(inputs=inputs, outputs=outputs, variables=var_dict)
-            top_name = 'model'
-        else:
-            var_list = var_dict.keys()
-            top_name = self.name
+            top_name = self.name if self.name else 'model'
 
         write_var_table(self.pathname, var_list, var_type, var_dict,
                         hierarchical, top_name, print_arrays, out_stream)

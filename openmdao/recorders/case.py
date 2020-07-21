@@ -685,8 +685,9 @@ class Case(object):
             # don't have execution order, just sort for determinism
             var_list = sorted(var_dict.keys())
 
+        top_name = pathname if pathname else 'model'
         write_var_table(pathname, var_list, var_type, var_dict,
-                        hierarchical=hierarchical, top_name='model',
+                        hierarchical=hierarchical, top_name=top_name,
                         print_arrays=print_arrays, out_stream=out_stream)
 
     def _get_variables_of_type(self, var_type, scaled=False, use_indices=False):

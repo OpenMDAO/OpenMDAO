@@ -8,7 +8,7 @@ from distutils.version import LooseVersion
 
 import openmdao.api as om
 
-from openmdao.utils.mpi import MPI
+from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.general_utils import printoptions, remove_whitespace
@@ -274,27 +274,28 @@ class DistributedListVarsTest(unittest.TestCase):
         with printoptions(**print_opts):
             prob.model.list_inputs(values=True, hierarchical=False, out_stream=stream)
 
-        if prob.comm.rank == 0:  # Only rank 0 prints
-            text = stream.getvalue().split('\n')
+        with multi_proc_exception_check(prob.comm):
+            if prob.comm.rank == 0:  # Only rank 0 prints
+                text = stream.getvalue().split('\n')
 
-            expected = [
-                "6 Input(s) in 'model'",
-                '---------------------',
-                '',
-                'varname   value',
-                '--------  -----',
-                'c1.x',
-                'sub.c2.x',
-                'sub.c3.x',
-                'c2.x',
-                'c3.x',
-                'sub2.x'
-            ]
+                expected = [
+                    "6 Input(s) in 'model'",
+                    '---------------------',
+                    '',
+                    'varname   value',
+                    '--------  -----',
+                    'c1.x',
+                    'sub.c2.x',
+                    'sub.c3.x',
+                    'c2.x',
+                    'c3.x',
+                    'sub2.x'
+                ]
 
-            for i, line in enumerate(expected):
-                if line and not line.startswith('-'):
-                    self.assertTrue(text[i].startswith(line),
-                                    '\nExpected: %s\nReceived: %s\n' % (line, text[i]))
+                for i, line in enumerate(expected):
+                    if line and not line.startswith('-'):
+                        self.assertTrue(text[i].startswith(line),
+                                        '\nExpected: %s\nReceived: %s\n' % (line, text[i]))
 
         #
         # list inputs, hierarchical
@@ -303,35 +304,36 @@ class DistributedListVarsTest(unittest.TestCase):
         with printoptions(**print_opts):
             prob.model.list_inputs(values=True, hierarchical=True, out_stream=stream)
 
-        if prob.comm.rank == 0:
-            text = stream.getvalue().split('\n')
+        with multi_proc_exception_check(prob.comm):
+            if prob.comm.rank == 0:
+                text = stream.getvalue().split('\n')
 
-            expected = [
-                "6 Input(s) in 'model'",
-                '---------------------',
-                '',
-                'varname  value',
-                '-------  -----',
-                'model',
-                '  c1',
-                '    x',
-                '  sub',
-                '    c2',
-                '      x',
-                '    c3',
-                '      x',
-                '  c2',
-                '    x',
-                '  c3',
-                '    x',
-                '  sub2',
-                '    x'
-            ]
+                expected = [
+                    "6 Input(s) in 'model'",
+                    '---------------------',
+                    '',
+                    'varname  value',
+                    '-------  -----',
+                    'model',
+                    '  c1',
+                    '    x',
+                    '  sub',
+                    '    c2',
+                    '      x',
+                    '    c3',
+                    '      x',
+                    '  c2',
+                    '    x',
+                    '  c3',
+                    '    x',
+                    '  sub2',
+                    '    x'
+                ]
 
-            for i, line in enumerate(expected):
-                if line and not line.startswith('-'):
-                    self.assertTrue(text[i].startswith(line),
-                                    '\nExpected: %s\nReceived: %s\n' % (line, text[i]))
+                for i, line in enumerate(expected):
+                    if line and not line.startswith('-'):
+                        self.assertTrue(text[i].startswith(line),
+                                        '\nExpected: %s\nReceived: %s\n' % (line, text[i]))
 
         #
         # list outputs, not hierarchical
@@ -340,32 +342,33 @@ class DistributedListVarsTest(unittest.TestCase):
         with printoptions(**print_opts):
             prob.model.list_outputs(values=True, residuals=True, hierarchical=False, out_stream=stream)
 
-        if prob.comm.rank == 0:
-            text = stream.getvalue().split('\n')
+        with multi_proc_exception_check(prob.comm):
+            if prob.comm.rank == 0:
+                text = stream.getvalue().split('\n')
 
-            expected = [
-                "7 Explicit Output(s) in 'model'",
-                '-------------------------------',
-                '',
-                'varname   value   resids',
-                '--------  -----   ------',
-                'iv.x',
-                'c1.y',
-                'sub.c2.y',
-                'sub.c3.y',
-                'c2.y',
-                'c3.y',
-                'sub2.y',
-                '',
-                '',
-                "0 Implicit Output(s) in 'model'",
-                '-------------------------------',
-            ]
+                expected = [
+                    "7 Explicit Output(s) in 'model'",
+                    '-------------------------------',
+                    '',
+                    'varname   value   resids',
+                    '--------  -----   ------',
+                    'iv.x',
+                    'c1.y',
+                    'sub.c2.y',
+                    'sub.c3.y',
+                    'c2.y',
+                    'c3.y',
+                    'sub2.y',
+                    '',
+                    '',
+                    "0 Implicit Output(s) in 'model'",
+                    '-------------------------------',
+                ]
 
-            for i, line in enumerate(expected):
-                if line and not line.startswith('-'):
-                    self.assertTrue(text[i].startswith(line),
-                                    '\nExpected: %s\nReceived: %s\n' % (line, text[i]))
+                for i, line in enumerate(expected):
+                    if line and not line.startswith('-'):
+                        self.assertTrue(text[i].startswith(line),
+                                        '\nExpected: %s\nReceived: %s\n' % (line, text[i]))
 
         #
         # list outputs, hierarchical
@@ -374,41 +377,42 @@ class DistributedListVarsTest(unittest.TestCase):
         with printoptions(**print_opts):
             prob.model.list_outputs(values=True, residuals=True, hierarchical=True, out_stream=stream)
 
-        if prob.comm.rank == 0:
-            text = stream.getvalue().split('\n')
+        with multi_proc_exception_check(prob.comm):
+            if prob.comm.rank == 0:
+                text = stream.getvalue().split('\n')
 
-            expected = [
-                "7 Explicit Output(s) in 'model'",
-                '-------------------------------',
-                '',
-                'varname  value   resids',
-                '-------  -----   ------',
-                'model',
-                '  iv',
-                '    x',
-                '  c1',
-                '    y',
-                '  sub',
-                '    c2',
-                '      y',
-                '    c3',
-                '      y',
-                '  c2',
-                '    y',
-                '  c3',
-                '    y',
-                '  sub2',
-                '    y',
-                '',
-                '',
-                "0 Implicit Output(s) in 'model'",
-                '-------------------------------',
-            ]
+                expected = [
+                    "7 Explicit Output(s) in 'model'",
+                    '-------------------------------',
+                    '',
+                    'varname  value   resids',
+                    '-------  -----   ------',
+                    'model',
+                    '  iv',
+                    '    x',
+                    '  c1',
+                    '    y',
+                    '  sub',
+                    '    c2',
+                    '      y',
+                    '    c3',
+                    '      y',
+                    '  c2',
+                    '    y',
+                    '  c3',
+                    '    y',
+                    '  sub2',
+                    '    y',
+                    '',
+                    '',
+                    "0 Implicit Output(s) in 'model'",
+                    '-------------------------------',
+                ]
 
-            for i, line in enumerate(expected):
-                if line and not line.startswith('-'):
-                    self.assertTrue(text[i].startswith(line),
-                                    '\nExpected: %s\nReceived: %s\n' % (line, text[i]))
+                for i, line in enumerate(expected):
+                    if line and not line.startswith('-'):
+                        self.assertTrue(text[i].startswith(line),
+                                        '\nExpected: %s\nReceived: %s\n' % (line, text[i]))
 
     def test_distribcomp_list_vars(self):
         print_opts = {'linewidth': 1024}
@@ -445,9 +449,9 @@ class DistributedListVarsTest(unittest.TestCase):
                 '',
                 'varname  value            shape  global_shape',
                 '-------  ---------------  -----  ------------',
-                'invec    |2.82842712475|  (8,)   Unavailable ',
+                'invec    |3.87298334621|  (8,)   (15,)',
                 '         value:',
-                '         array([1., 1., 1., 1., 1., 1., 1., 1.])'
+                '         array([ 1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.])'
             ]
 
             for i, line in enumerate(expected):
@@ -469,9 +473,9 @@ class DistributedListVarsTest(unittest.TestCase):
                 '',
                 'varname  value            shape  global_shape',
                 '-------  ---------------  -----  ------------',
-                'outvec   |2.82842712475|  (8,)   Unavailable ',
+                'outvec   |3.87298334621|  (8,)   (15,)',
                 '         value:',
-                '         array([1., 1., 1., 1., 1., 1., 1., 1.])'
+                '         array([ 1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.])'
             ]
 
             for i, line in enumerate(expected):
@@ -497,11 +501,11 @@ class DistributedListVarsTest(unittest.TestCase):
                 "1 Input(s) in 'C2'",
                 '------------------',
                 '',
-                'varname   value            shape  global_shape',
-                '--------  ---------------  -----  ------------',
-                'C2.invec  |3.87298334621|  (8,)   (15,)       ',
-                '          value:',
-                '          array([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.])'
+                'varname  value            shape  global_shape',
+                '-------  ---------------  -----  ------------',
+                'invec    |3.87298334621|  (8,)   (15,)',
+                '         value:',
+                '         array([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.])'
             ]
             for i, line in enumerate(expected):
                 if line and not line.startswith('-'):
@@ -520,11 +524,11 @@ class DistributedListVarsTest(unittest.TestCase):
                 "1 Explicit Output(s) in 'C2'",
                 '----------------------------',
                 '',
-                'varname    value           shape  global_shape',
-                '---------  --------------  -----  ------------',
-                'C2.outvec  |9.74679434481|  (8,)   (15,)       ',
-                '           value:',
-                '           array([ 2.,  2.,  2.,  2.,  2.,  2.,  2.,  2., -3., -3., -3., -3., -3., -3., -3.])'
+                'varname  value           shape  global_shape',
+                '-------  --------------  -----  ------------',
+                'outvec   |9.74679434481|  (8,)   (15,)',
+                '         value:',
+                '         array([ 2.,  2.,  2.,  2.,  2.,  2.,  2.,  2., -3., -3., -3., -3., -3., -3., -3.])'
             ]
             for i, line in enumerate(expected):
                 if line and not line.startswith('-'):
@@ -548,11 +552,11 @@ class DistributedListVarsTest(unittest.TestCase):
             "1 Input(s) in 'C3'",
             '------------------',
             '',
-            'varname   value                shape  global_shape',
-            '--------  -------------------  -----  ------------',
-            'C3.invec  {}  {}   {}        '.format(norm, shape, shape),
-            '          value:',
-            '          array({})'.format(value),
+            'varname  value                shape  global_shape',
+            '-------  -------------------  -----  ------------',
+            'invec  {}  {}   {}        '.format(norm, shape, shape),
+            '         value:',
+            '         array({})'.format(value),
         ]
 
         for i, line in enumerate(expected):

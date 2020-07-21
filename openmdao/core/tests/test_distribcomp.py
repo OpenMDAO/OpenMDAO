@@ -435,14 +435,14 @@ class MPITests(unittest.TestCase):
         # verify list_inputs/list_outputs work before run
         inputs = p.model.C2.list_inputs(shape=True, values=True, out_stream=None)
         outputs = p.model.C2.list_outputs(shape=True, values=True, out_stream=None)
-        verify(inputs, outputs, pathnames=True)
+        verify(inputs, outputs, pathnames=False)
 
         p.run_model()
 
         # verify list_inputs/list_outputs work after run
         inputs = p.model.C2.list_inputs(shape=True, values=True, out_stream=None)
         outputs = p.model.C2.list_outputs(shape=True, values=True, out_stream=None)
-        verify(inputs, outputs, in_vals=10., out_vals=7.5, pathnames=True)
+        verify(inputs, outputs, in_vals=10., out_vals=7.5, pathnames=False)
 
     def test_distrib_list_inputs_outputs(self):
         size = 11
@@ -486,13 +486,15 @@ class MPITests(unittest.TestCase):
                 outputs = self.C2.list_outputs(shape=True, global_shape=True, values=True, out_stream=None)
                 verify(inputs, outputs, pathnames=False, comm=self.comm, final=False)
 
+        #import wingdbstub
+
         p = om.Problem(Model())
         p.setup()
 
         # verify list_inputs/list_outputs work before final_setup for distributed comp
         inputs = p.model.C2.list_inputs(shape=True, global_shape=True, values=True, out_stream=None)
         outputs = p.model.C2.list_outputs(shape=True, global_shape=True, values=True, out_stream=None)
-        verify(inputs, outputs, pathnames=False, comm=p.comm, final=False)
+        verify(inputs, outputs, pathnames=False, comm=p.comm, final=True)
 
         p.final_setup()
 
@@ -501,14 +503,14 @@ class MPITests(unittest.TestCase):
         # verify list_inputs/list_outputs work before run for distributed comp
         inputs = p.model.C2.list_inputs(shape=True, global_shape=True, values=True, out_stream=None)
         outputs = p.model.C2.list_outputs(shape=True, global_shape=True, values=True, out_stream=None)
-        verify(inputs, outputs, pathnames=True, comm=p.comm, final=True)
+        verify(inputs, outputs, pathnames=False, comm=p.comm, final=True)
 
         p.run_model()
 
         # verify list_inputs/list_outputs work after run for distributed comp
         inputs = p.model.C2.list_inputs(shape=True, global_shape=True, values=True, out_stream=None)
         outputs = p.model.C2.list_outputs(shape=True, global_shape=True, values=True, out_stream=None)
-        verify(inputs, outputs, in_vals=10., out_vals=20., pathnames=True, comm=p.comm, final=True)
+        verify(inputs, outputs, in_vals=10., out_vals=20., pathnames=False, comm=p.comm, final=True)
 
     def test_distrib_idx_in_full_out(self):
         size = 11

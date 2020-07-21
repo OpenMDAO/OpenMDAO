@@ -1103,9 +1103,9 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # check that output from the Case method matches output from the System method
         # the system for the case should be properly identified as 'd1'
-        stream = StringIO()
-        d1.list_inputs(prom_name=True, desc=True, out_stream=stream)
-        expected = stream.getvalue().split('\n')
+        estream = StringIO()
+        d1.list_inputs(prom_name=True, desc=True, out_stream=estream)
+        expected = estream.getvalue().split('\n')
 
         stream = StringIO()
         case.list_inputs(prom_name=True, desc=True, out_stream=stream)
@@ -1376,8 +1376,8 @@ class TestSqliteCaseReader(unittest.TestCase):
             "",
             "varname     value",
             "----------  -----",
-            "sub.expl.a  [10.]",
-            "sub.expl.x  11   ",
+            "expl.a  [10.]",
+            "expl.x  11   ",
             # sub.impl.x is not recorded (excluded)
         ]
 
@@ -1398,10 +1398,8 @@ class TestSqliteCaseReader(unittest.TestCase):
             "",
             "varname   value",
             "--------  -----",
-            "model",
-            "  sub",
-            "    expl",
-            "      b   [20.]",
+            "expl",
+            "  b   [20.]",
             #      y is not recorded (excluded)
             "",
             "",
@@ -1410,10 +1408,8 @@ class TestSqliteCaseReader(unittest.TestCase):
             "",
             "varname   value",
             "-------   -----",
-            "model",
-            "  sub",
-            "    impl",
-            "      y   2    ",
+            "impl",
+            "  y   2    ",
         ]
 
         stream = StringIO()
@@ -4182,11 +4178,11 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
             "",
             "varname    value               ",
             "---------  --------------------",
-            "mda.d1.x   [3.43977636e-15]    ",
-            "mda.d1.y2  [3.75527777]        ",
-            "mda.d1.z   |1.9776388835080063|",
-            "mda.d2.y1  [3.16]              ",
-            "mda.d2.z   |1.9776388835080063|",
+            "d1.x   [3.43977636e-15]    ",
+            "d1.y2  [3.75527777]        ",
+            "d1.z   |1.9776388835080063|",
+            "d2.y1  [3.16]              ",
+            "d2.z   |1.9776388835080063|",
          ]
 
         stream = StringIO()
@@ -4204,8 +4200,8 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
             "",
             "varname    value       ",
             "---------  ------------",
-            "mda.d1.y1  [3.16]      ",
-            "mda.d2.y2  [3.75527777]",
+            "d1.y1  [3.16]      ",
+            "d2.y2  [3.75527777]",
             "",
             "",
             "0 Implicit Output(s) in 'mda'",
