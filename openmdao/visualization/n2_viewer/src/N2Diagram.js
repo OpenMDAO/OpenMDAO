@@ -629,28 +629,24 @@ class N2Diagram {
             .style("opacity", 0);
     }
 
+    /** Remove all rects in the highlight bar */
     clearHighlights() {
-        this.dom.highlightBar.selectAll('rect').remove();
+        const selection = this.dom.highlightBar.selectAll('rect');
+        debugInfo(`clearHighlights: Removing ${selection.size} highlights`);
+        selection.remove();
     }
 
+    /** Remove all pinned arrows */
     clearArrows() {
-        this.dom.n2OuterGroup.selectAll("[class^=n2_hover_elements]").remove();
+        this.arrowMgr.removeAllPinned();
         this.clearHighlights();
     }
 
-    /** Reveal arrows that had been hidden */
-    showArrows() {
-        for (const arrow of this.arrowCache) {
-            this.matrix.mouseOverOnDiagonal(arrow.cell);
-            arrow.element.attr('class', arrow.className);
-        }
-    }
-
-    /** Display connection arrows for all inputs/outputs */
+    /** Display connection arrows for all visible inputs/outputs */
     showAllArrows() {
         for (const cell of this.matrix.visibleCells) {
-            this.matrix.mouseOverOnDiagonal(cell);
-            this.mouseClickAll(cell);
+            this.matrix.drawConnectionArrows(cell);
+            this.arrowMgr.togglePin(cell.id, true);
         }
     }
 

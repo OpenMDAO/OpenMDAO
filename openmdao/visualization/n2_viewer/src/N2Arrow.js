@@ -853,10 +853,12 @@ class N2ArrowManager {
     /**
      * If arrows are hovering, then pin them, and vice versa.
      * @param {String} cellId The ID of the N2MatrixCell to operate on.
+     * @param {Boolean} [ pinOnly = false] If true, don't unpin anything.
      */
-    togglePin(cellId) {
+    togglePin(cellId, pinOnly = false) {
         const cellClassName = "n2_hover_elements_" + cellId;
         if (this.pinnedArrows.hasEventCell(cellId)) { // Arrows already pinned
+            if (pinOnly) return;
             debugInfo(`Unpinning ${cellId} arrows`)
             this.hoverArrows.migrateCell(cellId, this.pinnedArrows,
                 'n2_hover_elements', cellClassName);
@@ -876,5 +878,12 @@ class N2ArrowManager {
         const removedArrowIds = Object.keys(this.hoverArrows.arrows);
         this.hoverArrows.removeAll();
         debugInfo(`removeAllHovered(): Removed ${removedArrowIds.length} arrows`)
+    }
+
+    /** Remove all arrows in the pinnedArrow cache */
+    removeAllPinned() {
+        const removedArrowIds = Object.keys(this.pinnedArrows.arrows);
+        this.pinnedArrows.removeAll();
+        debugInfo(`removeAllPinned(): Removed ${removedArrowIds.length} arrows`)
     }
 }
