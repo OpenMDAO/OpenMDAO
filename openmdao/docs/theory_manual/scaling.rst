@@ -46,8 +46,7 @@ in this theory document.
 Scenarios: run_model
 ---------------------
 
-This sequence diagram shows the simplest possible operation -- executing a single explicit component with an input that comes from an IndepVarComp
-and solved using the RunOnce solver.  It shows how the outputs and residuals vectors are placed into an unscaled state right before compute is
+This sequence diagram shows the simplest possible operation -- executing a single explicit component and solving using the RunOnce solver.  It shows how the outputs and residuals vectors are placed into an unscaled state right before compute is
 called on the `Paraboloid`. You can also see where unit conversion takes places during data passing.
 
 .. figure:: sequence_diagrams/scaling_run_model.png
