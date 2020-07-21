@@ -1455,15 +1455,31 @@ class System(object):
         """
         abs2meta = self._var_abs2meta
         pro2abs = self._var_allprocs_prom2abs_list['output']
+        pro2abs_in = self._var_allprocs_prom2abs_list['input']
+        conns = self._problem_meta.get('connections', {})
+
         dv = self._design_vars
         for name, meta in dv.items():
+
             units = meta['units']
             dv[name]['total_adder'] = dv[name]['adder']
             dv[name]['total_scaler'] = dv[name]['scaler']
 
             if units is not None:
-                abs_name = pro2abs[name][0]
-                var_units = abs2meta[abs_name]['units']
+                # If derivatives are not being calculated, then you reach here before ivc_source
+                # is placed in the meta.
+                try:
+                    units_src = meta['ivc_source']
+                except KeyError:
+                    if name in abs2meta:
+                        units_src = name
+                    elif name in pro2abs:
+                        units_src = pro2abs[name][0]
+                    else:
+                        in_abs = pro2abs_in[name][0]
+                        units_src = conns[in_abs]
+
+                var_units = abs2meta[units_src]['units']
 
                 if var_units == units:
                     continue
@@ -1489,13 +1505,26 @@ class System(object):
         resp = self._responses
         type_dict = {'con': 'constraint', 'obj': 'objective'}
         for name, meta in resp.items():
+
             units = meta['units']
             resp[name]['total_scaler'] = resp[name]['scaler']
             resp[name]['total_adder'] = resp[name]['adder']
 
             if units is not None:
-                abs_name = pro2abs[name][0]
-                var_units = abs2meta[abs_name]['units']
+                # If derivatives are not being calculated, then you reach here before ivc_source
+                # is placed in the meta.
+                try:
+                    units_src = meta['ivc_source']
+                except KeyError:
+                    if name in abs2meta:
+                        units_src = name
+                    elif name in pro2abs:
+                        units_src = pro2abs[name][0]
+                    else:
+                        in_abs = pro2abs_in[name][0]
+                        units_src = conns[in_abs]
+
+                var_units = abs2meta[units_src]['units']
 
                 if var_units == units:
                     continue
