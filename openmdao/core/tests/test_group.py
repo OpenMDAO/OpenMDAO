@@ -2694,7 +2694,6 @@ class TestFeatureSetOrder(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('indeps', om.IndepVarComp('x', 1.))
         model.add_subsystem('C1', ReportOrderComp(order_list))
         model.add_subsystem('C2', ReportOrderComp(order_list))
         model.add_subsystem('C3', ReportOrderComp(order_list))
@@ -2708,7 +2707,7 @@ class TestFeatureSetOrder(unittest.TestCase):
         order_list[:] = []
 
         # now swap C2 and C1 in the order
-        model.set_order(['indeps', 'C2', 'C1', 'C3'])
+        model.set_order(['C2', 'C1', 'C3'])
 
         # after changing the order, we must call setup again
         prob.setup()

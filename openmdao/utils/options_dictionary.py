@@ -383,6 +383,10 @@ class OptionsDictionary(object):
 
         default_provided = default is not _undefined
 
+        if default_provided and default is None:
+            # specifying default=None implies allow_none
+            allow_none = True
+
         self._dict[name] = {
             'value': default,
             'values': values,

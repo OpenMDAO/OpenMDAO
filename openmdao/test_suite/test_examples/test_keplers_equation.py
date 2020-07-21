@@ -33,12 +33,11 @@ class TestKeplersEquation(unittest.TestCase):
                                E={'value': 0.0, 'units': 'rad'},
                                ecc={'value': 0.0})
 
-        prob.model.set_input_defaults('M', 85.0, units='deg')
-        prob.model.set_input_defaults('ecc', 0.6)
-
         prob.model.add_subsystem(name='balance', subsys=bal,
                                  promotes_inputs=['M'],
                                  promotes_outputs=['E'])
+
+        prob.model.set_input_defaults('M', 85.0, units='deg')
 
         prob.model.add_subsystem(name='lhs_comp', subsys=lhs_comp,
                                  promotes_inputs=['E', 'ecc'])
@@ -52,9 +51,11 @@ class TestKeplersEquation(unittest.TestCase):
 
         prob.setup()
 
+        prob.set_val('ecc', 0.6)
+
         prob.run_model()
 
-        assert_almost_equal(np.degrees(prob['E']), 115.9, decimal=1)
+        assert_almost_equal(np.degrees(prob.get_val('E')), 115.9, decimal=1)
 
 
 if __name__ == "__main__":

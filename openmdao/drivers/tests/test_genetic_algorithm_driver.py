@@ -1381,10 +1381,6 @@ class TestFeatureSimpleGA(unittest.TestCase):
         prob = om.Problem()
         prob.model.add_subsystem('cylinder', Cylinder(), promotes=['*'])
 
-        indeps = prob.model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
-        indeps.add_output('radius', 2.)  # height
-        indeps.add_output('height', 3.)  # radius
-
         # setup the optimization
         prob.driver = om.SimpleGADriver()
         prob.driver.options['penalty_parameter'] = 3.
@@ -1398,12 +1394,16 @@ class TestFeatureSimpleGA(unittest.TestCase):
         prob.model.add_constraint('Volume', lower=10.)
 
         prob.setup()
+
+        prob.set_val('radius', 2.)
+        prob.set_val('height', 3.)
+
         prob.run_driver()
 
         # These go to 0.5 for unconstrained problem. With constraint and penalty, they
         # will be above 1.0 (actual values will vary.)
-        self.assertGreater(prob['radius'], 1.)
-        self.assertGreater(prob['height'], 1.)
+        self.assertGreater(prob.get_val('radius'), 1.)
+        self.assertGreater(prob.get_val('height'), 1.)
 
     def test_pareto(self):
         import openmdao.api as om

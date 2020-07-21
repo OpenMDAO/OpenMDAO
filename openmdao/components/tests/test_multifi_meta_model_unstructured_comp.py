@@ -480,10 +480,10 @@ class MultiFiMetaModelFeatureTestCase(unittest.TestCase):
         mm.options['train:x_fi2'] = x_lofi
         mm.options['train:y_fi2'] = y_lofi
 
-        prob['mm.x'] = np.array([[2./3., 1./3.]])
+        prob.set_val('mm.x', np.array([[2./3., 1./3.]]))
         prob.run_model()
 
-        assert_near_equal(prob['mm.y'], 26.26, tolerance=0.02)
+        assert_near_equal(prob.get_val('mm.y'), 26.26, tolerance=0.02)
 
 
 if __name__ == "__main__":
