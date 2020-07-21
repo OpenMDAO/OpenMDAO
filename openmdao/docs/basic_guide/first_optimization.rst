@@ -61,8 +61,8 @@ Defining the Design Variables and Objective
 ---------------------------------------------------------------
 
 Next, we set up the problem formulation so that the optimizer knows what to vary and which objective to optimize.
-In these calls, we are always going to be specifying a single variable. For :ref:`add_design_var <feature_add_design_var>`,
-the variable will always be a component input. If the input is promoted, then it will be the promoted name.
+In these calls, we are going to be specifying a single variable. For :ref:`add_design_var <feature_add_design_var>`,
+the variable will be a component input. If the input is promoted, then it will be the promoted name.
 For :ref:`add_objective <feature_add_objective>` and :ref:`add_constraint <feature_add_constraint>`
 the variable can be the output of any component (including an :code:`IndepVarComp`).
 
