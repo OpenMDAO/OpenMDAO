@@ -1,7 +1,7 @@
 **********************************
 # Release Notes for OpenMDAO 3.2.0
 
-July 20, 2020
+July 21, 2020
 
 OpenMDAO 3.2.0 introduces significant changes in the way OpenMDAO works.
 The primary change is that the manual creation IndepVarComp outputs is no longer required because OpenMDAO will create them for you in the background.
