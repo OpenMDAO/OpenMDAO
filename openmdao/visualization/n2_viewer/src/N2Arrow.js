@@ -781,6 +781,74 @@ class N2ArrowManager {
         return newArrow;
     }
 
+    _transitionFullArrow(arrow, startCell, endCell) {
+        debugInfo(`transition: Found both sides of ${arrow.id}`)
+        let attribs = arrow.attribs;
+        attribs.start.col = startCell.col;
+        attribs.start.row = startCell.row;
+        attribs.end.col = endCell.col;
+        attribs.end.row = endCell.row;
+        attribs.width = this.lineWidth;
+        this.pinnedArrows.arrows[arrow.id] =
+            new N2BentArrow(attribs, this.n2Groups, this.nodeSize);
+    }
+
+    _transitionStartArrow(arrow, startCell, matrix) {
+        debugInfo(`transition: Only found start cell for ${arrow.id}`)
+        const side = (arrow.attribs.start.id > arrow.attribs.end.id)?
+            'bottom' : 'top';
+        const attribs = {
+            'cell': {
+                'col': startCell.col,
+                'row': startCell.row,
+                'srcId': startCell.srcObj.id,
+                'tgtId': startCell.tgtObj.id
+            },
+            'width': this.lineWidth,
+            'matrixSize': matrix.diagNodes.length,
+            'offscreenId': arrow.attribs.end.id,
+            'label': matrix.model.nodeIds[arrow.attribs.end.id].absPathName,
+            'color': arrow.attribs.color
+        }
+        this.pinnedArrows.arrows[arrow.id] =
+            new (this.arrowDirClasses[side]['outgoing'])(attribs,
+                    this.n2Groups, this.nodeSize);
+    }
+
+    _transitionEndArrow(arrow, endCell, matrix) {
+        debugInfo(`transition: Only found end cell for ${arrow.id}`)
+        const side = (arrow.attribs.start.id > arrow.attribs.end.id)?
+            'bottom' : 'top';
+        const attribs = {
+            'cell': {
+                'col': endCell.col,
+                'row': endCell.row,
+                'srcId': endCell.srcObj.id,
+                'tgtId': endCell.tgtObj.id
+            },
+            'width': this.lineWidth,
+            'matrixSize': matrix.diagNodes.length,
+            'offscreenId': arrow.attribs.start.id,
+            'label': matrix.model.nodeIds[arrow.attribs.start.id].absPathName,
+            'color': arrow.attribs.color
+        }
+        this.pinnedArrows.arrows[arrow.id] =
+            new (this.arrowDirClasses[side]['incoming'])(attribs,
+                this.n2Groups, this.nodeSize);       
+    }
+
+    _transitionUncollapsedNodes(uncollapsedNodeIds, matrix) {
+        for (const row in matrix.grid) {
+            const cell = matrix.grid[row][row]; // Diagonal cells only
+            for (const nodeId of uncollapsedNodeIds) {
+                if (cell.obj.hasParent(matrix.model.nodeIds[nodeId])) {
+                    matrix.drawOnDiagonalArrows(cell);
+                    this.togglePin(cell.id, true);
+                }
+            }
+        }
+    }
+
     /**
      * Redraw all the visible arrows in the pinned arrow cache, and remove
      * the ones for which neither endpoint is visible. Full arrows may
@@ -788,10 +856,14 @@ class N2ArrowManager {
      * @param {N2Matrix} matrix The matrix to operate with.
      */
     transition(matrix) {
+        let uncollapsedNodeIds = [];
+
         for (const arrowId in this.pinnedArrows.arrows) {
             const arrow = this.pinnedArrows.arrows[arrowId];
-            const startCell = matrix.findCellByNodeId(arrow.attribs.start.id);
-            const endCell = matrix.findCellByNodeId(arrow.attribs.end.id);
+            const startCellInfo = matrix.findCellByNodeId(arrow.attribs.start.id);
+            const endCellInfo = matrix.findCellByNodeId(arrow.attribs.end.id);
+            const startCell = startCellInfo.cell;
+            const endCell = endCellInfo.cell;
 
             if (startCell === endCell) { // Both undefined, or same cell
                 if (startCell === undefined)
@@ -802,60 +874,34 @@ class N2ArrowManager {
 
                 this.pinnedArrows.removeArrowFromScreen(arrowId);
             }
-            else if (startCell && endCell) { // Both endpoint cells are visible
-                debugInfo(`transition: Found both sides of ${arrowId}`)
-                let attribs = arrow.attribs;
-                attribs.start.col = startCell.col;
-                attribs.start.row = startCell.row;
-                attribs.end.col = endCell.col;
-                attribs.end.row = endCell.row;
-                attribs.width = this.lineWidth;
-                this.pinnedArrows.arrows[arrowId] =
-                    new N2BentArrow(attribs, this.n2Groups, this.nodeSize);
+            else if (startCellInfo.childMatch || endCellInfo.childMatch) {
+                debugInfo(`transition: ${arrowId} endpoint was previously collapsed, \
+                    pinning arrows for all children.`)
+                if (startCellInfo.childMatch)
+                    uncollapsedNodeIds.push(arrow.attribs.start.id);
+                if (endCellInfo.childMatch)
+                    uncollapsedNodeIds.push(arrow.attribs.end.id);
+
+                this.pinnedArrows.removeArrowFromScreen(arrowId);
+                this.pinnedArrows.removeArrowFromCache(arrowId);
             }
-            else if (startCell) { // Only the non-pointy end is visible
-                debugInfo(`transition: Only found start cell for ${arrowId}`)
-                const side = (arrow.attribs.start.id > arrow.attribs.end.id)?
-                    'bottom' : 'top';
-                const attribs = {
-                    'cell': {
-                        'col': startCell.col,
-                        'row': startCell.row,
-                        'srcId': startCell.srcObj.id,
-                        'tgtId': startCell.tgtObj.id
-                    },
-                    'width': this.lineWidth,
-                    'matrixSize': matrix.diagNodes.length,
-                    'offscreenId': arrow.attribs.end.id,
-                    'label': matrix.model.nodeIds[arrow.attribs.end.id].absPathName,
-                    'color': arrow.attribs.color
-                }
-                this.pinnedArrows.arrows[arrowId] =
-                    new (this.arrowDirClasses[side]['outgoing'])(attribs,
-                            this.n2Groups, this.nodeSize);
+            else if ((startCellInfo.exactMatch || startCellInfo.parentMatch) && 
+                (endCellInfo.exactMatch || endCellInfo.parentMatch)) {
+                // Both endpoint cells are visible
+                this._transitionFullArrow(arrow, startCell, endCell);
             }
-            else if (endCell) { // Only the pointy end is visible
-                debugInfo(`transition: Only found end cell for ${arrowId}`)
-                const side = (arrow.attribs.start.id > arrow.attribs.end.id)?
-                    'bottom' : 'top';
-                const attribs = {
-                    'cell': {
-                        'col': endCell.col,
-                        'row': endCell.row,
-                        'srcId': endCell.srcObj.id,
-                        'tgtId': endCell.tgtObj.id
-                    },
-                    'width': this.lineWidth,
-                    'matrixSize': matrix.diagNodes.length,
-                    'offscreenId': arrow.attribs.start.id,
-                    'label': matrix.model.nodeIds[arrow.attribs.start.id].absPathName,
-                    'color': arrow.attribs.color
-                }
-                this.pinnedArrows.arrows[arrowId] =
-                    new (this.arrowDirClasses[side]['incoming'])(attribs,
-                        this.n2Groups, this.nodeSize);
+            else if (startCell) {
+                // Only the non-pointy end is visible
+                this._transitionStartArrow(arrow, startCell, matrix);
+            }
+            else if (endCell) {
+                // Only the pointy end is visible
+                this._transitionEndArrow(arrow, endCell, matrix);
             }
         }
+
+        // Adding arrows, so do after iteration through arrow list
+        this._transitionUncollapsedNodes(uncollapsedNodeIds, matrix);
     }
 
     /**

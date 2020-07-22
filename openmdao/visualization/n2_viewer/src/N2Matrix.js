@@ -124,22 +124,59 @@ class N2Matrix {
      * Given the node ID, determine if one of the cells in the matrix
      * represents it or contains it.
      * @param {Number} nodeId The id of the N2TreeNode to search for
-     * @returns {N2MatrixCell} Reference to the cell if found, or undefined
+     * @returns {Object} Contains reference to cell if found, and flags describing it.
      */
     findCellByNodeId(nodeId) {
         const node = this.model.nodeIds[nodeId];
+        let ret = { 
+            'cell': undefined,    // Changed to refer to a related cell if found
+            'exactMatch': false,  // True if nodeId matches a cell
+            'parentMatch': false, // True if nodeId's ancestor is a cell
+            'childMatch': false   // True if nodeId's descendant is a cell
+        }
+
+        const debugStr = `${node.absPathName}(${nodeId})`
 
         // Continue only if the node is a child of the zoomed element
-        if (node.hasParent(this.layout.zoomedElement)) {
-            for (const cell of this.visibleCells) {
-                // Found directly:
-                if (cell.id == N2MatrixCell.makeId(nodeId)) return cell;
+        if (! node.hasParent(this.layout.zoomedElement)) {
+            debugInfo(`findCellByNodeId: No trace of ${debugStr} visible in matrix`)
+            return ret;
+        }
 
-                if (cell.obj.hasNode(node)) return cell;
+        // Less expensive to check entire matrix for direct matches first
+        for (const row in this.grid) { // Check diagonals only
+            const cell = this.grid[row][row];
+
+            // Found directly:
+            if (cell.id == N2MatrixCell.makeId(nodeId)) {
+                debugInfo(`findCellByNodeId: Found ${debugStr} directly in matrix`)
+                ret.cell = cell;
+                ret.exactMatch = true
+                return ret;
             }
         }
 
-        return undefined;
+        // Only check for relationships if node not directly visible
+        for (const row in this.grid) { // Check diagonals only
+            const cell = this.grid[row][row];
+            if (node.hasNodeInChildren(cell.obj)) {
+                debugInfo(`findCellByNodeId: Found descendant of ${debugStr} in matrix`)
+                ret.cell = cell;
+                ret.childMatch = true
+                return ret;
+            }
+
+            if (node.hasParent(cell.obj)) {
+                debugInfo(`findCellByNodeId: Found ancestor of ${debugStr} in matrix`)
+                ret.cell = cell;
+                ret.parentMatch = true
+                return ret;
+            }
+        }
+    
+        // Shouldn't really get here due to zoomedElement check at top
+        debugInfo(`findCellByNodeId: ${debugStr} fell through all checks!`)
+        return ret;
     }
 
     /**

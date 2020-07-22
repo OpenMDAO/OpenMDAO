@@ -12,7 +12,6 @@ class ModelData {
         this.sysPathnamesList = modelJSON.sys_pathnames_list;
 
         this.maxDepth = 1;
-        this.idCounter = 0;
         this.unconnectedParams = 0;
         this.autoivcSources = 0;
         this.nodePaths = {};
