@@ -3221,12 +3221,16 @@ class System(object):
         if out_stream is _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
 
+        inputs = self._gather_iovars(inputs, all_procs)
+
         if out_stream:
             self._write_table('input', inputs, hierarchical, print_arrays, all_procs, out_stream)
 
         if self.name:  # if we're not the top system, convert names to relative
             old = inputs
-            inputs = [(n[rel_idx:], meta) for n, meta in old]
+            inputs = [(n[rel_idx:], meta) for n, meta in old.items()]
+        else:
+            inputs = list(inputs.items())
 
         return inputs
 
@@ -3438,29 +3442,98 @@ class System(object):
         if out_stream is _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
 
-        if out_stream:
-            if explicit:
-                self._write_table('explicit', expl_outputs, hierarchical, print_arrays,
+        if explicit:
+            expl_dict = self._gather_iovars(expl_outputs, all_procs, residuals)
+            if out_stream:
+                self._write_table('explicit', expl_dict, hierarchical, print_arrays,
                                   all_procs, out_stream)
-            if implicit:
-                self._write_table('implicit', impl_outputs, hierarchical, print_arrays,
+            if self.name:
+                expl_outputs = [(n[rel_idx:], meta) for n, meta in expl_dict.items()]
+            else:
+                expl_outputs = list(expl_dict.items())
+
+        if implicit:
+            impl_dict = self._gather_iovars(impl_outputs, all_procs, residuals)
+            if out_stream:
+                self._write_table('implicit', impl_dict, hierarchical, print_arrays,
                                   all_procs, out_stream)
+            if self.name:
+                impl_outputs = [(n[rel_idx:], meta) for n, meta in impl_dict.items()]
+            else:
+                impl_outputs = list(impl_dict.items())
 
         if explicit and implicit:
-            final = expl_outputs + impl_outputs
+            return expl_outputs + impl_outputs
         elif explicit:
-            final = expl_outputs
+            return expl_outputs
         elif implicit:
-            final = impl_outputs
+            return impl_outputs
         else:
             raise RuntimeError(self.msginfo +
                                ': You have excluded both Explicit and Implicit components.')
 
-        if self.name:  # if we're not the top system, convert names to relative
-            old = final
-            final = [(n[rel_idx:], meta) for n, meta in old]
+    def _gather_iovars(self, var_data, all_procs, residuals=False):
+        var_dict = OrderedDict(var_data)
 
-        return final
+        # If parallel, gather up the vars.
+        if MPI and self.comm.size > 1:
+            # All procs must call this. Returns a list, one per proc.
+            all_var_dicts = self.comm.allgather(var_dict) if all_procs \
+                else self.comm.gather(var_dict, root=0)
+
+            # unless all_procs is requested, only the root process should print
+            if not all_procs and self.comm.rank > 0:
+                return var_dict
+
+            meta = self._var_abs2meta
+            allprocs_meta = self._var_allprocs_abs2meta
+
+            var_dict = all_var_dicts[self.comm.rank]  # start with metadata from current rank
+
+            keys = ['value']
+            if residuals:
+                keys.append('resids')
+
+            distrib = {k: {} for k in keys}  # dictionary to collect distributed values
+
+            # Go through data from all procs in order by rank and collect distributed values
+            for rank, proc_vars in enumerate(all_var_dicts):
+                for name in proc_vars:
+                    if name not in var_dict:     # If not in the merged dict, add it
+                        var_dict[name] = proc_vars[name]
+                    try:
+                        is_distributed = allprocs_meta[name]['distributed']
+                    except KeyError:
+                        is_distributed = False
+                    if is_distributed:
+                        # TODO no support for > 1D arrays
+                        #   meta.src_indices has the info we need to piece together arrays
+
+                        try:
+                            global_shape = allprocs_meta[name]['global_shape']
+                        except KeyError:
+                            # global_shape may not have been computed yet
+                            pass
+                        else:
+                            if allprocs_meta[name]['shape'] != global_shape:
+                                # if the local shape is different than the global shape and the
+                                # global shape matches the concatenation of values from all procs,
+                                # then assume the concatenation, otherwise just use the value from
+                                # the current proc
+                                for key in keys:
+                                    if key in var_dict[name]:
+                                        val = proc_vars[name][key]
+                                        if val.size > 0:
+                                            if name not in distrib[key]:
+                                                distrib[key][name] = [proc_vars[name][key]]
+                                            else:
+                                                distrib[key][name].append(proc_vars[name][key])
+
+                                        if rank == self.comm.size - 1 and name in distrib[key]:
+                                            var_dict[name][key] = np.concatenate(distrib[key][name],
+                                                                                 axis=0)
+
+        return var_dict
 
     def _write_table(self, var_type, var_data, hierarchical, print_arrays, all_procs, out_stream):
         """
@@ -3470,8 +3543,8 @@ class System(object):
         ----------
         var_type : 'input', 'explicit' or 'implicit'
             Indicates type of variables, input or explicit/implicit output.
-        var_data : list
-            List of (name, dict of vals and metadata) tuples.
+        var_data : list or dict
+            List or dict of name and metadata.
         hierarchical : bool
             When True, human readable output shows variables in hierarchical format.
         print_arrays : bool
@@ -3490,69 +3563,21 @@ class System(object):
             return
 
         # Make a dict of variables. Makes it easier to work with in this method
-        var_dict = OrderedDict(var_data)
-
-        # If parallel, gather up the vars.
-        if MPI and self.comm.size > 1:
-            # All procs must call this. Returns a list, one per proc.
-            all_var_dicts = self.comm.gather(var_dict, root=0) if not all_procs \
-                else self.comm.allgather(var_dict)
-
-            # unless all_procs is requested, only the root process should print
-            if not all_procs and self.comm.rank > 0:
-                return
-
-            meta = self._var_abs2meta
-            allprocs_meta = self._var_allprocs_abs2meta
-
-            var_dict = all_var_dicts[self.comm.rank]  # start with metadata from current rank
-
-            distrib = {'value': {}, 'resids': {}}     # dictionary to collect distributed values
-
-            # Go through data from all procs in order by rank and collect distributed values
-            for rank, proc_vars in enumerate(all_var_dicts):
-                for name in proc_vars:
-                    if name not in var_dict:     # If not in the merged dict, add it
-                        var_dict[name] = proc_vars[name]
-                    else:
-                        try:
-                            is_distributed = allprocs_meta[name]['distributed']
-                        except KeyError:
-                            is_distributed = False
-                        if is_distributed and name in allprocs_meta:
-                            # TODO no support for > 1D arrays
-                            #   meta.src_indices has the info we need to piece together arrays
-
-                            global_shape = allprocs_meta[name]['global_shape']
-
-                            if allprocs_meta[name]['shape'] != global_shape:
-                                # if the local shape is different than the global shape and the
-                                # global shape matches the concatenation of values from all procs,
-                                # then assume the concatenation, otherwise just use the value from
-                                # the current proc
-                                for key in ('value', 'resids'):
-                                    if key in var_dict[name]:
-                                        if rank == 0:
-                                            distrib[key][name] = proc_vars[name][key]
-                                        else:
-                                            distrib[key][name] = np.append(distrib[key][name],
-                                                                           proc_vars[name][key])
-
-                                        if rank == self.comm.size - 1:
-                                            if distrib[key][name].shape == global_shape:
-                                                var_dict[name][key] = distrib[key][name]
+        if isinstance(var_data, list):
+            var_data = OrderedDict(var_data)
 
         if self._outputs is None:
-            var_list = var_dict.keys()
+            var_list = var_data.keys()
             top_name = self.name
         else:
             inputs = var_type == 'input'
             outputs = not inputs
-            var_list = self._get_vars_exec_order(inputs=inputs, outputs=outputs, variables=var_dict)
+            var_list = self._get_vars_exec_order(inputs=inputs, outputs=outputs, variables=var_data)
             top_name = self.name if self.name else 'model'
 
-        write_var_table(self.pathname, var_list, var_type, var_dict,
-                        hierarchical, top_name, print_arrays, out_stream)
+        if all_procs or self.comm.size == 0 or self.comm.rank == 0:
+            write_var_table(self.pathname, var_list, var_type, var_data,
+                            hierarchical, top_name, print_arrays, out_stream)
 
     def _get_vars_exec_order(self, inputs=False, outputs=False, variables=None):
         """
@@ -3586,24 +3611,15 @@ class System(object):
 
         if self._subsystems_allprocs:
             for subsys in self._subsystems_allprocs:
-                # subsys.pathname will only be defined properly if a subsystem is local,
-                # but subsys.name will be properly defined.
-                path = '.'.join((self.pathname, subsys.name)) if self.pathname else subsys.name
-                path += '.'
+                prefix = subsys.pathname + '.'
                 for var_type in in_or_out:
-                    for var_name in real_vars[var_type]:
-                        if (not variables or var_name in variables) and var_name.startswith(path):
-                            var_list.append(var_name)
-                    for var_name in disc_vars[var_type]:
-                        if (not variables or var_name in variables) and var_name.startswith(path):
+                    for var_name in chain(real_vars[var_type], disc_vars[var_type]):
+                        if (variables is None or var_name in variables) and var_name.startswith(prefix):
                             var_list.append(var_name)
         else:
             # For components with no children, self._subsystems_allprocs is empty.
             for var_type in in_or_out:
-                for var_name in real_vars[var_type]:
-                    if not variables or var_name in variables:
-                        var_list.append(var_name)
-                for var_name in disc_vars[var_type]:
+                for var_name in chain(real_vars[var_type], disc_vars[var_type]):
                     if not variables or var_name in variables:
                         var_list.append(var_name)
 

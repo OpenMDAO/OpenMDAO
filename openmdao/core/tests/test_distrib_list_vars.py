@@ -84,59 +84,61 @@ class DistributedListVarsTest(unittest.TestCase):
         prob.run_driver()
 
         stream = StringIO()
-        inputs = sorted(prob.model.list_inputs(values=True, print_arrays=True, out_stream=stream))
-        self.assertEqual(inputs[0][0], 'plus.x')
-        self.assertEqual(inputs[1][0], 'summer.invec')
-        self.assertEqual(inputs[0][1]['value'].size, 50)  # should only return half that is local
-        self.assertEqual(inputs[1][1]['value'].size, 100)
+        with multi_proc_exception_check(prob.comm):
+            inputs = sorted(prob.model.list_inputs(values=True, print_arrays=True, out_stream=stream))
+            self.assertEqual(inputs[0][0], 'plus.x')
+            self.assertEqual(inputs[1][0], 'summer.invec')
+            self.assertEqual(inputs[0][1]['value'].size, 50)  # should only return half that is local
+            self.assertEqual(inputs[1][1]['value'].size, 100)
 
-        text = stream.getvalue()
-        if prob.comm.rank:  # Only rank 0 prints
-            self.assertEqual(len(text), 0)
-        else:
-            self.assertEqual(text.count('value'), 3)
-            self.assertEqual(text.count('\nmodel'), 1)
-            self.assertEqual(text.count('\n  plus'), 1)
-            self.assertEqual(text.count('\n    x'), 1)
-            self.assertEqual(text.count('\n  summer'), 1)
-            self.assertEqual(text.count('\n    invec'), 1)
-            # make sure all the arrays written have 100 elements in them
-            self.assertEqual(len(text.split('[')[1].split(']')[0].split()), 100)
-            self.assertEqual(len(text.split('[')[2].split(']')[0].split()), 100)
+            text = stream.getvalue()
+            if prob.comm.rank:  # Only rank 0 prints
+                self.assertEqual(len(text), 0)
+            else:
+                self.assertEqual(text.count('value'), 3)
+                self.assertEqual(text.count('\nmodel'), 1)
+                self.assertEqual(text.count('\n  plus'), 1)
+                self.assertEqual(text.count('\n    x'), 1)
+                self.assertEqual(text.count('\n  summer'), 1)
+                self.assertEqual(text.count('\n    invec'), 1)
+                # make sure all the arrays written have 100 elements in them
+                self.assertEqual(len(text.split('[')[1].split(']')[0].split()), 100)
+                self.assertEqual(len(text.split('[')[2].split(']')[0].split()), 100)
 
         stream = StringIO()
-        outputs = sorted(prob.model.list_outputs(values=True,
-                                                 units=True,
-                                                 shape=True,
-                                                 bounds=True,
-                                                 residuals=True,
-                                                 scaling=True,
-                                                 hierarchical=True,
-                                                 print_arrays=True,
-                                                 out_stream=stream))
-        self.assertEqual(outputs[0][0], 'des_vars.x')
-        self.assertEqual(outputs[1][0], 'plus.y')
-        self.assertEqual(outputs[2][0], 'summer.sum')
-        self.assertEqual(outputs[0][1]['value'].size, 100)
-        self.assertEqual(outputs[1][1]['value'].size, 50)
-        self.assertEqual(outputs[2][1]['value'].size, 1)
+        with multi_proc_exception_check(prob.comm):
+            outputs = sorted(prob.model.list_outputs(values=True,
+                                                    units=True,
+                                                    shape=True,
+                                                    bounds=True,
+                                                    residuals=True,
+                                                    scaling=True,
+                                                    hierarchical=True,
+                                                    print_arrays=True,
+                                                    out_stream=stream))
+            self.assertEqual(outputs[0][0], 'des_vars.x')
+            self.assertEqual(outputs[1][0], 'plus.y')
+            self.assertEqual(outputs[2][0], 'summer.sum')
+            self.assertEqual(outputs[0][1]['value'].size, 100)
+            self.assertEqual(outputs[1][1]['value'].size, 50)
+            self.assertEqual(outputs[2][1]['value'].size, 1)
 
-        text = stream.getvalue()
-        if prob.comm.rank:  # Only rank 0 prints
-            self.assertEqual(len(text), 0)
-        else:
-            self.assertEqual(text.count('value'), 3)
-            self.assertEqual(text.count('\n  des_vars'), 1)
-            self.assertEqual(text.count('\n    x'), 1)
-            self.assertEqual(text.count('\n  plus'), 1)
-            self.assertEqual(text.count('\n    y'), 1)
-            self.assertEqual(text.count('\n  summer'), 1)
-            self.assertEqual(text.count('\n    sum'), 1)
-            # make sure all the arrays written have 100 elements in them
-            self.assertEqual(len(text.split('[')[1].split(']')[0].split()), 100)
-            self.assertEqual(len(text.split('[')[2].split(']')[0].split()), 100)
-            self.assertEqual(len(text.split('[')[3].split(']')[0].split()), 100)
-            self.assertEqual(len(text.split('[')[4].split(']')[0].split()), 100)
+            text = stream.getvalue()
+            if prob.comm.rank:  # Only rank 0 prints
+                self.assertEqual(len(text), 0)
+            else:
+                self.assertEqual(text.count('value'), 3)
+                self.assertEqual(text.count('\n  des_vars'), 1)
+                self.assertEqual(text.count('\n    x'), 1)
+                self.assertEqual(text.count('\n  plus'), 1)
+                self.assertEqual(text.count('\n    y'), 1)
+                self.assertEqual(text.count('\n  summer'), 1)
+                self.assertEqual(text.count('\n    sum'), 1)
+                # make sure all the arrays written have 100 elements in them
+                self.assertEqual(len(text.split('[')[1].split(']')[0].split()), 100)
+                self.assertEqual(len(text.split('[')[2].split(']')[0].split()), 100)
+                self.assertEqual(len(text.split('[')[3].split(']')[0].split()), 100)
+                self.assertEqual(len(text.split('[')[4].split(']')[0].split()), 100)
 
     def test_distributed_list_vars(self):
 
@@ -182,75 +184,77 @@ class DistributedListVarsTest(unittest.TestCase):
         prob.cleanup()
 
         stream = StringIO()
-        inputs = sorted(prob.model.list_inputs(values=True, print_arrays=True, out_stream=stream))
-        self.assertEqual(inputs[0][0], 'Obj.y1')
-        self.assertEqual(inputs[1][0], 'Obj.y2')
-        if prob.comm.rank:  # Only rank 0 prints
-            self.assertEqual(inputs[2][0], 'par.G2.Cc.x')
-            self.assertEqual(inputs[3][0], 'par.G2.Cy.x')
-        else:
-            self.assertEqual(inputs[2][0], 'par.G1.Cc.x')
-            self.assertEqual(inputs[3][0], 'par.G1.Cy.x')
-        self.assertTrue('value' in inputs[0][1])
-        self.assertEqual(4, len(inputs))
+        with multi_proc_exception_check(prob.comm):
+            inputs = sorted(prob.model.list_inputs(values=True, print_arrays=True, out_stream=stream))
+            self.assertEqual(inputs[0][0], 'Obj.y1')
+            self.assertEqual(inputs[1][0], 'Obj.y2')
+            if prob.comm.rank:  # Only rank 0 prints
+                self.assertEqual(inputs[2][0], 'par.G2.Cc.x')
+                self.assertEqual(inputs[3][0], 'par.G2.Cy.x')
+            else:
+                self.assertEqual(inputs[2][0], 'par.G1.Cc.x')
+                self.assertEqual(inputs[3][0], 'par.G1.Cy.x')
+            self.assertTrue('value' in inputs[0][1])
+            self.assertEqual(4, len(inputs))
 
-        text = stream.getvalue()
-        if prob.comm.rank:  # Only rank 0 prints
-            self.assertEqual(len(text), 0)
-        else:
-            self.assertEqual(1, text.count("6 Input(s) in 'model'"), 1)
-            self.assertEqual(1, text.count('value'))
-            self.assertEqual(1, text.count('  par'))
-            self.assertEqual(1, text.count('    G1'))
-            self.assertEqual(1, text.count('    G2'))
-            self.assertEqual(2, text.count('      Cy'))
-            self.assertEqual(2, text.count('      Cc'))
-            self.assertEqual(4, text.count('        x'))
-            self.assertEqual(1, text.count('  Obj'))
-            self.assertEqual(1, text.count('    y1'))
-            self.assertEqual(1, text.count('    y2'))
+            text = stream.getvalue()
+            if prob.comm.rank:  # Only rank 0 prints
+                self.assertEqual(len(text), 0)
+            else:
+                self.assertEqual(1, text.count("6 Input(s) in 'model'"), 1)
+                self.assertEqual(1, text.count('value'))
+                self.assertEqual(1, text.count('  par'))
+                self.assertEqual(1, text.count('    G1'))
+                self.assertEqual(1, text.count('    G2'))
+                self.assertEqual(2, text.count('      Cy'))
+                self.assertEqual(2, text.count('      Cc'))
+                self.assertEqual(4, text.count('        x'))
+                self.assertEqual(1, text.count('  Obj'))
+                self.assertEqual(1, text.count('    y1'))
+                self.assertEqual(1, text.count('    y2'))
 
         stream = StringIO()
-        outputs = sorted(prob.model.list_outputs(values=True,
-                                                 units=True,
-                                                 shape=True,
-                                                 bounds=True,
-                                                 residuals=True,
-                                                 scaling=True,
-                                                 hierarchical=True,
-                                                 print_arrays=True,
-                                                 out_stream=stream))
-        self.assertEqual(outputs[0][0], 'Obj.obj')
-        if prob.comm.rank:  # outputs only return what is on their proc
-            self.assertEqual(outputs[1][0], 'par.G2.Cc.c')
-            self.assertEqual(outputs[2][0], 'par.G2.Cy.y')
-            self.assertEqual(outputs[3][0], 'par.G2.indep_var_comp.x')
-        else:
-            self.assertEqual(outputs[1][0], 'par.G1.Cc.c')
-            self.assertEqual(outputs[2][0], 'par.G1.Cy.y')
-            self.assertEqual(outputs[3][0], 'par.G1.indep_var_comp.x')
-        self.assertEqual(4, len(outputs))
-        self.assertTrue('value' in outputs[0][1])
-        self.assertTrue('units' in outputs[0][1])
+        with multi_proc_exception_check(prob.comm):
+            outputs = sorted(prob.model.list_outputs(values=True,
+                                                    units=True,
+                                                    shape=True,
+                                                    bounds=True,
+                                                    residuals=True,
+                                                    scaling=True,
+                                                    hierarchical=True,
+                                                    print_arrays=True,
+                                                    out_stream=stream))
+            self.assertEqual(outputs[0][0], 'Obj.obj')
+            if prob.comm.rank:  # outputs only return what is on their proc
+                self.assertEqual(outputs[1][0], 'par.G2.Cc.c')
+                self.assertEqual(outputs[2][0], 'par.G2.Cy.y')
+                self.assertEqual(outputs[3][0], 'par.G2.indep_var_comp.x')
+            else:
+                self.assertEqual(outputs[1][0], 'par.G1.Cc.c')
+                self.assertEqual(outputs[2][0], 'par.G1.Cy.y')
+                self.assertEqual(outputs[3][0], 'par.G1.indep_var_comp.x')
+            self.assertEqual(4, len(outputs))
+            self.assertTrue('value' in outputs[0][1])
+            self.assertTrue('units' in outputs[0][1])
 
-        text = stream.getvalue()
-        if prob.comm.rank:  # Only rank 0 prints
-            self.assertEqual(len(text), 0)
-        else:
-            self.assertEqual(1, text.count("7 Explicit Output(s) in 'model'"))
-            self.assertEqual(1, text.count('value'))
-            self.assertEqual(1, text.count('units'))
-            self.assertEqual(1, text.count('  par'))
-            self.assertEqual(1, text.count('    G1'))
-            self.assertEqual(1, text.count('    G2'))
-            self.assertEqual(2, text.count('      Cy'))
-            self.assertEqual(2, text.count('      Cc'))
-            self.assertEqual(2, text.count('      indep_var_comp'))
-            self.assertEqual(2, text.count('        x'))
-            self.assertEqual(2, text.count('        y'))
-            self.assertEqual(2, text.count('        c'))
-            self.assertEqual(1, text.count('  Obj'))
-            self.assertEqual(1, text.count('    obj'))
+            text = stream.getvalue()
+            if prob.comm.rank:  # Only rank 0 prints
+                self.assertEqual(len(text), 0)
+            else:
+                self.assertEqual(1, text.count("7 Explicit Output(s) in 'model'"))
+                self.assertEqual(1, text.count('value'))
+                self.assertEqual(1, text.count('units'))
+                self.assertEqual(1, text.count('  par'))
+                self.assertEqual(1, text.count('    G1'))
+                self.assertEqual(1, text.count('    G2'))
+                self.assertEqual(2, text.count('      Cy'))
+                self.assertEqual(2, text.count('      Cc'))
+                self.assertEqual(2, text.count('      indep_var_comp'))
+                self.assertEqual(2, text.count('        x'))
+                self.assertEqual(2, text.count('        y'))
+                self.assertEqual(2, text.count('        c'))
+                self.assertEqual(1, text.count('  Obj'))
+                self.assertEqual(1, text.count('    obj'))
 
     def test_parallel_list_vars(self):
         print_opts = {'linewidth': 1024, 'precision': 1}
