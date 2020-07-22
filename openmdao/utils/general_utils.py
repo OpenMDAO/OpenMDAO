@@ -987,7 +987,7 @@ def _is_slice(indices):
     Parameters
     ----------
     indices : ndarray
-        Dotted pathnames of systems.
+        Slice indices to check.
 
     Returns
     -------
@@ -1004,7 +1004,7 @@ def _is_ellipsis(indices):
     Parameters
     ----------
     indices : ndarray
-        Dotted pathnames of systems.
+        Ellipsis indices to check.
 
     Returns
     -------

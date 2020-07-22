@@ -2462,9 +2462,7 @@ class System(object):
 
         if indices is not None:
 
-            if isinstance(indices, slice):
-                pass
-            elif _is_ellipsis(indices):
+            if isinstance(indices, slice) or _is_ellipsis(indices):
                 pass
             # If given, indices must be a sequence
             elif not (isinstance(indices, Iterable) and
