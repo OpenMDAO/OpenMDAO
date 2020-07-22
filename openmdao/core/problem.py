@@ -741,12 +741,21 @@ class Problem(object):
         """
         Record the variables at the Problem level.
 
+        Must be called after `final_setup` has been called. This can either
+        happen automatically through `run_driver` or `run_model`, or it can be
+        called manually.
+
         Parameters
         ----------
         case_name : str
             Name used to identify this Problem case.
         """
-        record_iteration(self, self, case_name)
+        if self._setup_status < 2:
+            raise RuntimeError(f"{self.msginfo}: Problem.record() cannot be called before "
+                               "`Problem.run_model()`, `Problem.run_driver()`, or "
+                               "`Problem.final_setup()`.")
+        else:
+            record_iteration(self, self, case_name)
 
     def record_iteration(self, case_name):
         """

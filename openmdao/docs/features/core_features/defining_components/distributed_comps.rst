@@ -71,19 +71,21 @@ This example is run with two processes and a :code:`size` of 15:
     openmdao.core.tests.test_distribcomp.MPIFeatureTests.test_distribcomp_feature
     :layout: interleave
 
-In this example, we introduce a new component called an ``IndepVarComp``. If you used OpenMDAO prior to
-version 3.2, then you have are familiar with this component. An IndepVarComp is used to define an
-independent variable. You no longer have to define these because OpenMDAO defines and uses them
-automatically for all unconnected inputs in your model. However, when we define a distributed input, we often
-use the "src_indices" attribute to determine the allocation of that input to the processors that the
-component sees. For some sets of these indices, it isn't possible to easily determine the full size
-of the corresponding independent variable, the IndepVarComp cannot be created automatically.  So, for
-unconnected inputs on a distributed component, you must manually create one, as we did in this example.
 
-The call signature for the `IndepVarComp` constructor is:
+.. _distributed_indepvarcomp:
 
-.. automethod:: openmdao.core.indepvarcomp.IndepVarComp.__init__()
-    :noindex:
+.. note::
+
+    In this example, we introduce a new component called an :ref:`IndepVarComp<comp-type-1-indepvarcomp>`.
+    If you used OpenMDAO prior to version 3.2, then you are familiar with this component.  It is used to 
+    define an independent variable. 
+
+    You usually do not have to define these because OpenMDAO defines and uses them automatically for all
+    unconnected inputs in your model. However, when we define a distributed input, we often
+    use the "src_indices" attribute to determine the allocation of that input to the processors that the
+    component sees. For some sets of these indices, it isn't possible to easily determine the full size
+    of the corresponding independent variable, and the `IndepVarComp` cannot be created automatically.  So, 
+    for unconnected inputs on a distributed component, you must manually create one, as we did in this example.
 
 
 Distributed Component with Derivatives

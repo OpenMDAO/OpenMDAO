@@ -77,10 +77,6 @@ class MultipointBeamGroup(om.Group):
         num_load_cases = self.options['num_load_cases']
         parallel_derivs = self.options['parallel_derivs']
 
-        inputs_comp = om.IndepVarComp()
-        inputs_comp.add_output('h_cp', shape=num_cp)
-        self.add_subsystem('inputs_comp', inputs_comp)
-
         x_interp = sine_distribution(num_elements)
         comp = om.SplineComp(method='bsplines', num_cp=num_cp, x_interp_val=x_interp)
         comp.add_spline(y_cp_name='h_cp', y_interp_name='h')
@@ -153,10 +149,9 @@ class MultipointBeamGroup(om.Group):
         comp = VolumeComp(num_elements=num_elements, b=b, L=L)
         self.add_subsystem('volume_comp', comp)
 
-        self.connect('inputs_comp.h_cp', 'interp.h_cp')
         self.connect('interp.h', 'I_comp.h')
-        self.connect('I_comp.I', 'local_stiffness_matrix_comp.I')
         self.connect('interp.h', 'volume_comp.h')
+        self.connect('I_comp.I', 'local_stiffness_matrix_comp.I')
 
-        self.add_design_var('inputs_comp.h_cp', lower=1e-2, upper=10.)
+        self.add_design_var('interp.h_cp', lower=1e-2, upper=10.)
         self.add_objective('volume_comp.volume')

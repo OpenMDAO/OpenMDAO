@@ -1255,19 +1255,19 @@ class TestSqliteCaseReader(unittest.TestCase):
     def test_list_discrete(self):
         model = om.Group()
 
-        indep = model.add_subsystem('indep', om.IndepVarComp())
-        indep.add_discrete_output('x', 11)
-
-        model.add_subsystem('expl', ModCompEx(3))
-        model.add_subsystem('impl', ModCompIm(3))
-
-        model.connect('indep.x', ['expl.x', 'impl.x'])
+        model.add_subsystem('expl', ModCompEx(3),
+                            promotes_inputs=['x'])
+        model.add_subsystem('impl', ModCompIm(3),
+                            promotes_inputs=['x'])
 
         model.add_recorder(self.recorder)
 
         prob = om.Problem(model)
 
         prob.setup()
+
+        prob.set_val('x', 11)
+
         prob.run_model()
         prob.cleanup()
 
@@ -1308,12 +1308,11 @@ class TestSqliteCaseReader(unittest.TestCase):
         # list outputs, not hierarchical, with residuals
         #
         expected = [
-            "3 Explicit Output(s) in 'model'",
+            "2 Explicit Output(s) in 'model'",
             "-------------------------------",
             "",
             "varname  value  resids      ",
             "-------  -----  ------------",
-            "indep.x  11     Not Recorded",
             "expl.b   [20.]  [0.]        ",
             "expl.y   2      Not Recorded",
         ]
@@ -3309,10 +3308,12 @@ class TestFeatureSqliteReader(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
+
+        model.set_input_defaults('x', val=50.0)
+        model.set_input_defaults('y', val=50.0)
 
         prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
@@ -3326,8 +3327,9 @@ class TestFeatureSqliteReader(unittest.TestCase):
 
         prob.driver.add_recorder(recorder)
         prob.driver.recording_options['record_desvars'] = True
+        prob.driver.recording_options['record_outputs'] = True
         prob.driver.recording_options['includes'] = []
-        prob.driver.recording_options['excludes'] = ['y']
+        prob.driver.recording_options['excludes'] = []
 
         prob.set_solver_print(0)
         prob.setup()
@@ -3344,6 +3346,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         recorder = om.SqliteRecorder(filename)
         prob.driver.add_recorder(recorder)
         prob.driver.recording_options['record_desvars'] = False
+        prob.driver.recording_options['record_outputs'] = True
         prob.driver.recording_options['includes'] = []
 
         prob.setup()
@@ -3359,6 +3362,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         recorder = om.SqliteRecorder(filename)
         prob.driver.add_recorder(recorder)
         prob.driver.recording_options['record_desvars'] = True
+        prob.driver.recording_options['record_outputs'] = True
         prob.driver.recording_options['includes'] = ['*']
 
         prob.setup()
@@ -3370,10 +3374,11 @@ class TestFeatureSqliteReader(unittest.TestCase):
 
         self.assertEqual(sorted(case.outputs.keys()), ['c', 'f_xy', 'x', 'y'])
 
-        # Fourth case with record_desvars = False and includes = ['*']
+        # Fourth case with record_desvars = False, record_outputs = True, and includes = ['*']
         recorder = om.SqliteRecorder(filename)
         prob.driver.add_recorder(recorder)
         prob.driver.recording_options['record_desvars'] = False
+        prob.driver.recording_options['record_outputs'] = True
         prob.driver.recording_options['includes'] = ['*']
 
         prob.setup()
@@ -3383,7 +3388,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         cr = om.CaseReader(filename)
         case = cr.get_case(0)
 
-        self.assertEqual(sorted(case.outputs.keys()), ['c', 'f_xy', 'x'])
+        self.assertEqual(sorted(case.outputs.keys()), ['c', 'f_xy', 'x', 'y'])
 
     def test_feature_driver_options_with_values(self):
         import openmdao.api as om
@@ -3502,14 +3507,13 @@ class TestFeatureSqliteReader(unittest.TestCase):
         prob = om.Problem(model)
         model.add_recorder(om.SqliteRecorder('cases.sql'))
 
-        indep = om.IndepVarComp()
-        indep.add_output('length', val=100.)
-        indep.add_output('width', val=60.)
-
         model.add_subsystem('rect', RectangleCompWithTags(), promotes=['length', 'width', 'area'])
-        model.add_subsystem('indep', indep, promotes=['length', 'width'])
 
         prob.setup(check=False)
+
+        prob.set_val('length', 100.0)
+        prob.set_val('width', 60.0)
+
         prob.run_model()
 
         prob.cleanup()
@@ -3539,14 +3543,13 @@ class TestFeatureSqliteReader(unittest.TestCase):
         prob = om.Problem(model)
         model.add_recorder(om.SqliteRecorder('cases.sql'))
 
-        indep = om.IndepVarComp()
-        indep.add_output('length', val=100.)
-        indep.add_output('width', val=60.)
-
         model.add_subsystem('rect', RectangleComp(), promotes=['length', 'width', 'area'])
-        model.add_subsystem('indep', indep, promotes=['length', 'width'])
 
         prob.setup(check=False)
+
+        prob.set_val('length', 100.)
+        prob.set_val('width', 60.0)
+
         prob.run_model()
 
         prob.cleanup()
@@ -3568,9 +3571,9 @@ class TestFeatureSqliteReader(unittest.TestCase):
         outputs = case.list_outputs(includes=['*area'], out_stream=None)
         self.assertEqual(sorted([outp[0] for outp in outputs]), ['rect.area',])
 
-        # Outputs with excludes
-        outputs = case.list_outputs(excludes=['*area'], out_stream=None)
-        self.assertEqual(sorted([outp[0] for outp in outputs]), sorted(['indep.width', 'indep.length']))
+        # Inputs with excludes
+        inputs = case.list_inputs(excludes=['*length'], out_stream=None)
+        self.assertEqual(sorted(['rect.width']), sorted([inp[0] for inp in inputs]))
 
     def test_feature_get_val(self):
         import openmdao.api as om
@@ -3578,17 +3581,16 @@ class TestFeatureSqliteReader(unittest.TestCase):
         model = om.Group()
         model.add_recorder(om.SqliteRecorder('cases.sql'))
 
-        indep = om.IndepVarComp()
-        indep.add_output('x', val=100., units='m')
-        indep.add_output('t', val=60., units='s')
-
         speed = om.ExecComp('v=x/t', x={'units': 'm'}, t={'units': 's'}, v={'units': 'm/s'})
 
-        model.add_subsystem('indep', indep, promotes=['x', 't'])
         model.add_subsystem('speed', speed, promotes=['x', 't', 'v'])
 
         prob = om.Problem(model)
         prob.setup()
+
+        prob.set_val('x', 100., units='m')
+        prob.set_val('t', 60., units='s')
+
         prob.run_model()
         prob.cleanup()
 
@@ -3607,9 +3609,8 @@ class TestFeatureSqliteReader(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
-        model.add_subsystem('px', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('py', om.IndepVarComp('y', 50.0), promotes=['*'])
-        model.add_subsystem('egg_crate', EggCrate(), promotes=['*'])
+
+        model.add_subsystem('egg_crate', EggCrate(), promotes=['x', 'y', 'f_xy'])
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
         model.add_objective('f_xy')
@@ -3620,19 +3621,22 @@ class TestFeatureSqliteReader(unittest.TestCase):
         prob.add_recorder(recorder)
 
         prob.setup()
+
         prob.set_solver_print(0)
 
-        prob['x'] = 2.5
-        prob['y'] = 2.5
+        prob.set_val('x', 2.5)
+        prob.set_val('y', 2.5)
+
         prob.run_driver()
-        print(prob['x'], prob['y'], prob['f_xy'])
+        print(prob.get_val('x'), prob.get_val('y'), prob.get_val('f_xy'))
         case_name_1 = "c1"
         prob.record(case_name_1)
 
-        prob['x'] = 0.1
-        prob['y'] = -0.1
+
+        prob.set_val('x', 0.1)
+        prob.set_val('y', -0.1)
         prob.run_driver()
-        print(prob['x'], prob['y'], prob['f_xy'])
+        print(prob.get_val('x'), prob.get_val('y'), prob.get_val('f_xy'))
         case_name_2 = "c2"
         prob.record(case_name_2)
         prob.cleanup()

@@ -860,6 +860,8 @@ class MPIFeatureTests(unittest.TestCase):
         size = 15
 
         model = om.Group()
+
+        # Distributed component "C2" requires an IndepVarComp to supply inputs.
         model.add_subsystem("indep", om.IndepVarComp('x', np.zeros(size)))
         model.add_subsystem("C2", DistribComp(size=size))
         model.add_subsystem("C3", Summer(size=size))
@@ -870,14 +872,14 @@ class MPIFeatureTests(unittest.TestCase):
         prob = om.Problem(model)
         prob.setup()
 
-        prob['indep.x'] = np.ones(size)
+        prob.set_val('indep.x', np.ones(size))
         prob.run_model()
 
-        assert_near_equal(prob['C2.invec'],
+        assert_near_equal(prob.get_val('C2.invec'),
                           np.ones((8,)) if model.comm.rank == 0 else np.ones((7,)))
-        assert_near_equal(prob['C2.outvec'],
+        assert_near_equal(prob.get_val('C2.outvec'),
                           2*np.ones((8,)) if model.comm.rank == 0 else -3*np.ones((7,)))
-        assert_near_equal(prob['C3.sum'], -5.)
+        assert_near_equal(prob.get_val('C3.sum'), -5.)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -914,6 +916,7 @@ class TestGroupMPI(unittest.TestCase):
                               promotes_inputs=['x'])
 
         p.setup()
+        p.set_val('x', np.arange(5, dtype=float))
         p.run_model()
 
         # each rank holds the assigned portion of the input array

@@ -552,14 +552,14 @@ class TestFeatureEQConstraintComp(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        assert_near_equal(prob['x'], 0., 1e-5)
+        assert_near_equal(prob.get_val('x'), 0., 1e-5)
 
-        assert_near_equal([prob['y1'], prob['d1.y1']], [[3.16], [3.16]], 1e-5)
-        assert_near_equal([prob['y2'], prob['y2']], [[3.7552778], [3.7552778]], 1e-5)
+        assert_near_equal([prob.get_val('y1'), prob.get_val('d1.y1')], [[3.16], [3.16]], 1e-5)
+        assert_near_equal([prob.get_val('y2'), prob.get_val('y2')], [[3.7552778], [3.7552778]], 1e-5)
 
-        assert_near_equal(prob['z'], [1.977639, 0.], 1e-5)
+        assert_near_equal(prob.get_val('z'), [1.977639, 0.], 1e-5)
 
-        assert_near_equal(prob['obj_cmp.obj'], 3.18339395045, 1e-5)
+        assert_near_equal(prob.get_val('obj_cmp.obj'), 3.18339395045, 1e-5)
 
 
 if __name__ == '__main__':  # pragma: no cover

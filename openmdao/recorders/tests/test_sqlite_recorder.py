@@ -953,7 +953,6 @@ class TestSqliteRecorder(unittest.TestCase):
                          ['d1.x', 'd1.y2', 'd1.z', 'd2.y1', 'd2.z'])
         self.assertEqual(sorted(last_case.outputs.keys()), ['d1.y1', 'd2.y2'])
 
-
     def test_record_line_search_armijo_goldstein(self):
         prob = om.Problem()
         prob.model.add_subsystem('px', om.IndepVarComp('x', 1.0))
@@ -1731,8 +1730,6 @@ class TestSqliteRecorder(unittest.TestCase):
         self.assertEqual(set(final_case.outputs.keys()),
                          {'con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z'})
 
-
-
     def test_problem_record_with_options(self):
         prob = om.Problem(model=SellarDerivatives())
 
@@ -2117,7 +2114,6 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_data = ((coordinate, (t0, t1), None, None, None),)
         assertDriverIterDataRecorded(self, expected_data, self.eps)
 
-
     def test_problem_record_options_includes(self):
         prob = om.Problem(model=SellarDerivatives())
 
@@ -2181,7 +2177,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_data = ((case_name, (t0, t1), expected_derivs),)
         assertProblemDerivDataRecorded(self, expected_data, self.eps)
-
 
     def test_problem_recording_derivatives_option_false(self):
         prob = ParaboloidProblem()
@@ -2277,6 +2272,21 @@ class TestSqliteRecorder(unittest.TestCase):
         adder, scaler = determine_adder_scaler(ref0, ref, None, None)
         self.assertAlmostEqual((unscaled_x + adder) * scaler, scaled_x, places=12)
         self.assertAlmostEqual((unscaled_y + adder) * scaler, scaled_y, places=12)
+
+    def test_problem_record_before_final_setup(self):
+        prob = om.Problem()
+        prob.add_recorder(self.recorder)
+        prob.setup()
+
+        with self.assertRaises(RuntimeError) as cm:
+            prob.record('initial')
+
+        self.assertEqual(str(cm.exception),
+                         "Problem: Problem.record() cannot be called before "
+                         "`Problem.run_model()`, `Problem.run_driver()`, or "
+                         "`Problem.final_setup()`.")
+
+        prob.cleanup()
 
 
 @use_tempdirs
@@ -2986,6 +2996,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         assert_near_equal(y_recorded, y1)
 
+
 class TestFeatureAdvancedExample(unittest.TestCase):
 
     @classmethod
@@ -3144,6 +3155,7 @@ class TestFeatureAdvancedExample(unittest.TestCase):
         ax2.grid()
         # There are two lines in the right plot because "Z" contains two variables that are being
         # optimized
+
 
 @use_tempdirs
 class TestFeatureBasicRecording(unittest.TestCase):
