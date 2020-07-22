@@ -2464,7 +2464,7 @@ class System(object):
 
             if isinstance(indices, slice):
                 pass
-            elif _is_ellipsis(np.array(indices)):
+            elif _is_ellipsis(indices):
                 pass
             # If given, indices must be a sequence
             elif not (isinstance(indices, Iterable) and
@@ -2575,9 +2575,8 @@ class System(object):
             msg = "{}: Constraint '{}' cannot be both equality and inequality."
             raise ValueError(msg.format(self.msginfo, name))
 
-        if indices is not None:
-            if isinstance(indices, slice) or _is_ellipsis(np.array(indices)):
-                pass
+        if isinstance(indices, slice) or _is_ellipsis(indices):
+            pass
         # If given, indices must be a sequence
         elif (indices is not None and not (
                 isinstance(indices, Iterable) and all([isinstance(i, Integral) for i in indices]))):

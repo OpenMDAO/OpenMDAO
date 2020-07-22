@@ -29,7 +29,7 @@ from openmdao.recorders.recording_manager import RecordingManager, record_viewer
     record_system_options
 from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.general_utils import ContainsAll, pad_name, simple_warning, warn_deprecation, \
-_is_ellipsis
+    _is_ellipsis
 
 from openmdao.utils.mpi import FakeComm
 from openmdao.utils.mpi import MPI
@@ -497,9 +497,9 @@ class Problem(object):
             if indices is not None:
                 self._get_cached_val(name)
                 try:
-                    if isinstance(indices, slice) or  (indices):
-                        inds = np.arange(value.shape[0]*value.shape[1],
-                                        dtype=int).reshape(value.shape)[tuple(indices)]
+                    if isinstance(indices, slice) or _is_ellipsis(indices):
+                        inds = np.arange(value.shape[0] * value.shape[1],
+                                         dtype=int).reshape(value.shape)[tuple(indices)]
                         self._initial_condition_cache[name] = inds
                     else:
                         self._initial_condition_cache[name][indices] = value

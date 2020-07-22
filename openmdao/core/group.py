@@ -1771,8 +1771,9 @@ class Group(System):
             src_indices = np.atleast_1d(src_indices)
 
         if isinstance(src_indices, np.ndarray):
-            if not np.issubdtype(src_indices.dtype, np.integer) and \
-                not any(i == ... for i in src_indices):
+            if not np.issubdtype(src_indices.dtype, np.integer) and not \
+                    any(i == ... for i in src_indices):
+
                 raise TypeError("%s: src_indices must contain integers, but src_indices for "
                                 "connection from '%s' to '%s' is %s." %
                                 (self.msginfo, src_name, tgt_name, src_indices.dtype.type))

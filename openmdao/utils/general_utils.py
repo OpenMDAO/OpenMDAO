@@ -996,6 +996,7 @@ def _is_slice(indices):
     """
     return any(isinstance(i, slice) for i in indices)
 
+
 def _is_ellipsis(indices):
     """
     Check if an array of indices contains an ellipsis special constant.
@@ -1010,10 +1011,14 @@ def _is_ellipsis(indices):
     bool
         Returns True if indices contains an ellipsis.
     """
-    if indices.dtype == object:
-        return any(i == ... for i in indices)
+    if indices is not None:
+        if hasattr(indices, "dtype") and indices.dtype == object:
+            return any(i == ... for i in indices)
+        elif isinstance(indices, tuple):
+            return any(i == ... for i in np.array(indices))
     else:
         return False
+
 
 def _slice_indices(slicer, out_size, out_shape):
     """
