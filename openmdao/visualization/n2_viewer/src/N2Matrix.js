@@ -137,12 +137,6 @@ class N2Matrix {
 
         const debugStr = `${node.absPathName}(${nodeId})`
 
-        // Continue only if the node is a child of the zoomed element
-        if (! node.hasParent(this.layout.zoomedElement)) {
-            debugInfo(`findCellByNodeId: No trace of ${debugStr} visible in matrix`)
-            return ret;
-        }
-
         // Less expensive to check entire matrix for direct matches first
         for (const row in this.grid) { // Check diagonals only
             const cell = this.grid[row][row];
