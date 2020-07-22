@@ -683,8 +683,6 @@ class N2Diagram {
 
         // Compute the new tree layout if necessary.
         if (computeNewTreeLayout) {
-            // this.clearArrows();
-
             this.layout = new N2Layout(this.model, this.zoomedElement,
                 this.showLinearSolverNames, this.dims);
 
@@ -744,7 +742,6 @@ class N2Diagram {
             height = this.layout.calcFitDims().height;
         }
 
-        this.clearArrows();
         this.updateSizes(height, this.dims.size.font);
 
         N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;

@@ -916,6 +916,7 @@ class N2ArrowManager {
             debugInfo(`Unpinning ${cellId} arrows`)
             this.hoverArrows.migrateCell(cellId, this.pinnedArrows,
                 'n2_hover_elements', cellClassName);
+            this.removeAllHovered();
         }
         else if (this.hoverArrows.hasEventCell(cellId)) { // Arrows just "hovered"
             debugInfo(`Pinning ${cellId} arrows`)
