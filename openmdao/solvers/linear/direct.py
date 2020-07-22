@@ -228,8 +228,8 @@ class DirectSolver(LinearSolver):
         xvec = system._vectors['output']['linear']
 
         # First make a backup of the vectors
-        b_data = bvec.asarray(True)
-        x_data = xvec.asarray(True)
+        b_data = bvec.asarray(copy=True)
+        x_data = xvec.asarray(copy=True)
 
         nmtx = x_data.size
         eye = np.eye(nmtx)

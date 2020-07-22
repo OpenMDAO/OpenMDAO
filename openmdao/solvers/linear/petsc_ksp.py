@@ -375,8 +375,8 @@ class PETScKrylov(LinearSolver):
                 b_vec = system._vectors['output'][vec_name]
 
             # create numpy arrays to interface with PETSc
-            sol_array = x_vec.asarray(True)
-            rhs_array = b_vec.asarray(True)
+            sol_array = x_vec.asarray(copy=True)
+            rhs_array = b_vec.asarray(copy=True)
 
             # create PETSc vectors from numpy arrays
             sol_petsc_vec = PETSc.Vec().createWithArray(sol_array, comm=system.comm)

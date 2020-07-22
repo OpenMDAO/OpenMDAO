@@ -490,7 +490,7 @@ class BroydenSolver(NonlinearSolver):
             Array containing values of vector at desired states.
         """
         if self._full_inverse:
-            xm = vec.asarray(True)
+            xm = vec.asarray(copy=True)
         else:
             states = self.options['state_vars']
             xm = self.xm.copy()

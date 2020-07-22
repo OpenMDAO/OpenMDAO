@@ -146,7 +146,7 @@ class PETScVector(DefaultVector):
 
         if self._ncol == 1:
             if has_dups:
-                data_cache = self.asarray(True)
+                data_cache = self.asarray(copy=True)
                 data_cache[dup_inds] = 0.0
             else:
                 data_cache = self._data
