@@ -812,7 +812,34 @@ class TestGroup(unittest.TestCase):
         assert_near_equal(p['comp2.a'], np.array([30, 31, 32, 33]))
         assert_near_equal(p['comp3.a'], np.array([ 3, 13, 23, 33]))
 
-    def test_om_slice_with_ellipsis_in_desvar(self):
+    def test_om_slice_with_ellipsis_in_desvar1(self):
+
+        class MyComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones(4))
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])**2.0
+
+        p = om.Problem()
+
+        arr = np.array([0, 1, 2, 3])
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
+        p.model.add_subsystem('C1', MyComp())
+        p.model.connect('indep.x', 'C1.x')
+        p.model.add_design_var('indep.x')
+
+        p.model.add_objective('C1.y')
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(arr[p.model._design_vars['indep.x']['indices']][0],
+                          np.array([0, 1, 2, 3]))
+
+    def test_om_slice_with_ellipsis_in_desvar2(self):
 
         class MyComp(om.ExplicitComponent):
             def setup(self):
@@ -829,16 +856,15 @@ class TestGroup(unittest.TestCase):
 
         p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
         p.model.add_subsystem('C1', MyComp())
-        p.model.connect('indep.x', 'C1.x')
-        p.model.add_design_var('indep.x', indices=om.slicer[..., 0])
+        p.model.connect('indep.x', 'C1.x', src_indices=om.slicer[1, ...])
+        p.model.add_design_var('indep.x', indices=om.slicer[1, ...])
 
         p.model.add_objective('C1.y')
 
         p.setup()
         p.run_model()
 
-        # assert_near_equal(arr[p.model._design_vars['indep.x']['indices']],
-        #                   np.array([3, 4]))
+        assert_near_equal(arr[p.model._design_vars['indep.x']['indices']][0], 10)
 
     def test_promote_not_found1(self):
         p = om.Problem()
