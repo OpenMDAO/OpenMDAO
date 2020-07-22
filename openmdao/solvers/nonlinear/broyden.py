@@ -300,7 +300,7 @@ class BroydenSolver(NonlinearSolver):
             self.Gm = self.Gm.astype(np.complex)
             self.xm = self.xm.astype(np.complex)
             self.fxm = self.fxm.astype(np.complex)
-        elif np.iscomplex(self.xm[0]):
+        elif np.iscomplexobj(self.xm):
             self.Gm = self.Gm.real
             self.xm = self.xm.real
             self.fxm = self.fxm.real

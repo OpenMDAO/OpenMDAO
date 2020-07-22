@@ -319,6 +319,19 @@ class DefaultVector(Vector):
 
         return self._data
 
+    def iscomplex(self):
+        """
+        Return True if this vector contains complex values.
+
+        This checks the type of the values, not whether they have a nonzero imaginary part.
+
+        Returns
+        -------
+        bool
+            True if this vector contains complex values.
+        """
+        return np.iscomplexobj(self._data)
+
     def iadd(self, val, idxs=_full_slice):
         """
         Add the value to the data array at the specified indices or slice(s).
@@ -372,7 +385,7 @@ class DefaultVector(Vector):
         float
             The computed dot product value.
         """
-        return np.dot(self._data, vec._data)
+        return np.dot(self._data, vec.asarray())
 
     def get_norm(self):
         """
