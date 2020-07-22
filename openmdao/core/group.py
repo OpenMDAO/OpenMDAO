@@ -23,7 +23,7 @@ from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import convert_neg, array_connection_compatible, \
     _flatten_src_indices
 from openmdao.utils.general_utils import ContainsAll, all_ancestors, simple_warning, \
-    common_subpath, conditional_error, _is_slice, _slice_indices, _is_ellipse
+    common_subpath, conditional_error, _is_slice, _slice_indices, _is_ellipsis
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 from openmdao.utils.coloring import Coloring, _STD_COLORING_FNAME
@@ -1325,7 +1325,7 @@ class Group(System):
 
                 elif src_indices is not None:
                     shape = None
-                    if _is_slice(src_indices) or _is_ellipse(src_indices):
+                    if _is_slice(src_indices) or _is_ellipsis(src_indices):
                         global_size = self._var_allprocs_abs2meta[abs_out]['global_size']
                         global_shape = self._var_allprocs_abs2meta[abs_out]['global_shape']
                         src_indices = _slice_indices(src_indices, global_size, global_shape)
