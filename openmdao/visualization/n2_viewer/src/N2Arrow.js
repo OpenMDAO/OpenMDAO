@@ -781,6 +781,12 @@ class N2ArrowManager {
         return newArrow;
     }
 
+    /** 
+     * Both endpoints are visible, so draw a full arrow between them.
+     * @param {N2Arrow} arrow The arrow object to transition.
+     * @param {N2MatrixCell} startCell Cell at the beginning of the arrow.
+     * @param {N2MatrixCell} endCell Cell at the end of the arrow.
+     */
     _transitionFullArrow(arrow, startCell, endCell) {
         debugInfo(`transition: Found both sides of ${arrow.id}`)
         let attribs = arrow.attribs;
@@ -793,6 +799,13 @@ class N2ArrowManager {
             new N2BentArrow(attribs, this.n2Groups, this.nodeSize);
     }
 
+    /**
+     * Only the starting cell is visible, so draw an arrow from that
+     * heading offscreen in the direction the end would be.
+     * @param {N2Arrow} arrow The arrow object to transition.
+     * @param {N2MatrixCell} startCell Cell at the beginning of the arrow.
+     * @param {N2Matrix} matrix Reference to the matrix object.
+     */
     _transitionStartArrow(arrow, startCell, matrix) {
         debugInfo(`transition: Only found start cell for ${arrow.id}`)
         const side = (arrow.attribs.start.id > arrow.attribs.end.id)?
@@ -815,6 +828,13 @@ class N2ArrowManager {
                     this.n2Groups, this.nodeSize);
     }
 
+    /**
+     * Only the ending cell is visible, so draw an arrow to that
+     * from offscreen in the direction the starting cell would be.
+     * @param {N2Arrow} arrow The arrow object to transition.
+     * @param {N2MatrixCell} endCell Cell at the end of the arrow.
+     * @param {N2Matrix} matrix Reference to the matrix object.
+     */
     _transitionEndArrow(arrow, endCell, matrix) {
         debugInfo(`transition: Only found end cell for ${arrow.id}`)
         const side = (arrow.attribs.start.id > arrow.attribs.end.id)?
@@ -837,6 +857,13 @@ class N2ArrowManager {
                 this.n2Groups, this.nodeSize);       
     }
 
+    /**
+     * Handle nodes that were uncollapsed with pinned arrows by pinning arrows
+     * to their visible child nodes. This is done after the rest of the arrow
+     * transitions because new arrows are added to the cache.
+     * @param {Array} uncollapsedNodeIds List of nodeIds that were uncollapsed.
+     * @param {N2Matrix} matrix Reference to the matrix object.
+     */
     _transitionUncollapsedNodes(uncollapsedNodeIds, matrix) {
         for (const row in matrix.grid) {
             const cell = matrix.grid[row][row]; // Diagonal cells only
