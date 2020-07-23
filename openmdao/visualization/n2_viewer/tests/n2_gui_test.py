@@ -14,7 +14,7 @@ except ImportError:
 GUI_TEST_SUBDIR = 'gui_test_models'
 GUI_N2_SUFFIX = '_N2_TEST.html'
 URL_PREFIX = 'file://'
-DEBUG = True
+DEBUG = False
 LINE_STR = '-' * 78
 current_test = 1
 
