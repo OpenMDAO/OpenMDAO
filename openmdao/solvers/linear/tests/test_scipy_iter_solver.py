@@ -47,15 +47,15 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
 
         # forward
-        d_residuals.set_const(1.0)
-        d_outputs.set_const(0.0)
+        d_residuals.set_val(1.0)
+        d_outputs.set_val(0.0)
         group.run_solve_linear(['linear'], 'fwd')
         output = d_outputs._data
         assert_near_equal(output, group.expected_solution, 1e-15)
 
         # reverse
-        d_outputs.set_const(1.0)
-        d_residuals.set_const(0.0)
+        d_outputs.set_val(1.0)
+        d_residuals.set_val(0.0)
         group.run_solve_linear(['linear'], 'rev')
         output = d_residuals._data
         assert_near_equal(output, group.expected_solution, 1e-15)
@@ -76,15 +76,15 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
 
         # forward
-        d_residuals.set_const(1.0)
-        d_outputs.set_const(0.0)
+        d_residuals.set_val(1.0)
+        d_outputs.set_val(0.0)
         group.run_solve_linear(['linear'], 'fwd')
 
         self.assertTrue(group.linear_solver._iter_count == 2)
 
         # reverse
-        d_outputs.set_const(1.0)
-        d_residuals.set_const(0.0)
+        d_outputs.set_val(1.0)
+        d_residuals.set_val(0.0)
         group.run_solve_linear(['linear'], 'rev')
 
         self.assertTrue(group.linear_solver._iter_count == 2)
@@ -111,8 +111,8 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         # forward
         d_inputs, d_outputs, d_residuals = g1.get_linear_vectors()
 
-        d_residuals.set_const(1.0)
-        d_outputs.set_const(0.0)
+        d_residuals.set_val(1.0)
+        d_outputs.set_val(0.0)
         g1.run_solve_linear(['linear'], 'fwd')
 
         output = d_outputs._data
@@ -121,8 +121,8 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         # reverse
         d_inputs, d_outputs, d_residuals = g1.get_linear_vectors()
 
-        d_outputs.set_const(1.0)
-        d_residuals.set_const(0.0)
+        d_outputs.set_val(1.0)
+        d_residuals.set_val(0.0)
         g1.linear_solver._linearize()
         g1.run_solve_linear(['linear'], 'rev')
 

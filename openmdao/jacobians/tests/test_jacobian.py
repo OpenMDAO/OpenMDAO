@@ -290,14 +290,14 @@ class TestJacobian(unittest.TestCase):
         work = np.ones(d_outputs._data.size)
 
         # fwd apply_linear test
-        d_outputs.set_const(1.0)
+        d_outputs.set_val(1.0)
         prob.model.run_apply_linear(['linear'], 'fwd')
-        d_residuals._data[:] = d_residuals._data - check_vec
+        d_residuals.set_val(d_residuals._data - check_vec)
         self.assertAlmostEqual(d_residuals.get_norm(), 0)
 
         # fwd solve_linear test
-        d_outputs.set_const(0.0)
-        d_residuals._data[:] = check_vec
+        d_outputs.set_val(0.0)
+        d_residuals.set_val(check_vec)
 
         prob.model.run_solve_linear(['linear'], 'fwd')
 
@@ -310,14 +310,14 @@ class TestJacobian(unittest.TestCase):
         work = np.ones(d_outputs._data.size)
 
         # rev apply_linear test
-        d_residuals.set_const(1.0)
+        d_residuals.set_val(1.0)
         prob.model.run_apply_linear(['linear'], 'rev')
-        d_outputs._data[:] = d_outputs._data - check_vec
+        d_outputs.set_val(d_outputs._data - check_vec)
         self.assertAlmostEqual(d_outputs.get_norm(), 0)
 
         # rev solve_linear test
-        d_residuals.set_const(0.0)
-        d_outputs._data[:] = check_vec
+        d_residuals.set_val(0.0)
+        d_outputs.set_val(check_vec)
         prob.model.run_solve_linear(['linear'], 'rev')
         d_residuals -= work
         self.assertAlmostEqual(d_residuals.get_norm(), 0, delta=1e-6)

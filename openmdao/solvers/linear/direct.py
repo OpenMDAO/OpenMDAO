@@ -228,8 +228,8 @@ class DirectSolver(LinearSolver):
         xvec = system._vectors['output']['linear']
 
         # First make a backup of the vectors
-        b_data = bvec._data.copy()
-        x_data = xvec._data.copy()
+        b_data = bvec.asarray(copy=True)
+        x_data = xvec.asarray(copy=True)
 
         nmtx = x_data.size
         eye = np.eye(nmtx)
@@ -240,7 +240,7 @@ class DirectSolver(LinearSolver):
         # Assemble the Jacobian by running the identity matrix through apply_linear
         for i in range(nmtx):
             # set value of x vector to provided value
-            xvec._data[:] = eye[:, i]
+            xvec.set_val(eye[:, i])
 
             # apply linear
             system._apply_linear(self._assembled_jac, vnames, self._rel_systems, 'fwd',
@@ -250,8 +250,8 @@ class DirectSolver(LinearSolver):
             mtx[:, i] = bvec._data
 
         # Restore the backed-up vectors
-        bvec._data[:] = b_data
-        xvec._data[:] = x_data
+        bvec.set_val(b_data)
+        xvec.set_val(x_data)
 
         return mtx
 

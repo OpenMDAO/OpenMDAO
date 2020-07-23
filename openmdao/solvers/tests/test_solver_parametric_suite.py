@@ -59,14 +59,14 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
 
             d_inputs, d_outputs, d_residuals = prob.model.get_linear_vectors()
 
-            d_residuals.set_const(2.0)
-            d_outputs.set_const(0.0)
+            d_residuals.set_val(2.0)
+            d_outputs.set_val(0.0)
             prob.model.run_solve_linear(['linear'], 'fwd')
             result = d_outputs._data
             assert_near_equal(result, [-2., 2.])
 
-            d_outputs.set_const(2.0)
-            d_residuals.set_const(0.0)
+            d_outputs.set_val(2.0)
+            d_residuals.set_val(0.0)
             prob.model.run_solve_linear(['linear'], 'rev')
             result = d_residuals._data
             assert_near_equal(result, [2., -2.])
@@ -89,14 +89,14 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
 
         d_inputs, d_outputs, d_residuals = prob.model.get_linear_vectors()
 
-        d_residuals.set_const(1.0)
-        d_outputs.set_const(0.0)
+        d_residuals.set_val(1.0)
+        d_outputs.set_val(0.0)
         prob.model.run_solve_linear(['linear'], 'fwd')
         result = d_outputs._data
         assert_near_equal(result, prob.model.expected_solution, 1e-15)
 
-        d_outputs.set_const(1.0)
-        d_residuals.set_const(0.0)
+        d_outputs.set_val(1.0)
+        d_residuals.set_val(0.0)
         prob.model.run_solve_linear(['linear'], 'rev')
         result = d_residuals._data
         assert_near_equal(result, prob.model.expected_solution, 1e-15)

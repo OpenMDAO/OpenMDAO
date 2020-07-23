@@ -940,10 +940,10 @@ class _TotalJacInfo(object):
         vecs = self.model._vectors
 
         # clean out vectors from last solve
-        vecs['output'][vecname]._data[:] = 0.0
-        vecs['residual'][vecname]._data[:] = 0.0
+        vecs['output'][vecname].set_val(0.0)
+        vecs['residual'][vecname].set_val(0.0)
         if mode == 'rev':
-            vecs['input'][vecname]._data[:] = 0.0
+            vecs['input'][vecname].set_val(0.0)
 
     #
     # input setter functions
@@ -976,7 +976,7 @@ class _TotalJacInfo(object):
 
         loc_idx = self.in_loc_idxs[mode][idx]
         if loc_idx >= 0:
-            self.input_vec[mode][vecname]._data[loc_idx] = self.seeds[mode][idx]
+            self.input_vec[mode][vecname].set_val(self.seeds[mode][idx], loc_idx)
 
         if cache_lin_sol:
             return rel_systems, (vecname,), (idx, mode)
@@ -1010,7 +1010,7 @@ class _TotalJacInfo(object):
 
         self._zero_vecs('linear', mode)
 
-        self.input_vec[mode]['linear']._data[itermeta['local_in_idxs']] = itermeta['seeds']
+        self.input_vec[mode]['linear'].set_val(itermeta['seeds'], itermeta['local_in_idxs'])
 
         if itermeta['cache_lin_solve']:
             return itermeta['relevant'], ('linear',), (inds[0], mode)
@@ -1090,7 +1090,7 @@ class _TotalJacInfo(object):
             if loc_idx != -1:
                 # We apply a -1 here because the derivative of the output is minus the derivative
                 # of the residual in openmdao.
-                dinputs._data[loc_idx, col] = self.seeds[mode][i]
+                dinputs.set_val(self.seeds[mode][i], (loc_idx, col))
 
         if cache_lin_sol:
             return rel_systems, (vec_name,), (inds[0], mode)
@@ -1143,9 +1143,9 @@ class _TotalJacInfo(object):
                 loc_idx = in_loc_idxs[i]
                 if loc_idx != -1:
                     if ncol > 1:
-                        dinputs._data[loc_idx, col] = self.seeds[mode][i]
+                        dinputs.set_val(self.seeds[mode][i], (loc_idx, col))
                     else:
-                        dinputs._data[loc_idx] = self.seeds[mode][i]
+                        dinputs.set_val(self.seeds[mode][i], loc_idx)
 
         if cache:
             return all_rel_systems, sorted(vec_names), (inds[0][0], mode)
@@ -1350,9 +1350,9 @@ class _TotalJacInfo(object):
         # Prepare model for calculation by cleaning out the derivatives
         # vectors.
         for vec_name in model._lin_vec_names:
-            vec_dinput[vec_name]._data[:] = 0.0
-            vec_doutput[vec_name]._data[:] = 0.0
-            vec_dresid[vec_name]._data[:] = 0.0
+            vec_dinput[vec_name].set_val(0.0)
+            vec_doutput[vec_name].set_val(0.0)
+            vec_dresid[vec_name].set_val(0.0)
 
         # Linearize Model
         with model._scaled_context_all():
@@ -1443,9 +1443,9 @@ class _TotalJacInfo(object):
         # Prepare model for calculation by cleaning out the derivatives
         # vectors.
         for vec_name in model._lin_vec_names:
-            model._vectors['input'][vec_name].set_const(0.0)
-            model._vectors['output'][vec_name].set_const(0.0)
-            model._vectors['residual'][vec_name].set_const(0.0)
+            model._vectors['input'][vec_name].set_val(0.0)
+            model._vectors['output'][vec_name].set_val(0.0)
+            model._vectors['residual'][vec_name].set_val(0.0)
 
         # Solve for derivs with the approximation_scheme.
         # This cuts out the middleman by grabbing the Jacobian directly after linearization.
@@ -1548,7 +1548,7 @@ class _TotalJacInfo(object):
             for i, vec_name in enumerate(vec_names):
                 save_vec = lin_sol[i]
                 doutputs = self.output_vec[mode][vec_name]
-                doutputs._data[:] = save_vec
+                doutputs.set_val(save_vec)
         else:
             lin_sol_cache[key] = lin_sol = []
             for vec_name in vec_names:

@@ -290,7 +290,7 @@ class TestScaling(unittest.TestCase):
             prob.setup()
             prob.run_model()
 
-            return np.linalg.norm(prob.model._residuals._data) < 1e-5
+            return np.linalg.norm(prob.model._residuals.asarray()) < 1e-5
 
         # ---------------------------
         # coeffs: r1, r2, c1, c2
@@ -377,15 +377,15 @@ class TestScaling(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        res1 = -model.p1._residuals._data[0]
-        out1 = model.p1._outputs._data[0]
-        out2 = model.p2._outputs._data[0]
+        res1 = -model.p1._residuals.asarray()[0]
+        out1 = model.p1._outputs.asarray()[0]
+        out2 = model.p2._outputs.asarray()[0]
 
         self.assertEqual(res1, out1 - 2.0*(out2 + 1.0))
         with model._scaled_context_all():
-            res1 = -model.p1._residuals._data[0]
-            out1 = model.p1._outputs._data[0]
-            out2 = model.p2._outputs._data[0]
+            res1 = -model.p1._residuals.asarray()[0]
+            out1 = model.p1._outputs.asarray()[0]
+            out2 = model.p2._outputs.asarray()[0]
 
             self.assertEqual(res1, out1 - 2.0*(out2 + 1.0))
 
@@ -416,13 +416,13 @@ class TestScaling(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        res1 = -model.p1._residuals._data[0]
-        out1 = model.p1._outputs._data[0]
-        out2 = model.p2._outputs._data[0]
+        res1 = -model.p1._residuals.asarray()[0]
+        out1 = model.p1._outputs.asarray()[0]
+        out2 = model.p2._outputs.asarray()[0]
 
         self.assertEqual(res1, (out1 - 2.0*(out2 + 1.0)))
         with model._scaled_context_all():
-            res1a = -model.p1._residuals._data[0]
+            res1a = -model.p1._residuals.asarray()[0]
 
             self.assertEqual(res1a, (res1)/(ref))
 
@@ -451,13 +451,13 @@ class TestScaling(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        res1 = -model.p1._residuals._data[0]
-        out1 = model.p1._outputs._data[0]
-        out2 = model.p2._outputs._data[0]
+        res1 = -model.p1._residuals.asarray()[0]
+        out1 = model.p1._outputs.asarray()[0]
+        out2 = model.p2._outputs.asarray()[0]
 
         self.assertEqual(res1, out1 - 2.0*(out2+1.0))
         with model._scaled_context_all():
-            res1a = -model.p1._residuals._data[0]
+            res1a = -model.p1._residuals.asarray()[0]
 
             self.assertEqual(res1a, res1/res_ref)
 
@@ -488,13 +488,13 @@ class TestScaling(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        res1 = -model.p1._residuals._data[0]
-        out1 = model.p1._outputs._data[0]
-        out2 = model.p2._outputs._data[0]
+        res1 = -model.p1._residuals.asarray()[0]
+        out1 = model.p1._outputs.asarray()[0]
+        out2 = model.p2._outputs.asarray()[0]
 
         self.assertEqual(res1, out1 - 2.0*(out2+1.0))
         with model._scaled_context_all():
-            res1a = -model.p1._residuals._data[0]
+            res1a = -model.p1._residuals.asarray()[0]
 
             self.assertEqual(res1a, (res1)/(res_ref))
 
@@ -608,7 +608,7 @@ class TestScaling(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
-        
+
         # bounds arrays don't exist any more unless there's a linesearch that uses them,
         # so use Newton here even though we don't need to.
         model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)

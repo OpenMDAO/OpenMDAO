@@ -75,9 +75,6 @@ class Vector(object):
     _icol : int or None
         If not None, specifies the 'active' column of a multivector when interfaceing with
         a component that does not support multivectors.
-    _relevant : dict
-        Mapping of a VOI to a tuple containing dependent inputs, dependent outputs,
-        and dependent systems.
     _do_scaling : bool
         True if this vector performs scaling.
     _scaling : dict
@@ -93,8 +90,7 @@ class Vector(object):
     # Listing of relevant citations that should be referenced when
     cite = ""
 
-    def __init__(self, name, kind, system, root_vector=None, alloc_complex=False,
-                 ncol=1, relevant=None):
+    def __init__(self, name, kind, system, root_vector=None, alloc_complex=False, ncol=1):
         """
         Initialize all attributes.
 
@@ -112,16 +108,12 @@ class Vector(object):
             Whether to allocate any imaginary storage to perform complex step. Default is False.
         ncol : int
             Number of columns for multi-vectors.
-        relevant : dict
-            Mapping of a VOI to a tuple containing dependent inputs, dependent outputs,
-            and dependent systems.
         """
         self._name = name
         self._typ = _type_map[kind]
         self._kind = kind
         self._ncol = ncol
         self._icol = None
-        self._relevant = relevant
         self._len = 0
 
         self._system = weakref.ref(system)
@@ -130,7 +122,7 @@ class Vector(object):
         self._views = {}
         self._views_flat = {}
 
-        # self._names will either be equivalent to self._views or to the
+        # self._names will either contain the same names as self._views or to the
         # set of variables relevant to the current matvec product.
         self._names = self._views
 
@@ -170,10 +162,7 @@ class Vector(object):
         str
             String rep of this object.
         """
-        try:
-            return str(self._data)
-        except Exception as err:
-            return "<error during call to Vector.__str__>: %s" % err
+        return str(self.asarray())
 
     def __len__(self):
         """
@@ -185,28 +174,6 @@ class Vector(object):
             Total flattened length of this vector.
         """
         return self._len
-
-    def _clone(self, initialize_views=False):
-        """
-        Return a copy that optionally provides view access to its data.
-
-        Parameters
-        ----------
-        initialize_views : bool
-            Whether to initialize the views into the clone.
-
-        Returns
-        -------
-        <Vector>
-            instance of the clone; the data is copied.
-        """
-        vec = self.__class__(self._name, self._kind, self._system(), self._root_vector,
-                             alloc_complex=self._alloc_complex, ncol=self._ncol)
-        vec._under_complex_step = self._under_complex_step
-        vec._clone_data()
-        if initialize_views:
-            vec._initialize_views()
-        return vec
 
     def _copy_views(self):
         """
@@ -241,7 +208,7 @@ class Vector(object):
         """
         return [v for n, v in self._views.items() if n in self._names]
 
-    def name2abs_name(self, name):
+    def _name2abs_name(self, name):
         """
         Map the given promoted or relative name to the absolute name.
 
@@ -260,7 +227,7 @@ class Vector(object):
         system = self._system()
 
         # try relative name first
-        abs_name = name if system.pathname == '' else '.'.join((system.pathname, name))
+        abs_name = '.'.join((system.pathname, name)) if system.pathname else name
         if abs_name in self._names:
             return abs_name
 
@@ -283,7 +250,7 @@ class Vector(object):
 
         return (n[idx:] for n in system._var_abs_names[self._typ] if n in self._names)
 
-    def _abs_val_iter(self, flat=True):
+    def _abs_item_iter(self, flat=True):
         """
         Iterate over the items in the vector, using absolute names.
 
@@ -297,9 +264,16 @@ class Vector(object):
         for name, val in arrs.items():
             yield name, val
 
+    def _abs_iter(self):
+        """
+        Iterate over the absolute names in the vector.
+        """
+        for name in self._views:
+            yield name
+
     def __contains__(self, name):
         """
-        Check if the variable is involved in the current mat-vec product.
+        Check if the variable is found in this vector.
 
         Parameters
         ----------
@@ -311,7 +285,23 @@ class Vector(object):
         boolean
             True or False.
         """
-        return self.name2abs_name(name) is not None
+        return self._name2abs_name(name) is not None
+
+    def _contains_abs(self, name):
+        """
+        Check if the variable is found in this vector.
+
+        Parameters
+        ----------
+        name : str
+            Absolute variable name.
+
+        Returns
+        -------
+        boolean
+            True or False.
+        """
+        return name in self._names
 
     def __getitem__(self, name):
         """
@@ -327,7 +317,7 @@ class Vector(object):
         float or ndarray
             variable value.
         """
-        abs_name = self.name2abs_name(name)
+        abs_name = self._name2abs_name(name)
         if abs_name is not None:
             if self._icol is None:
                 return self._views[abs_name]
@@ -335,6 +325,28 @@ class Vector(object):
                 return self._views[abs_name][:, self._icol]
         else:
             raise KeyError(f"{self._system().msginfo}: Variable name '{name}' not found.")
+
+    def _abs_get_val(self, name, flat=True):
+        """
+        Get the variable value using the absolute name.
+
+        No error checking is performed on the name.
+
+        Parameters
+        ----------
+        name : str
+            Absolute name in the owning system's namespace.
+        flat : bool
+            If True, return the flat value.
+
+        Returns
+        -------
+        float or ndarray
+            variable value.
+        """
+        if flat:
+            return self._views_flat[name]
+        return self._views[name]
 
     def __setitem__(self, name, value):
         """
@@ -355,10 +367,6 @@ class Vector(object):
 
         Must be implemented by the subclass.
 
-        Sets the following attributes:
-
-        - _data
-
         Parameters
         ----------
         root_vector : <Vector> or None
@@ -372,11 +380,6 @@ class Vector(object):
         Internally assemble views onto the vectors.
 
         Must be implemented by the subclass.
-
-        Sets the following attributes:
-
-        - _views
-        - _views_flat
         """
         raise NotImplementedError('_initialize_views not defined for vector type %s' %
                                   type(self).__name__)
@@ -448,15 +451,43 @@ class Vector(object):
         scale_to : str
             Values are "phys" or "norm" to scale to physical or normalized.
         """
-        adder, scaler = self._scaling[scale_to]
-        if self._ncol == 1:
-            self._data *= scaler
-            if adder is not None:  # nonlinear only
-                self._data += adder
-        else:
-            self._data *= scaler[:, np.newaxis]
-            if adder is not None:  # nonlinear only
-                self._data += adder
+        raise NotImplementedError('scale not defined for vector type %s' %
+                                  type(self).__name__)
+
+    def asarray(self, copy=False):
+        """
+        Return a flat array representation of this vector.
+
+        If copy is True, return a copy.  Otherwise, try to avoid it.
+
+        Parameters
+        ----------
+        copy : bool
+            If True, return a copy of the array.
+
+        Returns
+        -------
+        ndarray
+            Array representation of this vector.
+        """
+        raise NotImplementedError('asarray not defined for vector type %s' %
+                                  type(self).__name__)
+        return None  # silence lint warning
+
+    def iscomplex(self):
+        """
+        Return True if this vector contains complex values.
+
+        This checks the type of the values, not whether they have a nonzero imaginary part.
+
+        Returns
+        -------
+        bool
+            True if this vector contains complex values.
+        """
+        raise NotImplementedError('iscomplex not defined for vector type %s' %
+                                  type(self).__name__)
+        return False  # silence lint warning
 
     def set_vec(self, vec):
         """
@@ -501,7 +532,7 @@ class Vector(object):
         idxs : int or slice or tuple of ints and/or slices.
             The locations where the data array should be updated.
         """
-        abs_name = self.name2abs_name(name)
+        abs_name = self._name2abs_name(name)
         if abs_name is None:
             raise KeyError(f"{self._system().msginfo}: Variable name '{name}' not found.")
 
@@ -553,6 +584,13 @@ class Vector(object):
                                   type(self).__name__)
         return None  # silence lint warning about missing return value.
 
+    def _in_matvec_context(self):
+        """
+        Return True if this vector is inside of a matvec_context.
+        """
+        raise NotImplementedError('_in_matvec_context not defined for vector type %s' %
+                                  type(self).__name__)
+
     def set_complex_step_mode(self, active, keep_real=False):
         """
         Turn on or off complex stepping mode.
@@ -582,4 +620,4 @@ class Vector(object):
         self._under_complex_step = active
 
         if arr is not None:
-            self.set_const(arr)
+            self.set_val(arr)
