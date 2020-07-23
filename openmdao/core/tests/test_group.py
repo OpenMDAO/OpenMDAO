@@ -4,6 +4,7 @@ Unit tests for Group.
 
 import itertools
 import unittest
+import warnings
 
 import numpy as np
 
@@ -17,7 +18,7 @@ from openmdao.test_suite.components.sellar import SellarDis2
 from openmdao.utils.mpi import MPI
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.logger_utils import TestLogger
-from openmdao.utils.general_utils import ignore_errors_context
+from openmdao.utils.general_utils import ignore_errors_context, reset_warning_registry
 from openmdao.utils.name_maps import name2abs_names
 
 try:
@@ -2237,6 +2238,47 @@ class TestGroupAddInput(unittest.TestCase):
         msg = "Groups 'G1' and 'G1.G2' called set_input_defaults for the input 'x' with conflicting 'units'. The value (inch) from 'G1' will be used."
         with assert_warning(UserWarning, msg):
             p.setup()
+
+    def test_sub_sub_override(self):
+        p = om.Problem()
+        model = p.model
+        G1 = model.add_subsystem('G1', om.Group())
+        G1.set_input_defaults('x', units='mm', val=1.)
+        G2 = G1.add_subsystem('G2', om.Group(), promotes=['x'])
+        G3 = G2.add_subsystem('G3', om.Group(), promotes=['x'])
+        G3.add_subsystem('C1', om.ExecComp('y = 3.*x', x={'units': 'm'}), promotes=['x'])
+        G3.add_subsystem('C2', om.ExecComp('y = 4.*x', x={'units': 'cm'}), promotes=['x'])
+        G3.set_input_defaults('x', units='cm')
+        msg = "Groups 'G1' and 'G1.G2.G3' called set_input_defaults for the input 'x' with conflicting 'units'. The value (mm) from 'G1' will be used."
+        with assert_warning(UserWarning, msg):
+            p.setup()
+
+    def test_sub_sub_override2(self):
+        p = om.Problem()
+        model = p.model
+        G1 = model.add_subsystem('G1', om.Group())
+        G1.set_input_defaults('x', units='mm', val=1.)
+        G2 = G1.add_subsystem('G2', om.Group(), promotes=['x'])
+        G2.set_input_defaults('x', units='km')
+        G3 = G2.add_subsystem('G3', om.Group(), promotes=['x'])
+        G3.add_subsystem('C1', om.ExecComp('y = 3.*x', x={'units': 'm'}), promotes=['x'])
+        G3.add_subsystem('C2', om.ExecComp('y = 4.*x', x={'units': 'cm'}), promotes=['x'])
+        G3.set_input_defaults('x', units='cm')
+        msgs = [
+            "Groups 'G1.G2' and 'G1.G2.G3' called set_input_defaults for the input 'x' with conflicting 'units'. The value (km) from 'G1.G2' will be used.",
+            "Groups 'G1' and 'G1.G2' called set_input_defaults for the input 'x' with conflicting 'units'. The value (mm) from 'G1' will be used."
+        ]
+        with reset_warning_registry():
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter("always")
+                p.setup()
+
+        for msg in msgs:
+            for warn in w:
+                if (issubclass(warn.category, UserWarning) and str(warn.message) == msg):
+                    break
+            else:
+                raise AssertionError("Did not see expected %s: %s" % (category.__name__, msg))
 
     def test_conflicting_units_multi_level_par(self):
         # multiple Group.set_input_defaults calls at different tree levels with conflicting units args
