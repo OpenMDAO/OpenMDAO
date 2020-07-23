@@ -177,8 +177,8 @@ class Group(System):
             Units to assume for the promoted input.
         """
         if name in self._group_inputs:
-            simple_warning(f"{self.msginfo}: Adding group input '{name}' which "
-                           "overrides a previous input of the same name.")
+            simple_warning(f"{self.msginfo}: Setting input defaults for input '{name}' which "
+                           "override previously set defaults.")
         meta = {}
         if val is not _undefined:
             meta['value'] = val
@@ -575,7 +575,7 @@ class Group(System):
                                        " dotted names.")
 
     def _top_level_setup2(self):
-        self._resolve_connected_input_defaults()
+        self._resolve_ambiguous_input_meta()
 
         if self.comm.size > 1:
             abs2meta = self._var_abs2meta
@@ -690,7 +690,7 @@ class Group(System):
 
         group_inputs = []
         for n, meta in self._group_inputs.items():
-            meta['path'] = self.pathname  # used for error reporting
+            meta['path'] = {'*': self.pathname}  # used for error reporting
 
         for subsys in self._subsystems_myproc:
             subsys._setup_var_data()
@@ -796,41 +796,79 @@ class Group(System):
                                    "multiple outputs: {}.".format(self.msginfo, prom_name,
                                                                   sorted(abs_list)))
 
-        ginputs = self._group_inputs
-        for prom, meta in group_inputs:
-            if prom in ginputs:
-                # check for any conflicting units or values
-                old = ginputs[prom]
+        self._resolve_group_input_defaults(group_inputs)
 
-                for n, val in meta.items():
-                    if n == 'path' or val is None:
-                        continue
-
-                    if n in old and old[n] is not None:
-                        if isinstance(val, np.ndarray) or isinstance(old[n], np.ndarray):
-                            eq = np.all(val == old[n])
-                        else:
-                            eq = val == old[n]
-
-                        if not eq:
-                            raise RuntimeError(f"Groups '{old['path']}' and '{meta['path']}' "
-                                               f"added the input '{prom}' with conflicting '{n}'.")
-                    old[n] = val
-            else:
-                ginputs[prom] = meta
-
-        if ginputs:
+        if self._group_inputs:
             p2abs_in = self._var_allprocs_prom2abs_list['input']
-            extra = [gin for gin in ginputs if gin not in p2abs_in]
+            extra = [gin for gin in self._group_inputs if gin not in p2abs_in]
             if extra:
-                raise RuntimeError(f"{self.msginfo}: The following group inputs could not be "
-                                   f"found: {sorted(extra)}.")
+                raise RuntimeError(f"{self.msginfo}: The following group inputs, passed to "
+                                   f"set_input_defaults(), could not be found: {sorted(extra)}.")
 
         if self._var_discrete['input'] or self._var_discrete['output']:
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
             self._discrete_outputs = _DictValues(self._var_discrete['output'])
         else:
             self._discrete_inputs = self._discrete_outputs = ()
+
+    def _resolve_group_input_defaults(self, sub_group_inputs):
+        my_group_inputs = self._group_inputs
+        ginputs = defaultdict(list)
+        for prom, meta in sub_group_inputs:
+            ginputs[prom].append(meta)
+
+        for prom, metalist in ginputs.items():
+            if len(metalist) > 1:
+                diffs, full = _get_diff_input_defaults_meta(metalist)
+                if diffs:
+                    nomatch = []
+                    for key in diffs:
+                        if prom not in my_group_inputs or key not in my_group_inputs[prom]:
+                            nomatch.append(key)
+                    if nomatch:
+                        subs = set()
+                        for n in nomatch:
+                            subs.update(diffs[n])
+                        subs = sorted(subs)
+                        args = ', '.join([f'{n}=?' for n in nomatch])
+                        conditional_error(f"{self.msginfo}: The following subsystems, {subs}, "
+                                          f"called set_input_defaults for promoted input '{prom}' "
+                                          f"with conflicting values for {nomatch}. "
+                                          f"Call <group>.set_input_defaults('{prom}', {args}), "
+                                          f"where <group> is the Group named '{self.pathname}' to "
+                                          "remove the ambiguity.")
+                meta = full
+            else:
+                meta = metalist[0]
+
+            if prom in my_group_inputs:
+                # check for any conflicting units or values
+                upper = my_group_inputs[prom]
+
+                for n, val in meta.items():
+                    if n == 'path' or val is None:
+                        continue
+
+                    if n in upper and upper[n] is not None:
+                        if isinstance(val, np.ndarray) or isinstance(upper[n], np.ndarray):
+                            eq = np.all(val == upper[n])
+                        else:
+                            eq = val == upper[n]
+
+                        if not eq:
+                            origin = _get_input_default_origin(meta['path'], n)
+                            simple_warning(f"Groups '{self.pathname}' and '{origin}' "
+                                           f"called set_input_defaults for the input '{prom}' with "
+                                           f"conflicting '{n}'. The value ({upper[n]}) from "
+                                           f"'{self.pathname}' will be used.")
+                    else:
+                        upper['path'][n] = _get_input_default_origin(meta['path'], n)
+                        simple_warning(f"Group '{self.pathname}' did not set a default '{n}' "
+                                       f"for input '{prom}', so the value of ({val}) from group "
+                                       f"'{upper['path'][n]}' will be used.")
+                        upper[n] = val
+            else:
+                my_group_inputs[prom] = meta
 
     def _setup_var_sizes(self):
         """
@@ -2772,7 +2810,7 @@ class Group(System):
 
         return auto_ivc
 
-    def _resolve_connected_input_defaults(self):
+    def _resolve_ambiguous_input_meta(self):
         # This should only be called on the top level Group.
 
         srcconns = defaultdict(list)
@@ -2832,12 +2870,15 @@ class Group(System):
         errs = sorted(metavars)
         inputs = sorted(tgts)
         gpath = common_subpath(tgts)
-        g = self._get_subsystem(gpath)
+        if gpath == self.pathname:
+            g = self
+        else:
+            g = self._get_subsystem(gpath)
         gprom = None
 
         # get promoted name relative to g
         if MPI is not None and self.comm.size > 1:
-            if not (g is not None and g.comm is not None):  # g is not a local system
+            if g is not None and not g._is_local:
                 g = None
             if self.comm.allreduce(int(g is not None)) < self.comm.size:
                 # some procs have remote g
@@ -2853,6 +2894,53 @@ class Group(System):
 
         args = ', '.join([f'{n}=?' for n in errs])
         conditional_error(f"{self.msginfo}: The following inputs, {inputs}, promoted "
-                          f"to '{prom}', are connected but the metadata entries {errs}"
+                          f"to '{prom}', are connected but their metadata entries {errs}"
                           f" differ. Call <group>.set_input_defaults('{gprom}', {args}), "
                           f"where <group> is the Group named '{gpath}' to remove the ambiguity.")
+
+
+def _get_input_default_origin(pathdict, meta_name):
+    """
+    Return the name of the group that set a particular metadata entry.
+
+    Parameters
+    ----------
+    pathdict : dict
+        Dict of the form {'*': default_path_of_setting_group, name1: path_of_setting_group, ...}
+    meta_name : str
+        Name of metadata entry, e.g., 'units'.
+    """
+    if meta_name in pathdict:
+        return pathdict[meta_name]
+    return pathdict['*']
+
+
+def _get_diff_input_defaults_meta(metas):
+    """
+    Return a dict of metadata items that are different.
+
+    If an item is missing in one dict and present in another, that is not
+    considered to be a difference.
+    """
+    diffs = defaultdict(set)
+    if metas:
+        full = dict(metas[0])
+        for meta in metas[1:]:
+            for key, val in meta.items():
+                if key == 'path':
+                    continue
+                if key in full and full[key] is not None:
+                    if isinstance(val, np.ndarray) or isinstance(full[key], np.ndarray):
+                        eq = np.all(val == full[key])
+                    else:
+                        eq = val == full[key]
+                    if not eq:
+                        diffs[key].add(_get_input_default_origin(meta['path'], key))
+                if key not in full:
+                    full[key] = val
+                    full['path'][key] = _get_input_default_origin(meta['path'], key)
+
+        for key, origins in diffs.items():
+            origins.add(_get_input_default_origin(full['path'], key))
+
+    return diffs, full

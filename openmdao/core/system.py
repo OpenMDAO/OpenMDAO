@@ -4478,7 +4478,7 @@ class System(object):
 
         raise KeyError('{}: Metadata for variable "{}" not found.'.format(self.msginfo, name))
 
-    def _resolve_connected_input_defaults(self):
+    def _resolve_ambiguous_input_meta(self):
         pass
 
 
