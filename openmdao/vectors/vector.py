@@ -208,7 +208,7 @@ class Vector(object):
         """
         return [v for n, v in self._views.items() if n in self._names]
 
-    def name2abs_name(self, name):
+    def _name2abs_name(self, name):
         """
         Map the given promoted or relative name to the absolute name.
 
@@ -227,7 +227,7 @@ class Vector(object):
         system = self._system()
 
         # try relative name first
-        abs_name = name if system.pathname == '' else '.'.join((system.pathname, name))
+        abs_name = '.'.join((system.pathname, name)) if system.pathname else name
         if abs_name in self._names:
             return abs_name
 
@@ -250,7 +250,7 @@ class Vector(object):
 
         return (n[idx:] for n in system._var_abs_names[self._typ] if n in self._names)
 
-    def _abs_val_iter(self, flat=True):
+    def _abs_item_iter(self, flat=True):
         """
         Iterate over the items in the vector, using absolute names.
 
@@ -285,7 +285,7 @@ class Vector(object):
         boolean
             True or False.
         """
-        return self.name2abs_name(name) is not None
+        return self._name2abs_name(name) is not None
 
     def _contains_abs(self, name):
         """
@@ -317,7 +317,7 @@ class Vector(object):
         float or ndarray
             variable value.
         """
-        abs_name = self.name2abs_name(name)
+        abs_name = self._name2abs_name(name)
         if abs_name is not None:
             if self._icol is None:
                 return self._views[abs_name]
@@ -456,7 +456,7 @@ class Vector(object):
 
     def asarray(self, copy=False):
         """
-        Return an array representation of this vector.
+        Return a flat array representation of this vector.
 
         If copy is True, return a copy.  Otherwise, try to avoid it.
 
@@ -473,6 +473,21 @@ class Vector(object):
         raise NotImplementedError('asarray not defined for vector type %s' %
                                   type(self).__name__)
         return None  # silence lint warning
+
+    def iscomplex(self):
+        """
+        Return True if this vector contains complex values.
+
+        This checks the type of the values, not whether they have a nonzero imaginary part.
+
+        Returns
+        -------
+        bool
+            True if this vector contains complex values.
+        """
+        raise NotImplementedError('iscomplex not defined for vector type %s' %
+                                  type(self).__name__)
+        return False  # silence lint warning
 
     def set_vec(self, vec):
         """
@@ -517,7 +532,7 @@ class Vector(object):
         idxs : int or slice or tuple of ints and/or slices.
             The locations where the data array should be updated.
         """
-        abs_name = self.name2abs_name(name)
+        abs_name = self._name2abs_name(name)
         if abs_name is None:
             raise KeyError(f"{self._system().msginfo}: Variable name '{name}' not found.")
 

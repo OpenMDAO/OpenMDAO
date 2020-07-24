@@ -236,10 +236,6 @@ the |connection_visibility| button.
    :align: middle
    :scale: 40 %
 
-.. |show_conn_arrows| image:: images/show_conn_arrows.png
-   :align: middle
-   :scale: 40 %
-
 .. |hide_conn_arrows| image:: images/hide_conn_arrows.png
    :align: middle
    :scale: 40 %
@@ -257,11 +253,9 @@ the |connection_visibility| button.
    +-----------------------+--------------------------------+-----------------------------------------------------------------------------------+
    | Button                | Title                          | Description                                                                       |
    +=======================+================================+===================================================================================+
-   | |show_conn_arrows|    | Show pinned connection arrows  | Display all the connection arrows the user has pinned by clicking on a connection |
+   | |hide_conn_arrows|    | Hide all connection arrows     | Hide all pinned connection arrows.                                                |
    +-----------------------+--------------------------------+-----------------------------------------------------------------------------------+
-   | |hide_conn_arrows|    | Hide all connection arrows     | Hide all connection arrows, pinned or otherwise                                   |
-   +-----------------------+--------------------------------+-----------------------------------------------------------------------------------+
-   | |show_all_conn_arrows|| Show all connections in model  | Show all connections in model. These are not added to the "pinned" list of arrows |
+   | |show_all_conn_arrows|| Show all connections in view   | Show all connections in view and pin them.                                        |
    +-----------------------+--------------------------------+-----------------------------------------------------------------------------------+
 
 |

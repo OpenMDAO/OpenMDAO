@@ -156,7 +156,7 @@ class N2TreeNode {
      * Look for the supplied node in the set of child names.
      * @returns {Boolean} True if a match is found, otherwise false.
      */
-    _hasNodeInChildren(compareNode) {
+    hasNodeInChildren(compareNode) {
         return this.childNames.has(compareNode.absPathName);
     }
 
@@ -166,7 +166,7 @@ class N2TreeNode {
      * @returns {Boolean} True if the node is found, otherwise false.
      */
     hasParent(compareNode, parentLimit = null) {
-        for (let obj = this; obj != null && obj !== parentLimit; obj = obj.parent) {
+        for (let obj = this.parent; obj != null && obj !== parentLimit; obj = obj.parent) {
             if (obj === compareNode) {
                 return true;
             }
@@ -184,10 +184,12 @@ class N2TreeNode {
     hasNode(compareNode, parentLimit = null) {
         if (this.type == 'root') return true;
 
+        if ( this === compareNode) return true;
+
         // Check parents first.
         if (this.hasParent(compareNode, parentLimit)) return true;
 
-        return this._hasNodeInChildren(compareNode);
+        return this.hasNodeInChildren(compareNode);
     }
 
     /**
@@ -250,6 +252,7 @@ class N2TreeNode {
         if ( ! (this.isRoot() || this.manuallyExpanded) &&
             (this.numDescendants > PRECOLLAPSE_THRESHOLD &&
                 this.children.length > 1 ) ) {
+            debugInfo(`Precollapsing node ${this.absPathName}`)
             this.minimize();
             return true;
         }

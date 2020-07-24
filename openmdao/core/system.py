@@ -894,17 +894,17 @@ class System(object):
         is_total = isinstance(self, Group)
 
         # compute perturbations
-        starting_inputs = self._inputs.asarray(True)
+        starting_inputs = self._inputs.asarray(copy=True)
         in_offsets = starting_inputs.copy()
         in_offsets[in_offsets == 0.0] = 1.0
         in_offsets *= info['perturb_size']
 
-        starting_outputs = self._outputs.asarray(True)
+        starting_outputs = self._outputs.asarray(copy=True)
         out_offsets = starting_outputs.copy()
         out_offsets[out_offsets == 0.0] = 1.0
         out_offsets *= info['perturb_size']
 
-        starting_resids = self._residuals.asarray(True)
+        starting_resids = self._residuals.asarray(copy=True)
 
         # for groups, this does some setup of approximations
         self._setup_approx_coloring()

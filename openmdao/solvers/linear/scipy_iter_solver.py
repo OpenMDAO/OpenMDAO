@@ -284,4 +284,4 @@ class ScipyKrylov(LinearSolver):
         self._solver_info.pop()
 
         # return resulting value of x vector
-        return x_vec.asarray(True)
+        return x_vec.asarray(copy=True)

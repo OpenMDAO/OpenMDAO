@@ -29,7 +29,7 @@ def _print_violations(unknowns, lower, upper):
         Vector containing the upper bounds.
     """
     start = end = 0
-    for name, val in unknowns._abs_val_iter():
+    for name, val in unknowns._abs_item_iter():
         end += val.size
         if upper is not None and any(val > upper[start:end]):
             print("'%s' exceeds upper bounds" % name)
@@ -107,7 +107,7 @@ class LinesearchSolver(NonlinearSolver):
         if system._has_bounds:
             abs2meta = system._var_abs2meta
             start = end = 0
-            for abs_name, val in system._outputs._abs_val_iter():
+            for abs_name, val in system._outputs._abs_item_iter():
                 end += val.size
                 meta = abs2meta[abs_name]
                 var_lower = meta['lower']
