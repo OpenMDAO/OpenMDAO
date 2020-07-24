@@ -1935,7 +1935,7 @@ class Group(System):
             self._residuals._under_complex_step = True
 
             self._outputs.set_complex_step_mode(True)
-            self._outputs._data[:] += imag_cache * 1j
+            self._outputs.iadd(imag_cache * 1j)
 
     def guess_nonlinear(self, inputs, outputs, residuals,
                         discrete_inputs=None, discrete_outputs=None):
@@ -2003,7 +2003,7 @@ class Group(System):
                 if rel_systems is not None:
                     for s in irrelevant_subs:
                         # zero out dvecs of irrelevant subsystems
-                        s._vectors['residual']['linear'].set_const(0.0)
+                        s._vectors['residual']['linear'].set_val(0.0)
 
             for subsys in self._subsystems_myproc:
                 if rel_systems is None or subsys.pathname in rel_systems:
@@ -2016,7 +2016,7 @@ class Group(System):
                     if rel_systems is not None:
                         for s in irrelevant_subs:
                             # zero out dvecs of irrelevant subsystems
-                            s._vectors['output']['linear'].set_const(0.0)
+                            s._vectors['output']['linear'].set_val(0.0)
 
     def _solve_linear(self, vec_names, mode, rel_systems):
         """

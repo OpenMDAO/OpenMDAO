@@ -314,13 +314,13 @@ class Solver(object):
             excl = ['.'.join((system.pathname, i)) for i in excl]
 
         if self.recording_options['record_solver_residuals']:
-            myresiduals = [n for n in system._residuals._views if check_path(n, incl, excl)]
+            myresiduals = [n for n in system._residuals._abs_iter() if check_path(n, incl, excl)]
 
         if self.recording_options['record_outputs']:
-            myoutputs = [n for n in system._outputs._views if check_path(n, incl, excl)]
+            myoutputs = [n for n in system._outputs._abs_iter() if check_path(n, incl, excl)]
 
         if self.recording_options['record_inputs']:
-            myinputs = [n for n in system._inputs._views if check_path(n, incl, excl)]
+            myinputs = [n for n in system._inputs._abs_iter() if check_path(n, incl, excl)]
 
         self._filtered_vars_to_record = {
             'input': myinputs,
@@ -832,9 +832,9 @@ class BlockLinearSolver(LinearSolver):
         system = self._system()
         for vec_name in system._lin_rel_vec_name_list:
             if self._mode == 'fwd':
-                rhs[vec_name] = system._vectors['residual'][vec_name]._data.copy()
+                rhs[vec_name] = system._vectors['residual'][vec_name].asarray(True)
             else:
-                rhs[vec_name] = system._vectors['output'][vec_name]._data.copy()
+                rhs[vec_name] = system._vectors['output'][vec_name].asarray(True)
 
     def _update_rhs_vecs(self):
         system = self._system()

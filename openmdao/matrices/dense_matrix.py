@@ -92,7 +92,7 @@ class DenseMatrix(COOMatrix):
         ndarray or None
             The mask array or None.
         """
-        if len(d_inputs._views) > len(d_inputs._names):
+        if d_inputs._in_matvec_context():
             sub = d_inputs._names
             mask = np.ones(len(d_inputs), dtype=np.bool)
             for key, val in self._metadata.items():

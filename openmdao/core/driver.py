@@ -289,7 +289,7 @@ class Driver(object):
 
         # Now determine if later we'll need to allgather cons, objs, or desvars.
         if model.comm.size > 1 and model._subsystems_allprocs:
-            local_out_vars = set(model._outputs._views)
+            local_out_vars = set(model._outputs._abs_iter())
             remote_dvs = set(src_design_vars) - local_out_vars
             remote_cons = set(src_cons) - local_out_vars
             remote_objs = set(src_objs) - local_out_vars
@@ -413,17 +413,17 @@ class Driver(object):
         if recording_options['record_outputs']:
             myoutputs = sorted([n for n, prom in abs2prom.items() if check_path(prom, incl, excl)])
 
-            views = model._outputs._views
+            model_outs = model._outputs
 
             if model._var_discrete['output']:
                 # if we have discrete outputs then residual name set doesn't match output one
                 if recording_options['record_residuals']:
-                    myresiduals = [n for n in myoutputs if n in views]
+                    myresiduals = [n for n in myoutputs if model_outs._contains_abs(n)]
             elif recording_options['record_residuals']:
                 myresiduals = myoutputs
 
         elif recording_options['record_residuals']:
-            myresiduals = [n for n in model._residuals._views
+            myresiduals = [n for n in model._residuals._abs_iter()
                            if check_path(abs2prom[n], incl, excl)]
 
         myoutputs = set(myoutputs)
@@ -486,7 +486,7 @@ class Driver(object):
         """
         model = self._problem().model
         comm = model.comm
-        vec = model._outputs._views_flat
+        get = model._outputs._abs_get_val
         distributed_vars = self._dist_driver_vars
         indices = meta['indices']
 
@@ -511,9 +511,9 @@ class Driver(object):
             else:
                 if owner == comm.rank:
                     if indices is None:
-                        val = vec[src_name].copy()
+                        val = get(name).copy()
                     else:
-                        val = vec[src_name][indices]
+                        val = get(name)[indices]
                 else:
                     if indices is not None:
                         size = len(indices)
@@ -547,9 +547,9 @@ class Driver(object):
                     raise ValueError(msg)
 
             elif indices is None:
-                val = vec[src_name].copy()
+                val = get(src_name).copy()
             else:
-                val = vec[src_name][indices]
+                val = get(src_name)[indices]
 
         if self._has_scaling and driver_scaling:
             # Scale design variable values
@@ -616,8 +616,8 @@ class Driver(object):
 
             problem.model._discrete_outputs[src_name] = value
 
-        elif src_name in problem.model._outputs._views_flat:
-            desvar = problem.model._outputs._views_flat[src_name]
+        elif problem.model._outputs._contains_abs(src_name):
+            desvar = problem.model._outputs._abs_get_val(src_name)
             if src_name in self._dist_driver_vars:
                 loc_idxs, _, dist_idxs = self._dist_driver_vars[src_name]
             else:
