@@ -259,10 +259,10 @@ class ApproximationScheme(object):
             wrt = key[0]
             directional = key[-1]
             data = self._get_approx_data(system, key)
-            if wrt in inputs._views_flat:
+            if inputs._contains_abs(wrt):
                 arr = inputs
                 slices = in_slices
-            elif wrt in outputs._views_flat:
+            elif outputs._contains_abs(wrt):
                 arr = outputs
                 slices = out_slices
             else:  # wrt is remote
@@ -295,7 +295,7 @@ class ApproximationScheme(object):
         system._set_approx_mode(True)
 
         # Clean vector for results
-        results_array = system._outputs._data.copy() if total else system._residuals._data.copy()
+        results_array = system._outputs.asarray(True) if total else system._residuals.asarray(True)
 
         # To support driver src_indices, we need to override some checks in Jacobian, but do it
         # selectively.

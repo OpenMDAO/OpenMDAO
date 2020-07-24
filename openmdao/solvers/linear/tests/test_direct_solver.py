@@ -123,8 +123,8 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         # forward
         d_inputs, d_outputs, d_residuals = g1.get_linear_vectors()
 
-        d_residuals.set_const(1.0)
-        d_outputs.set_const(0.0)
+        d_residuals.set_val(1.0)
+        d_outputs.set_val(0.0)
         g1._linearize(g1._assembled_jac)
         g1.linear_solver._linearize()
         g1.run_solve_linear(['linear'], 'fwd')
@@ -135,8 +135,8 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         # reverse
         d_inputs, d_outputs, d_residuals = g1.get_linear_vectors()
 
-        d_outputs.set_const(1.0)
-        d_residuals.set_const(0.0)
+        d_outputs.set_val(1.0)
+        d_residuals.set_val(0.0)
         g1.linear_solver._linearize()
         g1.run_solve_linear(['linear'], 'rev')
 

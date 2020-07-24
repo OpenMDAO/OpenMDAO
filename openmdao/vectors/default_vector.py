@@ -28,8 +28,9 @@ class DefaultVector(Vector):
         ndarray
             zeros array of correct size to hold all of this vector's variables.
         """
+        system = self._system()
         ncol = self._ncol
-        size = np.sum(self._system()._var_sizes[self._name][self._typ][self._iproc, :])
+        size = np.sum(system._var_sizes[self._name][self._typ][system.comm.rank, :])
         return np.zeros(size) if ncol == 1 else np.zeros((size, ncol))
 
     def _extract_root_data(self):
@@ -43,19 +44,11 @@ class DefaultVector(Vector):
         """
         system = self._system()
         type_ = self._typ
-        iproc = self._iproc
         ncol = self._ncol
         root_vec = self._root_vector
 
-        cplx_data = None
-        scaling = {}
-        if self._do_scaling:
-            scaling['phys'] = {}
-            scaling['norm'] = {}
-
         slices = root_vec.get_slice_dict()
 
-        sizes = system._var_sizes[self._name][type_]
         mynames = system._var_relevant_names[self._name][type_]
         if mynames:
             myslice = slice(slices[mynames[0]].start // ncol, slices[mynames[-1]].stop // ncol)
@@ -65,10 +58,13 @@ class DefaultVector(Vector):
         data = root_vec._data[myslice]
 
         # Extract view for complex storage too.
-        if self._alloc_complex:
-            cplx_data = root_vec._cplx_data[myslice]
+        cplx_data = root_vec._cplx_data[myslice] if self._alloc_complex else None
 
+        scaling = {}
         if self._do_scaling:
+            scaling['phys'] = {}
+            scaling['norm'] = {}
+
             for typ in ('phys', 'norm'):
                 root_scale = root_vec._scaling[typ]
                 rs0 = root_scale[0]
@@ -175,6 +171,17 @@ class DefaultVector(Vector):
         self._names = frozenset(views)
         self._len = end
 
+    def _in_matvec_context(self):
+        """
+        Return True if this vector is inside of a matvec_context.
+
+        Returns
+        -------
+        bool
+            Whether or not this vector is in a matvec_context.
+        """
+        return len(self._names) != len(self._views)
+
     def __iadd__(self, vec):
         """
         Perform in-place vector addition.
@@ -272,23 +279,58 @@ class DefaultVector(Vector):
         """
         self._data[idxs] = val
 
-    set_const = set_val  # for backward compat
-
-    def asarray(self, idxs=_full_slice):
+    def scale(self, scale_to):
         """
-        Return parts of the data array at the specified indices or slice(s).
+        Scale this vector to normalized or physical form.
 
         Parameters
         ----------
-        idxs : int or slice or tuple of ints and/or slices.
-            The locations to pull from the data array.
+        scale_to : str
+            Values are "phys" or "norm" to scale to physical or normalized.
+        """
+        adder, scaler = self._scaling[scale_to]
+        if self._ncol == 1:
+            self._data *= scaler
+            if adder is not None:  # nonlinear only
+                self._data += adder
+        else:
+            self._data *= scaler[:, np.newaxis]
+            if adder is not None:  # nonlinear only
+                self._data += adder
+
+    def asarray(self, copy=False):
+        """
+        Return an array representation of this vector.
+
+        If copy is True, return a copy.  Otherwise, try to avoid it.
+
+        Parameters
+        ----------
+        copy : bool
+            If True, return a copy of the array.
 
         Returns
         -------
         ndarray
-            Array of values.
+            Array representation of this vector.
         """
-        return self._data[idxs]
+        if copy:
+            return self._data.copy()
+
+        return self._data
+
+    def iscomplex(self):
+        """
+        Return True if this vector contains complex values.
+
+        This checks the type of the values, not whether they have a nonzero imaginary part.
+
+        Returns
+        -------
+        bool
+            True if this vector contains complex values.
+        """
+        return np.iscomplexobj(self._data)
 
     def iadd(self, val, idxs=_full_slice):
         """
@@ -343,7 +385,7 @@ class DefaultVector(Vector):
         float
             The computed dot product value.
         """
-        return np.dot(self._data, vec._data)
+        return np.dot(self._data, vec.asarray())
 
     def get_norm(self):
         """

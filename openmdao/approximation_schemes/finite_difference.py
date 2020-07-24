@@ -156,10 +156,10 @@ class FiniteDifference(ApproximationScheme):
         fd_form = _generate_fd_coeff(form, order, system)
 
         if step_calc == 'rel':
-            if wrt in system._outputs._views_flat:
-                step *= np.linalg.norm(system._outputs._views_flat[wrt])
-            elif wrt in system._inputs._views_flat:
-                step *= np.linalg.norm(system._inputs._views_flat[wrt])
+            if system._outputs._contains_abs(wrt):
+                step *= np.linalg.norm(system._outputs._abs_get_val(wrt))
+            elif system._inputs._contains_abs(wrt):
+                step *= np.linalg.norm(system._inputs._abs_get_val(wrt))
 
         deltas = fd_form.deltas * step
         coeffs = fd_form.coeffs / step
@@ -187,9 +187,9 @@ class FiniteDifference(ApproximationScheme):
         if jac is None:
             jac = system._jacobian
 
-        self._starting_outs = system._outputs._data.copy()
-        self._starting_resids = system._residuals._data.copy()
-        self._starting_ins = system._inputs._data.copy()
+        self._starting_outs = system._outputs.asarray(True)
+        self._starting_resids = system._residuals.asarray(True)
+        self._starting_ins = system._inputs.asarray(True)
         if total:
             self._results_tmp = self._starting_outs.copy()
         else:
@@ -296,20 +296,20 @@ class FiniteDifference(ApproximationScheme):
         """
         for vec, idxs in idx_info:
             if vec is not None:
-                vec._data[idxs] += delta
+                vec.iadd(delta, idxs)
 
         if total:
             system.run_solve_nonlinear()
-            self._results_tmp[:] = system._outputs._data
+            self._results_tmp[:] = system._outputs.asarray()
         else:
             system.run_apply_nonlinear()
-            self._results_tmp[:] = system._residuals._data
+            self._results_tmp[:] = system._residuals.asarray()
 
-        system._residuals._data[:] = self._starting_resids
+        system._residuals.set_val(self._starting_resids)
 
         # save results and restore starting inputs/outputs
-        system._inputs._data[:] = self._starting_ins
-        system._outputs._data[:] = self._starting_outs
+        system._inputs.set_val(self._starting_ins)
+        system._outputs.set_val(self._starting_outs)
 
         return self._results_tmp
 
