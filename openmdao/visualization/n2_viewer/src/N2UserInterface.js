@@ -60,11 +60,15 @@ class InfoUpdateType extends InfoPropDefault {
 function array_to_string(array, level=0){
     let indent = ' '.repeat(level);
     let s = indent + '[';
+    // Used to format that floats displayed
+    let val_formatter = d3.format("g");
+
     for (const element of array) {
         if (Array.isArray(element)) {
             s += array_to_string(element,level+1);
         } else {
-            s += element.toString() ;
+            // s += element.toString() ;
+            s += val_formatter(element) ;
         }
         s += ' ';
     }
@@ -135,6 +139,10 @@ class ValueInfo {
         this.hidden = true;
         this.pinned = false;
 
+
+        this.initial_width =  0 ;
+        this.initial_height =  0 ;
+
         const self = this;
         this.name = null;
         this.TRUNCATE_LIMIT = 80; // if the string version of the variable is longer than this, truncate
@@ -167,11 +175,12 @@ class ValueInfo {
 
         // Handle 1-D array
         if (!Array.isArray(val[0])) {
+            return true;
             // 1-D array
-            if (val.length < this.TRUNCATE_LIMIT) {
-                // too short to need separate window
-                return false;
-            }
+            // if (val.length < this.TRUNCATE_LIMIT) {
+            //     // too short to need separate window
+            //     return false;
+            // }
         }
 
         // Handle 2-D array
@@ -185,6 +194,9 @@ class ValueInfo {
 
     update(name, val) {
         this.title.text("Initial value for " + name);
+
+        // Used to format that floats displayed in the table
+        let val_formatter = d3.format("g");
 
         // Check to see if the data is a 2d array since the rest of the code assumes that it is an Array
         // If only 1d, make it a 2d with one row
@@ -201,8 +213,13 @@ class ValueInfo {
         .enter()
         .append('td')
         .text(function (d) {
-            return d;
+            return val_formatter(d);
         })
+
+
+        // getBoundingClientRect
+        this.initial_width = parseInt(this.table.style('width'));
+        this.initial_height = parseInt(this.table.style('height'));
     }
 
     clear() {
@@ -265,8 +282,11 @@ class ValueInfo {
                         .on('mouseup', null);
                 })
                 .on('mousemove', e => {
-                    const newWidth = d3.event.clientX - startPos.x + startDims.width;
-                    const newHeight = d3.event.clientY - startPos.y + startDims.height;
+                    let newWidth = d3.event.clientX - startPos.x + startDims.width;
+                    let newHeight = d3.event.clientY - startPos.y + startDims.height;
+
+                    newWidth = Math.min(newWidth, this.initial_width);
+                    newHeight = Math.min(newHeight, this.initial_height);
 
                     tableDiv.style('width', newWidth + 'px');
                     tableDiv.style('height', newHeight + 'px');
@@ -278,11 +298,229 @@ class ValueInfo {
     }
 }
 
+
 /**
  * Manage a window for displaying the value of a variable.
  * @typedef ValueInfo
  */
 class ValueInfoMultiple {
+    /**
+     * Build a list of the properties we care about and set up
+     * references to the HTML elements.
+     * @param {Object} abs2prom Object containing promoted variable names.
+     */
+    constructor(abs2prom) {
+        this.abs2prom = abs2prom;
+
+        /* need to create these */
+// <div class="node-value" id="node-value-container">
+//     <div id="node-value-header">
+//         <span id="node-value-title"></span>
+//         <span class="close-value-window-button">&times;</span>
+//     </div>
+//     <div id="node-value-table-div">
+//         <table id="node-value-table" cellpadding='0' cellspacing='0'>
+//         </table>
+//     </div>
+//     <div id="node-value-footer">
+//       <div id="node-value-resizer-handle"></div>
+//     </div>
+// </div>
+        let top_container = d3.select('#node-value-containers');
+        this.container = this.top_container.append('div').attr('class', 'node-value-container');
+        this.header = this.container.append('div').attr('class', 'node-value-header');
+        this.title = this.header.append('span').attr('class', 'node-value-title' )
+        this.close_button = this.header.append('span').attr('class', 'close-value-window-button' ).text('&times;')
+
+        this.table_div = this.container.append('div').attr('class', 'node-value-table-div');
+        this.table = this.table_div.append('table').attr('class', 'node-value-table')
+
+        this.footer = this.container.append('div').attr('class', 'node-value-footer');
+        this.resize_handle = this.footer.append('div').attr('class', 'node-value-resizer-handle')
+
+        // this.container = d3.select('#node-value-container');
+        // this.table = d3.select('#node-value-table');
+        // // this.header = d3.select('#node-value-header');
+        // this.title = d3.select('#node-value-title');
+        // this.thead = this.table.select('thead');
+        // this.tbody = this.table.select('tbody');
+
+
+        this.container = d3.select('#node-value-container');
+        this.table = d3.select('#node-value-table');
+        this.header = d3.select('#node-value-header');
+        this.grabber = d3.select('#node-value-title');
+        this.title = d3.select('#node-value-title');
+        this.thead = this.table.select('thead');
+        this.tbody = this.table.select('tbody');
+        this.hidden = true;
+        this.pinned = false;
+
+
+        this.initial_width =  0 ;
+        this.initial_height =  0 ;
+
+        const self = this;
+        this.name = null;
+        this.TRUNCATE_LIMIT = 80; // if the string version of the variable is longer than this, truncate
+
+        d3.select('.close-value-window-button').on(
+            'click',
+            function () {
+                self.hide();
+            }
+        );
+
+        this._setupDrag();
+        this._setupResizerDrag();
+    }
+
+    show() {
+        this.container.style('visibility', 'visible');
+    }
+
+    hide() {
+        this.container.style('visibility', 'hidden');
+    }
+
+    showMoreButtonDisplayed(val) {  //
+        if (!val) return false; // if no value, cannot display! Need to check this
+
+        if (!Array.isArray(val)) return false ; // scalars don't need separate display
+
+        // Now we know it is an array
+
+        // Handle 1-D array
+        if (!Array.isArray(val[0])) {
+            return true;
+            // 1-D array
+            // if (val.length < this.TRUNCATE_LIMIT) {
+            //     // too short to need separate window
+            //     return false;
+            // }
+        }
+
+        // Handle 2-D array
+        if (!Array.isArray(val[0][0])) {
+            return true;
+        }
+
+        // More than 3-D array - punt for now
+        return false;
+    }
+
+    update(name, val) {
+        this.title.text("Initial value for " + name);
+
+        // Used to format that floats displayed in the table
+        let val_formatter = d3.format("g");
+
+        // Check to see if the data is a 2d array since the rest of the code assumes that it is an Array
+        // If only 1d, make it a 2d with one row
+        if (!Array.isArray(val[0])){
+            val = [val];
+        }
+
+        var tbody = this.table.append("tbody");
+        var rows = tbody.selectAll('tr').data(val).enter().append('tr')
+        var cells = rows.selectAll('td')
+            .data(function(row) {
+                return row;
+        })
+        .enter()
+        .append('td')
+        .text(function (d) {
+            return val_formatter(d);
+        })
+
+
+        // getBoundingClientRect
+        this.initial_width = parseInt(this.table.style('width'));
+        this.initial_height = parseInt(this.table.style('height'));
+    }
+
+    clear() {
+        this.table.html('');
+    }
+
+        /** Listen for the event to begin dragging the legend */
+    _setupDrag() {
+        const self = this;
+
+        // this.title.on('mousedown', function() {
+        this.grabber.on('mousedown', function() {
+            d3.select('#node-value-title').style('cursor', 'grabbing');
+            let dragDiv = d3.select('#node-value-container');
+            dragDiv.style('cursor', 'grabbing')
+                // top style needs to be set explicitly before releasing bottom:
+                .style('top', dragDiv.style('top'))
+                .style('bottom', 'initial');
+
+            self._startPos = [d3.event.clientX, d3.event.clientY]
+            self._offset = [d3.event.clientX - parseInt(dragDiv.style('left')),
+                d3.event.clientY - parseInt(dragDiv.style('top'))];
+
+            let w = d3.select(window)
+                .on("mousemove", e => {
+                    dragDiv
+                        .style('top', (d3.event.clientY - self._offset[1]) + 'px')
+                        .style('left', (d3.event.clientX - self._offset[0]) + 'px');
+                })
+                .on("mouseup", e => {
+                    dragDiv.style('cursor', 'grab');
+                    w.on("mousemove", null).on("mouseup", null);
+
+                });
+
+            d3.event.preventDefault();
+        })
+    }
+
+        /** Set up event handlers for grabbing the bottom corner and dragging */
+    _setupResizerDrag() {
+        const handle = d3.select('#node-value-resizer-handle');
+        const body = d3.select('body');
+        const tableDiv = d3.select('#node-value-table-div');
+
+        handle.on('mousedown', e => {
+            const startPos = {
+                'x': d3.event.clientX,
+                'y': d3.event.clientY
+            };
+            const startDims = {
+                'width': parseInt(tableDiv.style('width')),
+                'height': parseInt(tableDiv.style('height'))
+            };
+            body.style('cursor', 'nwse-resize')
+                .on('mouseup', e => {
+                    // Get rid of the drag event handlers
+                    body.style('cursor', 'default')
+                        .on('mousemove', null)
+                        .on('mouseup', null);
+                })
+                .on('mousemove', e => {
+                    let newWidth = d3.event.clientX - startPos.x + startDims.width;
+                    let newHeight = d3.event.clientY - startPos.y + startDims.height;
+
+                    newWidth = Math.min(newWidth, this.initial_width);
+                    newHeight = Math.min(newHeight, this.initial_height);
+
+                    tableDiv.style('width', newWidth + 'px');
+                    tableDiv.style('height', newHeight + 'px');
+                });
+
+            d3.event.preventDefault();
+        });
+
+    }
+}
+
+
+/**
+ * Manage a window for displaying the value of a variable.
+ * @typedef ValueInfo
+ */
+class ValueInfoMultipleOld {
     /**
      * Build a list of the properties we care about and set up
      * references to the HTML elements.
@@ -360,11 +598,12 @@ class ValueInfoMultiple {
 
         // Handle 1-D array
         if (!Array.isArray(val[0])) {
-            // 1-D array
-            if (val.length < this.TRUNCATE_LIMIT) {
-                // too short to need separate window
-                return false;
-            }
+            return true;
+           // 1-D array
+           //  if (val.length < this.TRUNCATE_LIMIT) {
+           //      // too short to need separate window
+           //      return false;
+           //  }
         }
 
         // Handle 2-D array
@@ -591,14 +830,14 @@ class NodeInfo {
 
                     let html = nodeInfoVal;
                     // if ( this.valueInfo.showMoreButtonDisplayed(val) ){
-                    if ( isTruncated ){
+                    if ( isTruncated && this.valueInfo.showMoreButtonDisplayed(val)){
                         html += " <button type='button' class='show_value_button'>Show more</button>" ;
                     }
                     html += " <button type='button' class='copy_value_button'>Copy</button>" ;
                     td = newRow.append('td').html(html);
 
                     // if ( this.valueInfo.showMoreButtonDisplayed(val) ) {
-                    if ( isTruncated ) {
+                    if ( isTruncated && this.valueInfo.showMoreButtonDisplayed(val)) {
                         var showValueButton = td.select('.show_value_button');
                         const self = this;
                         showValueButton.on('click', function () {
