@@ -1044,7 +1044,7 @@ class TestProblem(unittest.TestCase):
         try:
             prob.setup()
         except RuntimeError as err:
-            self.assertEqual(str(err), "Group (<model>): The following inputs, ['C1.x', 'C2.x'], promoted to 'x', are connected but their metadata entries ['units', 'value'] differ. Call <group>.set_input_defaults('x', units=?, value=?), where <group> is the Group named '' to remove the ambiguity.")
+            self.assertEqual(str(err), "Group (<model>): The following inputs, ['C1.x', 'C2.x'], promoted to 'x', are connected but their metadata entries ['units', 'value'] differ. Call <group>.set_input_defaults('x', units=?, value=?), where <group> is the model to remove the ambiguity.")
         else:
             self.fail("Exception expected.")
 

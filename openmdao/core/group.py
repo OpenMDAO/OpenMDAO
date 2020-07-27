@@ -893,14 +893,14 @@ class Group(System):
                                                     prom = sub._var_abs2prom['input'][a]
                                                     break
 
+                                    gname = f"Group named '{common}'" if common else 'model'
                                     conditional_error(f"{self.msginfo}: The subsystems {origin} "
                                                       f"and {submeta['path']} called "
                                                       f"set_input_defaults for promoted input "
                                                       f"{prm} with conflicting values for "
                                                       f"'{key}'. Call <group>.set_input_defaults("
                                                       f"'{prom}', {key}=?), where <group> is the "
-                                                      f"Group named '{common}' to remove the"
-                                                      " ambiguity.")
+                                                      f"{gname} to remove the ambiguity.")
 
             # update all metadata dicts with any missing metadata that was filled in elsewhere
             for meta in metalist:
@@ -2928,8 +2928,9 @@ class Group(System):
         if gprom is None:
             gprom = g._var_allprocs_abs2prom['input'][inputs[0]]
 
+        gname = f"Group named '{gpath}'" if gpath else 'model'
         args = ', '.join([f'{n}=?' for n in errs])
         conditional_error(f"{self.msginfo}: The following inputs, {inputs}, promoted "
                           f"to '{prom}', are connected but their metadata entries {errs}"
                           f" differ. Call <group>.set_input_defaults('{gprom}', {args}), "
-                          f"where <group> is the Group named '{gpath}' to remove the ambiguity.")
+                          f"where <group> is the {gname} to remove the ambiguity.")
