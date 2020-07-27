@@ -777,7 +777,7 @@ class TestProblem(unittest.TestCase):
             def compute(self, inputs, outputs):
                 outputs['y'] = 3.0*inputs['x']
 
-                if np.iscomplex(inputs._data[0]) and not self.under_complex_step:
+                if inputs.iscomplex() and not self.under_complex_step:
                     raise RuntimeError('under_complex_step not set in component.')
 
             def compute_partials(self, inputs, partials):

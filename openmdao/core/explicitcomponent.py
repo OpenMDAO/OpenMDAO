@@ -214,8 +214,8 @@ class ExplicitComponent(Component):
         for abs_key, meta in self._subjacs_info.items():
             if 'method' in meta:
                 method = meta['method']
-                if (method is not None and method in self._approx_schemes and abs_key[1]
-                        not in self._outputs._views_flat):
+                if (method is not None and method in self._approx_schemes and
+                        not self._outputs._contains_abs(abs_key[1])):
                     yield abs_key
 
     def _apply_nonlinear(self):
@@ -250,7 +250,7 @@ class ExplicitComponent(Component):
         """
         with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
             with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
-                self._residuals.set_const(0.0)
+                self._residuals.set_val(0.0)
                 self._inputs.read_only = True
                 try:
                     if self._discrete_inputs or self._discrete_outputs:

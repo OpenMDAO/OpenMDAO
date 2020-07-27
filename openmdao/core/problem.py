@@ -507,11 +507,11 @@ class Problem(object):
             if indices is None:
                 indices = _full_slice
 
-            if abs_name in model._outputs._views:
+            if model._outputs._contains_abs(abs_name):
                 model._outputs.set_var(abs_name, value, indices)
             elif abs_name in conns:  # input name given. Set value into output
-                if src in model._outputs._views:  # src is local
-                    if (model._outputs._views_flat[src].size == 0 and
+                if model._outputs._contains_abs(src):  # src is local
+                    if (model._outputs._abs_get_val(src).size == 0 and
                             src.rsplit('.', 1)[0] == '_auto_ivc' and all_meta[src]['distributed']):
                         pass  # special case, auto_ivc dist var with 0 local size
                     elif tmeta['has_src_indices'] and n_proms < 2:
@@ -542,7 +542,7 @@ class Problem(object):
                 # also set the input
                 # TODO: maybe remove this if inputs are removed from case recording
                 if n_proms < 2:
-                    if abs_name in model._inputs._views:
+                    if model._inputs._contains_abs(abs_name):
                         model._inputs.set_var(abs_name, ivalue, indices)
                     elif abs_name in model._discrete_inputs:
                         model._discrete_inputs[abs_name] = value
@@ -554,7 +554,7 @@ class Problem(object):
                                   "Local assignment ignored.")
             elif abs_name in model._discrete_outputs:
                 model._discrete_outputs[abs_name] = value
-            elif abs_name in model._inputs._views:   # could happen if model is a component
+            elif model._inputs._contains_abs(abs_name):   # could happen if model is a component
                 model._inputs.set_var(abs_name, value, indices)
             elif abs_name in model._discrete_inputs:   # could happen if model is a component
                 model._discrete_inputs[abs_name] = value
@@ -674,7 +674,7 @@ class Problem(object):
         rvec = self.model._vectors[rkind]['linear']
         lvec = self.model._vectors[lkind]['linear']
 
-        rvec._data[:] = 0.
+        rvec.set_val(0.)
 
         conns = self.model._conn_global_abs_in2out
 
@@ -1048,8 +1048,8 @@ class Problem(object):
         partials_data = defaultdict(lambda: defaultdict(dict))
 
         # Caching current point to restore after setups.
-        input_cache = model._inputs._data.copy()
-        output_cache = model._outputs._data.copy()
+        input_cache = model._inputs.asarray(copy=True)
+        output_cache = model._outputs.asarray(copy=True)
 
         # Keep track of derivative keys that are declared dependent so that we don't print them
         # unless they are in error.
@@ -1061,8 +1061,8 @@ class Problem(object):
         # Analytic Jacobians
         print_reverse = False
         for mode in ('fwd', 'rev'):
-            model._inputs.set_const(input_cache)
-            model._outputs.set_const(output_cache)
+            model._inputs.set_val(input_cache)
+            model._outputs.set_val(output_cache)
             # Make sure we're in a valid state
             model.run_apply_nonlinear()
 
@@ -1112,10 +1112,10 @@ class Problem(object):
                                 directional = c_name in mfree_directions
 
                             try:
-                                flat_view = dinputs._views_flat[inp_abs]
+                                flat_view = dinputs._abs_get_val(inp_abs)
                             except KeyError:
                                 # Implicit state
-                                flat_view = dstate._views_flat[inp_abs]
+                                flat_view = dstate._abs_get_val(inp_abs)
 
                             if directional:
                                 n_in = 1
@@ -1129,8 +1129,8 @@ class Problem(object):
 
                             for idx in range(n_in):
 
-                                dinputs.set_const(0.0)
-                                dstate.set_const(0.0)
+                                dinputs.set_val(0.0)
+                                dstate.set_val(0.0)
 
                                 # Dictionary access returns a scalar for 1d input, and we
                                 # need a vector for clean code, so use _views_flat.
@@ -1146,10 +1146,10 @@ class Problem(object):
                                     out_abs = rel_name2abs_name(comp, out)
 
                                     try:
-                                        derivs = doutputs._views_flat[out_abs]
+                                        derivs = doutputs._abs_get_val(out_abs)
                                     except KeyError:
                                         # Implicit state
-                                        derivs = dstate._views_flat[out_abs]
+                                        derivs = dstate._abs_get_val(out_abs)
 
                                     if mode == 'fwd':
                                         key = out, inp
@@ -1239,8 +1239,8 @@ class Problem(object):
 
                             partials_data[c_name][rel_key][jac_key] = deriv_value.copy()
 
-        model._inputs.set_const(input_cache)
-        model._outputs.set_const(output_cache)
+        model._inputs.set_val(input_cache)
+        model._outputs.set_val(output_cache)
         model.run_apply_nonlinear()
 
         # Finite Difference to calculate Jacobian

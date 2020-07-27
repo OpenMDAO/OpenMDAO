@@ -97,12 +97,12 @@ class Test(unittest.TestCase):
 
         d_inputs, d_outputs, d_residuals = root.get_linear_vectors()
 
-        d_outputs.set_const(1.0)
+        d_outputs.set_val(1.0)
         root.run_apply_linear(['linear'], 'fwd')
         output = d_residuals._data
         assert_near_equal(output, [7, 3])
 
-        d_residuals.set_const(1.0)
+        d_residuals.set_val(1.0)
         root.run_apply_linear(['linear'], 'rev')
         output = d_outputs._data
         assert_near_equal(output, [7, 3])
@@ -113,14 +113,14 @@ class Test(unittest.TestCase):
 
         d_inputs, d_outputs, d_residuals = root.get_linear_vectors()
 
-        d_residuals.set_const(11.0)
-        d_outputs.set_const(0.0)
+        d_residuals.set_val(11.0)
+        d_outputs.set_val(0.0)
         root.run_solve_linear(['linear'], 'fwd')
         output = d_outputs._data
         assert_near_equal(output, [1, 5], 1e-10)
 
-        d_outputs.set_const(11.0)
-        d_residuals.set_const(0.0)
+        d_outputs.set_val(11.0)
+        d_residuals.set_val(0.0)
         root.run_solve_linear(['linear'], 'rev')
         output = d_residuals._data
         assert_near_equal(output, [1, 5], 1e-10)

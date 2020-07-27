@@ -452,7 +452,7 @@ class ExecComp(ExplicitComponent):
                 uwrap = _TmpDict(self._outputs, return_complex=True)
 
                 # solve with complex param value
-                self._residuals.set_const(0.0)
+                self._residuals.set_val(0.0)
                 self.compute(pwrap, uwrap)
 
                 for u in out_names:
@@ -468,7 +468,7 @@ class ExecComp(ExplicitComponent):
                     uwrap = _TmpDict(self._outputs, return_complex=True)
 
                     # solve with complex param value
-                    self._residuals.set_const(0.0)
+                    self._residuals.set_val(0.0)
                     self.compute(pwrap, uwrap)
 
                     for u in out_names:

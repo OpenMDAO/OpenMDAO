@@ -533,7 +533,6 @@ class System(object):
         for vec_name in vec_names:
             sizes = self._var_sizes[vec_name]['output']
             ncol = 1
-            rel = None
             if vec_name == 'nonlinear':
                 alloc_complex = nl_alloc_complex
             else:
@@ -547,13 +546,11 @@ class System(object):
                         else:
                             owner = self._owning_rank[vec_name]
                             ncol = sizes[owner, abs2idx[vec_name][vec_name]]
-                    rdct, _ = relevant[vec_name]['@all']
-                    rel = rdct['output']
 
             for key in ['input', 'output', 'residual']:
                 root_vectors[key][vec_name] = self._vector_class(vec_name, key, self,
                                                                  alloc_complex=alloc_complex,
-                                                                 ncol=ncol, relevant=rel)
+                                                                 ncol=ncol)
         return root_vectors
 
     def _get_approx_scheme(self, method):
@@ -898,17 +895,17 @@ class System(object):
         is_total = isinstance(self, Group)
 
         # compute perturbations
-        starting_inputs = self._inputs._data.copy()
+        starting_inputs = self._inputs.asarray(copy=True)
         in_offsets = starting_inputs.copy()
         in_offsets[in_offsets == 0.0] = 1.0
         in_offsets *= info['perturb_size']
 
-        starting_outputs = self._outputs._data.copy()
+        starting_outputs = self._outputs.asarray(copy=True)
         out_offsets = starting_outputs.copy()
         out_offsets[out_offsets == 0.0] = 1.0
         out_offsets *= info['perturb_size']
 
-        starting_resids = self._residuals._data.copy()
+        starting_resids = self._residuals.asarray(copy=True)
 
         # for groups, this does some setup of approximations
         self._setup_approx_coloring()
@@ -920,11 +917,10 @@ class System(object):
         for i in range(info['num_full_jacs']):
             # randomize inputs (and outputs if implicit)
             if i > 0:
-                self._inputs._data[:] = \
-                    starting_inputs + in_offsets * np.random.random(in_offsets.size)
-                self._outputs._data[:] = \
-                    starting_outputs + out_offsets * np.random.random(out_offsets.size)
-
+                self._inputs.set_val(starting_inputs +
+                                     in_offsets * np.random.random(in_offsets.size))
+                self._outputs.set_val(starting_outputs +
+                                      out_offsets * np.random.random(out_offsets.size))
                 if is_total:
                     self._solve_nonlinear()
                 else:
@@ -1000,9 +996,9 @@ class System(object):
             coloring_mod._CLASS_COLORINGS[coloring_fname] = coloring
 
         # restore original inputs/outputs
-        self._inputs._data[:] = starting_inputs
-        self._outputs._data[:] = starting_outputs
-        self._residuals._data[:] = starting_resids
+        self._inputs.set_val(starting_inputs)
+        self._outputs.set_val(starting_outputs)
+        self._residuals.set_val(starting_resids)
 
         self._first_call_to_linearize = save_first_call
 
@@ -1202,27 +1198,26 @@ class System(object):
             # includes and excludes for inputs are specified using _absolute_ names
             # vectors are keyed on absolute name, discretes on relative/promoted name
             if options['record_inputs']:
-                views = self._inputs._views
                 myinputs = sorted([n for n in self._var_abs2prom['input']
                                    if check_path(n, incl, excl)])
 
             # includes and excludes for outputs are specified using _promoted_ names
             # vectors are keyed on absolute name, discretes on relative/promoted name
             if options['record_outputs']:
-                views = self._outputs._views
                 myoutputs = sorted([n for n, prom in self._var_abs2prom['output'].items()
                                     if check_path(prom, incl, excl)])
 
                 if self._var_discrete['output']:
                     # if we have discrete outputs then residual name set doesn't match output one
                     if options['record_residuals']:
-                        myresiduals = [n for n in myoutputs if n in views]
+                        contains = self._residuals._contains_abs
+                        myresiduals = [n for n in myoutputs if contains(n)]
                 elif options['record_residuals']:
                     myresiduals = myoutputs
 
             elif options['record_residuals']:
                 abs2prom = self._var_abs2prom['output']
-                myresiduals = [n for n in self._residuals._views
+                myresiduals = [n for n in self._residuals._abs_iter()
                                if check_path(abs2prom[n], incl, excl)]
 
             self._filtered_vars_to_record = {
@@ -1751,10 +1746,10 @@ class System(object):
         """
         abs2meta = self._var_abs2meta
         for abs_name in self._var_abs_names['input']:
-            self._inputs._views[abs_name][:] = abs2meta[abs_name]['value']
+            self._inputs.set_var(abs_name, abs2meta[abs_name]['value'])
 
         for abs_name in self._var_abs_names['output']:
-            self._outputs._views[abs_name][:] = abs2meta[abs_name]['value']
+            self._outputs.set_var(abs_name, abs2meta[abs_name]['value'])
 
     def _get_maps(self, prom_names):
         """
@@ -2114,10 +2109,10 @@ class System(object):
 
         if clear:
             if mode == 'fwd':
-                d_residuals.set_const(0.0)
+                d_residuals.set_val(0.0)
             else:  # rev
-                d_inputs.set_const(0.0)
-                d_outputs.set_const(0.0)
+                d_inputs.set_val(0.0)
+                d_outputs.set_val(0.0)
 
         if scope_out is None and scope_in is None:
             yield d_inputs, d_outputs, d_residuals
@@ -2126,9 +2121,9 @@ class System(object):
             old_outs = d_outputs._names
 
             if scope_out is not None:
-                d_outputs._names = scope_out.intersection(d_outputs._views)
+                d_outputs._names = scope_out.intersection(d_outputs._abs_iter())
             if scope_in is not None:
-                d_inputs._names = scope_in.intersection(d_inputs._views)
+                d_inputs._names = scope_in.intersection(d_inputs._abs_iter())
 
             yield d_inputs, d_outputs, d_residuals
 
@@ -3162,7 +3157,7 @@ class System(object):
             # use absolute names, discretes handled separately
             # Only gathering up values and metadata from this proc, if MPI
             meta = self._var_abs2meta
-            var_names = self._inputs._views.keys()
+            var_names = self._inputs._abs_iter()
             abs2prom = self._var_abs2prom['input']
 
         allprocs_meta = self._var_allprocs_abs2meta
@@ -3182,7 +3177,10 @@ class System(object):
             if not match_includes_excludes(var_name, var_name_prom, includes, excludes):
                 continue
 
-            val = self._inputs._views[var_name] if self._inputs else meta[var_name]['value']
+            if self._inputs:
+                val = self._inputs._abs_get_val(var_name, False)
+            else:
+                val = meta[var_name]['value']
 
             var_meta = {}
             if values:
@@ -3343,7 +3341,7 @@ class System(object):
             # use absolute names, discretes handled separately
             # Only gathering up values and metadata from this proc, if MPI
             meta = self._var_abs2meta
-            var_names = self._outputs._views.keys()
+            var_names = self._outputs._abs_iter()
             if not list_autoivcs:
                 var_names = [v for v in var_names if not v.startswith('_auto_ivc.')]
             abs2prom = self._var_abs2prom['output']
@@ -3369,10 +3367,13 @@ class System(object):
                 continue
 
             if residuals_tol and self._residuals and \
-               np.linalg.norm(self._residuals._views[var_name]) < residuals_tol:
+               np.linalg.norm(self._residuals._abs_get_val(var_name)) < residuals_tol:
                 continue
 
-            val = self._outputs._views[var_name] if self._outputs else meta[var_name]['value']
+            if self._outputs:
+                val = self._outputs._abs_get_val(var_name, False)
+            else:
+                val = meta[var_name]['value']
 
             var_meta = {}
             if values:
@@ -3380,7 +3381,7 @@ class System(object):
             if prom_name:
                 var_meta['prom_name'] = var_name_prom
             if residuals and self._residuals:
-                var_meta['resids'] = self._residuals._views[var_name]
+                var_meta['resids'] = self._residuals._abs_get_val(var_name, False)
             if units:
                 var_meta['units'] = meta[var_name]['units']
             if shape:
@@ -4090,8 +4091,8 @@ class System(object):
             else:
                 if from_root:
                     vec = vec._root_vector
-                if abs_name in vec._views:
-                    val = vec._views_flat[abs_name] if flat else vec._views[abs_name]
+                if vec._contains_abs(abs_name):
+                    val = vec._abs_get_val(abs_name, flat)
 
         if get_remote and self.comm.size > 1:
             owner = self._owning_rank[abs_name]
@@ -4304,53 +4305,55 @@ class System(object):
         vdict = {}
         variables = filtered_vars.get(kind)
         if variables:
-            views = self._vectors[kind][vec_name]._views
-            views_flat = self._vectors[kind][vec_name]._views_flat
+            vec = self._vectors[kind][vec_name]
+            srcget = self._vectors['output'][vec_name]._abs_get_val
+            get = vec._abs_get_val
             rank = self.comm.rank
-            discrete_vec = None if kind == 'residual' else self._var_discrete[kind]
+            discrete_vec = () if kind == 'residual' else self._var_discrete[kind]
             offset = len(self.pathname) + 1 if self.pathname else 0
 
             if self.comm.size == 1:
                 vdict = {}
                 if discrete_vec:
                     for n in variables:
-                        if n in views:
-                            vdict[n] = views[n]
+                        if vec._contains_abs(n):
+                            vdict[n] = get(n, False)
                         elif n[offset:] in discrete_vec:
                             vdict[n] = discrete_vec[n[offset:]]['value']
                         else:
                             ivc_path = conns[prom2abs_in[n][0]]
-                            if ivc_path in views:
-                                vdict[ivc_path] = views[ivc_path]
+                            if vec._contains_abs(ivc_path):
+                                vdict[ivc_path] = srcget(ivc_path, False)
                             elif ivc_path[offset:] in discrete_vec:
                                 vdict[ivc_path] = discrete_vec[ivc_path[offset:]]['value']
                 else:
                     for name in variables:
-                        if name in views:
-                            vdict[name] = views[name]
+                        if vec._contains_abs(name):
+                            vdict[name] = get(name, False)
                         else:
                             ivc_path = conns[prom2abs_in[name][0]]
-                            vdict[ivc_path] = views[ivc_path]
-
+                            vdict[ivc_path] = srcget(ivc_path, False)
             elif parallel:
                 vdict = {}
                 if discrete_vec:
-                    for n in variables:
-                        if n in views:
-                            if views_flat[n].size > 0:
-                                vdict[n] = views[n]
-                        elif n[offset:] in discrete_vec and self._owning_rank[n] == rank:
-                            vdict[n] = discrete_vec[n[offset:]]['value']
+                    for name in variables:
+                        if vec._contains_abs(name):
+                            val = get(name, False)
+                            if val.size > 0:
+                                vdict[name] = val
+                        elif name[offset:] in discrete_vec and self._owning_rank[name] == rank:
+                            vdict[name] = discrete_vec[name[offset:]]['value']
                 else:
                     for name in variables:
-                        if name in views:
-                            if views_flat[name].size > 0:
-                                vdict[name] = views[name]
+                        if vec._contains_abs(name):
+                            val = get(name, False)
+                            if val.size > 0:
+                                vdict[name] = val
                         else:
                             ivc_path = conns[prom2abs_in[name][0]]
-                            if views_flat[ivc_path].size > 0:
-                                vdict[ivc_path] = views[ivc_path]
-
+                            val = srcget(ivc_path, False)
+                            if val.size > 0:
+                                vdict[ivc_path] = val
             else:
                 meta = self._var_allprocs_abs2meta
                 for name in variables:
@@ -4358,8 +4361,8 @@ class System(object):
                         # if using a serial recorder and rank 0 owns the variable,
                         # use local value on rank 0 and do nothing on other ranks.
                         if rank == 0:
-                            if name in views:
-                                vdict[name] = views[name]
+                            if vec._contains_abs(name):
+                                vdict[name] = vec._abs_get_val(name, flat=False)
                             elif name[offset:] in discrete_vec:
                                 vdict[name] = discrete_vec[name[offset:]]['value']
                     else:
