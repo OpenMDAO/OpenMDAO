@@ -962,7 +962,7 @@ class Problem(object):
             List of glob patterns for pathnames to exclude from the check. Default is None, which
             excludes nothing.
         compact_print : bool
-            Set to True to just print the essentials, one line per unknown-param pair.
+            Set to True to just print the essentials, one line per input-output pair.
         abs_err_tol : float
             Threshold value for absolute error.  Errors about this value will have a '*' displayed
             next to them in output, making them easy to search for. Default is 1.0E-6.
@@ -1378,7 +1378,7 @@ class Problem(object):
             Where to send human readable output. By default it goes to stdout.
             Set to None to suppress.
         compact_print : bool
-            Set to True to just print the essentials, one line per unknown-param pair.
+            Set to True to just print the essentials, one line per input-output pair.
         driver_scaling : bool
             When True, return derivatives that are scaled according to either the adder and scaler
             or the ref and ref0 values that were specified when add_design_var, add_objective, and
