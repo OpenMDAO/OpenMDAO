@@ -12,7 +12,7 @@ import numpy as np
 from openmdao.recorders.sqlite_recorder import blob_to_array
 from openmdao.utils.record_util import deserialize, get_source_system
 from openmdao.utils.variable_table import write_var_table
-from openmdao.utils.general_utils import make_set, match_includes_excludes
+from openmdao.utils.general_utils import make_set, match_includes_excludes, match_prom_or_abs
 from openmdao.utils.units import unit_conversion
 from openmdao.recorders.sqlite_recorder import format_version as current_version
 
@@ -456,7 +456,7 @@ class Case(object):
 
                 var_name_prom = self._abs2prom['input'][var_name]
 
-                if not match_includes_excludes(var_name, var_name_prom, includes, excludes):
+                if not match_prom_or_abs(var_name, var_name_prom, includes, excludes):
                     continue
 
                 val = self.inputs[var_name]
@@ -578,7 +578,7 @@ class Case(object):
 
             var_name_prom = self._abs2prom['output'][var_name]
 
-            if not match_includes_excludes(var_name, var_name_prom, includes, excludes):
+            if not match_prom_or_abs(var_name, var_name_prom, includes, excludes):
                 continue
 
             # check if residuals were recorded, skip if within specifed tolerance

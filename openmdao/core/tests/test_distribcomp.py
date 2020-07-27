@@ -394,21 +394,6 @@ class MPITests(unittest.TestCase):
         size = 11
 
         test = self
-        p = om.Problem(Model())
-
-        def verify(inputs, outputs, in_vals=1., out_vals=1., pathnames=False):
-            with multi_proc_exception_check(p.comm):
-                test.assertEqual(len(inputs), 1)
-                name, meta = inputs[0]
-                test.assertEqual(name, 'C2.invec' if pathnames else 'invec')
-                test.assertTrue(meta['shape'] == (size,))
-                test.assertTrue(all(meta['value'] == in_vals*np.ones(size)))
-    
-                test.assertEqual(len(outputs), 1)
-                name, meta = outputs[0]
-                test.assertEqual(name, 'C2.outvec' if pathnames else 'outvec')
-                test.assertTrue(meta['shape'] == (size,))
-                test.assertTrue(all(meta['value'] == out_vals*np.ones(size)))
 
         class Model(om.Group):
             def setup(self):
@@ -421,6 +406,23 @@ class MPITests(unittest.TestCase):
                 inputs = self.C2.list_inputs(shape=True, values=True, out_stream=None)
                 outputs = self.C2.list_outputs(shape=True, values=True, out_stream=None)
                 verify(inputs, outputs, pathnames=False)
+
+        p = om.Problem(Model())
+
+        def verify(inputs, outputs, in_vals=1., out_vals=1., pathnames=False):
+            with multi_proc_exception_check(p.comm):
+                test.assertEqual(len(inputs), 1)
+                name, meta = inputs[0]
+                test.assertEqual(name, 'C2.invec' if pathnames else 'invec')
+                test.assertTrue(meta['shape'] == (size,))
+                test.assertEqual(meta['value'].size, size)
+                test.assertTrue(all(meta['value'] == in_vals*np.ones(size)))
+
+                test.assertEqual(len(outputs), 1)
+                name, meta = outputs[0]
+                test.assertEqual(name, 'C2.outvec' if pathnames else 'outvec')
+                test.assertTrue(meta['shape'] == (size,))
+                test.assertTrue(all(meta['value'] == out_vals*np.ones(size)))
 
         p.setup()
 
@@ -449,7 +451,6 @@ class MPITests(unittest.TestCase):
         size = 11
 
         test = self
-        p = om.Problem(Model())
 
         def verify(inputs, outputs, in_vals=1., out_vals=1., pathnames=False, comm=None, final=True):
             global_shape = (size, ) if final else 'Unavailable'
@@ -460,14 +461,14 @@ class MPITests(unittest.TestCase):
                     local_size = sizes[comm.rank]
                 else:
                     local_size = size
-    
+
                 test.assertEqual(len(inputs), 1)
                 name, meta = inputs[0]
                 test.assertEqual(name, 'C2.invec' if pathnames else 'invec')
                 test.assertEqual(meta['shape'], (local_size,))
                 test.assertEqual(meta['global_shape'], global_shape)
                 test.assertTrue(all(meta['value'] == in_vals*np.ones(local_size)))
-    
+
                 test.assertEqual(len(outputs), 1)
                 name, meta = outputs[0]
                 test.assertEqual(name, 'C2.outvec' if pathnames else 'outvec')
@@ -489,6 +490,7 @@ class MPITests(unittest.TestCase):
                 outputs = self.C2.list_outputs(shape=True, global_shape=True, values=True, out_stream=None)
                 verify(inputs, outputs, pathnames=False, comm=self.comm, final=False)
 
+        p = om.Problem(Model())
         p.setup()
 
         # verify list_inputs/list_outputs work before final_setup for distributed comp

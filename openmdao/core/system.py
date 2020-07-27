@@ -33,7 +33,8 @@ from openmdao.utils.coloring import _compute_coloring, Coloring, \
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, ContainsAll, all_ancestors, \
-    simple_warning, make_set, match_includes_excludes, ensure_compatible, _is_slice
+    simple_warning, make_set, match_includes_excludes, ensure_compatible, _is_slice, \
+    match_prom_or_abs
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.utils.units import unit_conversion
@@ -70,6 +71,13 @@ _DEFAULT_COLORING_META.update(_DEF_COMP_SPARSITY_ARGS)
 
 _recordable_funcs = frozenset(['_apply_linear', '_apply_nonlinear', '_solve_linear',
                                '_solve_nonlinear'])
+
+# the following are local metadata that will also be accessible for vars on all procs
+global_meta_names = {
+    'input': ('units', 'shape', 'size', 'distributed', 'tags', 'desc'),
+    'output': ('units', 'shape', 'size', 'desc',
+               'ref', 'ref0', 'res_ref', 'distributed', 'lower', 'upper', 'tags'),
+}
 
 
 class System(object):
@@ -1313,6 +1321,7 @@ class System(object):
         Compute the global size and shape of all variables on this system.
         """
         meta = self._var_allprocs_abs2meta
+        loc_meta = self._var_abs2meta
 
         for typ in ('input', 'output'):
             # now set global sizes and shapes into metadata for distributed variables
@@ -1320,28 +1329,32 @@ class System(object):
             for idx, abs_name in enumerate(self._var_allprocs_abs_names[typ]):
                 mymeta = meta[abs_name]
                 local_shape = mymeta['shape']
-                if not mymeta['distributed']:
+                if mymeta['distributed']:
+                    global_size = np.sum(sizes[:, idx])
+                    mymeta['global_size'] = global_size
+
+                    # assume that all but the first dimension of the shape of a
+                    # distributed variable is the same on all procs
+                    high_dims = local_shape[1:]
+                    if high_dims:
+                        high_size = np.prod(high_dims)
+                        dim1 = global_size // high_size
+                        if global_size % high_size != 0:
+                            raise RuntimeError("%s: Global size of output '%s' (%s) does not agree "
+                                            "with local shape %s" % (self.msginfo, abs_name,
+                                                                        global_size, local_shape))
+                        mymeta['global_shape'] = tuple([dim1] + list(high_dims))
+                    else:
+                        mymeta['global_shape'] = (global_size,)
+
+                else:
                     # not distributed, just use local shape and size
                     mymeta['global_size'] = mymeta['size']
                     mymeta['global_shape'] = local_shape
-                    continue
 
-                global_size = np.sum(sizes[:, idx])
-                mymeta['global_size'] = global_size
-
-                # assume that all but the first dimension of the shape of a
-                # distributed variable is the same on all procs
-                high_dims = local_shape[1:]
-                if high_dims:
-                    high_size = np.prod(high_dims)
-                    dim1 = global_size // high_size
-                    if global_size % high_size != 0:
-                        raise RuntimeError("%s: Global size of output '%s' (%s) does not agree "
-                                           "with local shape %s" % (self.msginfo, abs_name,
-                                                                    global_size, local_shape))
-                    mymeta['global_shape'] = tuple([dim1] + list(high_dims))
-                else:
-                    mymeta['global_shape'] = (global_size,)
+                if abs_name in loc_meta:
+                    loc_meta[abs_name]['global_shape'] = mymeta['global_shape']
+                    loc_meta[abs_name]['global_size'] = mymeta['global_size']
 
     def _setup_global_connections(self, conns=None):
         """
@@ -3077,6 +3090,68 @@ class System(object):
         with self._scaled_context_all():
             self._apply_nonlinear()
 
+    def _var_filtered_iter(self, iotype, includes=None, excludes=(), get_remote=False):
+        it = self._var_allprocs_abs2prom[iotype] if get_remote else self._var_abs2prom[iotype]
+        for tup in it.items():
+            abs_name, prom = tup
+            if match_prom_or_abs(abs_name, prom, includes, excludes):
+                yield tup
+
+    def get_io_metadata(self, iotypes=('input', 'output'), metadata_keys=None,
+                        includes=None, excludes=(), get_remote=False, rank=None,
+                        return_rel_names=True):
+        """
+        """
+        prefix = self.pathname + '.' if self.pathname else ''
+        rel_idx = len(prefix)
+
+        if isinstance(iotypes, str):
+            iotypes = (iotypes,)
+
+        loc2meta = self._var_abs2meta
+        all2meta = self._var_allprocs_abs2meta
+
+        need_gather = get_remote and self.comm.size > 1
+        need_local_meta = (metadata_keys is None or 'value' in metadata_keys or
+                           'src_indices' in metadata_keys)
+        if not need_local_meta:
+            metadict = all2meta
+            disc_metadict = self._var_allprocs_discrete
+            need_gather = False  # we can get everything from global dict without gathering
+        else:
+            metadict = loc2meta
+            disc_metadict = self._var_discrete
+
+        for iotype in iotypes:
+            disc2meta = disc_metadict[iotype]
+
+            for abs_name, prom in self._var_filtered_iter(iotype, includes=includes,
+                                                          excludes=excludes, get_remote):
+                rel_name = abs_name[rel_idx:]
+
+                if abs_name in all2meta:  # continuous
+                    meta = metadict
+                else:  # discrete
+                    if need_local_meta:  # use relative name for discretes
+                        meta = disc2meta[rel_name]
+                    else:
+                        meta = disc2meta[abs_name]
+
+                if metadata_keys is None:
+                    ret_meta = meta.copy()
+                    ret_meta['prom_name'] = prom
+                    ret_meta['discrete'] = not abs_name in all2meta
+                    yield (rel_name if return_rel_names else abs_name, ret_meta)
+                else:
+                    ret_meta = {
+                        'prom_name': prom,
+                        'discrete': not abs_name in all2meta
+                    }
+                    for key in metadata_keys:
+                        ret_meta[key] = meta[key]
+
+                    yield (rel_name if return_rel_names else abs_name, ret_meta)
+
     def list_inputs(self,
                     values=True,
                     prom_name=False,
@@ -3088,7 +3163,7 @@ class System(object):
                     print_arrays=False,
                     tags=None,
                     includes=None,
-                    excludes=None,
+                    excludes=(),
                     all_procs=False,
                     out_stream=_DEFAULT_OUT_STREAM):
         """
@@ -3142,86 +3217,15 @@ class System(object):
         list
             list of input names and other optional information about those inputs
         """
-        prefix = self.pathname + '.' if self.pathname else ''
-        rel_idx = len(prefix)
 
-        # use absolute names, discretes handled separately
-        # Only gathering up values and metadata from this proc, if MPI
-        to_meta = self._var_abs2meta
-        var_names = self._var_abs_names['input']
-        abs2prom = self._var_abs2prom['input']
-
-        allprocs_meta = self._var_allprocs_abs2meta
-        tagset = make_set(tags)
-        inputs = []
-
-        for var_name in var_names:
-            meta = to_meta[var_name]
-
-            # Filter based on tags
-            if tags and not (tagset & meta['tags']):
-                continue
-
-            var_prom = abs2prom[var_name]
-
-            if not match_includes_excludes(var_name, var_prom, includes, excludes):
-                continue
-
-            var_meta = {}
-            if values:
-                if self._inputs is not None:
-                    var_meta['value'] = self._inputs._abs_get_val(var_name, False)
-                else:
-                    var_meta['value'] = meta['value']
-
-            if prom_name:
-                var_meta['prom_name'] = var_prom
-            if units:
-                var_meta['units'] = meta['units']
-            if shape:
-                var_meta['shape'] = meta['shape']
-            if global_shape:
-                try:
-                    var_meta['global_shape'] = allprocs_meta[var_name]['global_shape']
-                except KeyError:
-                    var_meta['global_shape'] = 'Unavailable'
-            if desc:
-                var_meta['desc'] = meta['desc']
-
-            inputs.append((var_name, var_meta))
-
-        if self._discrete_inputs:
-            disc_meta = self._discrete_inputs._dict
-
-            for rel_name, val in self._discrete_inputs.items():
-                # Filter based on tags
-                if tags and not (tagset & disc_meta[rel_name]['tags']):
-                    continue
-
-                abs_name = prefix + rel_name
-                var_prom = abs2prom[abs_name]
-
-                if not match_includes_excludes(rel_name, var_prom, includes, excludes):
-                    continue
-
-                var_meta = {}
-                if values:
-                    var_meta['value'] = val
-                if prom_name:
-                    var_meta['prom_name'] = var_prom
-
-                # remaining items do not apply for discrete vars
-                if units:
-                    var_meta['units'] = ''
-                if shape:
-                    var_meta['shape'] = ''
-
-                inputs.append((abs_name, var_meta))
+        metavalues = values and self._inputs is None
+        keynames = ['value', 'units', 'shape', 'global_shape', 'desc', 'tags']
+        keyvals = [metavalues, units, shape, global_shape, desc, tags is not None]
+        keys = [keynames[i] for i in len(keynames) if keyvals[i]]
+        inputs = self.get_io_metadata(iotypes=('input',), keys, includes, excludes, all_procs, 0)
 
         if out_stream is _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
-
-        inputs = self._gather_iovars(inputs, all_procs)
 
         if out_stream:
             self._write_table('input', inputs, hierarchical, print_arrays, all_procs, out_stream)
@@ -3250,7 +3254,7 @@ class System(object):
                      print_arrays=False,
                      tags=None,
                      includes=None,
-                     excludes=None,
+                     excludes=(),
                      all_procs=False,
                      list_autoivcs=False,
                      out_stream=_DEFAULT_OUT_STREAM):
@@ -3321,6 +3325,13 @@ class System(object):
         list
             list of output names and other optional information about those outputs
         """
+        keynames = np.array(['value', 'units', 'shape', 'global_shape', 'desc', 'tags'])
+        keys = [str(n) for n in keynames[np.array([values, units, shape, global_shape, desc, tags], dtype=bool)]]
+        if bounds:
+            keys.extend(('lower', 'upper'))
+        if scaling:
+            keys.extend(('ref', 'ref0', 'res_ref'))
+
         prefix = self.pathname + '.' if self.pathname else ''
         rel_idx = len(prefix)
 
@@ -3351,7 +3362,7 @@ class System(object):
             if not list_autoivcs and abs_name.startswith('_auto_ivc.'):
                 continue
 
-            if not match_includes_excludes(rel_name, var_prom, includes, excludes):
+            if not match_prom_or_abs(rel_name, var_prom, includes, excludes):
                 continue
 
             if residuals_tol and self._residuals and \
@@ -3410,7 +3421,7 @@ class System(object):
                 abs_name = prefix + rel_name
                 var_prom = abs2prom[abs_name]
 
-                if not match_includes_excludes(rel_name, var_prom, includes, excludes):
+                if not match_prom_or_abs(rel_name, var_prom, includes, excludes):
                     continue
 
                 var_meta = {}
@@ -3614,8 +3625,9 @@ class System(object):
                 prefix = subsys.pathname + '.'
                 for var_type in in_or_out:
                     for var_name in chain(real_vars[var_type], disc_vars[var_type]):
-                        if (variables is None or var_name in variables) and var_name.startswith(prefix):
-                            var_list.append(var_name)
+                        if variables is None or var_name in variables:
+                            if var_name.startswith(prefix):
+                                var_list.append(var_name)
         else:
             # For components with no children, self._subsystems_allprocs is empty.
             for var_type in in_or_out:

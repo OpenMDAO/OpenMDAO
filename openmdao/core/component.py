@@ -8,7 +8,8 @@ import numpy as np
 from numpy import ndarray, isscalar, atleast_1d, atleast_2d, promote_types
 from scipy.sparse import issparse
 
-from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_META
+from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_META, \
+    _global_meta_names
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.vectors.vector import INT_DTYPE, _full_slice
 from openmdao.utils.units import valid_units
@@ -18,13 +19,6 @@ from openmdao.utils.general_utils import format_as_float_or_array, ensure_compat
     find_matches, simple_warning, make_set, _is_slice
 import openmdao.utils.coloring as coloring_mod
 
-
-# the following metadata will be accessible for vars on all procs
-global_meta_names = {
-    'input': ('units', 'shape', 'size', 'distributed', 'tags', 'desc'),
-    'output': ('units', 'shape', 'size', 'desc',
-               'ref', 'ref0', 'res_ref', 'distributed', 'lower', 'upper', 'tags'),
-}
 
 _forbidden_chars = ['.', '*', '?', '!', '[', ']']
 _whitespace = set([' ', '\t', '\r', '\n'])
