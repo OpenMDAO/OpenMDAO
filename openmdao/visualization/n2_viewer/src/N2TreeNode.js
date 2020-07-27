@@ -101,34 +101,34 @@ class N2TreeNode {
         return (Array.isPopulatedArray(this[childrenPropName]));
     }
 
-    /** True if this.type is 'param' or 'unconnected_param'. */
-    isParam() {
-        return this.type.match(paramRegex);
+    /** True if this.type is 'input' or 'unconnected_input'. */
+    isInput() {
+        return this.type.match(inputRegex);
     }
 
     /** True if this is an input and connected. */
-    isConnectedParam() { return (this.type == 'param'); }
+    isConnectedInput() { return (this.type == 'input'); }
 
     /** True if this an input and unconnected. */
-    isUnconnectedParam() { return (this.type == 'unconnected_param'); }
+    isUnconnectedInput() { return (this.type == 'unconnected_input'); }
 
     /** True if this is an input whose source is an auto-ivc'd output */
-    isAutoIvcParam() { return (this.type == 'autoivc_param');}
+    isAutoIvcInput() { return (this.type == 'autoivc_input');}
 
-    /** True if this.type is 'unknown'. */
-    isUnknown() { return (this.type == 'unknown'); }
+    /** True if this.type is 'output'. */
+    isOutput() { return (this.type == 'output'); }
 
     /** True if this is the root node in the model */
     isRoot() { return (this.type == 'root'); }
 
-    /** True if this is an unknown and it's not implicit */
-    isExplicitOutput() { return (this.isUnknown() && !this.implicit); }
+    /** True if this is an output and it's not implicit */
+    isExplicitOutput() { return (this.isOutput() && !this.implicit); }
 
-    /** True if this is an unknown and it is implicit */
-    isImplicitOutput() { return (this.isUnknown() && this.implicit); }
+    /** True if this is an output and it is implicit */
+    isImplicitOutput() { return (this.isOutput() && this.implicit); }
 
-    /** True if this.type is 'param', 'unconnected_param', or 'unknown'. */
-    isParamOrUnknown() { return this.type.match(paramOrUnknownRegex); }
+    /** True if this.type is 'input', 'unconnected_input', or 'output'. */
+    isInputOrOutput() { return this.type.match(inputOrOutputRegex); }
 
     /** True is this.type is 'subsystem' */
     isSubsystem() { return (this.type == 'subsystem'); }
@@ -139,9 +139,9 @@ class N2TreeNode {
     /** True if it's a subsystem and this.subsystem_type is 'component' */
     isComponent() { return ( this.isSubsystem() && this.subsystem_type == 'component'); }
 
-    /** Not connectable if this is a param group or parents are minimized. */
+    /** Not connectable if this is a input group or parents are minimized. */
     isConnectable() {
-        if (this.isParamOrUnknown() && !(this.hasChildren() ||
+        if (this.isInputOrOutput() && !(this.hasChildren() ||
                 this.parent.isMinimized || this.parentComponent.isMinimized)) return true;
 
         return this.isMinimized;
