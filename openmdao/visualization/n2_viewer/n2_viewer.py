@@ -7,9 +7,6 @@ import zlib
 from collections import OrderedDict
 from itertools import chain
 import networkx as nx
-import sys
-
-import numpy as np
 
 from openmdao.components.exec_comp import ExecComp
 from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
@@ -67,13 +64,12 @@ def _get_var_dict(system, typ, name):
     if 'distributed' in meta:
         var_dict['distributed'] = meta['distributed']
 
+    var_dict['is_discrete'] = is_discrete
+
     if meta['value'].size < _MAX_ARRAY_SIZE_FOR_REPR_VAL:
         var_dict['value'] = meta['value']
     else:
         var_dict['value'] = None
-
-    if is_discrete:
-            var_dict['is_discrete'] = True
 
     return var_dict
 

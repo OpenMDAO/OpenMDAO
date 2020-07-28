@@ -109,7 +109,7 @@ class InfoPropArray extends InfoPropDefault {
         super(key, desc, capitalize);
     }
 
-    /** Return Yes or No when given True or False */
+    /** Simply return the array value */
     output(array) {
         return array;
     }
@@ -117,8 +117,8 @@ class InfoPropArray extends InfoPropDefault {
     canShow(obj) { return (obj.propExists(this.key) && obj[this.key] != '' )}
 }
 
-// Used to format that floats displayed in the table
-let val_formatter = d3.format("g");
+// Used to format that floats displayed in the table of the ValueInfo window
+let value_formatter = d3.format("g");
 
 /**
  * Manage a window for displaying the value of a variable.
@@ -206,7 +206,7 @@ class ValueInfo {
         .enter()
         .append('td')
         .text(function (d) {
-            return val_formatter(d);
+            return value_formatter(d);
         })
 
         // Save the width and height of the table when it is fully
@@ -327,7 +327,7 @@ class NodeInfo {
      * references to the HTML elements.
      * @param {Object} abs2prom Object containing promoted variable names.
      */
-    constructor(abs2prom, valueInfo) {
+    constructor(abs2prom) {
         this.propList = [
             new InfoPropDefault('absPathName', 'Absolute Name'),
             new InfoPropDefault('class', 'Class'),
@@ -363,7 +363,6 @@ class NodeInfo {
             .on('click', e => { self.unpin(); })
         this.name = null;
 
-        // this.valueInfo = valueInfo;
     }
 
     /** Make the info box visible if it's hidden */
@@ -422,7 +421,6 @@ class NodeInfo {
                             .html("Value too large to include in N2" );
                 } else {
                     var val_string = array_to_string(val)
-                    // var max_length = this.valueInfo.TRUNCATE_LIMIT;
                     var max_length = ValueInfo.TRUNCATE_LIMIT;
 
 
@@ -465,7 +463,7 @@ class NodeInfo {
                     copyValueButton.on('click',
                            function () {
                                 // This is the strange way you can get something on the clipboard
-                                var copyText = document.querySelector("#input");
+                                var copyText = document.querySelector("#input-for-pastebuffer");
                                 copyText.value = 'array(' + array_to_copy_string(val)  + ')';
                                 copyText.select();
                                 document.execCommand("copy");
@@ -644,7 +642,6 @@ class N2UserInterface {
         this._setupWindowResizer();
 
         this.legend = new N2Legend(this.n2Diag.modelData);
-        // this.valueInfoBox = new ValueInfo(this.n2Diag.model.abs2prom);
         this.nodeInfoBox = new NodeInfo(this.n2Diag.model.abs2prom, this.valueInfoBox);
         this.toolbar = new N2Toolbar(this);
     }

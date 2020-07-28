@@ -461,127 +461,248 @@ class TestViewModelData(unittest.TestCase):
         
         model_viewer_data = _get_viewer_data(prob)
 
+        # To get the value to put in this statement, use
+        # from openmdao.utils.testing_utils import print_nested_dicts_with_ndarrays
+        # print_nested_dicts_with_ndarrays(model_viewer_data['tree'])
         expected_tree_betz = json.loads("""
-            { 
-               "name":"root",
-               "type":"root",
-               "class":"Group",
-               "expressions":null,
-               "component_type":null,
-               "subsystem_type":"group",
-               "is_parallel":false,
-               "linear_solver":"LN: RUNONCE",
-               "nonlinear_solver":"NL: RUNONCE",
-               "children":[ 
-                  { 
-                     "name":"indeps",
-                     "type":"subsystem",
-                     "class":"IndepVarComp",
-                     "expressions":null,
-                     "subsystem_type":"component",
-                     "is_parallel":false,
-                     "component_type":"indep",
-                     "linear_solver":"",
-                     "nonlinear_solver":"",
-                     "children":[ 
-                        { 
-                           "name":"a",
-                           "type":"unknown",
-                           "implicit":false,
-                           "dtype":"ndarray"
+            {
+                "children": [
+                    {
+                        "children": [
+                            {
+                                "distributed": false,
+                                "dtype": "ndarray",
+                                "implicit": false,
+                                "is_discrete": false,
+                                "name": "a",
+                                "shape": "(1,)",
+                                "type": "unknown",
+                                "units": "None",
+                                "value": [
+                                    0.5
+                                ]
+                            },
+                            {
+                                "distributed": false,
+                                "dtype": "ndarray",
+                                "implicit": false,
+                                "is_discrete": false,
+                                "name": "Area",
+                                "shape": "(1,)",
+                                "type": "unknown",
+                                "units": "m**2",
+                                "value": [
+                                    10.0
+                                ]
+                            },
+                            {
+                                "distributed": false,
+                                "dtype": "ndarray",
+                                "implicit": false,
+                                "is_discrete": false,
+                                "name": "rho",
+                                "shape": "(1,)",
+                                "type": "unknown",
+                                "units": "kg/m**3",
+                                "value": [
+                                    1.225
+                                ]
+                            },
+                            {
+                                "distributed": false,
+                                "dtype": "ndarray",
+                                "implicit": false,
+                                "is_discrete": false,
+                                "name": "Vu",
+                                "shape": "(1,)",
+                                "type": "unknown",
+                                "units": "m/s",
+                                "value": [
+                                    10.0
+                                ]
+                            }
+                        ],
+                        "class": "IndepVarComp",
+                        "component_type": "indep",
+                        "expressions": null,
+                        "is_parallel": false,
+                        "linear_solver": "",
+                        "name": "indeps",
+                        "nonlinear_solver": "",
+                        "options": {
+                            "distributed": false,
+                            "lower": null,
+                            "ref": 1.0,
+                            "ref0": 0.0,
+                            "res_ref": null,
+                            "res_units": null,
+                            "shape": null,
+                            "tags": null,
+                            "units": null,
+                            "upper": null,
+                            "val": 1.0
                         },
-                        { 
-                           "name":"Area",
-                           "type":"unknown",
-                           "implicit":false,
-                           "dtype":"ndarray"
+                        "subsystem_type": "component",
+                        "type": "subsystem"
+                    },
+                    {
+                        "children": [
+                            {
+                                "distributed": false,
+                                "dtype": "ndarray",
+                                "is_discrete": false,
+                                "name": "a",
+                                "shape": "(1,)",
+                                "type": "param",
+                                "units": "None",
+                                "value": [
+                                    0.5
+                                ]
+                            },
+                            {
+                                "distributed": false,
+                                "dtype": "ndarray",
+                                "is_discrete": false,
+                                "name": "Area",
+                                "shape": "(1,)",
+                                "type": "param",
+                                "units": "m**2",
+                                "value": [
+                                    10.0
+                                ]
+                            },
+                            {
+                                "distributed": false,
+                                "dtype": "ndarray",
+                                "is_discrete": false,
+                                "name": "rho",
+                                "shape": "(1,)",
+                                "type": "param",
+                                "units": "kg/m**3",
+                                "value": [
+                                    1.225
+                                ]
+                            },
+                            {
+                                "distributed": false,
+                                "dtype": "ndarray",
+                                "is_discrete": false,
+                                "name": "Vu",
+                                "shape": "(1,)",
+                                "type": "param",
+                                "units": "m/s",
+                                "value": [
+                                    10.0
+                                ]
+                            },
+                            {
+                                "distributed": false,
+                                "dtype": "ndarray",
+                                "implicit": false,
+                                "is_discrete": false,
+                                "name": "Vr",
+                                "shape": "(1,)",
+                                "type": "unknown",
+                                "units": "m/s",
+                                "value": [
+                                    0.0
+                                ]
+                            },
+                            {
+                                "distributed": false,
+                                "dtype": "ndarray",
+                                "implicit": false,
+                                "is_discrete": false,
+                                "name": "Vd",
+                                "shape": "(1,)",
+                                "type": "unknown",
+                                "units": "m/s",
+                                "value": [
+                                    0.0
+                                ]
+                            },
+                            {
+                                "distributed": false,
+                                "dtype": "ndarray",
+                                "implicit": false,
+                                "is_discrete": false,
+                                "name": "Ct",
+                                "shape": "(1,)",
+                                "type": "unknown",
+                                "units": "None",
+                                "value": [
+                                    0.0
+                                ]
+                            },
+                            {
+                                "distributed": false,
+                                "dtype": "ndarray",
+                                "implicit": false,
+                                "is_discrete": false,
+                                "name": "thrust",
+                                "shape": "(1,)",
+                                "type": "unknown",
+                                "units": "N",
+                                "value": [
+                                    0.0
+                                ]
+                            },
+                            {
+                                "distributed": false,
+                                "dtype": "ndarray",
+                                "implicit": false,
+                                "is_discrete": false,
+                                "name": "Cp",
+                                "shape": "(1,)",
+                                "type": "unknown",
+                                "units": "None",
+                                "value": [
+                                    0.0
+                                ]
+                            },
+                            {
+                                "distributed": false,
+                                "dtype": "ndarray",
+                                "implicit": false,
+                                "is_discrete": false,
+                                "name": "power",
+                                "shape": "(1,)",
+                                "type": "unknown",
+                                "units": "W",
+                                "value": [
+                                    0.0
+                                ]
+                            }
+                        ],
+                        "class": "ActuatorDisc",
+                        "component_type": "explicit",
+                        "expressions": null,
+                        "is_parallel": false,
+                        "linear_solver": "",
+                        "name": "a_disk",
+                        "nonlinear_solver": "",
+                        "options": {
+                            "distributed": false
                         },
-                        { 
-                           "name":"rho",
-                           "type":"unknown",
-                           "implicit":false,
-                           "dtype":"ndarray"
-                        },
-                        { 
-                           "name":"Vu",
-                           "type":"unknown",
-                           "implicit":false,
-                           "dtype":"ndarray"
-                        }
-                     ]
-                  },
-                  { 
-                     "name":"a_disk",
-                     "type":"subsystem",
-                     "class":"ActuatorDisc",
-                     "expressions":null,
-                     "subsystem_type":"component",
-                     "is_parallel":false,
-                     "component_type":"explicit",
-                     "linear_solver":"",
-                     "nonlinear_solver":"",
-                     "children":[ 
-                        { 
-                           "name":"a",
-                           "type":"param",
-                           "dtype":"ndarray"
-                        },
-                        { 
-                           "name":"Area",
-                           "type":"param",
-                           "dtype":"ndarray"
-                        },
-                        { 
-                           "name":"rho",
-                           "type":"param",
-                           "dtype":"ndarray"
-                        },
-                        { 
-                           "name":"Vu",
-                           "type":"param",
-                           "dtype":"ndarray"
-                        },
-                        { 
-                           "name":"Vr",
-                           "type":"unknown",
-                           "implicit":false,
-                           "dtype":"ndarray"
-                        },
-                        { 
-                           "name":"Vd",
-                           "type":"unknown",
-                           "implicit":false,
-                           "dtype":"ndarray"
-                        },
-                        { 
-                           "name":"Ct",
-                           "type":"unknown",
-                           "implicit":false,
-                           "dtype":"ndarray"
-                        },
-                        { 
-                           "name":"thrust",
-                           "type":"unknown",
-                           "implicit":false,
-                           "dtype":"ndarray"
-                        },
-                        { 
-                           "name":"Cp",
-                           "type":"unknown",
-                           "implicit":false,
-                           "dtype":"ndarray"
-                        },
-                        { 
-                           "name":"power",
-                           "type":"unknown",
-                           "implicit":false,
-                           "dtype":"ndarray"
-                        }
-                     ]
-                  }
-               ]
+                        "subsystem_type": "component",
+                        "type": "subsystem"
+                    }
+                ],
+                "class": "Group",
+                "component_type": null,
+                "expressions": null,
+                "is_parallel": false,
+                "linear_solver": "LN: RUNONCE",
+                "name": "root",
+                "nonlinear_solver": "NL: RUNONCE",
+                "options": {
+                    "assembled_jac_type": "csc"
+                },
+                "subsystem_type": "group",
+                "type": "root"
             }
         """)
+
         expected_pathnames_betz = json.loads('[]')
         expected_conns_betz = json.loads("""
                 [{"src": "indeps.a", "tgt": "a_disk.a"}, {"src": "indeps.Area", "tgt": "a_disk.Area"},
@@ -775,23 +896,22 @@ class TestViewModelData(unittest.TestCase):
         model.add_subsystem('scalar', IndepVarComp('scalar', scalar))
 
         one_d = np.random.rand(SIZE)
-        model.add_subsystem('one_d', IndepVarComp('one_d', one_d))
+        model.add_subsystem('one_d', IndepVarComp('one_d', one_d, desc='1D array'))
 
         two_d = np.random.rand(SIZE,SIZE)
-        model.add_subsystem('two_d', IndepVarComp('two_d', two_d))
+        model.add_subsystem('two_d', IndepVarComp('two_d', two_d, desc='2D array'))
 
         three_d = np.random.rand(SIZE,SIZE,SIZE)
-        model.add_subsystem('three_d', IndepVarComp('three_d', three_d))
-
+        model.add_subsystem('three_d', IndepVarComp('three_d', three_d, desc='3D array'))
 
         one_d_large = np.random.rand(SIZE_LARGE)
-        model.add_subsystem('one_d_large', IndepVarComp('one_d_large', one_d_large))
+        model.add_subsystem('one_d_large', IndepVarComp('one_d_large', one_d_large, desc='1D array'))
 
         two_d_large = np.random.rand(SIZE_LARGE,SIZE_LARGE)
         model.add_subsystem('two_d_large', IndepVarComp('two_d_large', two_d_large))
 
         three_d_large = np.random.rand(SIZE_LARGE,SIZE_LARGE,SIZE_LARGE)
-        model.add_subsystem('three_d_large', IndepVarComp('three_d_large', three_d_large))
+        model.add_subsystem('three_d_large', IndepVarComp('three_d_large', three_d_large, desc='3D array'))
 
         prob = Problem(model)
         prob.setup()
