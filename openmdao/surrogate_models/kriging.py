@@ -131,7 +131,7 @@ class KrigingSurrogate(SurrogateModel):
 
         def _calcll(thetas):
             """Calculate loglike (callback function)."""
-            loglike = self._calculate_reduced_likelihood_inputs(np.exp(thetas))[0]
+            loglike = self._calculate_reduced_likelihood_params(np.exp(thetas))[0]
             return -loglike
 
         bounds = [(np.log(1e-5), np.log(1e5)) for _ in range(self.n_dims)]
@@ -145,14 +145,14 @@ class KrigingSurrogate(SurrogateModel):
             self._raise(msg, exc_type=ValueError)
 
         self.thetas = np.exp(optResult.x)
-        _, inputs = self._calculate_reduced_likelihood_inputs()
-        self.alpha = inputs['alpha']
-        self.U = inputs['U']
-        self.S_inv = inputs['S_inv']
-        self.Vh = inputs['Vh']
-        self.sigma2 = inputs['sigma2']
+        _, params = self._calculate_reduced_likelihood_params()
+        self.alpha = params['alpha']
+        self.U = params['U']
+        self.S_inv = params['S_inv']
+        self.Vh = params['Vh']
+        self.sigma2 = params['sigma2']
 
-    def _calculate_reduced_likelihood_inputs(self, thetas=None):
+    def _calculate_reduced_likelihood_params(self, thetas=None):
         """
         Calculate quantity with same maximum location as the log-likelihood for a given theta.
 
@@ -174,7 +174,7 @@ class KrigingSurrogate(SurrogateModel):
             thetas = self.thetas
 
         X, Y = self.X, self.Y
-        inputs = {}
+        params = {}
 
         # Correlation Matrix
         distances = np.zeros((self.n_samples, self.n_dims, self.n_samples))
@@ -201,13 +201,13 @@ class KrigingSurrogate(SurrogateModel):
         reduced_likelihood = -(np.log(np.sum(sigma2)) +
                                logdet / self.n_samples)
 
-        inputs['alpha'] = alpha
-        inputs['sigma2'] = sigma2 * np.square(self.Y_std)
-        inputs['S_inv'] = inv_factors
-        inputs['U'] = U
-        inputs['Vh'] = Vh
+        params['alpha'] = alpha
+        params['sigma2'] = sigma2 * np.square(self.Y_std)
+        params['S_inv'] = inv_factors
+        params['U'] = U
+        params['Vh'] = Vh
 
-        return reduced_likelihood, inputs
+        return reduced_likelihood, params
 
     def predict(self, x):
         """

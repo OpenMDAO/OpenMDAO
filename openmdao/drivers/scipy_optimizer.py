@@ -258,11 +258,11 @@ class ScipyOptimizeDriver(Driver):
         self.opt_settings['disp'] = self.options['disp']
 
         # Size Problem
-        ninput = 0
-        for input in self._designvars.values():
-            size = input['global_size'] if input['distributed'] else input['size']
-            ninput += size
-        x_init = np.empty(ninput)
+        ndesvar = 0
+        for desvar in self._designvars.values():
+            size = desvar['global_size'] if desvar['distributed'] else desvar['size']
+            ndesvar += size
+        x_init = np.empty(ndesvar)
 
         # Initial Design Vars
         i = 0
@@ -483,14 +483,14 @@ class ScipyOptimizeDriver(Driver):
             elif opt == 'dual_annealing':
                 from scipy.optimize import dual_annealing
                 self.opt_settings.pop('disp')  # It does not have this argument
-                # There is no "options" input, so "opt_settings" can be used to set the (many)
+                # There is no "options" param, so "opt_settings" can be used to set the (many)
                 # keyword arguments
                 result = dual_annealing(self._objfunc,
                                         bounds=bounds,
                                         **self.opt_settings)
             elif opt == 'differential_evolution':
                 from scipy.optimize import differential_evolution
-                # There is no "options" input, so "opt_settings" can be used to set the (many)
+                # There is no "options" param, so "opt_settings" can be used to set the (many)
                 # keyword arguments
                 result = differential_evolution(self._objfunc,
                                                 bounds=bounds,
@@ -498,9 +498,9 @@ class ScipyOptimizeDriver(Driver):
             elif opt == 'shgo':
                 from scipy.optimize import shgo
                 kwargs = dict()
-                for input in ('minimizer_kwargs', 'sampling_method ', 'n', 'iters'):
-                    if input in self.opt_settings:
-                        kwargs[input] = self.opt_settings[input]
+                for option in ('minimizer_kwargs', 'sampling_method ', 'n', 'iters'):
+                    if option in self.opt_settings:
+                        kwargs[option] = self.opt_settings[option]
                 # Set the Jacobian and the Hessian to the value calculated in OpenMDAO
                 if 'minimizer_kwargs' not in kwargs or kwargs['minimizer_kwargs'] is None:
                     kwargs['minimizer_kwargs'] = {}
