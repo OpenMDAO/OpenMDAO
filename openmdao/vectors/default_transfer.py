@@ -83,6 +83,7 @@ class DefaultTransfer(Transfer):
                 # Only continue if the input exists on this processor
                 if abs_in in abs2meta:
 
+                    indices = None
                     # Get meta
                     meta_in = abs2meta[abs_in]
                     meta_out = allprocs_abs2meta[abs_out]
@@ -121,7 +122,8 @@ class DefaultTransfer(Transfer):
                     input_inds = np.arange(offsets_in[iproc, idx_in],
                                            offsets_in[iproc, idx_in] +
                                            sizes_in[iproc, idx_in], dtype=INT_DTYPE)
-                    input_inds = input_inds.reshape((5, 3))
+                    if indices is not None:
+                        input_inds = input_inds.reshape(indices.shape)
 
                     # Now the indices are ready - input_inds, output_inds
                     sub_in = abs_in[mypathlen:].split('.', 1)[0]
@@ -146,12 +148,12 @@ class DefaultTransfer(Transfer):
             transfers[vec_name] = {}
 
             if tot_size > 0:
-                if len(fwd_xfer_in) > 1 and len(fwd_xfer_out) > 1:
-                    xfer_in = fwd_xfer_in[1].reshape(fwd_xfer_out[1].shape)
-                    xfer_out = fwd_xfer_out[1]
-                else:
+                try:
                     xfer_in = np.concatenate(fwd_xfer_in)
                     xfer_out = np.concatenate(fwd_xfer_out)
+                except ValueError:
+                    xfer_in = fwd_xfer_in
+                    xfer_out = fwd_xfer_out
 
                 out_vec = vectors['output'][vec_name]
 
