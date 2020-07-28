@@ -55,7 +55,7 @@ class Group(System):
         Mapping of promoted names to certain metadata (src_indices, units).
     _static_group_inputs : dict
         Group inputs added outside of setup/configure.
-    _post_setup_group_inputs : dict
+    _pre_config_group_inputs : dict
         Group inputs added inside of setup but before configure.
     _static_manual_connections : dict
         Dictionary that stores all explicit connections added outside of setup.
@@ -106,7 +106,7 @@ class Group(System):
         self._subsystems_proc_range = []
         self._manual_connections = {}
         self._group_inputs = defaultdict(list)
-        self._post_setup_group_inputs = defaultdict(list)
+        self._pre_config_group_inputs = defaultdict(list)
         self._static_group_inputs = defaultdict(list)
         self._static_manual_connections = {}
         self._conn_abs_in2out = {}
@@ -396,7 +396,7 @@ class Group(System):
         # need to save these because _setup_var_data can be called multiple times
         # during the config process and we don't want to wipe out any group_inputs
         # that were added during self.setup()
-        self._post_setup_group_inputs = self._group_inputs.copy()
+        self._pre_config_group_inputs = self._group_inputs.copy()
 
         self._static_mode = True
 
@@ -711,7 +711,7 @@ class Group(System):
 
         allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
 
-        self._group_inputs = self._post_setup_group_inputs.copy()
+        self._group_inputs = self._pre_config_group_inputs.copy()
         for n, lst in self._group_inputs.items():
             lst[0]['path'] = self.pathname  # used for error reporting
             self._group_inputs[n] = lst.copy()  # must copy the list manually

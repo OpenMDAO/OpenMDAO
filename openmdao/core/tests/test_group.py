@@ -2253,6 +2253,18 @@ class TestGroupAddInput(unittest.TestCase):
         with assert_warning(UserWarning, msg):
             p.setup()
 
+    def test_sub_sets_parent_meta(self):
+        p = om.Problem()
+        model = p.model
+        G1 = model.add_subsystem('G1', om.Group())
+        G1.set_input_defaults('x', val=2.)
+        G2 = G1.add_subsystem('G2', om.Group(), promotes=['x'])
+        G2.add_subsystem('C1', om.ExecComp('y = 3.*x', x={'units': 'm'}), promotes=['x'])
+        G2.set_input_defaults('x', units='cm')
+        msg = "Group 'G1' did not set a default 'units' for input 'x', so the value of (cm) from group 'G1.G2' will be used."
+        with assert_warning(UserWarning, msg):
+            p.setup()
+
     def test_sub_sub_override2(self):
         p = om.Problem()
         model = p.model
