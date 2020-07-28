@@ -374,77 +374,6 @@ class Solver(object):
         """
         pass
 
-    def _solve(self):
-        """
-        Run the iterative solver.
-        """
-        maxiter = self.options['maxiter']
-        atol = self.options['atol']
-        rtol = self.options['rtol']
-        iprint = self.options['iprint']
-
-        self._mpi_print_header()
-
-        self._iter_count = 0
-        norm0, norm = self._iter_initialize()
-
-        self._norm0 = norm0
-
-        self._mpi_print(self._iter_count, norm, norm / norm0)
-
-        while self._iter_count < maxiter and norm > atol and norm / norm0 > rtol:
-            with Recording(type(self).__name__, self._iter_count, self) as rec:
-                self._single_iteration()
-                self._iter_count += 1
-                self._run_apply()
-                norm = self._iter_get_norm()
-                # With solvers, we want to record the norm AFTER the call, but the call needs to
-                # be wrapped in the with for stack purposes, so we locally assign  norm & norm0
-                # into the class.
-                rec.abs = norm
-                if norm0 == 0:
-                    norm0 = 1
-                rec.rel = norm / norm0
-
-            self._mpi_print(self._iter_count, norm, norm / norm0)
-
-        system = self._system()
-        if system.comm.rank == 0 or os.environ.get('USE_PROC_FILES'):
-            prefix = self._solver_info.prefix + self.SOLVER
-
-            # Solver terminated early because a Nan in the norm doesn't satisfy the while-loop
-            # conditionals.
-            if np.isinf(norm) or np.isnan(norm):
-                msg = "Solver '{}' on system '{}': residuals contain 'inf' or 'NaN' after {} " + \
-                      "iterations."
-                if iprint > -1:
-                    print(prefix + msg.format(self.SOLVER, system.pathname,
-                                              self._iter_count))
-
-                # Raise AnalysisError if requested.
-                if self.options['err_on_non_converge']:
-                    raise AnalysisError(msg.format(self.SOLVER, system.pathname,
-                                                   self._iter_count))
-
-            # Solver hit maxiter without meeting desired tolerances.
-            elif (norm > atol and norm / norm0 > rtol):
-                msg = "Solver '{}' on system '{}' failed to converge in {} iterations."
-
-                if iprint > -1:
-                    print(prefix + msg.format(self.SOLVER, system.pathname,
-                                              self._iter_count))
-
-                # Raise AnalysisError if requested.
-                if self.options['err_on_non_converge']:
-                    raise AnalysisError(msg.format(self.SOLVER, system.pathname,
-                                                   self._iter_count))
-
-            # Solver converged
-            elif iprint == 1:
-                print(prefix + ' Converged in {} iterations'.format(self._iter_count))
-            elif iprint == 2:
-                print(prefix + ' Converged')
-
     def _iter_initialize(self):
         """
         Perform any necessary pre-processing operations.
@@ -597,6 +526,14 @@ class NonlinearSolver(Solver):
                              desc='If true, the values of input and output variables at '
                                   'the start of iteration are printed and written to a file '
                                   'after a failure to converge.')
+        self.options.declare('stall_limit', default=0,
+                             desc='Number of iterations after which, if the residual norms are '
+                                  'identical within the stall_tol, then terminate as if max '
+                                  'iterations were reached. Default is 0, which disables this '
+                                  'feature.')
+        self.options.declare('stall_tol', default=1e-6,
+                             desc='When stall checking is enabled, the threshhold below which the '
+                                  'residual norm is considered unchanged.')
 
     def solve(self):
         """
@@ -632,6 +569,100 @@ class NonlinearSolver(Solver):
             norm = 1.0
         norm0 = norm if norm != 0.0 else 1.0
         return norm0, norm
+
+    def _solve(self):
+        """
+        Run the iterative solver.
+        """
+        maxiter = self.options['maxiter']
+        atol = self.options['atol']
+        rtol = self.options['rtol']
+        iprint = self.options['iprint']
+        stall_limit = self.options['stall_limit']
+        stall_tol = self.options['stall_tol']
+
+        self._mpi_print_header()
+
+        self._iter_count = 0
+        norm0, norm = self._iter_initialize()
+
+        self._norm0 = norm0
+
+        self._mpi_print(self._iter_count, norm, norm / norm0)
+
+        stalled = False
+        if stall_limit > 0:
+            stall_count = 0
+            stall_norm = norm
+
+        while self._iter_count < maxiter and norm > atol and norm / norm0 > rtol and not stalled:
+            with Recording(type(self).__name__, self._iter_count, self) as rec:
+                self._single_iteration()
+                self._iter_count += 1
+                self._run_apply()
+                norm = self._iter_get_norm()
+                # With solvers, we want to record the norm AFTER the call, but the call needs to
+                # be wrapped in the with for stack purposes, so we locally assign  norm & norm0
+                # into the class.
+                rec.abs = norm
+                if norm0 == 0:
+                    norm0 = 1
+                rec.rel = norm / norm0
+
+                # Check if convergence is stalled.
+                if stall_limit > 0:
+                    norm_diff = np.abs(stall_norm - norm)
+                    if norm_diff <= stall_tol:
+                        stall_count += 1
+                        if stall_count >= stall_limit:
+                            stalled = True
+                    else:
+                        stall_count = 0
+                        stall_norm = norm
+
+            self._mpi_print(self._iter_count, norm, norm / norm0)
+
+        system = self._system()
+        if system.comm.rank == 0 or os.environ.get('USE_PROC_FILES'):
+            prefix = self._solver_info.prefix + self.SOLVER
+
+            # Solver terminated early because a Nan in the norm doesn't satisfy the while-loop
+            # conditionals.
+            if np.isinf(norm) or np.isnan(norm):
+                msg = "Solver '{}' on system '{}': residuals contain 'inf' or 'NaN' after {} " + \
+                      "iterations."
+                if iprint > -1:
+                    print(prefix + msg.format(self.SOLVER, system.pathname,
+                                              self._iter_count))
+
+                # Raise AnalysisError if requested.
+                if self.options['err_on_non_converge']:
+                    raise AnalysisError(msg.format(self.SOLVER, system.pathname,
+                                                   self._iter_count))
+
+            # Solver hit maxiter without meeting desired tolerances.
+            # Or solver stalled.
+            elif (norm > atol and norm / norm0 > rtol) or stalled:
+
+                if stalled:
+                    msg = "Solver '{}' on system '{}' stalled after {} iterations."
+                else:
+                    msg = "Solver '{}' on system '{}' failed to converge in {} iterations."
+
+                if iprint > -1:
+                    print(prefix + msg.format(self.SOLVER, system.pathname,
+                                              self._iter_count))
+
+                # Raise AnalysisError if requested.
+                if self.options['err_on_non_converge']:
+                    raise AnalysisError(msg.format(self.SOLVER, system.pathname,
+                                                   self._iter_count))
+
+            # Solver converged
+            elif iprint == 1:
+                print(prefix + ' Converged in {} iterations'.format(self._iter_count))
+            elif iprint == 2:
+                print(prefix + ' Converged')
 
     def _run_apply(self):
         """
@@ -783,6 +814,77 @@ class LinearSolver(Solver):
             Set of names of relevant systems based on the current linear solve.
         """
         raise NotImplementedError("class %s does not implement solve()." % (type(self).__name__))
+
+    def _solve(self):
+        """
+        Run the iterative solver.
+        """
+        maxiter = self.options['maxiter']
+        atol = self.options['atol']
+        rtol = self.options['rtol']
+        iprint = self.options['iprint']
+
+        self._mpi_print_header()
+
+        self._iter_count = 0
+        norm0, norm = self._iter_initialize()
+
+        self._norm0 = norm0
+
+        self._mpi_print(self._iter_count, norm, norm / norm0)
+
+        while self._iter_count < maxiter and norm > atol and norm / norm0 > rtol:
+            with Recording(type(self).__name__, self._iter_count, self) as rec:
+                self._single_iteration()
+                self._iter_count += 1
+                self._run_apply()
+                norm = self._iter_get_norm()
+                # With solvers, we want to record the norm AFTER the call, but the call needs to
+                # be wrapped in the with for stack purposes, so we locally assign  norm & norm0
+                # into the class.
+                rec.abs = norm
+                if norm0 == 0:
+                    norm0 = 1
+                rec.rel = norm / norm0
+
+            self._mpi_print(self._iter_count, norm, norm / norm0)
+
+        system = self._system()
+        if system.comm.rank == 0 or os.environ.get('USE_PROC_FILES'):
+            prefix = self._solver_info.prefix + self.SOLVER
+
+            # Solver terminated early because a Nan in the norm doesn't satisfy the while-loop
+            # conditionals.
+            if np.isinf(norm) or np.isnan(norm):
+                msg = "Solver '{}' on system '{}': residuals contain 'inf' or 'NaN' after {} " + \
+                      "iterations."
+                if iprint > -1:
+                    print(prefix + msg.format(self.SOLVER, system.pathname,
+                                              self._iter_count))
+
+                # Raise AnalysisError if requested.
+                if self.options['err_on_non_converge']:
+                    raise AnalysisError(msg.format(self.SOLVER, system.pathname,
+                                                   self._iter_count))
+
+            # Solver hit maxiter without meeting desired tolerances.
+            elif (norm > atol and norm / norm0 > rtol):
+                msg = "Solver '{}' on system '{}' failed to converge in {} iterations."
+
+                if iprint > -1:
+                    print(prefix + msg.format(self.SOLVER, system.pathname,
+                                              self._iter_count))
+
+                # Raise AnalysisError if requested.
+                if self.options['err_on_non_converge']:
+                    raise AnalysisError(msg.format(self.SOLVER, system.pathname,
+                                                   self._iter_count))
+
+            # Solver converged
+            elif iprint == 1:
+                print(prefix + ' Converged in {} iterations'.format(self._iter_count))
+            elif iprint == 2:
+                print(prefix + ' Converged')
 
     def _run_apply(self):
         """
