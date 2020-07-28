@@ -749,9 +749,8 @@ class TestGroup(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        print(p.get_val('row1_comp.x'))
-        # assert_near_equal(p['row1_comp.x'], arr[2, ..., 1])
-        # assert_near_equal(p['row4_comp.x'], arr[3, ..., 1])
+        assert_near_equal(p.get_val('row1_comp.x'), arr[2, ..., 1])
+        # assert_near_equal(p.get_val('row4_comp.x'), arr[3, ..., 1])
 
     def test_om_slice_with_ellipsis_in_promotes(self):
 

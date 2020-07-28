@@ -100,7 +100,7 @@ class DefaultTransfer(Transfer):
                                       src_indices.dtype == object):
                             if _is_slice(src_indices) or _is_ellipsis(src_indices):
                                 indices = _slice_indices(src_indices, meta_out['global_size'],
-                                                         meta_out['global_shape']).flatten()
+                                                         meta_out['global_shape'])
                                 src_indices = convert_neg(indices, meta_out['global_size'])
                         else:
                             src_indices = convert_neg(src_indices, meta_out['global_size'])
@@ -121,6 +121,7 @@ class DefaultTransfer(Transfer):
                     input_inds = np.arange(offsets_in[iproc, idx_in],
                                            offsets_in[iproc, idx_in] +
                                            sizes_in[iproc, idx_in], dtype=INT_DTYPE)
+                    input_inds = input_inds.reshape((5, 3))
 
                     # Now the indices are ready - input_inds, output_inds
                     sub_in = abs_in[mypathlen:].split('.', 1)[0]
@@ -145,8 +146,12 @@ class DefaultTransfer(Transfer):
             transfers[vec_name] = {}
 
             if tot_size > 0:
-                xfer_in = fwd_xfer_in[1]
-                xfer_out = fwd_xfer_out[1]
+                if len(fwd_xfer_in) > 1 and len(fwd_xfer_out) > 1:
+                    xfer_in = fwd_xfer_in[1].reshape(fwd_xfer_out[1].shape)
+                    xfer_out = fwd_xfer_out[1]
+                else:
+                    xfer_in = np.concatenate(fwd_xfer_in)
+                    xfer_out = np.concatenate(fwd_xfer_out)
 
                 out_vec = vectors['output'][vec_name]
 
