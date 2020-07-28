@@ -1,5 +1,7 @@
 """Define utils for use in testing."""
 
+import numpy as np
+import json
 
 def _new_setup(self):
     import os
@@ -74,3 +76,31 @@ def use_tempdirs(cls):
     setattr(cls, 'tearDown', _new_teardown)
 
     return cls
+
+
+class NumpyEncoder(json.JSONEncoder):
+    """ Special json encoder for numpy types """
+
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
+
+def print_nested_dicts_with_ndarrays(d):
+    """
+    For putting expected values in some tests, it is handy to use
+    this function to print the string needed.
+
+    For example, see the test test_model_viewer_has_correct_data_from_optimization_problem
+
+    Parameters
+    ----------
+    d : dict
+        Dict to be printed.
+    """
+    print(json.dumps(d, indent=4, cls=NumpyEncoder, sort_keys=True))
+
