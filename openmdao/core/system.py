@@ -224,10 +224,12 @@ class System(object):
     _rec_mgr : <RecordingManager>
         object that manages all recorders added to this system.
     _static_mode : bool
-        If true, we are outside of setup.
-        In this case, add_input, add_output, and add_subsystem all add to the
-        '_static' versions of the respective data structures.
-        These data structures are never reset during setup.
+        If True, we are outside of system setup and configure and will add things to '_static'
+        versions of our data structures so they won't get reset if problem setup is called multiple
+        times.  Changes to data structures during system setup/configure are considered 'dynamic'
+        and are reset each time problem setup is called.
+        add_input, add_output, and add_subsystem are exammples of functions that will modify
+        the '_static' versions of data structures if called outside of setup/configure.
     _static_subsystems_allprocs : [<System>, ...]
         List of subsystems that stores all subsystems added outside of setup.
     _static_design_vars : dict of dict
