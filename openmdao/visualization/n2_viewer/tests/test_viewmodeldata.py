@@ -767,15 +767,18 @@ class TestViewModelData(unittest.TestCase):
 
         from openmdao.api import Group, ScipyKrylov, LinearSystemComp
 
-        SIZE = 10
+        SIZE = 1
 
         model = Group()
 
         x = np.array([1, 2, -3])
         A = np.array([[5.0, -3.0, 2.0], [1.0, 7.0, -4.0], [1.0, 0.0, 8.0]])
 
+
         x = np.random.rand(SIZE) * 1e20
         A = np.random.rand(SIZE, SIZE)
+
+        # A[1][2] = 12.344523e9
 
         b = A.dot(x)
 
@@ -794,6 +797,44 @@ class TestViewModelData(unittest.TestCase):
         lingrp.linear_solver = ScipyKrylov()
 
         n2(prob, outfile="n2_node_value.html", show_browser=DEBUG_BROWSER)
+
+    def test_rubbish(self):
+        import numpy as np
+
+        from openmdao.api import Group
+
+        SIZE = 2
+
+        SIZE_LARGE = 10
+
+        model = Group()
+
+        scalar = 12.3222
+        model.add_subsystem('scalar', IndepVarComp('scalar', scalar))
+
+        one_d = np.random.rand(SIZE)
+        model.add_subsystem('one_d', IndepVarComp('one_d', one_d))
+
+        two_d = np.random.rand(SIZE,SIZE)
+        model.add_subsystem('two_d', IndepVarComp('two_d', two_d))
+
+        three_d = np.random.rand(SIZE,SIZE,SIZE)
+        model.add_subsystem('three_d', IndepVarComp('three_d', three_d))
+
+
+        one_d_large = np.random.rand(SIZE_LARGE)
+        model.add_subsystem('one_d_large', IndepVarComp('one_d_large', one_d_large))
+
+        two_d_large = np.random.rand(SIZE_LARGE,SIZE_LARGE)
+        model.add_subsystem('two_d_large', IndepVarComp('two_d_large', two_d_large))
+
+        three_d_large = np.random.rand(SIZE_LARGE,SIZE_LARGE,SIZE_LARGE)
+        model.add_subsystem('three_d_large', IndepVarComp('three_d_large', three_d_large))
+
+        prob = Problem(model)
+        prob.setup()
+
+        n2(prob, outfile="n2_node_value_rubbish.html", show_browser=DEBUG_BROWSER)
 
 
 

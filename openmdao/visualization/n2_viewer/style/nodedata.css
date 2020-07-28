@@ -190,20 +190,23 @@
 	cursor: pointer;
 }
 
-#node-value-title {
+/********************* node value classes ********************/
+
+.node-value-title {
     display: block;
     overflow: auto;
+    /*overflow: hidden;*/
     position: relative;
 }
 
 /* grabber bars on the node value title bar */
-#node-value-title::before {
+.node-value-title::before {
     content: '\A789\A789\A789\A789\A789\A789';
     color: black;
     padding-left: 5px;
     padding-right: 5px;
 }
-#node-value-title::after {
+.node-value-title::after {
     content: '\A789\A789\A789\A789\A789\A789';
     color: black;
     padding-left: 5px;
@@ -211,19 +214,12 @@
 }
 
 /****** resize ****/
-#node-value-resizer-box {
+.node-value-resizer-box {
     position: absolute;
     right: -3px;
 }
 
-.inactive-resizer-box {
-    visibility: visible;
-    left: auto;
-    border: 3px solid transparent;
-    pointer-events: none;
-}
-
-#node-value-resizer-handle {
+.node-value-resizer-handle {
     position: absolute;
     right: -2px;
     bottom: 0px;
@@ -234,45 +230,87 @@
     overflow: hidden;
 }
 
-.inactive-resizer-handle::before {
-    content: '\25a8';
-}
 
-.inactive-resizer-handle {
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0) 54%, rgba(255, 255, 255, 1) 55%, rgba(255, 255, 255, 1) 100%);
-    font-size: 20px;
-    border: 0;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    -moz-background-clip: text;
-    -moz-text-fill-color: transparent;
-    font-weight: bold;
-    text-align: right;
-    vertical-align: bottom;
-    width: 18px;
-    padding: 0;
-}
-
-/*
-.inactive-resizer-handle {
-    background: linear-gradient(135deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0) 54%, rgba(255,255,255,1) 55%, rgba(255,255,255,1) 100%);
-    font-size: 20px;
-    border: 0;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    -moz-background-clip: text;
-    -moz-text-fill-color: transparent;
-    font-weight: bold;
-    text-align: right;
-    vertical-align: bottom;
-    width: 18px;
-    padding: 0;
-}
-*/
-
-#node-value-grabber{
+.node-value-grabber{
     /*display:block;*/
     overflow:hidden;
     width:100%;
     height:100%;
+}
+
+
+.node-info-pin {
+    position: absolute;
+    top: 5px;
+    right: 8px;
+    cursor: pointer;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    font-size: 12px;
+    background: #ccc;
+    width: 18px;
+    height: 18px;
+    padding: 0 2px 0 2px;
+    /* box-shadow: 1px 1px 1px 1px rgba(0, 0, 0, 0.2); */
+    border-radius: 3px;
+}
+
+.node-info-pin:hover {
+    top: 4px;
+    right: 9px;
+    box-shadow: 1px 1px 1px 1px rgba(0, 0, 0, 0.2);
+}
+
+.node-value-container {
+    visibility: hidden;
+    overflow: hidden;
+	background-color: white;
+	border-radius: 10px;
+	border: 1px solid #a0a0a0;
+    transition: opacity 0.25s;
+    box-shadow: 3px 3px 3px 1px rgba(0, 0, 0, 0.2);
+    border-collapse: separate;
+    opacity: .95;
+    z-index: 20;
+    position: absolute;
+    top: 400px;
+    left: 700px;
+
+}
+
+.node-value-table-div {
+    overflow: auto;
+    padding-right: 10px;
+    padding-bottom: 10px;
+}
+
+.node-value-table {
+}
+
+.node-value-table tbody td {
+    text-align: left;
+    font-size: 9pt;
+    margin-top: 0;
+    margin-left: 0;
+    border: 1px solid #a0a0a0;
+    padding: 3px;
+    white-space: nowrap;
+}
+
+.node-value-header {
+    background-color: #42926b;
+    color: black;
+    margin: 0px;
+    padding: 5px;
+    font-size: 11pt;
+    text-align: center;
+    cursor: grab;
+}
+
+.node-value-footer {
+    background-color: #42926b;
+    color: black;
+    margin: 0px;
+    padding: 5px;
 }
