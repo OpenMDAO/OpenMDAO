@@ -38,8 +38,8 @@ class TestNewton(unittest.TestCase):
 
         prob.run_model()
 
-        assert_near_equal(prob['y1'], 25.58830273, .00001)
-        assert_near_equal(prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob.get_val('y1'), 25.58830273, .00001)
+        assert_near_equal(prob.get_val('y2'), 12.05848819, .00001)
 
     def test_feature_newton_basic(self):
         """ Feature test for slotting a Newton solver and using it to solve
@@ -53,8 +53,8 @@ class TestNewton(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_near_equal(prob['y1'], 25.58830273, .00001)
-        assert_near_equal(prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob.get_val('y1'), 25.58830273, .00001)
+        assert_near_equal(prob.get_val('y2'), 12.05848819, .00001)
 
     def test_sellar_grouped(self):
         # Tests basic Newton solution on Sellar in a subgroup
@@ -65,8 +65,8 @@ class TestNewton(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        assert_near_equal(prob['y1'], 25.58830273, .00001)
-        assert_near_equal(prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob.get_val('y1'), 25.58830273, .00001)
+        assert_near_equal(prob.get_val('y2'), 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
         self.assertLess(prob.model.nonlinear_solver._iter_count, 8)
@@ -79,8 +79,8 @@ class TestNewton(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_near_equal(prob['y1'], 25.58830273, .00001)
-        assert_near_equal(prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob.get_val('y1'), 25.58830273, .00001)
+        assert_near_equal(prob.get_val('y2'), 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
         self.assertLess(prob.model.nonlinear_solver._iter_count, 8)
@@ -98,8 +98,8 @@ class TestNewton(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        assert_near_equal(prob['y1'], 25.58830273, .00001)
-        assert_near_equal(prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob.get_val('y1'), 25.58830273, .00001)
+        assert_near_equal(prob.get_val('y2'), 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
         self.assertLess(prob.model.nonlinear_solver._iter_count, 8)
@@ -120,8 +120,8 @@ class TestNewton(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        assert_near_equal(prob['y1'], 25.58830273, .00001)
-        assert_near_equal(prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob.get_val('y1'), 25.58830273, .00001)
+        assert_near_equal(prob.get_val('y2'), 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
         self.assertLess(prob.model.nonlinear_solver._iter_count, 8)
@@ -135,7 +135,7 @@ class TestNewton(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob.get_val('y1'), 25.58830273, .00001)
         assert_near_equal(prob['state_eq.y2_command'], 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
@@ -152,7 +152,7 @@ class TestNewton(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob.get_val('y1'), 25.58830273, .00001)
         assert_near_equal(prob['state_eq.y2_command'], 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
@@ -204,7 +204,7 @@ class TestNewton(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob.get_val('y1'), 25.58830273, .00001)
         assert_near_equal(prob['state_eq.y2_command'], 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
@@ -258,7 +258,7 @@ class TestNewton(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob.get_val('y1'), 25.58830273, .00001)
         assert_near_equal(prob['state_eq.y2_command'], 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
@@ -856,9 +856,6 @@ class TestNewtonFeatures(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
-
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
@@ -874,11 +871,14 @@ class TestNewtonFeatures(unittest.TestCase):
         model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
 
         prob.setup()
+        
+        prob.set_val('x', 1.)
+        prob.set_val('z', np.array([5.0, 2.0]))
 
         prob.run_model()
 
-        assert_near_equal(prob['y1'], 25.58830273, .00001)
-        assert_near_equal(prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob.get_val('y1'), 25.58830273, .00001)
+        assert_near_equal(prob.get_val('y2'), 12.05848819, .00001)
 
     def test_feature_maxiter(self):
         import numpy as np
@@ -888,9 +888,6 @@ class TestNewtonFeatures(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
-
-        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
@@ -909,10 +906,13 @@ class TestNewtonFeatures(unittest.TestCase):
 
         prob.setup()
 
+        prob.set_val('x', 1.)
+        prob.set_val('z', np.array([5.0, 2.0]))
+        
         prob.run_model()
 
-        assert_near_equal(prob['y1'], 25.5878516779, .00001)
-        assert_near_equal(prob['y2'], 12.0607416105, .00001)
+        assert_near_equal(prob.get_val('y1'), 25.5878516779, .00001)
+        assert_near_equal(prob.get_val('y2'), 12.0607416105, .00001)
 
     def test_feature_rtol(self):
         import numpy as np
@@ -922,9 +922,6 @@ class TestNewtonFeatures(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
-
-        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
@@ -943,10 +940,13 @@ class TestNewtonFeatures(unittest.TestCase):
 
         prob.setup()
 
+        prob.set_val('x', 1.)
+        prob.set_val('z', np.array([5.0, 2.0]))
+
         prob.run_model()
 
-        assert_near_equal(prob['y1'], 25.5878516779, .00001)
-        assert_near_equal(prob['y2'], 12.0607416105, .00001)
+        assert_near_equal(prob.get_val('y1'), 25.5878516779, .00001)
+        assert_near_equal(prob.get_val('y2'), 12.0607416105, .00001)
 
     def test_feature_atol(self):
         import numpy as np
@@ -956,9 +956,6 @@ class TestNewtonFeatures(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
-
-        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
@@ -977,10 +974,13 @@ class TestNewtonFeatures(unittest.TestCase):
 
         prob.setup()
 
+        prob.set_val('x', 1.)
+        prob.set_val('z', np.array([5.0, 2.0]))
+
         prob.run_model()
 
-        assert_near_equal(prob['y1'], 25.5882856302, .00001)
-        assert_near_equal(prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob.get_val('y1'), 25.5882856302, .00001)
+        assert_near_equal(prob.get_val('y2'), 12.05848819, .00001)
 
     def test_feature_linear_solver(self):
         import numpy as np
@@ -991,9 +991,6 @@ class TestNewtonFeatures(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
-
-        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
@@ -1013,10 +1010,13 @@ class TestNewtonFeatures(unittest.TestCase):
 
         prob.setup()
 
+        prob.set_val('x', 1.)
+        prob.set_val('z', np.array([5.0, 2.0]))
+
         prob.run_model()
 
-        assert_near_equal(prob['y1'], 25.58830273, .00001)
-        assert_near_equal(prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob.get_val('y1'), 25.58830273, .00001)
+        assert_near_equal(prob.get_val('y2'), 12.05848819, .00001)
 
     def test_feature_max_sub_solves(self):
         import numpy as np
@@ -1065,9 +1065,6 @@ class TestNewtonFeatures(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
-
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
@@ -1085,6 +1082,9 @@ class TestNewtonFeatures(unittest.TestCase):
         newton.options['err_on_non_converge'] = True
 
         prob.setup()
+
+        prob.set_val('x', 1.)
+        prob.set_val('z', np.array([5.0, 2.0]))
 
         try:
             prob.run_model()
@@ -1116,10 +1116,10 @@ class TestNewtonFeatures(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_near_equal(prob['g1.y1'], 0.64, .00001)
-        assert_near_equal(prob['g1.y2'], 0.80, .00001)
-        assert_near_equal(prob['g2.y1'], 0.64, .00001)
-        assert_near_equal(prob['g2.y2'], 0.80, .00001)
+        assert_near_equal(prob.get_val('g1.y1'), 0.64, .00001)
+        assert_near_equal(prob.get_val('g1.y2'), 0.80, .00001)
+        assert_near_equal(prob.get_val('g2.y1'), 0.64, .00001)
+        assert_near_equal(prob.get_val('g2.y2'), 0.80, .00001)
 
 
 if __name__ == "__main__":

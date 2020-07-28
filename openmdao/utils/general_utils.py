@@ -23,6 +23,66 @@ import numpy as np
 import openmdao
 
 
+# Certain command line tools can make use of this to allow visualization of models when errors
+# are present that would normally cause setup to abort.
+_ignore_errors = False
+
+
+def ignore_errors(flag=None):
+    """
+    Disable certain errors that will prevent setup from completing.
+
+    Parameters
+    ----------
+    flag : bool or None
+        If not None, set the value of _ignore_errors to this value.
+
+    Returns
+    -------
+    bool
+        The current value of _ignore_errors
+    """
+    global _ignore_errors
+    if flag is not None:
+        _ignore_errors = True
+    return _ignore_errors
+
+
+def conditional_error(msg, exc=RuntimeError, category=UserWarning):
+    """
+    Raise an exception or issue a warning, depending on the value of _ignore_errors.
+
+    Parameters
+    ----------
+    msg : str
+        The error/warning message.
+    exc : exception class
+        This exception class is used to create the exception to be raised.
+    category : warning class
+        This category is the class of warning to be issued.
+    """
+    if ignore_errors():
+        simple_warning(msg, category=category)
+    else:
+        raise exc(msg)
+
+
+@contextmanager
+def ignore_errors_context(flag=True):
+    """
+    Set ignore_errors to the given flag in this context.
+
+    Parameters
+    ----------
+    flag : bool
+        If not None, set ignore_errors to this value.
+    """
+    save = ignore_errors()
+    ignore_errors(flag)
+    yield
+    ignore_errors(save)
+
+
 def warn_deprecation(msg):
     """
     Raise a warning and prints a deprecation message to stdout.
@@ -186,7 +246,10 @@ def ensure_compatible(name, value, shape=None, indices=None):
 
     if indices is not None:
         indices = np.atleast_1d(indices)
+        contains_slice = _is_slice(indices)
         ind_shape = indices.shape
+    else:
+        contains_slice = None
 
     # if shape is not given, infer from value (if not scalar) or indices
     if shape is not None:
@@ -221,8 +284,7 @@ def ensure_compatible(name, value, shape=None, indices=None):
                                  "Expected %s but got %s." %
                                  (name, shape, value.shape))
 
-    # finally make sure shape of indices is compatible
-    if indices is not None and shape != ind_shape[:len(shape)]:
+    if indices is not None and shape != ind_shape[:len(shape)] and not contains_slice:
         raise ValueError("Shape of indices does not match shape for '%s': "
                          "Expected %s but got %s." %
                          (name, shape, ind_shape[:len(shape)]))
@@ -440,6 +502,8 @@ def all_ancestors(pathname, delim='.'):
     """
     Return a generator of pathnames of the starting object and all of its parents.
 
+    Pathnames are ordered from longest to shortest.
+
     Parameters
     ----------
     pathname : str
@@ -448,8 +512,7 @@ def all_ancestors(pathname, delim='.'):
         Delimiter used to split the name
     """
     parts = pathname.split(delim)
-    yield parts[0]
-    for i in range(2, len(parts) + 1):
+    for i in range(len(parts), 0, -1):
         yield delim.join(parts[:i])
 
 
@@ -912,3 +975,66 @@ def common_subpath(pathnames):
         return '.'.join(splits[0][:common_loc])
 
     return ''
+
+
+def _is_slice(indices):
+    """
+    Check if an array of indices contains a slice object.
+
+    Parameters
+    ----------
+    indices : ndarray
+        Dotted pathnames of systems.
+
+    Returns
+    -------
+    bool
+        Returns True if indices contains a slice.
+    """
+    return any(isinstance(i, slice) for i in indices)
+
+
+def _slice_indices(slicer, out_size, out_shape):
+    """
+    Check if an array of indices contains a slice object.
+
+    Parameters
+    ----------
+    slicer : slice
+        Slice object to slice array
+    out_size : int
+        Size of output array
+    out_shape : tuple
+        Tuple of output array shape
+
+    Returns
+    -------
+    array
+        Returns the sliced indices.
+    """
+    return np.arange(out_size, dtype=int).reshape(out_shape)[tuple(slicer)]
+
+
+def prom2ivc_src_dict(prom_dict):
+    """
+    Convert a dictionary with promoted input names into one with ivc source names.
+
+    Parameters
+    ----------
+    prom_dict : dict
+        Original dict with some promoted paths.
+
+    Returns
+    -------
+    dict
+        New dict with ivc source pathnames.
+    """
+    src_dict = {}
+    for name, meta in prom_dict.items():
+        if meta['ivc_source'] is not None:
+            src_name = meta['ivc_source']
+            src_dict[src_name] = meta
+        else:
+            src_dict[name] = meta
+
+    return src_dict

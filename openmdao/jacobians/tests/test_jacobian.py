@@ -287,18 +287,17 @@ class TestJacobian(unittest.TestCase):
     def _check_fwd(self, prob, check_vec):
         d_inputs, d_outputs, d_residuals = prob.model.get_linear_vectors()
 
-        work = d_outputs._clone()
-        work.set_const(1.0)
+        work = np.ones(d_outputs._data.size)
 
         # fwd apply_linear test
-        d_outputs.set_const(1.0)
+        d_outputs.set_val(1.0)
         prob.model.run_apply_linear(['linear'], 'fwd')
-        d_residuals._data[:] = d_residuals._data - check_vec
+        d_residuals.set_val(d_residuals._data - check_vec)
         self.assertAlmostEqual(d_residuals.get_norm(), 0)
 
         # fwd solve_linear test
-        d_outputs.set_const(0.0)
-        d_residuals._data[:] = check_vec
+        d_outputs.set_val(0.0)
+        d_residuals.set_val(check_vec)
 
         prob.model.run_solve_linear(['linear'], 'fwd')
 
@@ -308,18 +307,17 @@ class TestJacobian(unittest.TestCase):
     def _check_rev(self, prob, check_vec):
         d_inputs, d_outputs, d_residuals = prob.model.get_linear_vectors()
 
-        work = d_outputs._clone()
-        work.set_const(1.0)
+        work = np.ones(d_outputs._data.size)
 
         # rev apply_linear test
-        d_residuals.set_const(1.0)
+        d_residuals.set_val(1.0)
         prob.model.run_apply_linear(['linear'], 'rev')
-        d_outputs._data[:] = d_outputs._data - check_vec
+        d_outputs.set_val(d_outputs._data - check_vec)
         self.assertAlmostEqual(d_outputs.get_norm(), 0)
 
         # rev solve_linear test
-        d_residuals.set_const(0.0)
-        d_outputs._data[:] = check_vec
+        d_residuals.set_val(0.0)
+        d_outputs.set_val(check_vec)
         prob.model.run_solve_linear(['linear'], 'rev')
         d_residuals -= work
         self.assertAlmostEqual(d_residuals.get_norm(), 0, delta=1e-6)
@@ -346,7 +344,7 @@ class TestJacobian(unittest.TestCase):
 
         prob = Problem()
         comp = ExplicitSetItemComp(dtype, value, shape, constructor)
-        prob.model.add_subsystem('C1', comp)
+        comp = prob.model.add_subsystem('C1', comp)
         prob.setup()
 
         prob.set_solver_print(level=0)
@@ -355,7 +353,7 @@ class TestJacobian(unittest.TestCase):
         prob.model.run_linearize()
 
         expected = constructor(value)
-        J = prob.model._subsystems_allprocs[0]._jacobian
+        J = comp._jacobian
         jac_out = J['out', 'in']
 
         self.assertEqual(len(jac_out.shape), 2)

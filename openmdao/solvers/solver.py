@@ -136,8 +136,8 @@ class Solver(object):
         Dict of list of var names to record
     _norm0: float
         Normalization factor
-    _solver_info : SolverInfo
-        A stack-like object shared by all Solvers in the model.
+    _problem_meta : dict
+        Problem level metadata.
     """
 
     # Object to store some formatting for iprint that is shared across all solvers.
@@ -157,7 +157,7 @@ class Solver(object):
         self._vec_names = None
         self._mode = 'fwd'
         self._iter_count = 0
-        self._solver_info = None
+        self._problem_meta = None
 
         # Solver options
         self.options = OptionsDictionary(parent_name=self.msginfo)
@@ -232,6 +232,20 @@ class Solver(object):
             return type(self).__name__
         return '{} in {}'.format(type(self).__name__, self._system().msginfo)
 
+    @property
+    def _recording_iter(self):
+        if self._problem_meta is None:
+            raise RuntimeError(f"{self.msginfo}: Can't access recording_iter because "
+                               "_setup_solvers has not been called.")
+        return self._problem_meta['recording_iter']
+
+    @property
+    def _solver_info(self):
+        if self._problem_meta is None:
+            raise RuntimeError(f"{self.msginfo}: Can't access solver_info because _setup_solvers "
+                               "has not been called.")
+        return self._problem_meta['solver_info']
+
     def _assembled_jac_solver_iter(self):
         """
         Return an empty generator of lin solvers using assembled jacs.
@@ -274,8 +288,7 @@ class Solver(object):
         """
         self._system = weakref.ref(system)
         self._depth = depth
-        self._solver_info = system._solver_info
-        self._recording_iter = system._recording_iter
+        self._problem_meta = system._problem_meta
 
         if system.pathname:
             parent_name = self.msginfo
@@ -301,13 +314,13 @@ class Solver(object):
             excl = ['.'.join((system.pathname, i)) for i in excl]
 
         if self.recording_options['record_solver_residuals']:
-            myresiduals = [n for n in system._residuals._views if check_path(n, incl, excl)]
+            myresiduals = [n for n in system._residuals._abs_iter() if check_path(n, incl, excl)]
 
         if self.recording_options['record_outputs']:
-            myoutputs = [n for n in system._outputs._views if check_path(n, incl, excl)]
+            myoutputs = [n for n in system._outputs._abs_iter() if check_path(n, incl, excl)]
 
         if self.recording_options['record_inputs']:
-            myinputs = [n for n in system._inputs._views if check_path(n, incl, excl)]
+            myinputs = [n for n in system._inputs._abs_iter() if check_path(n, incl, excl)]
 
         self._filtered_vars_to_record = {
             'input': myinputs,
@@ -676,11 +689,10 @@ class NonlinearSolver(Solver):
         Perform a Gauss-Seidel iteration over this Solver's subsystems.
         """
         system = self._system()
-        for isub, (subsys, local) in enumerate(system._all_subsystem_iter()):
+        for isub, subsys in enumerate(system._subsystems_allprocs):
             system._transfer('nonlinear', 'fwd', isub)
 
-            if local:
-
+            if subsys._is_local:
                 try:
                     subsys._solve_nonlinear()
                 except AnalysisError as err:
@@ -820,9 +832,9 @@ class BlockLinearSolver(LinearSolver):
         system = self._system()
         for vec_name in system._lin_rel_vec_name_list:
             if self._mode == 'fwd':
-                rhs[vec_name] = system._vectors['residual'][vec_name]._data.copy()
+                rhs[vec_name] = system._vectors['residual'][vec_name].asarray(True)
             else:
-                rhs[vec_name] = system._vectors['output'][vec_name]._data.copy()
+                rhs[vec_name] = system._vectors['output'][vec_name].asarray(True)
 
     def _update_rhs_vecs(self):
         system = self._system()

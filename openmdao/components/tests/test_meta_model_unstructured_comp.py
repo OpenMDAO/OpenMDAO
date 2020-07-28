@@ -444,11 +444,11 @@ class MetaModelTestCase(unittest.TestCase):
         prob.model.add_subsystem('trig', trig)
         prob.setup()
 
-        prob['trig.x'] = 2.1
+        prob.set_val('trig.x', 2.1)
         prob.run_model()
 
-        assert_near_equal(prob['trig.sin_x'], .5*np.sin(prob['trig.x']), 1e-4)
-        assert_near_equal(prob['trig.cos_x'], .5*np.cos(prob['trig.x']), 1e-4)
+        assert_near_equal(prob.get_val('trig.sin_x'), .5*np.sin(prob.get_val('trig.x')), 1e-4)
+        assert_near_equal(prob.get_val('trig.cos_x'), .5*np.cos(prob.get_val('trig.x')), 1e-4)
 
     def test_metamodel_feature2d(self):
         # similar to previous example, but output is 2d
@@ -474,12 +474,12 @@ class MetaModelTestCase(unittest.TestCase):
         ))
 
         # train the surrogate and check predicted value
-        prob['trig.x'] = 2.1
+        prob.set_val('trig.x', 2.1)
         prob.run_model()
-        assert_near_equal(prob['trig.y'],
+        assert_near_equal(prob.get_val('trig.y'),
                          np.append(
-                             .5*np.sin(prob['trig.x']),
-                             .5*np.cos(prob['trig.x'])
+                             .5*np.sin(prob.get_val('trig.x')),
+                             .5*np.cos(prob.get_val('trig.x'))
                          ),
                          1e-4)
 
@@ -652,12 +652,12 @@ class MetaModelTestCase(unittest.TestCase):
         ))
 
         # train the surrogate and check predicted value
-        prob['trig.x'] = np.array([2.1, 3.2, 4.3])
+        prob.set_val('trig.x', np.array([2.1, 3.2, 4.3]))
         prob.run_model()
-        assert_near_equal(prob['trig.y'],
+        assert_near_equal(prob.get_val('trig.y'),
                          np.column_stack((
-                             .5*np.sin(prob['trig.x']),
-                             .5*np.cos(prob['trig.x'])
+                             .5*np.sin(prob.get_val('trig.x')),
+                             .5*np.cos(prob.get_val('trig.x'))
                          )),
                          1e-4)
 
@@ -895,19 +895,15 @@ class MetaModelTestCase(unittest.TestCase):
 
         # Testing explicitly setting fd inside of setup
         prob = om.Problem()
-        indep = om.IndepVarComp()
-        indep.add_output('x', 5.)
-        prob.model.add_subsystem('indep', indep)
         trig = TrigWithFdInSetup()
-        prob.model.add_subsystem('trig', trig)
-        prob.model.connect('indep.x', 'trig.x')
+        prob.model.add_subsystem('trig', trig, promotes_inputs=['x'])
         prob.setup(check=True)
-        prob['indep.x'] = 5.0
+        prob.set_val('x', 5.)
         trig.train = False
         prob.run_model()
-        J = prob.compute_totals(of=['trig.sin_x'], wrt=['indep.x'])
-        deriv_using_fd = J[('trig.sin_x', 'indep.x')]
-        assert_near_equal(deriv_using_fd[0], np.cos(prob['indep.x']), 1e-4)
+        J = prob.compute_totals(of=['trig.sin_x'], wrt=['x'])
+        deriv_using_fd = J[('trig.sin_x', 'x')]
+        assert_near_equal(deriv_using_fd[0], np.cos(prob['x']), 1e-4)
 
     def test_metamodel_setup_called_twice_bug(self):
         class Trig(om.MetaModelUnStructuredComp):
@@ -1080,15 +1076,11 @@ class MetaModelUnstructuredSurrogatesFeatureTestCase(unittest.TestCase):
 
         prob = om.Problem()
 
-        prob.model.add_subsystem('p', om.IndepVarComp('x', 2.1))
-
         sin_mm = om.MetaModelUnStructuredComp()
-        sin_mm.add_input('x', 0.)
+        sin_mm.add_input('x', 2.1)
         sin_mm.add_output('f_x', 0., surrogate=om.KrigingSurrogate())
 
         prob.model.add_subsystem('sin_mm', sin_mm)
-
-        prob.model.connect('p.x', 'sin_mm.x')
 
         prob.setup(check=True)
 
@@ -1096,11 +1088,11 @@ class MetaModelUnstructuredSurrogatesFeatureTestCase(unittest.TestCase):
         sin_mm.options['train:x'] = np.linspace(0,10,20)
         sin_mm.options['train:f_x'] = .5*np.sin(sin_mm.options['train:x'])
 
-        prob['sin_mm.x'] = 2.1
+        prob.set_val('sin_mm.x', 2.1)
 
         prob.run_model()
 
-        assert_near_equal(prob['sin_mm.f_x'], .5*np.sin(prob['sin_mm.x']), 1e-4)
+        assert_near_equal(prob.get_val('sin_mm.f_x'), .5*np.sin(prob.get_val('sin_mm.x')), 1e-4)
 
     def test_nearest_neighbor(self):
         import numpy as np
@@ -1109,15 +1101,11 @@ class MetaModelUnstructuredSurrogatesFeatureTestCase(unittest.TestCase):
 
         prob = om.Problem()
 
-        prob.model.add_subsystem('p', om.IndepVarComp('x', 2.1))
-
         sin_mm = om.MetaModelUnStructuredComp()
-        sin_mm.add_input('x', 0.)
+        sin_mm.add_input('x', 2.1)
         sin_mm.add_output('f_x', 0., surrogate=om.NearestNeighbor(interpolant_type='linear'))
 
         prob.model.add_subsystem('sin_mm', sin_mm)
-
-        prob.model.connect('p.x', 'sin_mm.x')
 
         prob.setup(check=True)
 
@@ -1125,11 +1113,11 @@ class MetaModelUnstructuredSurrogatesFeatureTestCase(unittest.TestCase):
         sin_mm.options['train:x'] = np.linspace(0,10,20)
         sin_mm.options['train:f_x'] = .5*np.sin(sin_mm.options['train:x'])
 
-        prob['sin_mm.x'] = 2.1
+        prob.set_val('sin_mm.x', 2.1)
 
         prob.run_model()
 
-        assert_near_equal(prob['sin_mm.f_x'], .5*np.sin(prob['sin_mm.x']), 2e-3)
+        assert_near_equal(prob.get_val('sin_mm.f_x'), .5*np.sin(prob.get_val('sin_mm.x')), 2e-3)
 
     def test_response_surface(self):
         import numpy as np
@@ -1138,15 +1126,11 @@ class MetaModelUnstructuredSurrogatesFeatureTestCase(unittest.TestCase):
 
         prob = om.Problem()
 
-        prob.model.add_subsystem('p', om.IndepVarComp('x', 2.1))
-
         sin_mm = om.MetaModelUnStructuredComp()
-        sin_mm.add_input('x', 0.)
+        sin_mm.add_input('x', 2.1)
         sin_mm.add_output('f_x', 0., surrogate=om.ResponseSurface())
 
         prob.model.add_subsystem('sin_mm', sin_mm)
-
-        prob.model.connect('p.x', 'sin_mm.x')
 
         prob.setup(check=True)
 
@@ -1154,11 +1138,11 @@ class MetaModelUnstructuredSurrogatesFeatureTestCase(unittest.TestCase):
         sin_mm.options['train:x'] = np.linspace(0, 3.14, 20)
         sin_mm.options['train:f_x'] = .5*np.sin(sin_mm.options['train:x'])
 
-        prob['sin_mm.x'] = 2.1
+        prob.set_val('sin_mm.x', 2.1)
 
         prob.run_model()
 
-        assert_near_equal(prob['sin_mm.f_x'], .5*np.sin(prob['sin_mm.x']), 2e-3)
+        assert_near_equal(prob.get_val('sin_mm.f_x'), .5*np.sin(prob.get_val('sin_mm.x')), 2e-3)
 
     def test_kriging_options_eval_rmse(self):
         import numpy as np
@@ -1167,15 +1151,11 @@ class MetaModelUnstructuredSurrogatesFeatureTestCase(unittest.TestCase):
 
         prob = om.Problem()
 
-        prob.model.add_subsystem('p', om.IndepVarComp('x', 2.1))
-
         sin_mm = om.MetaModelUnStructuredComp()
-        sin_mm.add_input('x', 0.)
+        sin_mm.add_input('x', 2.1)
         sin_mm.add_output('f_x', 0., surrogate=om.KrigingSurrogate(eval_rmse=True))
 
         prob.model.add_subsystem('sin_mm', sin_mm)
-
-        prob.model.connect('p.x', 'sin_mm.x')
 
         prob.setup(check=True)
 
@@ -1183,12 +1163,12 @@ class MetaModelUnstructuredSurrogatesFeatureTestCase(unittest.TestCase):
         sin_mm.options['train:x'] = np.linspace(0,10,20)
         sin_mm.options['train:f_x'] = .5*np.sin(sin_mm.options['train:x'])
 
-        prob['sin_mm.x'] = 2.1
+        prob.set_val('sin_mm.x', 2.1)
 
         prob.run_model()
 
         print("mean")
-        assert_near_equal(prob['sin_mm.f_x'], .5*np.sin(prob['sin_mm.x']), 1e-4)
+        assert_near_equal(prob.get_val('sin_mm.f_x'), .5*np.sin(prob.get_val('sin_mm.x')), 1e-4)
         print("std")
         assert_near_equal(sin_mm._metadata('f_x')['rmse'][0, 0], 0.0, 1e-4)
 
@@ -1199,15 +1179,11 @@ class MetaModelUnstructuredSurrogatesFeatureTestCase(unittest.TestCase):
 
         prob = om.Problem()
 
-        prob.model.add_subsystem('p', om.IndepVarComp('x', 2.1))
-
         sin_mm = om.MetaModelUnStructuredComp()
-        sin_mm.add_input('x', 0.)
+        sin_mm.add_input('x', 2.1)
         sin_mm.add_output('f_x', 0., surrogate=om.NearestNeighbor(interpolant_type='rbf', num_neighbors=3))
 
         prob.model.add_subsystem('sin_mm', sin_mm)
-
-        prob.model.connect('p.x', 'sin_mm.x')
 
         prob.setup(check=True)
 
@@ -1215,11 +1191,11 @@ class MetaModelUnstructuredSurrogatesFeatureTestCase(unittest.TestCase):
         sin_mm.options['train:x'] = np.linspace(0,10,20)
         sin_mm.options['train:f_x'] = .5*np.sin(sin_mm.options['train:x'])
 
-        prob['sin_mm.x'] = 2.1
+        prob.set_val('sin_mm.x', 2.1)
 
         prob.run_model()
 
-        assert_near_equal(prob['sin_mm.f_x'], .5*np.sin(prob['sin_mm.x']), 5e-3)
+        assert_near_equal(prob.get_val('sin_mm.f_x'), .5*np.sin(prob.get_val('sin_mm.x')), 5e-3)
 
 
 if __name__ == "__main__":

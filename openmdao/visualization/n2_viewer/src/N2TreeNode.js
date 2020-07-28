@@ -106,11 +106,14 @@ class N2TreeNode {
         return this.type.match(paramRegex);
     }
 
-    /** True if this is a parameter and connected. */
+    /** True if this is an input and connected. */
     isConnectedParam() { return (this.type == 'param'); }
 
-    /** True if this a paramater and unconnected. */
+    /** True if this an input and unconnected. */
     isUnconnectedParam() { return (this.type == 'unconnected_param'); }
+
+    /** True if this is an input whose source is an auto-ivc'd output */
+    isAutoIvcParam() { return (this.type == 'autoivc_param');}
 
     /** True if this.type is 'unknown'. */
     isUnknown() { return (this.type == 'unknown'); }
@@ -153,7 +156,7 @@ class N2TreeNode {
      * Look for the supplied node in the set of child names.
      * @returns {Boolean} True if a match is found, otherwise false.
      */
-    _hasNodeInChildren(compareNode) {
+    hasNodeInChildren(compareNode) {
         return this.childNames.has(compareNode.absPathName);
     }
 
@@ -163,7 +166,7 @@ class N2TreeNode {
      * @returns {Boolean} True if the node is found, otherwise false.
      */
     hasParent(compareNode, parentLimit = null) {
-        for (let obj = this; obj != null && obj !== parentLimit; obj = obj.parent) {
+        for (let obj = this.parent; obj != null && obj !== parentLimit; obj = obj.parent) {
             if (obj === compareNode) {
                 return true;
             }
@@ -181,10 +184,12 @@ class N2TreeNode {
     hasNode(compareNode, parentLimit = null) {
         if (this.type == 'root') return true;
 
+        if ( this === compareNode) return true;
+
         // Check parents first.
         if (this.hasParent(compareNode, parentLimit)) return true;
 
-        return this._hasNodeInChildren(compareNode);
+        return this.hasNodeInChildren(compareNode);
     }
 
     /**
@@ -247,6 +252,7 @@ class N2TreeNode {
         if ( ! (this.isRoot() || this.manuallyExpanded) &&
             (this.numDescendants > PRECOLLAPSE_THRESHOLD &&
                 this.children.length > 1 ) ) {
+            debugInfo(`Precollapsing node ${this.absPathName}`)
             this.minimize();
             return true;
         }

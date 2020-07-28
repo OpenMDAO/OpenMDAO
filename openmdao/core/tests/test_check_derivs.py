@@ -124,13 +124,7 @@ class TestProblemCheckPartials(unittest.TestCase):
     def test_incorrect_jacobian(self):
 
         prob = om.Problem()
-
-        prob.model.add_subsystem('p1', om.IndepVarComp('x1', 3.0))
-        prob.model.add_subsystem('p2', om.IndepVarComp('x2', 5.0))
         prob.model.add_subsystem('comp', MyComp())
-
-        prob.model.connect('p1.x1', 'comp.x1')
-        prob.model.connect('p2.x2', 'comp.x2')
 
         prob.set_solver_print(level=0)
 
@@ -1851,12 +1845,7 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         prob = om.Problem()
 
-        prob.model.add_subsystem('p1', om.IndepVarComp('x1', 3.0))
-        prob.model.add_subsystem('p2', om.IndepVarComp('x2', 5.0))
         prob.model.add_subsystem('comp', MyComp())
-
-        prob.model.connect('p1.x1', 'comp.x1')
-        prob.model.connect('p2.x2', 'comp.x2')
 
         prob.set_solver_print(level=0)
 
@@ -1898,12 +1887,7 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         prob = om.Problem()
 
-        prob.model.add_subsystem('p1', om.IndepVarComp('x1', 3.0))
-        prob.model.add_subsystem('p2', om.IndepVarComp('x2', 5.0))
         prob.model.add_subsystem('comp', MyComp())
-
-        prob.model.connect('p1.x1', 'comp.x1')
-        prob.model.connect('p2.x2', 'comp.x2')
 
         prob.set_solver_print(level=0)
 
@@ -1920,13 +1904,9 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         prob = om.Problem()
 
-        prob.model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
-        prob.model.add_subsystem('p2', om.IndepVarComp('y', 5.0))
         comp = prob.model.add_subsystem('comp', ParaboloidTricky())
         prob.model.add_subsystem('comp2', ParaboloidMatVec())
 
-        prob.model.connect('p1.x', 'comp.x')
-        prob.model.connect('p2.y', 'comp.y')
         prob.model.connect('comp.f_xy', 'comp2.x')
 
         prob.set_solver_print(level=0)
@@ -1945,13 +1925,9 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         prob = om.Problem()
 
-        prob.model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
-        prob.model.add_subsystem('p2', om.IndepVarComp('y', 5.0))
         prob.model.add_subsystem('comp', ParaboloidTricky())
         prob.model.add_subsystem('comp2', ParaboloidMatVec())
 
-        prob.model.connect('p1.x', 'comp.x')
-        prob.model.connect('p2.y', 'comp.y')
         prob.model.connect('comp.f_xy', 'comp2.x')
 
         prob.set_solver_print(level=0)
@@ -1968,13 +1944,9 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         prob = om.Problem()
 
-        prob.model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
-        prob.model.add_subsystem('p2', om.IndepVarComp('y', 5.0))
         comp = prob.model.add_subsystem('comp', ParaboloidTricky())
         prob.model.add_subsystem('comp2', ParaboloidMatVec())
 
-        prob.model.connect('p1.x', 'comp.x')
-        prob.model.connect('p2.y', 'comp.y')
         prob.model.connect('comp.f_xy', 'comp2.x')
 
         prob.set_solver_print(level=0)
@@ -1993,13 +1965,9 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         prob = om.Problem()
 
-        prob.model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
-        prob.model.add_subsystem('p2', om.IndepVarComp('y', 5.0))
         prob.model.add_subsystem('comp', ParaboloidTricky())
         prob.model.add_subsystem('comp2', ParaboloidMatVec())
 
-        prob.model.connect('p1.x', 'comp.x')
-        prob.model.connect('p2.y', 'comp.y')
         prob.model.connect('comp.f_xy', 'comp2.x')
 
         prob.set_solver_print(level=0)
@@ -2016,13 +1984,9 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         prob = om.Problem()
 
-        prob.model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
-        prob.model.add_subsystem('p2', om.IndepVarComp('y', 5.0))
         prob.model.add_subsystem('comp', ParaboloidTricky())
         prob.model.add_subsystem('comp2', ParaboloidMatVec())
 
-        prob.model.connect('p1.x', 'comp.x')
-        prob.model.connect('p2.y', 'comp.y')
         prob.model.connect('comp.f_xy', 'comp2.x')
 
         prob.set_solver_print(level=0)
@@ -2038,12 +2002,7 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         prob = om.Problem()
 
-        prob.model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
-        prob.model.add_subsystem('p2', om.IndepVarComp('y', 5.0))
         prob.model.add_subsystem('comp', ParaboloidTricky())
-
-        prob.model.connect('p1.x', 'comp.x')
-        prob.model.connect('p2.y', 'comp.y')
 
         prob.set_solver_print(level=0)
 
@@ -2089,15 +2048,10 @@ class TestCheckPartialsFeature(unittest.TestCase):
                 J['z', 'y2'] = np.array([40.0])
 
         prob = om.Problem()
-        prob.model.add_subsystem('p0', om.IndepVarComp('x1', 3.0))
-        prob.model.add_subsystem('p1', om.IndepVarComp('x2', 5.0))
-        prob.model.add_subsystem('p2', om.IndepVarComp('y2', 6.0))
         prob.model.add_subsystem('good', MyCompGoodPartials())
         prob.model.add_subsystem('bad', MyCompBadPartials())
-        prob.model.connect('p0.x1', 'good.x1')
-        prob.model.connect('p1.x2', 'good.x2')
         prob.model.connect('good.y', 'bad.y1')
-        prob.model.connect('p2.y2', 'bad.y2')
+
         prob.set_solver_print(level=0)
         prob.setup()
         prob.run_model()
@@ -2268,8 +2222,8 @@ class TestProblemCheckTotals(unittest.TestCase):
         self.assertTrue('9.80614' in lines[5], "'9.80614' not found in '%s'" % lines[5])
         self.assertTrue('cs:None' in lines[5], "'cs:None not found in '%s'" % lines[5])
 
-        assert_near_equal(totals['con_cmp2.con2', 'px.x']['J_fwd'], [[0.09692762]], 1e-5)
-        assert_near_equal(totals['con_cmp2.con2', 'px.x']['J_fd'], [[0.09692762]], 1e-5)
+        assert_near_equal(totals['con_cmp2.con2', 'x']['J_fwd'], [[0.09692762]], 1e-5)
+        assert_near_equal(totals['con_cmp2.con2', 'x']['J_fd'], [[0.09692762]], 1e-5)
 
         # Test compact_print output
         compact_stream = StringIO()
@@ -2310,8 +2264,8 @@ class TestProblemCheckTotals(unittest.TestCase):
         self.assertTrue('0.000' in lines[6])
         self.assertTrue('0.000' in lines[8])
 
-        assert_near_equal(totals['px.x', 'px.x']['J_fwd'], [[1.0]], 1e-5)
-        assert_near_equal(totals['px.x', 'px.x']['J_fd'], [[1.0]], 1e-5)
+        assert_near_equal(totals['x', 'x']['J_fwd'], [[1.0]], 1e-5)
+        assert_near_equal(totals['x', 'x']['J_fd'], [[1.0]], 1e-5)
 
     def test_desvar_and_response_with_indices(self):
 
@@ -2429,7 +2383,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         # check derivatives with complex step and a larger step size.
         totals = prob.check_totals(method='cs', out_stream=None)
 
-        data = totals['con_cmp2.con2', 'px.x']
+        data = totals['con_cmp2.con2', 'x']
         self.assertTrue('J_fwd' in data)
         self.assertTrue('rel error' in data)
         self.assertTrue('abs error' in data)
@@ -2455,14 +2409,14 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         totals = prob.check_totals(method='fd', step=1.0e-1, out_stream=None)
 
-        assert_near_equal(totals['px.x', 'px.x']['J_fwd'], [[1.0]], 1e-5)
-        assert_near_equal(totals['px.x', 'px.x']['J_fd'], [[1.0]], 1e-5)
-        assert_near_equal(totals['pz.z', 'pz.z']['J_fwd'], np.eye(2), 1e-5)
-        assert_near_equal(totals['pz.z', 'pz.z']['J_fd'], np.eye(2), 1e-5)
-        assert_near_equal(totals['px.x', 'pz.z']['J_fwd'], [[0.0, 0.0]], 1e-5)
-        assert_near_equal(totals['px.x', 'pz.z']['J_fd'], [[0.0, 0.0]], 1e-5)
-        assert_near_equal(totals['pz.z', 'px.x']['J_fwd'], [[0.0], [0.0]], 1e-5)
-        assert_near_equal(totals['pz.z', 'px.x']['J_fd'], [[0.0], [0.0]], 1e-5)
+        assert_near_equal(totals['x', 'x']['J_fwd'], [[1.0]], 1e-5)
+        assert_near_equal(totals['x', 'x']['J_fd'], [[1.0]], 1e-5)
+        assert_near_equal(totals['z', 'z']['J_fwd'], np.eye(2), 1e-5)
+        assert_near_equal(totals['z', 'z']['J_fd'], np.eye(2), 1e-5)
+        assert_near_equal(totals['x', 'z']['J_fwd'], [[0.0, 0.0]], 1e-5)
+        assert_near_equal(totals['x', 'z']['J_fd'], [[0.0, 0.0]], 1e-5)
+        assert_near_equal(totals['z', 'x']['J_fwd'], [[0.0], [0.0]], 1e-5)
+        assert_near_equal(totals['z', 'x']['J_fd'], [[0.0], [0.0]], 1e-5)
 
     def test_full_con_with_index_desvar(self):
         prob = om.Problem()
@@ -2482,8 +2436,8 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         totals = prob.check_totals(method='fd', step=1.0e-1, out_stream=None)
 
-        assert_near_equal(totals['pz.z', 'pz.z']['J_fwd'], [[0.0], [1.0]], 1e-5)
-        assert_near_equal(totals['pz.z', 'pz.z']['J_fd'], [[0.0], [1.0]], 1e-5)
+        assert_near_equal(totals['z', 'z']['J_fwd'], [[0.0], [1.0]], 1e-5)
+        assert_near_equal(totals['z', 'z']['J_fd'], [[0.0], [1.0]], 1e-5)
 
     def test_full_desvar_with_index_con(self):
         prob = om.Problem()
@@ -2503,8 +2457,8 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         totals = prob.check_totals(method='fd', step=1.0e-1, out_stream=None)
 
-        assert_near_equal(totals['pz.z', 'pz.z']['J_fwd'], [[0.0, 1.0]], 1e-5)
-        assert_near_equal(totals['pz.z', 'pz.z']['J_fd'], [[0.0, 1.0]], 1e-5)
+        assert_near_equal(totals['z', 'z']['J_fwd'], [[0.0, 1.0]], 1e-5)
+        assert_near_equal(totals['z', 'z']['J_fd'], [[0.0, 1.0]], 1e-5)
 
     def test_full_desvar_with_index_obj(self):
         prob = om.Problem()
@@ -2524,8 +2478,8 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         totals = prob.check_totals(method='fd', step=1.0e-1, out_stream=None)
 
-        assert_near_equal(totals['pz.z', 'pz.z']['J_fwd'], [[0.0, 1.0]], 1e-5)
-        assert_near_equal(totals['pz.z', 'pz.z']['J_fd'], [[0.0, 1.0]], 1e-5)
+        assert_near_equal(totals['z', 'z']['J_fwd'], [[0.0, 1.0]], 1e-5)
+        assert_near_equal(totals['z', 'z']['J_fd'], [[0.0, 1.0]], 1e-5)
 
     def test_bug_fd_with_sparse(self):
         # This bug was found via the x57 model in pointer.

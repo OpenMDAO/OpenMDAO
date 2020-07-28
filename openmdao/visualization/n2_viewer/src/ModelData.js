@@ -12,10 +12,10 @@ class ModelData {
         this.sysPathnamesList = modelJSON.sys_pathnames_list;
 
         this.maxDepth = 1;
-        this.idCounter = 0;
         this.unconnectedParams = 0;
+        this.autoivcSources = 0;
         this.nodePaths = {};
-
+        this.nodeIds = [];
 
         startTimer('ModelData._convertToN2TreeNodes');
         this.root = this.tree = modelJSON.tree = this._convertToN2TreeNodes(modelJSON.tree);
@@ -97,7 +97,8 @@ class ModelData {
     _setParentsAndDepth(node, parent, depth) { // Formerly InitTree()
         node.depth = depth;
         node.parent = parent;
-        node.id = ++this.idCounter; // id starts at 1 for if comparision
+        node.id = this.nodeIds.length;
+        this.nodeIds.push(node);
 
         if (node.parent) { // not root node? node.parent.absPathName : "";
             if (node.parent.absPathName != "") {
@@ -203,6 +204,18 @@ class ModelData {
         return false;
     }
 
+    hasAutoIvcSrc(elementPath) {
+        for (let conn of this.conns) {
+            if (conn.tgt == elementPath && conn.src.match(/^_auto_ivc.*$/)) {
+                debugInfo(elementPath + " source is an auto-ivc output.");
+                this.autoivcSources++;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /**
      * Create an array in each node containing references to its
      * children that are subsystems. Runs recursively over the node's
@@ -302,6 +315,9 @@ class ModelData {
         let throwLbl = 'ModelData._computeConnections: ';
 
         for (let conn of this.conns) {
+            // Ignore connections from _auto_ivc, which is intentionally not included.
+            if (conn.src.match(/^_auto_ivc.*$/)) continue;
+
             // Process sources
             let srcObj = this.nodePaths[conn.src];
 
@@ -324,7 +340,6 @@ class ModelData {
             for (let obj = srcObj.parent; obj != null; obj = obj.parent) {
                 srcObjParents.push(obj);
             }
-
 
             // Process targets
             let tgtObj = this.nodePaths[conn.tgt];
@@ -422,8 +437,12 @@ class ModelData {
             console.warn("identifyUnconnectedParam error: absPathName not set for ", node);
         }
         else {
-            if (node.isParam() && !node.hasChildren() && !this.hasAnyConnection(node.absPathName))
-                node.type = "unconnected_param";
+            if (node.isParam()) {
+                if (!node.hasChildren() && !this.hasAnyConnection(node.absPathName))
+                    node.type = "unconnected_param";
+                else if (this.hasAutoIvcSrc(node.absPathName))
+                    node.type = "autoivc_param";
+            }
         }
     }
 

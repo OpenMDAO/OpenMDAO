@@ -244,8 +244,8 @@ class TestBryoden(unittest.TestCase):
 
         prob.run_model()
 
-        assert_near_equal(prob['y1'], 25.58830273, .00001)
-        assert_near_equal(prob['state_eq.y2_command'], 12.05848819, .00001)
+        assert_near_equal(prob.get_val('y1'), 25.58830273, .00001)
+        assert_near_equal(prob.get_val('state_eq.y2_command'), 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
         self.assertLess(prob.model.nonlinear_solver._iter_count, 6)
@@ -804,12 +804,9 @@ class TestBryodenFeature(unittest.TestCase):
         p = om.Problem()
         model = p.model
 
-        model.add_subsystem('ground', om.IndepVarComp('V', 0., units='V'))
-        model.add_subsystem('source', om.IndepVarComp('I', 0.1, units='A'))
-        model.add_subsystem('circuit', Circuit())
-
-        model.connect('source.I', 'circuit.I_in')
-        model.connect('ground.V', 'circuit.Vg')
+        model.add_subsystem('circuit', Circuit(), promotes_inputs=[('Vg', 'V'), ('I_in', 'I')])
+        model.set_input_defaults('V', 0., units='V')
+        model.set_input_defaults('I', 0.1, units='A')
 
         p.setup()
 
@@ -823,17 +820,17 @@ class TestBryodenFeature(unittest.TestCase):
         model.nonlinear_solver.linear_solver = om.LinearBlockGS()
 
         # set some initial guesses
-        p['circuit.n1.V'] = 10.
-        p['circuit.n2.V'] = 1.
+        p.set_val('circuit.n1.V', 10.)
+        p.set_val('circuit.n2.V', 1.)
 
         p.set_solver_print(level=2)
         p.run_model()
 
-        assert_near_equal(p['circuit.n1.V'], 9.90804735, 1e-5)
-        assert_near_equal(p['circuit.n2.V'], 0.71278226, 1e-5)
+        assert_near_equal(p.get_val('circuit.n1.V'), 9.90804735, 1e-5)
+        assert_near_equal(p.get_val('circuit.n2.V'), 0.71278226, 1e-5)
 
         # sanity check: should sum to .1 Amps
-        assert_near_equal(p['circuit.R1.I'] + p['circuit.D1.I'], .1, 1e-6)
+        assert_near_equal(p.get_val('circuit.R1.I') + p.get_val('circuit.D1.I'), .1, 1e-6)
 
     def test_circuit_options(self):
         import openmdao.api as om
@@ -842,12 +839,9 @@ class TestBryodenFeature(unittest.TestCase):
         p = om.Problem()
         model = p.model
 
-        model.add_subsystem('ground', om.IndepVarComp('V', 0., units='V'))
-        model.add_subsystem('source', om.IndepVarComp('I', 0.1, units='A'))
-        model.add_subsystem('circuit', Circuit())
-
-        model.connect('source.I', 'circuit.I_in')
-        model.connect('ground.V', 'circuit.Vg')
+        model.add_subsystem('circuit', Circuit(), promotes_inputs=[('Vg', 'V'), ('I_in', 'I')])
+        model.set_input_defaults('V', 0., units='V')
+        model.set_input_defaults('I', 0.1, units='A')
 
         p.setup()
 
@@ -861,17 +855,17 @@ class TestBryodenFeature(unittest.TestCase):
         model.circuit.nonlinear_solver.options['state_vars'] = ['n1.V', 'n2.V']
 
         # set some initial guesses
-        p['circuit.n1.V'] = 10.
-        p['circuit.n2.V'] = 1.
+        p.set_val('circuit.n1.V', 10.)
+        p.set_val('circuit.n2.V', 1.)
 
         p.set_solver_print(level=2)
         p.run_model()
 
-        assert_near_equal(p['circuit.n1.V'], 9.90804735, 1e-5)
-        assert_near_equal(p['circuit.n2.V'], 0.71278226, 1e-5)
+        assert_near_equal(p.get_val('circuit.n1.V'), 9.90804735, 1e-5)
+        assert_near_equal(p.get_val('circuit.n2.V'), 0.71278226, 1e-5)
 
         # sanity check: should sum to .1 Amps
-        assert_near_equal(p['circuit.R1.I'] + p['circuit.D1.I'], .1, 1e-6)
+        assert_near_equal(p.get_val('circuit.R1.I') + p.get_val('circuit.D1.I'), .1, 1e-6)
 
     def test_circuit_full(self):
         import openmdao.api as om
@@ -880,12 +874,9 @@ class TestBryodenFeature(unittest.TestCase):
         p = om.Problem()
         model = p.model
 
-        model.add_subsystem('ground', om.IndepVarComp('V', 0., units='V'))
-        model.add_subsystem('source', om.IndepVarComp('I', 0.1, units='A'))
-        model.add_subsystem('circuit', Circuit())
-
-        model.connect('source.I', 'circuit.I_in')
-        model.connect('ground.V', 'circuit.Vg')
+        model.add_subsystem('circuit', Circuit(), promotes_inputs=[('Vg', 'V'), ('I_in', 'I')])
+        model.set_input_defaults('V', 0., units='V')
+        model.set_input_defaults('I', 0.1, units='A')
 
         p.setup()
 
@@ -895,17 +886,17 @@ class TestBryodenFeature(unittest.TestCase):
         model.circuit.nonlinear_solver.linear_solver = om.DirectSolver()
 
         # set some initial guesses
-        p['circuit.n1.V'] = 10.
-        p['circuit.n2.V'] = 1.
+        p.set_val('circuit.n1.V', 10.)
+        p.set_val('circuit.n2.V', 1.)
 
         p.set_solver_print(level=2)
         p.run_model()
 
-        assert_near_equal(p['circuit.n1.V'], 9.90804735, 1e-5)
-        assert_near_equal(p['circuit.n2.V'], 0.71278226, 1e-5)
+        assert_near_equal(p.get_val('circuit.n1.V'), 9.90804735, 1e-5)
+        assert_near_equal(p.get_val('circuit.n2.V'), 0.71278226, 1e-5)
 
         # sanity check: should sum to .1 Amps
-        assert_near_equal(p['circuit.R1.I'] + p['circuit.D1.I'], .1, 1e-6)
+        assert_near_equal(p.get_val('circuit.R1.I') + p.get_val('circuit.D1.I'), .1, 1e-6)
 
 
 if __name__ == "__main__":

@@ -168,18 +168,6 @@ class TestJacobianFeatures(unittest.TestCase):
 
     def setUp(self):
         self.model = model = om.Group()
-        comp = om.IndepVarComp()
-        variables = (
-            ('x', 1.),
-            ('y1', np.ones(2)),
-            ('y2', np.ones(2)),
-            ('y3', np.ones(2)),
-            ('z', np.ones((2, 2))),
-        )
-        for name, val in variables:
-            comp.add_output(name, val)
-        model.add_subsystem('input_comp', comp, promotes=['x', 'y1', 'y2', 'y3', 'z'])
-
         self.problem = om.Problem(model=model)
         self.problem.set_solver_print(level=0)
         model.linear_solver = om.ScipyKrylov(assemble_jac=True)
@@ -262,11 +250,6 @@ class TestJacobianFeatures(unittest.TestCase):
 
     def test_const_jacobian(self):
         model = om.Group()
-        comp = om.IndepVarComp()
-        for name, val in (('x', 1.), ('y1', np.ones(2)), ('y2', np.ones(2)),
-                          ('y3', np.ones(2)), ('z', np.ones((2, 2)))):
-            comp.add_output(name, val)
-        model.add_subsystem('input_comp', comp, promotes=['x', 'y1', 'y2', 'y3', 'z'])
 
         problem = om.Problem(model=model)
         problem.set_solver_print(level=0)
@@ -369,12 +352,10 @@ class TestJacobianFeatures(unittest.TestCase):
 
         p = om.Problem()
         model = p.model
-        indep = model.add_subsystem('indep', om.IndepVarComp(), promotes=['*'])
-
-        indep.add_output('T', val=100., units='degK')
-        indep.add_output('P', val=1., units='bar')
 
         units = model.add_subsystem('units', UnitCompBase(), promotes=['*'])
+        model.set_input_defaults('T', val=100., units='degK')
+        model.set_input_defaults('P', val=1., units='bar')
 
         p.setup()
         p.run_model()
@@ -417,9 +398,7 @@ class TestJacobianFeatures(unittest.TestCase):
 
         p = om.Problem()
         model = p.model
-        indep = model.add_subsystem('indep', om.IndepVarComp(), promotes=['*'])
-
-        indep.add_output('x', val=100., shape=(3,), units='degK')
+        model.set_input_defaults('x', val=np.ones(3)*100., units='degK')
 
         model.add_subsystem('comp', TmpComp(), promotes=['*'])
 
@@ -441,12 +420,6 @@ class TestJacobianForDocs(unittest.TestCase):
         from openmdao.jacobians.tests.test_jacobian_features import SimpleCompConst
 
         model = om.Group(assembled_jac_type='dense')
-        comp = om.IndepVarComp()
-        for name, val in (('x', 1.), ('y1', np.ones(2)), ('y2', np.ones(2)),
-                          ('y3', np.ones(2)), ('z', np.ones((2, 2)))):
-            comp.add_output(name, val)
-        model.add_subsystem('input_comp', comp, promotes=['x', 'y1', 'y2', 'y3', 'z'])
-
         problem = om.Problem(model=model)
         problem.set_solver_print(0)
 
@@ -500,20 +473,14 @@ class TestJacobianForDocs(unittest.TestCase):
 
 
         model = om.Group()
-        comp = om.IndepVarComp()
-        comp.add_output('x', np.ones(4))
-
-        model.add_subsystem('input', comp)
         model.add_subsystem('example', SparsePartialComp())
-
-        model.connect('input.x', 'example.x')
 
         problem = om.Problem(model=model)
         problem.setup()
         problem.run_model()
-        totals = problem.compute_totals(['example.f'], ['input.x'])
+        totals = problem.compute_totals(['example.f'], ['example.x'])
 
-        assert_near_equal(totals['example.f', 'input.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]])
+        assert_near_equal(totals['example.f', 'example.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]])
 
     def test_sparse_jacobian(self):
         import numpy as np
@@ -534,20 +501,14 @@ class TestJacobianForDocs(unittest.TestCase):
                 partials['f', 'x'] = [1., 2., 3., 4.]
 
         model = om.Group()
-        comp = om.IndepVarComp()
-        comp.add_output('x', np.ones(4))
-
-        model.add_subsystem('input', comp)
         model.add_subsystem('example', SparsePartialComp())
-
-        model.connect('input.x', 'example.x')
 
         problem = om.Problem(model=model)
         problem.setup()
         problem.run_model()
-        totals = problem.compute_totals(['example.f'], ['input.x'])
+        totals = problem.compute_totals(['example.f'], ['example.x'])
 
-        assert_near_equal(totals['example.f', 'input.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]])
+        assert_near_equal(totals['example.f', 'example.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]])
 
     def test_sparse_jacobian_const(self):
         import numpy as np
@@ -571,23 +532,15 @@ class TestJacobianForDocs(unittest.TestCase):
                 pass
 
         model = om.Group()
-        comp = om.IndepVarComp()
-        comp.add_output('x', np.ones(4))
-        comp.add_output('y', np.ones(2))
-
-        model.add_subsystem('input', comp)
         model.add_subsystem('example', SparsePartialComp())
-
-        model.connect('input.x', 'example.x')
-        model.connect('input.y', 'example.y')
 
         problem = om.Problem(model=model)
         problem.setup()
         problem.run_model()
-        totals = problem.compute_totals(['example.f'], ['input.x', 'input.y'])
+        totals = problem.compute_totals(['example.f'], ['example.x', 'example.y'])
 
-        assert_near_equal(totals['example.f', 'input.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]])
-        assert_near_equal(totals['example.f', 'input.y'], [[1., 0.], [0., 1.]])
+        assert_near_equal(totals['example.f', 'example.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]])
+        assert_near_equal(totals['example.f', 'example.y'], [[1., 0.], [0., 1.]])
 
     def test_fd_glob(self):
         import numpy as np
@@ -614,24 +567,16 @@ class TestJacobianForDocs(unittest.TestCase):
                 f[1] = np.dot([0, 2, 3, 4], x) + y[1]
 
         model = om.Group()
-        comp = om.IndepVarComp()
-        comp.add_output('x', np.ones(4))
-        comp.add_output('y', np.ones(2))
-
-        model.add_subsystem('input', comp)
         model.add_subsystem('example', FDPartialComp())
-
-        model.connect('input.x', 'example.x')
-        model.connect('input.y', 'example.y')
 
         problem = om.Problem(model=model)
         problem.setup()
         problem.run_model()
-        totals = problem.compute_totals(['example.f'], ['input.x', 'input.y'])
+        totals = problem.compute_totals(['example.f'], ['example.x', 'example.y'])
 
-        assert_near_equal(totals['example.f', 'input.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]],
+        assert_near_equal(totals['example.f', 'example.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]],
                          tolerance=1e-8)
-        assert_near_equal(totals['example.f', 'input.y'], [[1., 0.], [0., 1.]], tolerance=1e-8)
+        assert_near_equal(totals['example.f', 'example.y'], [[1., 0.], [0., 1.]], tolerance=1e-8)
 
     def test_fd_options(self):
         import numpy as np
@@ -659,24 +604,16 @@ class TestJacobianForDocs(unittest.TestCase):
                 f[1] = np.dot([0, 2, 3, 4], x) + y[1]
 
         model = om.Group()
-        comp = om.IndepVarComp()
-        comp.add_output('x', np.ones(4))
-        comp.add_output('y', np.ones(2))
-
-        model.add_subsystem('input', comp)
         model.add_subsystem('example', FDPartialComp())
-
-        model.connect('input.x', 'example.x')
-        model.connect('input.y', 'example.y')
 
         problem = om.Problem(model=model)
         problem.setup()
         problem.run_model()
-        totals = problem.compute_totals(['example.f'], ['input.x', 'input.y'])
+        totals = problem.compute_totals(['example.f'], ['example.x', 'example.y'])
 
-        assert_near_equal(totals['example.f', 'input.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]],
+        assert_near_equal(totals['example.f', 'example.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]],
                          tolerance=1e-8)
-        assert_near_equal(totals['example.f', 'input.y'], [[1., 0.], [0., 1.]], tolerance=1e-8)
+        assert_near_equal(totals['example.f', 'example.y'], [[1., 0.], [0., 1.]], tolerance=1e-8)
 
 
 if __name__ == '__main__':

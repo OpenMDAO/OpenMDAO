@@ -110,6 +110,8 @@ class TestGroupFiniteDifference(unittest.TestCase):
 
         # 1. run_model; 2. step x; 3. step y
         self.assertEqual(model.parab.count, 3)
+        self.assertEqual(model.parab.iter_count_without_approx, 1)
+        self.assertEqual(model.parab.iter_count, 3)
 
     def test_fd_count_driver(self):
         # Make sure we aren't doing FD wrt any var that isn't in the driver desvar set.
@@ -2061,18 +2063,16 @@ class TestComponentComplexStep(unittest.TestCase):
                     print("y", outputs['y'])
 
         prob = om.Problem()
-        prob.model.add_subsystem('px', om.IndepVarComp('x', val=1.0))
         prob.model.add_subsystem('comp', SimpleComp())
-        prob.model.connect('px.x', 'comp.x')
 
-        prob.model.add_design_var('px.x', lower=-100, upper=100)
+        prob.model.add_design_var('comp.x', lower=-100, upper=100)
         prob.model.add_objective('comp.y')
 
         prob.setup(force_alloc_complex=True)
 
         prob.run_model()
 
-        prob.compute_totals(of=['comp.y'], wrt=['px.x'])
+        prob.compute_totals(of=['comp.y'], wrt=['comp.x'])
 
 
 class ApproxTotalsFeature(unittest.TestCase):
@@ -2108,7 +2108,9 @@ class ApproxTotalsFeature(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
-        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
+
+        model.set_input_defaults('x', 0.0)
+
         model.add_subsystem('comp1', CompOne(), promotes=['x', 'y'])
         comp2 = model.add_subsystem('comp2', CompTwo(), promotes=['y', 'z'])
 
@@ -2156,7 +2158,8 @@ class ApproxTotalsFeature(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
-        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
+        model.set_input_defaults('x', 0.0)
+
         model.add_subsystem('comp1', CompOne(), promotes=['x', 'y'])
         model.add_subsystem('comp2', CompTwo(), promotes=['y', 'z'])
 
@@ -2180,7 +2183,7 @@ class ApproxTotalsFeature(unittest.TestCase):
         class CompOne(om.ExplicitComponent):
 
             def setup(self):
-                self.add_input('x', val=0.0)
+                self.add_input('x', val=1.0)
                 self.add_output('y', val=np.zeros(25))
                 self._exec_count = 0
 
@@ -2203,7 +2206,6 @@ class ApproxTotalsFeature(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
-        model.add_subsystem('p1', om.IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('comp1', CompOne(), promotes=['x', 'y'])
         model.add_subsystem('comp2', CompTwo(), promotes=['y', 'z'])
 

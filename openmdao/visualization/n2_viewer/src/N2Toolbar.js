@@ -261,29 +261,22 @@ class N2Toolbar {
                 self._setRootButton(target);
             });
 
-        new N2ToolbarButtonClick('#show-connections', tooltipBox,
-            "Set connections visibility",
-            function (target) {
-                n2ui.n2Diag.showArrows();
-                self._setRootButton(target);
-            });
-
         new N2ToolbarButtonClick('#hide-connections', tooltipBox,
-            "Hide all connection arrows",
+            "Remove all connection arrows",
             function (target) {
                 n2ui.n2Diag.clearArrows();
                 self._setRootButton(target);
             });
 
-        new N2ToolbarButtonClick('#show-connections-2', tooltipBox,
-            "Show pinned connection arrows",
+        new N2ToolbarButtonClick('#hide-connections-2', tooltipBox,
+            "Remove all connection arrows",
             function (target) {
-                n2ui.n2Diag.showArrows();
+                n2ui.n2Diag.clearArrows();
                 self._setRootButton(target);
             });
 
         new N2ToolbarButtonClick('#show-all-connections', tooltipBox,
-            "Show all connections in model",
+            "Show all connections in view",
             function (target) {
                 n2ui.n2Diag.showAllArrows();
                 self._setRootButton(target);

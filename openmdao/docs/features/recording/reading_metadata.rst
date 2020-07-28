@@ -21,8 +21,11 @@ a `CaseReader`.
 System Options
 --------------
 
-Systems record both scaling factors and options within 'scaling_factors' and 'component_options',
-respectively, in :code:`system_options`.
+All case recorders record the component options and scaling factors for all systems in the model.
+These values are accessible using code such as this, where :code:`cr` is a case reader object.
+
+    - :code:`cr.system_options['root']['component_options']`
+    - :code:`cr.system_options['root']['scaling_factors']`
 
 The component options include user-defined options that were defined
 through the :code:`system.options.declare` method. By default, everything in options is
@@ -32,9 +35,6 @@ to record, they can be excluded using the 'options_excludes' recording option on
 .. embed-code::
     openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_recording_system_options
     :layout: interleave
-
-.. note::
-    Each system object must have a recorder explicitly attached in order for its metadata and options to be recorded.
 
 
 Solver Metadata

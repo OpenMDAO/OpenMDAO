@@ -10,8 +10,7 @@ Optimization of Paraboloid
 
 
 To start out, we'll reuse the :code:`Paraboloid` component that we defined in the :ref:`previous tutorial <tutorial_paraboloid_analysis>`.
-We'll add that component, along with an :ref:`IndepVarComp <comp-type-1-indepvarcomp>`, to construct our model
-inside a :ref:`Problem <feature_run_your_model>`.
+We'll add that component to construct our model inside a :ref:`Problem <feature_run_your_model>`.
 You've already used :code:`Problem` in the run script from the previous tutorial on the paraboloid analysis,
 but we'll take a closer look now.
 
@@ -62,18 +61,17 @@ Defining the Design Variables and Objective
 ---------------------------------------------------------------
 
 Next, we set up the problem formulation so that the optimizer knows what to vary and which objective to optimize.
-In these calls, we are always going to be specifying a single variable. For :ref:`add_design_var <feature_add_design_var>`,
-the variable will always be the output of an :ref:`IndepVarComp <comp-type-1-indepvarcomp>`.
+In these calls, we are going to be specifying a single variable. For :ref:`add_design_var <feature_add_design_var>`,
+the variable will be a component input. If the input is promoted, then it will be the promoted name.
 For :ref:`add_objective <feature_add_objective>` and :ref:`add_constraint <feature_add_constraint>`
-the variable can be the output of any component (including an :code:`IndepVarComp`).
+the variable can be the output of any component.
 
 .. code::
 
-        prob.model.add_design_var('indeps.x', lower=-50, upper=50)
-        prob.model.add_design_var('indeps.y', lower=-50, upper=50)
-        prob.model.add_objective('paraboloid.f_xy')
-        prob.model.add_constraint('const.g', lower=0, upper 10.)
-        #prob.model.add_constraint('const.g', equals=0.)
+        prob.model.add_design_var('x', lower=-50, upper=50)
+        prob.model.add_design_var('y', lower=-50, upper=50)
+        prob.model.add_objective('parab.f_xy')
+        prob.model.add_constraint('const.g', lower=0, upper=10.)
 
 .. note::
 

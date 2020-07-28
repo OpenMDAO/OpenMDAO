@@ -15,6 +15,7 @@ from openmdao.utils.mpi import MPI
 
 # Note: The following class definitions are used in feature docs
 
+
 class RectangleComp(om.ExplicitComponent):
     """
     A simple Explicit Component that computes the area of a rectangle.
@@ -74,17 +75,8 @@ class RectangleJacVec(RectangleComp):
 class RectangleGroup(om.Group):
 
     def setup(self):
-        comp1 = self.add_subsystem('comp1', om.IndepVarComp())
-        comp1.add_output('length', 1.0)
-        comp1.add_output('width', 1.0)
-
-        self.add_subsystem('comp2', RectanglePartial())
-        self.add_subsystem('comp3', RectangleJacVec())
-
-        self.connect('comp1.length', 'comp2.length')
-        self.connect('comp1.length', 'comp3.length')
-        self.connect('comp1.width', 'comp2.width')
-        self.connect('comp1.width', 'comp3.width')
+        self.add_subsystem('comp1', RectanglePartial(), promotes_inputs=['width', 'length'])
+        self.add_subsystem('comp2', RectangleJacVec(), promotes_inputs=['width', 'length'])
 
 
 class ExplCompTestCase(unittest.TestCase):
@@ -122,38 +114,36 @@ class ExplCompTestCase(unittest.TestCase):
         else:
             self.fail("Exception expected")
 
-        prob['comp1.length'] = 3.
-        prob['comp1.width'] = 2.
+        prob.set_val('length', 3.)
+        prob.set_val('width', 2.)
         prob.run_model()
+        assert_near_equal(prob['comp1.area'], 6.)
         assert_near_equal(prob['comp2.area'], 6.)
-        assert_near_equal(prob['comp3.area'], 6.)
 
         # total derivs
         total_derivs = prob.compute_totals(
-            wrt=['comp1.length', 'comp1.width'],
-            of=['comp2.area', 'comp3.area']
+            wrt=['length', 'width'],
+            of=['comp1.area', 'comp2.area']
         )
-        assert_near_equal(total_derivs['comp2.area', 'comp1.length'], [[2.]])
-        assert_near_equal(total_derivs['comp3.area', 'comp1.length'], [[2.]])
-        assert_near_equal(total_derivs['comp2.area', 'comp1.width'], [[3.]])
-        assert_near_equal(total_derivs['comp3.area', 'comp1.width'], [[3.]])
+        assert_near_equal(total_derivs['comp1.area', 'length'], [[2.]])
+        assert_near_equal(total_derivs['comp2.area', 'length'], [[2.]])
+        assert_near_equal(total_derivs['comp1.area', 'width'], [[3.]])
+        assert_near_equal(total_derivs['comp2.area', 'width'], [[3.]])
 
         # list inputs
         inputs = prob.model.list_inputs(out_stream=None)
         self.assertEqual(sorted(inputs), [
+            ('comp1.length', {'value': [3.]}),
+            ('comp1.width',  {'value': [2.]}),
             ('comp2.length', {'value': [3.]}),
             ('comp2.width',  {'value': [2.]}),
-            ('comp3.length', {'value': [3.]}),
-            ('comp3.width',  {'value': [2.]}),
         ])
 
         # list explicit outputs
         outputs = prob.model.list_outputs(implicit=False, out_stream=None)
         self.assertEqual(sorted(outputs), [
-            ('comp1.length', {'value': [3.]}),
-            ('comp1.width',  {'value': [2.]}),
+            ('comp1.area',   {'value': [6.]}),
             ('comp2.area',   {'value': [6.]}),
-            ('comp3.area',   {'value': [6.]}),
         ])
 
         # list states
@@ -897,8 +887,7 @@ class ExplCompTestCase(unittest.TestCase):
             prob.run_model()
 
         self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'length' in input vector "
-                         "when it is read only.")
+                         "BadComp (<model>): Attempt to set value of 'length' in input vector when it is read only.")
 
     def test_compute_inputs_read_only_reset(self):
         class BadComp(TestExplCompSimple):
@@ -928,7 +917,7 @@ class ExplCompTestCase(unittest.TestCase):
             prob.check_partials()
 
         self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'length' in input vector "
+                         "BadComp (<model>): Attempt to set value of 'length' in input vector "
                          "when it is read only.")
 
     def test_compute_partials_inputs_read_only_reset(self):
@@ -961,7 +950,7 @@ class ExplCompTestCase(unittest.TestCase):
             prob.check_partials()
 
         self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'length' in input vector "
+                         "BadComp (<model>): Attempt to set value of 'length' in input vector "
                          "when it is read only.")
 
     def test_compute_jacvec_product_inputs_read_only_reset(self):

@@ -317,23 +317,20 @@ class TestLinearSystemComp(unittest.TestCase):
         A = np.array([[5.0, -3.0, 2.0], [1.0, 7.0, -4.0], [1.0, 0.0, 8.0]])
         b = np.array([1.0, 2.0, -3.0])
 
-        model.add_subsystem('p1', om.IndepVarComp('A', A))
-        model.add_subsystem('p2', om.IndepVarComp('b', b))
-
         lingrp = model.add_subsystem('lingrp', om.Group(), promotes=['*'])
         lingrp.add_subsystem('lin', om.LinearSystemComp(size=3))
 
-        model.connect('p1.A', 'lin.A')
-        model.connect('p2.b', 'lin.b')
-
         prob = om.Problem(model)
         prob.setup()
+
+        prob.set_val('lin.A', A)
+        prob.set_val('lin.b', b)
 
         lingrp.linear_solver = om.ScipyKrylov()
 
         prob.run_model()
 
-        assert_near_equal(prob['lin.x'], np.array([0.36423841, -0.00662252, -0.4205298 ]), .0001)
+        assert_near_equal(prob.get_val('lin.x'), np.array([0.36423841, -0.00662252, -0.4205298 ]), .0001)
 
     def test_feature_vectorized(self):
         import numpy as np
@@ -345,23 +342,20 @@ class TestLinearSystemComp(unittest.TestCase):
         A = np.array([[5.0, -3.0, 2.0], [1.0, 7.0, -4.0], [1.0, 0.0, 8.0]])
         b = np.array([[2.0, -3.0, 4.0], [1.0, 0.0, -1.0]])
 
-        model.add_subsystem('p1', om.IndepVarComp('A', A))
-        model.add_subsystem('p2', om.IndepVarComp('b', b))
-
         lingrp = model.add_subsystem('lingrp', om.Group(), promotes=['*'])
         lingrp.add_subsystem('lin', om.LinearSystemComp(size=3, vec_size=2))
 
-        model.connect('p1.A', 'lin.A')
-        model.connect('p2.b', 'lin.b')
-
         prob = om.Problem(model)
         prob.setup()
+
+        prob.set_val('lin.A', A)
+        prob.set_val('lin.b', b)
 
         lingrp.linear_solver = om.ScipyKrylov()
 
         prob.run_model()
 
-        assert_near_equal(prob['lin.x'], np.array([[ 0.10596026, -0.16556291,  0.48675497],
+        assert_near_equal(prob.get_val('lin.x'), np.array([[ 0.10596026, -0.16556291,  0.48675497],
                                                         [ 0.19205298, -0.11258278, -0.14900662]]),
                          .0001)
 
@@ -376,23 +370,20 @@ class TestLinearSystemComp(unittest.TestCase):
                       [[2.0, 3.0, 4.0], [1.0, -1.0, -2.0], [3.0, 2.0, -2.0]]])
         b = np.array([[-5.0, 2.0, 3.0], [-1.0, 1.0, -3.0]])
 
-        model.add_subsystem('p1', om.IndepVarComp('A', A))
-        model.add_subsystem('p2', om.IndepVarComp('b', b))
-
         lingrp = model.add_subsystem('lingrp', om.Group(), promotes=['*'])
         lingrp.add_subsystem('lin', om.LinearSystemComp(size=3, vec_size=2, vectorize_A=True))
 
-        model.connect('p1.A', 'lin.A')
-        model.connect('p2.b', 'lin.b')
-
         prob = om.Problem(model)
         prob.setup()
+
+        prob.set_val('lin.A', A)
+        prob.set_val('lin.b', b)
 
         lingrp.linear_solver = om.ScipyKrylov()
 
         prob.run_model()
 
-        assert_near_equal(prob['lin.x'], np.array([[-0.78807947,  0.66887417,  0.47350993],
+        assert_near_equal(prob.get_val('lin.x'), np.array([[-0.78807947,  0.66887417,  0.47350993],
                                                         [ 0.7       , -1.8       ,  0.75      ]]),
                          .0001)
 

@@ -434,7 +434,7 @@ class ExecComp(ExplicitComponent):
             Contains sub-jacobians.
         """
         step = self.complex_stepsize * 1j
-        out_names = self._var_allprocs_prom2abs_list['output']
+        out_names = self._var_rel_names['output']
         inv_stepsize = 1.0 / self.complex_stepsize
         has_diag_partials = self.options['has_diag_partials']
 
@@ -452,7 +452,7 @@ class ExecComp(ExplicitComponent):
                 uwrap = _TmpDict(self._outputs, return_complex=True)
 
                 # solve with complex param value
-                self._residuals.set_const(0.0)
+                self._residuals.set_val(0.0)
                 self.compute(pwrap, uwrap)
 
                 for u in out_names:
@@ -468,7 +468,7 @@ class ExecComp(ExplicitComponent):
                     uwrap = _TmpDict(self._outputs, return_complex=True)
 
                     # solve with complex param value
-                    self._residuals.set_const(0.0)
+                    self._residuals.set_val(0.0)
                     self.compute(pwrap, uwrap)
 
                     for u in out_names:

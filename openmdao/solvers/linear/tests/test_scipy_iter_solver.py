@@ -47,15 +47,15 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
 
         # forward
-        d_residuals.set_const(1.0)
-        d_outputs.set_const(0.0)
+        d_residuals.set_val(1.0)
+        d_outputs.set_val(0.0)
         group.run_solve_linear(['linear'], 'fwd')
         output = d_outputs._data
         assert_near_equal(output, group.expected_solution, 1e-15)
 
         # reverse
-        d_outputs.set_const(1.0)
-        d_residuals.set_const(0.0)
+        d_outputs.set_val(1.0)
+        d_residuals.set_val(0.0)
         group.run_solve_linear(['linear'], 'rev')
         output = d_residuals._data
         assert_near_equal(output, group.expected_solution, 1e-15)
@@ -76,15 +76,15 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
 
         # forward
-        d_residuals.set_const(1.0)
-        d_outputs.set_const(0.0)
+        d_residuals.set_val(1.0)
+        d_outputs.set_val(0.0)
         group.run_solve_linear(['linear'], 'fwd')
 
         self.assertTrue(group.linear_solver._iter_count == 2)
 
         # reverse
-        d_outputs.set_const(1.0)
-        d_residuals.set_const(0.0)
+        d_outputs.set_val(1.0)
+        d_residuals.set_val(0.0)
         group.run_solve_linear(['linear'], 'rev')
 
         self.assertTrue(group.linear_solver._iter_count == 2)
@@ -111,8 +111,8 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         # forward
         d_inputs, d_outputs, d_residuals = g1.get_linear_vectors()
 
-        d_residuals.set_const(1.0)
-        d_outputs.set_const(0.0)
+        d_residuals.set_val(1.0)
+        d_outputs.set_val(0.0)
         g1.run_solve_linear(['linear'], 'fwd')
 
         output = d_outputs._data
@@ -121,8 +121,8 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         # reverse
         d_inputs, d_outputs, d_residuals = g1.get_linear_vectors()
 
-        d_outputs.set_const(1.0)
-        d_residuals.set_const(0.0)
+        d_outputs.set_val(1.0)
+        d_residuals.set_val(0.0)
         g1.linear_solver._linearize()
         g1.run_solve_linear(['linear'], 'rev')
 
@@ -226,9 +226,6 @@ class TestScipyKrylovFeature(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
-
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
@@ -244,6 +241,10 @@ class TestScipyKrylovFeature(unittest.TestCase):
         model.linear_solver = om.ScipyKrylov()
 
         prob.setup()
+
+        prob.set_val('x', 1.)
+        prob.set_val('z', np.array([5.0, 2.0]))
+
         prob.run_model()
 
         wrt = ['z']
@@ -262,9 +263,6 @@ class TestScipyKrylovFeature(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
-
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
@@ -281,6 +279,10 @@ class TestScipyKrylovFeature(unittest.TestCase):
         model.linear_solver.options['maxiter'] = 3
 
         prob.setup()
+
+        prob.set_val('x', 1.)
+        prob.set_val('z', np.array([5.0, 2.0]))
+
         prob.run_model()
 
         wrt = ['z']
@@ -299,9 +301,6 @@ class TestScipyKrylovFeature(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
-
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
@@ -318,6 +317,10 @@ class TestScipyKrylovFeature(unittest.TestCase):
         model.linear_solver.options['atol'] = 1.0e-20
 
         prob.setup()
+
+        prob.set_val('x', 1.)
+        prob.set_val('z', np.array([5.0, 2.0]))
+
         prob.run_model()
 
         wrt = ['z']
@@ -361,8 +364,8 @@ class TestScipyKrylovFeature(unittest.TestCase):
         prob.set_solver_print(level=2)
         prob.run_model()
 
-        assert_near_equal(prob['sub1.q1.x'], 1.996, .0001)
-        assert_near_equal(prob['sub2.q2.x'], 1.996, .0001)
+        assert_near_equal(prob.get_val('sub1.q1.x'), 1.996, .0001)
+        assert_near_equal(prob.get_val('sub2.q2.x'), 1.996, .0001)
 
 
 if __name__ == "__main__":
