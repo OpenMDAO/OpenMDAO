@@ -725,6 +725,34 @@ class TestGroup(unittest.TestCase):
         assert_near_equal(p['row1_comp.x'], arr_large_4x4[0, ...])
         assert_near_equal(p['row4_comp.x'], arr_large_4x4[3, ...])
 
+    def test_om_slice_4D_with_ellipsis_in_connect(self):
+
+        class SlicerComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones(shape=(5, 3)))
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])**2.0
+
+        p = om.Problem()
+
+        arr = np.random.randint(5, size=(3, 5, 3, 2))
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
+        p.model.add_subsystem('row1_comp', SlicerComp())
+        # p.model.add_subsystem('row4_comp', SlicerComp())
+
+        p.model.connect('indep.x', 'row1_comp.x', src_indices=om.slicer[2, ..., 1])
+        # p.model.connect('indep.x', 'row4_comp.x', src_indices=om.slicer[3, ..., 1])
+
+        p.setup()
+        p.run_model()
+
+        print(p.get_val('row1_comp.x'))
+        # assert_near_equal(p['row1_comp.x'], arr[2, ..., 1])
+        # assert_near_equal(p['row4_comp.x'], arr[3, ..., 1])
+
     def test_om_slice_with_ellipsis_in_promotes(self):
 
         p = om.Problem()

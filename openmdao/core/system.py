@@ -4204,6 +4204,7 @@ class System(object):
                 if not get_remote and distrib and src.startswith('_auto_ivc.'):
                     val = val.ravel()[src_indices - src_indices[0]]
                 else:
+                    print(src_indices)
                     val = val.ravel()[src_indices]
 
             if get_remote:

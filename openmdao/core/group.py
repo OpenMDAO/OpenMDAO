@@ -1324,11 +1324,12 @@ class Group(System):
                             simple_warning(msg)
 
                 elif src_indices is not None:
-                    shape = None
+                    shape = False
                     if _is_slice(src_indices) or _is_ellipsis(src_indices):
                         global_size = self._var_allprocs_abs2meta[abs_out]['global_size']
                         global_shape = self._var_allprocs_abs2meta[abs_out]['global_shape']
                         src_indices = _slice_indices(src_indices, global_size, global_shape)
+                        shape = True
                     else:
                         src_indices = np.atleast_1d(src_indices)
 
