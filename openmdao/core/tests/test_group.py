@@ -741,16 +741,16 @@ class TestGroup(unittest.TestCase):
 
         p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
         p.model.add_subsystem('row1_comp', SlicerComp())
-        # p.model.add_subsystem('row4_comp', SlicerComp())
+        p.model.add_subsystem('row4_comp', SlicerComp())
 
-        p.model.connect('indep.x', 'row1_comp.x', src_indices=om.slicer[2, ..., 1])
-        # p.model.connect('indep.x', 'row4_comp.x', src_indices=om.slicer[3, ..., 1])
+        p.model.connect('indep.x', 'row1_comp.x', src_indices=om.slicer[1, ..., 1])
+        p.model.connect('indep.x', 'row4_comp.x', src_indices=om.slicer[2, ..., 1])
 
         p.setup()
         p.run_model()
 
-        assert_near_equal(p.get_val('row1_comp.x'), arr[2, ..., 1])
-        # assert_near_equal(p.get_val('row4_comp.x'), arr[3, ..., 1])
+        assert_near_equal(p.get_val('row1_comp.x'), arr[1, ..., 1])
+        assert_near_equal(p.get_val('row4_comp.x'), arr[2, ..., 1])
 
     def test_om_slice_with_ellipsis_in_promotes(self):
 
