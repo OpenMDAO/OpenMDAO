@@ -3048,7 +3048,9 @@ class TestNaturalNamingMPI(unittest.TestCase):
         g3a = g2a.add_subsystem('g3', om.Group())
         g4a = g3a.add_subsystem('g4', om.Group(), promotes=['*'])
         c1 = g4a.add_subsystem('c1', om.ExecComp('y=2.0*x', x=7., y=9.), promotes=['x','y'])
-
+        
+        import wingdbstub
+        
         p.setup()
 
         for gtop in ['par.g1', 'par.g1a']:
@@ -3116,6 +3118,9 @@ class TestNaturalNamingMPI(unittest.TestCase):
                 p[name] = 9. + outcount
                 p.model.comm.barrier()
                 self.assertEqual(p.get_val(name, get_remote=True), 9. + outcount)
+                
+        self.assertEqual(p.model._gatherable_vars, 
+                         {'par.g1.g2.g3.g4.c1.x', 'par.g1a.g2.g3.g4.c1.x', 'par.g1.g2.g3.g4.c1.y', 'par.g1a.g2.g3.g4.c1.y'})
 
 
 if __name__ == "__main__":

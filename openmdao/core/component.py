@@ -9,7 +9,7 @@ from numpy import ndarray, isscalar, atleast_1d, atleast_2d, promote_types
 from scipy.sparse import issparse
 
 from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_META, \
-    _global_meta_names
+    global_meta_names
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.vectors.vector import INT_DTYPE, _full_slice
 from openmdao.utils.units import valid_units

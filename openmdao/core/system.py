@@ -1287,6 +1287,8 @@ class System(object):
         self._var_allprocs_abs2meta = {}
         self._var_abs2meta = {}
         self._var_allprocs_abs2idx = {}
+        self._gatherable_vars = set()
+        self._owning_rank = defaultdict(int)
 
     def _setup_var_index_maps(self):
         """
@@ -1314,7 +1316,6 @@ class System(object):
         """
         self._var_sizes = {}
         self._owned_sizes = None
-        self._owning_rank = defaultdict(int)
 
     def _setup_global_shapes(self):
         """
@@ -3114,19 +3115,19 @@ class System(object):
         need_gather = get_remote and self.comm.size > 1
         need_local_meta = (metadata_keys is None or 'value' in metadata_keys or
                            'src_indices' in metadata_keys)
-        if not need_local_meta:
+        if need_local_meta:
+            metadict = loc2meta
+            disc_metadict = self._var_discrete
+        else:
             metadict = all2meta
             disc_metadict = self._var_allprocs_discrete
             need_gather = False  # we can get everything from global dict without gathering
-        else:
-            metadict = loc2meta
-            disc_metadict = self._var_discrete
 
         for iotype in iotypes:
             disc2meta = disc_metadict[iotype]
 
             for abs_name, prom in self._var_filtered_iter(iotype, includes=includes,
-                                                          excludes=excludes, get_remote):
+                                                          excludes=excludes, get_remote=get_remote):
                 rel_name = abs_name[rel_idx:]
 
                 if abs_name in all2meta:  # continuous
@@ -3222,7 +3223,7 @@ class System(object):
         keynames = ['value', 'units', 'shape', 'global_shape', 'desc', 'tags']
         keyvals = [metavalues, units, shape, global_shape, desc, tags is not None]
         keys = [keynames[i] for i in len(keynames) if keyvals[i]]
-        inputs = self.get_io_metadata(iotypes=('input',), keys, includes, excludes, all_procs, 0)
+        inputs = self.get_io_metadata(('input',), keys, includes, excludes, all_procs, 0)
 
         if out_stream is _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
