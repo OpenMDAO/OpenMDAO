@@ -4,6 +4,7 @@ Unit tests for Group.
 
 import itertools
 import unittest
+import warnings
 
 import numpy as np
 
@@ -17,7 +18,7 @@ from openmdao.test_suite.components.sellar import SellarDis2
 from openmdao.utils.mpi import MPI
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.logger_utils import TestLogger
-from openmdao.utils.general_utils import ignore_errors_context
+from openmdao.utils.general_utils import ignore_errors_context, reset_warning_registry
 from openmdao.utils.name_maps import name2abs_names
 
 try:
@@ -2163,7 +2164,7 @@ class TestGroupAddInput(unittest.TestCase):
            p.setup()
 
         self.assertEqual(cm.exception.args[0],
-                         "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but the metadata entries ['units', 'value'] differ. Call <group>.set_input_defaults('x', units=?, value=?), where <group> is the Group named 'par' to remove the ambiguity.")
+                         "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but their metadata entries ['units', 'value'] differ. Call <group>.set_input_defaults('x', units=?, value=?), where <group> is the Group named 'par' to remove the ambiguity.")
 
     def test_missing_diff_vals(self):
         p = om.Problem()
@@ -2177,11 +2178,11 @@ class TestGroupAddInput(unittest.TestCase):
            p.setup()
 
         self.assertEqual(cm.exception.args[0],
-                         "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but the metadata entries ['value'] differ. Call <group>.set_input_defaults('x', value=?), where <group> is the Group named 'par' to remove the ambiguity.")
+                         "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but their metadata entries ['value'] differ. Call <group>.set_input_defaults('x', value=?), where <group> is the Group named 'par' to remove the ambiguity.")
 
     def test_conflicting_units(self):
         # multiple Group.set_input_defaults calls at same tree level with conflicting units args
-        p = self._make_tree_model(diff_units=True)
+        p = self._make_tree_model()
         model = p.model
         g2 = model._get_subsystem('G1.G2')
         g2.set_input_defaults('x', units='ft')
@@ -2198,14 +2199,14 @@ class TestGroupAddInput(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             p.setup()
 
-        self.assertEqual(cm.exception.args[0], "Groups 'par.G4' and 'par.G5' added the input 'x' with conflicting 'units'.")
+        self.assertEqual(cm.exception.args[0], "Group (<model>): The subsystems G1.G2 and par.G4 called set_input_defaults for promoted input 'x' with conflicting values for 'units'. Call <group>.set_input_defaults('x', units=?), where <group> is the model to remove the ambiguity.")
 
     def test_conflicting_units_multi_level(self):
         # multiple Group.set_input_defaults calls at different tree levels with conflicting units args
         p = self._make_tree_model(diff_units=True)
         model = p.model
         g2 = model._get_subsystem('G1.G2')
-        g2.set_input_defaults('x', units='ft')
+        g2.set_input_defaults('x', units='km')
 
         g3 = model._get_subsystem('G1.G3')
         g3.set_input_defaults('x', units='ft')
@@ -2222,7 +2223,74 @@ class TestGroupAddInput(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             p.setup()
 
-        self.assertEqual(cm.exception.args[0], "Groups 'G1' and 'G1.G2' added the input 'x' with conflicting 'units'.")
+        self.assertEqual(cm.exception.args[0], "Group (<model>): The subsystems G1 and par.G4 called set_input_defaults for promoted input 'x' with conflicting values for 'units'. Call <group>.set_input_defaults('x', units=?), where <group> is the model to remove the ambiguity.")
+
+    def test_override_units(self):
+        # multiple Group.set_input_defaults calls at different tree levels with conflicting units args
+        p = self._make_tree_model()
+        model = p.model
+        g2 = model._get_subsystem('G1.G2')
+        g2.set_input_defaults('x', units='km')
+
+        g1 = model._get_subsystem('G1')
+        g1.set_input_defaults('x', units='inch', val=2.)
+
+        msg = "Groups 'G1' and 'G1.G2' called set_input_defaults for the input 'x' with conflicting 'units'. The value (inch) from 'G1' will be used."
+        with assert_warning(UserWarning, msg):
+            p.setup()
+
+    def test_sub_sub_override(self):
+        p = om.Problem()
+        model = p.model
+        G1 = model.add_subsystem('G1', om.Group())
+        G1.set_input_defaults('x', units='mm', val=1.)
+        G2 = G1.add_subsystem('G2', om.Group(), promotes=['x'])
+        G3 = G2.add_subsystem('G3', om.Group(), promotes=['x'])
+        G3.add_subsystem('C1', om.ExecComp('y = 3.*x', x={'units': 'm'}), promotes=['x'])
+        G3.add_subsystem('C2', om.ExecComp('y = 4.*x', x={'units': 'cm'}), promotes=['x'])
+        G3.set_input_defaults('x', units='cm')
+        msg = "Groups 'G1' and 'G1.G2.G3' called set_input_defaults for the input 'x' with conflicting 'units'. The value (mm) from 'G1' will be used."
+        with assert_warning(UserWarning, msg):
+            p.setup()
+
+    def test_sub_sets_parent_meta(self):
+        p = om.Problem()
+        model = p.model
+        G1 = model.add_subsystem('G1', om.Group())
+        G1.set_input_defaults('x', val=2.)
+        G2 = G1.add_subsystem('G2', om.Group(), promotes=['x'])
+        G2.add_subsystem('C1', om.ExecComp('y = 3.*x', x={'units': 'm'}), promotes=['x'])
+        G2.set_input_defaults('x', units='cm')
+        msg = "Group 'G1' did not set a default 'units' for input 'x', so the value of (cm) from group 'G1.G2' will be used."
+        with assert_warning(UserWarning, msg):
+            p.setup()
+
+    def test_sub_sub_override2(self):
+        p = om.Problem()
+        model = p.model
+        G1 = model.add_subsystem('G1', om.Group())
+        G1.set_input_defaults('x', units='mm', val=1.)
+        G2 = G1.add_subsystem('G2', om.Group(), promotes=['x'])
+        G2.set_input_defaults('x', units='km')
+        G3 = G2.add_subsystem('G3', om.Group(), promotes=['x'])
+        G3.add_subsystem('C1', om.ExecComp('y = 3.*x', x={'units': 'm'}), promotes=['x'])
+        G3.add_subsystem('C2', om.ExecComp('y = 4.*x', x={'units': 'cm'}), promotes=['x'])
+        G3.set_input_defaults('x', units='cm')
+        msgs = [
+            "Groups 'G1' and 'G1.G2' called set_input_defaults for the input 'x' with conflicting 'units'. The value (mm) from 'G1' will be used.",
+            "Groups 'G1' and 'G1.G2.G3' called set_input_defaults for the input 'x' with conflicting 'units'. The value (mm) from 'G1' will be used."
+        ]
+        with reset_warning_registry():
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter("always")
+                p.setup()
+
+        for msg in msgs:
+            for warn in w:
+                if (issubclass(warn.category, UserWarning) and str(warn.message) == msg):
+                    break
+            else:
+                raise AssertionError("Did not see expected UserWarning: %s" % msg)
 
     def test_conflicting_units_multi_level_par(self):
         # multiple Group.set_input_defaults calls at different tree levels with conflicting units args
@@ -2246,7 +2314,7 @@ class TestGroupAddInput(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             p.setup()
 
-        self.assertEqual(cm.exception.args[0], "Groups 'par' and 'par.G4' added the input 'x' with conflicting 'units'.")
+        self.assertEqual(cm.exception.args[0], "Group (<model>): The subsystems G1.G2 and par called set_input_defaults for promoted input 'x' with conflicting values for 'units'. Call <group>.set_input_defaults('x', units=?), where <group> is the model to remove the ambiguity.")
 
     def test_group_input_not_found(self):
         p = self._make_tree_model(diff_units=True)
@@ -2266,7 +2334,7 @@ class TestGroupAddInput(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             p.setup()
 
-        self.assertEqual(cm.exception.args[0], "Group (G1.G2): The following group inputs could not be found: ['xx'].")
+        self.assertEqual(cm.exception.args[0], "Group (G1.G2): The following group inputs, passed to set_input_defaults(), could not be found: ['xx'].")
 
     def test_conflicting_val(self):
         p = self._make_tree_model(diff_vals=True)
@@ -2289,7 +2357,7 @@ class TestGroupAddInput(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             p.setup()
 
-        self.assertEqual(cm.exception.args[0], "Groups 'G1' and 'G1.G2' added the input 'x' with conflicting 'value'.")
+        self.assertEqual(cm.exception.args[0], "Group (<model>): The subsystems G1 and par.G4 called set_input_defaults for promoted input 'x' with conflicting values for 'value'. Call <group>.set_input_defaults('x', value=?), where <group> is the model to remove the ambiguity.")
 
 
 #

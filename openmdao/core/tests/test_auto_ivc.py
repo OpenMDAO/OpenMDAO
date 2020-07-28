@@ -206,7 +206,7 @@ class SerialTests(unittest.TestCase):
         try:
             p.setup()
         except Exception as err:
-            self.assertEqual(str(err), "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but the metadata entries ['value'] differ. Call <group>.set_input_defaults('x', value=?), where <group> is the Group named 'par' to remove the ambiguity.")
+            self.assertEqual(str(err), "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but their metadata entries ['value'] differ. Call <group>.set_input_defaults('x', value=?), where <group> is the Group named 'par' to remove the ambiguity.")
         else:
             self.fail("Exception expected.")
 

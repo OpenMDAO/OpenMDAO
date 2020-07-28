@@ -441,7 +441,7 @@ class Problem(object):
         if abs_names:
             n_proms = len(abs_names)  # for output this will never be > 1
             if n_proms > 1 and name in ginputs:
-                abs_name = ginputs[name].get('use_tgt', abs_names[0])
+                abs_name = ginputs[name][0].get('use_tgt', abs_names[0])
             else:
                 abs_name = abs_names[0]
         else:
@@ -459,7 +459,7 @@ class Problem(object):
                 else:
                     tlocmeta = None
 
-                gunits = ginputs[name].get('units') if name in ginputs else None
+                gunits = ginputs[name][0].get('units') if name in ginputs else None
                 if n_proms > 1:  # promoted input name was used
                     if gunits is None:
                         tunit_list = [all_meta[n]['units'] for n in abs_names]
