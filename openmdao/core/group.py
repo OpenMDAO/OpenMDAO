@@ -812,7 +812,8 @@ class Group(System):
             locs = {}
             locs_disc = {}
             for type_ in ('input', 'output'):
-                locs[type_] = np.array([n in abs2meta for n in allprocs_abs_names[type_]], dtype=bool)
+                locs[type_] = np.array([n in abs2meta and abs2meta[n]['size'] > 0
+                                        for n in allprocs_abs_names[type_]], dtype=bool)
                 locs_disc[type_] = np.array([
                     n in abs2prom[type_] for n in allprocs_abs_names_discrete[type_]
                 ], dtype=bool)
@@ -820,7 +821,7 @@ class Group(System):
             raw_locs = (locs, locs_disc)
             allprocs_raw_locs = self.comm.allgather(raw_locs)
             last_rank = self.comm.size - 1
-            owns = self._owning_rank
+            # owns = self._owning_rank
             for type_ in ('input', 'output'):
                 own_arr = np.zeros(len(allprocs_abs_names[type_]), dtype=int)
                 own_arr_disc = np.zeros(len(allprocs_abs_names_discrete[type_]), dtype=int)
@@ -838,12 +839,12 @@ class Group(System):
                 for i, n in enumerate(allprocs_abs_names[type_]):
                     if not all_locs[i]:
                         gatherable.add(n)
-                    owns[n] = own_arr[i]
+                    # owns[n] = own_arr[i]
 
                 for i, n in enumerate(allprocs_abs_names_discrete[type_]):
                     if not all_locs_disc[i]:
                         gatherable.add(n)
-                    owns[n] = own_arr_disc[i]
+                    # owns[n] = own_arr_disc[i]
 
         for prom_name, abs_list in allprocs_prom2abs_list['output'].items():
             if len(abs_list) > 1:
@@ -970,24 +971,24 @@ class Group(System):
 
             # compute owning ranks and owned sizes
             abs2meta = self._var_allprocs_abs2meta
-            # owns = self._owning_rank
+            owns = self._owning_rank
             self._owned_sizes = self._var_sizes[vec_names[0]]['output'].copy()
             for type_ in ('input', 'output'):
                 sizes = self._var_sizes[vec_names[0]][type_]
                 for i, name in enumerate(self._var_allprocs_abs_names[type_]):
                     for rank in range(self.comm.size):
                         if sizes[rank, i] > 0:
-                            # owns[name] = rank
+                            owns[name] = rank
                             if type_ == 'output' and not abs2meta[name]['distributed']:
                                 self._owned_sizes[rank + 1:, i] = 0  # zero out all dups
                             break
 
-                # if self._var_allprocs_discrete[type_]:
-                #     local = list(self._var_discrete[type_])
-                #     for i, names in enumerate(self.comm.allgather(local)):
-                #         for n in names:
-                #             if n not in owns:
-                #                 owns[n] = i
+                if self._var_allprocs_discrete[type_]:
+                    local = list(self._var_discrete[type_])
+                    for i, names in enumerate(self.comm.allgather(local)):
+                        for n in names:
+                            if n not in owns:
+                                owns[n] = i
         else:
             self._owned_sizes = self._var_sizes[vec_names[0]]['output']
             self._vector_class = self._local_vector_class

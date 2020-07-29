@@ -1342,7 +1342,7 @@ class System(object):
                         dim1 = global_size // high_size
                         if global_size % high_size != 0:
                             raise RuntimeError("%s: Global size of output '%s' (%s) does not agree "
-                                            "with local shape %s" % (self.msginfo, abs_name,
+                                               "with local shape %s" % (self.msginfo, abs_name,
                                                                         global_size, local_shape))
                         mymeta['global_shape'] = tuple([dim1] + list(high_dims))
                     else:
@@ -3099,9 +3099,45 @@ class System(object):
                 yield tup
 
     def get_io_metadata(self, iotypes=('input', 'output'), metadata_keys=None,
-                        includes=None, excludes=(), get_remote=False, rank=None,
+                        includes=None, excludes=(), tags=(), get_remote=False, rank=None,
                         return_rel_names=True):
         """
+        Retrieve metdata for a filtered list of variables.
+
+        Parameters
+        ----------
+        iotypes : iter of str
+            Will contain either 'input', 'output', or both.  Defaults to both.
+        metadata_keys : iter of str or None
+            Names of metadata entries to be retrieved or None, meaning retrieve all
+            available metadata.
+        includes : None or iter of str
+            Collection of glob patterns for pathnames of variables to include. Default is None,
+            which includes all variables.
+        excludes : None or iter of str
+            Collection of glob patterns for pathnames of variables to exclude. Default is ().
+        tags : str or iter of strs
+            User defined tags that can be used to filter what gets listed. Only inputs with the
+            given tags will be listed.
+            Default is None, which means there will be no filtering based on tags.
+        get_remote : bool
+            If True, retrieve variables from other MPI processes as well.
+        rank : int or None
+            If None, and get_remote is True, retrieve values from all MPI process to all other
+            MPI processes.  Otherwise, if get_remote is True, retrieve values from all MPI
+            processes only to the specified rank.
+        return_rel_names : bool
+            If True, the names returned will be relative to the scope of this System. Otherwise
+            they will be absolute names.
+
+        Yields
+        ------
+        tuple
+            A tuple of the form (name, metadata) where name is either absolute or relative
+            based on the value of the `return_rel_names` arg, and metadata is a dict containing
+            entries based on the value of the metadata_keys arg.  Every metadata dict will
+            always contain two entries, 'promoted_name' and 'discrete', to indicate a given
+            variable's promoted name and whether or not it is discrete.
         """
         prefix = self.pathname + '.' if self.pathname else ''
         rel_idx = len(prefix)
@@ -3123,6 +3159,9 @@ class System(object):
             disc_metadict = self._var_allprocs_discrete
             need_gather = False  # we can get everything from global dict without gathering
 
+        if tags:
+            tagset = make_set(tags)
+
         for iotype in iotypes:
             disc2meta = disc_metadict[iotype]
 
@@ -3131,27 +3170,73 @@ class System(object):
                 rel_name = abs_name[rel_idx:]
 
                 if abs_name in all2meta:  # continuous
-                    meta = metadict
+                    meta = metadict[abs_name] if abs_name in metadict else None
+                    distrib = all2meta[abs_name]['distributed']
                 else:  # discrete
                     if need_local_meta:  # use relative name for discretes
-                        meta = disc2meta[rel_name]
+                        meta = disc2meta[rel_name] if rel_name in disc2meta else None
                     else:
                         meta = disc2meta[abs_name]
+                    distrib = False
 
-                if metadata_keys is None:
-                    ret_meta = meta.copy()
-                    ret_meta['prom_name'] = prom
-                    ret_meta['discrete'] = not abs_name in all2meta
-                    yield (rel_name if return_rel_names else abs_name, ret_meta)
+                if meta is None:
+                    ret_meta = None
                 else:
-                    ret_meta = {
-                        'prom_name': prom,
-                        'discrete': not abs_name in all2meta
-                    }
-                    for key in metadata_keys:
-                        ret_meta[key] = meta[key]
+                    if metadata_keys is None:
+                        ret_meta = meta.copy()
+                    else:
+                        ret_meta = {}
+                        for key in metadata_keys:
+                            try:
+                                ret_meta[key] = meta[key]
+                            except KeyError:
+                                ret_meta[key] = 'Unavailable'
 
-                    yield (rel_name if return_rel_names else abs_name, ret_meta)
+                if need_gather:
+                    if rank is None:
+                        allproc_metas = self.comm.allgather(ret_meta)
+                    else:
+                        allproc_metas = self.comm.gather(ret_meta, root=rank)
+
+                    if rank is None or self.comm.rank == rank:
+                        if not ret_meta:
+                            ret_meta = {}
+                        if distrib:
+                            if 'value' in metadata_keys:
+                                # assemble the full distributed value
+                                dist_vals = [m['value'] for m in allproc_metas
+                                             if m is not None and m['value'].size > 0]
+                                if dist_vals:
+                                    ret_meta['value'] = np.concatenate(dist_vals)
+                                else:
+                                    ret_meta['value'] = np.zeros(0)
+                            if 'src_indices' in metadata_keys:
+                                # assemble full src_indices
+                                dist_src_inds = [m['src_indices'] for m in allproc_metas
+                                                 if m is not None and m['src_indices'].size > 0]
+                                if dist_src_inds:
+                                    ret_meta['src_indices'] = np.concatenate(dist_src_inds)
+                                else:
+                                    ret_meta['src_indices'] = np.zeros(0, dtype=INT_DTYPE)
+
+                        elif abs_name in self._gatherable_vars:
+                            for m in allproc_metas:
+                                if m is not None:
+                                    ret_meta = m
+                                    break
+                    else:
+                        ret_meta = None
+
+                if ret_meta is not None:
+                    ret_meta['prom_name'] = prom
+                    ret_meta['discrete'] = abs_name not in all2meta
+
+                    vname = rel_name if return_rel_names else abs_name
+
+                    if tags and not tagset & ret_meta['tags']:
+                        continue
+
+                    yield (vname, ret_meta)
 
     def list_inputs(self,
                     values=True,
@@ -3168,27 +3253,23 @@ class System(object):
                     all_procs=False,
                     out_stream=_DEFAULT_OUT_STREAM):
         """
-        Return and optionally log a list of input names and other optional information.
-
-        If the model is parallel, only the local variables are returned to the process.
-        Also optionally logs the information to a user defined output stream. If the model is
-        parallel, the rank 0 process logs information about all variables across all processes.
+        Write a list of input names and other optional information to a specified stream.
 
         Parameters
         ----------
         values : bool, optional
-            When True, display/return input values. Default is True.
+            When True, display input values. Default is True.
         prom_name : bool, optional
-            When True, display/return the promoted name of the variable.
+            When True, display the promoted name of the variable.
             Default is False.
         units : bool, optional
-            When True, display/return units. Default is False.
+            When True, display units. Default is False.
         shape : bool, optional
-            When True, display/return the shape of the value. Default is False.
+            When True, display the shape of the value. Default is False.
         global_shape : bool, optional
-            When True, display/return the global shape of the value. Default is False.
+            When True, display the global shape of the value. Default is False.
         desc : bool, optional
-            When True, display/return description. Default is False.
+            When True, display description. Default is False.
         hierarchical : bool, optional
             When True, human readable output shows variables in hierarchical format.
         print_arrays : bool, optional
@@ -3201,14 +3282,14 @@ class System(object):
             User defined tags that can be used to filter what gets listed. Only inputs with the
             given tags will be listed.
             Default is None, which means there will be no filtering based on tags.
-        includes : None or list_like
-            List of glob patterns for pathnames to include in the check. Default is None, which
-            includes all components in the model.
-        excludes : None or list_like
-            List of glob patterns for pathnames to exclude from the check. Default is None, which
-            excludes nothing.
+        includes : None or iter of str
+            Collection of glob patterns for pathnames of variables to include. Default is None,
+            which includes all input variables.
+        excludes : None or iter of str
+            Collection of glob patterns for pathnames of variables to exclude. Default is ().
         all_procs : bool, optional
-            When True, display output on all processors. Default is False.
+            When True, display output on all ranks. Default is False, which will display
+            output only from rank 0.
         out_stream : file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
@@ -3218,12 +3299,35 @@ class System(object):
         list
             list of input names and other optional information about those inputs
         """
-
         metavalues = values and self._inputs is None
         keynames = ['value', 'units', 'shape', 'global_shape', 'desc', 'tags']
         keyvals = [metavalues, units, shape, global_shape, desc, tags is not None]
-        keys = [keynames[i] for i in len(keynames) if keyvals[i]]
-        inputs = self.get_io_metadata(('input',), keys, includes, excludes, all_procs, 0)
+        keys = [n for i, n in enumerate(keynames) if keyvals[i]]
+
+        inputs = list(self.get_io_metadata(('input',), keys, includes, excludes, tags,
+                                           get_remote=True,
+                                           rank=None if all_procs or values else 0,
+                                           return_rel_names=False))
+
+        if inputs:
+            to_remove = ['discrete']
+            if tags:
+                to_remove.append('tags')
+            if not prom_name:
+                to_remove.append('prom_name')
+
+            for _, meta in inputs:
+                for key in to_remove:
+                    del meta[key]
+
+        if values and self._inputs is not None:
+            # we want value from the input vector, not from the metadata
+            for n, meta in inputs:
+                meta['value'] = self._abs_get_val(n, get_remote=True,
+                                                  rank=None if all_procs else 0, kind='input')
+
+        if not inputs or (not all_procs and self.comm.rank != 0):
+            return []
 
         if out_stream is _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
@@ -3231,11 +3335,10 @@ class System(object):
         if out_stream:
             self._write_table('input', inputs, hierarchical, print_arrays, all_procs, out_stream)
 
-        if self.name:  # if we're not the top system, convert names to relative
-            old = inputs
-            inputs = [(n[rel_idx:], meta) for n, meta in old.items()]
-        else:
-            inputs = list(inputs.items())
+        if self.pathname:
+            # convert to relative names
+            rel_idx = len(self.pathname) + 1
+            inputs = [(n[rel_idx:], meta) for n, meta in inputs]
 
         return inputs
 
@@ -3260,11 +3363,7 @@ class System(object):
                      list_autoivcs=False,
                      out_stream=_DEFAULT_OUT_STREAM):
         """
-        Return and optionally log a list of output names and other optional information.
-
-        If the model is parallel, only the local variables are returned to the process.
-        Also optionally logs the information to a user defined output stream. If the model is
-        parallel, the rank 0 process logs information about all variables across all processes.
+        Write a list of output names and other optional information to a specified stream.
 
         Parameters
         ----------
@@ -3273,28 +3372,28 @@ class System(object):
         implicit : bool, optional
             include outputs from implicit components. Default is True.
         values : bool, optional
-            When True, display/return output values. Default is True.
+            When True, display output values. Default is True.
         prom_name : bool, optional
-            When True, display/return the promoted name of the variable.
+            When True, display the promoted name of the variable.
             Default is False.
         residuals : bool, optional
-            When True, display/return residual values. Default is False.
+            When True, display residual values. Default is False.
         residuals_tol : float, optional
             If set, limits the output of list_outputs to only variables where
             the norm of the resids array is greater than the given 'residuals_tol'.
             Default is None.
         units : bool, optional
-            When True, display/return units. Default is False.
+            When True, display units. Default is False.
         shape : bool, optional
-            When True, display/return the shape of the value. Default is False.
+            When True, display the shape of the value. Default is False.
         global_shape : bool, optional
-            When True, display/return the global shape of the value. Default is False.
+            When True, display the global shape of the value. Default is False.
         bounds : bool, optional
-            When True, display/return bounds (lower and upper). Default is False.
+            When True, display bounds (lower and upper). Default is False.
         scaling : bool, optional
-            When True, display/return scaling (ref, ref0, and res_ref). Default is False.
+            When True, display scaling (ref, ref0, and res_ref). Default is False.
         desc : bool, optional
-            When True, display/return description. Default is False.
+            When True, display description. Default is False.
         hierarchical : bool, optional
             When True, human readable output shows variables in hierarchical format.
         print_arrays : bool, optional
@@ -3307,12 +3406,11 @@ class System(object):
             User defined tags that can be used to filter what gets listed. Only outputs with the
             given tags will be listed.
             Default is None, which means there will be no filtering based on tags.
-        includes : None or list_like
-            List of glob patterns for pathnames to include in the check. Default is None, which
-            includes all components in the model.
-        excludes : None or list_like
-            List of glob patterns for pathnames to exclude from the check. Default is None, which
-            excludes nothing.
+        includes : None or iter of str
+            Collection of glob patterns for pathnames of variables to include. Default is None,
+            which includes all output variables.
+        excludes : None or iter of str
+            Collection of glob patterns for pathnames of variables to exclude. Default is ().
         all_procs : bool, optional
             When True, display output on all processors. Default is False.
         list_autoivcs : bool
@@ -3327,152 +3425,68 @@ class System(object):
             list of output names and other optional information about those outputs
         """
         keynames = np.array(['value', 'units', 'shape', 'global_shape', 'desc', 'tags'])
-        keys = [str(n) for n in keynames[np.array([values, units, shape, global_shape, desc, tags], dtype=bool)]]
+        keys = [str(n) for n in keynames[np.array([values, units, shape, global_shape, desc, tags],
+                                                  dtype=bool)]]
         if bounds:
             keys.extend(('lower', 'upper'))
         if scaling:
             keys.extend(('ref', 'ref0', 'res_ref'))
 
-        prefix = self.pathname + '.' if self.pathname else ''
-        rel_idx = len(prefix)
+        outputs = list(self.get_io_metadata(('output',), keys, includes, excludes, tags,
+                                            get_remote=True,
+                                            rank=None if all_procs or values or residuals else 0,
+                                            return_rel_names=False))
 
-        # use absolute names, discretes handled separately
-        # Only gathering up values and metadata from this proc, if MPI
-        to_meta = self._var_abs2meta
-        var_names = self._var_abs_names['output']
-        abs2prom = self._var_abs2prom['output']
+        if outputs:
+            if not list_autoivcs:
+                outputs = [t for t in outputs if not t[0].startswith('_auto_ivc.')]
 
-        allprocs_meta = self._var_allprocs_abs2meta
-        states = self._list_states()
-        tagset = make_set(tags)
+            to_remove = ['discrete']
+            if tags:
+                to_remove.append('tags')
+            if not prom_name:
+                to_remove.append('prom_name')
 
-        # Go though the hierarchy. Printing Systems
-        # If the System owns an output directly, show its output
-        expl_outputs = []
-        impl_outputs = []
-        for abs_name in var_names:
-            meta = to_meta[abs_name]
-            rel_name = abs_name[rel_idx:]
+            for _, meta in outputs:
+                for key in to_remove:
+                    del meta[key]
 
-            # Filter based on tags
-            if tags and not (tagset & meta['tags']):
-                continue
-
-            var_prom = abs2prom[abs_name]
-
-            if not list_autoivcs and abs_name.startswith('_auto_ivc.'):
-                continue
-
-            if not match_prom_or_abs(rel_name, var_prom, includes, excludes):
-                continue
-
-            if residuals_tol and self._residuals and \
-               np.linalg.norm(self._residuals._abs_get_val(abs_name)) < residuals_tol:
-                continue
-
-            var_meta = {}
-            if values:
-                if self._outputs:
-                    var_meta['value'] = self._outputs._abs_get_val(abs_name, False)
-                else:
-                    var_meta['value'] = meta['value']
-
-            if prom_name:
-                var_meta['prom_name'] = var_prom
-            if residuals and self._residuals:
-                var_meta['resids'] = self._residuals._abs_get_val(abs_name, False)
-            if units:
-                var_meta['units'] = meta['units']
-            if shape:
-                var_meta['shape'] = meta['shape']
-            if global_shape:
-                try:
-                    var_meta['global_shape'] = allprocs_meta[abs_name]['global_shape']
-                except KeyError:
-                    if meta['distributed']:
-                        var_meta['global_shape'] = 'Unavailable'
-                    else:
-                        var_meta['global_shape'] = meta['shape']
-            if bounds:
-                var_meta['lower'] = meta['lower']
-                var_meta['upper'] = meta['upper']
-            if scaling:
-                var_meta['ref'] = meta['ref']
-                var_meta['ref0'] = meta['ref0']
-                var_meta['res_ref'] = meta['res_ref']
-            if desc:
-                var_meta['desc'] = meta['desc']
-            if abs_name in states:
-                impl_outputs.append((abs_name, var_meta))
-            else:
-                expl_outputs.append((abs_name, var_meta))
-
-        if self._discrete_outputs and not residuals_tol:
-            disc_meta = self._discrete_outputs._dict
-
-            for rel_name, val in self._discrete_outputs.items():
-
-                if not list_autoivcs and rel_name.startswith('_auto_ivc.'):
-                    continue
-
-                # Filter based on tags
-                if tags and not (tagset & disc_meta[rel_name]['tags']):
-                    continue
-
-                abs_name = prefix + rel_name
-                var_prom = abs2prom[abs_name]
-
-                if not match_prom_or_abs(rel_name, var_prom, includes, excludes):
-                    continue
-
-                var_meta = {}
+        if self._outputs is not None and (values or residuals):
+            # we want value from the input vector, not from the metadata
+            for n, meta in outputs:
                 if values:
-                    var_meta['value'] = val
-                if prom_name:
-                    var_meta['prom_name'] = var_prom
-
-                # remaining items do not apply for discrete vars
+                    meta['value'] = self._abs_get_val(n, get_remote=True,
+                                                      rank=None if all_procs else 0, kind='output')
                 if residuals:
-                    var_meta['resids'] = ''
-                if units:
-                    var_meta['units'] = ''
-                if shape:
-                    var_meta['shape'] = ''
-                if bounds:
-                    var_meta['lower'] = ''
-                    var_meta['upper'] = ''
-                if scaling:
-                    var_meta['ref'] = ''
-                    var_meta['ref0'] = ''
-                    var_meta['res_ref'] = ''
+                    meta['resids'] = self._abs_get_val(n, get_remote=True,
+                                                       rank=None if all_procs else 0,
+                                                       kind='residual')
 
-                if abs_name in states:
-                    impl_outputs.append((abs_name, var_meta))
-                else:
-                    expl_outputs.append((abs_name, var_meta))
+        if not outputs or (not all_procs and self.comm.rank != 0):
+            return []
 
         if out_stream is _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
 
+        rel_idx = len(self.name) + 1 if self.name else 0
+
+        states = set(self._list_states())
+
         if explicit:
-            expl_dict = self._gather_iovars(expl_outputs, all_procs, residuals)
+            expl_outputs = [t for t in outputs if t[0] not in states]
             if out_stream:
-                self._write_table('explicit', expl_dict, hierarchical, print_arrays,
+                self._write_table('explicit', expl_outputs, hierarchical, print_arrays,
                                   all_procs, out_stream)
             if self.name:
-                expl_outputs = [(n[rel_idx:], meta) for n, meta in expl_dict.items()]
-            else:
-                expl_outputs = list(expl_dict.items())
+                expl_outputs = [(n[rel_idx:], meta) for n, meta in expl_outputs]
 
         if implicit:
-            impl_dict = self._gather_iovars(impl_outputs, all_procs, residuals)
+            impl_outputs = [t for t in outputs if t[0] in states]
             if out_stream:
-                self._write_table('implicit', impl_dict, hierarchical, print_arrays,
+                self._write_table('implicit', impl_outputs, hierarchical, print_arrays,
                                   all_procs, out_stream)
             if self.name:
-                impl_outputs = [(n[rel_idx:], meta) for n, meta in impl_dict.items()]
-            else:
-                impl_outputs = list(impl_dict.items())
+                impl_outputs = [(n[rel_idx:], meta) for n, meta in impl_outputs]
 
         if explicit and implicit:
             return expl_outputs + impl_outputs
@@ -3483,69 +3497,6 @@ class System(object):
         else:
             raise RuntimeError(self.msginfo +
                                ': You have excluded both Explicit and Implicit components.')
-
-    def _gather_iovars(self, var_data, all_procs, residuals=False):
-        var_dict = OrderedDict(var_data)
-
-        # If parallel, gather up the vars.
-        if MPI and self.comm.size > 1:
-            # All procs must call this. Returns a list, one per proc.
-            all_var_dicts = self.comm.allgather(var_dict) if all_procs \
-                else self.comm.gather(var_dict, root=0)
-
-            # unless all_procs is requested, only the root process should print
-            if not all_procs and self.comm.rank > 0:
-                return var_dict
-
-            meta = self._var_abs2meta
-            allprocs_meta = self._var_allprocs_abs2meta
-
-            var_dict = all_var_dicts[self.comm.rank]  # start with metadata from current rank
-
-            keys = ['value']
-            if residuals:
-                keys.append('resids')
-
-            distrib = {k: {} for k in keys}  # dictionary to collect distributed values
-
-            # Go through data from all procs in order by rank and collect distributed values
-            for rank, proc_vars in enumerate(all_var_dicts):
-                for name in proc_vars:
-                    if name not in var_dict:     # If not in the merged dict, add it
-                        var_dict[name] = proc_vars[name]
-                    try:
-                        is_distributed = allprocs_meta[name]['distributed']
-                    except KeyError:
-                        is_distributed = False
-                    if is_distributed:
-                        # TODO no support for > 1D arrays
-                        #   meta.src_indices has the info we need to piece together arrays
-
-                        try:
-                            global_shape = allprocs_meta[name]['global_shape']
-                        except KeyError:
-                            # global_shape may not have been computed yet
-                            pass
-                        else:
-                            if allprocs_meta[name]['shape'] != global_shape:
-                                # if the local shape is different than the global shape and the
-                                # global shape matches the concatenation of values from all procs,
-                                # then assume the concatenation, otherwise just use the value from
-                                # the current proc
-                                for key in keys:
-                                    if key in var_dict[name]:
-                                        val = proc_vars[name][key]
-                                        if val.size > 0:
-                                            if name not in distrib[key]:
-                                                distrib[key][name] = [proc_vars[name][key]]
-                                            else:
-                                                distrib[key][name].append(proc_vars[name][key])
-
-                                        if rank == self.comm.size - 1 and name in distrib[key]:
-                                            var_dict[name][key] = np.concatenate(distrib[key][name],
-                                                                                 axis=0)
-
-        return var_dict
 
     def _write_table(self, var_type, var_data, hierarchical, print_arrays, all_procs, out_stream):
         """
@@ -3587,7 +3538,7 @@ class System(object):
             var_list = self._get_vars_exec_order(inputs=inputs, outputs=outputs, variables=var_data)
             top_name = self.name if self.name else 'model'
 
-        if all_procs or self.comm.size == 0 or self.comm.rank == 0:
+        if all_procs or self.comm.rank == 0:
             write_var_table(self.pathname, var_list, var_type, var_data,
                             hierarchical, top_name, print_arrays, out_stream)
 
@@ -4084,6 +4035,8 @@ class System(object):
 
         if kind is None:
             kind = typ
+        if vec_name is None:
+            vec_name = 'nonlinear'
 
         if not discrete:
             try:
@@ -4128,7 +4081,10 @@ class System(object):
                     offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
                     offsets[1:] = np.cumsum(sizes[:-1])
                     loc_val = val if val is not _undefined else np.zeros(sizes[idx])
-                    val = np.zeros(np.sum(sizes))
+                    if rank == self.comm.rank:
+                        val = np.zeros(np.sum(sizes))
+                    else:
+                        val = _undefined
                     self.comm.Gatherv(loc_val, [val, sizes, offsets, MPI.DOUBLE], root=rank)
                 else:
                     if rank != owner:

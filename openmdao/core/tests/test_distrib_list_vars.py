@@ -86,10 +86,13 @@ class DistributedListVarsTest(unittest.TestCase):
         stream = StringIO()
         with multi_proc_exception_check(prob.comm):
             inputs = sorted(prob.model.list_inputs(values=True, print_arrays=True, out_stream=stream))
-            self.assertEqual(inputs[0][0], 'plus.x')
-            self.assertEqual(inputs[1][0], 'summer.invec')
-            self.assertEqual(inputs[0][1]['value'].size, 50)  # should only return half that is local
-            self.assertEqual(inputs[1][1]['value'].size, 100)
+            if prob.comm.rank:
+                self.assertEqual(inputs, [])
+            else:
+                self.assertEqual(inputs[0][0], 'plus.x')
+                self.assertEqual(inputs[1][0], 'summer.invec')
+                self.assertEqual(inputs[0][1]['value'].size, 100)
+                self.assertEqual(inputs[1][1]['value'].size, 100)
 
             text = stream.getvalue()
             if prob.comm.rank:  # Only rank 0 prints
@@ -116,12 +119,15 @@ class DistributedListVarsTest(unittest.TestCase):
                                                     hierarchical=True,
                                                     print_arrays=True,
                                                     out_stream=stream))
-            self.assertEqual(outputs[0][0], 'des_vars.x')
-            self.assertEqual(outputs[1][0], 'plus.y')
-            self.assertEqual(outputs[2][0], 'summer.sum')
-            self.assertEqual(outputs[0][1]['value'].size, 100)
-            self.assertEqual(outputs[1][1]['value'].size, 50)
-            self.assertEqual(outputs[2][1]['value'].size, 1)
+            if prob.comm.rank:
+                self.assertEqual(outputs, [])
+            else:
+                self.assertEqual(outputs[0][0], 'des_vars.x')
+                self.assertEqual(outputs[1][0], 'plus.y')
+                self.assertEqual(outputs[2][0], 'summer.sum')
+                self.assertEqual(outputs[0][1]['value'].size, 100)
+                self.assertEqual(outputs[1][1]['value'].size, 100)
+                self.assertEqual(outputs[2][1]['value'].size, 1)
 
             text = stream.getvalue()
             if prob.comm.rank:  # Only rank 0 prints
@@ -186,16 +192,12 @@ class DistributedListVarsTest(unittest.TestCase):
         stream = StringIO()
         with multi_proc_exception_check(prob.comm):
             inputs = sorted(prob.model.list_inputs(values=True, print_arrays=True, out_stream=stream))
-            self.assertEqual(inputs[0][0], 'Obj.y1')
-            self.assertEqual(inputs[1][0], 'Obj.y2')
-            if prob.comm.rank:  # Only rank 0 prints
-                self.assertEqual(inputs[2][0], 'par.G2.Cc.x')
-                self.assertEqual(inputs[3][0], 'par.G2.Cy.x')
+            if prob.comm.rank:
+                self.assertEqual(inputs, [])
             else:
-                self.assertEqual(inputs[2][0], 'par.G1.Cc.x')
-                self.assertEqual(inputs[3][0], 'par.G1.Cy.x')
-            self.assertTrue('value' in inputs[0][1])
-            self.assertEqual(4, len(inputs))
+                inames = [t[0] for t in inputs]
+                self.assertEqual(inames, ['Obj.y1', 'Obj.y2', 'par.G1.Cc.x', 'par.G1.Cy.x', 'par.G2.Cc.x', 'par.G2.Cy.x'])
+                self.assertTrue('value' in inputs[0][1])
 
             text = stream.getvalue()
             if prob.comm.rank:  # Only rank 0 prints
@@ -216,26 +218,21 @@ class DistributedListVarsTest(unittest.TestCase):
         stream = StringIO()
         with multi_proc_exception_check(prob.comm):
             outputs = sorted(prob.model.list_outputs(values=True,
-                                                    units=True,
-                                                    shape=True,
-                                                    bounds=True,
-                                                    residuals=True,
-                                                    scaling=True,
-                                                    hierarchical=True,
-                                                    print_arrays=True,
-                                                    out_stream=stream))
-            self.assertEqual(outputs[0][0], 'Obj.obj')
-            if prob.comm.rank:  # outputs only return what is on their proc
-                self.assertEqual(outputs[1][0], 'par.G2.Cc.c')
-                self.assertEqual(outputs[2][0], 'par.G2.Cy.y')
-                self.assertEqual(outputs[3][0], 'par.G2.indep_var_comp.x')
+                                                     units=True,
+                                                     shape=True,
+                                                     bounds=True,
+                                                     residuals=True,
+                                                     scaling=True,
+                                                     hierarchical=True,
+                                                     print_arrays=True,
+                                                     out_stream=stream))
+            onames = [t[0] for t in outputs]
+            if prob.comm.rank == 0:
+                self.assertEqual(onames, ['Obj.obj', 'par.G1.Cc.c', 'par.G1.Cy.y', 'par.G1.indep_var_comp.x', 'par.G2.Cc.c', 'par.G2.Cy.y', 'par.G2.indep_var_comp.x'])
+                self.assertTrue('value' in outputs[0][1])
+                self.assertTrue('units' in outputs[0][1])
             else:
-                self.assertEqual(outputs[1][0], 'par.G1.Cc.c')
-                self.assertEqual(outputs[2][0], 'par.G1.Cy.y')
-                self.assertEqual(outputs[3][0], 'par.G1.indep_var_comp.x')
-            self.assertEqual(4, len(outputs))
-            self.assertTrue('value' in outputs[0][1])
-            self.assertTrue('units' in outputs[0][1])
+                self.assertEqual(onames, [])
 
             text = stream.getvalue()
             if prob.comm.rank:  # Only rank 0 prints

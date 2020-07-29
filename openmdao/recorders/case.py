@@ -582,7 +582,7 @@ class Case(object):
                 continue
 
             # check if residuals were recorded, skip if within specifed tolerance
-            if self.residuals and var_name in self.residuals.absolute_names():
+            if residuals and self.residuals and var_name in self.residuals.absolute_names():
                 resids = self.residuals[var_name]
                 if residuals_tol and np.linalg.norm(resids) < residuals_tol:
                     continue
