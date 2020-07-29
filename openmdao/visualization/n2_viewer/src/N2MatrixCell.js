@@ -525,12 +525,12 @@ class N2MatrixCell {
 
         if (this.onDiagonal()) {
             if (this.obj.isMinimized) return N2Style.color.collapsed;
-            if (this.obj.isAutoIvcParam()) return N2Style.color.autoivcParam;
-            if (this.obj.isConnectedParam()) return N2Style.color.param;
-            if (this.obj.isUnconnectedParam()) return N2Style.color.unconnectedParam;
+            if (this.obj.isAutoIvcInput()) return N2Style.color.autoivcInput;
+            if (this.obj.isConnectedInput()) return N2Style.color.input;
+            if (this.obj.isUnconnectedInput()) return N2Style.color.unconnectedInput;
             return (this.obj.implicit) ?
-                N2Style.color.unknownImplicit :
-                N2Style.color.unknownExplicit;
+                N2Style.color.outputImplicit :
+                N2Style.color.outputExplicit;
         }
 
         return N2Style.color.connection;
@@ -633,8 +633,8 @@ class N2MatrixCell {
         const treeNode = d3.select('rect#' + treeId);
 
         let fill = treeNode.style('fill');
-        if (direction == 'input') fill = N2Style.color.input;
-        else if (direction == 'output') fill = N2Style.color.output;
+        if (direction == 'input') fill = N2Style.color.inputArrow;
+        else if (direction == 'output') fill = N2Style.color.outputArrow;
 
         d3.select('#highlight-bar').append('rect')
             .attr('x', 0)

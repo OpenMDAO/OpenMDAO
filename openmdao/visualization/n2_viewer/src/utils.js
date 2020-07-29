@@ -64,8 +64,8 @@ Array.isPopulatedArray = function (arr) {
     return (Array.isArray(arr) && arr.length > 0);
 };
 
-const paramRegex = /^(param|unconnected_param|autoivc_param)$/;
-const paramOrUnknownRegex = /^(unknown|param|unconnected_param|autoivc_param)$/;
+const inputRegex = /^(input|unconnected_input|autoivc_input)$/;
+const inputOrOutputRegex = /^(output|input|unconnected_input|autoivc_input)$/;
 
 d3.selection.prototype.originalFuncs = {
     'transition': d3.selection.prototype.transition,

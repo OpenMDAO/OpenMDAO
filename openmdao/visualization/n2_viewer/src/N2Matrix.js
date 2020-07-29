@@ -1,5 +1,5 @@
 /**
- * Use the model tree to build the matrix of parameters and connections, display, and
+ * Use the model tree to build the matrix of variables and connections, display, and
  * perform operations with it.
  * @typedef N2Matrix
  * @property {N2TreeNodes[]} nodes Reference to nodes that will be drawn.
@@ -295,12 +295,12 @@ class N2Matrix {
             }
 
             // Solver nodes
-            if (diagNode.isParam()) {
+            if (diagNode.isInput()) {
                 for (let j = srcIdx + 1; j < this.diagNodes.length; ++j) {
                     let tgtObj = this.diagNodes[j];
                     if (diagNode.parentComponent !== tgtObj.parentComponent) break;
 
-                    if (tgtObj.isUnknown()) {
+                    if (tgtObj.isOutput()) {
                         let tgtIdx = j;
                         let newCell = new N2MatrixCell(srcIdx, tgtIdx, diagNode, tgtObj, this.model);
                         this._addCell(srcIdx, tgtIdx, newCell);
@@ -312,7 +312,7 @@ class N2Matrix {
     }
 
     /**
-     * Determine the size of the boxes that will border the parameters of each component.
+     * Determine the size of the boxes that will border the variables of each component.
      */
     _setupComponentBoxesAndGridLines() {
         let currentBox = {
@@ -322,7 +322,7 @@ class N2Matrix {
 
         this.boxInfo = [currentBox];
 
-        // Find which component box each of the parameters belong in,
+        // Find which component box each of the variables belong in,
         // while finding the bounds of that box. Top and bottom
         // rows recorded for each node in this.boxInfo[].
         for (let ri = 1; ri < this.diagNodes.length; ++ri) {
@@ -711,7 +711,7 @@ class N2Matrix {
                             'row': cell.row,
                             'id': cell.tgtObj.id
                         },
-                        'color': N2Style.color.greenArrow,
+                        'color': N2Style.color.outputArrow,
                     });
 
                     highlights.push({
@@ -735,7 +735,7 @@ class N2Matrix {
                             'row': cell.row,
                             'id': cell.tgtObj.id
                         },
-                        'color': N2Style.color.redArrow,
+                        'color': N2Style.color.inputArrow,
                     });
 
                     highlights.push({
@@ -761,7 +761,7 @@ class N2Matrix {
         for (const h of highlights) h.cell.highlight(h.varType, h.direction);
     }
 
-    drawArrowsParamView(cell, startIndex, endIndex) {
+    drawArrowsInputView(cell, startIndex, endIndex) {
         let boxStart = this.boxInfo[startIndex];
         let boxEnd = this.boxInfo[endIndex];
 
@@ -796,7 +796,7 @@ class N2Matrix {
                     'id': this.grid[arrow.end][arrow.end].tgtObj.id
                 },
                 'color': (startIndex < endIndex) ?
-                    N2Style.color.greenArrow : N2Style.color.redArrow,
+                    N2Style.color.outputArrow : N2Style.color.inputArrow,
             });
         }
     }
@@ -820,7 +820,7 @@ class N2Matrix {
                 'row': cell.col,
                 'id': cell.tgtObj.id
             },
-            'color': N2Style.color.redArrow,
+            'color': N2Style.color.inputArrow,
         });
 
         if (cell.row > cell.col) {
@@ -858,7 +858,7 @@ class N2Matrix {
                             }
 
                             if (firstBeginIndex != firstEndIndex) {
-                                this.drawArrowsParamView(cell, firstBeginIndex, firstEndIndex);
+                                this.drawArrowsInputView(cell, firstBeginIndex, firstEndIndex);
                             }
                         }
                     }

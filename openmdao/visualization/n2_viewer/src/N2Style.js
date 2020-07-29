@@ -51,20 +51,20 @@ class N2Style {
             'rect': {
                 'stroke': N2Style.color.treeStroke,
             },
-            '#tree > g.unknown > rect': {
-                'fill': N2Style.color.unknownExplicit,
+            '#tree > g.output > rect': {
+                'fill': N2Style.color.outputExplicit,
                 'fill-opacity': '.8',
             },
-            '#tree > g.unknown_implicit > rect': {
-                'fill': N2Style.color.unknownImplicit,
+            '#tree > g.output_implicit > rect': {
+                'fill': N2Style.color.outputImplicit,
                 'fill-opacity': '.8',
             },
-            '#tree > g.param > rect': {
-                'fill': N2Style.color.param,
+            '#tree > g.input > rect': {
+                'fill': N2Style.color.input,
                 'fill-opacity': '.8',
             },
-            '#tree > g.unconnected_param > rect': {
-                'fill': N2Style.color.unconnectedParam,
+            '#tree > g.unconnected_input > rect': {
+                'fill': N2Style.color.unconnectedInput,
                 'fill-opacity': '.8',
             },
             '#tree > g.subsystem > rect': {
@@ -77,25 +77,25 @@ class N2Style {
                 'fill-opacity': '.8',
                 'fill': N2Style.color.component,
             },
-            '#tree > g.param_group > rect': {
+            '#tree > g.input_group > rect': {
                 'cursor': 'pointer',
                 'fill-opacity': '.8',
-                'fill': N2Style.color.paramGroup,
+                'fill': N2Style.color.inputGroup,
             },
-            '#tree > g.unknown_group > rect': {
+            '#tree > g.output_group > rect': {
                 'cursor': 'pointer',
                 'fill-opacity': '.8',
-                'fill': N2Style.color.unknownGroup,
+                'fill': N2Style.color.outputGroup,
             },
             '#tree > g.minimized > rect': {
                 'cursor': 'pointer',
                 'fill-opacity': '.8',
                 'fill': N2Style.color.collapsed,
             },
-            '#tree > g.autoivc_param > rect': {
+            '#tree > g.autoivc_input > rect': {
                 'cursor': 'pointer',
                 'fill-opacity': '.8',
-                'fill': N2Style.color.autoivcParam,
+                'fill': N2Style.color.autoivcInput,
             },
             'text': {
                 //'dominant-baseline: middle',
@@ -187,21 +187,21 @@ class N2Style {
         if (element.isMinimized) return 'minimized';
 
         switch (element.type) {
-            case 'param':
-                if (Array.isPopulatedArray(element.children)) return 'param_group';
-                return 'param';
+            case 'input':
+                if (Array.isPopulatedArray(element.children)) return 'input_group';
+                return 'input';
 
-            case 'unconnected_param':
-                if (Array.isPopulatedArray(element.children)) return 'param_group';
-                return 'unconnected_param';
+            case 'unconnected_input':
+                if (Array.isPopulatedArray(element.children)) return 'input_group';
+                return 'unconnected_input';
 
-            case 'autoivc_param':
-                return 'autoivc_param';
+            case 'autoivc_input':
+                return 'autoivc_input';
 
-            case 'unknown':
-                if (Array.isPopulatedArray(element.children)) return 'unknown_group';
-                if (element.implicit) return 'unknown_implicit';
-                return 'unknown';
+            case 'output':
+                if (Array.isPopulatedArray(element.children)) return 'output_group';
+                if (element.implicit) return 'output_implicit';
+                return 'output';
 
             case 'root':
                 return 'subsystem';
@@ -219,26 +219,23 @@ class N2Style {
 // From Isaias Reyes
 N2Style.color = {
     'connection': 'gray',
-    'unknownImplicit': '#C7D06D',
-    'unknownExplicit': '#9FC4C6',
+    'outputImplicit': '#C7D06D',
+    'outputExplicit': '#9FC4C6',
     'componentBox': '#555',
     'background': '#eee',
     'gridline': 'white',
     'treeStroke': '#eee',
-    'unknownGroup': '#888',
-    'param': '#30B0AD',
-    'paramGroup': 'Orchid',
+    'outputGroup': '#888',
+    'input': '#30B0AD',
+    'inputGroup': 'Orchid',
     'group': '#6092B5',
     'component': '#02BFFF',
     'collapsed': '#555555',
-    'unconnectedParam': '#F42F0D',
-    'highlightHovered': 'blue',
-    'redArrow': 'salmon',
-    'input': 'salmon',
-    'greenArrow': 'seagreen',
-    'output': 'seagreen',
+    'unconnectedInput': '#F42F0D',
+    'inputArrow': 'salmon',
+    'outputArrow': 'seagreen',
     'declaredPartial': 'black',
-    'autoivcParam': '#F42F0D'
+    'autoivcInput': '#F42F0D'
 };
 
 Object.freeze(N2Style.color); // Make it the equivalent of a constant
