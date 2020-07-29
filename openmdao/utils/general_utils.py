@@ -246,12 +246,10 @@ def ensure_compatible(name, value, shape=None, indices=None):
 
     if indices is not None:
         indices = np.atleast_1d(indices)
-        contains_slice = _is_slice(indices)
-        contains_ellipsis = _is_ellipsis(indices)
+        contains_slicer = _is_slicer_op(indices)
         ind_shape = indices.shape
     else:
-        contains_slice = None
-        contains_ellipsis = None
+        contains_slicer = None
 
     # if shape is not given, infer from value (if not scalar) or indices
     if shape is not None:
@@ -286,8 +284,7 @@ def ensure_compatible(name, value, shape=None, indices=None):
                                  "Expected %s but got %s." %
                                  (name, shape, value.shape))
 
-    if indices is not None and shape != ind_shape[:len(shape)] and not contains_slice and \
-            not contains_ellipsis:
+    if indices is not None and shape != ind_shape[:len(shape)] and not contains_slicer:
         raise ValueError("Shape of indices does not match shape for '%s': "
                          "Expected %s but got %s." %
                          (name, shape, ind_shape[:len(shape)]))
@@ -980,42 +977,31 @@ def common_subpath(pathnames):
     return ''
 
 
-def _is_slice(indices):
+def _is_slicer_op(indices):
     """
-    Check if an array of indices contains a slice object.
+    Check if an array of indices contains a colon or ellipsis operator.
 
     Parameters
     ----------
     indices : ndarray
-        Slice indices to check.
+        Indices to check.
 
     Returns
     -------
     bool
-        Returns True if indices contains a slice.
+        Returns True if indices contains a colon or ellipsis operator.
     """
-    return any(isinstance(i, slice) for i in indices)
-
-
-def _is_ellipsis(indices):
-    """
-    Check if an array of indices contains an ellipsis special constant.
-
-    Parameters
-    ----------
-    indices : ndarray
-        Ellipsis indices to check.
-
-    Returns
-    -------
-    bool
-        Returns True if indices contains an ellipsis.
-    """
-    if indices is not None:
-        if hasattr(indices, "dtype") and indices.dtype == object:
-            return any(i == ... for i in indices)
-        elif isinstance(indices, tuple):
-            return any(i == ... for i in np.array(indices))
+    if isinstance(indices, Iterable):
+        for i in indices:
+            if isinstance(i, slice):
+                return True
+        if indices is not None:
+            if hasattr(indices, "dtype") and indices.dtype == object:
+                return any(i == ... for i in indices)
+            elif isinstance(indices, tuple):
+                return any(i == ... for i in np.array(indices))
+    elif isinstance(indices, slice):
+        return True
     else:
         return False
 
