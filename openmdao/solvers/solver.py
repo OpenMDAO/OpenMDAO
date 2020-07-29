@@ -593,7 +593,7 @@ class NonlinearSolver(Solver):
         stalled = False
         if stall_limit > 0:
             stall_count = 0
-            stall_norm = norm
+            stall_norm = norm0
 
         while self._iter_count < maxiter and norm > atol and norm / norm0 > rtol and not stalled:
             with Recording(type(self).__name__, self._iter_count, self) as rec:
@@ -611,14 +611,15 @@ class NonlinearSolver(Solver):
 
                 # Check if convergence is stalled.
                 if stall_limit > 0:
-                    norm_diff = np.abs(stall_norm - norm)
+                    rel_norm = rec.rel
+                    norm_diff = np.abs(stall_norm - rel_norm)
                     if norm_diff <= stall_tol:
                         stall_count += 1
                         if stall_count >= stall_limit:
                             stalled = True
                     else:
                         stall_count = 0
-                        stall_norm = norm
+                        stall_norm = rel_norm
 
             self._mpi_print(self._iter_count, norm, norm / norm0)
 
