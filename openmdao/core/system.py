@@ -3110,7 +3110,9 @@ class System(object):
             Will contain either 'input', 'output', or both.  Defaults to both.
         metadata_keys : iter of str or None
             Names of metadata entries to be retrieved or None, meaning retrieve all
-            available metadata.
+            available 'allprocs' metadata.  If 'values' or 'src_indices' are required,
+            their keys must be provided explicitly since they are not found in the 'allprocs'
+            metadata and must be retrieved from local metadata located in each process.
         includes : None or iter of str
             Collection of glob patterns for pathnames of variables to include. Default is None,
             which includes all variables.
@@ -3148,16 +3150,17 @@ class System(object):
         loc2meta = self._var_abs2meta
         all2meta = self._var_allprocs_abs2meta
 
+        gather_keys = {'value', 'src_indices'}
         need_gather = get_remote and self.comm.size > 1
-        need_local_meta = (metadata_keys is None or 'value' in metadata_keys or
-                           'src_indices' in metadata_keys)
+        need_local_meta = len(gather_keys.intersection(metadata_keys)) > 0
+
         if need_local_meta:
             metadict = loc2meta
             disc_metadict = self._var_discrete
         else:
             metadict = all2meta
             disc_metadict = self._var_allprocs_discrete
-            need_gather = False  # we can get everything from global dict without gathering
+            need_gather = False  # we can get everything from 'allprocs' dict without gathering
 
         if tags:
             tagset = make_set(tags)
@@ -3193,39 +3196,40 @@ class System(object):
                                 ret_meta[key] = 'Unavailable'
 
                 if need_gather:
-                    if rank is None:
-                        allproc_metas = self.comm.allgather(ret_meta)
-                    else:
-                        allproc_metas = self.comm.gather(ret_meta, root=rank)
+                    if distrib or abs_name in self._gatherable_vars:
+                        if rank is None:
+                            allproc_metas = self.comm.allgather(ret_meta)
+                        else:
+                            allproc_metas = self.comm.gather(ret_meta, root=rank)
 
-                    if rank is None or self.comm.rank == rank:
-                        if not ret_meta:
-                            ret_meta = {}
-                        if distrib:
-                            if 'value' in metadata_keys:
-                                # assemble the full distributed value
-                                dist_vals = [m['value'] for m in allproc_metas
-                                             if m is not None and m['value'].size > 0]
-                                if dist_vals:
-                                    ret_meta['value'] = np.concatenate(dist_vals)
-                                else:
-                                    ret_meta['value'] = np.zeros(0)
-                            if 'src_indices' in metadata_keys:
-                                # assemble full src_indices
-                                dist_src_inds = [m['src_indices'] for m in allproc_metas
-                                                 if m is not None and m['src_indices'].size > 0]
-                                if dist_src_inds:
-                                    ret_meta['src_indices'] = np.concatenate(dist_src_inds)
-                                else:
-                                    ret_meta['src_indices'] = np.zeros(0, dtype=INT_DTYPE)
+                        if rank is None or self.comm.rank == rank:
+                            if not ret_meta:
+                                ret_meta = {}
+                            if distrib:
+                                if 'value' in metadata_keys:
+                                    # assemble the full distributed value
+                                    dist_vals = [m['value'] for m in allproc_metas
+                                                 if m is not None and m['value'].size > 0]
+                                    if dist_vals:
+                                        ret_meta['value'] = np.concatenate(dist_vals)
+                                    else:
+                                        ret_meta['value'] = np.zeros(0)
+                                if 'src_indices' in metadata_keys:
+                                    # assemble full src_indices
+                                    dist_src_inds = [m['src_indices'] for m in allproc_metas
+                                                     if m is not None and m['src_indices'].size > 0]
+                                    if dist_src_inds:
+                                        ret_meta['src_indices'] = np.concatenate(dist_src_inds)
+                                    else:
+                                        ret_meta['src_indices'] = np.zeros(0, dtype=INT_DTYPE)
 
-                        elif abs_name in self._gatherable_vars:
-                            for m in allproc_metas:
-                                if m is not None:
-                                    ret_meta = m
-                                    break
-                    else:
-                        ret_meta = None
+                            elif abs_name in self._gatherable_vars:
+                                for m in allproc_metas:
+                                    if m is not None:
+                                        ret_meta = m
+                                        break
+                        else:
+                            ret_meta = None
 
                 if ret_meta is not None:
                     ret_meta['prom_name'] = prom
