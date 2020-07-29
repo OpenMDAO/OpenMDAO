@@ -2164,7 +2164,7 @@ class TestGroupAddInput(unittest.TestCase):
            p.setup()
 
         self.assertEqual(cm.exception.args[0],
-                         "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but their metadata entries ['units', 'value'] differ. Call <group>.set_input_defaults('x', units=?, value=?), where <group> is the Group named 'par' to remove the ambiguity.")
+                         "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but their metadata entries ['units', 'value'] differ. Call <group>.set_input_defaults('x', units=?, val=?), where <group> is the Group named 'par' to remove the ambiguity.")
 
     def test_missing_diff_vals(self):
         p = om.Problem()
@@ -2178,7 +2178,7 @@ class TestGroupAddInput(unittest.TestCase):
            p.setup()
 
         self.assertEqual(cm.exception.args[0],
-                         "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but their metadata entries ['value'] differ. Call <group>.set_input_defaults('x', value=?), where <group> is the Group named 'par' to remove the ambiguity.")
+                         "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but their metadata entries ['value'] differ. Call <group>.set_input_defaults('x', val=?), where <group> is the Group named 'par' to remove the ambiguity.")
 
     def test_conflicting_units(self):
         # multiple Group.set_input_defaults calls at same tree level with conflicting units args
@@ -2357,7 +2357,7 @@ class TestGroupAddInput(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             p.setup()
 
-        self.assertEqual(cm.exception.args[0], "Group (<model>): The subsystems G1 and par.G4 called set_input_defaults for promoted input 'x' with conflicting values for 'value'. Call <group>.set_input_defaults('x', value=?), where <group> is the model to remove the ambiguity.")
+        self.assertEqual(cm.exception.args[0], "Group (<model>): The subsystems G1 and par.G4 called set_input_defaults for promoted input 'x' with conflicting values for 'value'. Call <group>.set_input_defaults('x', val=?), where <group> is the model to remove the ambiguity.")
 
 
 #
