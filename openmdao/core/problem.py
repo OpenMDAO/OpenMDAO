@@ -497,9 +497,11 @@ class Problem(object):
                 self._get_cached_val(name)
                 try:
                     if _is_slicer_op(indices):
-                        self._initial_condition_cache[name] = value[tuple(indices)]
+                        self._initial_condition_cache[name] = value[indices]
                     else:
                         self._initial_condition_cache[name][indices] = value
+                except IndexError:
+                    self._initial_condition_cache[name][indices] = value
                 except Exception as err:
                     raise RuntimeError(f"Failed to set value of '{name}': {str(err)}.")
             else:
