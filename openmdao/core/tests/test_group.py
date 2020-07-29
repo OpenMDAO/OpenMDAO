@@ -934,6 +934,7 @@ class TestGroup(unittest.TestCase):
                           np.array([10, 11, 12, 13]))
         self.assertTrue(p.model._design_vars['x']['indices'][0], 1)
         self.assertTrue(p.model._design_vars['x']['indices'][1], ...)
+        self.assertTrue(p.driver.get_design_var_values()['x'], np.array(11.))
 
     def test_promote_not_found1(self):
         p = om.Problem()

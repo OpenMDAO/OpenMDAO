@@ -498,9 +498,7 @@ class Problem(object):
                 self._get_cached_val(name)
                 try:
                     if isinstance(indices, slice) or _is_ellipsis(indices):
-                        inds = np.arange(value.shape[0] * value.shape[1],
-                                         dtype=int).reshape(value.shape)[tuple(indices)]
-                        self._initial_condition_cache[name] = inds
+                        self._initial_condition_cache[name] = value[tuple(indices)]
                     else:
                         self._initial_condition_cache[name][indices] = value
                 except Exception as err:
