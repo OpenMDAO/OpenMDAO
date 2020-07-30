@@ -35,9 +35,9 @@ def _descendents(mysystem, sysiter):
 
 class _ConfigInfo(object):
     def __init__(self):
-        self._modified_systems = set()
+        self._reset()
 
-    def _clear(self):
+    def _reset(self):
         self._modified_systems = set()
 
     def _add_mod_parallel_groups(self, group):

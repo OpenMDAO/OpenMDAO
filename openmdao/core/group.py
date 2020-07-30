@@ -335,7 +335,7 @@ class Group(System):
             self.matrix_free |= subsys.matrix_free
 
         conf_info = self._problem_meta['config_info']
-        conf_info._clear()
+        conf_info._reset()
 
         self.configure()
 
@@ -852,18 +852,18 @@ class Group(System):
             last_rank = self.comm.size - 1
             # owns = self._owning_rank
             for type_ in ('input', 'output'):
-                own_arr = np.zeros(len(allprocs_abs_names[type_]), dtype=int)
-                own_arr_disc = np.zeros(len(allprocs_abs_names_discrete[type_]), dtype=int)
+                # own_arr = np.zeros(len(allprocs_abs_names[type_]), dtype=int)
+                # own_arr_disc = np.zeros(len(allprocs_abs_names_discrete[type_]), dtype=int)
                 all_locs = np.ones(len(allprocs_abs_names[type_]), dtype=bool)
                 all_locs_disc = np.ones(len(allprocs_abs_names_discrete[type_]), dtype=bool)
                 for rank, (loc, loc_disc) in enumerate(allprocs_raw_locs):
                     all_locs &= loc[type_]
                     all_locs_disc &= loc_disc[type_]
 
-                    # go in reverse order for ownership so that lowest rank owner will be kept
-                    rev_rank = last_rank - rank
-                    own_arr[allprocs_raw_locs[rev_rank][0][type_]] = rev_rank
-                    own_arr_disc[allprocs_raw_locs[rev_rank][1][type_]] = rev_rank
+                    # # go in reverse order for ownership so that lowest rank owner will be kept
+                    # rev_rank = last_rank - rank
+                    # own_arr[allprocs_raw_locs[rev_rank][0][type_]] = rev_rank
+                    # own_arr_disc[allprocs_raw_locs[rev_rank][1][type_]] = rev_rank
 
                 for i, n in enumerate(allprocs_abs_names[type_]):
                     if not all_locs[i]:
