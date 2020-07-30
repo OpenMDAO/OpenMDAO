@@ -145,6 +145,7 @@ class ProbRemoteTestCase(unittest.TestCase):
                     outputs['y'][0] = 2.
 
         class MyModel(om.Group):
+
             def setup(self):
                 self.add_subsystem('ivc', om.IndepVarComp('x', 0.), promotes_outputs=['*'])
                 self.add_subsystem('dst', DistribComp(), promotes_inputs=['*'])
