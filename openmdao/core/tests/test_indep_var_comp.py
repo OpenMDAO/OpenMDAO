@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 
 
 class TestIndepVarComp(unittest.TestCase):
@@ -202,6 +202,61 @@ class TestIndepVarComp(unittest.TestCase):
 
         self.assertEqual(len(prob.get_val('num_x')), 4)
         self.assertEqual(prob.get_val('val_y'), 2.5)
+
+    def test_ivc_deprecations(self):
+        # ref0
+        prob = om.Problem()
+
+        indep = prob.model.add_subsystem('p1', om.IndepVarComp())
+
+        msg = "'ref0' has been deprecated and will be removed in a future version"
+        with assert_warning(DeprecationWarning, msg):
+            indep.add_output('x', 12., ref=0.0, ref0=1.)
+
+        # res_units
+        prob = om.Problem()
+
+        indep = prob.model.add_subsystem('p1', om.IndepVarComp())
+
+        msg = "'res_units' has been deprecated and will be removed in a future version"
+        with assert_warning(DeprecationWarning, msg):
+            indep.add_output('x', 12., res_units='m')
+
+        # upper
+        prob = om.Problem()
+
+        indep = prob.model.add_subsystem('p1', om.IndepVarComp())
+
+        msg = "'upper' has been deprecated and will be removed in a future version"
+        with assert_warning(DeprecationWarning, msg):
+            indep.add_output('x', 12., upper=1.)
+
+        # lower
+        prob = om.Problem()
+
+        indep = prob.model.add_subsystem('p1', om.IndepVarComp())
+
+        msg = "'lower' has been deprecated and will be removed in a future version"
+        with assert_warning(DeprecationWarning, msg):
+            indep.add_output('x', 12., lower=1.)
+
+        # res_ref
+        prob = om.Problem()
+
+        indep = prob.model.add_subsystem('p1', om.IndepVarComp())
+
+        msg = "'res_ref' has been deprecated and will be removed in a future version"
+        with assert_warning(DeprecationWarning, msg):
+            indep.add_output('x', 12., res_ref=1.)
+
+        # res_ref
+        prob = om.Problem()
+
+        indep = prob.model.add_subsystem('p1', om.IndepVarComp())
+
+        msg = "'ref' has been deprecated and will be removed in a future version"
+        with assert_warning(DeprecationWarning, msg):
+            indep.add_output('x', 12., ref=2.)
 
 
 if __name__ == '__main__':
