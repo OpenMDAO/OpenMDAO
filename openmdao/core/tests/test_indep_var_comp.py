@@ -218,7 +218,8 @@ class TestIndepVarComp(unittest.TestCase):
 
         indep = prob.model.add_subsystem('p1', om.IndepVarComp())
 
-        msg = "'res_units' has been deprecated and will be removed in a future version"
+        msg = "'res_units' has been deprecated and will be removed in a future " + \
+              "version"
         with assert_warning(DeprecationWarning, msg):
             indep.add_output('x', 12., res_units='m')
 
