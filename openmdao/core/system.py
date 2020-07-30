@@ -4021,9 +4021,10 @@ class System(object):
         ----------
         abs_name : str
             The absolute name of the variable.
-        get_remote : bool
+        get_remote : bool or None
             If True, return the value even if the variable is remote. NOTE: This function must be
             called in all procs in the Problem's MPI communicator.
+            If None and the variable is remote or distributed, a RuntimeError will be raised.
         rank : int or None
             If not None, specifies that the value is to be gathered to the given rank only.
             Otherwise, if get_remote is specified, the value will be broadcast to all procs
@@ -4059,6 +4060,12 @@ class System(object):
                 distrib = meta['distributed']
             else:
                 meta = my_meta[abs_name]
+                distrib = meta['distributed']
+                if distrib and get_remote is None:
+                    raise RuntimeError(f"{self.msginfo}: {abs_name} is a distributed variable, "
+                                       "You can retrieve values from all processes using "
+                                       "`get_val(<name>, get_remote=True)' or from the local "
+                                       "process using `get_val(<name>, get_remote=False)'.")
         except KeyError:
             discrete = True
             relname = abs_name[len(self.pathname) + 1:] if self.pathname else abs_name
@@ -4156,10 +4163,11 @@ class System(object):
             Units to convert to before return.
         indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
             Indices or slice to return.
-        get_remote : bool
+        get_remote : bool or None
             If True, retrieve the value even if it is on a remote process.  Note that if the
             variable is remote on ANY process, this function must be called on EVERY process
             in the Problem's MPI communicator.
+            If None and the variable is remote or distributed, a RuntimeError will be raised.
         rank : int or None
             If not None, only gather the value to this rank.
         vec_name : str
