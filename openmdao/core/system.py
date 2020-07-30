@@ -33,7 +33,7 @@ from openmdao.utils.coloring import _compute_coloring, Coloring, \
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, ContainsAll, all_ancestors, \
-    simple_warning, make_set, match_includes_excludes, ensure_compatible, _is_slice, \
+    simple_warning, make_set, ensure_compatible, _is_slice, \
     match_prom_or_abs
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
@@ -3091,7 +3091,7 @@ class System(object):
         with self._scaled_context_all():
             self._apply_nonlinear()
 
-    def _var_filtered_iter(self, iotype, includes=None, excludes=(), get_remote=False):
+    def _var_filtered_iter(self, iotype, includes=None, excludes=None, get_remote=False):
         it = self._var_allprocs_abs2prom[iotype] if get_remote else self._var_abs2prom[iotype]
         for tup in it.items():
             abs_name, prom = tup
@@ -3099,7 +3099,7 @@ class System(object):
                 yield tup
 
     def get_io_metadata(self, iotypes=('input', 'output'), metadata_keys=None,
-                        includes=None, excludes=(), tags=(), get_remote=False, rank=None,
+                        includes=None, excludes=None, tags=(), get_remote=False, rank=None,
                         return_rel_names=True):
         """
         Retrieve metdata for a filtered list of variables.
@@ -3113,11 +3113,11 @@ class System(object):
             available 'allprocs' metadata.  If 'values' or 'src_indices' are required,
             their keys must be provided explicitly since they are not found in the 'allprocs'
             metadata and must be retrieved from local metadata located in each process.
-        includes : None or iter of str
+        includes : iter of str or None
             Collection of glob patterns for pathnames of variables to include. Default is None,
             which includes all variables.
-        excludes : None or iter of str
-            Collection of glob patterns for pathnames of variables to exclude. Default is ().
+        excludes : iter of str or None
+            Collection of glob patterns for pathnames of variables to exclude. Default is None.
         tags : str or iter of strs
             User defined tags that can be used to filter what gets listed. Only inputs with the
             given tags will be listed.

@@ -891,10 +891,11 @@ def match_includes_excludes(name, includes=None, excludes=None):
     ----------
     name : str
         Name to be checked for match.
-    includes : None or list_like
-        List of glob patterns for name to include in the filtering.
-    excludes : None or list_like
-        List of glob patterns for name to exclude in the filtering.
+    includes : iter of str or None
+        Glob patterns for name to include in the filtering.  None, the default, means
+        include all.
+    excludes : iter of str or None
+        Glob patterns for name to exclude in the filtering.
 
     Returns
     -------
@@ -928,10 +929,11 @@ def match_prom_or_abs(name, prom_name, includes=None, excludes=None):
         Unpromoted variable name to be checked for match.
     prom_name : str
         Promoted variable name to be checked for match.
-    includes : None or list_like
-        List of glob patterns for name to include in the filtering.
-    excludes : None or list_like
-        List of glob patterns for name to exclude in the filtering.
+    includes : iter of str or None
+        Glob patterns for name to include in the filtering.  None, the default, means
+        to include all.
+    excludes : iter of str or None
+        Glob patterns for name to exclude in the filtering.
 
     Returns
     -------

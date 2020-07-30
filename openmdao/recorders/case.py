@@ -12,7 +12,7 @@ import numpy as np
 from openmdao.recorders.sqlite_recorder import blob_to_array
 from openmdao.utils.record_util import deserialize, get_source_system
 from openmdao.utils.variable_table import write_var_table
-from openmdao.utils.general_utils import make_set, match_includes_excludes, match_prom_or_abs
+from openmdao.utils.general_utils import make_set, match_prom_or_abs
 from openmdao.utils.units import unit_conversion
 from openmdao.recorders.sqlite_recorder import format_version as current_version
 
@@ -430,12 +430,11 @@ class Case(object):
             User defined tags that can be used to filter what gets listed. Only inputs with the
             given tags will be listed.
             Default is None, which means there will be no filtering based on tags.
-        includes : None or list_like
-            List of glob patterns for pathnames to include in the check. Default is None, which
-            includes all components in the model.
-        excludes : None or list_like
-            List of glob patterns for pathnames to exclude from the check. Default is None, which
-            excludes nothing.
+        includes : iter of str or None
+            Glob patterns for pathnames to include in the check. Default is None, which
+            includes all.
+        excludes : iter of str or None
+            Glob patterns for pathnames to exclude from the check.
         out_stream : file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
@@ -547,12 +546,11 @@ class Case(object):
             User defined tags that can be used to filter what gets listed. Only outputs with the
             given tags will be listed.
             Default is None, which means there will be no filtering based on tags.
-        includes : None or list_like
-            List of glob patterns for pathnames to include in the check. Default is None, which
-            includes all components in the model.
-        excludes : None or list_like
-            List of glob patterns for pathnames to exclude from the check. Default is None, which
-            excludes nothing.
+        includes : iter of str or None
+            Glob patterns for pathnames to include in the check. Default is None, which
+            includes all.
+        excludes : iter of str or None
+            Glob patterns for pathnames to exclude from the check.
         list_autoivcs : bool
             If True, include auto_ivc outputs in the listing.  Defaults to False.
         out_stream : file-like
