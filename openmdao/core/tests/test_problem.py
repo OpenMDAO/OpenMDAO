@@ -2044,6 +2044,14 @@ class TestProblem(unittest.TestCase):
                                           'vectorize_derivs',
                                           'cache_linear_solution'])
 
+    def test_out_of_order_set_val(self):
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+
+        with self.assertRaises(RuntimeError) as cm:
+            prob.set_val('x', 0.)
+        self.assertEqual(str(cm.exception), "Cannot call set_val before setup.")
 
 class NestedProblemTestCase(unittest.TestCase):
 
