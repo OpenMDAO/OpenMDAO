@@ -312,7 +312,7 @@ class N2OffGridUpArrow extends N2OffGridArrow {
             'start': { 'id': attribs.offscreenId },
             'end': { 'id': attribs.cell.tgtId },
             'direction': 'up',
-            'color': attribs.color ? attribs.color : N2Style.color.redArrow
+            'color': attribs.color ? attribs.color : N2Style.color.inputArrow
         }), n2Groups, nodeSize);
 
         this.label.ref = d3.select("div#left.offgrid");
@@ -356,7 +356,7 @@ class N2OffGridDownArrow extends N2OffGridArrow {
             'start': { 'id': attribs.offscreenId },
             'end': { 'id': attribs.cell.tgtId },
             'direction': 'down',
-            'color': attribs.color ? attribs.color : N2Style.color.redArrow
+            'color': attribs.color ? attribs.color : N2Style.color.inputArrow
         }), n2Groups, nodeSize);
 
         this.label.ref = d3.select("div#bottom.offgrid");
@@ -399,7 +399,7 @@ class N2OffGridLeftArrow extends N2OffGridArrow {
             'start': { 'id': attribs.cell.srcId },
             'end': { 'id': attribs.offscreenId },
             'direction': 'left',
-            'color': attribs.color ? attribs.color : N2Style.color.greenArrow
+            'color': attribs.color ? attribs.color : N2Style.color.outputArrow
         }), n2Groups, nodeSize);
 
         this.label.ref = d3.select("div#bottom.offgrid");
@@ -443,7 +443,7 @@ class N2OffGridRightArrow extends N2OffGridArrow {
             'start': { 'id': attribs.cell.srcId },
             'end': { 'id': attribs.offscreenId },
             'direction': 'right',
-            'color': attribs.color ? attribs.color : N2Style.color.greenArrow
+            'color': attribs.color ? attribs.color : N2Style.color.outputArrow
         }), n2Groups, nodeSize);
 
         this.label.ref = d3.select("div#right.offgrid");

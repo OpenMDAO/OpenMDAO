@@ -122,10 +122,10 @@ class N2Search {
 
         if (node === this.zoomedElement) return didMatch;
 
-        if (!didMatch && !node.hasChildren() && node.isParamOrUnknown()) {
+        if (!didMatch && !node.hasChildren() && node.isInputOrOutput()) {
             didMatch = regexMatch.test(node.absPathName);
             if (didMatch) {
-                // only params and unknowns can count as matches
+                // only inputs and outputs can count as matches
                 ++this.numMatches;
             }
             else if (undoList) {
@@ -159,7 +159,7 @@ class N2Search {
     performSearch() {
         for (let node of this.searchCollapsedUndo) {
             //auto undo on successive searches
-            if (!node.hasChildren() && node.isParamOrUnknown()) node.varIsHidden = false;
+            if (!node.hasChildren() && node.isInputOrOutput()) node.varIsHidden = false;
             else node.isMinimized = false;
         }
 
@@ -268,7 +268,7 @@ class N2Search {
         if (node === this.zoomedElement) return;
 
         let nodeName = node.name;
-        if (! node.isParamOrUnknown()) nodeName += ".";
+        if (! node.isInputOrOutput()) nodeName += ".";
         let namesToAdd = [nodeName];
 
         for (let name of namesToAdd) {

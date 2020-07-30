@@ -42,10 +42,10 @@ def _get_var_dict(system, typ, name):
 
     var_dict['name'] = name
     if typ == 'input':
-        var_dict['type'] = 'param'
+        var_dict['type'] = 'input'
     elif typ == 'output':
         isimplicit = isinstance(system, ImplicitComponent)
-        var_dict['type'] = 'unknown'
+        var_dict['type'] = 'output'
         var_dict['implicit'] = isimplicit
 
     var_dict['dtype'] = type(meta['value']).__name__

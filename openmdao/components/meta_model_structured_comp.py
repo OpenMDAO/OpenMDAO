@@ -30,7 +30,7 @@ class MetaModelStructuredComp(ExplicitComponent):
         Cached shape of the gradient of the outputs wrt the training inputs.
     interps : dict
         Dictionary of interpolations for each output.
-    params : list
+    inputs : list
         List containing training data for each input.
     pnames : list
         Cached list of input names.
@@ -50,7 +50,7 @@ class MetaModelStructuredComp(ExplicitComponent):
         super(MetaModelStructuredComp, self).__init__(**kwargs)
 
         self.pnames = []
-        self.params = []
+        self.inputs = []
         self.training_outputs = {}
         self.interps = {}
         self.grad_shape = ()
@@ -97,7 +97,7 @@ class MetaModelStructuredComp(ExplicitComponent):
         super(MetaModelStructuredComp, self).add_input(name, val * np.ones(n), **kwargs)
 
         self.pnames.append(name)
-        self.params.append(np.asarray(training_data))
+        self.inputs.append(np.asarray(training_data))
 
     def add_output(self, name, val=1.0, training_data=None, **kwargs):
         """
@@ -142,11 +142,11 @@ class MetaModelStructuredComp(ExplicitComponent):
             opts = self.options['interp_options']
         for name, train_data in self.training_outputs.items():
             self.interps[name] = InterpND(method=interp_method,
-                                          points=self.params, values=train_data,
+                                          points=self.inputs, values=train_data,
                                           extrapolate=self.options['extrapolate'])
 
         if self.options['training_data_gradients']:
-            self.grad_shape = tuple([self.options['vec_size']] + [i.size for i in self.params])
+            self.grad_shape = tuple([self.options['vec_size']] + [i.size for i in self.inputs])
 
         super(MetaModelStructuredComp, self)._setup_var_data()
 

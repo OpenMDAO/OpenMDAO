@@ -2405,15 +2405,15 @@ class System(object):
         name : string
             Name of the design variable in the system.
         lower : float or ndarray, optional
-            Lower boundary for the param
+            Lower boundary for the input
         upper : upper or ndarray, optional
-            Upper boundary for the param
+            Upper boundary for the input
         ref : float or ndarray, optional
             Value of design var that scales to 1.0 in the driver.
         ref0 : float or ndarray, optional
             Value of design var that scales to 0.0 in the driver.
         indices : iter of int, optional
-            If a param is an array, these indicate which entries are of
+            If an input is an array, these indicate which entries are of
             interest for this particular design variable.  These may be
             positive or negative integers.
         units : str, optional
@@ -4178,8 +4178,8 @@ class System(object):
             if abs_name not in self._var_allprocs_discrete['input']:
                 # can't get here unless self is a Group because len(abs_names) always == 1 for comp
                 try:
-                    units = self._group_inputs[name]['units']
-                except KeyError:
+                    units = self._group_inputs[name][0]['units']
+                except (KeyError, IndexError):
                     self._show_ambiguity_msg(name, ('units',), abs_names)
 
         val = self._abs_get_val(src, get_remote, rank, vec_name, kind, flat, from_root=True)
@@ -4360,6 +4360,9 @@ class System(object):
 
         base_units = meta['units']
 
+        if base_units == units:
+            return val
+
         try:
             scale, offset = unit_conversion(base_units, units)
         except Exception:
@@ -4387,6 +4390,9 @@ class System(object):
             The value converted to the specified units.
         """
         base_units = self._get_var_meta(name)['units']
+
+        if base_units == units:
+            return val
 
         try:
             scale, offset = unit_conversion(units, base_units)
@@ -4416,6 +4422,9 @@ class System(object):
         float or ndarray of float
             The value converted to the specified units.
         """
+        if units_from == units_to:
+            return val
+
         try:
             scale, offset = unit_conversion(units_from, units_to)
         except Exception:
@@ -4448,7 +4457,7 @@ class System(object):
 
         raise KeyError('{}: Metadata for variable "{}" not found.'.format(self.msginfo, name))
 
-    def _resolve_connected_input_defaults(self):
+    def _resolve_ambiguous_input_meta(self):
         pass
 
 
