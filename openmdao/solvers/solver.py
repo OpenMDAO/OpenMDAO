@@ -601,9 +601,8 @@ class NonlinearSolver(Solver):
                 self._iter_count += 1
                 self._run_apply()
                 norm = self._iter_get_norm()
-                # With solvers, we want to record the norm AFTER the call, but the call needs to
-                # be wrapped in the with for stack purposes, so we locally assign  norm & norm0
-                # into the class.
+
+                # Save the norm values in the context manager so they can also be recorded.
                 rec.abs = norm
                 if norm0 == 0:
                     norm0 = 1
@@ -840,9 +839,8 @@ class LinearSolver(Solver):
                 self._iter_count += 1
                 self._run_apply()
                 norm = self._iter_get_norm()
-                # With solvers, we want to record the norm AFTER the call, but the call needs to
-                # be wrapped in the with for stack purposes, so we locally assign  norm & norm0
-                # into the class.
+
+                # Save the norm values in the context manager so they can also be recorded.
                 rec.abs = norm
                 if norm0 == 0:
                     norm0 = 1

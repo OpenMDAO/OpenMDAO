@@ -125,7 +125,7 @@ NewtonSolver Option Examples
   In this example, we set stall_limit to 3. While the solver iterates, it will compare the value of the
   residual norm to the value computed in the previous iteration.  If the value matches for three iterations
   in a row, then iteration will terminate due to detection of a stall. If "err_on_non_converge" is set
-  to True, then an ``AnalysisError`` just as if we had reached the iteration count limit.
+  to True, then an ``AnalysisError`` will be raised just as if we had reached the iteration count limit.
 
   We also set the `stall_tol` to 1e-6, which is the threshold below which a change in the relative residual
   norm is considered to be unchanged.
