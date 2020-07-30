@@ -1092,14 +1092,14 @@ class TestScalingOverhaul(unittest.TestCase):
         model = prob.model
 
         inputs_comp = om.IndepVarComp()
-        inputs_comp.add_output('x1_u_u', val=1.0)
-        inputs_comp.add_output('x1_u_s', val=1.0)
-        inputs_comp.add_output('x1_s_u', val=1.0, ref=3.0)
-        inputs_comp.add_output('x1_s_s', val=1.0, ref=3.0)
+        inputs_comp.add_output('x1_u_u',  val=1.0)
+        inputs_comp.add_output('x1_u_s',  val=1.0)
+        inputs_comp.add_output('x1_s_u',  val=1.0)
+        inputs_comp.add_output('x1_s_s',  val=1.0)
         inputs_comp.add_output('ox1_u_u', val=1.0)
         inputs_comp.add_output('ox1_u_s', val=1.0)
-        inputs_comp.add_output('ox1_s_u', val=1.0, ref=3.0)
-        inputs_comp.add_output('ox1_s_s', val=1.0, ref=3.0)
+        inputs_comp.add_output('ox1_s_u', val=1.0)
+        inputs_comp.add_output('ox1_s_s', val=1.0)
 
         model.add_subsystem('p', inputs_comp)
         mycomp = model.add_subsystem('comp', MyComp())

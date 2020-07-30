@@ -105,8 +105,7 @@ class IndepVarComp(ExplicitComponent):
 
         super(IndepVarComp, self)._configure_check()
 
-    def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, tags=None):
+    def add_output(self, name, val=1.0, shape=None, units=None, desc='', tags=None):
         """
         Add an independent variable to this component.
 
@@ -122,47 +121,18 @@ class IndepVarComp(ExplicitComponent):
         units : str or None
             Units in which the output variables will be provided to the component during execution.
             Default is None, which means it has no units.
-        res_units : str or None
-            Units in which the residuals of this output will be given to the user when requested.
-            Default is None, which means it has no units.
         desc : str
             description of the variable
-        lower : float or list or tuple or ndarray or None
-            lower bound(s) in user-defined units. It can be (1) a float, (2) an array_like
-            consistent with the shape arg (if given), or (3) an array_like matching the shape of
-            val, if val is array_like. A value of None means this output has no lower bound.
-            Default is None.
-        upper : float or list or tuple or ndarray or None
-            upper bound(s) in user-defined units. It can be (1) a float, (2) an array_like
-            consistent with the shape arg (if given), or (3) an array_like matching the shape of
-            val, if val is array_like. A value of None means this output has no upper bound.
-            Default is None.
-        ref : float
-            Scaling parameter. The value in the user-defined units of this output variable when
-            the scaled value is 1. Default is 1.
-        ref0 : float
-            Scaling parameter. The value in the user-defined units of this output variable when
-            the scaled value is 0. Default is 0.
-        res_ref : float
-            Scaling parameter. The value in the user-defined res_units of this output's residual
-            when the scaled value is 1. Default is None, which means residual scaling matches
-            output scaling.
         tags : str or list of strs
             User defined tags that can be used to filter what gets listed when calling
             list_outputs.
         """
-        if res_ref is None:
-            res_ref = ref
-
         if tags is None:
             tags = {'indep_var'}
         else:
             tags = make_set(tags) | {'indep_var'}
 
-        kwargs = {'shape': shape, 'units': units, 'res_units': res_units, 'desc': desc,
-                  'lower': lower, 'upper': upper, 'ref': ref, 'ref0': ref0,
-                  'res_ref': res_ref, 'tags': tags
-                  }
+        kwargs = {'shape': shape, 'units': units, 'desc': desc, 'tags': tags}
         super(IndepVarComp, self).add_output(name, val, **kwargs)
 
     def add_discrete_output(self, name, val, desc='', tags=None):

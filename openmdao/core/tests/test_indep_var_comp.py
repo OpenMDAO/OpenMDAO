@@ -59,8 +59,8 @@ class TestIndepVarComp(unittest.TestCase):
         import openmdao.api as om
 
         comp = om.IndepVarComp()
-        comp.add_output('indep_var_1', val=1.0, lower=0, upper=10)
-        comp.add_output('indep_var_2', val=2.0, lower=1, upper=20)
+        comp.add_output('indep_var_1', val=1.0)
+        comp.add_output('indep_var_2', val=2.0)
 
         prob = om.Problem(comp).setup()
 
@@ -111,8 +111,8 @@ class TestIndepVarComp(unittest.TestCase):
         from openmdao.api import Problem, IndepVarComp
 
         comp = IndepVarComp()
-        comp.add_output('indep_var_1', val=1.0, lower=0, upper=10, tags="tag1")
-        comp.add_output('indep_var_2', val=2.0, lower=1, upper=20, tags="tag2")
+        comp.add_output('indep_var_1', val=1.0, tags="tag1")
+        comp.add_output('indep_var_2', val=2.0, tags="tag2")
 
         prob = Problem(comp).setup(check=False)
         prob.run_model()
@@ -175,7 +175,7 @@ class TestIndepVarComp(unittest.TestCase):
         model = prob.model
 
         ivc = om.IndepVarComp()
-        ivc.add_output('x1', val=[1, 2, 3], lower=0, upper=10)
+        ivc.add_output('x1', val=[1, 2, 3])
 
         model.add_subsystem('p', ivc)
 
