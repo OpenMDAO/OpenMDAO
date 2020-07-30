@@ -105,9 +105,9 @@ class Group(System):
         self._subgroups_myproc = None
         self._subsystems_proc_range = []
         self._manual_connections = {}
-        self._group_inputs = defaultdict(list)
-        self._pre_config_group_inputs = defaultdict(list)
-        self._static_group_inputs = defaultdict(list)
+        self._group_inputs = {}
+        self._pre_config_group_inputs = {}
+        self._static_group_inputs = {}
         self._static_manual_connections = {}
         self._conn_abs_in2out = {}
         self._conn_discrete_in2out = {}
@@ -182,12 +182,11 @@ class Group(System):
         units : str or None
             Units to assume for the promoted input.
         """
-        meta = {}
+        meta = {'prom': name}
         if val is not _undefined:
             meta['value'] = val
         if units is not None:
             meta['units'] = units
-        meta['prom'] = name
 
         dct = self._static_group_inputs if self._static_mode else self._group_inputs
 
@@ -199,7 +198,7 @@ class Group(System):
                                f"override previously set defaults for {overlap}.")
             old.update(meta)
         else:
-            dct[name].append(meta)
+            dct[name] = [meta]
 
     def _get_scope(self, excl_sub=None):
         """
@@ -385,7 +384,7 @@ class Group(System):
         self._subsystems_allprocs = self._static_subsystems_allprocs.copy()
         self._manual_connections = self._static_manual_connections.copy()
         self._group_inputs = self._static_group_inputs.copy()
-        # defaultdict doesn't copy the internal list so we have to do it manually (we don't want
+        # copy doesn't copy the internal list so we have to do it manually (we don't want
         # a full deepcopy either because we want the internal metadata dicts to be shared)
         for n, lst in self._group_inputs.items():
             self._group_inputs[n] = lst.copy()
@@ -397,6 +396,8 @@ class Group(System):
         # during the config process and we don't want to wipe out any group_inputs
         # that were added during self.setup()
         self._pre_config_group_inputs = self._group_inputs.copy()
+        for n, lst in self._pre_config_group_inputs.items():
+            self._pre_config_group_inputs[n] = lst.copy()
 
         self._static_mode = True
 
@@ -759,7 +760,10 @@ class Group(System):
             if isinstance(subsys, Group):
                 subprom2prom = var_maps['input']
                 for sub_prom, metalist in subsys._group_inputs.items():
-                    self._group_inputs[subprom2prom[sub_prom]].extend(metalist)
+                    key = subprom2prom[sub_prom]
+                    if key not in self._group_inputs:
+                        self._group_inputs[key] = []
+                    self._group_inputs[key].extend(metalist)
 
         # If running in parallel, allgather
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
@@ -798,6 +802,8 @@ class Group(System):
 
                 if rank != myrank:
                     for p, mlist in ginputs.items():
+                        if p not in self._group_inputs:
+                            self._group_inputs[p] = []
                         self._group_inputs[p].extend(mlist)
 
                 # Assemble in parallel allprocs_abs2meta
@@ -847,22 +853,20 @@ class Group(System):
 
         for prom, metalist in self._group_inputs.items():
             origins = {}
-            fullmeta = {}
             top_origin = metalist[0]['path']
             top_prom = metalist[0]['prom']
+            allmeta = set()
             for meta in metalist:
-                for key in meta:
-                    fullmeta[key] = _undefined
+                allmeta.update(meta)
+            fullmeta = {n: _undefined for n in allmeta - skip}
 
             for key in sorted(fullmeta):
-                if key in skip:
-                    continue
                 for i, submeta in enumerate(metalist):
                     if key in submeta:
                         if fullmeta[key] is _undefined:
-                            val = fullmeta[key] = submeta[key]
                             origin = submeta['path']
                             origin_prom = submeta['prom']
+                            val = fullmeta[key] = submeta[key]
                             if origin != top_origin:
                                 simple_warning(f"Group '{top_origin}' did not set a default "
                                                f"'{key}' for input '{top_prom}', so the value of "
