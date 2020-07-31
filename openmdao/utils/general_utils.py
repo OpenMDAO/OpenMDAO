@@ -992,18 +992,12 @@ def _is_slicer_op(indices):
         Returns True if indices contains a colon or ellipsis operator.
     """
     if isinstance(indices, Iterable):
-        for i in indices:
-            if isinstance(i, slice):
-                return True
-        if indices is not None:
-            if hasattr(indices, "dtype") and indices.dtype == object:
-                return any(i == ... for i in indices)
-            elif isinstance(indices, tuple):
-                return any(i == ... for i in np.array(indices))
-    elif isinstance(indices, slice):
-        return True
+        if isinstance(indices, tuple):
+            return any(isinstance(i, slice) or i == ... for i in indices)
+        else:
+            return any(isinstance(i, slice) or i == ... for i in indices.flatten())
     else:
-        return False
+        return isinstance(indices, slice)
 
 
 def _slice_indices(slicer, out_size, out_shape):
