@@ -91,12 +91,12 @@ class TestViewModelData(unittest.TestCase):
                                  "children":[
                                     {
                                        "name":"y2_actual",
-                                       "type":"param",
+                                       "type":"input",
                                        "dtype":"ndarray"
                                     },
                                     {
                                        "name":"y2_command",
-                                       "type":"unknown",
+                                       "type":"output",
                                        "implicit":true,
                                        "dtype":"ndarray"
                                     }
@@ -117,22 +117,22 @@ class TestViewModelData(unittest.TestCase):
                            "children":[
                               {
                                  "name":"z",
-                                 "type":"param",
+                                 "type":"input",
                                  "dtype":"ndarray"
                               },
                               {
                                  "name":"x",
-                                 "type":"param",
+                                 "type":"input",
                                  "dtype":"ndarray"
                               },
                               {
                                  "name":"y2",
-                                 "type":"param",
+                                 "type":"input",
                                  "dtype":"ndarray"
                               },
                               {
                                  "name":"y1",
-                                 "type":"unknown",
+                                 "type":"output",
                                  "implicit":false,
                                  "dtype":"ndarray"
                               }
@@ -151,17 +151,17 @@ class TestViewModelData(unittest.TestCase):
                            "children":[
                               {
                                  "name":"z",
-                                 "type":"param",
+                                 "type":"input",
                                  "dtype":"ndarray"
                               },
                               {
                                  "name":"y1",
-                                 "type":"param",
+                                 "type":"input",
                                  "dtype":"ndarray"
                               },
                               {
                                  "name":"y2",
-                                 "type":"unknown",
+                                 "type":"output",
                                  "implicit":false,
                                  "dtype":"ndarray"
                               }
@@ -184,27 +184,27 @@ class TestViewModelData(unittest.TestCase):
                      "children":[
                         {
                            "name":"x",
-                           "type":"param",
+                           "type":"input",
                            "dtype":"ndarray"
                         },
                         {
                            "name":"y1",
-                           "type":"param",
+                           "type":"input",
                            "dtype":"ndarray"
                         },
                         {
                            "name":"y2",
-                           "type":"param",
+                           "type":"input",
                            "dtype":"ndarray"
                         },
                         {
                            "name":"z",
-                           "type":"param",
+                           "type":"input",
                            "dtype":"ndarray"
                         },
                         {
                            "name":"obj",
-                           "type":"unknown",
+                           "type":"output",
                            "implicit":false,
                            "dtype":"ndarray"
                         }
@@ -225,12 +225,12 @@ class TestViewModelData(unittest.TestCase):
                      "children":[
                         {
                            "name":"y1",
-                           "type":"param",
+                           "type":"input",
                            "dtype":"ndarray"
                         },
                         {
                            "name":"con1",
-                           "type":"unknown",
+                           "type":"output",
                            "implicit":false,
                            "dtype":"ndarray"
                         }
@@ -251,12 +251,12 @@ class TestViewModelData(unittest.TestCase):
                      "children":[
                         {
                            "name":"y2",
-                           "type":"param",
+                           "type":"input",
                            "dtype":"ndarray"
                         },
                         {
                            "name":"con2",
-                           "type":"unknown",
+                           "type":"output",
                            "implicit":false,
                            "dtype":"ndarray"
                         }
@@ -476,7 +476,7 @@ class TestViewModelData(unittest.TestCase):
                                 "is_discrete": false,
                                 "name": "a",
                                 "shape": "(1,)",
-                                "type": "unknown",
+                                "type": "output",
                                 "units": "None",
                                 "value": [
                                     0.5
@@ -489,7 +489,7 @@ class TestViewModelData(unittest.TestCase):
                                 "is_discrete": false,
                                 "name": "Area",
                                 "shape": "(1,)",
-                                "type": "unknown",
+                                "type": "output",
                                 "units": "m**2",
                                 "value": [
                                     10.0
@@ -502,7 +502,7 @@ class TestViewModelData(unittest.TestCase):
                                 "is_discrete": false,
                                 "name": "rho",
                                 "shape": "(1,)",
-                                "type": "unknown",
+                                "type": "output",
                                 "units": "kg/m**3",
                                 "value": [
                                     1.225
@@ -515,7 +515,7 @@ class TestViewModelData(unittest.TestCase):
                                 "is_discrete": false,
                                 "name": "Vu",
                                 "shape": "(1,)",
-                                "type": "unknown",
+                                "type": "output",
                                 "units": "m/s",
                                 "value": [
                                     10.0
@@ -530,8 +530,10 @@ class TestViewModelData(unittest.TestCase):
                         "name": "indeps",
                         "nonlinear_solver": "",
                         "options": {
+                            "desc": null,
                             "distributed": false,
                             "lower": null,
+                            "name": null,
                             "ref": 1.0,
                             "ref0": 0.0,
                             "res_ref": null,
@@ -553,7 +555,7 @@ class TestViewModelData(unittest.TestCase):
                                 "is_discrete": false,
                                 "name": "a",
                                 "shape": "(1,)",
-                                "type": "param",
+                                "type": "input",
                                 "units": "None",
                                 "value": [
                                     0.5
@@ -565,7 +567,7 @@ class TestViewModelData(unittest.TestCase):
                                 "is_discrete": false,
                                 "name": "Area",
                                 "shape": "(1,)",
-                                "type": "param",
+                                "type": "input",
                                 "units": "m**2",
                                 "value": [
                                     10.0
@@ -577,7 +579,7 @@ class TestViewModelData(unittest.TestCase):
                                 "is_discrete": false,
                                 "name": "rho",
                                 "shape": "(1,)",
-                                "type": "param",
+                                "type": "input",
                                 "units": "kg/m**3",
                                 "value": [
                                     1.225
@@ -589,7 +591,7 @@ class TestViewModelData(unittest.TestCase):
                                 "is_discrete": false,
                                 "name": "Vu",
                                 "shape": "(1,)",
-                                "type": "param",
+                                "type": "input",
                                 "units": "m/s",
                                 "value": [
                                     10.0
@@ -602,7 +604,7 @@ class TestViewModelData(unittest.TestCase):
                                 "is_discrete": false,
                                 "name": "Vr",
                                 "shape": "(1,)",
-                                "type": "unknown",
+                                "type": "output",
                                 "units": "m/s",
                                 "value": [
                                     0.0
@@ -615,7 +617,7 @@ class TestViewModelData(unittest.TestCase):
                                 "is_discrete": false,
                                 "name": "Vd",
                                 "shape": "(1,)",
-                                "type": "unknown",
+                                "type": "output",
                                 "units": "m/s",
                                 "value": [
                                     0.0
@@ -628,7 +630,7 @@ class TestViewModelData(unittest.TestCase):
                                 "is_discrete": false,
                                 "name": "Ct",
                                 "shape": "(1,)",
-                                "type": "unknown",
+                                "type": "output",
                                 "units": "None",
                                 "value": [
                                     0.0
@@ -641,7 +643,7 @@ class TestViewModelData(unittest.TestCase):
                                 "is_discrete": false,
                                 "name": "thrust",
                                 "shape": "(1,)",
-                                "type": "unknown",
+                                "type": "output",
                                 "units": "N",
                                 "value": [
                                     0.0
@@ -654,7 +656,7 @@ class TestViewModelData(unittest.TestCase):
                                 "is_discrete": false,
                                 "name": "Cp",
                                 "shape": "(1,)",
-                                "type": "unknown",
+                                "type": "output",
                                 "units": "None",
                                 "value": [
                                     0.0
@@ -667,7 +669,7 @@ class TestViewModelData(unittest.TestCase):
                                 "is_discrete": false,
                                 "name": "power",
                                 "shape": "(1,)",
-                                "type": "unknown",
+                                "type": "output",
                                 "units": "W",
                                 "value": [
                                     0.0
@@ -693,8 +695,15 @@ class TestViewModelData(unittest.TestCase):
                 "expressions": null,
                 "is_parallel": false,
                 "linear_solver": "LN: RUNONCE",
+                "linear_solver_options": {
+                    "assemble_jac": false,
+                    "iprint": 1
+                },
                 "name": "root",
                 "nonlinear_solver": "NL: RUNONCE",
+                "nonlinear_solver_options": {
+                    "iprint": 1
+                },
                 "options": {
                     "assembled_jac_type": "csc"
                 },

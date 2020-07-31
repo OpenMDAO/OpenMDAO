@@ -495,11 +495,11 @@ class N2Diagram {
                 self.ui.nodeInfoBox.update_solver(d3.event, d, d3.select(this).select('rect').style('fill'))
 
                 if (self.model.abs2prom != undefined) {
-                    if (d.isParam()) {
+                    if (d.isInput()) {
                         return self.dom.toolTip.text(self.model.abs2prom.input[d.absPathName])
                             .style("visibility", "visible");
                     }
-                    if (d.isUnknown()) {
+                    if (d.isOutput()) {
                         return self.dom.toolTip.text(self.model.abs2prom.output[d.absPathName])
                             .style("visibility", "visible");
                     }
@@ -936,11 +936,11 @@ class N2Diagram {
     }
 
     /**
-     * Recursively minimize non-parameter nodes to the specified depth.
+     * Recursively minimize non-input nodes to the specified depth.
      * @param {N2TreeNode} node The node to work on.
      */
     _minimizeToDepth(node) {
-        if (node.isParamOrUnknown()) {
+        if (node.isInputOrOutput()) {
             return;
         }
 

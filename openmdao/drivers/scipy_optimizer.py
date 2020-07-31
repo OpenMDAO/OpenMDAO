@@ -258,11 +258,11 @@ class ScipyOptimizeDriver(Driver):
         self.opt_settings['disp'] = self.options['disp']
 
         # Size Problem
-        nparam = 0
-        for param in self._designvars.values():
-            size = param['global_size'] if param['distributed'] else param['size']
-            nparam += size
-        x_init = np.empty(nparam)
+        ndesvar = 0
+        for desvar in self._designvars.values():
+            size = desvar['global_size'] if desvar['distributed'] else desvar['size']
+            ndesvar += size
+        x_init = np.empty(ndesvar)
 
         # Initial Design Vars
         i = 0
@@ -498,9 +498,9 @@ class ScipyOptimizeDriver(Driver):
             elif opt == 'shgo':
                 from scipy.optimize import shgo
                 kwargs = dict()
-                for param in ('minimizer_kwargs', 'sampling_method ', 'n', 'iters'):
-                    if param in self.opt_settings:
-                        kwargs[param] = self.opt_settings[param]
+                for option in ('minimizer_kwargs', 'sampling_method ', 'n', 'iters'):
+                    if option in self.opt_settings:
+                        kwargs[option] = self.opt_settings[option]
                 # Set the Jacobian and the Hessian to the value calculated in OpenMDAO
                 if 'minimizer_kwargs' not in kwargs or kwargs['minimizer_kwargs'] is None:
                     kwargs['minimizer_kwargs'] = {}
@@ -557,7 +557,7 @@ class ScipyOptimizeDriver(Driver):
         Parameters
         ----------
         x_new : ndarray
-            Array containing parameter values at new design point.
+            Array containing input values at new design point.
 
         Returns
         -------
@@ -568,7 +568,7 @@ class ScipyOptimizeDriver(Driver):
 
         try:
 
-            # Pass in new parameters
+            # Pass in new inputs
             i = 0
             if MPI:
                 model.comm.Bcast(x_new, root=0)
@@ -608,7 +608,7 @@ class ScipyOptimizeDriver(Driver):
         Parameters
         ----------
         x_new : ndarray
-            Array containing parameter values at new design point.
+            Array containing input values at new design point.
         name : string
             Name of the constraint to be evaluated.
         dbl : bool
@@ -633,7 +633,7 @@ class ScipyOptimizeDriver(Driver):
         Parameters
         ----------
         x_new : ndarray
-            Array containing parameter values at new design point.
+            Array containing input values at new design point.
         name : string
             Name of the constraint to be evaluated.
         dbl : bool
@@ -683,12 +683,12 @@ class ScipyOptimizeDriver(Driver):
         Parameters
         ----------
         x_new : ndarray
-            Array containing parameter values at new design point.
+            Array containing input values at new design point.
 
         Returns
         -------
         ndarray
-            Gradient of objective with respect to parameter array.
+            Gradient of objective with respect to input array.
         """
         try:
             grad = self._compute_totals(of=self._obj_and_nlcons, wrt=self._dvlist,
@@ -715,7 +715,7 @@ class ScipyOptimizeDriver(Driver):
         Parameters
         ----------
         x_new : ndarray
-            Array containing parameter values at new design point.
+            Array containing input values at new design point.
         name : string
             Name of the constraint to be evaluated.
         dbl : bool
@@ -726,7 +726,7 @@ class ScipyOptimizeDriver(Driver):
         Returns
         -------
         float
-            Gradient of the constraint function wrt all params.
+            Gradient of the constraint function wrt all inputs.
         """
         if self._exc_info is not None:
             self._reraise()

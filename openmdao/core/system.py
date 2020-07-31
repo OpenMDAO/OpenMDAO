@@ -2392,15 +2392,15 @@ class System(object):
         name : string
             Name of the design variable in the system.
         lower : float or ndarray, optional
-            Lower boundary for the param
+            Lower boundary for the input
         upper : upper or ndarray, optional
-            Upper boundary for the param
+            Upper boundary for the input
         ref : float or ndarray, optional
             Value of design var that scales to 1.0 in the driver.
         ref0 : float or ndarray, optional
             Value of design var that scales to 0.0 in the driver.
         indices : iter of int, optional
-            If a param is an array, these indicate which entries are of
+            If an input is an array, these indicate which entries are of
             interest for this particular design variable.  These may be
             positive or negative integers.
         units : str, optional

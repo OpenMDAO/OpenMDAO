@@ -130,39 +130,39 @@ class N2Legend {
                 this._setDisplayBooleans(node.children);
             }
             else {
-                if (!this.showSysVar.input && node.isParam()) {
+                if (!this.showSysVar.input && node.isInput()) {
                     this.showSysVar.input = true;
                     this.sysAndVar.push({
                         'name': 'Input',
-                        'color': N2Style.color.param
+                        'color': N2Style.color.input
                     })
                 }
                 else if (!this.showSysVar.outputExplicit && node.isExplicitOutput()) {
                     this.showSysVar.outputExplicit = true;
                     this.sysAndVar.push({
                         'name': 'Explicit Output',
-                        'color': N2Style.color.unknownExplicit
+                        'color': N2Style.color.outputExplicit
                     })
                 }
                 else if (!this.showSysVar.outputImplicit && node.isImplicitOutput()) {
                     this.showSysVar.outputImplicit = true;
                     this.sysAndVar.push({
                         'name': 'Implicit Output',
-                        'color': N2Style.color.unknownImplicit
+                        'color': N2Style.color.outputImplicit
                     })
                 }
-                else if (!this.showSysVar.autoivcInput && node.isAutoIvcParam()) {
+                else if (!this.showSysVar.autoivcInput && node.isAutoIvcInput()) {
                     this.showSysVar.autoivcInput = true;
                     this.sysAndVar.push({
                         'name': 'Auto-IVC Input',
-                        'color': N2Style.color.autoivcParam
+                        'color': N2Style.color.autoivcInput
                     })
                 }
-                else if (!this.showSysVar.unconnectedInput && node.isUnconnectedParam()) {
+                else if (!this.showSysVar.unconnectedInput && node.isUnconnectedInput()) {
                     this.showSysVar.unconnectedInput = true;
                     this.sysAndVar.push({
                         'name': 'Unconnected Input',
-                        'color': N2Style.color.unconnectedParam
+                        'color': N2Style.color.unconnectedInput
                     })
                 }
             }

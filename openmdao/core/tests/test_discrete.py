@@ -564,7 +564,7 @@ class DiscreteTestCase(unittest.TestCase):
         model = prob.model
 
         indep = model.add_subsystem('indep', om.IndepVarComp())
-        indep.add_output('x', 1.0, ref=10.)
+        indep.add_output('x', 1.0)
 
         comp = model.add_subsystem('comp', CompDiscWDerivsImplicit(), promotes=['N'])
         sink = model.add_subsystem('sink', MixedCompDiscIn(1.0))

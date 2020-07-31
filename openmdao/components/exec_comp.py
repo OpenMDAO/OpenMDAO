@@ -438,45 +438,45 @@ class ExecComp(ExplicitComponent):
         inv_stepsize = 1.0 / self.complex_stepsize
         has_diag_partials = self.options['has_diag_partials']
 
-        for param in inputs:
+        for input in inputs:
 
             pwrap = _TmpDict(inputs)
-            pval = inputs[param]
+            pval = inputs[input]
             psize = pval.size
-            pwrap[param] = np.asarray(pval, npcomplex)
+            pwrap[input] = np.asarray(pval, npcomplex)
 
             if has_diag_partials or psize == 1:
-                # set a complex param value
-                pwrap[param] += step
+                # set a complex input value
+                pwrap[input] += step
 
                 uwrap = _TmpDict(self._outputs, return_complex=True)
 
-                # solve with complex param value
+                # solve with complex input value
                 self._residuals.set_val(0.0)
                 self.compute(pwrap, uwrap)
 
                 for u in out_names:
-                    partials[(u, param)] = imag(uwrap[u] * inv_stepsize).flat
+                    partials[(u, input)] = imag(uwrap[u] * inv_stepsize).flat
 
-                # restore old param value
-                pwrap[param] -= step
+                # restore old input value
+                pwrap[input] -= step
             else:
-                for i, idx in enumerate(array_idx_iter(pwrap[param].shape)):
-                    # set a complex param value
-                    pwrap[param][idx] += step
+                for i, idx in enumerate(array_idx_iter(pwrap[input].shape)):
+                    # set a complex input value
+                    pwrap[input][idx] += step
 
                     uwrap = _TmpDict(self._outputs, return_complex=True)
 
-                    # solve with complex param value
+                    # solve with complex input value
                     self._residuals.set_val(0.0)
                     self.compute(pwrap, uwrap)
 
                     for u in out_names:
                         # set the column in the Jacobian entry
-                        partials[(u, param)][:, i] = imag(uwrap[u] * inv_stepsize).flat
+                        partials[(u, input)][:, i] = imag(uwrap[u] * inv_stepsize).flat
 
-                    # restore old param value
-                    pwrap[param][idx] -= step
+                    # restore old input value
+                    pwrap[input][idx] -= step
 
 
 class _TmpDict(object):

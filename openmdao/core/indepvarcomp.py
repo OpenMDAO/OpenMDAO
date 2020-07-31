@@ -3,7 +3,7 @@
 import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent
-from openmdao.utils.general_utils import make_set
+from openmdao.utils.general_utils import make_set, warn_deprecation
 
 
 class IndepVarComp(ExplicitComponent):
@@ -151,6 +151,21 @@ class IndepVarComp(ExplicitComponent):
             User defined tags that can be used to filter what gets listed when calling
             list_outputs.
         """
+        if res_units is not None:
+            warn_deprecation(
+                "'res_units' has been deprecated and will be removed in a future version")
+        elif lower is not None:
+            warn_deprecation("'lower' has been deprecated and will be removed in a future version")
+        elif upper is not None:
+            warn_deprecation("'upper' has been deprecated and will be removed in a future version")
+        elif ref0:
+            warn_deprecation("'ref0' has been deprecated and will be removed in a future version")
+        elif res_ref is not None:
+            warn_deprecation(
+                "'res_ref' has been deprecated and will be removed in a future version")
+        elif ref:
+            warn_deprecation("'ref' has been deprecated and will be removed in a future version")
+
         if res_ref is None:
             res_ref = ref
 
