@@ -466,8 +466,7 @@ class Problem(object):
                         tu0 = tunit_list[0]
                         for tu in tunit_list:
                             if tu != tu0:
-                                model._show_ambiguity_msg(name, ('units',),
-                                                          abs_names)
+                                model._show_ambiguity_msg(name, ('units',), abs_names)
 
                 if units is None:
                     if self._setup_status > 1:  # avoids double unit conversion
