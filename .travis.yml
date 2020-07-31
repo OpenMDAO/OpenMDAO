@@ -97,9 +97,9 @@ install:
     conda install -c anaconda mpi4py --yes;
     conda install -c conda-forge petsc=$PETSc petsc4py --yes;
 
-    # need these for building paropt
-#    conda install -c anaconda gxx_linux-64 --yes;
-#    conda install -c anaconda gfortran_linux-64 --yes;
+    # Might need to install these for building paropt locally
+    #    conda install -c anaconda gxx_linux-64 --yes;
+    #    conda install -c anaconda gfortran_linux-64 --yes;
   fi
 
   if [ "$PYOPTSPARSE" ]; then
