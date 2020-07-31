@@ -106,7 +106,7 @@ class IndepVarComp(ExplicitComponent):
         super(IndepVarComp, self)._configure_check()
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, tags=None):
+                   lower=None, upper=None, ref=None, ref0=None, res_ref=None, tags=None):
         """
         Add an independent variable to this component.
 
@@ -139,10 +139,10 @@ class IndepVarComp(ExplicitComponent):
             Default is None.
         ref : float
             Scaling parameter. The value in the user-defined units of this output variable when
-            the scaled value is 1. Default is 1.
+            the scaled value is 1. Default is None.
         ref0 : float
             Scaling parameter. The value in the user-defined units of this output variable when
-            the scaled value is 0. Default is 0.
+            the scaled value is 0. Default is None.
         res_ref : float
             Scaling parameter. The value in the user-defined res_units of this output's residual
             when the scaled value is 1. Default is None, which means residual scaling matches
@@ -158,13 +158,16 @@ class IndepVarComp(ExplicitComponent):
             warn_deprecation("'lower' has been deprecated and will be removed in a future version")
         elif upper is not None:
             warn_deprecation("'upper' has been deprecated and will be removed in a future version")
-        elif ref0:
+        elif ref0 is not None:
             warn_deprecation("'ref0' has been deprecated and will be removed in a future version")
         elif res_ref is not None:
             warn_deprecation(
                 "'res_ref' has been deprecated and will be removed in a future version")
-        elif ref:
+        elif ref is not None:
             warn_deprecation("'ref' has been deprecated and will be removed in a future version")
+
+        ref = 1.0
+        ref0 = 0.0
 
         if res_ref is None:
             res_ref = ref
