@@ -368,21 +368,8 @@ class pyOptSparseDriver(Driver):
 
         # Instantiate the requested optimizer
         try:
-            print("__import__", optimizer)
             _tmp = __import__('pyoptsparse', globals(), locals(), [optimizer], 0)
-            print("_tmp", _tmp)
-            print("dir(_tmp)", dir(_tmp))
-            # opt = getattr(_tmp, optimizer)()
-            opt_class_or_mod = getattr(_tmp, optimizer)
-            print("opt_mod", opt_class_or_mod)
-            import inspect
-            if inspect.ismodule(opt_class_or_mod):
-                print('was module getting class', optimizer)
-                opt_class = getattr(opt_class_or_mod, optimizer)
-            else:
-                opt_class = opt_class_or_mod
-            opt = opt_class()
-            print("opt being used is ", opt)
+            opt = getattr(_tmp, optimizer)()
 
         except Exception as err:
             # Change whatever pyopt gives us to an ImportError, give it a readable message,

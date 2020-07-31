@@ -1963,10 +1963,6 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.driver = om.pyOptSparseDriver()
         prob.driver.options['optimizer'] = "ParOpt"
-        # just test some options
-        prob.driver.opt_settings['output_level'] = 0
-        prob.driver.opt_settings['abs_optimality_tol'] = 1e-6
-        prob.driver.opt_settings['rel_function_tol'] = 0.0
 
         model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
         model.add_design_var('x', lower=0.0, upper=10.0)
