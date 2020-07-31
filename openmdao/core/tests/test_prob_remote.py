@@ -163,14 +163,22 @@ class ProbRemoteTestCase(unittest.TestCase):
         prob.run_model()
 
         # get_remote=True
+        assert_near_equal(prob.get_val('x', get_remote=True), [7.])
         assert_near_equal(prob.get_val('dst.y', get_remote=True), [2., 7., 7.])
+        assert_near_equal(prob.get_val('par.c1.x', get_remote=True), [7.])
         assert_near_equal(prob.get_val('par.c1.y', get_remote=True), [14.])
+        assert_near_equal(prob.get_val('par.c2.x', get_remote=True), [7.])
         assert_near_equal(prob.get_val('par.c2.y', get_remote=True), [35.])
 
         if prob.comm.rank == 0:
             # get_remote=False
+            assert_near_equal(prob.get_val('x', get_remote=False), [7.])
             assert_near_equal(prob.get_val('dst.y', get_remote=False), [2., 7.])
+
+            assert_near_equal(prob.get_val('par.c1.x', get_remote=False), [7.])
             assert_near_equal(prob.get_val('par.c1.y', get_remote=False), [14.])
+
+            assert_near_equal(prob.get_val('par.c2.x', get_remote=False), [7.])
             with self.assertRaises(RuntimeError) as cm:
                 prob.get_val('par.c2.y', get_remote=False)
             self.assertEqual(str(cm.exception),
@@ -179,6 +187,7 @@ class ProbRemoteTestCase(unittest.TestCase):
                               "`problem.get_val(<name>, get_remote=True)`."))
 
             # get_remote=None
+            assert_near_equal(prob['x'], [7.])
             with self.assertRaises(RuntimeError) as cm:
                 prob['dst.y']
             self.assertEqual(str(cm.exception),
@@ -186,7 +195,11 @@ class ProbRemoteTestCase(unittest.TestCase):
                              "You can retrieve values from all processes using "
                              "`get_val(<name>, get_remote=True)' or from the local "
                              "process using `get_val(<name>, get_remote=False)'."))
+
+            assert_near_equal(prob['par.c1.x'], [7.])
             assert_near_equal(prob['par.c1.y'], [14.])
+
+            assert_near_equal(prob['par.c2.x'], [7.])
             with self.assertRaises(RuntimeError) as cm:
                 prob['par.c2.y']
             self.assertEqual(str(cm.exception),
@@ -195,16 +208,22 @@ class ProbRemoteTestCase(unittest.TestCase):
                               "`problem.get_val(<name>, get_remote=True)`."))
         else:
             # get_remote=False
+            assert_near_equal(prob.get_val('x', get_remote=False), [7.])
             assert_near_equal(prob.get_val('dst.y', get_remote=False), [7.])
+
+            assert_near_equal(prob['par.c1.x'], [7.])
             with self.assertRaises(RuntimeError) as cm:
                 prob.get_val('par.c1.y', get_remote=False)
             self.assertEqual(str(cm.exception),
                              ("Problem: Variable 'par.c1.y' is not local to rank 1. "
                               "You can retrieve values from  other processes using "
                               "`problem.get_val(<name>, get_remote=True)`."))
+
+            assert_near_equal(prob.get_val('par.c2.x', get_remote=False), [7.])
             assert_near_equal(prob.get_val('par.c2.y', get_remote=False), [35.])
 
             # get_remote=None
+            assert_near_equal(prob['x'], [7.])
             with self.assertRaises(RuntimeError) as cm:
                 prob['dst.y']
             self.assertEqual(str(cm.exception),
@@ -212,12 +231,16 @@ class ProbRemoteTestCase(unittest.TestCase):
                              "You can retrieve values from all processes using "
                              "`get_val(<name>, get_remote=True)' or from the local "
                              "process using `get_val(<name>, get_remote=False)'."))
+
+            assert_near_equal(prob['par.c1.x'], [7.])
             with self.assertRaises(RuntimeError) as cm:
                 prob['par.c1.y']
             self.assertEqual(str(cm.exception),
                              ("Problem: Variable 'par.c1.y' is not local to rank 1. "
                               "You can retrieve values from  other processes using "
                               "`problem.get_val(<name>, get_remote=True)`."))
+
+            assert_near_equal(prob['par.c2.x'], [7.])
             assert_near_equal(prob['par.c2.y'], [35.])
 
 
