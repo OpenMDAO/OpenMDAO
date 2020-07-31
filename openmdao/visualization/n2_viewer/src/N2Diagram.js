@@ -491,7 +491,8 @@ class N2Diagram {
                 self.ui.rightClick(d, this);
             })
             .on("mouseover", function (d) {
-                self.ui.nodeInfoBox.update(d3.event, d, d3.select(this).select('rect').style('fill'))
+                // self.ui.nodeInfoBox.update(d3.event, d, d3.select(this).select('rect').style('fill'))
+                self.ui.nodeInfoBox.update_solver(d3.event, d, d3.select(this).select('rect').style('fill'))
 
                 if (self.model.abs2prom != undefined) {
                     if (d.isParam()) {

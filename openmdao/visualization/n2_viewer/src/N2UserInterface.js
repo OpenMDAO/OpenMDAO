@@ -120,6 +120,35 @@ class InfoPropArray extends InfoPropDefault {
 // Used to format that floats displayed in the table of the ValueInfo window
 let value_formatter = d3.format("g");
 
+
+/**
+ * Manage a window for displaying the value of a variable.
+ * @typedef ValueInfo
+ */
+class ValueInfoManager {
+    /**
+     * Manage the value info windows.
+     */
+    constructor(ui) {
+        this.ui = ui;
+        this.valueInfoWindows = {};
+    }
+
+    add(abs2prom, name, val){
+        // Check to see if already exists before opening a new one
+        if (!this.valueInfoWindows[name]){
+            let valueInfoBox = new ValueInfo(abs2prom, name, val, this.ui);
+            this.valueInfoWindows[name] = valueInfoBox;
+        }
+    }
+
+    remove(name){
+        this.valueInfoWindows[name].clear() // remove the DOM elements
+        delete this.valueInfoWindows[name]; // remove the reference and let GC cleanup
+    }
+};
+
+
 /**
  * Manage a window for displaying the value of a variable.
  * @typedef ValueInfo
@@ -132,10 +161,11 @@ class ValueInfo {
      * @param {str} name Variable name.
      * @param {Number} val Variable value.
      */
-    constructor(abs2prom, name, val) {
+    constructor(abs2prom, name, val, ui) {
         this.abs2prom = abs2prom;
         this.name = name;
         this.val = val;
+        this.ui = ui;
 
         /* Construct the DOM elements that make up the window */
         this.top_container = d3.select('#node-value-containers');
@@ -164,7 +194,10 @@ class ValueInfo {
         this.close_button.on(
             'click',
             function () {
-                self.hide(); // ********************!!!!!!!!!!!!!! really need to clean up the html and the object!
+                // self.clear();
+                self.ui.valueInfoManager.remove(self.name); //newway
+
+
             }
         );
 
@@ -180,6 +213,19 @@ class ValueInfo {
 
     hide() {
         this.container.style('visibility', 'hidden');
+    }
+
+    clear() {
+        var elem = this.container;
+
+        // d3.select(this.parentNode) returns SVG element
+        //
+        // g = circle.select(function() { return this.parentNode; }) returns d3 object
+
+        var node = elem.node();
+
+
+        node.parentNode.removeChild(node);
     }
 
     update() {
@@ -327,7 +373,7 @@ class NodeInfo {
      * references to the HTML elements.
      * @param {Object} abs2prom Object containing promoted variable names.
      */
-    constructor(abs2prom) {
+    constructor(ui, abs2prom) {
         this.propList = [
             new InfoPropDefault('absPathName', 'Absolute Name'),
             new InfoPropDefault('class', 'Class'),
@@ -346,9 +392,35 @@ class NodeInfo {
             new InfoPropYesNo('is_parallel', 'Parallel'),
             new InfoPropDefault('linear_solver', 'Linear Solver'),
             new InfoPropDefault('nonlinear_solver', 'Non-Linear Solver'),
-            new InfoPropDefault('options', 'Options')
+            new InfoPropDefault('options', 'Options'),
+            new InfoPropDefault('linear_solver_options', 'Linear Solver Options'),
+            new InfoPropDefault('nonlinear_solver_options', 'Non-Linear Solver Options'),
         ];
 
+        this.propListSolvers = [
+            new InfoPropDefault('absPathName', 'Absolute Name'),
+            // new InfoPropDefault('class', 'Class'),
+            // new InfoUpdateType('type', 'Type', true),
+            // new InfoPropDefault('dtype', 'DType'),
+            //
+            // new InfoPropDefault('units', 'Units'),
+            // new InfoPropDefault('shape', 'Shape'),
+            // new InfoPropYesNo('is_discrete', 'Discrete'),
+            // new InfoPropYesNo('distributed', 'Distributed'),
+            // new InfoPropArray('value', 'Value'),
+            //
+            // new InfoPropDefault('subsystem_type', 'Subsystem Type', true),
+            // new InfoPropDefault('component_type', 'Component Type', true),
+            // new InfoPropYesNo('implicit', 'Implicit'),
+            // new InfoPropYesNo('is_parallel', 'Parallel'),
+            // new InfoPropDefault('linear_solver', 'Linear Solver'),
+            // new InfoPropDefault('nonlinear_solver', 'Non-Linear Solver'),
+            // new InfoPropDefault('options', 'Options'),
+            new InfoPropDefault('linear_solver_options', 'Linear Solver Options'),
+            new InfoPropDefault('nonlinear_solver_options', 'Non-Linear Solver Options'),
+        ];
+
+        this.ui = ui;
         this.abs2prom = abs2prom;
         this.table = d3.select('#node-info-table');
         this.container = d3.select('#node-info-container');
@@ -404,9 +476,14 @@ class NodeInfo {
         else this.pin();
     }
 
-    _addPropertyRow(label, val, capitalize = false) {
+    _addPropertyRow(label, val, obj, capitalize = false) {
 
-        if ( label != 'Options'){
+
+
+
+
+        if ( ! ['Options', 'Linear Solver Options', 'Non-Linear Solver Options'].includes(label)){
+        // if ( label != 'Options'){
             const newRow = this.tbody.append('tr');
 
             const th = newRow.append('th')
@@ -453,7 +530,10 @@ class NodeInfo {
                             // self.valueInfo.update(self.name, val);
                             // self.valueInfo.show();
 
-                            let valueInfo = new ValueInfo(this.abs2prom, self.name, val);
+                            self.ui.valueInfoManager.add(this.abs2prom, self.name, val); //newway
+
+
+                            // let valueInfo = new ValueInfo(this.abs2prom, self.name, val); //oldway
                             // self.valueInfo.update(self.name, val);
                             // self.valueInfo.show();
                         });
@@ -480,8 +560,15 @@ class NodeInfo {
         } else {
             // Add Options to the Node Info table
             if ( Object.keys(val).length !== 0 ){
-                const tr = this.tbody.append('th').text("Options").attr('colspan', '2').attr('class', 'options-header');
-                for (const key in val) {
+                if (label === 'Non-Linear Solver Options'){
+                    label += ': ' + obj.nonlinear_solver.substring(3);
+                }
+                if (label === 'Linear Solver Options'){
+                    label += ': ' + obj.linear_solver.substring(3);
+                }
+                const tr = this.tbody.append('th').text(label).attr('colspan', '2').attr('class', 'options-header');
+
+                for (const key of Object.keys(val).sort()) {
                     const tr = this.tbody.append('tr');
                     const th = tr.append('th').text(key);
                     let v;
@@ -519,29 +606,90 @@ class NodeInfo {
 
         if (this.abs2prom) {
             if (obj.isParam()) {
-                this._addPropertyRow('Promoted Name', this.abs2prom.input[obj.absPathName]);
+                this._addPropertyRow('Promoted Name', this.abs2prom.input[obj.absPathName], obj);
             }
             else if (obj.isUnknown()) {
-                this._addPropertyRow('Promoted Name', this.abs2prom.output[obj.absPathName]);
+                this._addPropertyRow('Promoted Name', this.abs2prom.output[obj.absPathName], obj);
             }
         }
 
         if (DebugFlags.info && obj.hasChildren()) {
-            this._addPropertyRow('Children', obj.children.length);
-            this._addPropertyRow('Descendants', obj.numDescendants);
-            this._addPropertyRow('Leaves', obj.numLeaves);
-            this._addPropertyRow('Manually Expanded', obj.manuallyExpanded.toString())
+            this._addPropertyRow('Children', obj.children.length, obj);
+            this._addPropertyRow('Descendants', obj.numDescendants, obj);
+            this._addPropertyRow('Leaves', obj.numLeaves, obj);
+            this._addPropertyRow('Manually Expanded', obj.manuallyExpanded.toString(), obj)
         }
 
         for (const prop of this.propList) {
             // if (obj.propExists(prop.key) && obj[prop.key] != '') {
             if (prop.key === 'value') {
                 if (obj.hasOwnProperty('value')) {
-                    this._addPropertyRow(prop.desc, prop.output(obj[prop.key]), prop.capitalize)
+                    this._addPropertyRow(prop.desc, prop.output(obj[prop.key]), obj, prop.capitalize)
                 }
             } else {
                 if (prop.canShow(obj)) {
-                    this._addPropertyRow(prop.desc, prop.output(obj[prop.key]), prop.capitalize)
+                    this._addPropertyRow(prop.desc, prop.output(obj[prop.key]), obj, prop.capitalize)
+                }
+            }
+        }
+
+        // Solidify the size of the table after populating so that
+        // it can be positioned reliably by move().
+        this.table
+            .style('width', this.table.node().scrollWidth + 'px')
+            .style('height', this.table.node().scrollHeight + 'px')
+
+        this.move(event);
+        this.container.attr('class', 'info-visible');
+    }
+
+        /**
+     * Iterate over the list of known properties and display them
+     * if the specified object contains them.
+     * @param {Object} event The related event so we can get position.
+     * @param {N2TreeNode} obj The node to examine.
+     * @param {N2TreeNode} color The color to make the title bar.
+     */
+    update_solver(event, obj, color = '#42926b') {
+        if (this.hidden || this.pinned) return;
+
+        this.clear();
+        // Put the name in the title
+        this.table.select('thead th')
+            .style('background-color', color)
+            .text(obj.name);
+
+        this.name = obj.absPathName;
+
+        this.table.select('tfoot th')
+            .style('background-color', color);
+
+        if (this.abs2prom) {
+            if (obj.isParam()) {
+                this._addPropertyRow('Promoted Name', this.abs2prom.input[obj.absPathName], obj);
+            }
+            else if (obj.isUnknown()) {
+                this._addPropertyRow('Promoted Name', this.abs2prom.output[obj.absPathName], obj);
+            }
+        }
+
+        if (DebugFlags.info && obj.hasChildren()) {
+            this._addPropertyRow('Children', obj.children.length, obj);
+            this._addPropertyRow('Descendants', obj.numDescendants, obj);
+            this._addPropertyRow('Leaves', obj.numLeaves, obj);
+            this._addPropertyRow('Manually Expanded', obj.manuallyExpanded.toString(), obj)
+        }
+
+        // for (const prop of this.propList) {
+        for (const prop of this.propListSolvers) {
+            // if (obj.propExists(prop.key) && obj[prop.key] != '') {
+            if (prop.key === 'value') {
+                if (obj.hasOwnProperty('value')) {
+                    this._addPropertyRow(prop.desc, prop.output(obj[prop.key]), obj, prop.capitalize)
+                }
+            } else {
+                if (prop.canShow(obj)) {
+                    this._addPropertyRow(prop.desc, prop.output(obj[prop.key]), obj, prop.capitalize)
                 }
             }
         }
@@ -642,7 +790,12 @@ class N2UserInterface {
         this._setupWindowResizer();
 
         this.legend = new N2Legend(this.n2Diag.modelData);
-        this.nodeInfoBox = new NodeInfo(this.n2Diag.model.abs2prom, this.valueInfoBox);
+        // this.nodeInfoBox = new NodeInfo(this, this.n2Diag.model.abs2prom, this.valueInfoBox);
+        this.nodeInfoBox = new NodeInfo(this, this.n2Diag.model.abs2prom);
+
+        this.valueInfoManager = new ValueInfoManager(this); // newway
+
+
         this.toolbar = new N2Toolbar(this);
     }
 
