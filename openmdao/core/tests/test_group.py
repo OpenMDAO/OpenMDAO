@@ -2845,6 +2845,18 @@ class TestFeatureConfigure(unittest.TestCase):
         self.assertTrue(isinstance(top.model.sub.nonlinear_solver, om.NewtonSolver))
         self.assertTrue(isinstance(top.model.sub.linear_solver, om.ScipyKrylov))
 
+    def test_configure_set_input_defaults(self):
+        class ConfigGroup(om.Group):
+            def configure(self):
+                self.set_input_defaults('x', val=99.)
+
+        p = om.Problem(model=ConfigGroup())
+        C1 = p.model.add_subsystem('C1', om.ExecComp('y=2*x'), promotes_inputs=['x'])
+        C2 = p.model.add_subsystem('C2', om.ExecComp('y=3*x'), promotes_inputs=['x'])
+
+        p.setup()
+        self.assertEqual(p['x'], 99.)
+
     def test_configure_add_input_output(self):
         """
         A simple example to compute the resultant force on an aircraft using data
