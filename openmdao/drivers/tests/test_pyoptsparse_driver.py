@@ -229,6 +229,9 @@ class TestMPIScatter(unittest.TestCase):
                           1e-5)
 
     def test_paropt_distcomp(self):
+        _, local_opt = set_pyoptsparse_opt('ParOpt')
+        if local_opt != 'ParOpt':
+            raise unittest.SkipTest("pyoptsparse is not providing ParOpt")
         size = 7
 
         prob = om.Problem()
