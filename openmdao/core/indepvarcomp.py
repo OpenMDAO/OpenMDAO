@@ -152,19 +152,23 @@ class IndepVarComp(ExplicitComponent):
             list_outputs.
         """
         if res_units is not None:
-            warn_deprecation(
-                "'res_units' has been deprecated and will be removed in a future version")
+            warn_deprecation("'res_units' has been deprecated and unused. It will be removed in "
+                             "a future version")
         elif lower is not None:
-            warn_deprecation("'lower' has been deprecated and will be removed in a future version")
+            warn_deprecation("'lower' has been deprecated and unused. It will be removed in a "
+                             "future version")
         elif upper is not None:
-            warn_deprecation("'upper' has been deprecated and will be removed in a future version")
+            warn_deprecation("'upper' has been deprecated and unused. It will be removed in a "
+                             "future version")
         elif ref0 is not None:
-            warn_deprecation("'ref0' has been deprecated and will be removed in a future version")
+            warn_deprecation("'ref0' has been deprecated and unused. It will be removed in a "
+                             "future version")
         elif res_ref is not None:
-            warn_deprecation(
-                "'res_ref' has been deprecated and will be removed in a future version")
+            warn_deprecation("'res_ref' has been deprecated and unused. It will be removed in a "
+                             "future version")
         elif ref is not None:
-            warn_deprecation("'ref' has been deprecated and will be removed in a future version")
+            warn_deprecation("'ref' has been deprecated and unused. It will be removed in a "
+                             "future version")
 
         ref = 1.0
         ref0 = 0.0
