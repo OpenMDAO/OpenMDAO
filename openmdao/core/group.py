@@ -325,6 +325,12 @@ class Group(System):
 
         Highest system's settings take precedence.
         """
+        # reset group_inputs back to what it was just after self.setup() in case _configure
+        # is called multiple times.
+        self._group_inputs = self._pre_config_group_inputs.copy()
+        for n, lst in self._group_inputs.items():
+            self._group_inputs[n] = lst.copy()
+
         for subsys in self._subsystems_myproc:
             subsys._configure()
 
@@ -712,7 +718,6 @@ class Group(System):
 
         allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
 
-        self._group_inputs = self._pre_config_group_inputs.copy()
         for n, lst in self._group_inputs.items():
             lst[0]['path'] = self.pathname  # used for error reporting
             self._group_inputs[n] = lst.copy()  # must copy the list manually
