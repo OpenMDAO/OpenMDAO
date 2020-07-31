@@ -448,7 +448,7 @@ class TestDriver(unittest.TestCase):
         model = prob.model
 
         ivc = om.IndepVarComp()
-        ivc.add_output('x', 35.0, units='degF', lower=32.0, upper=212.0)
+        ivc.add_output('x', 35.0, units='degF')
 
         model.add_subsystem('p', ivc, promotes=['x'])
         model.add_subsystem('comp1', om.ExecComp('y1 = 2.0*x',
@@ -507,7 +507,7 @@ class TestDriver(unittest.TestCase):
         model = prob.model
 
         ivc = om.IndepVarComp()
-        ivc.add_output('x', 35.0, units='degF', lower=32.0, upper=212.0)
+        ivc.add_output('x', 35.0, units='degF')
 
         model.add_subsystem('p', ivc, promotes=['x'])
         model.add_subsystem('comp1', om.ExecComp('y1 = 2.0*x',
@@ -550,7 +550,7 @@ class TestDriver(unittest.TestCase):
         model = prob.model
 
         ivc = om.IndepVarComp()
-        ivc.add_output('x', 35.0, units='degF', lower=32.0, upper=212.0)
+        ivc.add_output('x', 35.0, units='degF')
 
         model.add_subsystem('p', ivc, promotes=['x'])
         model.add_subsystem('comp1', om.ExecComp('y1 = 2.0*x',
@@ -634,7 +634,7 @@ class TestDriver(unittest.TestCase):
         model = prob.model
 
         ivc = om.IndepVarComp()
-        ivc.add_output('x', 35.0, units='degF', lower=32.0, upper=212.0)
+        ivc.add_output('x', 35.0, units='degF')
 
         model.add_subsystem('p', ivc, promotes=['x'])
         model.add_subsystem('comp1', om.ExecComp('y1 = 2.0*x',
@@ -655,7 +655,7 @@ class TestDriver(unittest.TestCase):
         model = prob.model
 
         ivc = om.IndepVarComp()
-        ivc.add_output('x', 35.0, units='degF', lower=32.0, upper=212.0)
+        ivc.add_output('x', 35.0, units='degF')
 
         model.add_subsystem('p', ivc, promotes=['x'])
         model.add_subsystem('comp1', om.ExecComp('y1 = 2.0*x',
@@ -676,7 +676,7 @@ class TestDriver(unittest.TestCase):
         model = prob.model
 
         ivc = om.IndepVarComp()
-        ivc.add_output('x', 35.0, units=None, lower=32.0, upper=212.0)
+        ivc.add_output('x', 35.0, units=None)
 
         model.add_subsystem('p', ivc, promotes=['x'])
         model.add_subsystem('comp1', om.ExecComp('y1 = 2.0*x',
@@ -697,7 +697,7 @@ class TestDriver(unittest.TestCase):
         model = prob.model
 
         ivc = om.IndepVarComp()
-        ivc.add_output('x', 35.0, units=None, lower=32.0, upper=212.0)
+        ivc.add_output('x', 35.0, units=None)
 
         model.add_subsystem('p', ivc, promotes=['x'])
         model.add_subsystem('comp1', om.ExecComp('y1 = 2.0*x',
