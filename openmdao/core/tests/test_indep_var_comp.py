@@ -209,7 +209,7 @@ class TestIndepVarComp(unittest.TestCase):
 
         indep = prob.model.add_subsystem('p1', om.IndepVarComp())
 
-        msg = "'ref0' has been deprecated and unused. It will be removed in a future version"
+        msg = "'ref0' has been deprecated and will be removed in a future version"
         with assert_warning(DeprecationWarning, msg):
             indep.add_output('x', 12., ref=0.0, ref0=1.)
 
@@ -218,7 +218,7 @@ class TestIndepVarComp(unittest.TestCase):
 
         indep = prob.model.add_subsystem('p1', om.IndepVarComp())
 
-        msg = "'res_units' has been deprecated and unused. It will be removed in a future " + \
+        msg = "'res_units' has been deprecated and will be removed in a future " + \
               "version"
         with assert_warning(DeprecationWarning, msg):
             indep.add_output('x', 12., res_units='m')
@@ -228,7 +228,7 @@ class TestIndepVarComp(unittest.TestCase):
 
         indep = prob.model.add_subsystem('p1', om.IndepVarComp())
 
-        msg = "'upper' has been deprecated and unused. It will be removed in a future version"
+        msg = "'upper' has been deprecated and will be removed in a future version"
         with assert_warning(DeprecationWarning, msg):
             indep.add_output('x', 12., upper=1.)
 
@@ -237,7 +237,7 @@ class TestIndepVarComp(unittest.TestCase):
 
         indep = prob.model.add_subsystem('p1', om.IndepVarComp())
 
-        msg = "'lower' has been deprecated and unused. It will be removed in a future version"
+        msg = "'lower' has been deprecated and will be removed in a future version"
         with assert_warning(DeprecationWarning, msg):
             indep.add_output('x', 12., lower=1.)
 
@@ -246,7 +246,7 @@ class TestIndepVarComp(unittest.TestCase):
 
         indep = prob.model.add_subsystem('p1', om.IndepVarComp())
 
-        msg = "'res_ref' has been deprecated and unused. It will be removed in a future version"
+        msg = "'res_ref' has been deprecated and will be removed in a future version"
         with assert_warning(DeprecationWarning, msg):
             indep.add_output('x', 12., res_ref=1.)
 
@@ -255,7 +255,7 @@ class TestIndepVarComp(unittest.TestCase):
 
         indep = prob.model.add_subsystem('p1', om.IndepVarComp())
 
-        msg = "'ref' has been deprecated and unused. It will be removed in a future version"
+        msg = "'ref' has been deprecated and will be removed in a future version"
         with assert_warning(DeprecationWarning, msg):
             indep.add_output('x', 12., ref=2.)
 
