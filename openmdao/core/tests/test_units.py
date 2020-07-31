@@ -67,29 +67,23 @@ class TestUnitConversion(unittest.TestCase):
         import openmdao.api as om
         from openmdao.core.tests.test_units import SpeedComp
 
-        comp = om.IndepVarComp()
-        comp.add_output('distance', val=1., units='m')
-        comp.add_output('time', val=1., units='s')
-
         prob = om.Problem()
-        prob.model.add_subsystem('c1', comp)
-        prob.model.add_subsystem('c2', SpeedComp())
-        prob.model.add_subsystem('c3', om.ExecComp('f=speed',speed={'units': 'm/s'}))
-        prob.model.connect('c1.distance', 'c2.distance')
-        prob.model.connect('c1.time', 'c2.time')
-        prob.model.connect('c2.speed', 'c3.speed')
+        prob.model.add_subsystem('c1', SpeedComp())
+        prob.model.add_subsystem('c2', om.ExecComp('f=speed',speed={'units': 'm/s'}))
+
+        prob.model.set_input_defaults('c1.distance', val=1., units='m')
+        prob.model.set_input_defaults('c1.time', val=1., units='s')
+
+        prob.model.connect('c1.speed', 'c2.speed')
 
         prob.setup()
         prob.run_model()
 
-        assert_near_equal(prob['c1.distance'], 1.)  # units: m
-        assert_near_equal(prob['c2.distance'], 1.e-3)  # units: km
+        assert_near_equal(prob.get_val('c1.distance'), 1.e-3)  # units: km
+        assert_near_equal(prob.get_val('c1.time'), 1./3600.)   # units: h
+        assert_near_equal(prob.get_val('c1.speed'), 3.6)       # units: km/h
 
-        assert_near_equal(prob['c1.time'], 1.)  # units: s
-        assert_near_equal(prob['c2.time'], 1./3600.)  # units: h
-
-        assert_near_equal(prob['c2.speed'], 3.6)  # units: km/h
-        assert_near_equal(prob['c3.f'], 1.0)  # units: km/h
+        assert_near_equal(prob.get_val('c2.f'), 1.0)           # units: m/s
 
     def test_basic(self):
         """Test that output values and total derivatives are correct."""
@@ -123,7 +117,7 @@ class TestUnitConversion(unittest.TestCase):
         assert_near_equal(J['tgtK.x3', 'px1.x1'][0][0], 1.0, 1e-6)
 
         # Make sure check partials handles conversion
-        data = prob.check_partials()
+        data = prob.check_partials(out_stream=None)
 
         for key1, val1 in data.items():
             for key2, val2 in val1.items():
@@ -249,7 +243,7 @@ class TestUnitConversion(unittest.TestCase):
         assert_near_equal(J['tgtK.x3']['x1'][0][0], 1.0, 1e-6)
 
         # Make sure check partials handles conversion
-        data = prob.check_partials()
+        data = prob.check_partials(out_stream=None)
 
         for key1, val1 in data.items():
             for key2, val2 in val1.items():

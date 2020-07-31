@@ -7,6 +7,7 @@ from numpy import ndarray, imag, complex as npcomplex
 
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.units import valid_units
+from openmdao.utils.general_utils import warn_deprecation
 
 # regex to check for variable names.
 VAR_RGX = re.compile(r'([.]*[_a-zA-Z]\w*[ ]*\(?)')
@@ -132,6 +133,7 @@ class ExecComp(ExplicitComponent):
         exp(x)                     Exponential function
         expm1(x)                   exp(x) - 1
         factorial(x)               Factorial of all numbers in x
+                                   (DEPRECATED, not available with SciPy >=1.5)
         fmax(x, y)                 Element-wise maximum of x and y
         fmin(x, y)                 Element-wise minimum of x and y
         inner(x, y)                Inner product of arrays x and y
@@ -432,49 +434,49 @@ class ExecComp(ExplicitComponent):
             Contains sub-jacobians.
         """
         step = self.complex_stepsize * 1j
-        out_names = self._var_allprocs_prom2abs_list['output']
+        out_names = self._var_rel_names['output']
         inv_stepsize = 1.0 / self.complex_stepsize
         has_diag_partials = self.options['has_diag_partials']
 
-        for param in inputs:
+        for input in inputs:
 
             pwrap = _TmpDict(inputs)
-            pval = inputs[param]
+            pval = inputs[input]
             psize = pval.size
-            pwrap[param] = np.asarray(pval, npcomplex)
+            pwrap[input] = np.asarray(pval, npcomplex)
 
             if has_diag_partials or psize == 1:
-                # set a complex param value
-                pwrap[param] += step
+                # set a complex input value
+                pwrap[input] += step
 
                 uwrap = _TmpDict(self._outputs, return_complex=True)
 
-                # solve with complex param value
-                self._residuals.set_const(0.0)
+                # solve with complex input value
+                self._residuals.set_val(0.0)
                 self.compute(pwrap, uwrap)
 
                 for u in out_names:
-                    partials[(u, param)] = imag(uwrap[u] * inv_stepsize).flat
+                    partials[(u, input)] = imag(uwrap[u] * inv_stepsize).flat
 
-                # restore old param value
-                pwrap[param] -= step
+                # restore old input value
+                pwrap[input] -= step
             else:
-                for i, idx in enumerate(array_idx_iter(pwrap[param].shape)):
-                    # set a complex param value
-                    pwrap[param][idx] += step
+                for i, idx in enumerate(array_idx_iter(pwrap[input].shape)):
+                    # set a complex input value
+                    pwrap[input][idx] += step
 
                     uwrap = _TmpDict(self._outputs, return_complex=True)
 
-                    # solve with complex param value
-                    self._residuals.set_const(0.0)
+                    # solve with complex input value
+                    self._residuals.set_val(0.0)
                     self.compute(pwrap, uwrap)
 
                     for u in out_names:
                         # set the column in the Jacobian entry
-                        partials[(u, param)][:, i] = imag(uwrap[u] * inv_stepsize).flat
+                        partials[(u, input)][:, i] = imag(uwrap[u] * inv_stepsize).flat
 
-                    # restore old param value
-                    pwrap[param][idx] -= step
+                    # restore old input value
+                    pwrap[input][idx] -= step
 
 
 class _TmpDict(object):
@@ -634,8 +636,26 @@ try:
 except ImportError:
     pass
 else:
-    _import_functs(scipy.special, _expr_dict,
-                   names=['factorial', 'erf', 'erfc'])
+    _import_functs(scipy.special, _expr_dict, names=['erf', 'erfc'])
+
+    from distutils.version import LooseVersion
+    if LooseVersion(scipy.__version__) >= LooseVersion("1.5.0"):
+        def factorial(*args):
+            """
+            Raise a RuntimeError stating that the factorial function is not supported.
+            """
+            raise RuntimeError("The 'factorial' function is not supported for SciPy "
+                               f"versions >= 1.5, current version: {scipy.__version__}")
+    else:
+        def factorial(*args):
+            """
+            Raise a warning stating that the factorial function is deprecated.
+            """
+            warn_deprecation("The 'factorial' function is deprecated. "
+                             "It is no longer supported for SciPy versions >= 1.5.")
+            return scipy.special.factorial(*args)
+
+    _expr_dict['factorial'] = factorial
 
 
 # Put any functions here that need special versions to work under

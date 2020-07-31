@@ -38,6 +38,14 @@ NonlinearBlockGS Options
     NonlinearBlockGS
     options
 
+NonlinearBlockGS Constructor
+----------------------------
+
+The call signature for the `NonlinearBlockGS` constructor is:
+
+.. automethod:: openmdao.solvers.nonlinear.nonlinear_block_gs.NonlinearBlockGS.__init__
+    :noindex:
+
 
 Aitken relaxation
 -------------------

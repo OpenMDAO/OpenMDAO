@@ -11,7 +11,7 @@ class ContentContainerDirective(Directive):
     """
     Just for having an outer div.
 
-    Relevant CSS: rosetta_left and rosetta_outer
+    Relevant CSS: rosetta_outer
     """
 
     has_content = True
@@ -52,24 +52,33 @@ class EmbedCompareDirective(Directive):
 
     # must have at least one directive for this to work
     required_arguments = 1
-    optional_arguments = 2
+    optional_arguments = 3
     has_content = True
 
     def run(self):
+        arg = self.arguments
+
         # create a list of document nodes to return
         doc_nodes = []
+
+        # Choose style
+        left_style = 'rosetta_left'
+        right_style = 'rosetta_right'
+        if len(arg) == 4:
+            if arg[3] == 'style2':
+                left_style = 'rosetta_left2'
+                right_style = 'rosetta_right2'
 
         # LEFT side = Old OpenMDAO
         text = '\n'.join(self.content)
         left_body = nodes.literal_block(text, text)
         left_body['language'] = 'python'
-        left_body['classes'].append('rosetta_left')
+        left_body['classes'].append(left_style)
 
         # for RIGHT side, get the code block, and reduce it if requested
-        arg = self.arguments
         right_method = arg[0]
         text, _, _, _, _ = get_source_code(right_method)
-        if len(arg) == 3:
+        if len(arg) >= 3:
             start_txt = arg[1]
             end_txt = arg[2]
             lines = text.split('\n')
@@ -104,7 +113,7 @@ class EmbedCompareDirective(Directive):
         # RIGHT side = Current OpenMDAO
         right_body = nodes.literal_block(text, text)
         right_body['language'] = 'python'
-        right_body['classes'].append('rosetta_right')
+        right_body['classes'].append(right_style)
 
         doc_nodes.append(left_body)
         doc_nodes.append(right_body)

@@ -3,7 +3,7 @@ import sys
 import numpy as np
 from petsc4py import PETSc
 
-from openmdao.vectors.default_vector import DefaultVector, INT_DTYPE
+from openmdao.vectors.default_vector import DefaultVector, INT_DTYPE, _full_slice
 from openmdao.vectors.petsc_transfer import PETScTransfer
 from openmdao.utils.mpi import MPI
 
@@ -17,9 +17,6 @@ CITATION = '''@InProceedings{petsc-efficient,
     Publisher = "Birkh{\"{a}}user Press",
     Year = "1997"
 }'''
-
-
-_full_slice = slice(None)
 
 
 class PETScVector(DefaultVector):
@@ -40,8 +37,7 @@ class PETScVector(DefaultVector):
     TRANSFER = PETScTransfer
     cite = CITATION
 
-    def __init__(self, name, kind, system, root_vector=None, resize=False, alloc_complex=False,
-                 ncol=1, relevant=None):
+    def __init__(self, name, kind, system, root_vector=None, alloc_complex=False, ncol=1):
         """
         Initialize all attributes.
 
@@ -55,19 +51,13 @@ class PETScVector(DefaultVector):
             Pointer to the owning system.
         root_vector : <Vector>
             Pointer to the vector owned by the root system.
-        resize : bool
-            If true, resize the root vector.
         alloc_complex : bool
             Whether to allocate any imaginary storage to perform complex step. Default is False.
         ncol : int
             Number of columns for multi-vectors.
-        relevant : dict
-            Mapping of a VOI to a tuple containing dependent inputs, dependent outputs,
-            and dependent systems.
         """
         super(PETScVector, self).__init__(name, kind, system, root_vector=root_vector,
-                                          resize=resize, alloc_complex=alloc_complex, ncol=ncol,
-                                          relevant=relevant)
+                                          alloc_complex=alloc_complex, ncol=ncol)
 
         self._dup_inds = None
 
@@ -156,7 +146,7 @@ class PETScVector(DefaultVector):
 
         if self._ncol == 1:
             if has_dups:
-                data_cache = self._data.copy()
+                data_cache = self.asarray(copy=True)
                 data_cache[dup_inds] = 0.0
             else:
                 data_cache = self._data

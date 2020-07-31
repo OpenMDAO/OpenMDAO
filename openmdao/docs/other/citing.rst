@@ -39,7 +39,7 @@ If you copy the following script into a file called `paraboloid.py`,
 then you can get the citations from the command line using the :ref:`openmdao command-line script<om-command>`.
 
 .. embed-code::
-    openmdao.test_suite.test_examples.tldr_paraboloid.TestParaboloidTLDR.test_tldr
+    openmdao.test_suite.test_examples.test_tldr_paraboloid.TestParaboloidTLDR.test_tldr
     :layout: code, output
 
 .. embed-shell-cmd::

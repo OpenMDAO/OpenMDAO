@@ -451,7 +451,7 @@ class N2MatrixCell {
         this.col = col;
         this.srcObj = this.obj = srcObj;
         this.tgtObj = tgtObj;
-        this.id = srcObj.id + "_" + tgtObj.id;
+        this.id = N2MatrixCell.makeId(srcObj.id, tgtObj.id);
 
         this.symbolType = new SymbolType(this, model);
         this.renderer = this._newRenderer();
@@ -467,6 +467,12 @@ class N2MatrixCell {
             },
             "total": 0
         }
+    }
+
+    static makeId(srcId, tgtId = null) {
+        if (! tgtId || srcId == tgtId) return "node_" + srcId;
+        
+        return "conn_" + srcId + "_to_" + tgtId;
     }
 
     /**
@@ -494,7 +500,7 @@ class N2MatrixCell {
     }
 
     /**
-     * Select the mouseover callback depending on whether we"re on the diagonal.
+     * Select the mouseover callback depending on whether we're on the diagonal.
      * TODO: Remove these globals
      */
     mouseover() {
@@ -503,7 +509,7 @@ class N2MatrixCell {
     }
 
     /**
-    * Select the mousemove callback depending on whether we"re on the diagonal.
+    * Select the mousemove callback depending on whether we're on the diagonal.
     * TODO: Remove these globals
     */
     mousemove() {
@@ -514,13 +520,17 @@ class N2MatrixCell {
      * Choose a color based on our location and state of the associated N2TreeNode.
      */
     color() {
+        if (this.symbolType.potentialDeclaredPartial &&
+            this.symbolType.declaredPartial) return N2Style.color.declaredPartial;
+
         if (this.onDiagonal()) {
             if (this.obj.isMinimized) return N2Style.color.collapsed;
-            if (this.obj.isConnectedParam()) return N2Style.color.param;
-            if (this.obj.isUnconnectedParam()) return N2Style.color.unconnectedParam;
+            if (this.obj.isAutoIvcInput()) return N2Style.color.autoivcInput;
+            if (this.obj.isConnectedInput()) return N2Style.color.input;
+            if (this.obj.isUnconnectedInput()) return N2Style.color.unconnectedInput;
             return (this.obj.implicit) ?
-                N2Style.color.unknownImplicit :
-                N2Style.color.unknownExplicit;
+                N2Style.color.outputImplicit :
+                N2Style.color.outputExplicit;
         }
 
         return N2Style.color.connection;
@@ -528,7 +538,7 @@ class N2MatrixCell {
 
 
     /**
-     * An connection going "off-screen" was detected between two nodes.
+     * A connection going "off-screen" was detected between two nodes.
      * Determine whether the arrow should be in the top or bottom section of the
      * matrix based on rootIndex, and add to the appropriate array of
      * tracked offscreen connections.
@@ -577,31 +587,33 @@ class N2MatrixCell {
             return new N2ConnectorLower(this.color(), this.id)
         }
 
+        const color = this.color();
+
         switch (this.symbolType.name) {
             case "scalar":
-                return new N2ScalarCell(this.color(), this.id);
+                return new N2ScalarCell(color, this.id);
             case "vector":
-                return new N2VectorCell(this.color(), this.id);
+                return new N2VectorCell(color, this.id);
             case "group":
-                return new N2GroupCell(this.color(), this.id);
+                return new N2GroupCell(color, this.id);
             case "scalarScalar":
-                return new N2ScalarScalarCell(this.color(), this.id);
+                return new N2ScalarScalarCell(color, this.id);
             case "scalarVector":
-                return new N2ScalarVectorCell(this.color(), this.id);
+                return new N2ScalarVectorCell(color, this.id);
             case "vectorScalar":
-                return new N2VectorScalarCell(this.color(), this.id);
+                return new N2VectorScalarCell(color, this.id);
             case "vectorVector":
-                return new N2VectorVectorCell(this.color(), this.id);
+                return new N2VectorVectorCell(color, this.id);
             case "scalarGroup":
-                return new N2ScalarGroupCell(this.color(), this.id);
+                return new N2ScalarGroupCell(color, this.id);
             case "groupScalar":
-                return new N2GroupScalarCell(this.color(), this.id);
+                return new N2GroupScalarCell(color, this.id);
             case "vectorGroup":
-                return new N2VectorGroupCell(this.color(), this.id);
+                return new N2VectorGroupCell(color, this.id);
             case "groupVector":
-                return new N2GroupVectorCell(this.color(), this.id);
+                return new N2GroupVectorCell(color, this.id);
             case "groupGroup":
-                return new N2GroupGroupCell(this.color(), this.id);
+                return new N2GroupGroupCell(color, this.id);
         }
     }
 
@@ -621,8 +633,8 @@ class N2MatrixCell {
         const treeNode = d3.select('rect#' + treeId);
 
         let fill = treeNode.style('fill');
-        if (direction == 'input') fill = N2Style.color.input;
-        else if (direction == 'output') fill = N2Style.color.output;
+        if (direction == 'input') fill = N2Style.color.inputArrow;
+        else if (direction == 'output') fill = N2Style.color.outputArrow;
 
         d3.select('#highlight-bar').append('rect')
             .attr('x', 0)

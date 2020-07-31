@@ -105,6 +105,10 @@ Instructions on editing the icons used for the toolbar.
 	content: '\e900';
 }
 
+.icon-hide-connections-2:before {
+	content: '\e900';
+}
+
 .icon-linear-solver:before {
 	content: '\e901';
 }

@@ -8,6 +8,7 @@ import numpy as np
 from openmdao.vectors.vector import INT_DTYPE
 from openmdao.vectors.transfer import Transfer
 from openmdao.utils.array_utils import convert_neg, _global2local_offsets, _flatten_src_indices
+from openmdao.utils.general_utils import _is_slice, _slice_indices
 from openmdao.utils.mpi import MPI
 
 _empty_idx_array = np.array([], dtype=INT_DTYPE)
@@ -26,7 +27,7 @@ class DefaultTransfer(Transfer):
     """
 
     @staticmethod
-    def _setup_transfers(group, recurse=True):
+    def _setup_transfers(group):
         """
         Compute all transfers that are owned by our parent group.
 
@@ -34,15 +35,12 @@ class DefaultTransfer(Transfer):
         ----------
         group : <Group>
             Parent group.
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         iproc = group.comm.rank
         rev = group._mode == 'rev' or group._mode == 'auto'
 
-        if recurse:
-            for subsys in group._subgroups_myproc:
-                subsys._setup_transfers(recurse)
+        for subsys in group._subgroups_myproc:
+            subsys._setup_transfers()
 
         abs2meta = group._var_abs2meta
         allprocs_abs2meta = group._var_allprocs_abs2meta
@@ -97,11 +95,20 @@ class DefaultTransfer(Transfer):
                     if src_indices is None:
                         pass
                     elif src_indices.ndim == 1:
-                        src_indices = convert_neg(src_indices, meta_out['global_size'])
+                        if isinstance(src_indices, tuple) or \
+                                     (isinstance(src_indices, np.ndarray) and
+                                      src_indices.dtype == object):
+                            if _is_slice(src_indices):
+                                indices = _slice_indices(src_indices, meta_out['global_size'],
+                                                         meta_out['global_shape'])
+                                src_indices = convert_neg(indices, meta_out['global_size'])
+                        else:
+                            src_indices = convert_neg(src_indices, meta_out['global_size'])
                     else:
                         src_indices = _flatten_src_indices(src_indices, meta_in['shape'],
                                                            meta_out['global_shape'],
                                                            meta_out['global_size'])
+                        meta_in['src_indices'] = src_indices
 
                     # 1. Compute the output indices
                     offset = offsets_out[iproc, idx_out]
@@ -169,7 +176,7 @@ class DefaultTransfer(Transfer):
             transfers['nonlinear'] = transfers['linear']
 
     @staticmethod
-    def _setup_discrete_transfers(group, recurse=True):
+    def _setup_discrete_transfers(group):
         """
         Compute all transfers that are owned by our parent group.
 
@@ -177,8 +184,6 @@ class DefaultTransfer(Transfer):
         ----------
         group : <Group>
             Parent group.
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         group._discrete_transfers = transfers = defaultdict(list)
         name_offset = len(group.pathname) + 1 if group.pathname else 0
@@ -265,11 +270,11 @@ class DefaultTransfer(Transfer):
         """
         if mode == 'fwd':
             # this works whether the vecs have multi columns or not due to broadcasting
-            in_vec._data[self._in_inds] = out_vec._data[self._out_inds]
+            in_vec.set_val(out_vec.asarray()[self._out_inds], self._in_inds)
 
         else:  # rev
             if out_vec._ncol == 1:
-                out_vec._data[:] += np.bincount(self._out_inds, in_vec._data[self._in_inds],
-                                                minlength=out_vec._data.size)
+                out_vec.iadd(np.bincount(self._out_inds, in_vec._data[self._in_inds],
+                                         minlength=out_vec._data.size))
             else:  # matrix-matrix   (bincount only works with 1d arrays)
                 np.add.at(out_vec._data, self._out_inds, in_vec._data[self._in_inds])

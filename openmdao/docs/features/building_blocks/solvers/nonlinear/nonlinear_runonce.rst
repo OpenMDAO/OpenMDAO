@@ -29,4 +29,13 @@ NonlinearRunOnce Options
     NonlinearRunOnce
     options
 
+NonlinearRunOnce Constructor
+----------------------------
+
+The call signature for the `NonlinearRunOnce` constructor is:
+
+.. automethod:: openmdao.solvers.nonlinear.nonlinear_runonce.NonlinearRunOnce.__init__
+    :noindex:
+
+
 .. tags:: Solver, NonlinearSolver

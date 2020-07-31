@@ -9,6 +9,7 @@ from openmdao.vectors.default_transfer import DefaultTransfer, _merge
 from openmdao.vectors.vector import INT_DTYPE
 from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import convert_neg, _flatten_src_indices
+from openmdao.utils.general_utils import _is_slice, _slice_indices
 
 _empty_idx_array = np.array([], dtype=INT_DTYPE)
 
@@ -53,7 +54,7 @@ class PETScTransfer(DefaultTransfer):
             self._transfer = self._multi_transfer
 
     @staticmethod
-    def _setup_transfers(group, recurse=True):
+    def _setup_transfers(group):
         """
         Compute all transfers that are owned by our parent group.
 
@@ -61,14 +62,11 @@ class PETScTransfer(DefaultTransfer):
         ----------
         group : <Group>
             Parent group.
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         rev = group._mode != 'fwd'
 
-        if recurse:
-            for subsys in group._subgroups_myproc:
-                subsys._setup_transfers(recurse)
+        for subsys in group._subgroups_myproc:
+            subsys._setup_transfers()
 
         abs2meta = group._var_abs2meta
         allprocs_abs2meta = group._var_allprocs_abs2meta
@@ -127,17 +125,36 @@ class PETScTransfer(DefaultTransfer):
                         if meta_in['size'] > sizes_out[owner, idx_out]:
                             src_indices = np.arange(meta_in['size'], dtype=INT_DTYPE)
                     elif src_indices.ndim == 1:
-                        src_indices = convert_neg(src_indices, meta_out['global_size'])
+                        if _is_slice(src_indices):
+                            indices = _slice_indices(src_indices, meta_out['global_size'],
+                                                     meta_out['global_shape'])
+                            src_indices = convert_neg(indices, meta_out['global_size'])
                     else:
                         src_indices = _flatten_src_indices(src_indices, meta_in['shape'],
                                                            meta_out['global_shape'],
                                                            meta_out['global_size'])
 
                     # 1. Compute the output indices
+                    # NOTE: src_indices are relative to a single, possibly distributed variable,
+                    # while the output_inds that we compute are relative to the full distributed
+                    # array that contains all local variables from each rank stacked in rank order.
                     if src_indices is None:
-                        rank = myproc if abs_out in abs2meta else owner
-                        offset = offsets_out[rank, idx_out]
-                        output_inds = np.arange(offset, offset + meta_in['size'], dtype=INT_DTYPE)
+                        if meta_out['distributed']:
+                            # input in this case is non-distributed (else src_indices would be
+                            # defined by now).  The input size must match the full
+                            # distributed size of the output.
+                            for rank, sz in enumerate(sizes_out[:, idx_out]):
+                                if sz > 0:
+                                    out_offset = offsets_out[rank, idx_out]
+                                    break
+                            output_inds = np.arange(out_offset,
+                                                    out_offset + meta_out['global_size'],
+                                                    dtype=INT_DTYPE)
+                        else:
+                            rank = myproc if abs_out in abs2meta else owner
+                            offset = offsets_out[rank, idx_out]
+                            output_inds = np.arange(offset, offset + meta_in['size'],
+                                                    dtype=INT_DTYPE)
                     else:
                         output_inds = np.zeros(src_indices.size, INT_DTYPE)
                         start = end = 0

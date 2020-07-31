@@ -21,6 +21,4 @@ class ComplianceComp(om.ExplicitComponent):
                               val=force_vector.reshape((1, 2 * num_nodes)))
 
     def compute(self, inputs, outputs):
-        force_vector = self.options['force_vector']
-
-        outputs['compliance'] = np.dot(force_vector, inputs['displacements'])
+        outputs['compliance'] = np.dot(self.options['force_vector'], inputs['displacements'])

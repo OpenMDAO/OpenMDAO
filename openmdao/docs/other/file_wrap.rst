@@ -505,7 +505,7 @@ Quibbling over the 11th--15th decimal place may sound unnecessary,
 but some applications are sensitive to changes of this magnitude. Moreover, it
 is important to consider how your component may be used during optimization. A
 gradient optimizer will often use a finite difference scheme to calculate the
-gradients for a model, and this means that some component params might be
+gradients for a model, and this means that some component inputs might be
 subjected to small increments and decrements. A loss of precision here can
 completely change the calculated gradient and prevent the optimizer from
 reaching a correct minimum value.

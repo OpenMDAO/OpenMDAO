@@ -30,7 +30,7 @@ class BalanceComp(ImplicitComponent):
                              'residuals.')
 
     def __init__(self, name=None, eq_units=None, lhs_name=None, rhs_name=None, rhs_val=0.0,
-                 use_mult=False, mult_name=None, mult_val=1.0, normalize=True, **kwargs):
+                 use_mult=False, mult_name=None, mult_val=1.0, normalize=True, val=None, **kwargs):
         r"""
         Initialize a BalanceComp, optionally creating a new implicit state variable.
 
@@ -68,17 +68,15 @@ class BalanceComp(ImplicitComponent):
             prob = Problem()
             bal = BalanceComp()
             bal.add_balance('x', val=1.0)
-            tgt = IndepVarComp(name='y_tgt', val=2)
             exec_comp = ExecComp('y=x**2')
-            prob.model.add_subsystem(name='target', subsys=tgt, promotes_outputs=['y_tgt'])
             prob.model.add_subsystem(name='exec', subsys=exec_comp)
             prob.model.add_subsystem(name='balance', subsys=bal)
-            prob.model.connect('y_tgt', 'balance.rhs:x')
             prob.model.connect('balance.x', 'exec.x')
             prob.model.connect('exec.y', 'balance.lhs:x')
             prob.model.linear_solver = DirectSolver()
-            prob.model.nonlinear_solver = NewtonSolver()
+            prob.model.nonlinear_solver = NewtonSolver(solve_subsystems=False)
             prob.setup()
+            prob.set_val('exec.x', 2)
             prob.run_model()
 
         The arguments to add_balance can be provided on initialization to provide a balance
@@ -88,17 +86,15 @@ class BalanceComp(ImplicitComponent):
 
             prob = Problem()
             bal = BalanceComp('x', val=1.0)
-            tgt = IndepVarComp(name='y_tgt', val=2)
             exec_comp = ExecComp('y=x**2')
-            prob.model.add_subsystem(name='target', subsys=tgt, promotes_outputs=['y_tgt'])
             prob.model.add_subsystem(name='exec', subsys=exec_comp)
             prob.model.add_subsystem(name='balance', subsys=bal)
-            prob.model.connect('y_tgt', 'balance.rhs:x')
             prob.model.connect('balance.x', 'exec.x')
             prob.model.connect('exec.y', 'balance.lhs:x')
             prob.model.linear_solver = DirectSolver()
-            prob.model.nonlinear_solver = NewtonSolver()
+            prob.model.nonlinear_solver = NewtonSolver(solve_subsystems=False)
             prob.setup()
+            prob.set_val('exec.x', 2)
             prob.run_model()
 
         Parameters
@@ -129,6 +125,8 @@ class BalanceComp(ImplicitComponent):
         normalize : bool
             Specifies whether or not the resulting residual should be normalized by a quadratic
             function of the RHS.
+        val : float, int, or np.ndarray
+            Set initial value for the state.
         **kwargs : dict
             Additional arguments to be passed for the creation of the implicit state variable.
             (see `add_output` method).
@@ -143,7 +141,7 @@ class BalanceComp(ImplicitComponent):
 
         if name is not None:
             self.add_balance(name, eq_units, lhs_name, rhs_name, rhs_val,
-                             use_mult, mult_name, mult_val, normalize, **kwargs)
+                             use_mult, mult_name, mult_val, normalize, val, **kwargs)
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         """
@@ -261,7 +259,8 @@ class BalanceComp(ImplicitComponent):
             self.options['guess_func'](inputs, outputs, residuals)
 
     def add_balance(self, name, eq_units=None, lhs_name=None, rhs_name=None, rhs_val=0.0,
-                    use_mult=False, mult_name=None, mult_val=1.0, normalize=True, **kwargs):
+                    use_mult=False, mult_name=None, mult_val=1.0, normalize=True, val=None,
+                    **kwargs):
         """
         Add a new state variable and associated equation to be balanced.
 
@@ -297,6 +296,8 @@ class BalanceComp(ImplicitComponent):
         normalize : bool
             Specifies whether or not the resulting residual should be normalized by a quadratic
             function of the RHS.
+        val : float, int, or np.ndarray
+            Set initial value for the state.
         **kwargs : dict
             Additional arguments to be passed for the creation of the implicit state variable.
             (see `add_output` method).
@@ -312,6 +313,9 @@ class BalanceComp(ImplicitComponent):
                    'normalize': normalize}
 
         self._state_vars[name] = options
+
+        if val is not None:
+            options['kwargs']['val'] = val
 
         meta = self.add_output(name, **options['kwargs'])
 

@@ -231,59 +231,52 @@ class N2Toolbar {
 
         new N2ToolbarButtonClick('#collapse-element', tooltipBox,
             "Control variable collapsing",
-            e => { n2ui.collapseOutputsButtonClick(n2ui.n2Diag.zoomedElement) });
+            e => { n2ui.collapseAll(n2ui.n2Diag.zoomedElement) });
 
         new N2ToolbarButtonClick('#collapse-element-2', tooltipBox,
             "Collapse only variables in current view",
             function (target) {
-                n2ui.collapseOutputsButtonClick(n2ui.n2Diag.zoomedElement);
+                n2ui.collapseAll(n2ui.n2Diag.zoomedElement);
                 self._setRootButton(target);
             });
 
         new N2ToolbarButtonClick('#collapse-all', tooltipBox,
             "Collapse all variables in entire model",
             function (target) {
-                n2ui.collapseOutputsButtonClick(n2ui.n2Diag.model.root);
+                n2ui.collapseAll(n2ui.n2Diag.model.root);
                 self._setRootButton(target);
             });
 
         new N2ToolbarButtonClick('#expand-element', tooltipBox,
             "Expand only variables in current view",
             function (target) {
-                n2ui.uncollapseButtonClick(n2ui.n2Diag.zoomedElement);
+                n2ui.expandAll(n2ui.n2Diag.zoomedElement);
                 self._setRootButton(target);
             });
 
         new N2ToolbarButtonClick('#expand-all', tooltipBox,
             "Expand all variables in entire model",
             function (target) {
-                n2ui.uncollapseButtonClick(n2ui.n2Diag.model.root);
-                self._setRootButton(target);
-            });
-
-        new N2ToolbarButtonClick('#show-connections', tooltipBox,
-            "Set connections visibility",
-            function (target) {
-                n2ui.n2Diag.showArrows();
+                n2ui.expandAll(n2ui.n2Diag.model.root);
                 self._setRootButton(target);
             });
 
         new N2ToolbarButtonClick('#hide-connections', tooltipBox,
-            "Hide all connection arrows",
+            "Remove all connection arrows",
             function (target) {
                 n2ui.n2Diag.clearArrows();
                 self._setRootButton(target);
             });
 
-        new N2ToolbarButtonClick('#show-connections-2', tooltipBox,
-            "Show pinned connection arrows",
+        new N2ToolbarButtonClick('#hide-connections-2', tooltipBox,
+            "Remove all connection arrows",
             function (target) {
-                n2ui.n2Diag.showArrows();
+                n2ui.n2Diag.clearArrows();
                 self._setRootButton(target);
             });
 
         new N2ToolbarButtonClick('#show-all-connections', tooltipBox,
-            "Show all connections in model",
+            "Show all connections in view",
             function (target) {
                 n2ui.n2Diag.showAllArrows();
                 self._setRootButton(target);

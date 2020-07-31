@@ -12,6 +12,11 @@ from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.assert_utils import assert_near_equal
 
 try:
+    from pyoptsparse import Optimization as pyoptsparse_opt
+except ImportError:
+    pyoptsparse_opt = None
+
+try:
     from parameterized import parameterized
 except ImportError:
     from openmdao.utils.assert_utils import SkipParameterized as parameterized
@@ -172,10 +177,12 @@ class MPITests2(unittest.TestCase):
         size = 3
         group = om.Group()
 
-        group.add_subsystem('P', om.IndepVarComp('x', np.arange(size)))
+        group.add_subsystem('P', om.IndepVarComp('x', np.arange(size)),
+                            promotes_outputs=['x'])
         group.add_subsystem('C1', DistribExecComp(['y=2.0*x', 'y=3.0*x'], arr_size=size,
                                                   x=np.zeros(size),
-                                                  y=np.zeros(size)))
+                                                  y=np.zeros(size)),
+                            promotes_inputs=['x'])
         group.add_subsystem('C2', om.ExecComp(['z=3.0*y'],
                                            y=np.zeros(size),
                                            z=np.zeros(size)))
@@ -183,21 +190,20 @@ class MPITests2(unittest.TestCase):
         prob = om.Problem()
         prob.model = group
         prob.model.linear_solver = om.LinearBlockGS()
-        prob.model.connect('P.x', 'C1.x')
         prob.model.connect('C1.y', 'C2.y')
 
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
 
-        J = prob.compute_totals(['C2.z'], ['P.x'])
-        assert_near_equal(J['C2.z', 'P.x'], np.diag([6.0, 6.0, 9.0]), 1e-6)
+        J = prob.compute_totals(['C2.z'], ['x'])
+        assert_near_equal(J['C2.z', 'x'], np.diag([6.0, 6.0, 9.0]), 1e-6)
 
         prob.setup(check=False, mode='rev')
         prob.run_model()
 
-        J = prob.compute_totals(['C2.z'], ['P.x'])
-        assert_near_equal(J['C2.z', 'P.x'], np.diag([6.0, 6.0, 9.0]), 1e-6)
+        J = prob.compute_totals(['C2.z'], ['x'])
+        assert_near_equal(J['C2.z', 'x'], np.diag([6.0, 6.0, 9.0]), 1e-6)
 
     @parameterized.expand(itertools.product([om.NonlinearRunOnce, om.NonlinearBlockGS]),
                           name_func=_test_func_name)
@@ -1031,6 +1037,7 @@ class MPITests3(unittest.TestCase):
                                                             [-0. , -0. , -0. , -0. , -0. , -0. , 12.2]]),
                           1e-11)
 
+
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class MPITestsBug(unittest.TestCase):
 
@@ -1179,6 +1186,8 @@ class MPIFeatureTests(unittest.TestCase):
         size = 15
 
         model = om.Group()
+
+        # Distributed component "C2" requires an IndepVarComp to supply inputs.
         model.add_subsystem("indep", om.IndepVarComp('x', np.zeros(size)))
         model.add_subsystem("C2", DistribCompDerivs(size=size))
         model.add_subsystem("C3", SummerDerivs(size=size))
@@ -1189,14 +1198,14 @@ class MPIFeatureTests(unittest.TestCase):
         prob = om.Problem(model)
         prob.setup()
 
-        prob['indep.x'] = np.ones(size)
+        prob.set_val('indep.x', np.ones(size))
         prob.run_model()
 
-        assert_near_equal(prob['C2.invec'],
+        assert_near_equal(prob.get_val('C2.invec'),
                           np.ones(8) if model.comm.rank == 0 else np.ones(7))
-        assert_near_equal(prob['C2.outvec'],
+        assert_near_equal(prob.get_val('C2.outvec'),
                           2*np.ones(8) if model.comm.rank == 0 else -3*np.ones(7))
-        assert_near_equal(prob['C3.sum'], -5.)
+        assert_near_equal(prob.get_val('C3.sum'), -5.)
 
         assert_check_partials(prob.check_partials())
 
@@ -1204,6 +1213,7 @@ class MPIFeatureTests(unittest.TestCase):
         assert_near_equal(J[('C2.outvec', 'indep.x')],
                           np.eye(15)*np.append(2*np.ones(8), -3*np.ones(7)))
 
+    @unittest.skipUnless(pyoptsparse_opt, "pyOptsparse is required.")
     def test_distributed_constraint(self):
         import numpy as np
         import openmdao.api as om
@@ -1286,7 +1296,9 @@ class ZeroLengthInputsOutputs(unittest.TestCase):
         assert_near_equal(J[('C2.outvec', 'indep.x')],
                           np.eye(3)*np.append(2*np.ones(1), -3*np.ones(2)))
 
+
 class DistribCompDenseJac(om.ExplicitComponent):
+
     def initialize(self):
         self.options['distributed'] = True
         self.options.declare('size', default=7)
@@ -1300,7 +1312,6 @@ class DistribCompDenseJac(om.ExplicitComponent):
         # automatically infer dimensions without specifying rows, cols
         self.declare_partials('y', 'x')
 
-
     def compute(self, inputs, outputs):
         N = self.options['size']
         rank = self.comm.rank
@@ -1313,6 +1324,7 @@ class DistribCompDenseJac(om.ExplicitComponent):
         sizes, offsets = evenly_distrib_idxs(self.comm.size, N)
         # Define jacobian element by element with variable size array
         J['y','x'] = -2.33 * np.ones((sizes[rank],))
+
 
 class DeclarePartialsWithoutRowCol(unittest.TestCase):
     N_PROCS = 3
@@ -1342,6 +1354,7 @@ class DeclarePartialsWithoutRowCol(unittest.TestCase):
 
         data = prob.check_totals(out_stream=None)
         assert_near_equal(data[('execcomp.z', 'dvs.x')]['abs error'][0], 0.0, 1e-6)
+
 
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests

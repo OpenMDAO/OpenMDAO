@@ -6,6 +6,7 @@ import os
 import sys
 import traceback
 import unittest
+import functools
 
 from openmdao.core.analysis_error import AnalysisError
 
@@ -172,22 +173,68 @@ def multi_proc_exception_check(comm):
     comm : MPI communicator or None
         Communicator from the ParallelGroup that owns the calling solver.
     """
-    if MPI is None:
+    if MPI is None or comm.size == 1:
         yield
     else:
         try:
             yield
         except Exception:
-            msg = traceback.format_exc()
+            exc = sys.exc_info()
+            fail = 1
         else:
-            msg = ''
+            fail = 0
 
-        fails = comm.allgather(msg)
+        failed = comm.allreduce(fail)
+        if failed:
+            if fail:
+                msg = f"Exception raised on rank {comm.rank}: {exc[1]}"
+                raise exc[0](msg).with_traceback(exc[2])
+            else:
+                raise exc[0]("Exception raised on other rank.")
 
-        for i, f in enumerate(fails):
-            if f:
-                raise RuntimeError("Exception raised in rank %d: traceback follows\n%s"
-                                   % (i, f))
+
+if MPI:
+    def check_mpi_exceptions(fn):
+        """
+        Wrap a function in multi_proc_exception_check.
+
+        This should be used only as a method decorator on an instance that
+        has a 'comm' attribute that refers to an MPI communicator.
+
+        Parameters
+        ----------
+        fn : function
+            The function being checked for possible memory leaks.
+
+        Returns
+        -------
+        function
+            A wrapper for fn that reports possible memory leaks.
+        """
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            with multi_proc_exception_check(args[0].comm):
+                return fn(*args, **kwargs)
+        return wrapper
+else:
+    # do nothing decorator
+    def check_mpi_exceptions(fn):
+        """
+        Wrap a function in multi_proc_exception_check.
+
+        This does nothing if not running under MPI.
+
+        Parameters
+        ----------
+        fn : function
+            The function being checked for possible memory leaks.
+
+        Returns
+        -------
+        function
+            A wrapper for fn that reports possible memory leaks.
+        """
+        return fn
 
 
 if MPI:

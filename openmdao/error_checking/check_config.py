@@ -14,7 +14,7 @@ from openmdao.utils.logger_utils import get_logger
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.mpi import MPI
 from openmdao.utils.hooks import _register_hook
-from openmdao.utils.general_utils import printoptions, simple_warning
+from openmdao.utils.general_utils import printoptions, simple_warning, ignore_errors
 from openmdao.utils.units import convert_units, _has_val_mismatch
 from openmdao.utils.file_utils import _load_and_exec
 
@@ -660,6 +660,7 @@ def _check_config_cmd(options, user_args):
     # register the hook
     _register_hook('final_setup', class_name='Problem', inst_id=options.problem, post=_check_config)
 
+    ignore_errors(True)
     _load_and_exec(options.file[0], user_args)
 
 

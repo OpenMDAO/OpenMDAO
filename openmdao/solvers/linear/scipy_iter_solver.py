@@ -147,7 +147,7 @@ class ScipyKrylov(LinearSolver):
             x_vec = system._vectors['residual'][vec_name]
             b_vec = system._vectors['output'][vec_name]
 
-        x_vec._data[:] = in_arr
+        x_vec.set_val(in_arr)
         scope_out, scope_in = system._get_scope()
         system._apply_linear(self._assembled_jac, [vec_name], self._rel_systems, self._mode,
                              scope_out, scope_in)
@@ -231,20 +231,20 @@ class ScipyKrylov(LinearSolver):
             self._iter_count = 0
             if solver is gmres:
                 if LooseVersion(scipy.__version__) < LooseVersion("1.1"):
-                    x, info = solver(linop, b_vec._data.copy(), M=M, restart=restart,
+                    x, info = solver(linop, b_vec.asarray(True), M=M, restart=restart,
                                      x0=x_vec_combined, maxiter=maxiter, tol=atol,
                                      callback=self._monitor)
                 else:
-                    x, info = solver(linop, b_vec._data.copy(), M=M, restart=restart,
+                    x, info = solver(linop, b_vec.asarray(True), M=M, restart=restart,
                                      x0=x_vec_combined, maxiter=maxiter, tol=atol, atol='legacy',
                                      callback=self._monitor)
             else:
-                x, info = solver(linop, b_vec._data.copy(), M=M,
+                x, info = solver(linop, b_vec.asarray(True), M=M,
                                  x0=x_vec_combined, maxiter=maxiter, tol=atol,
                                  callback=self._monitor)
 
             fail |= (info != 0)
-            x_vec._data[:] = x
+            x_vec.set_val(x)
 
     def _apply_precon(self, in_vec):
         """
@@ -265,7 +265,7 @@ class ScipyKrylov(LinearSolver):
         mode = self._mode
 
         # Need to clear out any junk from the inputs.
-        system._vectors['input'][vec_name].set_const(0.0)
+        system._vectors['input'][vec_name].set_val(0.0)
 
         # assign x and b vectors based on mode
         if mode == 'fwd':
@@ -276,7 +276,7 @@ class ScipyKrylov(LinearSolver):
             b_vec = system._vectors['output'][vec_name]
 
         # set value of b vector to KSP provided value
-        b_vec._data[:] = in_vec
+        b_vec.set_val(in_vec)
 
         # call the preconditioner
         self._solver_info.append_precon()
@@ -284,4 +284,4 @@ class ScipyKrylov(LinearSolver):
         self._solver_info.pop()
 
         # return resulting value of x vector
-        return x_vec._data.copy()
+        return x_vec.asarray(copy=True)

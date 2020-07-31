@@ -60,9 +60,6 @@ class TestNLBGaussSeidel(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
-
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
@@ -80,11 +77,12 @@ class TestNLBGaussSeidel(unittest.TestCase):
         nlbgs.options['rtol'] = 1e-6
 
         prob.setup()
-
+        prob.set_val('x', 1.)
+        prob.set_val('z', np.array([5.0, 2.0]))
         prob.run_model()
 
-        assert_near_equal(prob['y1'], 25.58830273, .00001)
-        assert_near_equal(prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob.get_val('y1'), 25.58830273, .00001)
+        assert_near_equal(prob.get_val('y2'), 12.05848819, .00001)
 
     def test_feature_basic(self):
         import numpy as np
@@ -94,9 +92,6 @@ class TestNLBGaussSeidel(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
-
-        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
@@ -112,10 +107,13 @@ class TestNLBGaussSeidel(unittest.TestCase):
 
         prob.setup()
 
+        prob.set_val('x', 1.)
+        prob.set_val('z', np.array([5.0, 2.0]))
+
         prob.run_model()
 
-        assert_near_equal(prob['y1'], 25.58830273, .00001)
-        assert_near_equal(prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob.get_val('y1'), 25.58830273, .00001)
+        assert_near_equal(prob.get_val('y2'), 12.05848819, .00001)
 
     def test_feature_maxiter(self):
         import numpy as np
@@ -125,9 +123,6 @@ class TestNLBGaussSeidel(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
-
-        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
@@ -143,11 +138,15 @@ class TestNLBGaussSeidel(unittest.TestCase):
         nlbgs.options['maxiter'] = 2
 
         prob.setup()
+
+        prob.set_val('x', 1.)
+        prob.set_val('z', np.array([5.0, 2.0]))
+
         prob.set_solver_print()
         prob.run_model()
 
-        assert_near_equal(prob['y1'], 25.58914915, .00001)
-        assert_near_equal(prob['y2'], 12.05857185, .00001)
+        assert_near_equal(prob.get_val('y1'), 25.58914915, .00001)
+        assert_near_equal(prob.get_val('y2'), 12.05857185, .00001)
 
     def test_feature_rtol(self):
         import numpy as np
@@ -157,9 +156,6 @@ class TestNLBGaussSeidel(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
-
-        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
@@ -176,10 +172,13 @@ class TestNLBGaussSeidel(unittest.TestCase):
 
         prob.setup()
 
+        prob.set_val('x', 1.)
+        prob.set_val('z', np.array([5.0, 2.0]))
+
         prob.run_model()
 
-        assert_near_equal(prob['y1'], 25.5883027, .00001)
-        assert_near_equal(prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob.get_val('y1'), 25.5883027, .00001)
+        assert_near_equal(prob.get_val('y2'), 12.05848819, .00001)
 
     def test_feature_atol(self):
         import numpy as np
@@ -189,9 +188,6 @@ class TestNLBGaussSeidel(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
-
-        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
@@ -208,19 +204,19 @@ class TestNLBGaussSeidel(unittest.TestCase):
 
         prob.setup()
 
+        prob.set_val('x', 1.)
+        prob.set_val('z', np.array([5.0, 2.0]))
+
         prob.run_model()
 
-        assert_near_equal(prob['y1'], 25.5882856302, .00001)
-        assert_near_equal(prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob.get_val('y1'), 25.5882856302, .00001)
+        assert_near_equal(prob.get_val('y2'), 12.05848819, .00001)
 
     def test_sellar(self):
         # Basic sellar test.
 
         prob = om.Problem()
         model = prob.model
-
-        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
@@ -235,11 +231,15 @@ class TestNLBGaussSeidel(unittest.TestCase):
         nlbgs = model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.setup()
+
+        prob.set_val('x', 1.)
+        prob.set_val('z', np.array([5.0, 2.0]))
+
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        assert_near_equal(prob['y1'], 25.58830273, .00001)
-        assert_near_equal(prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob.get_val('y1'), 25.58830273, .00001)
+        assert_near_equal(prob.get_val('y2'), 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
         self.assertEqual(model.nonlinear_solver._iter_count, 7)
@@ -272,8 +272,8 @@ class TestNLBGaussSeidel(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        assert_near_equal(prob['y1'], 25.58830273, .00001)
-        assert_near_equal(prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob.get_val('y1'), 25.58830273, .00001)
+        assert_near_equal(prob.get_val('y2'), 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
         self.assertEqual(model.nonlinear_solver._iter_count, 7)
@@ -362,8 +362,8 @@ class TestNLBGaussSeidel(unittest.TestCase):
         model.nonlinear_solver.options['use_aitken'] = True
         prob.run_model()
 
-        assert_near_equal(prob['y1'], 25.58830273, .00001)
-        assert_near_equal(prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob.get_val('y1'), 25.58830273, .00001)
+        assert_near_equal(prob.get_val('y2'), 12.05848819, .00001)
         self.assertTrue(model.nonlinear_solver._iter_count == 5)
 
     def test_NLBGS_Aitken_cs(self):
@@ -381,8 +381,8 @@ class TestNLBGaussSeidel(unittest.TestCase):
 
         prob.run_model()
 
-        assert_near_equal(prob['y1'], 25.58830273, .00001)
-        assert_near_equal(prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob.get_val('y1'), 25.58830273, .00001)
+        assert_near_equal(prob.get_val('y2'), 12.05848819, .00001)
 
         J = prob.compute_totals(of=['y1'], wrt=['x'])
         assert_near_equal(J['y1', 'x'][0][0], 0.98061448, 1e-6)
@@ -401,8 +401,8 @@ class TestNLBGaussSeidel(unittest.TestCase):
 
         prob.run_model()
 
-        assert_near_equal(prob['y1'], 25.58830273, .00001)
-        assert_near_equal(prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob.get_val('y1'), 25.58830273, .00001)
+        assert_near_equal(prob.get_val('y2'), 12.05848819, .00001)
 
         J = prob.compute_totals(of=['y1'], wrt=['x'])
         assert_near_equal(J['y1', 'x'][0][0], 0.98061448, 1e-6)
@@ -437,6 +437,39 @@ class TestNLBGaussSeidel(unittest.TestCase):
         p.run_model()
 
         self.assertEqual(nlbgs._iter_count, 9, 'res_ref should make this take more iters.')
+
+    def test_guess_nonlinear(self):
+        class SmartGroup(om.Group):
+
+            def setup(self):
+                self.add_subsystem('c1', om.ExecComp('y = 2.7951 + 10.56*x**2 - 5.4*x**3 + 0.5*x**4'), promotes=['*'])
+                self.add_subsystem('c2', om.ExecComp('x = y/8.954'), promotes=['*'])
+
+                self.nonlinear_solver = om.NonlinearBlockGS()
+                self.nonlinear_solver.options['maxiter'] = 100
+                self.nonlinear_solver.options['atol'] = 1e-6
+
+            def guess_nonlinear(self, inputs, outputs, residuals):
+                x = outputs['x']
+                y = outputs['y']
+
+                if np.abs(x) > 1.0 or np.abs(y) > 10.0:
+                    # Pull out of divergence zone.
+                    x = outputs['x'] = 0.5
+                    outputs['y'] = 2.7951 + 10.56*x**2 - 5.4*x**3 + 0.5*x**4
+
+        prob = om.Problem(model=SmartGroup())
+
+        prob.setup()
+        prob.set_solver_print(level=0)
+
+        # This will mess things up. Only guess_nonlinear can save us.
+        prob['y'] = 1000.0
+        prob['x'] = 1000.0
+
+        prob.run_model()
+
+        assert_near_equal(prob['x'], 0.67883021, 1e-5)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")

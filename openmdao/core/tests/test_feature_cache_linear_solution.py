@@ -92,10 +92,7 @@ class CacheLinearTestCase(unittest.TestCase):
         p.driver = om.ScipyOptimizeDriver()
         p.driver.options['optimizer'] = 'SLSQP'
 
-        indeps = p.model.add_subsystem('indeps', om.IndepVarComp(), promotes_outputs=['a', 'b', 'c'])
-        indeps.add_output('a', 1.)
-        indeps.add_output('b', 4.)
-        indeps.add_output('c', 1.)
+        p.model.set_input_defaults('b', val=4.)
         p.model.add_subsystem('quad', QuadraticComp(), promotes_inputs=['a', 'b', 'c'], promotes_outputs=['states'])
         p.model.add_subsystem('obj', om.ExecComp('y = (x[1]-x[0])**2', x=np.ones(2)))
         p.model.connect('states', 'obj.x')
