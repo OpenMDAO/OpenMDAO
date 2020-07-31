@@ -992,7 +992,7 @@ def _is_slicer_op(indices):
         Returns True if indices contains a colon or ellipsis operator.
     """
     if isinstance(indices, Iterable):
-        if isinstance(indices, tuple):
+        if isinstance(indices, (tuple, list, range, str)):
             return any(isinstance(i, slice) or i == ... for i in indices)
         else:
             return any(isinstance(i, slice) or i == ... for i in indices.flatten())
