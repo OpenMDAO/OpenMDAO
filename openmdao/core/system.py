@@ -620,6 +620,7 @@ class System(object):
         self._configure_check()
 
         self._setup_var_data()
+
         self._setup_vec_names(mode)
         self._setup_global_connections()
 
