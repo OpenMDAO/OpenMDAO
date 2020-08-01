@@ -222,7 +222,6 @@ class Component(System):
         super(Component, self)._setup_var_data()
 
         allprocs_abs_names = self._var_allprocs_abs_names
-        allprocs_abs_names_discrete = self._var_allprocs_abs_names_discrete
 
         allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
 
@@ -261,9 +260,6 @@ class Component(System):
             for prom_name, val in self._var_discrete[type_].items():
                 abs_name = prefix + prom_name
 
-                # Compute allprocs_abs_names_discrete
-                allprocs_abs_names_discrete[type_].append(abs_name)
-
                 # Compute allprocs_prom2abs_list, abs2prom
                 allprocs_prom2abs_list[type_][prom_name] = [abs_name]
                 abs2prom[type_][abs_name] = prom_name
@@ -272,10 +268,9 @@ class Component(System):
                 self._var_allprocs_discrete[type_][abs_name] = v = val.copy()
                 del v['value']
 
-        self._var_allprocs_abs2prom = abs2prom
+        self._var_allprocs_abs2prom = self._var_abs2prom
 
         self._var_abs_names = allprocs_abs_names
-        self._var_abs_names_discrete = allprocs_abs_names_discrete
 
         if self._var_discrete['input'] or self._var_discrete['output']:
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
@@ -779,7 +774,7 @@ class Component(System):
         sizes_in = self._var_sizes['nonlinear']['input']
         sizes_out = all_sizes['nonlinear']['output']
         added_src_inds = set()
-        for i, iname in enumerate(self._var_allprocs_abs_names['input']):
+        for i, iname in enumerate(self._abs_name_iter('input', local=False)):
             if iname in abs2meta and abs2meta[iname]['src_indices'] is None:
                 src = abs_in2out[iname]
                 out_i = all_abs2idx[src]

@@ -81,7 +81,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
     with printoptions(precision=precision, suppress=True, threshold=10000):
 
-        for t in system._var_abs_names['input']:
+        for t in system._abs_name_iter('input'):
             tmeta = system._var_abs2meta[t]
             idxs = tmeta['src_indices']
 
@@ -109,12 +109,12 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
     src_systems = set()
     tgt_systems = set()
-    for s in system._var_abs_names['output']:
+    for s in system._abs_name_iter('output'):
         parts = s.split('.')
         for i in range(len(parts)):
             src_systems.add('.'.join(parts[:i]))
 
-    for t in system._var_abs_names['input']:
+    for t in system._abs_name_iter('input'):
         parts = t.split('.')
         for i in range(len(parts)):
             tgt_systems.add('.'.join(parts[:i]))
@@ -146,7 +146,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
         idx += 1
 
     # add rows for unconnected sources
-    for src in system._var_abs_names['output']:
+    for src in system._abs_name_iter('output'):
         if src not in src2tgts:
             if show_values:
                 v = _val2str(system._outputs[src])

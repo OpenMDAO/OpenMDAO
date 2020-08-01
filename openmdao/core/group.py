@@ -221,11 +221,11 @@ class Group(System):
 
         if excl_sub is None:
             # All outputs
-            scope_out = frozenset(self._var_allprocs_abs_names['output'])
+            scope_out = frozenset(self._abs_name_iter('output', local=False))
 
             # All inputs connected to an output in this system
             scope_in = frozenset(self._conn_global_abs_in2out).intersection(
-                self._var_allprocs_abs_names['input'])
+                self._abs_name_iter('input', local=False))
 
         else:
             # Empty for the excl_sub
@@ -233,7 +233,7 @@ class Group(System):
 
             # All inputs connected to an output in this system but not in excl_sub
             scope_in = set()
-            for abs_in in self._var_allprocs_abs_names['input']:
+            for abs_in in self._abs_name_iter('input', local=False):
                 if abs_in in self._conn_global_abs_in2out:
                     abs_out = self._conn_global_abs_in2out[abs_in]
 
@@ -615,7 +615,7 @@ class Group(System):
 
             # the code below is to handle the case where src_indices were not specified
             # for a distributed input. This update can't happen until sizes are known.
-            dist_ins = [n for n in self._var_allprocs_abs_names['input']
+            dist_ins = [n for n in self._abs_name_iter('input', local=False)
                         if all_abs2meta[n]['distributed']]
             dcomp_names = set(d.rsplit('.', 1)[0] for d in dist_ins)
             if dcomp_names:
@@ -702,10 +702,7 @@ class Group(System):
         super(Group, self)._setup_var_data()
 
         abs_names = self._var_abs_names
-        abs_names_discrete = self._var_abs_names_discrete
-
         allprocs_abs_names = self._var_allprocs_abs_names
-        allprocs_abs_names_discrete = self._var_allprocs_abs_names_discrete
 
         var_discrete = self._var_discrete
         allprocs_discrete = self._var_allprocs_discrete
@@ -714,7 +711,7 @@ class Group(System):
         abs2prom = self._var_abs2prom
 
         allprocs_abs2meta = self._var_allprocs_abs2meta
-        allprocs_abs2prom = self._var_allprocs_abs2prom
+        # allprocs_abs2prom = self._var_allprocs_abs2prom
 
         allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
 
@@ -740,11 +737,8 @@ class Group(System):
                 # Assemble abs_names and allprocs_abs_names
                 allprocs_abs_names[type_].extend(
                     subsys._var_allprocs_abs_names[type_])
-                allprocs_abs_names_discrete[type_].extend(
-                    subsys._var_allprocs_abs_names_discrete[type_])
 
-                abs_names[type_].extend(subsys._var_abs_names[type_])
-                abs_names_discrete[type_].extend(subsys._var_abs_names_discrete[type_])
+                abs_names[type_].extend(subsys._abs_name_iter(type_))
 
                 allprocs_discrete[type_].update(subsys._var_allprocs_discrete[type_])
                 var_discrete[type_].update({sub_prefix + k: v for k, v in
@@ -760,7 +754,7 @@ class Group(System):
                     for abs_name in sub_abs:
                         if abs_name in sub_loc_proms:
                             abs2prom[type_][abs_name] = prom_name
-                        allprocs_abs2prom[type_][abs_name] = prom_name
+                        # allprocs_abs2prom[type_][abs_name] = prom_name
 
             if isinstance(subsys, Group):
                 subprom2prom = var_maps['input']
@@ -775,14 +769,12 @@ class Group(System):
             mysub = self._subsystems_myproc[0] if self._subsystems_myproc else False
             if (mysub and mysub.comm.rank == 0 and (mysub._full_comm is None or
                                                     mysub._full_comm.rank == 0)):
-                raw = (allprocs_abs_names, allprocs_abs_names_discrete, allprocs_discrete,
-                       allprocs_prom2abs_list, allprocs_abs2prom, allprocs_abs2meta,
+                raw = (allprocs_abs_names, allprocs_discrete,
+                       allprocs_prom2abs_list, allprocs_abs2meta,
                        self._has_output_scaling, self._has_resid_scaling, self._group_inputs)
             else:
                 raw = (
                     {'input': [], 'output': []},
-                    {'input': [], 'output': []},
-                    {'input': {}, 'output': {}},
                     {'input': {}, 'output': {}},
                     {'input': {}, 'output': {}},
                     {},
@@ -794,13 +786,11 @@ class Group(System):
 
             for type_ in ['input', 'output']:
                 allprocs_abs_names[type_] = []
-                allprocs_abs_names_discrete[type_] = []
-                allprocs_abs2prom[type_] = {}
                 allprocs_prom2abs_list[type_] = OrderedDict()
 
             myrank = self.comm.rank
-            for rank, (myproc_abs_names, myproc_abs_names_discrete, myproc_discrete,
-                       myproc_prom2abs_list, all_abs2prom, myproc_abs2meta, oscale,
+            for rank, (myproc_abs_names, myproc_discrete,
+                       myproc_prom2abs_list, myproc_abs2meta, oscale,
                        rscale, ginputs) in enumerate(gathered):
                 self._has_output_scaling |= oscale
                 self._has_resid_scaling |= rscale
@@ -820,9 +810,7 @@ class Group(System):
 
                     # Assemble in parallel allprocs_abs_names
                     allprocs_abs_names[type_].extend(myproc_abs_names[type_])
-                    allprocs_abs_names_discrete[type_].extend(myproc_abs_names_discrete[type_])
                     allprocs_discrete[type_].update(myproc_discrete[type_])
-                    allprocs_abs2prom[type_].update(all_abs2prom[type_])
 
                     # Assemble in parallel allprocs_prom2abs_list
                     for prom_name, abs_names_list in myproc_prom2abs_list[type_].items():
@@ -835,6 +823,12 @@ class Group(System):
                 raise RuntimeError("{}: Output name '{}' refers to "
                                    "multiple outputs: {}.".format(self.msginfo, prom_name,
                                                                   sorted(abs_list)))
+
+        for iotype in ('input', 'output'):
+            a2p = self._var_allprocs_abs2prom[iotype]
+            for prom, abslist in self._var_allprocs_prom2abs_list[iotype].items():
+                for abs_name in abslist:
+                    a2p[abs_name] = prom
 
         if self._group_inputs:
             p2abs_in = self._var_allprocs_prom2abs_list['input']
@@ -1004,18 +998,18 @@ class Group(System):
             abs2meta = self._var_allprocs_abs2meta
             owns = self._owning_rank
             self._owned_sizes = self._var_sizes[vec_names[0]]['output'].copy()
-            for type_ in ('input', 'output'):
-                sizes = self._var_sizes[vec_names[0]][type_]
-                for i, name in enumerate(self._var_allprocs_abs_names[type_]):
+            for iotype in ('input', 'output'):
+                sizes = self._var_sizes[vec_names[0]][iotype]
+                for i, name in enumerate(self._abs_name_iter(iotype, local=False)):
                     for rank in range(self.comm.size):
                         if sizes[rank, i] > 0:
                             owns[name] = rank
-                            if type_ == 'output' and not abs2meta[name]['distributed']:
+                            if iotype == 'output' and not abs2meta[name]['distributed']:
                                 self._owned_sizes[rank + 1:, i] = 0  # zero out all dups
                             break
 
-                if self._var_allprocs_discrete[type_]:
-                    local = list(self._var_discrete[type_])
+                if self._var_allprocs_discrete[iotype]:
+                    local = list(self._var_discrete[iotype])
                     for i, names in enumerate(self.comm.allgather(local)):
                         for n in names:
                             if n not in owns:
@@ -2264,7 +2258,7 @@ class Group(System):
             # We current cannot approximate across a group with a distributed component if the
             # inputs are distributed via src_indices.
             abs2meta = self._var_abs2meta
-            for iname in self._var_allprocs_abs_names['input']:
+            for iname in self._abs_name_iter('input', local=False):
                 if abs2meta[iname]['src_indices'] is not None and \
                    abs2meta[iname]['distributed'] and \
                    iname not in self._conn_abs_in2out:
@@ -2738,7 +2732,7 @@ class Group(System):
         abs2meta = self._var_abs2meta
         all_abs2meta = self._var_allprocs_abs2meta
         conns = self._problem_meta['connections']
-        auto_tgts = [n for n in self._var_allprocs_abs_names['input'] if n not in conns]
+        auto_tgts = [n for n in self._abs_name_iter('input', local=False) if n not in conns]
         for tgt in auto_tgts:
             prom = abs2prom[tgt]
             if prom in prom2auto:
@@ -2828,7 +2822,7 @@ class Group(System):
                                                  self._var_allprocs_abs_names[typ])
             old = self._var_allprocs_prom2abs_list[typ]
             p2abs = OrderedDict()
-            for name in auto_ivc._var_allprocs_abs_names[typ]:
+            for name in auto_ivc._abs_name_iter(typ, local=False):
                 p2abs[name] = [name]
             p2abs.update(old)
             self._var_allprocs_prom2abs_list[typ] = p2abs
@@ -2838,11 +2832,6 @@ class Group(System):
             self._var_allprocs_abs2prom[typ].update({n: n for n in
                                                      auto_ivc._var_allprocs_abs2prom[typ]})
 
-            self._var_allprocs_abs_names_discrete[typ] = (
-                auto_ivc._var_allprocs_abs_names_discrete[typ] +
-                self._var_allprocs_abs_names_discrete[typ])
-            self._var_abs_names_discrete[typ] = (auto_ivc._var_abs_names_discrete[typ] +
-                                                 self._var_abs_names_discrete[typ])
             self._var_discrete[typ].update({'_auto_ivc.' + k: v for k, v in
                                             auto_ivc._var_discrete[typ].items()})
             self._var_allprocs_discrete[typ].update(auto_ivc._var_allprocs_discrete[typ])

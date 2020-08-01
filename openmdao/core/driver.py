@@ -308,7 +308,7 @@ class Driver(object):
             abs2meta = model._var_allprocs_abs2meta
             rank = model.comm.rank
             nprocs = model.comm.size
-            for i, vname in enumerate(model._var_allprocs_abs_names['output']):
+            for i, vname in enumerate(model._abs_name_iter('output', local=False)):
                 if vname in responses:
                     indices = responses[vname].get('indices')
                 elif vname in src_design_vars:
