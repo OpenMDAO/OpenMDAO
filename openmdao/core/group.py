@@ -702,7 +702,6 @@ class Group(System):
         super(Group, self)._setup_var_data()
 
         abs_names = self._var_abs_names
-        allprocs_abs_names = self._var_allprocs_abs_names
 
         var_discrete = self._var_discrete
         allprocs_discrete = self._var_allprocs_discrete
@@ -710,7 +709,7 @@ class Group(System):
         abs2meta = self._var_abs2meta
         abs2prom = self._var_abs2prom
 
-        allprocs_abs2meta = self._var_allprocs_abs2meta
+        allprocs_abs2meta = OrderedDict()
         # allprocs_abs2prom = self._var_allprocs_abs2prom
 
         allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
@@ -735,8 +734,6 @@ class Group(System):
             for type_ in ['input', 'output']:
                 subprom2prom = var_maps[type_]
                 # Assemble abs_names and allprocs_abs_names
-                allprocs_abs_names[type_].extend(
-                    subsys._var_allprocs_abs_names[type_])
 
                 abs_names[type_].extend(subsys._abs_name_iter(type_))
 
@@ -754,7 +751,6 @@ class Group(System):
                     for abs_name in sub_abs:
                         if abs_name in sub_loc_proms:
                             abs2prom[type_][abs_name] = prom_name
-                        # allprocs_abs2prom[type_][abs_name] = prom_name
 
             if isinstance(subsys, Group):
                 subprom2prom = var_maps['input']
@@ -769,12 +765,10 @@ class Group(System):
             mysub = self._subsystems_myproc[0] if self._subsystems_myproc else False
             if (mysub and mysub.comm.rank == 0 and (mysub._full_comm is None or
                                                     mysub._full_comm.rank == 0)):
-                raw = (allprocs_abs_names, allprocs_discrete,
-                       allprocs_prom2abs_list, allprocs_abs2meta,
+                raw = (allprocs_discrete, allprocs_prom2abs_list, allprocs_abs2meta,
                        self._has_output_scaling, self._has_resid_scaling, self._group_inputs)
             else:
                 raw = (
-                    {'input': [], 'output': []},
                     {'input': {}, 'output': {}},
                     {'input': {}, 'output': {}},
                     {},
@@ -784,14 +778,15 @@ class Group(System):
                 )
             gathered = self.comm.allgather(raw)
 
+            # start with a fresh OrderedDict to keep order the same in all procs
+            allprocs_abs2meta = OrderedDict()
+
             for type_ in ['input', 'output']:
-                allprocs_abs_names[type_] = []
                 allprocs_prom2abs_list[type_] = OrderedDict()
 
             myrank = self.comm.rank
-            for rank, (myproc_abs_names, myproc_discrete,
-                       myproc_prom2abs_list, myproc_abs2meta, oscale,
-                       rscale, ginputs) in enumerate(gathered):
+            for rank, (myproc_discrete, myproc_prom2abs_list, myproc_abs2meta, 
+                       oscale, rscale, ginputs) in enumerate(gathered):
                 self._has_output_scaling |= oscale
                 self._has_resid_scaling |= rscale
 
@@ -802,14 +797,11 @@ class Group(System):
                         self._group_inputs[p].extend(mlist)
 
                 # Assemble in parallel allprocs_abs2meta
-                for n in myproc_abs2meta:
-                    if n not in allprocs_abs2meta:
-                        allprocs_abs2meta[n] = myproc_abs2meta[n]
+                allprocs_abs2meta.update(myproc_abs2meta)
 
                 for type_ in ['input', 'output']:
 
                     # Assemble in parallel allprocs_abs_names
-                    allprocs_abs_names[type_].extend(myproc_abs_names[type_])
                     allprocs_discrete[type_].update(myproc_discrete[type_])
 
                     # Assemble in parallel allprocs_prom2abs_list
@@ -817,6 +809,8 @@ class Group(System):
                         if prom_name not in allprocs_prom2abs_list[type_]:
                             allprocs_prom2abs_list[type_][prom_name] = []
                         allprocs_prom2abs_list[type_][prom_name].extend(abs_names_list)
+
+        self._var_allprocs_abs2meta = allprocs_abs2meta
 
         for prom_name, abs_list in allprocs_prom2abs_list['output'].items():
             if len(abs_list) > 1:
@@ -829,6 +823,10 @@ class Group(System):
             for prom, abslist in self._var_allprocs_prom2abs_list[iotype].items():
                 for abs_name in abslist:
                     a2p[abs_name] = prom
+            
+            self._var_allprocs_abs_names[iotype] = [
+                n for n, m in self._var_allprocs_abs2meta.items() if m['iotype'] == iotype
+            ]
 
         if self._group_inputs:
             p2abs_in = self._var_allprocs_prom2abs_list['input']

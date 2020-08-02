@@ -21,8 +21,8 @@ import openmdao.utils.coloring as coloring_mod
 
 # the following metadata will be accessible for vars on all procs
 global_meta_names = {
-    'input': ('units', 'shape', 'size', 'distributed', 'tags', 'desc'),
-    'output': ('units', 'shape', 'size', 'desc',
+    'input': ('units', 'shape', 'size', 'distributed', 'tags', 'desc', 'iotype'),
+    'output': ('units', 'shape', 'size', 'desc', 'iotype',
                'ref', 'ref0', 'res_ref', 'distributed', 'lower', 'upper', 'tags'),
 }
 
@@ -469,6 +469,7 @@ class Component(System):
             'desc': desc,
             'distributed': distributed,
             'tags': make_set(tags),
+            'iotype': 'input',
         }
 
         if src_indices is not None:
@@ -527,6 +528,7 @@ class Component(System):
             'type': type(val),
             'desc': desc,
             'tags': make_set(tags),
+            'iotype': 'input',
         }
 
         if metadata['type'] == np.ndarray:
@@ -675,6 +677,7 @@ class Component(System):
             'res_ref': format_as_float_or_array('res_ref', res_ref, flatten=True),
             'lower': lower,
             'upper': upper,
+            'iotype': 'output',
         }
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
@@ -726,7 +729,8 @@ class Component(System):
             'value': val,
             'type': type(val),
             'desc': desc,
-            'tags': make_set(tags)
+            'tags': make_set(tags),
+            'iotype': 'output',
         }
 
         if metadata['type'] == np.ndarray:
