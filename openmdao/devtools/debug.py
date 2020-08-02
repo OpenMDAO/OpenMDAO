@@ -314,7 +314,7 @@ def config_summary(problem, stream=sys.stdout):
 
     printer()
 
-    input_names = model._var_allprocs_abs_names['input']
+    input_names = list(model._abs_name_iter('input', local=False))
     ninputs = len(input_names)
     if setup_done:
         printer("Input variables:         %5d   Total size: %8d" %
@@ -322,7 +322,7 @@ def config_summary(problem, stream=sys.stdout):
     else:
         printer("Input variables:         %5d" % ninputs)
 
-    output_names = model._var_allprocs_abs_names['output']
+    output_names = list(model._abs_name_iter('output', local=False))
     noutputs = len(output_names)
     if setup_done:
         printer("Output variables:        %5d   Total size: %8d" %

@@ -380,7 +380,7 @@ def _check_comp_has_no_outputs(problem, logger):
     msg = []
 
     for comp in problem.model.system_iter(include_self=True, recurse=True, typ=Component):
-        if len(comp._var_allprocs_abs_names['output']) == 0:
+        if len(list(comp._abs_name_iter('output', local=False, discrete=True))) == 0:
             msg.append("   %s\n" % comp.pathname)
 
     if msg:

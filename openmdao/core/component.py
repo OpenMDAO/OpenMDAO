@@ -221,7 +221,7 @@ class Component(System):
         global global_meta_names
         super(Component, self)._setup_var_data()
 
-        allprocs_abs_names = self._var_allprocs_abs_names
+        abs_names = self._var_abs_names
 
         allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
 
@@ -239,7 +239,7 @@ class Component(System):
                 metadata = self._var_rel2meta[prom_name]
 
                 # Compute allprocs_abs_names
-                allprocs_abs_names[type_].append(abs_name)
+                abs_names[type_].append(abs_name)
 
                 # Compute allprocs_prom2abs_list, abs2prom
                 allprocs_prom2abs_list[type_][prom_name] = [abs_name]
@@ -269,8 +269,7 @@ class Component(System):
                 del v['value']
 
         self._var_allprocs_abs2prom = self._var_abs2prom
-
-        self._var_abs_names = allprocs_abs_names
+        self._var_allprocs_abs_names = abs_names
 
         if self._var_discrete['input'] or self._var_discrete['output']:
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
