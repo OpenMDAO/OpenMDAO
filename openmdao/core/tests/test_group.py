@@ -1749,6 +1749,18 @@ class TestConnect(unittest.TestCase):
         with assert_warning(UserWarning, msg):
             self.prob.setup()
 
+    def test_explicit_conn_to_prom_inputs(self):
+        p = om.Problem()
+        p.model.add_subsystem('indeps', om.IndepVarComp('foo', val=10., units='ft'))
+        p.model.add_subsystem('C1', om.ExecComp('y=3*x', x={'units': 'ft', 'value': 1.}), promotes_inputs=['x'])
+        p.model.add_subsystem('C2', om.ExecComp('y=4*x', x={'units': 'ft', 'value': 1.}), promotes_inputs=['x'])
+        p.model.connect('indeps.foo', 'x')
+        p.setup()
+        p.final_setup()
+
+        # before bug fix, the following generated an ambiguity error
+        p['x']
+
     def test_invalid_target(self):
         msg = "Group (sub): Attempted to connect from 'src.x' to 'tgt.z', but 'tgt.z' doesn't exist."
 
