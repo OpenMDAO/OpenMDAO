@@ -1054,6 +1054,28 @@ class TestGroup(unittest.TestCase):
         for key, val in totals.items():
             assert_near_equal(val['rel error'][0], 0.0, 1e-15)
 
+    def test_set_order_error(self):
+
+        class SimpleGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
+                self.add_subsystem('comp2', om.ExecComp('b=2*a'))
+
+            def configure(self):
+                self.set_order(['C1', 'C2', 'C3'])
+
+        # This doesn't raise an error but should
+        order_list = []
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('C1', SimpleGroup())
+        model.add_subsystem('C2', SimpleGroup())
+
+        prob.setup()
+        prob.run_model()
+
 @unittest.skipUnless(MPI, "MPI is required.")
 class TestGroupMPISlice(unittest.TestCase):
     N_PROCS = 2
