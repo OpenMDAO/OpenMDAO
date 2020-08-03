@@ -722,7 +722,7 @@ class TestPyoptSparse(unittest.TestCase):
     def test_pyopt_fd_is_called(self):
 
         class ParaboloidApplyLinear(Paraboloid):
-            def apply_linear(params, unknowns, resids):
+            def apply_linear(inputs, outputs, resids):
                 raise Exception("OpenMDAO's finite difference has been called."
                                 " pyopt_fd option has failed.")
 
@@ -1854,7 +1854,7 @@ class TestPyoptSparse(unittest.TestCase):
                 elif self.iter_count > 3:
                     raise RuntimeError('SNOPT should have stopped.')
                 else:
-                    # Post optimization run with optimal params.
+                    # Post optimization run with optimal inputs.
                     pass
 
             def compute_partials(self, inputs, partials):
@@ -2131,7 +2131,7 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
     def test_snopt_fd_is_called(self):
 
         class ParaboloidApplyLinear(Paraboloid):
-            def apply_linear(params, unknowns, resids):
+            def apply_linear(inputs, outputs, resids):
                 raise Exception("OpenMDAO's finite difference has been called."
                                 " snopt_fd option has failed.")
 

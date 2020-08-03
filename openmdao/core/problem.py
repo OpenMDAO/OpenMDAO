@@ -442,7 +442,7 @@ class Problem(object):
         if abs_names:
             n_proms = len(abs_names)  # for output this will never be > 1
             if n_proms > 1 and name in ginputs:
-                abs_name = ginputs[name].get('use_tgt', abs_names[0])
+                abs_name = ginputs[name][0].get('use_tgt', abs_names[0])
             else:
                 abs_name = abs_names[0]
         else:
@@ -460,15 +460,14 @@ class Problem(object):
                 else:
                     tlocmeta = None
 
-                gunits = ginputs[name].get('units') if name in ginputs else None
+                gunits = ginputs[name][0].get('units') if name in ginputs else None
                 if n_proms > 1:  # promoted input name was used
                     if gunits is None:
                         tunit_list = [all_meta[n]['units'] for n in abs_names]
                         tu0 = tunit_list[0]
                         for tu in tunit_list:
                             if tu != tu0:
-                                model._show_ambiguity_msg(name, ('units',),
-                                                          abs_names)
+                                model._show_ambiguity_msg(name, ('units',), abs_names)
 
                 if units is None:
                     if self._setup_status > 1:  # avoids double unit conversion
@@ -963,7 +962,7 @@ class Problem(object):
             List of glob patterns for pathnames to exclude from the check. Default is None, which
             excludes nothing.
         compact_print : bool
-            Set to True to just print the essentials, one line per unknown-param pair.
+            Set to True to just print the essentials, one line per input-output pair.
         abs_err_tol : float
             Threshold value for absolute error.  Errors about this value will have a '*' displayed
             next to them in output, making them easy to search for. Default is 1.0E-6.
@@ -1379,7 +1378,7 @@ class Problem(object):
             Where to send human readable output. By default it goes to stdout.
             Set to None to suppress.
         compact_print : bool
-            Set to True to just print the essentials, one line per unknown-param pair.
+            Set to True to just print the essentials, one line per input-output pair.
         driver_scaling : bool
             When True, return derivatives that are scaled according to either the adder and scaler
             or the ref and ref0 values that were specified when add_design_var, add_objective, and

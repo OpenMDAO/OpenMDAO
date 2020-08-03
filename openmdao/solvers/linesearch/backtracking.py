@@ -15,21 +15,21 @@ from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.general_utils import simple_warning
 
 
-def _print_violations(unknowns, lower, upper):
+def _print_violations(outputs, lower, upper):
     """
     Print out which variables exceed their bounds.
 
     Parameters
     ----------
-    unknowns : <Vector>
-        Vector containing the unknowns.
+    outputs : <Vector>
+        Vector containing the outputs.
     lower : <Vector>
         Vector containing the lower bounds.
     upper : <Vector>
         Vector containing the upper bounds.
     """
     start = end = 0
-    for name, val in unknowns._abs_item_iter():
+    for name, val in outputs._abs_item_iter():
         end += val.size
         if upper is not None and any(val > upper[start:end]):
             print("'%s' exceeds upper bounds" % name)
@@ -147,7 +147,7 @@ class LinesearchSolver(NonlinearSolver):
         """
         Enforce lower/upper bounds.
 
-        Modifies the vector of unknowns and the step.
+        Modifies the vector of outputs and the step.
 
         Parameters
         ----------

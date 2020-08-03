@@ -224,10 +224,12 @@ class System(object):
     _rec_mgr : <RecordingManager>
         object that manages all recorders added to this system.
     _static_mode : bool
-        If true, we are outside of setup.
-        In this case, add_input, add_output, and add_subsystem all add to the
-        '_static' versions of the respective data structures.
-        These data structures are never reset during setup.
+        If True, we are outside of system setup and configure and will add things to '_static'
+        versions of our data structures so they won't get reset if problem setup is called multiple
+        times.  Changes to data structures during system setup/configure are considered 'dynamic'
+        and are reset each time problem setup is called.
+        add_input, add_output, and add_subsystem are exammples of functions that will modify
+        the '_static' versions of data structures if called outside of setup/configure.
     _static_subsystems_allprocs : [<System>, ...]
         List of subsystems that stores all subsystems added outside of setup.
     _static_design_vars : dict of dict
@@ -2390,15 +2392,15 @@ class System(object):
         name : string
             Name of the design variable in the system.
         lower : float or ndarray, optional
-            Lower boundary for the param
+            Lower boundary for the input
         upper : upper or ndarray, optional
-            Upper boundary for the param
+            Upper boundary for the input
         ref : float or ndarray, optional
             Value of design var that scales to 1.0 in the driver.
         ref0 : float or ndarray, optional
             Value of design var that scales to 0.0 in the driver.
         indices : iter of int, optional
-            If a param is an array, these indicate which entries are of
+            If an input is an array, these indicate which entries are of
             interest for this particular design variable.  These may be
             positive or negative integers.
         units : str, optional
@@ -4197,7 +4199,7 @@ class System(object):
         if from_src and abs_names[0] in conns:  # pull input from source
             return self._get_input_from_src(name, abs_names, conns, units=units, indices=indices,
                                             get_remote=get_remote, rank=rank, vec_name='nonlinear',
-                                            kind='output', flat=flat)
+                                            flat=flat)
         else:
             val = self._abs_get_val(abs_names[0], get_remote, rank, vec_name, kind, flat)
 
@@ -4209,25 +4211,60 @@ class System(object):
 
         return val
 
-    def _get_input_from_src(self, name, abs_names, conns, units=None, indices=None,
-                            get_remote=False, rank=None, vec_name='nonlinear', kind=None,
-                            flat=False):
-        abs_name = abs_names[0]
+    def _get_input_from_src(self, name, abs_ins, conns, units=None, indices=None,
+                            get_remote=False, rank=None, vec_name='nonlinear', flat=False):
+        """
+        Given an input name, retrieve the value from its source output.
+
+        Parameters
+        ----------
+        name : str
+            Promoted or relative variable name in the root system's namespace.
+        abs_ins : list of str
+            List of absolute input names.
+        conns : dict
+            Mapping of absolute names of each input to its connected output across the whole model.
+        units : str, optional
+            Units to convert to before return.
+        indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
+            Indices or slice to return.
+        get_remote : bool
+            If True, retrieve the value even if it is on a remote process.  Note that if the
+            variable is remote on ANY process, this function must be called on EVERY process
+            in the Problem's MPI communicator.
+        rank : int or None
+            If not None, only gather the value to this rank.
+        vec_name : str
+            Name of the vector to use.   Defaults to 'nonlinear'.
+        flat : bool
+            If True, return the flattened version of the value.
+
+        Returns
+        -------
+        object
+            The value of the requested variable.
+        """
+        abs_name = abs_ins[0]
         src = conns[abs_name]
         if src in self._var_allprocs_discrete['output']:
-            return self._abs_get_val(src, get_remote, rank, vec_name, kind, flat, from_root=True)
+            return self._abs_get_val(src, get_remote, rank, vec_name, 'output', flat,
+                                     from_root=True)
 
         # if we have multiple promoted inputs that are explicitly connected to an output and units
         # have not been specified, look for group input to disambiguate
-        if units is None and len(abs_names) > 1:
+        if units is None and len(abs_ins) > 1:
             if abs_name not in self._var_allprocs_discrete['input']:
-                # can't get here unless self is a Group because len(abs_names) always == 1 for comp
+                # can't get here unless self is a Group because len(abs_ins) always == 1 for comp
                 try:
-                    units = self._group_inputs[name]['units']
-                except KeyError:
-                    self._show_ambiguity_msg(name, ('units',), abs_names)
+                    units = self._group_inputs[name][0]['units']
+                except (KeyError, IndexError):
+                    unit0 = self._var_allprocs_abs2meta[abs_ins[0]]['units']
+                    for n in abs_ins[1:]:
+                        if unit0 != self._var_allprocs_abs2meta[n]['units']:
+                            self._show_ambiguity_msg(name, ('units',), abs_ins)
+                            break
 
-        val = self._abs_get_val(src, get_remote, rank, vec_name, kind, flat, from_root=True)
+        val = self._abs_get_val(src, get_remote, rank, vec_name, 'output', flat, from_root=True)
 
         if abs_name in self._var_abs2meta:  # input is local
             vmeta = self._var_abs2meta[abs_name]
@@ -4405,6 +4442,9 @@ class System(object):
 
         base_units = meta['units']
 
+        if base_units == units:
+            return val
+
         try:
             scale, offset = unit_conversion(base_units, units)
         except Exception:
@@ -4432,6 +4472,9 @@ class System(object):
             The value converted to the specified units.
         """
         base_units = self._get_var_meta(name)['units']
+
+        if base_units == units:
+            return val
 
         try:
             scale, offset = unit_conversion(units, base_units)
@@ -4461,6 +4504,9 @@ class System(object):
         float or ndarray of float
             The value converted to the specified units.
         """
+        if units_from == units_to:
+            return val
+
         try:
             scale, offset = unit_conversion(units_from, units_to)
         except Exception:
@@ -4493,7 +4539,7 @@ class System(object):
 
         raise KeyError('{}: Metadata for variable "{}" not found.'.format(self.msginfo, name))
 
-    def _resolve_connected_input_defaults(self):
+    def _resolve_ambiguous_input_meta(self):
         pass
 
 
