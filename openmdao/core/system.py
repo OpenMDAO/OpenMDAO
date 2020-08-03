@@ -4212,12 +4212,15 @@ class System(object):
         if units is None and len(abs_names) > 1:
             if abs_name not in self._var_allprocs_discrete['input']:
                 # can't get here unless self is a Group because len(abs_names) always == 1 for comp
-                unitset = set(self._var_allprocs_abs2meta[n]['units'] for n in abs_names)
-                if len(unitset) > 1:
-                    try:
-                        units = self._group_inputs[name][0]['units']
-                    except (KeyError, IndexError):
-                        self._show_ambiguity_msg(name, ('units',), abs_names)
+                try:
+                    units = self._group_inputs[name][0]['units']
+                except (KeyError, IndexError):
+                    for i, n in enumerate(abs_names):
+                        if i == 0:
+                            unit0 = self._var_allprocs_abs2meta[n]['units']
+                        elif unit0 != self._var_allprocs_abs2meta[n]['units']:
+                            self._show_ambiguity_msg(name, ('units',), abs_names)
+                            break
 
         val = self._abs_get_val(src, get_remote, rank, vec_name, kind, flat, from_root=True)
 
