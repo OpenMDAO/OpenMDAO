@@ -165,6 +165,8 @@ script:
     testflo -n 1 openmdao --timeout=120 --show_skipped;
   fi
 
+cat config.log
+
 after_success:
 # again, only run coverage operations on the upload machine after success.
 # strip the site-package path so that links works on coveralls.io
