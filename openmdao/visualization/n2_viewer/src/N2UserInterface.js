@@ -30,7 +30,7 @@ class InfoPropYesNo extends InfoPropDefault {
 }
 
 /**
- * Rename params to inputs and unknowns to outputs. 
+ * Rename inputs to inputs and outputs to outputs. 
  * @typedef InfoPropYesNo
  */
 class InfoUpdateType extends InfoPropDefault {
@@ -41,8 +41,8 @@ class InfoUpdateType extends InfoPropDefault {
     /** Replace the old terms with new ones */
     output(msg) {
         return msg
-            .replace(/param/, 'input')
-            .replace(/unknown/, 'output')
+            .replace(/input/, 'input')
+            .replace(/output/, 'output')
             .replace('_', ' ');
     }
 }
@@ -156,10 +156,10 @@ class NodeInfo {
             .style('background-color', color);
 
         if (this.abs2prom) {
-            if (obj.isParam()) {
+            if (obj.isInput()) {
                 this._addPropertyRow('Promoted Name', this.abs2prom.input[obj.absPathName]);
             }
-            else if (obj.isUnknown()) {
+            else if (obj.isOutput()) {
                 this._addPropertyRow('Promoted Name', this.abs2prom.output[obj.absPathName]);
             }
         }
@@ -500,7 +500,7 @@ class N2UserInterface {
         d3.event.preventDefault();
         d3.event.stopPropagation();
 
-        if (!node.hasChildren() || node.isParam()) return;
+        if (!node.hasChildren() || node.isInput()) return;
         if (d3.event.button != 0) return;
         this.addBackButtonHistory();
         node.expand();

@@ -12,7 +12,7 @@ class ModelData {
         this.sysPathnamesList = modelJSON.sys_pathnames_list;
 
         this.maxDepth = 1;
-        this.unconnectedParams = 0;
+        this.unconnectedInputs = 0;
         this.autoivcSources = 0;
         this.nodePaths = {};
         this.nodeIds = [];
@@ -25,8 +25,8 @@ class ModelData {
         this._setParentsAndDepth(this.root, null, 1);
         stopTimer('ModelData._setParentsAndDepth');
 
-        if (this.unconnectedParams > 0)
-            console.info("Unconnected nodes: ", this.unconnectedParams);
+        if (this.unconnectedInputs > 0)
+            console.info("Unconnected nodes: ", this.unconnectedInputs);
 
         startTimer('ModelData._initSubSystemChildren');
         this._initSubSystemChildren(this.root);
@@ -110,16 +110,16 @@ class ModelData {
             this.nodePaths[node.absPathName] = node;
         }
 
-        this.identifyUnconnectedParam(node);
+        this.identifyUnconnectedInput(node);
 
-        if (node.isParamOrUnknown()) {
+        if (node.isInputOrOutput()) {
             let parentComponent = (node.originalParent) ? node.originalParent : node.parent;
             if (parentComponent.type == "subsystem" &&
                 parentComponent.subsystem_type == "component") {
                 node.parentComponent = parentComponent;
             }
             else {
-                throw ("Param or unknown without a parent component!");
+                throw ("Input or output without a parent component!");
             }
         }
 
@@ -199,7 +199,7 @@ class ModelData {
         }
 
         debugInfo(elementPath + " has no connections.");
-        this.unconnectedParams++;
+        this.unconnectedInputs++;
 
         return false;
     }
@@ -251,40 +251,6 @@ class ModelData {
         return this.declarePartialsList.includes(partialsStr);
     }
 
-    /**
-     * Traverse the tree trying to match a complete path to the node.
-     * @param {N2TreeNode} node Starting point.
-     * @param {string[]} nameArray Path to node broken into components as array nodes.
-     * @param {number} nameIndex Index of nameArray currently being searched for.
-     * @return {N2TreeNode} Reference to node in the path.
-     */
-    _getObjectInTree(node, nameArray, nameIndex) {
-        // Reached the last name:
-        if (nameArray.length == nameIndex) return node;
-
-        // No children:
-
-        for (let child of node.children) {
-            if (child.name == nameArray[nameIndex]) {
-                return this._getObjectInTree(child, nameArray, nameIndex + 1);
-            }
-            else {
-                let numNames = child.name.split(":").length;
-                if (numNames >= 2 && nameIndex + numNames <= nameArray.length) {
-                    let mergedName = nameArray[nameIndex];
-                    for (let j = 1; j < numNames; ++j) {
-                        mergedName += ":" + nameArray[nameIndex + j];
-                    }
-                    if (child.name == mergedName) {
-                        return this._getObjectInTree(child, nameArray, nameIndex + numNames);
-                    }
-                }
-            }
-        }
-
-        return null;
-    }
-
     /** 
      * Add all leaf descendents of specified node to the array.
      * @param {N2TreeNode} node Current node to work on.
@@ -292,7 +258,7 @@ class ModelData {
      */
 
     _addLeaves(node, objArray) {
-        if (!node.isParam()) {
+        if (!node.isInput()) {
             objArray.push(node);
         }
 
@@ -327,8 +293,8 @@ class ModelData {
             }
 
             let srcObjParents = [srcObj];
-            if (!srcObj.isUnknown()) { // source obj must be unknown
-                console.warn(throwLbl + "Found a source that is not an unknown.");
+            if (!srcObj.isOutput()) { // source obj must be output
+                console.warn(throwLbl + "Found a source that is not an output.");
                 continue;
             }
 
@@ -349,9 +315,9 @@ class ModelData {
                 continue;
             }
 
-            // Target obj must be a param
-            if (!tgtObj.isParam()) {
-                console.warn(throwLbl + "Found a target that is NOT a param.");
+            // Target obj must be an input
+            if (!tgtObj.isInput()) {
+                console.warn(throwLbl + "Found a target that is NOT a input.");
                 continue;
             }
             if (tgtObj.hasChildren()) {
@@ -360,8 +326,7 @@ class ModelData {
             }
 
             if (!tgtObj.parentComponent) {
-                console.warn(throwLbl + "Target object " + conn.tgt +
-                    " is missing a parentComponent.");
+                console.warn(`${throwLbl} Target object ${conn.tgt} is missing a parent component.`);
                 continue;
             }
 
@@ -432,16 +397,16 @@ class ModelData {
      * relabel it as unconnected.
      * @param {N2TreeNode} node The tree node to work on.
      */
-    identifyUnconnectedParam(node) { // Formerly updateRootTypes
+    identifyUnconnectedInput(node) { // Formerly updateRootTypes
         if (!node.hasOwnProperty('absPathName')) {
-            console.warn("identifyUnconnectedParam error: absPathName not set for ", node);
+            console.warn("identifyUnconnectedInput error: absPathName not set for ", node);
         }
         else {
-            if (node.isParam()) {
+            if (node.isInput()) {
                 if (!node.hasChildren() && !this.hasAnyConnection(node.absPathName))
-                    node.type = "unconnected_param";
+                    node.type = "unconnected_input";
                 else if (this.hasAutoIvcSrc(node.absPathName))
-                    node.type = "autoivc_param";
+                    node.type = "autoivc_input";
             }
         }
     }

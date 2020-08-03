@@ -46,26 +46,26 @@ class SymbolType {
     getType(cell, model) {
         if (cell.onDiagonal()) {
             if (cell.srcObj.isSubsystem()) this.name = 'group';
-            else if (cell.srcObj.isParamOrUnknown()) {
+            else if (cell.srcObj.isInputOrOutput()) {
                 if (cell.srcObj.dtype == "ndarray") this.name = 'vector';
                 else this.name = 'scalar';
             }
             else {
-                throw ("Unknown symbol type '" + cell.srcObj.type + "' for cell on diagonal.");
+                throw ("Output symbol type '" + cell.srcObj.type + "' for cell on diagonal.");
             }
         }
         else if (cell.srcObj.isSubsystem()) {
             if (cell.tgtObj.isSubsystem()) this.name = 'groupGroup';
-            else if (cell.tgtObj.isParamOrUnknown()) {
+            else if (cell.tgtObj.isInputOrOutput()) {
                 if (cell.tgtObj.dtype == "ndarray") this.name = 'groupVector';
                 else this.name = 'groupScalar';
             }
-            else throw ("Unknown group symbol type.");
+            else throw ("Output group symbol type.");
         }
-        else if (cell.srcObj.isParamOrUnknown()) {
+        else if (cell.srcObj.isInputOrOutput()) {
             if (cell.srcObj.dtype == "ndarray") {
-                if (cell.tgtObj.isParamOrUnknown()) {
-                    if (cell.tgtObj.dtype == "ndarray" || cell.tgtObj.isParam()) {
+                if (cell.tgtObj.isInputOrOutput()) {
+                    if (cell.tgtObj.dtype == "ndarray" || cell.tgtObj.isInput()) {
                         this.name = 'vectorVector';
                         this._setDeclaredPartialInfo(cell, model);
                     }
@@ -76,10 +76,10 @@ class SymbolType {
                 }
 
                 else if (cell.tgtObj.isSubsystem()) this.name = 'vectorGroup';
-                else throw ("Unknown vector symbol type.");
+                else throw ("Output vector symbol type.");
             }
 
-            else if (cell.tgtObj.isParamOrUnknown()) {
+            else if (cell.tgtObj.isInputOrOutput()) {
                 if (cell.tgtObj.dtype == "ndarray") {
                     this.name = 'scalarVector';
                     this._setDeclaredPartialInfo(cell, model);
@@ -92,7 +92,7 @@ class SymbolType {
 
             else if (cell.tgtObj.isSubsystem()) this.name = 'scalarGroup';
 
-            else throw ("Unknown vector or scalar symbol type.");
+            else throw ("Output vector or scalar symbol type.");
         }
         else throw ("Completely unrecognized symbol type.")
     }

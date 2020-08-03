@@ -91,12 +91,12 @@ class TestViewModelData(unittest.TestCase):
                                  "children":[
                                     {
                                        "name":"y2_actual",
-                                       "type":"param",
+                                       "type":"input",
                                        "dtype":"ndarray"
                                     },
                                     {
                                        "name":"y2_command",
-                                       "type":"unknown",
+                                       "type":"output",
                                        "implicit":true,
                                        "dtype":"ndarray"
                                     }
@@ -117,22 +117,22 @@ class TestViewModelData(unittest.TestCase):
                            "children":[
                               {
                                  "name":"z",
-                                 "type":"param",
+                                 "type":"input",
                                  "dtype":"ndarray"
                               },
                               {
                                  "name":"x",
-                                 "type":"param",
+                                 "type":"input",
                                  "dtype":"ndarray"
                               },
                               {
                                  "name":"y2",
-                                 "type":"param",
+                                 "type":"input",
                                  "dtype":"ndarray"
                               },
                               {
                                  "name":"y1",
-                                 "type":"unknown",
+                                 "type":"output",
                                  "implicit":false,
                                  "dtype":"ndarray"
                               }
@@ -151,17 +151,17 @@ class TestViewModelData(unittest.TestCase):
                            "children":[
                               {
                                  "name":"z",
-                                 "type":"param",
+                                 "type":"input",
                                  "dtype":"ndarray"
                               },
                               {
                                  "name":"y1",
-                                 "type":"param",
+                                 "type":"input",
                                  "dtype":"ndarray"
                               },
                               {
                                  "name":"y2",
-                                 "type":"unknown",
+                                 "type":"output",
                                  "implicit":false,
                                  "dtype":"ndarray"
                               }
@@ -184,27 +184,27 @@ class TestViewModelData(unittest.TestCase):
                      "children":[
                         {
                            "name":"x",
-                           "type":"param",
+                           "type":"input",
                            "dtype":"ndarray"
                         },
                         {
                            "name":"y1",
-                           "type":"param",
+                           "type":"input",
                            "dtype":"ndarray"
                         },
                         {
                            "name":"y2",
-                           "type":"param",
+                           "type":"input",
                            "dtype":"ndarray"
                         },
                         {
                            "name":"z",
-                           "type":"param",
+                           "type":"input",
                            "dtype":"ndarray"
                         },
                         {
                            "name":"obj",
-                           "type":"unknown",
+                           "type":"output",
                            "implicit":false,
                            "dtype":"ndarray"
                         }
@@ -225,12 +225,12 @@ class TestViewModelData(unittest.TestCase):
                      "children":[
                         {
                            "name":"y1",
-                           "type":"param",
+                           "type":"input",
                            "dtype":"ndarray"
                         },
                         {
                            "name":"con1",
-                           "type":"unknown",
+                           "type":"output",
                            "implicit":false,
                            "dtype":"ndarray"
                         }
@@ -251,12 +251,12 @@ class TestViewModelData(unittest.TestCase):
                      "children":[
                         {
                            "name":"y2",
-                           "type":"param",
+                           "type":"input",
                            "dtype":"ndarray"
                         },
                         {
                            "name":"con2",
-                           "type":"unknown",
+                           "type":"output",
                            "implicit":false,
                            "dtype":"ndarray"
                         }
@@ -486,25 +486,25 @@ class TestViewModelData(unittest.TestCase):
                      "children":[ 
                         { 
                            "name":"a",
-                           "type":"unknown",
+                           "type":"output",
                            "implicit":false,
                            "dtype":"ndarray"
                         },
                         { 
                            "name":"Area",
-                           "type":"unknown",
+                           "type":"output",
                            "implicit":false,
                            "dtype":"ndarray"
                         },
                         { 
                            "name":"rho",
-                           "type":"unknown",
+                           "type":"output",
                            "implicit":false,
                            "dtype":"ndarray"
                         },
                         { 
                            "name":"Vu",
-                           "type":"unknown",
+                           "type":"output",
                            "implicit":false,
                            "dtype":"ndarray"
                         }
@@ -523,57 +523,57 @@ class TestViewModelData(unittest.TestCase):
                      "children":[ 
                         { 
                            "name":"a",
-                           "type":"param",
+                           "type":"input",
                            "dtype":"ndarray"
                         },
                         { 
                            "name":"Area",
-                           "type":"param",
+                           "type":"input",
                            "dtype":"ndarray"
                         },
                         { 
                            "name":"rho",
-                           "type":"param",
+                           "type":"input",
                            "dtype":"ndarray"
                         },
                         { 
                            "name":"Vu",
-                           "type":"param",
+                           "type":"input",
                            "dtype":"ndarray"
                         },
                         { 
                            "name":"Vr",
-                           "type":"unknown",
+                           "type":"output",
                            "implicit":false,
                            "dtype":"ndarray"
                         },
                         { 
                            "name":"Vd",
-                           "type":"unknown",
+                           "type":"output",
                            "implicit":false,
                            "dtype":"ndarray"
                         },
                         { 
                            "name":"Ct",
-                           "type":"unknown",
+                           "type":"output",
                            "implicit":false,
                            "dtype":"ndarray"
                         },
                         { 
                            "name":"thrust",
-                           "type":"unknown",
+                           "type":"output",
                            "implicit":false,
                            "dtype":"ndarray"
                         },
                         { 
                            "name":"Cp",
-                           "type":"unknown",
+                           "type":"output",
                            "implicit":false,
                            "dtype":"ndarray"
                         },
                         { 
                            "name":"power",
-                           "type":"unknown",
+                           "type":"output",
                            "implicit":false,
                            "dtype":"ndarray"
                         }
