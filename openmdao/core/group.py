@@ -1896,6 +1896,10 @@ class Group(System):
         """
         # Make sure the new_order is valid. It must contain all subsystems
         # in this model.
+
+        if self._setup_procs_finished:
+            raise RuntimeError("%s: Cannot call set_order after setup" % (self.msginfo))
+
         newset = set(new_order)
         if self._static_mode:
             subsystems = self._static_subsystems_allprocs

@@ -1054,7 +1054,7 @@ class TestGroup(unittest.TestCase):
         for key, val in totals.items():
             assert_near_equal(val['rel error'][0], 0.0, 1e-15)
 
-    def test_set_order_error(self):
+    def test_set_order_in_config_error(self):
 
         class SimpleGroup(om.Group):
             def setup(self):
@@ -1062,7 +1062,26 @@ class TestGroup(unittest.TestCase):
                 self.add_subsystem('comp2', om.ExecComp('b=2*a'))
 
             def configure(self):
-                self.set_order(['C1', 'C2', 'C3'])
+                self.set_order(['C2', 'C1'])
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('C1', SimpleGroup())
+        model.add_subsystem('C2', SimpleGroup())
+
+        msg = "SimpleGroup (C1): Cannot call set_order in the configure method"
+        with self.assertRaises(RuntimeError) as cm:
+            prob.setup()
+
+        self.assertEqual(str(cm.exception), msg)
+
+    def test_set_order_after_setup(self):
+
+        class SimpleGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
+                self.add_subsystem('comp2', om.ExecComp('b=2*a'))
 
         # This doesn't raise an error but should
         order_list = []
@@ -1074,7 +1093,13 @@ class TestGroup(unittest.TestCase):
         model.add_subsystem('C2', SimpleGroup())
 
         prob.setup()
-        prob.run_model()
+
+
+        msg = "Group (<model>): Cannot call set_order after setup"
+        with self.assertRaises(RuntimeError) as cm:
+            model.set_order(['C2', 'C1'])
+        self.assertEqual(str(cm.exception), msg)
+
 
 @unittest.skipUnless(MPI, "MPI is required.")
 class TestGroupMPISlice(unittest.TestCase):
