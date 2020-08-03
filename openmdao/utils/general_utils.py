@@ -993,12 +993,11 @@ def _is_slicer_op(indices):
     """
     if isinstance(indices, Iterable):
         if isinstance(indices, (tuple, list, range, str)):
-            return any(isinstance(i, slice) or i == ... for i in indices)
+            return any(isinstance(i, slice) or i is ... for i in indices)
         else:
-            return any(isinstance(i, slice) or i == ... for i in indices.flatten())
+            return any(isinstance(i, slice) or i is ... for i in indices.flatten())
     else:
         return isinstance(indices, slice)
-
 
 def _slice_indices(slicer, out_size, out_shape):
     """
