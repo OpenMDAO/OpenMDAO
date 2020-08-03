@@ -1757,6 +1757,8 @@ class TestConnect(unittest.TestCase):
         p.model.connect('indeps.foo', 'x')
         p.setup()
         p.final_setup()
+
+        # before bug fix, the following generated an ambiguity error
         p['x']
 
     def test_invalid_target(self):
