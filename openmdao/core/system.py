@@ -79,6 +79,26 @@ global_meta_names = {
                'ref', 'ref0', 'res_ref', 'distributed', 'lower', 'upper', 'tags'),
 }
 
+allowed_meta_names = {
+    'value',
+    'shape',
+    'global_shape',
+    'size',
+    'global_size',
+    'src_indices',
+    'flat_src_indices',
+    'units',
+    'desc',
+    'distributed',
+    'tags',
+    'type',
+    'res_units',
+    'ref',
+    'ref0',
+    'res_ref',
+    'lower',
+    'upper',
+}
 
 class System(object):
     """
@@ -3153,7 +3173,13 @@ class System(object):
 
         gather_keys = {'value', 'src_indices'}
         need_gather = get_remote and self.comm.size > 1
-        need_local_meta = len(gather_keys.intersection(metadata_keys)) > 0
+        if metadata_keys is not None:
+            keyset = set(metadata_keys)
+            diff = keyset - allowed_meta_names
+            if diff:
+                raise RuntimeError(f"{self.msginfo}: {sorted(diff)} are not valid metadata entry "
+                                   "names.")
+        need_local_meta = metadata_keys is not None and len(gather_keys.intersection(keyset)) > 0
 
         if need_local_meta:
             metadict = loc2meta

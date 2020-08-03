@@ -15,7 +15,7 @@ except ImportError:
 
 import openmdao.api as om
 from openmdao.test_suite.components.sellar import SellarDis2
-from openmdao.utils.mpi import MPI
+from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.logger_utils import TestLogger
 from openmdao.utils.general_utils import ignore_errors_context, reset_warning_registry
@@ -2358,6 +2358,325 @@ class TestGroupAddInput(unittest.TestCase):
             p.setup()
 
         self.assertEqual(cm.exception.args[0], "Group (<model>): The subsystems G1 and par.G4 called set_input_defaults for promoted input 'x' with conflicting values for 'value'. Call <group>.set_input_defaults('x', value=?), where <group> is the model to remove the ambiguity.")
+
+
+class MultComp(om.ExplicitComponent):
+    def __init__(self, mults=(), inits=None, **kwargs):
+        super(MultComp, self).__init__(**kwargs)
+        self.mults = list(mults)
+        self.var_setup_count = 0
+        if inits is None:
+            inits = {}
+        self.inits = inits
+
+    def _setup_var_data(self):
+        super(MultComp, self)._setup_var_data()
+        self.var_setup_count += 1
+
+    def add_mult(self, inp, mult, out):
+        self.mults((inp, mult, out))
+
+    def setup(self):
+        all_ins = set([inp for inp, _, _ in self.mults])
+        all_outs = set([out for _, _, out in self.mults])
+        common = sorted(all_ins.intersection(all_outs))
+        if common:
+            raise RuntimeError(f"{common} are both inputs and outputs.")
+
+        out_list = [o for _, _, o in self.mults]
+        if len(all_outs) < len(out_list):
+            raise RuntimeError(f"Some outputs appear more than once.")
+
+        for inp, _, out in self.mults:
+            self.add_input(inp, val=self.inits.get(inp, 1.))
+            self.add_output(out, val=self.inits.get(out, 1.))
+
+    def compute(self, inputs, outputs):
+        for inp, mult, out in self.mults:
+            outputs[out] = mult * inputs[inp]
+
+
+class ConfigGroup(om.Group):
+    def __init__(self, parallel=False, *args, **kwargs):
+        super(ConfigGroup, self).__init__(*args, **kwargs)
+        self.cfgproms = []
+        self.cfg_group_ins = []
+        self.cfgio = {}
+        self.cfg_invars = []
+        self.cfg_outvars = []
+        self.io_results = {}
+        self.var_setup_count = 0
+
+        if parallel:
+            self._mpi_proc_allocator.parallel = True
+
+    def _setup_var_data(self):
+        super(ConfigGroup, self)._setup_var_data()
+        self.var_setup_count += 1
+
+    def add_config_prom(self, child, prom):
+        self.cfgproms.append((child, prom))
+
+    def add_input_defaults(self, name, val=None, units=None):
+        self.cfg_group_ins.append((name, val, units))
+
+    def add_var_input(self, name, val=None, units=None):
+        self.cfg_invars.append((name, val, units))
+
+    def add_var_output(self, name, val=None, units=None):
+        self.cfg_outvars.append((name, val, units))
+
+    def add_get_io(self, child, **kwargs):
+        if child in self.cfgio:
+            raise RuntimeError(f"Can't set more than 1 call to get_io_metadata for child {child}.")
+
+        self.cfgio[child] = kwargs
+
+    def configure(self):
+        # retrieve metadata
+        for child, kwargs in self.cfgio.items():
+            kid = self._get_subsystem(child)
+            if kid is not None:
+                self.io_results[child] = list(kid.get_io_metadata(**kwargs))
+            else:
+                print(f"'{kid}' not found locally.")
+
+        # promotes
+        for child, prom in self.cfgproms:
+            if '.' in child:
+                parent, child = child.rsplit('.', 1)
+                s = self._get_subsystem(parent)
+                if s is None:
+                    print(f"'{parent}' not found locally.")
+                    continue
+            else:
+                s = self
+            s.promotes(child, any=prom)
+
+        # add inputs
+        for vpath, val, units in self.cfg_invars:
+            if '.' in vpath:
+                parent, vname = vpath.rsplit('.', 1)
+                s = self._get_subsystem(parent)
+                if s is None:
+                    print(f"'{parent}' not found locally.")
+                    continue
+                s.add_input(vname, val, units=units)
+            else:
+                raise RuntimeError("tried to add input var to a Group.")
+
+        # add outputs
+        for vpath, val, units in self.cfg_outvars:
+            if '.' in vpath:
+                parent, vname = vpath.rsplit('.', 1)
+                s = self._get_subsystem(parent)
+                if s is None:
+                    print(f"'{parent}' not found locally.")
+                    continue
+                s.add_output(vname, val, units=units)
+            else:
+                raise RuntimeError("tried to add output var to a Group.")
+
+        # set input defaults
+        for name, val, units in self.cfg_group_ins:
+            self.set_input_defaults(name, val=val, units=units)
+
+
+class Test3Deep(unittest.TestCase):
+    top_par = False
+    sub_par = False
+
+    def build_model(self):
+        p = om.Problem(model=ConfigGroup())
+
+        cfg = p.model.add_subsystem('cfg', ConfigGroup(parallel=self.top_par))
+        cfg.add_subsystem('C1', MultComp([('x', 2., 'y')]))
+        cfg.add_subsystem('C2', MultComp([('x', 3., 'y')]))
+
+        sub = cfg.add_subsystem('sub', ConfigGroup(parallel=self.sub_par))
+        sub.add_subsystem('C3', MultComp([('x', 4., 'y')]))
+        sub.add_subsystem('C4', MultComp([('x', 5., 'y')]))
+
+        return p
+
+    def get_matching_var_setup_counts(self, p, count):
+        result = set()
+        for s in p.model.system_iter(include_self=True):
+            if hasattr(s, 'var_setup_count') and s.var_setup_count == count:
+                result.add(s.pathname)
+        return result
+
+    def test_io_meta_local(self):
+        p = self.build_model()
+        p.model.cfg.add_get_io('C1', return_rel_names=False)
+        p.model.cfg.add_get_io('C2')
+        p.model.cfg.add_get_io('sub')
+        p.setup()
+
+        res = p.model.cfg.io_results['C1']
+        expected = {'cfg.C1.x', 'cfg.C1.y'}
+        self.assertEqual({t[0] for t in res}, expected)
+
+        res = p.model.cfg.io_results['C2']
+        expected = {'x', 'y'}
+        self.assertEqual({t[0] for t in res}, expected)
+
+        res = p.model.cfg.io_results['sub']
+        expected = {'C3.x', 'C4.x', 'C3.y', 'C4.y'}
+        self.assertEqual({t[0] for t in res}, expected)
+
+        names = self.get_matching_var_setup_counts(p, 1)
+        expected = {'', 'cfg', 'cfg.C1', 'cfg.C2', 'cfg.sub', 'cfg.sub.C3', 'cfg.sub.C4'}
+        self.assertEqual(names, expected)
+
+    def test_io_meta_local_bad_meta_key(self):
+        p = self.build_model()
+        p.model.cfg.add_get_io('sub', metadata_keys=('value', 'foo'))
+        with self.assertRaises(Exception) as cm:
+            p.setup()
+
+        self.assertEqual(cm.exception.args[0], "ConfigGroup (cfg.sub): ['foo'] are not valid metadata entry names.")
+
+    def test_promote_descendant(self):
+        p = self.build_model()
+        p.model.cfg.add_config_prom('sub.C3', ['x'])
+        p.model.cfg.add_config_prom('sub.C4', ['y'])
+        p.setup()
+
+        names = self.get_matching_var_setup_counts(p, 1)
+        expected = {'', 'cfg', 'cfg.C1', 'cfg.C2', 'cfg.sub.C3', 'cfg.sub.C4'}
+        self.assertEqual(names, expected)
+
+        names = self.get_matching_var_setup_counts(p, 2)
+        expected = {'cfg.sub'}
+        self.assertEqual(names, expected)
+
+    def test_promote_child(self):
+        p = self.build_model()
+        p.model.cfg.add_config_prom('C1', ['x'])
+        p.model.cfg.add_config_prom('C2', ['y'])
+        p.model.cfg.sub.add_config_prom('C3', ['x'])
+        p.model.cfg.sub.add_config_prom('C4', ['y'])
+        p.setup()
+
+        names = self.get_matching_var_setup_counts(p, 1)
+        expected = {'', 'cfg', 'cfg.C1', 'cfg.C2', 'cfg.sub', 'cfg.sub.C3', 'cfg.sub.C4'}
+        self.assertEqual(names, expected)
+
+    def test_add_input_to_child(self):
+        p = self.build_model()
+        p.model.cfg.sub.add_var_input('C3.ivar0', 3.0, units='ft')
+        p.setup()
+
+        names = self.get_matching_var_setup_counts(p, 1)
+        expected = {'', 'cfg', 'cfg.C1', 'cfg.C2', 'cfg.sub', 'cfg.sub.C4'}
+        self.assertEqual(names, expected)
+
+        names = self.get_matching_var_setup_counts(p, 2)
+        expected = {'cfg.sub.C3'}
+        self.assertEqual(names, expected)
+
+    def test_add_output_to_child(self):
+        p = self.build_model()
+        p.model.cfg.sub.add_var_output('C3.ovar0', 3.0, units='ft')
+        p.setup()
+
+        names = self.get_matching_var_setup_counts(p, 1)
+        expected = {'', 'cfg', 'cfg.C1', 'cfg.C2', 'cfg.sub', 'cfg.sub.C4'}
+        self.assertEqual(names, expected)
+
+        names = self.get_matching_var_setup_counts(p, 2)
+        expected = {'cfg.sub.C3'}
+        self.assertEqual(names, expected)
+
+    def test_add_input_to_descendant(self):
+        p = self.build_model()
+        p.model.cfg.add_var_input('sub.C3.ivar0', 3.0, units='ft')
+        p.model.add_var_input('cfg.sub.C3.ivar1', 4.0, units='inch')
+        p.setup()
+
+        names = self.get_matching_var_setup_counts(p, 1)
+        expected = {'', 'cfg.C1', 'cfg.C2', 'cfg.sub.C4'}
+        self.assertEqual(names, expected)
+
+        names = self.get_matching_var_setup_counts(p, 2)
+        expected = {'cfg'}
+        self.assertEqual(names, expected)
+
+        names = self.get_matching_var_setup_counts(p, 3)
+        expected = {'cfg.sub', 'cfg.sub.C3'}
+        self.assertEqual(names, expected)
+
+    def test_add_output_to_descendant(self):
+        p = self.build_model()
+        p.model.cfg.add_var_output('sub.C3.ovar0', 3.0, units='ft')
+        p.model.add_var_output('cfg.sub.C3.ovar1', 4.0, units='inch')
+        p.setup()
+
+        names = self.get_matching_var_setup_counts(p, 1)
+        expected = {'', 'cfg.C1', 'cfg.C2', 'cfg.sub.C4'}
+        self.assertEqual(names, expected)
+
+        names = self.get_matching_var_setup_counts(p, 2)
+        expected = {'cfg'}
+        self.assertEqual(names, expected)
+
+        names = self.get_matching_var_setup_counts(p, 3)
+        expected = {'cfg.sub', 'cfg.sub.C3'}
+        self.assertEqual(names, expected)
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestInConfigMPIpar(Test3Deep):
+    N_PROCS = 2
+    sub_par = True
+
+    def test_io_meta_local(self):
+        p = self.build_model()
+        p.model.cfg.add_get_io('C1', return_rel_names=False)
+        p.model.cfg.add_get_io('C2')
+        p.model.cfg.add_get_io('sub')
+
+        #import wingdbstub
+
+        with multi_proc_exception_check(p.comm):
+            p.setup()
+
+        with multi_proc_exception_check(p.comm):
+            res = p.model.cfg.io_results['C1']
+            expected = {'cfg.C1.x', 'cfg.C1.y'}
+            self.assertEqual({t[0] for t in res}, expected)
+
+            res = p.model.cfg.io_results['C2']
+            expected = {'x', 'y'}
+            self.assertEqual({t[0] for t in res}, expected)
+
+            res = p.model.cfg.io_results['sub']
+            expected = {'C3.x', 'C4.x', 'C3.y', 'C4.y'}
+            self.assertEqual({t[0] for t in res}, expected)
+
+            names = self.get_matching_var_setup_counts(p, 1)
+            expected = {'', 'cfg', 'cfg.C1', 'cfg.C2', 'cfg.sub', 'cfg.sub.C3', 'cfg.sub.C4'}
+            self.assertEqual(names, expected)
+
+    def test_io_meta_remote_subcomp(self):
+        pass
+
+    def test_io_meta_remote_subgroup(self):
+        pass
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestInConfigMPIparpar(Test3Deep):
+    N_PROCS = 4
+    top_par = True
+    sub_par = True
+
+    def test_io_meta_remote_subcomp(self):
+        pass
+
+    def test_io_meta_remote_subgroup(self):
+        pass
 
 
 #
