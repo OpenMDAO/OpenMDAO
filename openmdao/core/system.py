@@ -4235,7 +4235,8 @@ class System(object):
         abs_name = abs_ins[0]
         src = conns[abs_name]
         if src in self._var_allprocs_discrete['output']:
-            return self._abs_get_val(src, get_remote, rank, vec_name, 'output', flat, from_root=True)
+            return self._abs_get_val(src, get_remote, rank, vec_name, 'output', flat,
+                                     from_root=True)
 
         # if we have multiple promoted inputs that are explicitly connected to an output and units
         # have not been specified, look for group input to disambiguate
