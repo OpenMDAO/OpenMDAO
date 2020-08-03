@@ -4024,6 +4024,8 @@ class System(object):
         get_remote : bool or None
             If True, return the value even if the variable is remote. NOTE: This function must be
             called in all procs in the Problem's MPI communicator.
+            If False, only retrieve the value if it is on the current process, or only the part
+            of the value that's on the current process for a distributed variable.
             If None and the variable is remote or distributed, a RuntimeError will be raised.
         rank : int or None
             If not None, specifies that the value is to be gathered to the given rank only.
@@ -4167,6 +4169,8 @@ class System(object):
             If True, retrieve the value even if it is on a remote process.  Note that if the
             variable is remote on ANY process, this function must be called on EVERY process
             in the Problem's MPI communicator.
+            If False, only retrieve the value if it is on the current process, or only the part
+            of the value that's on the current process for a distributed variable.
             If None and the variable is remote or distributed, a RuntimeError will be raised.
         rank : int or None
             If not None, only gather the value to this rank.
