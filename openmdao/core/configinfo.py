@@ -51,9 +51,9 @@ class _ConfigInfo(object):
                             if p.startswith(prefix)]
                 mod_pars = set()
                 for par in our_pars:
-                    prefix = par + '.'
+                    pre = par + '.'
                     for spath in self._modified_systems:
-                        if spath.startswith(prefix):
+                        if spath.startswith(pre):
                             mod_pars.add(par)
                             break
                 all_mods = group.comm.allgather(mod_pars)

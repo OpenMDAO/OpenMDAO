@@ -2483,13 +2483,13 @@ class ConfigGroup(om.Group):
 
 
 class Test3Deep(unittest.TestCase):
-    top_par = False
+    cfg_par = False
     sub_par = False
 
     def build_model(self):
         p = om.Problem(model=ConfigGroup())
 
-        cfg = p.model.add_subsystem('cfg', ConfigGroup(parallel=self.top_par))
+        cfg = p.model.add_subsystem('cfg', ConfigGroup(parallel=self.cfg_par))
         cfg.add_subsystem('C1', MultComp([('x', 2., 'y')]))
         cfg.add_subsystem('C2', MultComp([('x', 3., 'y')]))
 
@@ -2504,7 +2504,31 @@ class Test3Deep(unittest.TestCase):
         for s in p.model.system_iter(include_self=True):
             if hasattr(s, 'var_setup_count') and s.var_setup_count == count:
                 result.add(s.pathname)
-        return result
+
+        if p.model.comm.size > 1:
+            newres = set()
+            for res in p.model.comm.allgather(result):
+                newres.update(res)
+            result = newres
+
+        return sorted(result)
+
+    def get_io_results(self, p, parent, path):
+        s = p.model._get_subsystem(parent)
+        if s is None:
+            raise RuntimeError(f"No parent named {parent}.")
+        res = s.io_results[path]
+        if s.comm.size > 1:
+            allres = []
+            seen = set()
+            for procres in s.comm.allgather(res):
+                for r in procres:
+                    if r[0] not in seen:
+                        allres.append(r)
+                    else:
+                        seen.add(r[0])
+            res = allres
+        return res
 
     def test_io_meta_local(self):
         p = self.build_model()
@@ -2521,13 +2545,13 @@ class Test3Deep(unittest.TestCase):
         expected = {'x', 'y'}
         self.assertEqual({t[0] for t in res}, expected)
 
-        res = p.model.cfg.io_results['sub']
+        res = self.get_io_results(p, 'cfg', 'sub')
         expected = {'C3.x', 'C4.x', 'C3.y', 'C4.y'}
         self.assertEqual({t[0] for t in res}, expected)
 
         names = self.get_matching_var_setup_counts(p, 1)
         expected = {'', 'cfg', 'cfg.C1', 'cfg.C2', 'cfg.sub', 'cfg.sub.C3', 'cfg.sub.C4'}
-        self.assertEqual(names, expected)
+        self.assertEqual(names, sorted(expected))
 
     def test_io_meta_local_bad_meta_key(self):
         p = self.build_model()
@@ -2545,11 +2569,11 @@ class Test3Deep(unittest.TestCase):
 
         names = self.get_matching_var_setup_counts(p, 1)
         expected = {'', 'cfg', 'cfg.C1', 'cfg.C2', 'cfg.sub.C3', 'cfg.sub.C4'}
-        self.assertEqual(names, expected)
+        self.assertEqual(names, sorted(expected))
 
         names = self.get_matching_var_setup_counts(p, 2)
         expected = {'cfg.sub'}
-        self.assertEqual(names, expected)
+        self.assertEqual(names, sorted(expected))
 
     def test_promote_child(self):
         p = self.build_model()
@@ -2561,20 +2585,26 @@ class Test3Deep(unittest.TestCase):
 
         names = self.get_matching_var_setup_counts(p, 1)
         expected = {'', 'cfg', 'cfg.C1', 'cfg.C2', 'cfg.sub', 'cfg.sub.C3', 'cfg.sub.C4'}
-        self.assertEqual(names, expected)
+        self.assertEqual(names, sorted(expected))
 
     def test_add_input_to_child(self):
         p = self.build_model()
         p.model.cfg.sub.add_var_input('C3.ivar0', 3.0, units='ft')
+
+        #import wingdbstub
+
+        # from openmdao.devtools.debug import trace_mpi
+        # trace_mpi()
+
         p.setup()
 
         names = self.get_matching_var_setup_counts(p, 1)
         expected = {'', 'cfg', 'cfg.C1', 'cfg.C2', 'cfg.sub', 'cfg.sub.C4'}
-        self.assertEqual(names, expected)
+        self.assertEqual(names, sorted(expected))
 
         names = self.get_matching_var_setup_counts(p, 2)
         expected = {'cfg.sub.C3'}
-        self.assertEqual(names, expected)
+        self.assertEqual(names, sorted(expected))
 
     def test_add_output_to_child(self):
         p = self.build_model()
@@ -2583,11 +2613,11 @@ class Test3Deep(unittest.TestCase):
 
         names = self.get_matching_var_setup_counts(p, 1)
         expected = {'', 'cfg', 'cfg.C1', 'cfg.C2', 'cfg.sub', 'cfg.sub.C4'}
-        self.assertEqual(names, expected)
+        self.assertEqual(names, sorted(expected))
 
         names = self.get_matching_var_setup_counts(p, 2)
         expected = {'cfg.sub.C3'}
-        self.assertEqual(names, expected)
+        self.assertEqual(names, sorted(expected))
 
     def test_add_input_to_descendant(self):
         p = self.build_model()
@@ -2597,15 +2627,15 @@ class Test3Deep(unittest.TestCase):
 
         names = self.get_matching_var_setup_counts(p, 1)
         expected = {'', 'cfg.C1', 'cfg.C2', 'cfg.sub.C4'}
-        self.assertEqual(names, expected)
+        self.assertEqual(names, sorted(expected))
 
         names = self.get_matching_var_setup_counts(p, 2)
         expected = {'cfg'}
-        self.assertEqual(names, expected)
+        self.assertEqual(names, sorted(expected))
 
         names = self.get_matching_var_setup_counts(p, 3)
         expected = {'cfg.sub', 'cfg.sub.C3'}
-        self.assertEqual(names, expected)
+        self.assertEqual(names, sorted(expected))
 
     def test_add_output_to_descendant(self):
         p = self.build_model()
@@ -2615,61 +2645,20 @@ class Test3Deep(unittest.TestCase):
 
         names = self.get_matching_var_setup_counts(p, 1)
         expected = {'', 'cfg.C1', 'cfg.C2', 'cfg.sub.C4'}
-        self.assertEqual(names, expected)
+        self.assertEqual(names, sorted(expected))
 
         names = self.get_matching_var_setup_counts(p, 2)
         expected = {'cfg'}
-        self.assertEqual(names, expected)
+        self.assertEqual(names, sorted(expected))
 
         names = self.get_matching_var_setup_counts(p, 3)
         expected = {'cfg.sub', 'cfg.sub.C3'}
-        self.assertEqual(names, expected)
+        self.assertEqual(names, sorted(expected))
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestInConfigMPIpar(Test3Deep):
     N_PROCS = 2
-    sub_par = True
-
-    def test_io_meta_local(self):
-        p = self.build_model()
-        p.model.cfg.add_get_io('C1', return_rel_names=False)
-        p.model.cfg.add_get_io('C2')
-        p.model.cfg.add_get_io('sub')
-
-        #import wingdbstub
-
-        with multi_proc_exception_check(p.comm):
-            p.setup()
-
-        with multi_proc_exception_check(p.comm):
-            res = p.model.cfg.io_results['C1']
-            expected = {'cfg.C1.x', 'cfg.C1.y'}
-            self.assertEqual({t[0] for t in res}, expected)
-
-            res = p.model.cfg.io_results['C2']
-            expected = {'x', 'y'}
-            self.assertEqual({t[0] for t in res}, expected)
-
-            res = p.model.cfg.io_results['sub']
-            expected = {'C3.x', 'C4.x', 'C3.y', 'C4.y'}
-            self.assertEqual({t[0] for t in res}, expected)
-
-            names = self.get_matching_var_setup_counts(p, 1)
-            expected = {'', 'cfg', 'cfg.C1', 'cfg.C2', 'cfg.sub', 'cfg.sub.C3', 'cfg.sub.C4'}
-            self.assertEqual(names, expected)
-
-    def test_io_meta_remote_subcomp(self):
-        pass
-
-    def test_io_meta_remote_subgroup(self):
-        pass
-
-
-@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-class TestInConfigMPIparpar(Test3Deep):
-    N_PROCS = 4
-    top_par = True
     sub_par = True
 
     def test_io_meta_remote_subcomp(self):
