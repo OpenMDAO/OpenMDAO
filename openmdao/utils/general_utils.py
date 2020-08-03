@@ -999,6 +999,7 @@ def _is_slicer_op(indices):
     else:
         return isinstance(indices, slice)
 
+
 def _slice_indices(slicer, out_size, out_shape):
     """
     Check if an array of indices contains a slice object.
