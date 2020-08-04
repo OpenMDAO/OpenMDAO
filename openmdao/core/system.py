@@ -1,14 +1,14 @@
 """Define the base System class."""
 import sys
 import os
+import time
+
 from contextlib import contextmanager
 from collections import OrderedDict, defaultdict
 from collections.abc import Iterable
 
 from fnmatch import fnmatchcase
-import sys
-import os
-import time
+
 from numbers import Integral
 
 import numpy as np
@@ -4066,10 +4066,10 @@ class System(object):
                 meta = my_meta[abs_name]
                 distrib = meta['distributed']
                 if distrib and get_remote is None:
-                    raise RuntimeError(f"{self.msginfo}: {abs_name} is a distributed variable, "
-                                       "You can retrieve values from all processes using "
-                                       "`get_val(<name>, get_remote=True)' or from the local "
-                                       "process using `get_val(<name>, get_remote=False)'.")
+                    raise RuntimeError(f"{self.msginfo}: Variable '{abs_name}' is a distributed "
+                                       "variable. You can retrieve values from all processes "
+                                       "using `get_val(<name>, get_remote=True)` or from the "
+                                       "local process using `get_val(<name>, get_remote=False)`.")
         except KeyError:
             discrete = True
             relname = abs_name[len(self.pathname) + 1:] if self.pathname else abs_name
@@ -4232,6 +4232,9 @@ class System(object):
             If True, retrieve the value even if it is on a remote process.  Note that if the
             variable is remote on ANY process, this function must be called on EVERY process
             in the Problem's MPI communicator.
+            If False, only retrieve the value if it is on the current process, or only the part
+            of the value that's on the current process for a distributed variable.
+            If None and the variable is remote or distributed, a RuntimeError will be raised.
         rank : int or None
             If not None, only gather the value to this rank.
         vec_name : str
@@ -4274,6 +4277,17 @@ class System(object):
             vmeta = self._var_allprocs_abs2meta[abs_name]
             src_indices = None  # FIXME: remote var could have src_indices
             has_src_indices = vmeta['has_src_indices']
+            distrib = vmeta['distributed']
+            if not get_remote:
+                if not distrib:
+                    raise RuntimeError(f"{self.msginfo}: Variable '{abs_name}' is not local to "
+                                       f"rank {self.comm.rank}. You can retrieve values from "
+                                       "other processes using `get_val(<name>, get_remote=True)`.")
+                elif get_remote is None:
+                    raise RuntimeError(f"{self.msginfo}: Variable '{abs_name}' is a distributed "
+                                       "variable. You can retrieve values from all processes "
+                                       "using `get_val(<name>, get_remote=True)` or from the "
+                                       "local process using `get_val(<name>, get_remote=False)`.")
 
         if has_src_indices:
             distrib = vmeta['distributed']

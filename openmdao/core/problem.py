@@ -392,9 +392,9 @@ class Problem(object):
             if get_remote:
                 raise KeyError('{}: Variable name "{}" not found.'.format(self.msginfo, name))
             else:
-                raise RuntimeError(f"{self.msginfo}: Variable '{name}' is not local to rank "
-                                   f"{self.comm.rank}. You can retrieve values from  other "
-                                   "processes using `problem.get_val(<name>, get_remote=True)`.")
+                raise RuntimeError(f"{self.model.msginfo}: Variable '{name}' is not local to "
+                                   f"rank {self.comm.rank}. You can retrieve values from "
+                                   "other processes using `get_val(<name>, get_remote=True)`.")
 
         return val
 
