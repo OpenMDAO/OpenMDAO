@@ -28,8 +28,8 @@ addition to `stdout`.  Checks can also be performed by calling the `check_config
 your problem object.
 
 
-The OpenMDAO `Group` API includes three methods that are invoked during the `setup` process: `setup`, `configure`, and
-`initialize`. Most of the time, `setup` is all you need to build a group. The specific use case for
+The OpenMDAO `Group` API includes three methods that are invoked during the `setup` process:
+`initialize`, `setup`, and `configure`. Most of the time, `setup` is all you need to build a group. The specific use case for
 `configure` is shown below in the next section. The `initialize` method is only used for declaring options for your
 group (and also in `Component`), and their placement here allows them to be passed into the group as
 instantiation arguments.
@@ -50,7 +50,7 @@ Usage of setup vs. configure
 ----------------------------
 
 The need for two methods for setting up a group arose from a need to sometimes change the linear or
-nonlinear solvers in a subgroup after it has been added. When `setup` is called on the `problem`, the
+nonlinear solvers in a subgroup after it had been added. When `setup` is called on the `problem`, the
 `setup` method in each group is called recursively from top to bottom of the hierarchy. For example,
 a group may contain several components and groups. Setup is first called in that top group, during
 which, those components and groups are instantiated. However, the `setup` methods belonging to those sub-components
@@ -74,10 +74,9 @@ Here is a quick guide covering what you can do in the `setup` and `configure` me
 Action                                                                               setup   configure
 ==================================================================================== ======= ===========
 Add subsystems                                                                          o
-Delete subsystems                                                                       o
 Issue connections                                                                       o        o
-Set system execution order                                                              o        o
-Directly add inputs and outputs to components within this group                         o        o
+Set system execution order                                                              o
+Add inputs and outputs to components within this group                                  o        o
 Promote variables from subsystems                                                       o        o
 Assign solvers at **this** group level                                                  o        o
 Assign solvers within subsystems                                                                 o
@@ -107,7 +106,7 @@ phases is to allow you to perform certain actions after `setup`:
 
 **Post-setup actions**
 
- - Set values of unconnected inputs and indepvarcomps
+ - Set values of inputs and indepvarcomps
  - Change settings on solvers
  - Change options on systems
  - Add recorders
@@ -123,8 +122,8 @@ During setup, the following things happen:
  - For each custom Group, setup function is called recursively from top to bottom
  - Model hierarchy is created
  - For each custom Group, configure function is called recursively from bottom to top
- - Variables are sized
  - Connections are assembled and verified
+ - Variables are sized
 
 This is just enough to allow you to perform the post-setup actions listed above, but there are
 still more things to do before the model can run. In `final_setup`, the following happens:
