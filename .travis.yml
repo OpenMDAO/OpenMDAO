@@ -101,7 +101,8 @@ install:
 
   if [ "$PYOPTSPARSE" ]; then
     echo " >> Installing pyOptSparse";
-    git clone -q https://github.com/OpenMDAO/build_pyoptsparse;
+    # git clone -q https://github.com/OpenMDAO/build_pyoptsparse;
+    git clone -q https://github.com/hschilling/build_pyoptsparse;
 
     cd build_pyoptsparse;
     git checkout add_paropt
@@ -144,6 +145,8 @@ install:
 # display summary of installed packages and their versions
 - conda list
 
+- cat config.log
+
 script:
 # prevent OpenMPI warning messages
 - export OMPI_MCA_btl=^openib
@@ -166,7 +169,6 @@ script:
     testflo -n 1 openmdao --timeout=120 --show_skipped;
   fi
 
-  cat config.log
 
 after_success:
 # again, only run coverage operations on the upload machine after success.
