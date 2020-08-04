@@ -415,7 +415,7 @@ class Group(System):
         for n, lst in self._pre_config_group_inputs.items():
             self._pre_config_group_inputs[n] = lst.copy()
 
-        if MPI and nproc > 1:
+        if MPI:
 
             proc_info = [self._proc_info[s.name] for s in self._subsystems_allprocs]
 
@@ -473,7 +473,7 @@ class Group(System):
         if MPI and nproc > 1:
             if self._mpi_proc_allocator.parallel:
                 self._problem_meta['parallel_groups'].append(self.pathname)
-    
+
             allpars = self.comm.allgather(self._problem_meta['parallel_groups'])
             full = set()
             for p in allpars:
