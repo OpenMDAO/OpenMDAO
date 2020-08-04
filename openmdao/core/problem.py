@@ -1118,10 +1118,15 @@ class Problem(object):
 
                             if directional:
                                 n_in = 1
-                                perturb = 2.0 * np.random.random(len(flat_view)) - 1.0
                                 if c_name not in mfree_directions:
                                     mfree_directions[c_name] = {}
-                                mfree_directions[c_name][inp] = perturb
+
+                                if inp in mfree_directions[c_name]:
+                                    perturb = mfree_directions[c_name][inp]
+                                else:
+                                    perturb = 2.0 * np.random.random(len(flat_view)) - 1.0
+                                    mfree_directions[c_name][inp] = perturb
+
                             else:
                                 n_in = len(flat_view)
                                 perturb = 1.0
