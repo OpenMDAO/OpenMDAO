@@ -3,7 +3,7 @@
 import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent
-from openmdao.utils.general_utils import make_set
+from openmdao.utils.general_utils import make_set, warn_deprecation
 
 
 class IndepVarComp(ExplicitComponent):
@@ -106,7 +106,7 @@ class IndepVarComp(ExplicitComponent):
         super(IndepVarComp, self)._configure_check()
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, tags=None):
+                   lower=None, upper=None, ref=None, ref0=None, res_ref=None, tags=None):
         """
         Add an independent variable to this component.
 
@@ -122,35 +122,42 @@ class IndepVarComp(ExplicitComponent):
         units : str or None
             Units in which the output variables will be provided to the component during execution.
             Default is None, which means it has no units.
-        res_units : str or None
-            Units in which the residuals of this output will be given to the user when requested.
-            Default is None, which means it has no units.
+        res_units : None
+            This argument is deprecated because it was unused.
         desc : str
             description of the variable
-        lower : float or list or tuple or ndarray or None
-            lower bound(s) in user-defined units. It can be (1) a float, (2) an array_like
-            consistent with the shape arg (if given), or (3) an array_like matching the shape of
-            val, if val is array_like. A value of None means this output has no lower bound.
-            Default is None.
-        upper : float or list or tuple or ndarray or None
-            upper bound(s) in user-defined units. It can be (1) a float, (2) an array_like
-            consistent with the shape arg (if given), or (3) an array_like matching the shape of
-            val, if val is array_like. A value of None means this output has no upper bound.
-            Default is None.
-        ref : float
-            Scaling parameter. The value in the user-defined units of this output variable when
-            the scaled value is 1. Default is 1.
-        ref0 : float
-            Scaling parameter. The value in the user-defined units of this output variable when
-            the scaled value is 0. Default is 0.
-        res_ref : float
-            Scaling parameter. The value in the user-defined res_units of this output's residual
-            when the scaled value is 1. Default is None, which means residual scaling matches
-            output scaling.
+        lower : None
+            This argument is deprecated because it was unused.
+        upper : None
+            This argument is deprecated because it was unused.
+        ref : None
+            This argument is deprecated because it was unused.
+        ref0 : None
+            This argument is deprecated because it was unused.
+        res_ref : None
+            This argument is deprecated because it was unused.
         tags : str or list of strs
             User defined tags that can be used to filter what gets listed when calling
             list_outputs.
         """
+        if res_units is not None:
+            warn_deprecation(
+                "'res_units' has been deprecated and will be removed in a future version")
+        elif lower is not None:
+            warn_deprecation("'lower' has been deprecated and will be removed in a future version")
+        elif upper is not None:
+            warn_deprecation("'upper' has been deprecated and will be removed in a future version")
+        elif ref0 is not None:
+            warn_deprecation("'ref0' has been deprecated and will be removed in a future version")
+        elif res_ref is not None:
+            warn_deprecation(
+                "'res_ref' has been deprecated and will be removed in a future version")
+        elif ref is not None:
+            warn_deprecation("'ref' has been deprecated and will be removed in a future version")
+
+        ref = 1.0
+        ref0 = 0.0
+
         if res_ref is None:
             res_ref = ref
 

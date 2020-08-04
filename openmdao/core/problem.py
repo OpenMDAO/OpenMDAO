@@ -428,7 +428,11 @@ class Problem(object):
             Indices or slice to set to specified value.
         """
         model = self.model
-        conns = self._metadata['connections']
+        try:
+            conns = self._metadata['connections']
+        except AttributeError:
+            raise RuntimeError(f"{self.msginfo}: '{name}' Cannot call set_val before setup.")
+
         all_meta = model._var_allprocs_abs2meta
         n_proms = 0  # if nonzero, name given was promoted input name w/o a matching prom output
 
@@ -466,8 +470,7 @@ class Problem(object):
                         tu0 = tunit_list[0]
                         for tu in tunit_list:
                             if tu != tu0:
-                                model._show_ambiguity_msg(name, ('units',),
-                                                          abs_names)
+                                model._show_ambiguity_msg(name, ('units',), abs_names)
 
                 if units is None:
                     if self._setup_status > 1:  # avoids double unit conversion
