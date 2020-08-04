@@ -429,7 +429,11 @@ class Problem(object):
             Indices or slice to set to specified value.
         """
         model = self.model
-        conns = self._metadata['connections']
+        try:
+            conns = self._metadata['connections']
+        except AttributeError:
+            raise RuntimeError(f"{self.msginfo}: '{name}' Cannot call set_val before setup.")
+
         all_meta = model._var_allprocs_abs2meta
         n_proms = 0  # if nonzero, name given was promoted input name w/o a matching prom output
 
