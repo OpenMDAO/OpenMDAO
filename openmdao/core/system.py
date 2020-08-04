@@ -31,7 +31,7 @@ from openmdao.utils.coloring import _compute_coloring, Coloring, \
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, ContainsAll, all_ancestors, \
-    simple_warning, make_set, match_includes_excludes, ensure_compatible, _is_slice
+    simple_warning, make_set, match_includes_excludes, ensure_compatible, _is_slicer_op
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.utils.units import unit_conversion
@@ -2488,7 +2488,7 @@ class System(object):
 
         if indices is not None:
 
-            if isinstance(indices, slice):
+            if _is_slicer_op(indices):
                 pass
             # If given, indices must be a sequence
             elif not (isinstance(indices, Iterable) and
@@ -2599,7 +2599,7 @@ class System(object):
             msg = "{}: Constraint '{}' cannot be both equality and inequality."
             raise ValueError(msg.format(self.msginfo, name))
 
-        if isinstance(indices, slice):
+        if _is_slicer_op(indices):
             pass
         # If given, indices must be a sequence
         elif (indices is not None and not (
@@ -4271,7 +4271,10 @@ class System(object):
                 if not get_remote and distrib and src.startswith('_auto_ivc.'):
                     val = val.ravel()[src_indices - src_indices[0]]
                 else:
-                    val = val.ravel()[src_indices]
+                    if _is_slicer_op(src_indices):
+                        val = val[tuple(src_indices)].ravel()
+                    else:
+                        val = val.ravel()[src_indices]
 
             if get_remote:
                 if distrib:
