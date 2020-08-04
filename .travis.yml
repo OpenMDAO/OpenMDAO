@@ -108,8 +108,8 @@ install:
     chmod 755 ./build_pyoptsparse.sh;
 
     # Need to install these for building paropt
-#    conda install -c anaconda gxx_linux-64 --yes;
-#    conda install -c anaconda gfortran_linux-64 --yes;
+    #    conda install -c anaconda gxx_linux-64 --yes;
+    #    conda install -c anaconda gfortran_linux-64 --yes;
     if [ "$SNOPT" == "7.7" ] && [ "$SNOPT_LOCATION_77" ]; then
       echo "  > Secure copying SNOPT 7.7 over SSH";
       mkdir SNOPT;
