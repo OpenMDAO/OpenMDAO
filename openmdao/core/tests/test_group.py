@@ -2531,8 +2531,19 @@ class Test3Deep(unittest.TestCase):
                         seen.add(r[0])
             res = allres
         return res
+    
+    def check_vs_meta(self, p, parent, meta_list):
+        system = p.model._get_subsystem(parent)
+        metas = (system._var_allprocs_abs2meta, system._var_abs2meta)
+        for vname, meta in meta_list:
+            for key, val in meta.items():
+                for mymeta in metas:
+                    if key in mymeta:
+                        if (isinstance(val, np.ndarray) and not np.testing.assert_allclose(val, mymeta[key])) or val != mymeta[key]:
+                            raise RuntimeError(f"{val} != {mymeta[key]}")
+                        break
 
-    def test_io_meta_local(self):
+    def test_io_meta(self):
         p = self.build_model()
         p.model.cfg.add_get_io('C1', return_rel_names=False)
         p.model.cfg.add_get_io('C2')
@@ -2543,14 +2554,17 @@ class Test3Deep(unittest.TestCase):
         res = self.get_io_results(p, 'cfg', 'C1')
         expected = {'cfg.C1.x', 'cfg.C1.y'}
         self.assertEqual({t[0] for t in res}, expected)
+        self.check_vs_meta(p, 'cfg', res)
 
         res = self.get_io_results(p, 'cfg', 'C2')
         expected = {'x', 'y'}
         self.assertEqual({t[0] for t in res}, expected)
+        self.check_vs_meta(p, 'cfg', res)
 
         res = self.get_io_results(p, 'cfg', 'sub')
         expected = {'C3.x', 'C4.x', 'C3.y', 'C4.y'}
         self.assertEqual({t[0] for t in res}, expected)
+        self.check_vs_meta(p, 'cfg', res)
 
         names = self.get_matching_var_setup_counts(p, 1)
         expected = {'', 'cfg', 'cfg.C1', 'cfg.C2', 'cfg.sub', 'cfg.sub.C3', 'cfg.sub.C4'}
@@ -2660,11 +2674,25 @@ class TestInConfigMPIpar(Test3Deep):
     N_PROCS = 2
     sub_par = True
 
-    def test_io_meta_remote_subcomp(self):
-        pass
+    def test_io_meta_remote(self):
+        p = self.build_model()
+        p.model.add_get_io('cfg', metadata_keys=('value', 'src_indices', 'shape'), get_remote=True)
+        p.model.cfg.add_get_io('sub')
+        
+        p.setup()
 
-    def test_io_meta_remote_subgroup(self):
-        pass
+        res = sorted(p.model.io_results['cfg'], key=lambda x:x[0])
+        expected = {'sub.C3.x', 'sub.C3.y', 'sub.C4.x', 'sub.C4.y', 'C1.x', 'C1.y', 'C2.x', 'C2.y'}
+        self.assertEqual([t[0] for t in res], sorted(expected))
+        self.check_vs_meta(p, 'cfg', res)
+
+        res = sorted(p.model.cfg.io_results['sub'], key=lambda x:x[0])
+        if p.model.comm.rank == 0:
+            expected = {'C3.y', 'C3.x'}
+        else:
+            expected = {'C4.y', 'C4.x'}
+        self.assertEqual([t[0] for t in res], sorted(expected))
+        self.check_vs_meta(p, 'cfg.sub', res)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -2672,12 +2700,6 @@ class TestInConfigMPIparpar(Test3Deep):
     N_PROCS = 4
     cfg_par = True
     sub_par = True
-
-    def test_io_meta_remote_subcomp(self):
-        pass
-
-    def test_io_meta_remote_subgroup(self):
-        pass
 
 
 #
