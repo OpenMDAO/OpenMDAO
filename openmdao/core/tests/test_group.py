@@ -1083,8 +1083,25 @@ class TestGroup(unittest.TestCase):
                 self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
                 self.add_subsystem('comp2', om.ExecComp('b=2*a'))
 
-        # This doesn't raise an error but should
-        order_list = []
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('C1', SimpleGroup())
+        model.add_subsystem('C2', SimpleGroup())
+
+        prob.setup()
+        model.set_order(['C2', 'C1'])
+
+        msg = "Problem: Cannot call set_order after setup"
+        with self.assertRaises(RuntimeError) as cm:
+            prob.run_model()
+        self.assertEqual(str(cm.exception), msg)
+
+    def test_double_setup_for_set_order(self):
+        class SimpleGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
+                self.add_subsystem('comp2', om.ExecComp('b=2*a'))
 
         prob = om.Problem()
         model = prob.model
@@ -1093,12 +1110,9 @@ class TestGroup(unittest.TestCase):
         model.add_subsystem('C2', SimpleGroup())
 
         prob.setup()
-
-
-        msg = "Group (<model>): Cannot call set_order after setup"
-        with self.assertRaises(RuntimeError) as cm:
-            model.set_order(['C2', 'C1'])
-        self.assertEqual(str(cm.exception), msg)
+        model.set_order(['C2', 'C1'])
+        prob.setup()
+        prob.run_model()
 
 
 @unittest.skipUnless(MPI, "MPI is required.")
@@ -2821,6 +2835,7 @@ class TestFeatureSetOrder(unittest.TestCase):
         # reset the shared order list
         order_list[:] = []
 
+        prob.setup()
         # now swap C2 and C1 in the order
         model.set_order(['C2', 'C1', 'C3'])
 

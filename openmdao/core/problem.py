@@ -927,6 +927,9 @@ class Problem(object):
             record_viewer_data(self)
             record_system_options(self)
 
+        if hasattr(self.model, '_in_good_standing') and not self.model._in_good_standing:
+            raise RuntimeError("%s: Cannot call set_order after setup" % (self.msginfo))
+
         if self._setup_status < 2:
             self._setup_status = 2
             self._set_initial_conditions()

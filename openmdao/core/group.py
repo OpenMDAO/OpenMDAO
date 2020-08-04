@@ -85,6 +85,8 @@ class Group(System):
         group or distributed component is below a DirectSolver so that we can raise an exception.
     _raise_connection_errors : bool
         Flag indicating whether connection errors are raised as an Exception.
+    _config_finished : bool
+        Flag to check if configure is complete.
     """
 
     def __init__(self, **kwargs):
@@ -118,6 +120,9 @@ class Group(System):
         self._has_distrib_vars = False
         self._contains_parallel_group = False
         self._raise_connection_errors = True
+        self._config_finished = False
+        self._order_set = False
+        self._ready_for_setup = True
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -341,6 +346,7 @@ class Group(System):
             if subsys.matrix_free:
                 self.matrix_free = True
 
+        self._config_finished = True
         self.configure()
 
     def _setup_procs(self, pathname, comm, mode, prob_meta):
@@ -1894,12 +1900,12 @@ class Group(System):
         new_order : list of str
             List of system names in desired new execution order.
         """
+        if self._config_finished and not self._setup_finished:
+            raise RuntimeError("%s: Cannot call set_order in "
+                               "the configure method" % (self.msginfo))
+
         # Make sure the new_order is valid. It must contain all subsystems
         # in this model.
-
-        if self._setup_procs_finished:
-            raise RuntimeError("%s: Cannot call set_order after setup" % (self.msginfo))
-
         newset = set(new_order)
         if self._static_mode:
             subsystems = self._static_subsystems_allprocs
@@ -1930,6 +1936,7 @@ class Group(System):
                              (self.msginfo, sorted(dupes)))
 
         subsystems[:] = [olddict[name] for name in new_order]
+        self._order_set = True
 
     def _get_subsystem(self, name):
         """

@@ -286,6 +286,8 @@ class System(object):
         If True, this is the first call to _linearize.
     _is_local : bool
         If True, this system is local to this mpi process.
+    _setup_finished : bool
+        Flag to check if setup is complete.
     """
 
     def __init__(self, num_par_fd=1, **kwargs):
@@ -414,6 +416,7 @@ class System(object):
         self._static_subsystems_allprocs = []
         self._static_design_vars = OrderedDict()
         self._static_responses = OrderedDict()
+        self._setup_finished = False
 
         self.supports_multivecs = False
 
@@ -648,6 +651,11 @@ class System(object):
             self._top_level_setup2()
 
         self._setup_connections()
+
+        if hasattr(self, '_order_set') and self._order_set:
+            self._in_good_standing = True
+
+        self._setup_finished = True
 
     def _top_level_setup(self, mode):
         pass
