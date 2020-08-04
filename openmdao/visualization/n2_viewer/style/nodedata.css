@@ -3,8 +3,8 @@
     position: absolute;
     z-index: 10;
     height: auto;
-    max-width: 800px;
-    overflow: scroll;
+    /*max-width: 800px;*/
+    /*overflow: scroll;*/
 }
 
 #node-info-table {
@@ -45,7 +45,7 @@
     white-space: nowrap;
 }
 
-#node-info-table tbody th.options-header {
+#node-info-table tbody .options-header {
     background-color: #eeeeee;
     text-align: center;
 }
@@ -90,7 +90,6 @@
     top: 5px;
     right: 8px;
     cursor: pointer;
-    padding: 0;
     margin: 0;
     border: 0;
     font-size: 12px;
@@ -108,68 +107,10 @@
     box-shadow: 1px 1px 1px 1px rgba(0, 0, 0, 0.2);
 }
 
+/******************* Node Value Window styling *******************/
+
 #node-value-containers {
     visibility: hidden;
-}
-
-#node-value-container {
-    visibility: hidden;
-    overflow: hidden;
-	background-color: white;
-	border-radius: 10px;
-	border: 1px solid #a0a0a0;
-    transition: opacity 0.25s;
-    box-shadow: 3px 3px 3px 1px rgba(0, 0, 0, 0.2);
-    border-collapse: separate;
-    opacity: .95;
-    z-index: 20;
-    position: absolute;
-    top: 400px;
-    left: 700px;
-}
-
-#node-value-table-div {
-    overflow: auto;
-}
-
-#node-value-table {
-}
-
-#node-value-table tbody td {
-    text-align: left;
-    font-size: 9pt;
-    margin-top: 0;
-    margin-left: 0;
-    border: 1px solid #a0a0a0;
-    padding: 3px;
-    white-space: nowrap;
-}
-
-#node-value-header {
-    background-color: #42926b;
-    color: black;
-    margin: 0px;
-    padding: 5px;
-    font-size: 11pt;
-    text-align: center;
-    cursor: grab;
-}
-
-#node-value-footer {
-    background-color: #42926b;
-    color: black;
-    margin: 0px;
-    padding: 5px;
-}
-
-/* this is an off screen element that is used in the strange way you
-   need to put content on the clipboard.
-   It has to have visibility of visible to work
- */
-#input {
-    visibility: visible;
-    position: absolute;
-    left: -999em;
 }
 
 .show_value_button {
@@ -189,17 +130,15 @@
 
 .close-value-window-button:hover,
 .close-value-window-button:focus {
-	color: #000;
+	color: #f00;
 	text-decoration: none;
 	cursor: pointer;
 }
 
-/********************* node value classes ********************/
-
 .node-value-title {
+    color: black;
     display: block;
     overflow: auto;
-    /*overflow: hidden;*/
     position: relative;
 }
 
@@ -226,7 +165,7 @@
 .node-value-resizer-handle {
     position: absolute;
     right: -2px;
-    bottom: 0px;
+    bottom: 0;
     margin: 0;
     height: 18px;
     cursor: nwse-resize;
@@ -234,40 +173,14 @@
     overflow: hidden;
 }
 
-
-.node-value-grabber{
-    /*display:block;*/
+.node-value-grabber {
     overflow:hidden;
     width:100%;
     height:100%;
 }
 
-
-.node-info-pin {
-    position: absolute;
-    top: 5px;
-    right: 8px;
-    cursor: pointer;
-    padding: 0;
-    margin: 0;
-    border: 0;
-    font-size: 12px;
-    background: #ccc;
-    width: 18px;
-    height: 18px;
-    padding: 0 2px 0 2px;
-    /* box-shadow: 1px 1px 1px 1px rgba(0, 0, 0, 0.2); */
-    border-radius: 3px;
-}
-
-.node-info-pin:hover {
-    top: 4px;
-    right: 9px;
-    box-shadow: 1px 1px 1px 1px rgba(0, 0, 0, 0.2);
-}
-
 .node-value-container {
-    visibility: hidden;
+    visibility: visible;
     overflow: hidden;
 	background-color: white;
 	border-radius: 10px;
@@ -280,16 +193,12 @@
     position: absolute;
     top: 400px;
     left: 700px;
-
 }
 
 .node-value-table-div {
     overflow: auto;
     padding-right: 10px;
     padding-bottom: 10px;
-}
-
-.node-value-table {
 }
 
 .node-value-table tbody td {
@@ -305,7 +214,7 @@
 .node-value-header {
     background-color: #42926b;
     color: black;
-    margin: 0px;
+    margin: 0;
     padding: 5px;
     font-size: 11pt;
     text-align: center;
@@ -315,6 +224,16 @@
 .node-value-footer {
     background-color: #42926b;
     color: black;
-    margin: 0px;
+    margin: 0;
     padding: 5px;
+}
+
+/* this is an off screen element that is used in the strange way you
+   need to put content on the clipboard.
+   It has to have visibility of visible to work
+ */
+#input-for-pastebuffer {
+    visibility: visible;
+    position: absolute;
+    left: -999em;
 }

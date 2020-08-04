@@ -140,11 +140,8 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
             tree_dict['linear_solver_options'] = None
         elif system.linear_solver:
             tree_dict['linear_solver'] = system.linear_solver.SOLVER
-            # tree_dict['linear_solver_options'] = system.linear_solver.options
-
             options = {k: system.linear_solver.options[k] for k in system.linear_solver.options}
             tree_dict['linear_solver_options'] = options
-
         else:
             tree_dict['linear_solver'] = ""
             tree_dict['linear_solver_options'] = None
@@ -154,28 +151,21 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
             tree_dict['nonlinear_solver_options'] = None
         elif system.nonlinear_solver:
             tree_dict['nonlinear_solver'] = system.nonlinear_solver.SOLVER
-            # tree_dict['nonlinear_solver_options'] = system.nonlinear_solver.options
             options = {k: system.nonlinear_solver.options[k] for k in system.nonlinear_solver.options}
             tree_dict['nonlinear_solver_options'] = options
-
-
         else:
             tree_dict['nonlinear_solver'] = ""
             tree_dict['nonlinear_solver_options'] = None
     else:
         if system.linear_solver:
             tree_dict['linear_solver'] = system.linear_solver.SOLVER
-
             options = {k: system.linear_solver.options[k] for k in system.linear_solver.options}
             tree_dict['linear_solver_options'] = options
-
-
         else:
             tree_dict['linear_solver'] = ""
 
         if system.nonlinear_solver:
             tree_dict['nonlinear_solver'] = system.nonlinear_solver.SOLVER
-
             options = {k: system.nonlinear_solver.options[k] for k in system.nonlinear_solver.options}
             tree_dict['nonlinear_solver_options'] = options
 

@@ -122,8 +122,8 @@ let value_formatter = d3.format("g");
 
 
 /**
- * Manage a window for displaying the value of a variable.
- * @typedef ValueInfo
+ * Manage the windows for displaying the values of a variables.
+ * @typedef ValueInfoManager
  */
 class ValueInfoManager {
     /**
@@ -137,7 +137,7 @@ class ValueInfoManager {
     add(abs2prom, name, val){
         // Check to see if already exists before opening a new one
         if (!this.valueInfoWindows[name]){
-            let valueInfoBox = new ValueInfo(abs2prom, name, val, this.ui);
+            let valueInfoBox = new ValueInfo( name, val, this.ui);
             this.valueInfoWindows[name] = valueInfoBox;
         }
     }
@@ -157,74 +157,41 @@ class ValueInfo {
     /**
      * Build a list of the properties we care about and set up
      * references to the HTML elements.
-     * @param {Object} abs2prom Object containing promoted variable names.
      * @param {str} name Variable name.
      * @param {Number} val Variable value.
      */
-    constructor(abs2prom, name, val, ui) {
-        this.abs2prom = abs2prom;
+    constructor( name, val, ui) {
         this.name = name;
         this.val = val;
         this.ui = ui;
 
         /* Construct the DOM elements that make up the window */
-        this.top_container = d3.select('#node-value-containers');
-        this.container = this.top_container.append('div').attr('class', 'node-value-container');
+        let top_container = d3.select('#node-value-containers');
+        this.container = top_container.append('div').attr('class', 'node-value-container');
         this.header = this.container.append('div').attr('class', 'node-value-header');
-        this.close_button = this.header.append('span').attr('class', 'close-value-window-button' ).text('x');
+        let close_button = this.header.append('span').attr('class', 'close-value-window-button' ).text('x');
         this.title = this.header.append('span').attr('class', 'node-value-title' );
-
         this.table_div = this.container.append('div').attr('class', 'node-value-table-div');
         this.table = this.table_div.append('table').attr('class', 'node-value-table')
-
-        this.footer = this.container.append('div').attr('class', 'node-value-footer');
+        this.container.append('div').attr('class', 'node-value-footer');
         let resizer_box = this.container.append('div').attr('class', 'node-value-resizer-box inactive-resizer-box')
-        this.risizer_handle = resizer_box.append('p').attr('class','node-value-resizer-handle inactive-resizer-handle')
-
-        this.tbody = null;
-
-        this.hidden = true;
-        this.pinned = false;
-
-        this.initial_width =  0 ;
-        this.initial_height =  0 ;
+        this.resizer_handle = resizer_box.append('p').attr('class','node-value-resizer-handle inactive-resizer-handle')
 
         const self = this;
-
-        this.close_button.on(
+        close_button.on(
             'click',
             function () {
-                // self.clear();
                 self.ui.valueInfoManager.remove(self.name); //newway
-
-
             }
         );
 
         this.update();
-        this.show();
         this._setupDrag();
         this._setupResizerDrag();
     }
 
-    show() {
-        this.container.style('visibility', 'visible');
-    }
-
-    hide() {
-        this.container.style('visibility', 'hidden');
-    }
-
     clear() {
-        var elem = this.container;
-
-        // d3.select(this.parentNode) returns SVG element
-        //
-        // g = circle.select(function() { return this.parentNode; }) returns d3 object
-
-        var node = elem.node();
-
-
+        const node = this.container.node();
         node.parentNode.removeChild(node);
     }
 
@@ -297,7 +264,7 @@ class ValueInfo {
 
     /** Set up event handlers for grabbing the bottom corner and dragging */
     _setupResizerDrag() {
-        const handle = this.risizer_handle;
+        const handle = this.resizer_handle;
         const body = d3.select('body');
         const tableDiv = this.table_div;
 
@@ -434,7 +401,6 @@ class NodeInfo {
         this.pinButton = d3.select('#node-info-pin')
             .on('click', e => { self.unpin(); })
         this.name = null;
-
     }
 
     /** Make the info box visible if it's hidden */
@@ -665,10 +631,10 @@ class NodeInfo {
             .style('background-color', color);
 
         if (this.abs2prom) {
-            if (obj.isParam()) {
+            if (obj.isInput()) {
                 this._addPropertyRow('Promoted Name', this.abs2prom.input[obj.absPathName], obj);
             }
-            else if (obj.isUnknown()) {
+            else if (obj.isOutput()) {
                 this._addPropertyRow('Promoted Name', this.abs2prom.output[obj.absPathName], obj);
             }
         }

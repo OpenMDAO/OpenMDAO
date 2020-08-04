@@ -484,7 +484,8 @@ class N2Diagram {
                 if (self.ui.nodeInfoBox.hidden) { self.ui.leftClick(d); } // Zoom if not in info panel mode
                 else { // Pin/unpin the info panel
                     self.ui.nodeInfoBox.togglePin();
-                    self.ui.nodeInfoBox.update(d3.event, d, d3.select(this).select('rect').style('fill'));
+                    // self.ui.nodeInfoBox.update(d3.event, d, d3.select(this).select('rect').style('fill'));
+                    self.ui.nodeInfoBox.update_solver(d3.event, d, d3.select(this).select('rect').style('fill'))
                 }
             })
             .on("contextmenu", function (d) {
