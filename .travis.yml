@@ -145,8 +145,6 @@ install:
 # display summary of installed packages and their versions
 - conda list
 
-- cat config.log
-
 script:
 # prevent OpenMPI warning messages
 - export OMPI_MCA_btl=^openib
