@@ -166,7 +166,7 @@ script:
     testflo -n 1 openmdao --timeout=120 --show_skipped;
   fi
 
-cat config.log
+  cat config.log
 
 after_success:
 # again, only run coverage operations on the upload machine after success.
