@@ -376,6 +376,7 @@ class Group(System):
         self._setup_procs_finished = False
 
         self._vectors = {}
+        nproc = comm.size
 
         if self._num_par_fd > 1:
             info = self._coloring_info
@@ -414,9 +415,7 @@ class Group(System):
         for n, lst in self._pre_config_group_inputs.items():
             self._pre_config_group_inputs[n] = lst.copy()
 
-        if MPI:
-            if self._mpi_proc_allocator.parallel:
-                self._problem_meta['parallel_groups'].append(self.pathname)
+        if MPI and nproc > 1:
 
             proc_info = [self._proc_info[s.name] for s in self._subsystems_allprocs]
 
@@ -470,6 +469,16 @@ class Group(System):
         self._subgroups_myproc = [s for s in self._subsystems_myproc if isinstance(s, Group)]
 
         self._loc_subsys_map = {s.name: s for s in self._subsystems_myproc}
+
+        if MPI and nproc > 1:
+            if self._mpi_proc_allocator.parallel:
+                self._problem_meta['parallel_groups'].append(self.pathname)
+    
+            allpars = self.comm.allgather(self._problem_meta['parallel_groups'])
+            full = set()
+            for p in allpars:
+                full.update(p)
+            self._problem_meta['parallel_groups'] = sorted(full)
 
         if self._problem_meta['parallel_groups']:
             prefix = self.pathname + '.' if self.pathname else ''

@@ -2489,11 +2489,13 @@ class Test3Deep(unittest.TestCase):
     def build_model(self):
         p = om.Problem(model=ConfigGroup())
 
-        cfg = p.model.add_subsystem('cfg', ConfigGroup(parallel=self.cfg_par))
+        minprocs = 3 if self.cfg_par else 1
+        cfg = p.model.add_subsystem('cfg', ConfigGroup(parallel=self.cfg_par), min_procs=minprocs)
         cfg.add_subsystem('C1', MultComp([('x', 2., 'y')]))
         cfg.add_subsystem('C2', MultComp([('x', 3., 'y')]))
 
-        sub = cfg.add_subsystem('sub', ConfigGroup(parallel=self.sub_par))
+        minprocs = 2 if self.sub_par else 1
+        sub = cfg.add_subsystem('sub', ConfigGroup(parallel=self.sub_par), min_procs=minprocs)
         sub.add_subsystem('C3', MultComp([('x', 4., 'y')]))
         sub.add_subsystem('C4', MultComp([('x', 5., 'y')]))
 
@@ -2535,13 +2537,14 @@ class Test3Deep(unittest.TestCase):
         p.model.cfg.add_get_io('C1', return_rel_names=False)
         p.model.cfg.add_get_io('C2')
         p.model.cfg.add_get_io('sub')
+
         p.setup()
 
-        res = p.model.cfg.io_results['C1']
+        res = self.get_io_results(p, 'cfg', 'C1')
         expected = {'cfg.C1.x', 'cfg.C1.y'}
         self.assertEqual({t[0] for t in res}, expected)
 
-        res = p.model.cfg.io_results['C2']
+        res = self.get_io_results(p, 'cfg', 'C2')
         expected = {'x', 'y'}
         self.assertEqual({t[0] for t in res}, expected)
 
@@ -2591,11 +2594,6 @@ class Test3Deep(unittest.TestCase):
         p = self.build_model()
         p.model.cfg.sub.add_var_input('C3.ivar0', 3.0, units='ft')
 
-        #import wingdbstub
-
-        # from openmdao.devtools.debug import trace_mpi
-        # trace_mpi()
-
         p.setup()
 
         names = self.get_matching_var_setup_counts(p, 1)
@@ -2623,6 +2621,7 @@ class Test3Deep(unittest.TestCase):
         p = self.build_model()
         p.model.cfg.add_var_input('sub.C3.ivar0', 3.0, units='ft')
         p.model.add_var_input('cfg.sub.C3.ivar1', 4.0, units='inch')
+
         p.setup()
 
         names = self.get_matching_var_setup_counts(p, 1)
@@ -2659,6 +2658,19 @@ class Test3Deep(unittest.TestCase):
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestInConfigMPIpar(Test3Deep):
     N_PROCS = 2
+    sub_par = True
+
+    def test_io_meta_remote_subcomp(self):
+        pass
+
+    def test_io_meta_remote_subgroup(self):
+        pass
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestInConfigMPIparpar(Test3Deep):
+    N_PROCS = 4
+    cfg_par = True
     sub_par = True
 
     def test_io_meta_remote_subcomp(self):
