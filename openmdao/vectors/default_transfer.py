@@ -8,7 +8,7 @@ import numpy as np
 from openmdao.vectors.vector import INT_DTYPE
 from openmdao.vectors.transfer import Transfer
 from openmdao.utils.array_utils import convert_neg, _global2local_offsets, _flatten_src_indices
-from openmdao.utils.general_utils import _is_slice, _slice_indices
+from openmdao.utils.general_utils import _is_slicer_op, _slice_indices
 from openmdao.utils.mpi import MPI
 
 _empty_idx_array = np.array([], dtype=INT_DTYPE)
@@ -83,6 +83,7 @@ class DefaultTransfer(Transfer):
                 # Only continue if the input exists on this processor
                 if abs_in in abs2meta:
 
+                    indices = None
                     # Get meta
                     meta_in = abs2meta[abs_in]
                     meta_out = allprocs_abs2meta[abs_out]
@@ -98,7 +99,7 @@ class DefaultTransfer(Transfer):
                         if isinstance(src_indices, tuple) or \
                                      (isinstance(src_indices, np.ndarray) and
                                       src_indices.dtype == object):
-                            if _is_slice(src_indices):
+                            if _is_slicer_op(src_indices):
                                 indices = _slice_indices(src_indices, meta_out['global_size'],
                                                          meta_out['global_shape'])
                                 src_indices = convert_neg(indices, meta_out['global_size'])
@@ -121,6 +122,8 @@ class DefaultTransfer(Transfer):
                     input_inds = np.arange(offsets_in[iproc, idx_in],
                                            offsets_in[iproc, idx_in] +
                                            sizes_in[iproc, idx_in], dtype=INT_DTYPE)
+                    if indices is not None:
+                        input_inds = input_inds.reshape(indices.shape)
 
                     # Now the indices are ready - input_inds, output_inds
                     sub_in = abs_in[mypathlen:].split('.', 1)[0]
@@ -145,8 +148,12 @@ class DefaultTransfer(Transfer):
             transfers[vec_name] = {}
 
             if tot_size > 0:
-                xfer_in = np.concatenate(fwd_xfer_in)
-                xfer_out = np.concatenate(fwd_xfer_out)
+                try:
+                    xfer_in = np.concatenate(fwd_xfer_in)
+                    xfer_out = np.concatenate(fwd_xfer_out)
+                except ValueError:
+                    xfer_in = fwd_xfer_in
+                    xfer_out = fwd_xfer_out
 
                 out_vec = vectors['output'][vec_name]
 
