@@ -471,7 +471,8 @@ class Problem(object):
                                 model._show_ambiguity_msg(name, ('units',), abs_names)
 
                 if units is None:
-                    if self._metadata['_setup_status'] > self.POST_SETUP:  # avoids double unit conversion
+                    # avoids double unit conversion
+                    if self._metadata['_setup_status'] > self.POST_SETUP:
                         ivalue = value
                         if sunits is not None:
                             if gunits is not None and gunits != tunits:
@@ -863,7 +864,7 @@ class Problem(object):
             'remote_systems': {},
             'remote_vars': {},  # does not include distrib vars
             'prom2abs': {'input': {}, 'output': {}},  # includes ALL promotes including buried ones
-            '_setup_status' : self.PRE_SETUP
+            '_setup_status': self.PRE_SETUP
         }
         model._setup(model_comm, mode, self._metadata)
 
@@ -924,7 +925,7 @@ class Problem(object):
                            (mode, desvar_size, response_size), RuntimeWarning)
 
         if self._metadata['_setup_status'] == self.PRE_SETUP and \
-            hasattr(self.model, '_order_set') and self.model._order_set:
+                hasattr(self.model, '_order_set') and self.model._order_set:
             raise RuntimeError("%s: Cannot call set_order without calling "
                                "setup after" % (self.msginfo))
 

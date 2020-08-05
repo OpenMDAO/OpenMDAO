@@ -85,8 +85,8 @@ class Group(System):
         group or distributed component is below a DirectSolver so that we can raise an exception.
     _raise_connection_errors : bool
         Flag indicating whether connection errors are raised as an Exception.
-    _config_finished : bool
-        Flag to check if configure is complete.
+    _order_set : bool
+        Flag to check if set_order has been called.
     """
 
     def __init__(self, **kwargs):
@@ -120,7 +120,6 @@ class Group(System):
         self._has_distrib_vars = False
         self._contains_parallel_group = False
         self._raise_connection_errors = True
-        self._config_finished = False
         self._order_set = False
 
         # TODO: we cannot set the solvers with property setters at the moment
@@ -345,7 +344,6 @@ class Group(System):
             if subsys.matrix_free:
                 self.matrix_free = True
 
-        self._config_finished = True
         self._problem_meta['_setup_status'] = 1
         self.configure()
 
