@@ -101,8 +101,6 @@ allowed_meta_names = {
     'upper',
 }
 
-_glob_re = re.compile('[*?[]')
-
 
 class System(object):
     """
@@ -1829,6 +1827,7 @@ class System(object):
             renames = {}
             for entry in lst:
                 if isinstance(entry, str):
+                    # note, conditional here is faster than using precompiled regex
                     if '*' in entry or '?' in entry or '[' in entry:
                         patterns.append(entry)
                     else:
@@ -3116,13 +3115,6 @@ class System(object):
         with self._scaled_context_all():
             self._apply_nonlinear()
 
-    def _var_filtered_iter(self, iotype, includes=None, excludes=None, get_remote=False):
-        it = self._var_allprocs_abs2prom[iotype] if get_remote else self._var_abs2prom[iotype]
-        for tup in it.items():
-            abs_name, prom = tup
-            if match_prom_or_abs(abs_name, prom, includes, excludes):
-                yield tup
-
     def get_io_metadata(self, iotypes=('input', 'output'), metadata_keys=None,
                         includes=None, excludes=None, tags=(), get_remote=False, rank=None,
                         return_rel_names=True):
@@ -3202,11 +3194,15 @@ class System(object):
 
         result = {}
 
+        it = self._var_allprocs_abs2prom if get_remote else self._var_abs2prom
+
         for iotype in iotypes:
             disc2meta = disc_metadict[iotype]
 
-            for abs_name, prom in self._var_filtered_iter(iotype, includes=includes,
-                                                          excludes=excludes, get_remote=get_remote):
+            for abs_name, prom in it[iotype].items():
+                if not match_prom_or_abs(abs_name, prom, includes, excludes):
+                    continue
+
                 rel_name = abs_name[rel_idx:]
 
                 if abs_name in all2meta:  # continuous
@@ -3339,8 +3335,8 @@ class System(object):
 
         Returns
         -------
-        list
-            list of input names and other optional information about those inputs
+        dict
+            Dict of input names keyed to other optional information about those inputs.
         """
         metavalues = values and self._inputs is None
         keynames = ['value', 'units', 'shape', 'global_shape', 'desc', 'tags']
@@ -3464,8 +3460,8 @@ class System(object):
 
         Returns
         -------
-        list
-            list of output names and other optional information about those outputs
+        dict
+            Dict of output names keyed to optional information about those outputs.
         """
         keynames = np.array(['value', 'units', 'shape', 'global_shape', 'desc', 'tags'])
         keys = [str(n) for n in keynames[np.array([values, units, shape, global_shape, desc, tags],
@@ -3520,7 +3516,7 @@ class System(object):
             if out_stream:
                 self._write_table('explicit', expl_outputs, hierarchical, print_arrays,
                                   all_procs, out_stream)
-            if self.name:
+            if self.name:  # convert to relative name
                 expl_outputs = {n[rel_idx:]: meta for n, meta in expl_outputs.items()}
 
         if implicit:
@@ -3528,7 +3524,7 @@ class System(object):
             if out_stream:
                 self._write_table('implicit', impl_outputs, hierarchical, print_arrays,
                                   all_procs, out_stream)
-            if self.name:
+            if self.name:  # convert to relative name
                 impl_outputs = {n[rel_idx:]: meta for n, meta in impl_outputs.items()}
 
         if explicit:
