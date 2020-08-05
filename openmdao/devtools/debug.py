@@ -234,7 +234,7 @@ def config_summary(problem, stream=sys.stdout):
                          if s.nonlinear_solver is not None]
 
     max_depth = max([len(name.split('.')) for name in sysnames])
-    setup_done = problem._setup_status == 2
+    setup_done = model._problem_meta['_setup_status'] == 3
 
     if problem.comm.size > 1:
         local_max = np.array([max_depth])
