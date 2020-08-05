@@ -3,6 +3,9 @@
 import unittest
 import os
 import json
+import re
+import base64
+import zlib
 
 import errno
 from shutil import rmtree
@@ -53,45 +56,7 @@ class TestViewModelData(unittest.TestCase):
                "nonlinear_solver":"NL: Newton",
                "solve_subsystems":false,
                "children":[
-                  {
-                     "name":"px",
-                     "type":"subsystem",
-                     "class":"IndepVarComp",
-                     "expressions":null,
-                     "subsystem_type":"component",
-                     "is_parallel":false,
-                     "component_type":"indep",
-                     "linear_solver":"",
-                     "nonlinear_solver":"",
-                     "children":[
-                        {
-                           "name":"x",
-                           "type":"unknown",
-                           "implicit":false,
-                           "dtype":"ndarray"
-                        }
-                     ]
-                  },
-                  {
-                     "name":"pz",
-                     "type":"subsystem",
-                     "class":"IndepVarComp",
-                     "expressions":null,
-                     "subsystem_type":"component",
-                     "is_parallel":false,
-                     "component_type":"indep",
-                     "linear_solver":"",
-                     "nonlinear_solver":"",
-                     "children":[
-                        {
-                           "name":"z",
-                           "type":"unknown",
-                           "implicit":false,
-                           "dtype":"ndarray"
-                        }
-                     ]
-                  },
-                  {
+                   {
                      "name":"sub",
                      "type":"subsystem",
                      "class":"Group",
@@ -126,12 +91,12 @@ class TestViewModelData(unittest.TestCase):
                                  "children":[
                                     {
                                        "name":"y2_actual",
-                                       "type":"param",
+                                       "type":"input",
                                        "dtype":"ndarray"
                                     },
                                     {
                                        "name":"y2_command",
-                                       "type":"unknown",
+                                       "type":"output",
                                        "implicit":true,
                                        "dtype":"ndarray"
                                     }
@@ -152,22 +117,22 @@ class TestViewModelData(unittest.TestCase):
                            "children":[
                               {
                                  "name":"z",
-                                 "type":"param",
+                                 "type":"input",
                                  "dtype":"ndarray"
                               },
                               {
                                  "name":"x",
-                                 "type":"param",
+                                 "type":"input",
                                  "dtype":"ndarray"
                               },
                               {
                                  "name":"y2",
-                                 "type":"param",
+                                 "type":"input",
                                  "dtype":"ndarray"
                               },
                               {
                                  "name":"y1",
-                                 "type":"unknown",
+                                 "type":"output",
                                  "implicit":false,
                                  "dtype":"ndarray"
                               }
@@ -186,17 +151,17 @@ class TestViewModelData(unittest.TestCase):
                            "children":[
                               {
                                  "name":"z",
-                                 "type":"param",
+                                 "type":"input",
                                  "dtype":"ndarray"
                               },
                               {
                                  "name":"y1",
-                                 "type":"param",
+                                 "type":"input",
                                  "dtype":"ndarray"
                               },
                               {
                                  "name":"y2",
-                                 "type":"unknown",
+                                 "type":"output",
                                  "implicit":false,
                                  "dtype":"ndarray"
                               }
@@ -219,27 +184,27 @@ class TestViewModelData(unittest.TestCase):
                      "children":[
                         {
                            "name":"x",
-                           "type":"param",
+                           "type":"input",
                            "dtype":"ndarray"
                         },
                         {
                            "name":"y1",
-                           "type":"param",
+                           "type":"input",
                            "dtype":"ndarray"
                         },
                         {
                            "name":"y2",
-                           "type":"param",
+                           "type":"input",
                            "dtype":"ndarray"
                         },
                         {
                            "name":"z",
-                           "type":"param",
+                           "type":"input",
                            "dtype":"ndarray"
                         },
                         {
                            "name":"obj",
-                           "type":"unknown",
+                           "type":"output",
                            "implicit":false,
                            "dtype":"ndarray"
                         }
@@ -260,12 +225,12 @@ class TestViewModelData(unittest.TestCase):
                      "children":[
                         {
                            "name":"y1",
-                           "type":"param",
+                           "type":"input",
                            "dtype":"ndarray"
                         },
                         {
                            "name":"con1",
-                           "type":"unknown",
+                           "type":"output",
                            "implicit":false,
                            "dtype":"ndarray"
                         }
@@ -286,12 +251,12 @@ class TestViewModelData(unittest.TestCase):
                      "children":[
                         {
                            "name":"y2",
-                           "type":"param",
+                           "type":"input",
                            "dtype":"ndarray"
                         },
                         {
                            "name":"con2",
-                           "type":"unknown",
+                           "type":"output",
                            "implicit":false,
                            "dtype":"ndarray"
                         }
@@ -305,15 +270,15 @@ class TestViewModelData(unittest.TestCase):
             [
                 {"src": "sub.d1.y1", "tgt": "con_cmp1.y1"},
                 {"src": "sub.d2.y2", "tgt": "con_cmp2.y2"},
-                {"src": "px.x", "tgt": "obj_cmp.x"},
+                {"src": "_auto_ivc.v1", "tgt": "obj_cmp.x"},
                 {"src": "sub.d1.y1", "tgt": "obj_cmp.y1"},
                 {"src": "sub.d2.y2", "tgt": "obj_cmp.y2"},
-                {"src": "pz.z", "tgt": "obj_cmp.z"},
-                {"src": "px.x", "tgt": "sub.d1.x"},
+                {"src": "_auto_ivc.v0", "tgt": "obj_cmp.z"},
+                {"src": "_auto_ivc.v1", "tgt": "sub.d1.x"},
                 {"src": "sub.state_eq_group.state_eq.y2_command", "tgt": "sub.d1.y2"},
-                {"src": "pz.z", "tgt": "sub.d1.z"},
+                {"src": "_auto_ivc.v0", "tgt": "sub.d1.z"},
                 {"src": "sub.d1.y1", "tgt": "sub.d2.y1"},
-                {"src": "pz.z", "tgt": "sub.d2.z"},
+                {"src": "_auto_ivc.v0", "tgt": "sub.d2.z"},
                 {"src": "sub.d2.y2", "tgt": "sub.state_eq_group.state_eq.y2_actual", "cycle_arrows": ["sub.d1 sub.d2", "sub.state_eq_group.state_eq sub.d1"]}
             ]
         """)
@@ -334,8 +299,8 @@ class TestViewModelData(unittest.TestCase):
                     "con_cmp2.y2": "con_cmp2.y2"
                 },
                 "output": {
-                    "px.x": "x",
-                    "pz.z": "z",
+                    "x": "x",
+                    "z": "z",
                     "sub.state_eq_group.state_eq.y2_command": "state_eq.y2_command",
                     "sub.d1.y1": "y1",
                     "sub.d2.y2": "d2.y2",
@@ -521,25 +486,25 @@ class TestViewModelData(unittest.TestCase):
                      "children":[ 
                         { 
                            "name":"a",
-                           "type":"unknown",
+                           "type":"output",
                            "implicit":false,
                            "dtype":"ndarray"
                         },
                         { 
                            "name":"Area",
-                           "type":"unknown",
+                           "type":"output",
                            "implicit":false,
                            "dtype":"ndarray"
                         },
                         { 
                            "name":"rho",
-                           "type":"unknown",
+                           "type":"output",
                            "implicit":false,
                            "dtype":"ndarray"
                         },
                         { 
                            "name":"Vu",
-                           "type":"unknown",
+                           "type":"output",
                            "implicit":false,
                            "dtype":"ndarray"
                         }
@@ -558,57 +523,57 @@ class TestViewModelData(unittest.TestCase):
                      "children":[ 
                         { 
                            "name":"a",
-                           "type":"param",
+                           "type":"input",
                            "dtype":"ndarray"
                         },
                         { 
                            "name":"Area",
-                           "type":"param",
+                           "type":"input",
                            "dtype":"ndarray"
                         },
                         { 
                            "name":"rho",
-                           "type":"param",
+                           "type":"input",
                            "dtype":"ndarray"
                         },
                         { 
                            "name":"Vu",
-                           "type":"param",
+                           "type":"input",
                            "dtype":"ndarray"
                         },
                         { 
                            "name":"Vr",
-                           "type":"unknown",
+                           "type":"output",
                            "implicit":false,
                            "dtype":"ndarray"
                         },
                         { 
                            "name":"Vd",
-                           "type":"unknown",
+                           "type":"output",
                            "implicit":false,
                            "dtype":"ndarray"
                         },
                         { 
                            "name":"Ct",
-                           "type":"unknown",
+                           "type":"output",
                            "implicit":false,
                            "dtype":"ndarray"
                         },
                         { 
                            "name":"thrust",
-                           "type":"unknown",
+                           "type":"output",
                            "implicit":false,
                            "dtype":"ndarray"
                         },
                         { 
                            "name":"Cp",
-                           "type":"unknown",
+                           "type":"output",
                            "implicit":false,
                            "dtype":"ndarray"
                         },
                         { 
                            "name":"power",
-                           "type":"unknown",
+                           "type":"output",
                            "implicit":false,
                            "dtype":"ndarray"
                         }
@@ -664,6 +629,22 @@ class TestViewModelData(unittest.TestCase):
                         (self.problem_html_filename + " is not a valid file."))
         self.assertGreater(os.path.getsize(self.problem_html_filename), 100)
 
+    def _extract_compressed_model(self, filename):
+        """
+        Load an N2 html, find the compressed data string, uncompress and decode it.
+        """
+        file = open(filename, 'r')
+        for line in file:
+            if re.search('var compressedModel', line):
+                b64_data = line.replace('var compressedModel = "', '').replace('";', '')
+                break
+        
+        file.close()
+        compressed_data = base64.b64decode(b64_data)
+        model_data = json.loads(zlib.decompress(compressed_data).decode("utf-8"))
+
+        return model_data
+
     def test_n2_from_sqlite(self):
         """
         Test that an n2 html file is generated from a sqlite file.
@@ -686,13 +667,12 @@ class TestViewModelData(unittest.TestCase):
         # Check that there are no errors when running from the command line with a recording.
         check_call('openmdao n2 --no_browser %s' % self.sqlite_db_filename2)
 
-        # Compare the sizes of the files generated from the Problem and the recording
-        size1 = os.path.getsize(self.sqlite_html_filename)
-        size2 = os.path.getsize(self.compare_html_filename)
-        self.assertTrue(size1 == size2,
-                        'File size of ' + self.sqlite_html_filename + ' is ' + str(size1) +
-                        ', but size of ' + self.compare_html_filename + ' is ' + str(size2))
-                        
+        # Compare models from the files generated from the Problem and the recording
+        sqlite_model_data = self._extract_compressed_model(self.sqlite_html_filename)
+        compare_model_data = self._extract_compressed_model(self.compare_html_filename)
+
+        self.assertTrue(sqlite_model_data == compare_model_data,
+                        'Model data from sqlite does not match data from Problem.')
 
     def test_n2_command(self):
         """

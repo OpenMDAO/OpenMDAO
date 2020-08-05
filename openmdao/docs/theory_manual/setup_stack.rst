@@ -95,18 +95,6 @@ Add a case recorder to the group or to a solver in a subsystem                  
  and component in the model, so if you add something here, setup will never be called, and it will
  never be fully integrated into the model hierarchy.
 
-.. warning::
-
-    While inputs and outputs can be *directly* added to a component during configure of a parent Group,
-    take care for those systems which _queue_ the addition of inputs and outputs.
-
-    OpenMDAO components  like BalanceComp and MuxComp which queue things (such as with the
-    `add_balance` method) have a special `_post_configure` method which resolves these queued
-    variables after everything has been configured.
-
-    Your own components which use this behavior should either utilize `_post_configure`
-    or allow another method which directly adds the I/O and doesn't queue it.
-
 
 Problem setup and final_setup
 -----------------------------

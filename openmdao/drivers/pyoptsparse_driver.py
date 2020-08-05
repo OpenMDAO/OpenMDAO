@@ -224,8 +224,9 @@ class pyOptSparseDriver(Driver):
         self._setup_tot_jac_sparsity()
 
         # Handle deprecated option.
-        if self.options['user_teriminate_signal'] is not None:
-            self.options['user_terminate_signal'] = self.options['user_teriminate_signal']
+        if self.options._dict['user_teriminate_signal']['value'] is not None:
+            self.options['user_terminate_signal'] = \
+                self.options._dict['user_teriminate_signal']['value']
 
     def run(self):
         """
@@ -286,13 +287,14 @@ class pyOptSparseDriver(Driver):
                                 comm=comm)
 
         # Add all design variables
-        param_meta = self._designvars
-        self._indep_list = indep_list = list(param_meta)
-        param_vals = self.get_design_var_values()
+        input_meta = self._designvars
+        self._indep_list = indep_list = list(input_meta)
+        input_vals = self.get_design_var_values()
 
-        for name, meta in param_meta.items():
-            opt_prob.addVarGroup(name, meta['size'], type='c',
-                                 value=param_vals[name],
+        for name, meta in input_meta.items():
+            size = meta['global_size'] if meta['distributed'] else meta['size']
+            opt_prob.addVarGroup(name, size, type='c',
+                                 value=input_vals[name],
                                  lower=meta['lower'], upper=meta['upper'])
 
         opt_prob.finalizeDesignVariables()
@@ -330,10 +332,10 @@ class pyOptSparseDriver(Driver):
             size = meta['global_size'] if meta['distributed'] else meta['size']
             lower = upper = meta['equals']
             if fwd:
-                wrt = [v for v in indep_list if name in relevant[v]]
+                wrt = [v for v in indep_list if name in relevant[input_meta[v]['ivc_source']]]
             else:
                 rels = relevant[name]
-                wrt = [v for v in indep_list if v in rels]
+                wrt = [v for v in indep_list if input_meta[v]['ivc_source'] in rels]
 
             if meta['linear']:
                 jac = {w: _lin_jacs[name][w] for w in wrt}
@@ -359,10 +361,10 @@ class pyOptSparseDriver(Driver):
             upper = meta['upper']
 
             if fwd:
-                wrt = [v for v in indep_list if name in relevant[v]]
+                wrt = [v for v in indep_list if name in relevant[input_meta[v]['ivc_source']]]
             else:
                 rels = relevant[name]
-                wrt = [v for v in indep_list if v in rels]
+                wrt = [v for v in indep_list if input_meta[v]['ivc_source'] in rels]
 
             if meta['linear']:
                 jac = {w: _lin_jacs[name][w] for w in wrt}

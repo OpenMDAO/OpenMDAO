@@ -451,7 +451,7 @@ class N2MatrixCell {
         this.col = col;
         this.srcObj = this.obj = srcObj;
         this.tgtObj = tgtObj;
-        this.id = srcObj.id + "_" + tgtObj.id;
+        this.id = N2MatrixCell.makeId(srcObj.id, tgtObj.id);
 
         this.symbolType = new SymbolType(this, model);
         this.renderer = this._newRenderer();
@@ -467,6 +467,12 @@ class N2MatrixCell {
             },
             "total": 0
         }
+    }
+
+    static makeId(srcId, tgtId = null) {
+        if (! tgtId || srcId == tgtId) return "node_" + srcId;
+        
+        return "conn_" + srcId + "_to_" + tgtId;
     }
 
     /**
@@ -494,7 +500,7 @@ class N2MatrixCell {
     }
 
     /**
-     * Select the mouseover callback depending on whether we"re on the diagonal.
+     * Select the mouseover callback depending on whether we're on the diagonal.
      * TODO: Remove these globals
      */
     mouseover() {
@@ -503,7 +509,7 @@ class N2MatrixCell {
     }
 
     /**
-    * Select the mousemove callback depending on whether we"re on the diagonal.
+    * Select the mousemove callback depending on whether we're on the diagonal.
     * TODO: Remove these globals
     */
     mousemove() {
@@ -519,11 +525,12 @@ class N2MatrixCell {
 
         if (this.onDiagonal()) {
             if (this.obj.isMinimized) return N2Style.color.collapsed;
-            if (this.obj.isConnectedParam()) return N2Style.color.param;
-            if (this.obj.isUnconnectedParam()) return N2Style.color.unconnectedParam;
+            if (this.obj.isAutoIvcInput()) return N2Style.color.autoivcInput;
+            if (this.obj.isConnectedInput()) return N2Style.color.input;
+            if (this.obj.isUnconnectedInput()) return N2Style.color.unconnectedInput;
             return (this.obj.implicit) ?
-                N2Style.color.unknownImplicit :
-                N2Style.color.unknownExplicit;
+                N2Style.color.outputImplicit :
+                N2Style.color.outputExplicit;
         }
 
         return N2Style.color.connection;
@@ -531,7 +538,7 @@ class N2MatrixCell {
 
 
     /**
-     * An connection going "off-screen" was detected between two nodes.
+     * A connection going "off-screen" was detected between two nodes.
      * Determine whether the arrow should be in the top or bottom section of the
      * matrix based on rootIndex, and add to the appropriate array of
      * tracked offscreen connections.
@@ -626,8 +633,8 @@ class N2MatrixCell {
         const treeNode = d3.select('rect#' + treeId);
 
         let fill = treeNode.style('fill');
-        if (direction == 'input') fill = N2Style.color.input;
-        else if (direction == 'output') fill = N2Style.color.output;
+        if (direction == 'input') fill = N2Style.color.inputArrow;
+        else if (direction == 'output') fill = N2Style.color.outputArrow;
 
         d3.select('#highlight-bar').append('rect')
             .attr('x', 0)

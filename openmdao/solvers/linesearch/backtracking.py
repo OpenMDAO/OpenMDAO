@@ -15,21 +15,21 @@ from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.general_utils import simple_warning
 
 
-def _print_violations(unknowns, lower, upper):
+def _print_violations(outputs, lower, upper):
     """
     Print out which variables exceed their bounds.
 
     Parameters
     ----------
-    unknowns : <Vector>
-        Vector containing the unknowns.
+    outputs : <Vector>
+        Vector containing the outputs.
     lower : <Vector>
         Vector containing the lower bounds.
     upper : <Vector>
         Vector containing the upper bounds.
     """
     start = end = 0
-    for name, val in unknowns._views_flat.items():
+    for name, val in outputs._abs_item_iter():
         end += val.size
         if upper is not None and any(val > upper[start:end]):
             print("'%s' exceeds upper bounds" % name)
@@ -107,7 +107,7 @@ class LinesearchSolver(NonlinearSolver):
         if system._has_bounds:
             abs2meta = system._var_abs2meta
             start = end = 0
-            for abs_name, val in system._outputs._abs_val_iter():
+            for abs_name, val in system._outputs._abs_item_iter():
                 end += val.size
                 meta = abs2meta[abs_name]
                 var_lower = meta['lower']
@@ -147,7 +147,7 @@ class LinesearchSolver(NonlinearSolver):
         """
         Enforce lower/upper bounds.
 
-        Modifies the vector of unknowns and the step.
+        Modifies the vector of outputs and the step.
 
         Parameters
         ----------
@@ -496,10 +496,11 @@ def _enforce_bounds_vector(u, du, alpha, lower_bounds, upper_bounds):
 
     # Find the largest amount a bound is violated
     # where positive means a bound is violated - i.e. the required d_alpha.
-    mask = du._data != 0
+    du_arr = du.asarray()
+    mask = du_arr != 0
     if mask.any():
-        abs_du_mask = np.abs(du._data[mask])
-        u_mask = u._data[mask]
+        abs_du_mask = np.abs(du_arr[mask])
+        u_mask = u.asarray()[mask]
 
         # Check lower bound
         if lower_bounds is not None:

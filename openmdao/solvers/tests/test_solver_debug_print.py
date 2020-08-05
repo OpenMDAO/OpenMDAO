@@ -159,12 +159,7 @@ class TestNonlinearSolvers(unittest.TestCase):
         p = om.Problem()
         model = p.model
 
-        model.add_subsystem('ground', om.IndepVarComp('V', 0., units='V'))
-        model.add_subsystem('source', om.IndepVarComp('I', 0.1, units='A'))
         model.add_subsystem('circuit', Circuit())
-
-        model.connect('source.I', 'circuit.I_in')
-        model.connect('ground.V', 'circuit.Vg')
 
         p.setup()
 
@@ -175,8 +170,10 @@ class TestNonlinearSolvers(unittest.TestCase):
         nl.options['err_on_non_converge'] = True
 
         # set some poor initial guesses so that we don't converge
-        p['circuit.n1.V'] = 10.
-        p['circuit.n2.V'] = 1e-3
+        p.set_val('circuit.I_in', 0.1, units='A')
+        p.set_val('circuit.Vg', 0.0, units='V')
+        p.set_val('circuit.n1.V', 10.)
+        p.set_val('circuit.n2.V', 1e-3)
 
         opts = {}
         # formatting has changed in numpy 1.14 and beyond.

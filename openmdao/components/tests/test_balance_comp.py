@@ -59,6 +59,32 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
+    def test_balance_comp_with_units_kwarg_and_eq_units(self):
+
+        prob = om.Problem()
+
+        bal = om.BalanceComp()
+        bal.add_balance('x', val=1.0, eq_units='m', units='m')
+
+        tgt = om.IndepVarComp(name='y_tgt', val=2)
+
+        exec_comp = om.ExecComp('y=x**2')
+
+        prob.model.add_subsystem(name='target', subsys=tgt, promotes_outputs=['y_tgt'])
+        prob.model.add_subsystem(name='exec', subsys=exec_comp)
+        prob.model.add_subsystem(name='balance', subsys=bal)
+
+        prob.model.connect('y_tgt', 'balance.rhs:x')
+        prob.model.connect('balance.x', 'exec.x')
+        prob.model.connect('exec.y', 'balance.lhs:x')
+
+        prob.setup()
+
+        prob.run_model()
+        self.assertEqual(prob._metadata['meta']['balance.x']['units'], 'm')
+        self.assertEqual(prob._metadata['meta']['balance.rhs:x']['units'], 'm')
+        self.assertEqual(prob._metadata['meta']['balance.lhs:x']['units'], 'm')
+
     def test_create_on_init(self):
 
         prob = om.Problem()
@@ -737,19 +763,11 @@ class TestBalanceComp(unittest.TestCase):
         bal = om.BalanceComp()
         bal.add_balance('x', use_mult=True)
 
-        tgt = om.IndepVarComp(name='y_tgt', val=4)
-
-        mult_ivc = om.IndepVarComp(name='mult', val=2.0)
-
         exec_comp = om.ExecComp('y=x**2', x={'value': 1}, y={'value': 1})
 
-        prob.model.add_subsystem(name='target', subsys=tgt, promotes_outputs=['y_tgt'])
-        prob.model.add_subsystem(name='mult_comp', subsys=mult_ivc, promotes_outputs=['mult'])
         prob.model.add_subsystem(name='exec', subsys=exec_comp)
         prob.model.add_subsystem(name='balance', subsys=bal)
 
-        prob.model.connect('y_tgt', 'balance.rhs:x')
-        prob.model.connect('mult', 'balance.mult:x')
         prob.model.connect('balance.x', 'exec.x')
         prob.model.connect('exec.y', 'balance.lhs:x')
 
@@ -758,12 +776,15 @@ class TestBalanceComp(unittest.TestCase):
 
         prob.setup()
 
+        prob.set_val('balance.rhs:x', 4)
+        prob.set_val('balance.mult:x', 2.)
+
         # A reasonable initial guess to find the positive root.
         prob['balance.x'] = 1.0
 
         prob.run_model()
 
-        assert_almost_equal(prob['balance.x'], np.sqrt(2), decimal=7)
+        assert_almost_equal(prob.get_val('balance.x'), np.sqrt(2), decimal=7)
 
     def test_feature_scalar_with_default_mult(self):
         from numpy.testing import assert_almost_equal
@@ -774,15 +795,11 @@ class TestBalanceComp(unittest.TestCase):
         bal = om.BalanceComp()
         bal.add_balance('x', use_mult=True, mult_val=2.0)
 
-        tgt = om.IndepVarComp(name='y_tgt', val=4)
-
         exec_comp = om.ExecComp('y=x**2', x={'value': 1}, y={'value': 1})
 
-        prob.model.add_subsystem(name='target', subsys=tgt, promotes_outputs=['y_tgt'])
         prob.model.add_subsystem(name='exec', subsys=exec_comp)
         prob.model.add_subsystem(name='balance', subsys=bal)
 
-        prob.model.connect('y_tgt', 'balance.rhs:x')
         prob.model.connect('balance.x', 'exec.x')
         prob.model.connect('exec.y', 'balance.lhs:x')
 
@@ -791,12 +808,14 @@ class TestBalanceComp(unittest.TestCase):
 
         prob.setup()
 
+        prob.set_val('balance.rhs:x', 4)
+
         # A reasonable initial guess to find the positive root.
-        prob['balance.x'] = 1.0
+        prob.set_val('balance.x', 1.0)
 
         prob.run_model()
 
-        assert_almost_equal(prob['balance.x'], np.sqrt(2), decimal=7)
+        assert_almost_equal(prob.get_val('balance.x'), np.sqrt(2), decimal=7)
 
     def test_feature_vector(self):
         import numpy as np
@@ -825,15 +844,15 @@ class TestBalanceComp(unittest.TestCase):
 
         prob.setup()
 
-        prob['balance.x'] = np.random.rand(n)
+        prob.set_val('balance.x', np.random.rand(n))
 
         prob.run_model()
 
-        b = prob['exec.b']
-        c = prob['exec.c']
+        b = prob.get_val('exec.b')
+        c = prob.get_val('exec.c')
 
-        assert_almost_equal(prob['balance.x'], -c/b, decimal=6)
-        assert_almost_equal(-c/b, prob['balance.x'], decimal=6)  # expected
+        assert_almost_equal(prob.get_val('balance.x'), -c/b, decimal=6)
+        assert_almost_equal(-c/b, prob.get_val('balance.x'), decimal=6)  # expected
 
     def test_specified_shape(self):
         shape = (3, 2, 4)

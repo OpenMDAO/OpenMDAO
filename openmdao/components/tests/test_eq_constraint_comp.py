@@ -17,7 +17,7 @@ class TestEQConstraintComp(unittest.TestCase):
         prob.setup()
 
         # check derivatives
-        prob['dv.y1'] = 100
+        prob['y1'] = 100
         prob['equal.rhs:y1'] = 1
 
         prob.run_model()
@@ -29,15 +29,15 @@ class TestEQConstraintComp(unittest.TestCase):
         # check results
         prob.run_driver()
 
-        assert_near_equal(prob['dv.x'], 0., 1e-5)
-        assert_near_equal(prob['dv.z'], [1.977639, 0.], 1e-5)
+        assert_near_equal(prob['x'], 0., 1e-5)
+        assert_near_equal(prob['z'], [1.977639, 0.], 1e-5)
 
         assert_near_equal(prob['obj_cmp.obj'], 3.18339395045, 1e-5)
 
-        assert_almost_equal(prob['dv.y1'], 3.16)
+        assert_almost_equal(prob['y1'], 3.16)
         assert_almost_equal(prob['d1.y1'], 3.16)
 
-        assert_almost_equal(prob['dv.y2'], 3.7552778)
+        assert_almost_equal(prob['y2'], 3.7552778)
         assert_almost_equal(prob['d2.y2'], 3.7552778)
 
         assert_almost_equal(prob['equal.y1'], 0.0)
@@ -552,14 +552,14 @@ class TestFeatureEQConstraintComp(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        assert_near_equal(prob['dv.x'], 0., 1e-5)
+        assert_near_equal(prob.get_val('x'), 0., 1e-5)
 
-        assert_near_equal([prob['dv.y1'], prob['d1.y1']], [[3.16], [3.16]], 1e-5)
-        assert_near_equal([prob['dv.y2'], prob['d2.y2']], [[3.7552778], [3.7552778]], 1e-5)
+        assert_near_equal([prob.get_val('y1'), prob.get_val('d1.y1')], [[3.16], [3.16]], 1e-5)
+        assert_near_equal([prob.get_val('y2'), prob.get_val('y2')], [[3.7552778], [3.7552778]], 1e-5)
 
-        assert_near_equal(prob['dv.z'], [1.977639, 0.], 1e-5)
+        assert_near_equal(prob.get_val('z'), [1.977639, 0.], 1e-5)
 
-        assert_near_equal(prob['obj_cmp.obj'], 3.18339395045, 1e-5)
+        assert_near_equal(prob.get_val('obj_cmp.obj'), 3.18339395045, 1e-5)
 
 
 if __name__ == '__main__':  # pragma: no cover

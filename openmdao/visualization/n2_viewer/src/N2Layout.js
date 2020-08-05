@@ -166,7 +166,7 @@ class N2Layout {
         let retVal = node.name;
 
         if (this.outputNamingType == "Promoted" &&
-            node.isParamOrUnknown() &&
+            node.isInputOrOutput() &&
             this.zoomedElement.propExists('promotions') &&
             this.zoomedElement.promotions.propExists(node.absPathName)) {
             retVal = this.zoomedElement.promotions[node.absPathName];
@@ -215,7 +215,7 @@ class N2Layout {
      * @param {N2TreeNode} [node = this.zoomedElement] Item to begin looking from.
      */
     _updateSolverTextWidths(node = this.zoomedElement) {
-        if (node.isParam() || node.varIsHidden) {
+        if (node.isInput() || node.varIsHidden) {
             return;
         }
 
@@ -237,7 +237,9 @@ class N2Layout {
         node.numLeaves = 0;
 
         if (! node.varIsHidden) {
-            if (this.model.idCounter > ALLOW_PRECOLLAPSE_COUNT) node.minimizeIfLarge();
+            if (this.model.nodeIds.length > ALLOW_PRECOLLAPSE_COUNT) {
+                node.minimizeIfLarge();
+            }
 
             if (node.hasChildren() && !node.isMinimized) {
                 for (let child of node.children) {
@@ -395,7 +397,7 @@ class N2Layout {
             (this.cols[workNode.depth].width / this.size.partitionTree.width) : 1 - workNode.dims.x;
         node.dims.height = workNode.numLeaves / this.model.root.numLeaves;
 
-        if (node.varIsHidden) { // param or hidden leaf leaving
+        if (node.varIsHidden) { // input or hidden leaf leaving
             node.dims.x = this.cols[node.parentComponent.depth + 1].location / this.size.partitionTree.width;
             node.dims.y = node.parentComponent.dims.y;
             node.dims.width = node.dims.height = 1e-6;
@@ -432,7 +434,7 @@ class N2Layout {
                 this.zoomedSolverNodes.push(node);
             }
             if (!node.hasChildren() || node.isMinimized) { //at a "leaf" workNode
-                if (!node.isParam() && !node.varIsHidden) {
+                if (!node.isInput() && !node.varIsHidden) {
                     this.visibleSolverNodes.push(node);
                 }
                 earliestMinimizedParent = node;
@@ -450,7 +452,7 @@ class N2Layout {
 
         node.solverDims.height = workNode.numLeaves / this.model.root.numLeaves;
 
-        if (node.varIsHidden) { //param or hidden leaf leaving
+        if (node.varIsHidden) { //input or hidden leaf leaving
             node.solverDims.x = this.cols[node.parentComponent.depth + 1].location /
                 this.size.partitionTree.width;
             node.solverDims.y = node.parentComponent.dims.y;

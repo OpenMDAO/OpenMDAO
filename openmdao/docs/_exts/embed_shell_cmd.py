@@ -124,7 +124,7 @@ class EmbedShellCmdDirective(Directive):
         os.chdir(workdir)
 
         try:
-            output = subprocess.check_output(cmd, stderr=stderr).decode('utf-8', 'ignore')
+            output = subprocess.check_output(cmd, stderr=subprocess.STDOUT,env=os.environ).decode('utf-8', 'ignore')
         except subprocess.CalledProcessError as err:
             # Failed cases raised as a Directive warning (level 2 in docutils).
             # This way, the sphinx build does not terminate if, for example, you are building on

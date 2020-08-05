@@ -35,11 +35,10 @@
                 </div>
                 <div class="toolbar-group group-3">
                     <div class="expandable">
-                        <i class="fas icon-show-connections" id="show-connections"></i>
+                        <i class="fas icon-hide-connections" id="hide-connections"></i>
                         <i class="fas icon-caret-right caret"></i>
                         <div class="toolbar-group-expandable" id="connections-expandable">
-                            <i class="fas icon-show-connections" id="show-connections-2"></i>
-                            <i class="fas icon-hide-connections" id="hide-connections"></i>
+                            <i class="fas icon-hide-connections" id="hide-connections-2"></i>
                             <i class="fas icon-bezier-curve" id="show-all-connections"></i>
                         </div>
                     </div>
@@ -135,7 +134,6 @@
                             <g id='n2gridlines' clip-path='url(#n2MatrixClip)'></g>
                             <g id='n2elements' clip-path='url(#n2MatrixClip)'></g>
                             <g id='n2componentBoxes' clip-path='url(#n2MatrixClip)'></g>
-                            <g id='n2dots' clip-path='url(#n2MatrixClip)'></g>
                             <g id='n2arrows'></g>
                         </g>
                         <g id='n2top' class='offgridLabel'></g>
@@ -236,7 +234,8 @@
     <img id="company-logo" alt="OpenMDAO" src="data:image/png;base64,{{logo_png}}" />
 </div>
 
-{d3_lib} {awesomplete_lib} {vk_beautify_lib} {{model_data}} {modal_lib}
+{d3_lib} {awesomplete_lib} {vk_beautify_lib} {pako_inflate_lib}
+{{model_data}} {modal_lib}
 {utils_lib} {symboltype_lib} {n2treenode_lib} {modeldata_lib} {n2style_lib}
 {n2layout_lib} {n2matrixcell_lib} {n2legend_lib} {n2matrix_lib} {n2arrow_lib}
 {n2search_lib} {n2toolbar_lib} {n2diagram_lib}

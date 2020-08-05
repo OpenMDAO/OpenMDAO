@@ -1,5 +1,5 @@
 /**
- * Use the model tree to build the matrix of parameters and connections, display, and
+ * Use the model tree to build the matrix of variables and connections, display, and
  * perform operations with it.
  * @typedef N2Matrix
  * @property {N2TreeNodes[]} nodes Reference to nodes that will be drawn.
@@ -19,10 +19,12 @@ class N2Matrix {
      * @param {ModelData} model The pre-processed model data.
      * @param {N2Layout} layout Pre-computed layout of the diagram.
      * @param {Object} n2Groups References to <g> SVG elements created by N2Diagram.
+     * @param {N2ArrowManager} arrowMgr Object to create and manage conn. arrows.
      * @param {Boolean} lastClickWasLeft
      * @param {function} findRootOfChangeFunction
      */
-    constructor(model, layout, n2Groups, lastClickWasLeft,
+    constructor(model, layout, n2Groups, arrowMgr,
+        lastClickWasLeft,
         findRootOfChangeFunction,
         prevNodeSize = {
             'width': 0,
@@ -33,6 +35,7 @@ class N2Matrix {
         this.layout = layout;
         this.diagNodes = layout.visibleNodes;
         this.n2Groups = n2Groups;
+        this.arrowMgr = arrowMgr;
         this.lastClickWasLeft = lastClickWasLeft;
         this.findRootOfChangeFunction = findRootOfChangeFunction;
 
@@ -41,6 +44,7 @@ class N2Matrix {
             'width': layout.size.n2matrix.width / this.diagNodes.length,
             'height': layout.size.n2matrix.height / this.diagNodes.length,
         }
+        this.arrowMgr.setNodeSize(this.nodeSize);
 
         let markerSize = Math.max(2, this.nodeSize.width * .04, this.nodeSize.height * .04);
         d3.select("#arrow").attr("markerWidth", markerSize).attr("markerHeight", markerSize);
@@ -106,6 +110,67 @@ class N2Matrix {
         }
 
         return undefined;
+    }
+
+    findCellById(cellId) {
+        for (const cell of this.visibleCells) {
+            if (cell.id == cellId) return cell;
+        }
+
+        return undefined;
+    }
+
+    /**
+     * Given the node ID, determine if one of the cells in the matrix
+     * represents it or contains it.
+     * @param {Number} nodeId The id of the N2TreeNode to search for
+     * @returns {Object} Contains reference to cell if found, and flags describing it.
+     */
+    findCellByNodeId(nodeId) {
+        const node = this.model.nodeIds[nodeId];
+        let ret = { 
+            'cell': undefined,    // Changed to refer to a related cell if found
+            'exactMatch': false,  // True if nodeId matches a cell
+            'parentMatch': false, // True if nodeId's ancestor is a cell
+            'childMatch': false   // True if nodeId's descendant is a cell
+        }
+
+        const debugStr = `${node.absPathName}(${nodeId})`
+
+        // Less expensive to check entire matrix for direct matches first
+        for (const row in this.grid) { // Check diagonals only
+            const cell = this.grid[row][row];
+
+            // Found directly:
+            if (cell.id == N2MatrixCell.makeId(nodeId)) {
+                debugInfo(`findCellByNodeId: Found ${debugStr} directly in matrix`)
+                ret.cell = cell;
+                ret.exactMatch = true
+                return ret;
+            }
+        }
+
+        // Only check for relationships if node not directly visible
+        for (const row in this.grid) { // Check diagonals only
+            const cell = this.grid[row][row];
+            if (node.hasNodeInChildren(cell.obj)) {
+                debugInfo(`findCellByNodeId: Found descendant of ${debugStr} in matrix`)
+                ret.cell = cell;
+                ret.childMatch = true
+                return ret;
+            }
+
+            if (node.hasParent(cell.obj)) {
+                debugInfo(`findCellByNodeId: Found ancestor of ${debugStr} in matrix`)
+                ret.cell = cell;
+                ret.parentMatch = true
+                return ret;
+            }
+        }
+    
+        // Shouldn't really get here due to zoomedElement check at top
+        debugInfo(`findCellByNodeId: ${debugStr} fell through all checks!`)
+        return ret;
     }
 
     /**
@@ -230,12 +295,12 @@ class N2Matrix {
             }
 
             // Solver nodes
-            if (diagNode.isParam()) {
+            if (diagNode.isInput()) {
                 for (let j = srcIdx + 1; j < this.diagNodes.length; ++j) {
                     let tgtObj = this.diagNodes[j];
                     if (diagNode.parentComponent !== tgtObj.parentComponent) break;
 
-                    if (tgtObj.isUnknown()) {
+                    if (tgtObj.isOutput()) {
                         let tgtIdx = j;
                         let newCell = new N2MatrixCell(srcIdx, tgtIdx, diagNode, tgtObj, this.model);
                         this._addCell(srcIdx, tgtIdx, newCell);
@@ -247,7 +312,7 @@ class N2Matrix {
     }
 
     /**
-     * Determine the size of the boxes that will border the parameters of each component.
+     * Determine the size of the boxes that will border the variables of each component.
      */
     _setupComponentBoxesAndGridLines() {
         let currentBox = {
@@ -257,7 +322,7 @@ class N2Matrix {
 
         this.boxInfo = [currentBox];
 
-        // Find which component box each of the parameters belong in,
+        // Find which component box each of the variables belong in,
         // while finding the bounds of that box. Top and bottom
         // rows recorded for each node in this.boxInfo[].
         for (let ri = 1; ri < this.diagNodes.length; ++ri) {
@@ -366,7 +431,7 @@ class N2Matrix {
                     (self.cellDims.size.height * d.row +
                         self.cellDims.bottomRight.y) + ')';
 
-                return(tranStr);
+                return (tranStr);
             })
             // "this" refers to the element here, so leave it alone:
             .each(function (d) {
@@ -600,24 +665,88 @@ class N2Matrix {
      * Iterate through all the offscreen connection sets of the
      * hovered cell and draw an arrow/add a tooltip for each.
      */
-    _drawOffscreenArrows(cell, lineWidth) {
+    _drawOffscreenArrows(cell) {
         if (!cell.offScreen.total) return;
 
         for (let side in cell.offScreen) {
             for (let dir in cell.offScreen[side]) {
                 for (let offscreenNode of cell.offScreen[side][dir]) {
-                    new (N2OffGridArrow.arrowDir[side][dir])({
+                    this.arrowMgr.addOffGridArrow(cell.id, side, dir, {
                         'cell': {
                             'col': cell.row,
-                            'row': cell.row
+                            'row': cell.row,
+                            'srcId': cell.srcObj.id,
+                            'tgtId': cell.tgtObj.id
                         },
-                        'width': lineWidth,
                         'matrixSize': this.diagNodes.length,
-                        'label': offscreenNode.absPathName
-                    }, this.n2Groups, this.nodeSize);
+                        'label': offscreenNode.absPathName,
+                        'offscreenId': offscreenNode.id
+                    });
                 }
             }
         }
+    }
+
+    /**
+     * For a cell that's on the diagonal, look for and draw connection arrows.
+     * @param {N2MatrixCell} cell The on-diagonal cell to draw arrows for.
+     * @returns {Array} The highlights that can optionally be performed.
+     */
+    drawOnDiagonalArrows(cell) {
+        // Loop over all elements in the matrix looking for other cells in the same column
+        this._drawOffscreenArrows(cell);
+        let highlights = [{ 'cell': cell, 'varType': 'self', 'direction': 'self' }];
+
+        for (let col = 0; col < this.layout.visibleNodes.length; ++col) {
+            if (this.exists(cell.row, col)) {
+                if (col != cell.row) {
+                    this.arrowMgr.addFullArrow(cell.id, {
+                        'end': {
+                            'col': col,
+                            'row': col,
+                            'id': this.grid[col][col].srcObj.id
+                        },
+                        'start': {
+                            'col': cell.row,
+                            'row': cell.row,
+                            'id': cell.tgtObj.id
+                        },
+                        'color': N2Style.color.outputArrow,
+                    });
+
+                    highlights.push({
+                        'cell': this.cell(cell.row, col),
+                        'varType': 'target', 'direction': 'output'
+                    });
+                }
+            }
+
+            // Now swap row and col
+            if (this.exists(col, cell.row)) {
+                if (col != cell.row) {
+                    this.arrowMgr.addFullArrow(cell.id, {
+                        'start': {
+                            'col': col,
+                            'row': col,
+                            'id': this.grid[col][col].srcObj.id
+                        },
+                        'end': {
+                            'col': cell.row,
+                            'row': cell.row,
+                            'id': cell.tgtObj.id
+                        },
+                        'color': N2Style.color.inputArrow,
+                    });
+
+                    highlights.push({
+                        'cell': this.cell(col, cell.row),
+                        'varType': 'source', 'direction': 'input'
+                    });
+                }
+            }
+        }
+
+        return highlights;
     }
 
     /**
@@ -628,66 +757,11 @@ class N2Matrix {
     mouseOverOnDiagonal(cell) {
         // Don't do anything during transition:
         if (d3.active(cell)) return;
-
-        // Loop over all elements in the matrix looking for other cells in the same column as
-        let lineWidth = Math.min(4, this.nodeSize.width * .5,
-            this.nodeSize.height * .5);
-
-        let leftTextWidthHovered = this.diagNodes[cell.row].nameWidthPx;
-
-        cell.highlight();
-
-        this._drawOffscreenArrows(cell, lineWidth);
-
-        for (let col = 0; col < this.layout.visibleNodes.length; ++col) {
-            let leftTextWidthDependency = this.layout.visibleNodes[col].nameWidthPx;
-
-            if (this.exists(cell.row, col)) {
-                if (col != cell.row) {
-
-                    new N2BentArrow({
-                        'end': {
-                            'col': col,
-                            'row': col
-                        },
-                        'start': {
-                            'col': cell.row,
-                            'row': cell.row
-                        },
-                        'color': N2Style.color.greenArrow,
-                        'width': lineWidth
-                    }, this.n2Groups, this.nodeSize);
-
-                    this.cell(cell.row, col).highlight('target', 'output');
-                }
-
-            }
-
-            // Now swap row and col
-            if (this.exists(col, cell.row)) {
-                if (col != cell.row) {
-
-                    new N2BentArrow({
-                        'start': {
-                            'col': col,
-                            'row': col
-                        },
-                        'end': {
-                            'col': cell.row,
-                            'row': cell.row
-                        },
-                        'color': N2Style.color.redArrow,
-                        'width': lineWidth
-                    }, this.n2Groups, this.nodeSize);
-
-                    this.cell(col, cell.row).highlight('source', 'input');
-                }
-            }
-        }
+        const highlights = this.drawOnDiagonalArrows(cell);
+        for (const h of highlights) h.cell.highlight(h.varType, h.direction);
     }
 
-    drawArrowsParamView(startIndex, endIndex, nodeSize) {
-        let lineWidth = Math.min(5, nodeSize.width * .5, nodeSize.height * .5);
+    drawArrowsInputView(cell, startIndex, endIndex) {
         let boxStart = this.boxInfo[startIndex];
         let boxEnd = this.boxInfo[endIndex];
 
@@ -710,47 +784,44 @@ class N2Matrix {
         }
 
         for (let arrow of arrows) {
-            new N2BentArrow({
+            this.arrowMgr.addFullArrow(cell.id, {
                 'start': {
                     'col': arrow.start,
-                    'row': arrow.start
+                    'row': arrow.start,
+                    'id': this.grid[arrow.start][arrow.start].srcObj.id
                 },
                 'end': {
                     'col': arrow.end,
-                    'row': arrow.end
+                    'row': arrow.end,
+                    'id': this.grid[arrow.end][arrow.end].tgtObj.id
                 },
                 'color': (startIndex < endIndex) ?
-                    N2Style.color.greenArrow : N2Style.color.redArrow,
-                'width': lineWidth
-            }, this.n2Groups, this.nodeSize);
+                    N2Style.color.outputArrow : N2Style.color.inputArrow,
+            });
         }
     }
 
     /**
-     * When the mouse goes over a cell that's not on the diagonal, look for and
-     * draw cycle arrows, and highlight variable names.
-     * @param {N2MatrixCell} cell The cell the event occured on.
+     * Look for and draw cycle arrows of the specified cell.
+     * @param {N2MatrixCell} cell The off-diagonal cell to draw arrows for.
      */
-    mouseOverOffDiagonal(cell) {
-        // Don't do anything during transition:
-        if (d3.active(cell)) return;
-
-        let lineWidth = Math.min(5, this.nodeSize.width * .5, this.nodeSize.height * .5);
+    drawOffDiagonalArrows(cell) {
         let src = this.diagNodes[cell.row];
         let tgt = this.diagNodes[cell.col];
 
-        new N2BentArrow({
+        this.arrowMgr.addFullArrow(cell.id, {
             'start': {
                 'col': cell.row,
-                'row': cell.row
+                'row': cell.row,
+                'id': cell.srcObj.id
             },
             'end': {
                 'col': cell.col,
-                'row': cell.col
+                'row': cell.col,
+                'id': cell.tgtObj.id
             },
-            'color': N2Style.color.redArrow,
-            'width': lineWidth
-        }, this.n2Groups, this.nodeSize);
+            'color': N2Style.color.inputArrow,
+        });
 
         if (cell.row > cell.col) {
             let targetsWithCycleArrows = tgt.getNodesWithCycleArrows();
@@ -787,16 +858,37 @@ class N2Matrix {
                             }
 
                             if (firstBeginIndex != firstEndIndex) {
-                                this.drawArrowsParamView(firstBeginIndex, firstEndIndex,
-                                    this.nodeSize);
+                                this.drawArrowsInputView(cell, firstBeginIndex, firstEndIndex);
                             }
                         }
                     }
                 }
             }
         }
+    }
+
+    /**
+     * When the mouse goes over a cell that's not on the diagonal, look for and
+     * draw cycle arrows, and highlight variable names.
+     * @param {N2MatrixCell} cell The cell the event occured on.
+     */
+    mouseOverOffDiagonal(cell) {
+        // Don't do anything during transition:
+        if (d3.active(cell)) return;
+
+        this.drawOffDiagonalArrows(cell);
 
         cell.highlight('source', 'input');
         cell.highlight('target', 'output');
+    }
+
+    /**
+     * Determine if a cell is on the diagonal or not and draw the appropriate
+     * connection arrows.
+     * @param {N2MatrixCell} cell The cell to operate on.
+     */
+    drawConnectionArrows(cell) {
+        if (cell.row == cell.col) this.drawOnDiagonalArrows(cell);
+        else this.drawOffDiagonalArrows(cell);
     }
 }

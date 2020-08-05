@@ -870,28 +870,18 @@ class TestMetaModelStructuredPython(unittest.TestCase):
     def test_vectorized_lagrange3(self):
         prob = om.Problem()
         model = prob.model
-        ivc = om.IndepVarComp()
 
         mapdata = SampleMap()
 
         params = mapdata.param_data
         x, y, _ = params
         outs = mapdata.output_data
-        z = outs[0]
-        ivc.add_output('x', np.array([x['default'], x['default'], x['default']]),
-                       units=x['units'])
-        ivc.add_output('y', np.array([y['default'], y['default'], y['default']]),
-                       units=x['units'])
-        ivc.add_output('z', np.array([z['default'], z['default'], z['default']]),
-                       units=x['units'])
-
-        model.add_subsystem('des_vars', ivc, promotes=["*"])
 
         comp = om.MetaModelStructuredComp(method='lagrange3', extrapolate=True, vec_size=3)
 
         for param in params:
             comp.add_input(param['name'], np.array([param['default'], param['default'], param['default']]),
-                           param['values'])
+                           param['values'], units=param['units'])
 
         for out in outs:
             comp.add_output(out['name'], np.array([out['default'], out['default'], out['default']]),
@@ -900,9 +890,9 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         model.add_subsystem('comp', comp, promotes=["*"])
 
         prob.setup(force_alloc_complex=True)
-        prob['x'] = np.array([1.0, 10.0, 90.0])
-        prob['y'] = np.array([0.75, 0.81, 1.2])
-        prob['z'] = np.array([-1.7, 1.1, 2.1])
+        prob.set_val('x', np.array([1.0, 10.0, 90.0]))
+        prob.set_val('y', np.array([0.75, 0.81, 1.2]))
+        prob.set_val('z', np.array([-1.7, 1.1, 2.1]))
 
         prob.run_model()
 
@@ -924,9 +914,9 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         ivc.add_output('x', np.array([x['default'], x['default'], x['default']]),
                        units=x['units'])
         ivc.add_output('y', np.array([y['default'], y['default'], y['default']]),
-                       units=x['units'])
+                       units=y['units'])
         ivc.add_output('z', np.array([z['default'], z['default'], z['default']]),
-                       units=x['units'])
+                       units=z['units'])
 
         model.add_subsystem('des_vars', ivc, promotes=["*"])
 
@@ -1112,25 +1102,24 @@ class TestMetaModelStructuredCompFeature(unittest.TestCase):
         xor_interp.add_input('x', 0.0, training_data=np.array([0.0, 1.0]), units=None)
         xor_interp.add_input('y', 1.0, training_data=np.array([0.0, 1.0]), units=None)
 
+
         xor_interp.add_output('xor', 1.0, training_data=np.array([[0.0, 1.0], [1.0, 0.0]]), units=None)
 
         # Set up the OpenMDAO model
         model = om.Group()
-        ivc = om.IndepVarComp()
-        ivc.add_output('x', 0.0)
-        ivc.add_output('y', 1.0)
-        model.add_subsystem('ivc', ivc, promotes=["*"])
         model.add_subsystem('comp', xor_interp, promotes=["*"])
         prob = om.Problem(model)
         prob.setup()
 
+        prob.set_val('x', 0)
+
         # Now test out a 'fuzzy' XOR
-        prob['x'] = 0.9
-        prob['y'] = 0.001242
+        prob.set_val('x', 0.9)
+        prob.set_val('y', 0.001242)
 
         prob.run_model()
 
-        computed = prob['xor']
+        computed = prob.get_val('xor')
         actual = 0.8990064
 
         assert_almost_equal(computed, actual)
@@ -1170,13 +1159,13 @@ class TestMetaModelStructuredCompFeature(unittest.TestCase):
         prob.setup()
 
         # set inputs
-        prob['p1'] = 55.12
-        prob['p2'] = -2.14
-        prob['p3'] = 0.323
+        prob.set_val('p1', 55.12)
+        prob.set_val('p2', -2.14)
+        prob.set_val('p3', 0.323)
 
         prob.run_model()
 
-        computed = prob['f']
+        computed = prob.get_val('f')
         actual = 6.73306472
 
         assert_almost_equal(computed, actual)
@@ -1213,9 +1202,9 @@ class TestMetaModelStructuredCompFeature(unittest.TestCase):
         prob.setup()
 
         # set inputs
-        prob['p1'] = np.array([55.12, 12.0])
-        prob['p2'] = np.array([-2.14, 3.5])
-        prob['p3'] = np.array([0.323, 0.5])
+        prob.set_val('p1', np.array([55.12, 12.0]))
+        prob.set_val('p2', np.array([-2.14, 3.5]))
+        prob.set_val('p3', np.array([0.323, 0.5]))
 
         prob.run_model()
 
@@ -1256,13 +1245,13 @@ class TestMetaModelStructuredCompFeature(unittest.TestCase):
         prob.setup()
 
         # set inputs
-        prob['p1'] = 55.12
-        prob['p2'] = -2.14
-        prob['p3'] = 0.323
+        prob.set_val('p1', 55.12)
+        prob.set_val('p2', -2.14)
+        prob.set_val('p3', 0.323)
 
         prob.run_model()
 
-        computed = prob['f']
+        computed = prob.get_val('f')
         actual = 6.73306472
 
         assert_almost_equal(computed, actual)

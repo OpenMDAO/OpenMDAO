@@ -498,17 +498,15 @@ class ParFDFeatureTestCase(unittest.TestCase):
         p = om.Problem(model=om.Group(num_par_fd=3))
         model = p.model
         model.approx_totals(method='fd')
-        model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(mat.shape[1])))
         comp = model.add_subsystem('comp', MatMultComp(mat))
 
-        model.connect('indep.x', 'comp.x')
-
+        model.set_input_defaults('comp.x', val=np.ones(mat.shape[1]))
         p.setup(mode='fwd')
         p.run_model()
 
         pre_count = comp.num_computes
 
-        J = p.compute_totals(of=['comp.y'], wrt=['indep.x'], return_format='array')
+        J = p.compute_totals(of=['comp.y'], wrt=['comp.x'], return_format='array')
 
         post_count =  comp.num_computes
 
@@ -526,18 +524,16 @@ class ParFDFeatureTestCase(unittest.TestCase):
 
         p = om.Problem()
         model = p.model
-        model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(mat.shape[1])))
         comp = model.add_subsystem('comp', MatMultComp(mat, approx_method='fd', num_par_fd=3))
 
-        model.connect('indep.x', 'comp.x')
-
+        model.set_input_defaults('comp.x', val=np.ones(mat.shape[1]))
         p.setup(mode='fwd')
         p.run_model()
 
         pre_count = comp.num_computes
 
         # calling compute_totals will result in the computation of partials for comp
-        p.compute_totals(of=['comp.y'], wrt=['indep.x'])
+        p.compute_totals(of=['comp.y'], wrt=['comp.x'])
 
         # get the partial jacobian matrix
         J = comp._jacobian['y', 'x']

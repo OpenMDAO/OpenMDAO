@@ -35,9 +35,6 @@ class N2Diagram {
         // Assign this way because defaultDims is read-only.
         this.dims = JSON.parse(JSON.stringify(defaultDims));
 
-        // Keep track of arrows to show and hide them
-        this.arrowCache = [];
-
         this._referenceD3Elements();
         this.transitionStartDelay = N2TransitionDefaults.startDelay;
         this.chosenCollapseDepth = -1;
@@ -48,8 +45,10 @@ class N2Diagram {
             this.showLinearSolverNames, this.dims);
         this.search = new N2Search(this.zoomedElement, this.model.root);
         this.ui = new N2UserInterface(this);
+        // Keep track of arrows to show and hide them
+        this.arrowMgr = new N2ArrowManager(this.dom.n2Groups);
         this.matrix = new N2Matrix(this.model, this.layout, this.dom.n2Groups,
-            true, this.ui.findRootOfChangeFunction);
+            this.arrowMgr, true, this.ui.findRootOfChangeFunction);
 
         // TODO: Move to N2Layout
         this.scales = {
@@ -495,11 +494,11 @@ class N2Diagram {
                 self.ui.nodeInfoBox.update(d3.event, d, d3.select(this).select('rect').style('fill'))
 
                 if (self.model.abs2prom != undefined) {
-                    if (d.isParam()) {
+                    if (d.isInput()) {
                         return self.dom.toolTip.text(self.model.abs2prom.input[d.absPathName])
                             .style("visibility", "visible");
                     }
-                    if (d.isUnknown()) {
+                    if (d.isOutput()) {
                         return self.dom.toolTip.text(self.model.abs2prom.output[d.absPathName])
                             .style("visibility", "visible");
                     }
@@ -576,8 +575,6 @@ class N2Diagram {
                     self.scales.solver.y(d.solverDims.y) + ")";
             });
 
-
-
         nodeUpdate.select("rect")
             .attr("width", function (d) {
                 return d.solverDims.width * self.transitCoords.solver.x;
@@ -632,28 +629,26 @@ class N2Diagram {
             .style("opacity", 0);
     }
 
+    /** Remove all rects in the highlight bar */
     clearHighlights() {
-        this.dom.highlightBar.selectAll('rect').remove();
+        const selection = this.dom.highlightBar.selectAll('rect');
+        const size = selection.size();
+        debugInfo(`clearHighlights: Removing ${size} highlights`);
+        selection.remove();
     }
 
+    /** Remove all pinned arrows */
     clearArrows() {
-        this.dom.n2OuterGroup.selectAll("[class^=n2_hover_elements]").remove();
+        this.arrowMgr.removeAllPinned();
         this.clearHighlights();
     }
 
-    /** Reveal arrows that had been hidden */
-    showArrows() {
-        for (const arrow of this.arrowCache) {
-            this.matrix.mouseOverOnDiagonal(arrow.cell);
-            arrow.element.attr('class', arrow.className);
-        }
-    }
-
-    /** Display connection arrows for all inputs/outputs */
+    /** Display connection arrows for all visible inputs/outputs */
     showAllArrows() {
-        for (const cell of this.matrix.visibleCells) {
-            this.matrix.mouseOverOnDiagonal(cell);
-            this.mouseClickAll(cell);
+        for (const row in this.matrix.grid) {
+            const cell = this.matrix.grid[row][row]; // Diagonal cells only
+            this.matrix.drawOnDiagonalArrows(cell);
+            this.arrowMgr.togglePin(cell.id, true);
         }
     }
 
@@ -688,15 +683,13 @@ class N2Diagram {
 
         // Compute the new tree layout if necessary.
         if (computeNewTreeLayout) {
-            this.clearArrows();
-
             this.layout = new N2Layout(this.model, this.zoomedElement,
                 this.showLinearSolverNames, this.dims);
 
             this.ui.updateClickedIndices();
 
             this.matrix = new N2Matrix(this.model, this.layout,
-                this.dom.n2Groups, this.ui.lastClickWasLeft,
+                this.dom.n2Groups, this.arrowMgr, this.ui.lastClickWasLeft,
                 this.ui.findRootOfChangeFunction, this.matrix.nodeSize);
         }
 
@@ -711,6 +704,7 @@ class N2Diagram {
         this._setupSolverTransition(d3SolverRefs);
         this._runSolverTransition(d3SolverRefs.selection);
 
+        this.arrowMgr.transition(this.matrix);
         this.matrix.draw();
 
         if (!d3.selection.prototype.transitionAllowed) this.hideWaiter();
@@ -748,7 +742,6 @@ class N2Diagram {
             height = this.layout.calcFitDims().height;
         }
 
-        this.clearArrows();
         this.updateSizes(height, this.dims.size.font);
 
         N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
@@ -797,9 +790,9 @@ class N2Diagram {
         }
     }
 
-    /** When the mouse leaves a cell, remove all temporary arrows. */
+    /** When the mouse leaves a cell, remove all temporary arrows and highlights. */
     mouseOut() {
-        this.dom.n2OuterGroup.selectAll(".n2_hover_elements").remove();
+        this.arrowMgr.removeAllHovered();
         this.clearHighlights();
         d3.selectAll("div.offgrid").style("visibility", "hidden").html('');
 
@@ -808,48 +801,17 @@ class N2Diagram {
 
     /**
      * When the mouse is left-clicked on a cell, change their CSS class
-     * so they're not removed when the mouse moves out.
+     * so they're not removed when the mouse moves out. Or, if in info panel
+     * mode, pin the info panel.
      * @param {N2MatrixCell} cell The cell the event occured on.
      */
     mouseClick(cell) {
-        if (this.ui.nodeInfoBox.hidden) { // If not in info panel mode
-            let newClassName = "n2_hover_elements_" + cell.row + "_" + cell.col;
-            let selection = this.dom.n2OuterGroup.selectAll("." + newClassName);
-            if (selection.size() > 0) {
-                selection.remove();
-                const arrow = this.arrowCache.find(o => o.cell.row === cell.row && o.cell.col === cell.col);
-                const arrowIndex = this.arrowCache.indexOf(arrow);
-                this.arrowCache.splice(arrowIndex, 1);
-            }
-            else {
-                const arrow = {
-                    'cell': cell,
-                    'element': this.dom.n2OuterGroup
-                        .selectAll("path.n2_hover_elements, circle.n2_hover_elements"),
-                    'className': newClassName
-                }
-                this.arrowCache.push(arrow);
-                this.dom.n2OuterGroup
-                    .selectAll("path.n2_hover_elements, circle.n2_hover_elements")
-                    .attr("class", newClassName);
-            }
+        if (this.ui.nodeInfoBox.hidden) { // If not in info-panel mode, pin/unpin arrows
+            this.arrowMgr.togglePin(cell.id);
         }
         else { // Pin/unpin the info panel
             this.ui.nodeInfoBox.togglePin();
             this.ui.nodeInfoBox.update(d3.event, cell.obj, cell.color());
-        }
-    }
-
-    mouseClickAll(cell) {
-        let newClassName = "n2_hover_elements_" + cell.row + "_" + cell.col;
-        let selection = this.dom.n2OuterGroup.selectAll("." + newClassName);
-        if (selection.size() > 0) {
-            selection.remove();
-        }
-        else {
-            this.dom.n2OuterGroup
-                .selectAll("path.n2_hover_elements, circle.n2_hover_elements")
-                .attr("class", newClassName);
         }
     }
 
@@ -973,11 +935,11 @@ class N2Diagram {
     }
 
     /**
-     * Recursively minimize non-parameter nodes to the specified depth.
+     * Recursively minimize non-input nodes to the specified depth.
      * @param {N2TreeNode} node The node to work on.
      */
     _minimizeToDepth(node) {
-        if (node.isParamOrUnknown()) {
+        if (node.isInputOrOutput()) {
             return;
         }
 

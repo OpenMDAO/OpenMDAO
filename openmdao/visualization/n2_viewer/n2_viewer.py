@@ -3,6 +3,7 @@ import base64
 import inspect
 import json
 import os
+import zlib
 from collections import OrderedDict
 from itertools import chain
 import networkx as nx
@@ -27,11 +28,6 @@ from openmdao.utils.mpi import MPI
 from openmdao.visualization.html_utils import read_files, write_script, DiagramWriter
 from openmdao.utils.general_utils import warn_deprecation
 
-# Toolbar settings
-_FONT_SIZES = [8, 9, 10, 11, 12, 13, 14]
-_MODEL_HEIGHTS = [600, 650, 700, 750, 800,
-                  850, 900, 950, 1000, 2000, 3000, 4000]
-
 _IND = 4  # HTML indentation (spaces)
 
 
@@ -46,10 +42,10 @@ def _get_var_dict(system, typ, name):
 
     var_dict['name'] = name
     if typ == 'input':
-        var_dict['type'] = 'param'
+        var_dict['type'] = 'input'
     elif typ == 'output':
         isimplicit = isinstance(system, ImplicitComponent)
-        var_dict['type'] = 'unknown'
+        var_dict['type'] = 'output'
         var_dict['implicit'] = isimplicit
 
     var_dict['dtype'] = type(meta['value']).__name__
@@ -99,9 +95,13 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
         tree_dict['component_type'] = None
         tree_dict['subsystem_type'] = 'group'
         tree_dict['is_parallel'] = is_parallel
-        children = [_get_tree_dict(s, component_execution_orders, component_execution_index,
-                                   is_parallel)
-                    for s in system._subsystems_myproc]
+
+        children = []
+        for s in system._subsystems_myproc:
+            if (s.name != '_auto_ivc'):
+                children.append(_get_tree_dict(s, component_execution_orders,
+                                component_execution_index, is_parallel))
+
         if system.comm.size > 1:
             if system._subsystems_myproc:
                 sub_comm = system._subsystems_myproc[0].comm
@@ -297,7 +297,7 @@ def _get_viewer_data(data_source):
 
     data_dict['driver'] = {'name': driver_name, 'type': driver_type,
                            'options': driver_options, 'opt_settings': driver_opt_settings}
-    data_dict['design_vars'] = root_group.get_design_vars()
+    data_dict['design_vars'] = root_group.get_design_vars(use_prom_ivc=False)
     data_dict['responses'] = root_group.get_responses()
 
     data_dict['declare_partials_list'] = _get_declare_partials(root_group)
@@ -350,8 +350,9 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
         warn_deprecation("'use_declare_partial_info' is now the"
                          " default and the option is ignored.")
 
-    model_data = 'var modelData = %s' % json.dumps(
-        model_data, default=make_serializable)
+    raw_data = json.dumps(model_data, default=make_serializable).encode('utf8')
+    b64_data = str(base64.b64encode(zlib.compress(raw_data)).decode("ascii"))
+    model_data = 'var compressedModel = "%s";' % b64_data
 
     import openmdao
     openmdao_dir = os.path.dirname(inspect.getfile(openmdao))
@@ -362,8 +363,12 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     assets_dir = os.path.join(vis_dir, "assets")
 
     # grab the libraries, src and style
-    lib_dct = {'d3': 'd3.v5.min', 'awesomplete': 'awesomplete',
-               'vk_beautify': 'vkBeautify'}
+    lib_dct = {
+        'd3': 'd3.v5.min',
+        'awesomplete': 'awesomplete',
+        'vk_beautify': 'vkBeautify',
+        'pako_inflate': 'pako_inflate.min'
+    }
     libs = read_files(lib_dct.values(), libs_dir, 'js')
     src_names = \
         'modal', \

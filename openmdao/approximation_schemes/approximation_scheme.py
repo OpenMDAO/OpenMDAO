@@ -8,8 +8,7 @@ from openmdao.utils.array_utils import sub2full_indices, get_input_idx_split
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.mpi import MPI
 from openmdao.jacobians.jacobian import Jacobian
-
-_full_slice = slice(None)
+from openmdao.vectors.vector import _full_slice
 
 
 class ApproximationScheme(object):
@@ -47,6 +46,17 @@ class ApproximationScheme(object):
         self._j_data_offsets = None
         self._approx_groups_cached_under_cs = False
         self._exec_dict = defaultdict(list)
+
+    def __repr__(self):
+        """
+        Return a simple string representation.
+
+        Returns
+        -------
+        str
+            String containing class name and added approximation keys.
+        """
+        return f"{self.__class__.__name__}: {list(self._exec_dict.keys())}"
 
     def _reset(self):
         """
@@ -142,7 +152,6 @@ class ApproximationScheme(object):
         approx_wrt_idx = system._owns_approx_wrt_idx
 
         out_slices = outputs.get_slice_dict()
-        in_slices = inputs.get_slice_dict()
 
         is_total = isinstance(system, Group)
 
@@ -202,7 +211,7 @@ class ApproximationScheme(object):
 
         if len(full_wrts) != len(wrt_matches) or approx_wrt_idx:
             if is_total and system.pathname == '':  # top level approx totals
-                full_wrt_sizes = [abs2meta[wrt]['size'] for wrt in wrt_names]
+                full_wrt_sizes = [abs2meta[wrt]['size'] for wrt in full_wrts]
             else:
                 _, full_wrt_sizes = system._get_partials_var_sizes()
 
@@ -250,10 +259,10 @@ class ApproximationScheme(object):
             wrt = key[0]
             directional = key[-1]
             data = self._get_approx_data(system, key)
-            if wrt in inputs._views_flat:
+            if inputs._contains_abs(wrt):
                 arr = inputs
                 slices = in_slices
-            elif wrt in outputs._views_flat:
+            elif outputs._contains_abs(wrt):
                 arr = outputs
                 slices = out_slices
             else:  # wrt is remote
@@ -281,8 +290,12 @@ class ApproximationScheme(object):
 
     def _compute_approximations(self, system, jac, total, under_cs):
         from openmdao.core.component import Component
+
+        # Set system flag that we're under approximation to true
+        system._set_approx_mode(True)
+
         # Clean vector for results
-        results_array = system._outputs._data.copy() if total else system._residuals._data.copy()
+        results_array = system._outputs.asarray(True) if total else system._residuals.asarray(True)
 
         # To support driver src_indices, we need to override some checks in Jacobian, but do it
         # selectively.
@@ -444,6 +457,9 @@ class ApproximationScheme(object):
                     jac._override_checks = False
                 else:
                     jac[key] = _from_dense(jacobian, key, oview, rows_reduced, cols_reduced)
+
+        # Set system flag that we're under approximation to false
+        system._set_approx_mode(False)
 
 
 def _from_dense(jac, key, subjac, reduced_rows=_full_slice, reduced_cols=_full_slice):
