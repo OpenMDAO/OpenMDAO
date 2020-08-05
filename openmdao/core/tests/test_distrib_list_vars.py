@@ -85,7 +85,7 @@ class DistributedListVarsTest(unittest.TestCase):
 
         stream = StringIO()
         with multi_proc_exception_check(prob.comm):
-            inputs = sorted(prob.model.list_inputs(values=True, print_arrays=True, out_stream=stream))
+            inputs = sorted(prob.model.list_inputs(values=True, print_arrays=True, out_stream=stream).items())
             if prob.comm.rank:
                 self.assertEqual(inputs, [])
             else:
@@ -118,7 +118,7 @@ class DistributedListVarsTest(unittest.TestCase):
                                                     scaling=True,
                                                     hierarchical=True,
                                                     print_arrays=True,
-                                                    out_stream=stream))
+                                                    out_stream=stream).items())
             if prob.comm.rank:
                 self.assertEqual(outputs, [])
             else:
@@ -191,7 +191,7 @@ class DistributedListVarsTest(unittest.TestCase):
 
         stream = StringIO()
         with multi_proc_exception_check(prob.comm):
-            inputs = sorted(prob.model.list_inputs(values=True, print_arrays=True, out_stream=stream))
+            inputs = sorted(prob.model.list_inputs(values=True, print_arrays=True, out_stream=stream).items())
             if prob.comm.rank:
                 self.assertEqual(inputs, [])
             else:
@@ -225,7 +225,7 @@ class DistributedListVarsTest(unittest.TestCase):
                                                      scaling=True,
                                                      hierarchical=True,
                                                      print_arrays=True,
-                                                     out_stream=stream))
+                                                     out_stream=stream).items())
             onames = [t[0] for t in outputs]
             if prob.comm.rank == 0:
                 self.assertEqual(onames, ['Obj.obj', 'par.G1.Cc.c', 'par.G1.Cy.y', 'par.G1.indep_var_comp.x', 'par.G2.Cc.c', 'par.G2.Cy.y', 'par.G2.indep_var_comp.x'])

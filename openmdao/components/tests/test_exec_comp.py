@@ -863,50 +863,50 @@ class TestExecComp(unittest.TestCase):
 
         # Inputs no tags
         inputs = prob.model.list_inputs(values=False, out_stream=None)
-        self.assertEqual(sorted(inputs), [
+        self.assertEqual(sorted(inputs.items()), [
             ('C1.x', {}),
             ('C1.z', {}),
         ])
 
         # Inputs with tags
         inputs = prob.model.list_inputs(values=False, out_stream=None, tags="tagx")
-        self.assertEqual(sorted(inputs), [
+        self.assertEqual(sorted(inputs.items()), [
             ('C1.x', {}),
         ])
 
         # Inputs with multiple tags
         inputs = prob.model.list_inputs(values=False, out_stream=None, tags=["tagx", "tagz"])
-        self.assertEqual(sorted(inputs), [
+        self.assertEqual(sorted(inputs.items()), [
             ('C1.x', {}),
             ('C1.z', {}),
         ])
 
         # Inputs with tag that does not match
         inputs = prob.model.list_inputs(values=False, out_stream=None, tags="tag_wrong")
-        self.assertEqual(sorted(inputs), [])
+        self.assertEqual(sorted(inputs.items()), [])
 
         # Outputs no tags
         outputs = prob.model.list_outputs(values=False, out_stream=None)
-        self.assertEqual(sorted(outputs), [
+        self.assertEqual(sorted(outputs.items()), [
             ('C1.y', {}),
             ('indep.x', {}),
         ])
 
         # Outputs with tags
         outputs = prob.model.list_outputs(values=False, out_stream=None, tags="tagy")
-        self.assertEqual(sorted(outputs), [
+        self.assertEqual(sorted(outputs.items()), [
             ('C1.y', {}),
         ])
 
         # Outputs with multiple tags
         outputs = prob.model.list_outputs(values=False, out_stream=None, tags=["tagy", "tagx"])
-        self.assertEqual(sorted(outputs), [
+        self.assertEqual(sorted(outputs.items()), [
             ('C1.y', {}),
         ])
 
         # Outputs with tag that does not match
         outputs = prob.model.list_outputs(values=False, out_stream=None, tags="tag_wrong")
-        self.assertEqual(sorted(outputs), [])
+        self.assertEqual(sorted(outputs.items()), [])
 
     def test_feature_has_diag_partials(self):
         import numpy as np

@@ -1870,8 +1870,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        inputs_before = prob.model.list_inputs(values=True, units=True, out_stream=None)
-        outputs_before = prob.model.list_outputs(values=True, units=True, out_stream=None)
+        inputs_before = prob.model.list_inputs(values=True, units=True, out_stream=None).items()
+        outputs_before = prob.model.list_outputs(values=True, units=True, out_stream=None).items()
 
         cr = om.CaseReader(self.filename)
 
@@ -1894,8 +1894,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        inputs_after = prob.model.list_inputs(values=True, units=True, out_stream=None)
-        outputs_after = prob.model.list_outputs(values=True, units=True, out_stream=None)
+        inputs_after = prob.model.list_inputs(values=True, units=True, out_stream=None).items()
+        outputs_after = prob.model.list_outputs(values=True, units=True, out_stream=None).items()
 
         iter_count_after = driver.iter_count
 

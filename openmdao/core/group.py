@@ -593,7 +593,7 @@ class Group(System):
 
     def _top_level_setup(self, mode):
         self._problem_meta['connections'] = conns = self._conn_global_abs_in2out
-        self._problem_meta['all_meta'] = abs2meta = self._var_allprocs_abs2meta
+        self._problem_meta['all_meta'] = self._var_allprocs_abs2meta
         self._problem_meta['meta'] = self._var_abs2meta
 
         self._problem_meta['remote_systems'] = rsystems = self._find_remote_sys_owners()
@@ -871,7 +871,7 @@ class Group(System):
 
             raw_locs = (locs, locs_disc)
             allprocs_raw_locs = self.comm.allgather(raw_locs)
-            last_rank = self.comm.size - 1
+            # last_rank = self.comm.size - 1
             # owns = self._owning_rank
             for type_ in ('input', 'output'):
                 # own_arr = np.zeros(len(allprocs_abs_names[type_]), dtype=int)

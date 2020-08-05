@@ -2449,7 +2449,7 @@ class ConfigGroup(om.Group):
         for child, kwargs in self.cfgio.items():
             kid = self._get_subsystem(child)
             if kid is not None:
-                self.io_results[child] = list(kid.get_io_metadata(**kwargs))
+                self.io_results[child] = kid.get_io_metadata(**kwargs)
             else:
                 print(f"'{kid}' not found locally.")
 
@@ -2533,21 +2533,16 @@ class Test3Deep(unittest.TestCase):
             raise RuntimeError(f"No parent named {parent}.")
         res = s.io_results[path]
         if s.comm.size > 1:
-            allres = []
-            seen = set()
+            allres = {}
             for procres in s.comm.allgather(res):
-                for r in procres:
-                    if r[0] not in seen:
-                        allres.append(r)
-                    else:
-                        seen.add(r[0])
+                allres.update(procres)
             res = allres
         return res
-    
-    def check_vs_meta(self, p, parent, meta_list):
+
+    def check_vs_meta(self, p, parent, meta_dict):
         system = p.model._get_subsystem(parent)
         metas = (system._var_allprocs_abs2meta, system._var_abs2meta)
-        for vname, meta in meta_list:
+        for vname, meta in meta_dict.items():
             for key, val in meta.items():
                 for mymeta in metas:
                     if key in mymeta:
@@ -2565,17 +2560,17 @@ class Test3Deep(unittest.TestCase):
 
         res = self.get_io_results(p, 'cfg', 'C1')
         expected = {'cfg.C1.x', 'cfg.C1.y'}
-        self.assertEqual({t[0] for t in res}, expected)
+        self.assertEqual({n for n in res}, expected)
         self.check_vs_meta(p, 'cfg', res)
 
         res = self.get_io_results(p, 'cfg', 'C2')
         expected = {'x', 'y'}
-        self.assertEqual({t[0] for t in res}, expected)
+        self.assertEqual({n for n in res}, expected)
         self.check_vs_meta(p, 'cfg', res)
 
         res = self.get_io_results(p, 'cfg', 'sub')
         expected = {'C3.x', 'C4.x', 'C3.y', 'C4.y'}
-        self.assertEqual({t[0] for t in res}, expected)
+        self.assertEqual({n for n in res}, expected)
         self.check_vs_meta(p, 'cfg', res)
 
         names = self.get_matching_var_setup_counts(p, 1)
@@ -2690,20 +2685,20 @@ class TestInConfigMPIpar(Test3Deep):
         p = self.build_model()
         p.model.add_get_io('cfg', metadata_keys=('value', 'src_indices', 'shape'), get_remote=True)
         p.model.cfg.add_get_io('sub')
-        
+
         p.setup()
 
-        res = sorted(p.model.io_results['cfg'], key=lambda x:x[0])
+        res = p.model.io_results['cfg']
         expected = {'sub.C3.x', 'sub.C3.y', 'sub.C4.x', 'sub.C4.y', 'C1.x', 'C1.y', 'C2.x', 'C2.y'}
-        self.assertEqual([t[0] for t in res], sorted(expected))
+        self.assertEqual(sorted([n for n in res]), sorted(expected))
         self.check_vs_meta(p, 'cfg', res)
 
-        res = sorted(p.model.cfg.io_results['sub'], key=lambda x:x[0])
+        res = p.model.cfg.io_results['sub']
         if p.model.comm.rank == 0:
             expected = {'C3.y', 'C3.x'}
         else:
             expected = {'C4.y', 'C4.x'}
-        self.assertEqual([t[0] for t in res], sorted(expected))
+        self.assertEqual(sorted([n for n in res]), sorted(expected))
         self.check_vs_meta(p, 'cfg.sub', res)
 
 
@@ -3253,8 +3248,8 @@ class TestFeatureConfigure(unittest.TestCase):
                 # In this case, we can only determine the 'vec_size' for totalforcecomp
                 # after flightdatacomp has been setup.
 
-                flight_data = dict(self.flightdatacomp.list_outputs(shape=True, out_stream=None))
-                data_shape = flight_data['thrust']['shape']
+                meta = self.flightdatacomp.get_io_metadata('output', includes='thrust')
+                data_shape = meta['thrust']['shape']
 
                 self.totalforcecomp.add_equation('total_force',
                                                  input_names=['thrust', 'drag', 'lift', 'weight'],

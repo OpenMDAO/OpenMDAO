@@ -100,14 +100,14 @@ class ExplCompTestCase(unittest.TestCase):
 
         # list explicit outputs
         outputs = prob.model.list_outputs(implicit=False, out_stream=None)
-        self.assertEqual(sorted(outputs), [
-            ('comp1.area',   {'value': [1.]}),
-            ('comp2.area',   {'value': [1.]}),
-        ])
+        expected = {'comp1.area', 'comp2.area'}
+        self.assertEqual(set(outputs), expected)
+        for name in expected:
+            self.assertEqual(outputs[name], {'value': [1.]})
 
         # list states
         states = prob.model.list_outputs(explicit=False, out_stream=None)
-        self.assertEqual(states, [])
+        self.assertEqual(states, {})
 
         prob.set_val('length', 3.)
         prob.set_val('width', 2.)
@@ -127,23 +127,26 @@ class ExplCompTestCase(unittest.TestCase):
 
         # list inputs
         inputs = prob.model.list_inputs(out_stream=None)
-        self.assertEqual(sorted(inputs), [
-            ('comp1.length', {'value': [3.]}),
-            ('comp1.width',  {'value': [2.]}),
-            ('comp2.length', {'value': [3.]}),
-            ('comp2.width',  {'value': [2.]}),
-        ])
+        expected = {
+            'comp1.length': [3.],
+            'comp1.width':  [2.],
+            'comp2.length': [3.],
+            'comp2.width':  [2.],
+        }
+        self.assertEqual(set(inputs), set(expected))
+        for name, val in expected.items():
+            self.assertEqual(inputs[name], {'value': val})
 
         # list explicit outputs
         outputs = prob.model.list_outputs(implicit=False, out_stream=None)
-        self.assertEqual(sorted(outputs), [
-            ('comp1.area',   {'value': [6.]}),
-            ('comp2.area',   {'value': [6.]}),
-        ])
+        expected = {'comp1.area', 'comp2.area'}
+        self.assertEqual(set(outputs), expected)
+        for name in expected:
+            self.assertEqual(outputs[name], {'value': [6.]})
 
         # list states
         states = prob.model.list_outputs(explicit=False, out_stream=None)
-        self.assertEqual(states, [])
+        self.assertEqual(states, {})
 
         # list excluding both explicit and implicit components raises error
         msg = "You have excluded both Explicit and Implicit components."
@@ -184,7 +187,7 @@ class ExplCompTestCase(unittest.TestCase):
             'p2.y': {'value': 1.},
             'comp.z': {'value': 0.},
         }
-        self.assertEqual(dict(outputs), expected)
+        self.assertEqual(outputs, expected)
 
         # list_inputs on a component before run is okay, using relative names
         expl_inputs = prob.model.comp.list_inputs(out_stream=None)
@@ -192,17 +195,17 @@ class ExplCompTestCase(unittest.TestCase):
             'x': {'value': 0.},
             'y': {'value': 0.}
         }
-        self.assertEqual(dict(expl_inputs), expected)
+        self.assertEqual(expl_inputs, expected)
 
         expl_inputs = prob.model.comp.list_inputs(includes='x', out_stream=None)
-        self.assertEqual(dict(expl_inputs), {'x': {'value': 0.}})
+        self.assertEqual(expl_inputs, {'x': {'value': 0.}})
 
         expl_inputs = prob.model.comp.list_inputs(excludes='x', out_stream=None)
-        self.assertEqual(dict(expl_inputs), {'y': {'value': 0.}})
+        self.assertEqual(expl_inputs, {'y': {'value': 0.}})
 
         # specifying prom_name should not cause an error
         expl_inputs = prob.model.comp.list_inputs(prom_name=True, out_stream=None)
-        self.assertEqual(dict(expl_inputs), {
+        self.assertEqual(expl_inputs, {
             'x': {'value': 0., 'prom_name': 'x'},
             'y': {'value': 0., 'prom_name': 'y'},
         })
@@ -213,7 +216,7 @@ class ExplCompTestCase(unittest.TestCase):
         expected = {
             'x': {'value': 12.}
         }
-        self.assertEqual(dict(expl_outputs), expected)
+        self.assertEqual(expl_outputs, expected)
 
         text = stream.getvalue().split('\n')
         expected_text = [
@@ -233,18 +236,18 @@ class ExplCompTestCase(unittest.TestCase):
                 self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
 
         expl_outputs = prob.model.p1.list_outputs(includes='x', out_stream=None)
-        self.assertEqual(dict(expl_outputs), expected)
+        self.assertEqual(expl_outputs, expected)
 
         expl_outputs = prob.model.p1.list_outputs(excludes='x', out_stream=None)
-        self.assertEqual(dict(expl_outputs), {})
+        self.assertEqual(expl_outputs, {})
 
         # specifying residuals_tol should not cause an error
         expl_outputs = prob.model.p1.list_outputs(residuals_tol=.01, out_stream=None)
-        self.assertEqual(dict(expl_outputs), expected)
+        self.assertEqual(expl_outputs, expected)
 
         # specifying prom_name should not cause an error
         expl_outputs = prob.model.p1.list_outputs(prom_name=True, out_stream=None)
-        self.assertEqual(dict(expl_outputs), {
+        self.assertEqual(expl_outputs, {
             'x': {'value': 12., 'prom_name': 'x'}
         })
 
@@ -257,7 +260,7 @@ class ExplCompTestCase(unittest.TestCase):
         stream = StringIO()
         inputs = prob.model.list_inputs(units=True, shape=True, out_stream=stream)
         tol = 1e-7
-        for actual, expected in zip(sorted(inputs), [
+        for actual, expected in zip(sorted(inputs.items()), [
             ('comp.x', {'value': [12.], 'shape': (1,), 'units': 'inch'}),
             ('comp.y', {'value': [12.], 'shape': (1,), 'units': 'inch'})
         ]):
@@ -286,7 +289,7 @@ class ExplCompTestCase(unittest.TestCase):
 
         # list outputs for implicit comps - should get none
         outputs = prob.model.list_outputs(implicit=True, explicit=False, out_stream=None)
-        self.assertEqual(outputs, [])
+        self.assertEqual(outputs, {})
 
         # list outputs with out_stream and all the optional display values True
         stream = StringIO()
@@ -307,7 +310,7 @@ class ExplCompTestCase(unittest.TestCase):
                       'lower': [1.], 'upper': [100.], 'ref': 1.1, 'ref0': 2.1, 'res_ref': 1.1}),
             ('p2.y', {'value': [1.], 'resids': [0.], 'units': 'ft', 'shape': (1,), 'desc': 'indep y',
                       'lower': [2.], 'upper': [200.], 'ref': 1.2, 'ref0': 0.0, 'res_ref': 2.2}),
-        ], sorted(outputs))
+        ], sorted(outputs.items()))
 
         text = stream.getvalue().split('\n')
         expected_text = [
@@ -373,7 +376,7 @@ class ExplCompTestCase(unittest.TestCase):
                                           hierarchical=False,
                                           print_arrays=False)
 
-        self.assertEqual(sorted(outputs), [
+        self.assertEqual(sorted(outputs.items()), [
             ('comp.z', {'value': [24.], 'resids': [0.], 'units': 'inch', 'shape': (1,),
                         'lower': None, 'upper': None, 'ref': 1.0, 'ref0': 0.0, 'res_ref': 1.0}),
             ('p1.x', {'value': [12.], 'resids': [0.], 'units': 'inch', 'shape': (1,),
@@ -752,53 +755,53 @@ class ExplCompTestCase(unittest.TestCase):
 
         # Inputs no tags
         inputs = prob.model.list_inputs(out_stream=None)
-        self.assertEqual(sorted(inputs), [
+        self.assertEqual(sorted(inputs.items()), [
             ('length', {'value': [1.]}),
             ('width', {'value': [1.]}),
         ])
 
         # Inputs with tags
         inputs = prob.model.list_inputs(out_stream=None, tags="tag1")
-        self.assertEqual(sorted(inputs), [
+        self.assertEqual(sorted(inputs.items()), [
             ('length', {'value': [1.]}),
         ])
 
         # Inputs with multiple tags
         inputs = prob.model.list_inputs(out_stream=None, tags=["tag1", "tag3"])
-        self.assertEqual(sorted(inputs), [
+        self.assertEqual(sorted(inputs.items()), [
             ('length', {'value': [1.]}),
         ])
         inputs = prob.model.list_inputs(out_stream=None, tags=["tag1", "tag2"])
-        self.assertEqual(sorted(inputs), [
+        self.assertEqual(sorted(inputs.items()), [
             ('length', {'value': [1.]}),
             ('width', {'value': [1.]}),
         ])
 
         # Inputs with tag that does not match
         inputs = prob.model.list_inputs(out_stream=None, tags="tag3")
-        self.assertEqual(sorted(inputs), [])
+        self.assertEqual(sorted(inputs.items()), [])
 
         # Outputs no tags
         outputs = prob.model.list_outputs(out_stream=None)
-        self.assertEqual(sorted(outputs), [
+        self.assertEqual(sorted(outputs.items()), [
             ('area', {'value': [1.]}),
         ])
 
         # Outputs with tags
         outputs = prob.model.list_outputs(out_stream=None, tags="tag1")
-        self.assertEqual(sorted(outputs), [
+        self.assertEqual(sorted(outputs.items()), [
             ('area', {'value': [1.]}),
         ])
 
         # Outputs with multiple tags
         outputs = prob.model.list_outputs(out_stream=None, tags=["tag1", "tag3"])
-        self.assertEqual(sorted(outputs), [
+        self.assertEqual(sorted(outputs.items()), [
             ('area', {'value': [1.]}),
         ])
 
         # Outputs with tag that does not match
         outputs = prob.model.list_outputs(out_stream=None, tags="tag3")
-        self.assertEqual(sorted(outputs), [])
+        self.assertEqual(sorted(outputs.items()), [])
 
     def test_feature_simple_var_tags(self):
         from openmdao.api import Problem, ExplicitComponent
@@ -824,49 +827,49 @@ class ExplCompTestCase(unittest.TestCase):
 
         # Inputs no tags
         inputs = prob.model.list_inputs(values=False, out_stream=None)
-        self.assertEqual(sorted(inputs), [
+        self.assertEqual(sorted(inputs.items()), [
             ('length', {}),
             ('width', {}),
         ])
 
         # Inputs with tags
         inputs = prob.model.list_inputs(values=False, out_stream=None, tags="tag1")
-        self.assertEqual(sorted(inputs), [
+        self.assertEqual(sorted(inputs.items()), [
             ('length', {}),
         ])
 
         # Inputs with multiple tags
         inputs = prob.model.list_inputs(values=False, out_stream=None, tags=["tag1", "tag2"])
-        self.assertEqual(sorted(inputs), [
+        self.assertEqual(sorted(inputs.items()), [
             ('length', {}),
             ('width', {}),
         ])
 
         # Inputs with tag that does not match
         inputs = prob.model.list_inputs(values=False, out_stream=None, tags="tag3")
-        self.assertEqual(sorted(inputs), [])
+        self.assertEqual(sorted(inputs.items()), [])
 
         # Outputs no tags
         outputs = prob.model.list_outputs(values=False, out_stream=None)
-        self.assertEqual(sorted(outputs), [
+        self.assertEqual(sorted(outputs.items()), [
             ('area', {}),
         ])
 
         # Outputs with tags
         outputs = prob.model.list_outputs(values=False, out_stream=None, tags="tag1")
-        self.assertEqual(sorted(outputs), [
+        self.assertEqual(sorted(outputs.items()), [
             ('area', {}),
         ])
 
         # Outputs with multiple tags
         outputs = prob.model.list_outputs(values=False, out_stream=None, tags=["tag1", "tag3"])
-        self.assertEqual(sorted(outputs), [
+        self.assertEqual(sorted(outputs.items()), [
             ('area', {}),
         ])
 
         # Outputs with tag that does not match
         outputs = prob.model.list_outputs(values=False, out_stream=None, tags="tag3")
-        self.assertEqual(sorted(outputs), [])
+        self.assertEqual(sorted(outputs.items()), [])
 
     def test_compute_inputs_read_only(self):
         class BadComp(TestExplCompSimple):

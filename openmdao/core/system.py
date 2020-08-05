@@ -6,6 +6,7 @@ from collections import OrderedDict, defaultdict
 from collections.abc import Iterable
 from itertools import chain
 
+import re
 from fnmatch import fnmatchcase
 import sys
 import os
@@ -99,6 +100,8 @@ allowed_meta_names = {
     'lower',
     'upper',
 }
+
+_glob_re = re.compile('[*?[]')
 
 
 class System(object):
@@ -3135,10 +3138,10 @@ class System(object):
             available 'allprocs' metadata.  If 'values' or 'src_indices' are required,
             their keys must be provided explicitly since they are not found in the 'allprocs'
             metadata and must be retrieved from local metadata located in each process.
-        includes : iter of str or None
+        includes : str, iter of str or None
             Collection of glob patterns for pathnames of variables to include. Default is None,
             which includes all variables.
-        excludes : iter of str or None
+        excludes : str, iter of str or None
             Collection of glob patterns for pathnames of variables to exclude. Default is None.
         tags : str or iter of strs
             User defined tags that can be used to filter what gets listed. Only inputs with the
@@ -3154,10 +3157,10 @@ class System(object):
             If True, the names returned will be relative to the scope of this System. Otherwise
             they will be absolute names.
 
-        Yields
-        ------
-        tuple
-            A tuple of the form (name, metadata) where name is either absolute or relative
+        Returns
+        -------
+        dict
+            A dict of metadata keyed on name, where name is either absolute or relative
             based on the value of the `return_rel_names` arg, and metadata is a dict containing
             entries based on the value of the metadata_keys arg.  Every metadata dict will
             always contain two entries, 'promoted_name' and 'discrete', to indicate a given
@@ -3168,6 +3171,10 @@ class System(object):
 
         if isinstance(iotypes, str):
             iotypes = (iotypes,)
+        if isinstance(includes, str):
+            includes = (includes,)
+        if isinstance(excludes, str):
+            excludes = (excludes,)
 
         loc2meta = self._var_abs2meta
         all2meta = self._var_allprocs_abs2meta
@@ -3192,6 +3199,8 @@ class System(object):
 
         if tags:
             tagset = make_set(tags)
+
+        result = {}
 
         for iotype in iotypes:
             disc2meta = disc_metadict[iotype]
@@ -3268,7 +3277,9 @@ class System(object):
                     if tags and not tagset & ret_meta['tags']:
                         continue
 
-                    yield (vname, ret_meta)
+                    result[vname] = ret_meta
+
+        return result
 
     def list_inputs(self,
                     values=True,
@@ -3336,10 +3347,10 @@ class System(object):
         keyvals = [metavalues, units, shape, global_shape, desc, tags is not None]
         keys = [n for i, n in enumerate(keynames) if keyvals[i]]
 
-        inputs = list(self.get_io_metadata(('input',), keys, includes, excludes, tags,
-                                           get_remote=True,
-                                           rank=None if all_procs or values else 0,
-                                           return_rel_names=False))
+        inputs = self.get_io_metadata(('input',), keys, includes, excludes, tags,
+                                      get_remote=True,
+                                      rank=None if all_procs or values else 0,
+                                      return_rel_names=False)
 
         if inputs:
             to_remove = ['discrete']
@@ -3348,18 +3359,18 @@ class System(object):
             if not prom_name:
                 to_remove.append('prom_name')
 
-            for _, meta in inputs:
+            for _, meta in inputs.items():
                 for key in to_remove:
                     del meta[key]
 
         if values and self._inputs is not None:
             # we want value from the input vector, not from the metadata
-            for n, meta in inputs:
+            for n, meta in inputs.items():
                 meta['value'] = self._abs_get_val(n, get_remote=True,
                                                   rank=None if all_procs else 0, kind='input')
 
         if not inputs or (not all_procs and self.comm.rank != 0):
-            return []
+            return {}
 
         if out_stream is _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
@@ -3370,7 +3381,7 @@ class System(object):
         if self.pathname:
             # convert to relative names
             rel_idx = len(self.pathname) + 1
-            inputs = [(n[rel_idx:], meta) for n, meta in inputs]
+            inputs = {n[rel_idx:]: meta for n, meta in inputs.items()}
 
         return inputs
 
@@ -3464,14 +3475,14 @@ class System(object):
         if scaling:
             keys.extend(('ref', 'ref0', 'res_ref'))
 
-        outputs = list(self.get_io_metadata(('output',), keys, includes, excludes, tags,
-                                            get_remote=True,
-                                            rank=None if all_procs or values or residuals else 0,
-                                            return_rel_names=False))
+        outputs = self.get_io_metadata(('output',), keys, includes, excludes, tags,
+                                       get_remote=True,
+                                       rank=None if all_procs or values or residuals else 0,
+                                       return_rel_names=False)
 
         if outputs:
             if not list_autoivcs:
-                outputs = [t for t in outputs if not t[0].startswith('_auto_ivc.')]
+                outputs = {n: m for n, m in outputs.items() if not n.startswith('_auto_ivc.')}
 
             to_remove = ['discrete']
             if tags:
@@ -3479,13 +3490,13 @@ class System(object):
             if not prom_name:
                 to_remove.append('prom_name')
 
-            for _, meta in outputs:
+            for _, meta in outputs.items():
                 for key in to_remove:
                     del meta[key]
 
         if self._outputs is not None and (values or residuals):
             # we want value from the input vector, not from the metadata
-            for n, meta in outputs:
+            for n, meta in outputs.items():
                 if values:
                     meta['value'] = self._abs_get_val(n, get_remote=True,
                                                       rank=None if all_procs else 0, kind='output')
@@ -3495,7 +3506,7 @@ class System(object):
                                                        kind='residual')
 
         if not outputs or (not all_procs and self.comm.rank != 0):
-            return []
+            return {}
 
         if out_stream is _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
@@ -3505,24 +3516,24 @@ class System(object):
         states = set(self._list_states())
 
         if explicit:
-            expl_outputs = [t for t in outputs if t[0] not in states]
+            expl_outputs = {n: m for n, m in outputs.items() if n not in states}
             if out_stream:
                 self._write_table('explicit', expl_outputs, hierarchical, print_arrays,
                                   all_procs, out_stream)
             if self.name:
-                expl_outputs = [(n[rel_idx:], meta) for n, meta in expl_outputs]
+                expl_outputs = {n[rel_idx:]: meta for n, meta in expl_outputs.items()}
 
         if implicit:
-            impl_outputs = [t for t in outputs if t[0] in states]
+            impl_outputs = {n: m for n, m in outputs.items() if n in states}
             if out_stream:
                 self._write_table('implicit', impl_outputs, hierarchical, print_arrays,
                                   all_procs, out_stream)
             if self.name:
-                impl_outputs = [(n[rel_idx:], meta) for n, meta in impl_outputs]
+                impl_outputs = {n[rel_idx:]: meta for n, meta in impl_outputs.items()}
 
-        if explicit and implicit:
-            return expl_outputs + impl_outputs
-        elif explicit:
+        if explicit:
+            if implicit:
+                expl_outputs.update(impl_outputs)
             return expl_outputs
         elif implicit:
             return impl_outputs
@@ -3538,8 +3549,8 @@ class System(object):
         ----------
         var_type : 'input', 'explicit' or 'implicit'
             Indicates type of variables, input or explicit/implicit output.
-        var_data : list or dict
-            List or dict of name and metadata.
+        var_data : dict
+            dict of name and metadata.
         hierarchical : bool
             When True, human readable output shows variables in hierarchical format.
         print_arrays : bool
@@ -3556,10 +3567,6 @@ class System(object):
         """
         if out_stream is None:
             return
-
-        # Make a dict of variables. Makes it easier to work with in this method
-        if isinstance(var_data, list):
-            var_data = OrderedDict(var_data)
 
         if self._outputs is None:
             var_list = var_data.keys()
@@ -4419,9 +4426,7 @@ class System(object):
         float or ndarray of float
             The value converted to the specified units.
         """
-        meta = self._get_var_meta(name)
-
-        base_units = meta['units']
+        base_units = self.get_var_meta(name, 'units')
 
         if base_units == units:
             return val
@@ -4452,7 +4457,7 @@ class System(object):
         float or ndarray of float
             The value converted to the specified units.
         """
-        base_units = self._get_var_meta(name)['units']
+        base_units = self.get_var_meta(name, 'units')
 
         if base_units == units:
             return val
@@ -4496,29 +4501,79 @@ class System(object):
 
         return (val + offset) * scale
 
-    def _get_var_meta(self, name):
+    def get_var_meta(self, name, key):
         """
-        Get the metadata for a variable.
+        Get metadata for a variable.
 
         Parameters
         ----------
         name : str
             Variable name (promoted, relative, or absolute) in the root system's namespace.
+        key : str
+            Key into the metadata dict for the given variable.
 
         Returns
         -------
-        dict
-            The metadata dictionary for the named variable.
+        object
+            The value stored under key in the metadata dictionary for the named variable.
         """
-        meta = self._problem_meta['all_meta']
-        if name in meta:
-            return meta[name]
+        if self._problem_meta is not None and 'all_meta' in self._problem_meta:
+            meta_all = self._problem_meta['all_meta']
+            meta_loc = self._problem_meta['meta']
+        else:
+            meta_all = self._var_allprocs_abs2meta
+            meta_loc = self._var_abs2meta
 
-        abs_name = name2abs_name(self, name)
+        meta = None
+        if name in meta_all:
+            abs_name = name
+            meta = meta_all[name]
+
+        if meta is None:
+            abs_name = name2abs_name(self, name)
+            if abs_name is not None and abs_name in meta_all:
+                meta = meta_all[abs_name]
+
+        if meta:
+            if key in meta:
+                return meta[key]
+            else:
+                # key is either bogus or a key into the local metadata dict
+                # (like 'value' or 'src_indices'). If MPI is active, this val may be remote
+                # on some procs
+                if self.comm.size > 1:
+                    pass
+                elif abs_name in meta_loc:
+                    try:
+                        return meta_loc[abs_name][key]
+                    except KeyError:
+                        raise KeyError(f"{self.msginfo}: Metadata key '{key}' not found for "
+                                       f"variable '{name}'.")
+
         if abs_name is not None:
-            return meta[abs_name]
+            if abs_name in self._var_allprocs_discrete['output']:
+                meta = self._var_allprocs_discrete['output'][abs_name]
+            elif abs_name in self._var_allprocs_discrete['input']:
+                meta = self._var_allprocs_discrete['input'][abs_name]
 
-        raise KeyError('{}: Metadata for variable "{}" not found.'.format(self.msginfo, name))
+            if meta and key in meta:
+                return meta[key]
+
+            rel_idx = len(self.pathname) + 1 if self.pathname else 0
+            relname = abs_name[rel_idx:]
+            if relname in self._var_discrete['output']:
+                meta = self._var_discrete['output']
+            elif relname in self._var_discrete['input']:
+                meta = self._var_discrete['input']
+
+            if meta:
+                try:
+                    return meta[key]
+                except KeyError:
+                    raise KeyError(f"{self.msginfo}: Metadata key '{key}' not found for "
+                                   f"variable '{name}'.")
+
+        raise KeyError(f"{self.msginfo}: Metadata for variable '{name}' not found.")
 
     def _resolve_ambiguous_input_meta(self):
         pass
