@@ -113,6 +113,7 @@ install:
     #    conda install -c anaconda gfortran_linux-64 --yes;
     if [ "$SNOPT" == "7.7" ] && [ "$SNOPT_LOCATION_77" ]; then
       echo "  > Secure copying SNOPT 7.7 over SSH";
+      echo "SNOPT_LOCATION_77 is $SNOPT_LOCATION_77"
       mkdir SNOPT;
       scp -qr "$SNOPT_LOCATION_77" SNOPT;
       ./build_pyoptsparse.sh -b "$PYOPTSPARSE" -s SNOPT/src -a;
