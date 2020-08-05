@@ -96,12 +96,14 @@ class Problem(object):
     _initial_condition_cache : dict
         Any initial conditions that are set at the problem level via setitem are cached here
         until they can be processed.
-    _setup_status : int
-        Current status of the setup in _model.
-        0 -- Newly initialized problem or newly added model.
-        1 -- Configure has been called.
-        2 -- The `setup` method has been called, but vectors not initialized.
-        3 -- The `final_setup` has been run, everything ready to run.
+    PRE_SETUP : int
+        Newly initialized problem or newly added model.
+    POST_CONFIGURE : int
+        Configure has been called.
+    POST_SETUP : int
+        The `setup` method has been called, but vectors not initialized.
+    POST_FINAL_SETUP : int
+        The `final_setup` has been run, everything ready to run.
     cite : str
         Listing of relevant citations that should be referenced when
         publishing work that uses this class.
@@ -173,10 +175,10 @@ class Problem(object):
 
         self._initial_condition_cache = {}
 
-        # Status of the setup of _model.
-        # 0 -- Newly initialized problem or newly added model.
-        # 1 -- The `setup` method has been called, but vectors not initialized.
-        # 2 -- The `final_setup` has been run, everything ready to run.
+        self.PRE_SETUP = 0
+        self.POST_CONFIGURE = 1
+        self.POST_SETUP = 2
+        self.POST_FINAL_SETUP = 3
 
         self._system_options_recorded = False
         self._rec_mgr = RecordingManager()
@@ -277,7 +279,7 @@ class Problem(object):
         bool
             True if the named system or variable is local to this process.
         """
-        if self._metadata['_setup_status'] < 2:
+        if not hasattr(self, '_metadata'):
             raise RuntimeError("{}: is_local('{}') was called before setup() "
                                "completed.".format(self.msginfo, name))
 
@@ -374,7 +376,7 @@ class Problem(object):
         object
             The value of the requested output/input variable.
         """
-        if self._metadata['_setup_status'] == 2:
+        if self._metadata['_setup_status'] == self.POST_SETUP:
             val = self._get_cached_val(name, get_remote=get_remote)
             if val is not _undefined:
                 if indices is not None:
@@ -469,7 +471,7 @@ class Problem(object):
                                 model._show_ambiguity_msg(name, ('units',), abs_names)
 
                 if units is None:
-                    if self._metadata['_setup_status'] > 2:  # avoids double unit conversion
+                    if self._metadata['_setup_status'] > self.POST_SETUP:  # avoids double unit conversion
                         ivalue = value
                         if sunits is not None:
                             if gunits is not None and gunits != tunits:
@@ -481,7 +483,7 @@ class Problem(object):
                         ivalue = model.convert_from_units(abs_name, value, units)
                     else:
                         ivalue = model.convert_units(name, value, units, gunits)
-                    if self._metadata['_setup_status'] == 2:
+                    if self._metadata['_setup_status'] == self.POST_SETUP:
                         value = ivalue
                     else:
                         value = model.convert_from_units(src, value, units)
@@ -491,7 +493,7 @@ class Problem(object):
                 value = model.convert_from_units(abs_name, value, units)
 
         # Caching only needed if vectors aren't allocated yet.
-        if self._metadata['_setup_status'] == 2:
+        if self._metadata['_setup_status'] == self.POST_SETUP:
             if indices is not None:
                 self._get_cached_val(name)
                 try:
@@ -749,7 +751,7 @@ class Problem(object):
         case_name : str
             Name used to identify this Problem case.
         """
-        if self._metadata['_setup_status'] < 3:
+        if self._metadata['_setup_status'] < self.POST_FINAL_SETUP:
             raise RuntimeError(f"{self.msginfo}: Problem.record() cannot be called before "
                                "`Problem.run_model()`, `Problem.run_driver()`, or "
                                "`Problem.final_setup()`.")
@@ -861,7 +863,7 @@ class Problem(object):
             'remote_systems': {},
             'remote_vars': {},  # does not include distrib vars
             'prom2abs': {'input': {}, 'output': {}},  # includes ALL promotes including buried ones
-            '_setup_status' : 0
+            '_setup_status' : self.PRE_SETUP
         }
         model._setup(model_comm, mode, self._metadata)
 
@@ -869,7 +871,7 @@ class Problem(object):
         self._check = check
         self._logger = logger
 
-        self._metadata['_setup_status'] = 2
+        self._metadata['_setup_status'] = self.POST_SETUP
 
         return self
 
@@ -894,7 +896,7 @@ class Problem(object):
         else:
             mode = self._orig_mode
 
-        if self._metadata['_setup_status'] < 3:
+        if self._metadata['_setup_status'] < self.POST_FINAL_SETUP:
             self.model._final_setup(self.comm)
 
         driver._setup_driver(self)
@@ -921,13 +923,13 @@ class Problem(object):
                            "(objectives and nonlinear constraints)." %
                            (mode, desvar_size, response_size), RuntimeWarning)
 
-        if self._metadata['_setup_status'] == 0 and hasattr(self.model, '_order_set') and \
-            self.model._order_set:
+        if self._metadata['_setup_status'] == self.PRE_SETUP and \
+            hasattr(self.model, '_order_set') and self.model._order_set:
             raise RuntimeError("%s: Cannot call set_order without calling "
                                "setup after" % (self.msginfo))
 
         # we only want to set up recording once, after problem setup
-        if self._metadata['_setup_status'] == 2:
+        if self._metadata['_setup_status'] == self.POST_SETUP:
             driver._setup_recording()
             self._setup_recording()
             record_viewer_data(self)
@@ -936,8 +938,8 @@ class Problem(object):
         if hasattr(self.model, '_in_good_standing') and not self.model._in_good_standing:
             raise RuntimeError("%s: Cannot call set_order after setup" % (self.msginfo))
 
-        if self._metadata['_setup_status'] < 3:
-            self._metadata['_setup_status'] = 3
+        if self._metadata['_setup_status'] < self.POST_FINAL_SETUP:
+            self._metadata['_setup_status'] = self.POST_FINAL_SETUP
             self._set_initial_conditions()
 
         if self._check:
@@ -1009,7 +1011,7 @@ class Problem(object):
             For 'J_fd', 'J_fwd', 'J_rev' the value is: A numpy array representing the computed
                 Jacobian for the three different methods of computation.
         """
-        if self._metadata['_setup_status'] < 3:
+        if self._metadata['_setup_status'] < self.POST_FINAL_SETUP:
             self.final_setup()
 
         model = self.model
@@ -1422,7 +1424,7 @@ class Problem(object):
             For 'rel error', 'abs error', 'magnitude' the value is: A tuple containing norms for
                 forward - fd, adjoint - fd, forward - adjoint.
         """
-        if self._metadata['_setup_status'] < 3:
+        if self._metadata['_setup_status'] < self.POST_FINAL_SETUP:
             raise RuntimeError(self.msginfo + ": run_model must be called before total "
                                "derivatives can be checked.")
 
@@ -1528,7 +1530,7 @@ class Problem(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
-        if self._metadata['_setup_status'] < 3:
+        if self._metadata['_setup_status'] < self.POST_FINAL_SETUP:
             self.final_setup()
 
         if self.model._owns_approx_jac:
