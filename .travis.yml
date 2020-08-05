@@ -116,8 +116,10 @@ install:
       echo "SNOPT_LOCATION_77 is $SNOPT_LOCATION_77"
       mkdir SNOPT;
       scp -qr "$SNOPT_LOCATION_77" SNOPT;
+
       ls -l SNOPT
-      ./build_pyoptsparse.sh -b "$PYOPTSPARSE" -s SNOPT/src -a;
+      # ./build_pyoptsparse.sh -b "$PYOPTSPARSE" -s SNOPT/src -a;
+      ./build_pyoptsparse.sh -b "$PYOPTSPARSE" -s SNOPT/snopt77 -a;
 
     elif [ "$SNOPT" == "7.2" ] && [ "$SNOPT_LOCATION_72" ]; then
       echo "  > Secure copying SNOPT 7.2 over SSH";
