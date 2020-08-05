@@ -531,7 +531,7 @@ class NonlinearSolver(Solver):
                                   'identical within the stall_tol, then terminate as if max '
                                   'iterations were reached. Default is 0, which disables this '
                                   'feature.')
-        self.options.declare('stall_tol', default=1e-6,
+        self.options.declare('stall_tol', default=1e-12,
                              desc='When stall checking is enabled, the threshold below which the '
                                   'residual norm is considered unchanged.')
 

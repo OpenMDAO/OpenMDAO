@@ -72,7 +72,7 @@ class TestSolverFeatures(unittest.TestCase):
         newton = prob.model.nonlinear_solver = om.NewtonSolver()
         newton.options['solve_subsystems'] = True
         newton.options['stall_limit'] = 3
-        newton.options['stall_tol'] = 1e-6
+        newton.options['stall_tol'] = 1e-8
         newton.options['maxiter'] = 100
         newton.options['err_on_non_converge'] = True
 
@@ -100,7 +100,7 @@ class TestSolverFeatures(unittest.TestCase):
         newton = prob.model.nonlinear_solver = om.NewtonSolver()
         newton.options['solve_subsystems'] = True
         newton.options['stall_limit'] = 3
-        newton.options['stall_tol'] = 1e-6
+        newton.options['stall_tol'] = 1e-8
         newton.options['maxiter'] = 100
 
         prob.model.linear_solver = om.DirectSolver()
@@ -123,7 +123,7 @@ class TestSolverFeatures(unittest.TestCase):
 
         nl_solver = prob.model.nonlinear_solver = om.BroydenSolver()
         nl_solver.options['stall_limit'] = 3
-        nl_solver.options['stall_tol'] = 1e-6
+        nl_solver.options['stall_tol'] = 1e-8
         nl_solver.options['maxiter'] = 100
 
         prob.model.linear_solver = om.DirectSolver()
