@@ -652,11 +652,6 @@ class System(object):
 
         self._setup_connections()
 
-        if hasattr(self, '_order_set') and self._order_set:
-            self._in_good_standing = True
-
-        self._setup_finished = True
-
     def _top_level_setup(self, mode):
         pass
 

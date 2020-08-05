@@ -1090,12 +1090,29 @@ class TestGroup(unittest.TestCase):
         model.add_subsystem('C2', SimpleGroup())
 
         prob.setup()
-        model.set_order(['C2', 'C1'])
+        prob.model.set_order(['C2', 'C1'])
 
-        msg = "Problem: Cannot call set_order after setup"
+        msg = "Problem: Cannot call set_order without calling setup after"
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
         self.assertEqual(str(cm.exception), msg)
+
+    def test_set_order_normal(self):
+
+        class SimpleGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
+                self.add_subsystem('comp2', om.ExecComp('b=2*a'))
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('C1', SimpleGroup())
+        model.add_subsystem('C2', SimpleGroup())
+
+        prob.model.set_order(['C2', 'C1'])
+        prob.setup()
+        prob.run_model()
 
     def test_double_setup_for_set_order(self):
         class SimpleGroup(om.Group):
