@@ -1,7 +1,6 @@
 """
 Unit tests for the BalanceComp.
 """
-import os
 import unittest
 import warnings
 
@@ -896,6 +895,27 @@ class TestBalanceComp(unittest.TestCase):
         cpd = prob.check_partials(out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
+
+    def test_shape_from_rhs_val(self):
+        n = 5
+        p = om.Problem()
+
+        p.model.add_subsystem('comp_A',
+                              om.ExecComp('y = x**2', y={'shape': (n, )}, x={'shape': (n, )}))
+        p.model.add_subsystem('comp_B',
+                              om.ExecComp('y = x + 7', y={'shape': (n, )}, x={'shape': (n, )}))
+
+        p.model.add_subsystem('bal', om.BalanceComp('x', rhs_val=np.ones((n, ))))
+        p.model.connect('bal.x', 'comp_A.x')
+        p.model.connect('bal.x', 'comp_B.x')
+        p.model.connect('comp_A.y', 'bal.lhs:x')
+        p.model.connect('comp_B.y', 'bal.rhs:x')
+
+        p.model.linear_solver = om.DirectSolver()
+        p.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+
+        # Bug was a size mismatch exception raised during setup.
+        p.setup()
 
 
 if __name__ == '__main__':  # pragma: no cover
