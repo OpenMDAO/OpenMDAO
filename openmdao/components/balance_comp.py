@@ -315,7 +315,7 @@ class BalanceComp(ImplicitComponent):
         self._state_vars[name] = options
 
         if val is None:
-            # If user doesn't specify initial guess for val, we cann size problem from initial
+            # If user doesn't specify initial guess for val, we can size problem from initial
             # rhs_val.
             if 'shape' not in kwargs and not np.isscalar(rhs_val):
                 kwargs['shape'] = rhs_val.shape
