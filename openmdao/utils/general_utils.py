@@ -246,10 +246,10 @@ def ensure_compatible(name, value, shape=None, indices=None):
 
     if indices is not None:
         indices = np.atleast_1d(indices)
-        contains_slice = _is_slice(indices)
+        contains_slicer = _is_slicer_op(indices)
         ind_shape = indices.shape
     else:
-        contains_slice = None
+        contains_slicer = None
 
     # if shape is not given, infer from value (if not scalar) or indices
     if shape is not None:
@@ -284,7 +284,7 @@ def ensure_compatible(name, value, shape=None, indices=None):
                                  "Expected %s but got %s." %
                                  (name, shape, value.shape))
 
-    if indices is not None and shape != ind_shape[:len(shape)] and not contains_slice:
+    if indices is not None and shape != ind_shape[:len(shape)] and not contains_slicer:
         raise ValueError("Shape of indices does not match shape for '%s': "
                          "Expected %s but got %s." %
                          (name, shape, ind_shape[:len(shape)]))
@@ -977,21 +977,27 @@ def common_subpath(pathnames):
     return ''
 
 
-def _is_slice(indices):
+def _is_slicer_op(indices):
     """
-    Check if an array of indices contains a slice object.
+    Check if an array of indices contains a colon or ellipsis operator.
 
     Parameters
     ----------
     indices : ndarray
-        Dotted pathnames of systems.
+        Indices to check.
 
     Returns
     -------
     bool
-        Returns True if indices contains a slice.
+        Returns True if indices contains a colon or ellipsis operator.
     """
-    return any(isinstance(i, slice) for i in indices)
+    if isinstance(indices, Iterable):
+        if isinstance(indices, (tuple, list, range, str)):
+            return any(isinstance(i, slice) or i is ... for i in indices)
+        else:
+            return any(isinstance(i, slice) or i is ... for i in indices.flatten())
+    else:
+        return isinstance(indices, slice)
 
 
 def _slice_indices(slicer, out_size, out_shape):

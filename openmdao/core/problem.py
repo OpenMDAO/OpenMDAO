@@ -28,8 +28,8 @@ from openmdao.recorders.recording_iteration_stack import _RecIteration
 from openmdao.recorders.recording_manager import RecordingManager, record_viewer_data, \
     record_system_options
 from openmdao.utils.record_util import create_local_meta
-from openmdao.utils.general_utils import ContainsAll, pad_name, simple_warning, warn_deprecation
-
+from openmdao.utils.general_utils import ContainsAll, pad_name, simple_warning, warn_deprecation, \
+    _is_slicer_op
 from openmdao.utils.mpi import FakeComm
 from openmdao.utils.mpi import MPI
 from openmdao.utils.name_maps import prom_name2abs_name, name2abs_names
@@ -430,7 +430,11 @@ class Problem(object):
             Indices or slice to set to specified value.
         """
         model = self.model
-        conns = self._metadata['connections']
+        try:
+            conns = self._metadata['connections']
+        except AttributeError:
+            raise RuntimeError(f"{self.msginfo}: '{name}' Cannot call set_val before setup.")
+
         all_meta = model._var_allprocs_abs2meta
         n_proms = 0  # if nonzero, name given was promoted input name w/o a matching prom output
 
@@ -498,6 +502,11 @@ class Problem(object):
             if indices is not None:
                 self._get_cached_val(name)
                 try:
+                    if _is_slicer_op(indices):
+                        self._initial_condition_cache[name] = value[indices]
+                    else:
+                        self._initial_condition_cache[name][indices] = value
+                except IndexError:
                     self._initial_condition_cache[name][indices] = value
                 except Exception as err:
                     raise RuntimeError(f"Failed to set value of '{name}': {str(err)}.")
@@ -1130,10 +1139,15 @@ class Problem(object):
 
                             if directional:
                                 n_in = 1
-                                perturb = 2.0 * np.random.random(len(flat_view)) - 1.0
                                 if c_name not in mfree_directions:
                                     mfree_directions[c_name] = {}
-                                mfree_directions[c_name][inp] = perturb
+
+                                if inp in mfree_directions[c_name]:
+                                    perturb = mfree_directions[c_name][inp]
+                                else:
+                                    perturb = 2.0 * np.random.random(len(flat_view)) - 1.0
+                                    mfree_directions[c_name][inp] = perturb
+
                             else:
                                 n_in = len(flat_view)
                                 perturb = 1.0
