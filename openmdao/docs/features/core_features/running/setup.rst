@@ -4,7 +4,7 @@
 Setup Your Model
 ****************
 
-After you have built up a model by defining variables and components, organizing them into a
+After you have built a model by defining variables and components, organizing them into a
 hierarchy, and connecting them together you then need to call the :code:`setup()` method to have
 the framework do some initialization work in preparation for execution.
 You can control some details of that initialization with the arguments that you pass into :code:`setup()`,

@@ -3123,7 +3123,7 @@ class System(object):
 
         Parameters
         ----------
-        iotypes : iter of str
+        iotypes : str or iter of str
             Will contain either 'input', 'output', or both.  Defaults to both.
         metadata_keys : iter of str or None
             Names of metadata entries to be retrieved or None, meaning retrieve all

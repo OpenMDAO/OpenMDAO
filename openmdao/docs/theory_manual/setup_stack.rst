@@ -39,10 +39,10 @@ One question that is often asked is: why can't we just put all of our model buil
 running a parallel model under MPI, certain systems might only be executed on certain processors.
 To save memory across the model, these systems are not fully set up on processors where they are
 not local. The only way to do this is to isolate the model building process into a custom method
-(`setup`) and only call it on the processors where you need the footprint for that group. While
+(`setup`) and only call it on the processors where that system is active. While
 not everyone will run their models in parallel, it is a good practice to follow the stricter
 guideline so that, if someone wants to include your model in a larger parallel model, they won't
-be forced to refactor it.
+be forced to allocate any unnecessary memory.
 
 .. _theory_setup_vs_configure:
 
@@ -91,8 +91,8 @@ Add a case recorder to the group or to a solver in a subsystem                  
 ==================================================================================== ======= ===========
 
  Keep in mind that, when `configure` is being run, you are already done calling `setup` on every group
- and component in the model, so if you add something here, setup will never be called, and it will
- never be fully integrated into the model hierarchy.
+ and component in the model, so if you add a new subsystem here, setup will never be called on it,
+ and it will not be properly integrated into the model hierarchy.
 
 
 Problem setup and final_setup
@@ -113,8 +113,8 @@ phases is to allow you to perform certain actions after `setup`:
  - Assign Jacobians
  - Add training data to metamodels
 
-If you do anything that changes the model hierarchy, such as adding a component to a group, then you will need to
-run `setup` again.
+If you do anything that changes the model hierarchy, such as adding a component to a group, then
+you will need to run `setup` again.
 
 During setup, the following things happen:
 
