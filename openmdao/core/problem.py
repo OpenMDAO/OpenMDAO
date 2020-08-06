@@ -97,14 +97,6 @@ class Problem(object):
     _initial_condition_cache : dict
         Any initial conditions that are set at the problem level via setitem are cached here
         until they can be processed.
-    PRE_SETUP : int
-        Newly initialized problem or newly added model.
-    POST_CONFIGURE : int
-        Configure has been called.
-    POST_SETUP : int
-        The `setup` method has been called, but vectors not initialized.
-    POST_FINAL_SETUP : int
-        The `final_setup` has been run, everything ready to run.
     cite : str
         Listing of relevant citations that should be referenced when
         publishing work that uses this class.
@@ -429,9 +421,9 @@ class Problem(object):
             Indices or slice to set to specified value.
         """
         model = self.model
-        try:
+        if self._metadata is not None:
             conns = self._metadata['connections']
-        except AttributeError:
+        else:
             raise RuntimeError(f"{self.msginfo}: '{name}' Cannot call set_val before setup.")
 
         all_meta = model._var_allprocs_abs2meta
