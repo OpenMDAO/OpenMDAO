@@ -124,6 +124,8 @@ class Problem(object):
         Problem name.
     _system_options_recorded : bool
         A flag to indicate whether the system options for all the systems have been recorded
+    _metadata : dict
+        Problem level metadata.
     """
 
     def __init__(self, model=None, driver=None, comm=None, name=None, **options):
