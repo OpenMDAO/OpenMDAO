@@ -225,10 +225,8 @@ class BoundsEnforceLS(LinesearchSolver):
 
             self._run_apply()
             norm = self._iter_get_norm()
-            # With solvers, we want to record the norm AFTER
-            # the call, but the call needs to
-            # be wrapped in the with for stack purposes,
-            # so we locally assign  norm & norm0 into the class.
+
+            # Save the norm values in the context manager so they can also be recorded.
             rec.abs = norm
             rec.rel = norm / norm0
 
@@ -444,9 +442,7 @@ class ArmijoGoldsteinLS(LinesearchSolver):
 
                     phi = self._line_search_objective()
 
-                    # With solvers, we want to report the norm AFTER
-                    # the iter_execute call, but the i_e call needs to
-                    # be wrapped in the with for stack purposes.
+                    # Save the norm values in the context manager so they can also be recorded.
                     rec.abs = phi
                     rec.rel = phi / phi0
 

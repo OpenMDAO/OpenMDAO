@@ -113,6 +113,28 @@ NewtonSolver Option Examples
 
   This feature can be set on any iterative nonlinear or linear solver.
 
+**stall_limit and stall_tol**
+
+  In some cases, nonlinear solvers can stall out where the norm of the residual stops changing at all. This
+  can happen for a couple of reasons. You can hit numerical noise problems and just be wandering around in
+  a circle, or you can get stuck on a bound and the line search just keeps running into the same spot no
+  matter what. Either way, if you have say 100 max iterations and you stall at 15 ... you waste a lot of
+  compute time. To remedy this, you can turn on stall detection in all nonlinear solvers by setting the
+  "stall_limit" option to a number greater than zero.
+
+  In this example, we set stall_limit to 3. While the solver iterates, it will compare the value of the
+  residual norm to the value computed in the previous iteration.  If the value matches for three iterations
+  in a row, then iteration will terminate due to detection of a stall. If "err_on_non_converge" is set
+  to True, then an ``AnalysisError`` will be raised just as if we had reached the iteration count limit.
+
+  We also set the `stall_tol` to 1e-6, which is the threshold below which a change in the relative residual
+  norm is considered to be unchanged.
+
+  .. embed-code::
+      openmdao.solvers.tests.test_solver_features.TestSolverFeatures.test_feature_stall_detection_newton
+      :layout: interleave
+
+
 Specifying a Linear Solver
 --------------------------
 

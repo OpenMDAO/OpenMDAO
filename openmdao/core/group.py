@@ -23,7 +23,7 @@ from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import convert_neg, array_connection_compatible, \
     _flatten_src_indices
 from openmdao.utils.general_utils import ContainsAll, all_ancestors, simple_warning, \
-    common_subpath, conditional_error, _is_slice, _slice_indices
+    common_subpath, conditional_error, _is_slicer_op, _slice_indices
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 from openmdao.utils.coloring import Coloring, _STD_COLORING_FNAME
@@ -1470,11 +1470,12 @@ class Group(System):
                             simple_warning(msg)
 
                 elif src_indices is not None:
-                    shape = None
-                    if _is_slice(src_indices):
+                    shape = False
+                    if _is_slicer_op(src_indices):
                         global_size = self._var_allprocs_abs2meta[abs_out]['global_size']
                         global_shape = self._var_allprocs_abs2meta[abs_out]['global_shape']
                         src_indices = _slice_indices(src_indices, global_size, global_shape)
+                        shape = True
                     else:
                         src_indices = np.atleast_1d(src_indices)
 
@@ -1916,14 +1917,16 @@ class Group(System):
                             " connect('%s', %s)?" % (self.msginfo, src_name, tgt_name))
 
         if isinstance(src_indices, tuple):
-            if not _is_slice(src_indices):
+            if not _is_slicer_op(src_indices):
                 src_indices = np.atleast_1d(src_indices)
 
         elif isinstance(src_indices, list):
             src_indices = np.atleast_1d(src_indices)
 
         if isinstance(src_indices, np.ndarray):
-            if not np.issubdtype(src_indices.dtype, np.integer):
+            if not np.issubdtype(src_indices.dtype, np.integer) and not \
+                    any(i == ... for i in src_indices):
+
                 raise TypeError("%s: src_indices must contain integers, but src_indices for "
                                 "connection from '%s' to '%s' is %s." %
                                 (self.msginfo, src_name, tgt_name, src_indices.dtype.type))
