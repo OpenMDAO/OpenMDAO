@@ -35,7 +35,7 @@ Configuring Setup-Dependent I/O
 Another situation in which the :code:`configure` method might be useful is if the inputs
 and outputs of a component or subsystem are dependent on the :code:`setup` of another system.
 
-Collecting variable metadata information during configure should be done via the
+Collecting variable metadata information during configure can be done via the
 :code:`get_io_metadata` method.
 
 .. automethod:: openmdao.core.system.System.get_io_metadata
@@ -51,6 +51,12 @@ The shape information is collected using :code:`get_io_metadata`.
 .. embed-code::
     openmdao.core.tests.test_group.TestFeatureConfigure.test_configure_add_input_output
     :layout: code, output
+
+
+Variable information may also be collected using :code:`list_inputs` and :code:`list_outputs`
+which provide a somewhat simpler interface with a little less flexibility and a little more
+overhead.
+
 
 Uses of setup vs. configure
 ---------------------------
