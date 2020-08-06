@@ -924,7 +924,6 @@ class Group(System):
         prom2abs_in = self._var_allprocs_prom2abs_list['input']
 
         for prom, metalist in self._group_inputs.items():
-            origins = {}
             top_origin = metalist[0]['path']
             top_prom = metalist[0]['prom']
             allmeta = set()
@@ -2740,13 +2739,6 @@ class Group(System):
                 if not dist and sname in sys_owners:
                     owners[abs_name] = sys_owners[sname]
         return owners
-
-    def _get_src_inds_max(self, tgt, meta):
-        inds = meta['src_indices']
-        if np.min(inds) < 0:
-            raise RuntimeError(f"{self.msginfo}: Can't connect '{tgt}' to an "
-                               "auto_ivc using negative src_indices.")
-        return inds, np.max(inds)
 
     def _get_auto_ivc_out_val(self, tgts, remote_vars, all_abs2meta, abs2meta):
         info = []

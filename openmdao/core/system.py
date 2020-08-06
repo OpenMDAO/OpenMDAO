@@ -2052,27 +2052,6 @@ class System(object):
                 vec.scale('norm')
 
     @contextmanager
-    def _unscaled_context_all(self):
-        """
-        Context manager that temporarily puts all vectors in an unscaled state.
-        """
-        if self._has_output_scaling:
-            for vec in self._vectors['output'].values():
-                vec.scale('phys')
-        if self._has_resid_scaling:
-            for vec in self._vectors['residual'].values():
-                vec.scale('phys')
-
-        yield
-
-        if self._has_output_scaling:
-            for vec in self._vectors['output'].values():
-                vec.scale('norm')
-        if self._has_resid_scaling:
-            for vec in self._vectors['residual'].values():
-                vec.scale('norm')
-
-    @contextmanager
     def _scaled_context_all(self):
         """
         Context manager that temporarily puts all vectors in a scaled state.
