@@ -1700,13 +1700,13 @@ class Group(System):
                     simple_warning(f"{self.msginfo}: src_indices have been specified with promotes"
                                    " 'any'. Note that src_indices only apply to matching inputs.")
 
-                # src_indices will applied when promotes are resolved
-                if inputs is not None:
-                    for inp in inputs:
-                        subsys._var_promotes_src_indices[inp] = (src_indices, flat_src_indices)
-                if any is not None:
-                    for inp in any:
-                        subsys._var_promotes_src_indices[inp] = (src_indices, flat_src_indices)
+            # src_indices will applied when promotes are resolved
+            if inputs is not None:
+                for inp in inputs:
+                    subsys._var_promotes_src_indices[inp] = (src_indices, flat_src_indices)
+            if any is not None:
+                for inp in any:
+                    subsys._var_promotes_src_indices[inp] = (src_indices, flat_src_indices)
 
         # check for attempt to promote with different alias
         list_comp = [i if isinstance(i, tuple) else (i, i) for i in subsys._var_promotes['input']]
