@@ -17,6 +17,7 @@ from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.utils.mpi import MPI
 from openmdao.utils.name_maps import abs_key2rel_key, rel_key2abs_key
 from openmdao.utils.general_utils import simple_warning
+from openmdao.core.constants import POST_FINAL_SETUP
 
 # an object used to detect when a named value isn't found
 _notfound = object()
@@ -234,7 +235,7 @@ def config_summary(problem, stream=sys.stdout):
                          if s.nonlinear_solver is not None]
 
     max_depth = max([len(name.split('.')) for name in sysnames])
-    setup_done = model._problem_meta['_setup_status'] == 3
+    setup_done = model._problem_meta['_setup_status'] == POST_FINAL_SETUP
 
     if problem.comm.size > 1:
         local_max = np.array([max_depth])
