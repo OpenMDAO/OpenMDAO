@@ -41,29 +41,25 @@ class _ConfigInfo(object):
         self._modified_systems = set()
 
     def _add_mod_parallel_groups(self, group):
-        if group.comm.size > 1:
-            from openmdao.core.parallel_group import ParallelGroup
-            if isinstance(group, ParallelGroup):
-                pass
-            elif group._contains_parallel_group:
-                prefix = group.pathname + '.' if group.pathname else ''
-                our_pars = [p for p in group._problem_meta['parallel_groups']
-                            if p.startswith(prefix)]
-                mod_pars = set()
-                for par in our_pars:
-                    pre = par + '.'
-                    for spath in self._modified_systems:
-                        if spath.startswith(pre):
-                            mod_pars.add(par)
-                            break
-                all_mods = group.comm.allgather(mod_pars)
-                for mods in all_mods:
-                    self._modified_systems.update(mods)
+        # if this group on any proc has local modified descendant systems that are parallel groups,
+        # this information needs to be known on all procs so that local parallel groups can
+        # be marked as modified if they have any modified descendants, even remote ones.
+        if group.comm.size > 1 and group._contains_parallel_group:
+            prefix = group.pathname + '.' if group.pathname else ''
+            our_pars = [p for p in group._problem_meta['parallel_groups']
+                        if p.startswith(prefix)]
+            mod_pars = set()
+            for par in our_pars:
+                pre = par + '.'
+                for spath in self._modified_systems:
+                    if spath.startswith(pre):
+                        mod_pars.add(par)
+                        break
+            all_mods = group.comm.allgather(mod_pars)
+            for mods in all_mods:
+                self._modified_systems.update(mods)
 
     def _var_added(self, comp_path, vname):
-        self._modified_systems.add(comp_path)
-
-    def _var_removed(self, comp_path, vname):
         self._modified_systems.add(comp_path)
 
     def _prom_added(self, group_path, any=None, inputs=None, outputs=None):
