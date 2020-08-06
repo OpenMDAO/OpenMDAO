@@ -9,6 +9,7 @@ from collections import OrderedDict
 
 import numpy as np
 
+from openmdao.core.constants import _DEFAULT_OUT_STREAM
 from openmdao.recorders.sqlite_recorder import blob_to_array
 from openmdao.utils.record_util import deserialize, get_source_system
 from openmdao.utils.variable_table import write_var_table
@@ -16,7 +17,6 @@ from openmdao.utils.general_utils import make_set, match_prom_or_abs
 from openmdao.utils.units import unit_conversion
 from openmdao.recorders.sqlite_recorder import format_version as current_version
 
-_DEFAULT_OUT_STREAM = object()
 _AMBIGOUS_PROM_NAME = object()
 
 

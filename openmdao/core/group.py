@@ -15,6 +15,7 @@ import networkx as nx
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.core.system import System, INT_DTYPE
 from openmdao.core.component import Component, _DictValues, _full_slice
+from openmdao.core.constants import _UNDEFINED
 from openmdao.proc_allocators.default_allocator import DefaultAllocator, ProcAllocationError
 from openmdao.jacobians.jacobian import SUBJAC_META_DEFAULTS
 from openmdao.recorders.recording_iteration_stack import Recording
@@ -28,7 +29,6 @@ from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismat
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 from openmdao.utils.coloring import Coloring, _STD_COLORING_FNAME
 import openmdao.utils.coloring as coloring_mod
-from openmdao.utils.options_dictionary import _undefined
 
 # regex to check for valid names.
 import re
@@ -169,7 +169,7 @@ class Group(System):
         """
         pass
 
-    def set_input_defaults(self, name, val=_undefined, units=None):
+    def set_input_defaults(self, name, val=_UNDEFINED, units=None):
         """
         Specify metadata to be assumed when multiple inputs are promoted to the same name.
 
@@ -183,7 +183,7 @@ class Group(System):
             Units to assume for the promoted input.
         """
         meta = {'prom': name}
-        if val is not _undefined:
+        if val is not _UNDEFINED:
             meta['value'] = val
         if units is not None:
             meta['units'] = units
@@ -929,12 +929,12 @@ class Group(System):
             allmeta = set()
             for meta in metalist:
                 allmeta.update(meta)
-            fullmeta = {n: _undefined for n in allmeta - skip}
+            fullmeta = {n: _UNDEFINED for n in allmeta - skip}
 
             for key in sorted(fullmeta):
                 for i, submeta in enumerate(metalist):
                     if key in submeta:
-                        if fullmeta[key] is _undefined:
+                        if fullmeta[key] is _UNDEFINED:
                             origin = submeta['path']
                             origin_prom = submeta['prom']
                             val = fullmeta[key] = submeta[key]
@@ -2843,7 +2843,7 @@ class Group(System):
         for abs_in in sorted(self._var_allprocs_discrete['input']):
             if abs_in not in conns:  # unconnected, so connect the input to an _auto_ivc output
                 prom = abs2prom[abs_in]
-                val = _undefined
+                val = _UNDEFINED
 
                 if prom in prom2auto:
                     # multiple connected inputs w/o a src. Connect them to the same IVC

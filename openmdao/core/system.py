@@ -18,11 +18,12 @@ import networkx as nx
 
 import openmdao
 from openmdao.core.configinfo import _ConfigInfo
+from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.vectors.vector import INT_DTYPE, _full_slice
 from openmdao.utils.mpi import MPI
-from openmdao.utils.options_dictionary import OptionsDictionary, _undefined
+from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.units import is_compatible, unit_conversion
 from openmdao.utils.variable_table import write_var_table
@@ -39,9 +40,7 @@ from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.utils.units import unit_conversion
 
-# Use this as a special value to be able to tell if the caller set a value for the optional
-#   out_stream argument. We run into problems running testflo if we use a default of sys.stdout.
-_DEFAULT_OUT_STREAM = object()
+
 _empty_frozen_set = frozenset()
 
 _asm_jac_types = {
@@ -4015,7 +4014,7 @@ class System(object):
             The value of the requested output/input/resid variable.  None if variable is not found.
         """
         discrete = distrib = False
-        val = _undefined
+        val = _UNDEFINED
         typ = 'output' if abs_name in self._var_allprocs_abs2prom['output'] else 'input'
         if from_root:
             all_meta = self._problem_meta['all_meta']
@@ -4044,7 +4043,7 @@ class System(object):
             elif get_remote:
                 raise ValueError(f"{self.msginfo}: Can't find variable named '{abs_name}'.")
             else:
-                return _undefined
+                return _UNDEFINED
 
         if kind is None:
             kind = typ
@@ -4077,7 +4076,7 @@ class System(object):
                     # TODO: could cache these offsets
                     offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
                     offsets[1:] = np.cumsum(sizes[:-1])
-                    loc_val = val if val is not _undefined else np.zeros(sizes[myrank])
+                    loc_val = val if val is not _UNDEFINED else np.zeros(sizes[myrank])
                     val = np.zeros(np.sum(sizes))
                     self.comm.Allgatherv(loc_val, [val, sizes, offsets, MPI.DOUBLE])
                 else:
@@ -4093,11 +4092,11 @@ class System(object):
                     # TODO: could cache these offsets
                     offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
                     offsets[1:] = np.cumsum(sizes[:-1])
-                    loc_val = val if val is not _undefined else np.zeros(sizes[idx])
+                    loc_val = val if val is not _UNDEFINED else np.zeros(sizes[idx])
                     if rank == self.comm.rank:
                         val = np.zeros(np.sum(sizes))
                     else:
-                        val = _undefined
+                        val = _UNDEFINED
                     self.comm.Gatherv(loc_val, [val, sizes, offsets, MPI.DOUBLE], root=rank)
                 else:
                     if rank != owner:
@@ -4112,7 +4111,7 @@ class System(object):
                         elif self.comm.rank == rank:
                             val = self.comm.recv(source=owner, tag=tag)
 
-        if not flat and val is not _undefined and not discrete and not np.isscalar(val):
+        if not flat and val is not _UNDEFINED and not discrete and not np.isscalar(val):
             val.shape = meta['global_shape'] if get_remote and distrib else meta['shape']
 
         return val

@@ -20,6 +20,7 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group, System
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.total_jac import _TotalJacInfo
+from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.solvers.solver import SolverInfo
@@ -33,7 +34,7 @@ from openmdao.utils.general_utils import ContainsAll, pad_name, simple_warning, 
 from openmdao.utils.mpi import FakeComm
 from openmdao.utils.mpi import MPI
 from openmdao.utils.name_maps import prom_name2abs_name, name2abs_names
-from openmdao.utils.options_dictionary import OptionsDictionary, _undefined
+from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import convert_units
 from openmdao.utils import coloring as coloring_mod
 from openmdao.utils.name_maps import abs_key2rel_key
@@ -50,9 +51,6 @@ except ImportError:
 
 from openmdao.utils.name_maps import rel_key2abs_key, rel_name2abs_name
 
-# Use this as a special value to be able to tell if the caller set a value for the optional
-#   out_stream argument. We run into problems running testflo if we use a default of sys.stdout.
-_DEFAULT_OUT_STREAM = object()
 
 ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
 MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])
@@ -324,7 +322,7 @@ class Problem(object):
                 else:
                     val = self.model.comm.bcast(None, root=owner)
 
-            if val is not _undefined:
+            if val is not _UNDEFINED:
                 # Need to cache the "get" in case the user calls in-place numpy operations.
                 self._initial_condition_cache[name] = val
 
@@ -376,7 +374,7 @@ class Problem(object):
         """
         if self._setup_status == 1:
             val = self._get_cached_val(name, get_remote=get_remote)
-            if val is not _undefined:
+            if val is not _UNDEFINED:
                 if indices is not None:
                     val = val[indices]
                 if units is not None:
@@ -385,7 +383,7 @@ class Problem(object):
             val = self.model.get_val(name, units=units, indices=indices, get_remote=get_remote,
                                      from_src=True)
 
-        if val is _undefined:
+        if val is _UNDEFINED:
             if get_remote:
                 raise KeyError('{}: Variable name "{}" not found.'.format(self.msginfo, name))
             else:
