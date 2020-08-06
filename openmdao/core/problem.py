@@ -865,8 +865,7 @@ class Problem(object):
             'use_derivatives': derivatives,
             'force_alloc_complex': force_alloc_complex,
             'connections': {},  # all connections in the model (after setup)
-            'remote_systems': {},
-            'remote_vars': {},  # does not include distrib vars
+            'remote_vars': {},  # vars that are remote somewhere. does not include distrib vars
             'prom2abs': {'input': {}, 'output': {}},  # includes ALL promotes including buried ones
             'static_mode': False,  # used to determine where various 'static' and 'dynamic' data
                                    # structures are stored.  Dynamic ones are added during System
@@ -874,7 +873,7 @@ class Problem(object):
                                    # each Problem setup.  Static ones are added outside of
                                    # Problem setup and they are never wiped out or re-created.
             'config_info': None,  # used during config to determine if additional updates required
-            'parallel_groups': [],  # list of pathnames of parallel groups in this proc
+            'parallel_groups': [],  # list of pathnames of parallel groups in this model (all procs)
         }
         model._setup(model_comm, mode, self._metadata)
 

@@ -83,16 +83,11 @@ def write_var_table(pathname, var_list, var_type, var_dict,
 
     # Find with width of the first column in the table
     #    Need to look through all the possible varnames to find the max width
-    if top_name != 'model':
-        max_varname_len = len('varname')
-        offset = 0
-    else:
-        max_varname_len = max(len(top_name), len('varname'))
-        offset = 1
+    max_varname_len = len('varname')
     if hierarchical:
         for name, outs in var_dict.items():
             for i, name_part in enumerate(name[rel_idx:].split('.')):
-                total_len = (i + offset) * indent_inc + len(name_part)
+                total_len = i * indent_inc + len(name_part)
                 max_varname_len = max(max_varname_len, total_len)
     else:
         for name, outs in var_dict.items():
@@ -125,8 +120,6 @@ def write_var_table(pathname, var_list, var_type, var_dict,
 
     # Write out the variable names and optional values and metadata
     if hierarchical:
-        if top_name == 'model':
-            out_stream.write(top_name + '\n')
 
         cur_sys_names = []
 
@@ -150,8 +143,6 @@ def write_var_table(pathname, var_list, var_type, var_dict,
 
             # Write the Systems in the var name path
             indent = len(existing_sys_names) * indent_inc
-            if top_name == 'model':
-                indent += indent_inc
             for i, sys_name in enumerate(remaining_sys_path_parts):
                 out_stream.write(indent * ' ' + sys_name + '\n')
                 indent += indent_inc

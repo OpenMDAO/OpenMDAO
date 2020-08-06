@@ -596,9 +596,8 @@ class Group(System):
         self._problem_meta['all_meta'] = self._var_allprocs_abs2meta
         self._problem_meta['meta'] = self._var_abs2meta
 
-        self._problem_meta['remote_systems'] = rsystems = self._find_remote_sys_owners()
-        self._problem_meta['remote_vars'] = \
-            self._find_remote_var_owners(self._problem_meta['remote_systems'])
+        rsystems = self._find_remote_sys_owners()
+        self._problem_meta['remote_vars'] = self._find_remote_var_owners(rsystems)
         self._problem_meta['prom2abs'] = self._get_all_promotes(rsystems)
 
         self._resolve_group_input_defaults()
@@ -1768,7 +1767,7 @@ class Group(System):
                     raise RuntimeError("%s: Trying to promote '%s' when it has been aliased to "
                                        "'%s'." % (self.msginfo, original_inside, new))
 
-        # if this was called during configure(), make this group as modified
+        # if this was called during configure(), mark this group as modified
         if self._problem_meta is not None:
             if self._problem_meta['config_info'] is not None:
                 self._problem_meta['config_info']._prom_added(self.pathname, any=any,
