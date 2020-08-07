@@ -644,6 +644,11 @@ class System(object):
         self._setup_var_index_ranges()
         self._setup_var_sizes()
 
+        # These are used when the driver assembles the design variables.
+        self._problem_meta['abs2idx'] = self._var_allprocs_abs2idx
+        self._problem_meta['sizes'] = self._var_sizes
+        self._problem_meta['abs2prom'] = self._var_allprocs_abs2prom
+
         if self.pathname == '':
             self._top_level_setup2()
 
@@ -2872,9 +2877,12 @@ class System(object):
         pro2abs_out = self._var_allprocs_prom2abs_list['output']
         pro2abs_in = self._var_allprocs_prom2abs_list['input']
         conns = self._problem_meta.get('connections', {})
+        if use_prom_ivc:
+            abs2prom = self._problem_meta.get('abs2prom', {})['input']
 
         # Human readable error message during Driver setup.
         out = OrderedDict()
+        out_scope_ivc = {}
         try:
             for name, data in self._design_vars.items():
                 if name in pro2abs_out:
@@ -2883,18 +2891,30 @@ class System(object):
                     abs_name = pro2abs_out[name][0]
                     out[abs_name] = data
                     out[abs_name]['ivc_source'] = abs_name
+                    out_scope_ivc[abs_name] = False
 
                 else:  # assume an input name else KeyError
 
                     # Design variable on an auto_ivc input, so use connected output name.
                     in_abs = pro2abs_in[name][0]
                     ivc_path = conns[in_abs]
+
                     if use_prom_ivc:
+
+                        # If we are not at the top, then promoted name needs to be converted to the
+                        # top scope.
+                        if self.pathname and in_abs in abs2prom:
+                            name = abs2prom[in_abs]
+                            out_scope_ivc[name] = True
+                        else:
+                            out_scope_ivc[name] = False
+
                         out[name] = data
                         out[name]['ivc_source'] = ivc_path
                     else:
                         out[ivc_path] = data
                         out[ivc_path]['ivc_source'] = ivc_path
+                        out_scope_ivc[ivc_path] = False
 
         except KeyError as err:
             msg = "{}: Output not found for design variable {}."
@@ -2902,9 +2922,14 @@ class System(object):
 
         if get_sizes:
             # Size them all
-            sizes = self._var_sizes['nonlinear']['output']
-            abs2idx = self._var_allprocs_abs2idx['nonlinear']
             for name, meta in out.items():
+
+                if out_scope_ivc[name]:
+                    abs2idx = self._problem_meta.get('abs2idx', {})['nonlinear']
+                    sizes = self._problem_meta.get('sizes', {})['nonlinear']['output']
+                else:
+                    sizes = self._var_sizes['nonlinear']['output']
+                    abs2idx = self._var_allprocs_abs2idx['nonlinear']
 
                 src_name = name
                 if meta['ivc_source'] is not None:
@@ -2917,14 +2942,18 @@ class System(object):
                         meta['size'] = 0  # discrete var, don't know size
 
                 if src_name in abs2idx:
-                    meta = self._var_allprocs_abs2meta[src_name]
+                    if out_scope_ivc[name]:
+                        meta = self._problem_meta.get('all_meta', {})[src_name]
+                    else:
+                        meta = self._var_allprocs_abs2meta[src_name]
+
                     out[name]['distributed'] = meta['distributed']
                     out[name]['global_size'] = meta['global_size']
 
         if recurse:
             for subsys in self._subsystems_myproc:
                 out.update(subsys.get_design_vars(recurse=recurse, get_sizes=get_sizes,
-                                                  use_prom_ivc=False))
+                                                  use_prom_ivc=use_prom_ivc))
 
             if self.comm.size > 1 and self._subsystems_allprocs:
                 allouts = self.comm.allgather(out)
