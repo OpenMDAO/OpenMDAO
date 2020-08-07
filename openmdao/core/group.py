@@ -1408,7 +1408,8 @@ class Group(System):
 
                 elif src_indices is not None:
                     shape = False
-                    if _is_slicer_op(src_indices):
+                    is_slice = _is_slicer_op(src_indices)
+                    if is_slice:
                         global_size = self._var_allprocs_abs2meta[abs_out]['global_size']
                         global_shape = self._var_allprocs_abs2meta[abs_out]['global_shape']
                         src_indices = _slice_indices(src_indices, global_size, global_shape)
@@ -1419,9 +1420,12 @@ class Group(System):
                     if np.prod(src_indices.shape) == 0:
                         continue
 
+                    flat_array_slice_check = True if is_slice and \
+                        src_indices.size == np.prod(in_shape) else False
+
                     # initial dimensions of indices shape must be same shape as target
                     for idx_d, inp_d in zip(src_indices.shape, in_shape):
-                        if idx_d != inp_d:
+                        if idx_d != inp_d and not flat_array_slice_check:
                             msg = f"{self.msginfo}: The source indices " + \
                                   f"{src_indices} do not specify a " + \
                                   f"valid shape for the connection '{abs_out}' to " + \
@@ -1434,7 +1438,7 @@ class Group(System):
                                 continue
 
                     # any remaining dimension of indices must match shape of source
-                    if len(src_indices.shape) > len(in_shape):
+                    if len(src_indices.shape) > len(in_shape) and not flat_array_slice_check:
                         source_dimensions = src_indices.shape[len(in_shape)]
                         if source_dimensions != len(out_shape):
                             str_indices = str(src_indices).replace('\n', '')
