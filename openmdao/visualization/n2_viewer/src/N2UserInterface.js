@@ -34,24 +34,6 @@ class InfoPropYesNo extends InfoPropDefault {
     canShow(obj) { return (obj.propExists(this.key) && obj[this.key] != '' && this.showIfFalse == false )}
 }
 
-/**
- * Rename inputs to inputs and outputs to outputs.
- * @typedef InfoUpdateType
- */
-class InfoUpdateType extends InfoPropDefault {
-    constructor(key, desc, capitalize = false) {
-        super(key, desc, capitalize);
-    }
-
-    /** Replace the old terms with new ones */
-    output(msg) {
-        return msg
-            .replace(/input/, 'input')
-            .replace(/output/, 'output')
-            .replace('_', ' ');
-    }
-}
-
 // Used to format that floats displayed
 let val_formatter = d3.format("g");
 
@@ -79,7 +61,7 @@ function array_to_string(array, level=0){
     return s;
 }
 
-/** Convert an array to a string that can be used in code.
+/** Convert an array to a string that can be used in Python code.
  * @param {array} arr The array to convert.
  * @returns {str} the string of the converted array.
  */
@@ -114,11 +96,10 @@ class InfoPropArray extends InfoPropDefault {
         return array;
     }
 
-    canShow(obj) { return (obj.propExists(this.key) && obj[this.key] != '' )}
 }
 
 /**
- * Manage the windows for displaying the values of a variables.
+ * Manage the windows that display the values of variables
  * @typedef ValueInfoManager
  */
 class ValueInfoManager {
@@ -144,7 +125,6 @@ class ValueInfoManager {
     }
 };
 
-
 /**
  * Manage a window for displaying the value of a variable.
  * @typedef ValueInfo
@@ -159,25 +139,23 @@ class ValueInfo {
     constructor( name, val, ui) {
         this.name = name;
         this.val = val;
-        this.ui = ui;
 
         /* Construct the DOM elements that make up the window */
-        let top_container = d3.select('#node-value-containers');
+        const top_container = d3.select('#node-value-containers');
         this.container = top_container.append('div').attr('class', 'node-value-container');
         this.header = this.container.append('div').attr('class', 'node-value-header');
-        let close_button = this.header.append('span').attr('class', 'close-value-window-button' ).text('x');
+        const close_button = this.header.append('span').attr('class', 'close-value-window-button' ).text('x');
         this.title = this.header.append('span').attr('class', 'node-value-title' );
         this.table_div = this.container.append('div').attr('class', 'node-value-table-div');
         this.table = this.table_div.append('table').attr('class', 'node-value-table')
         this.container.append('div').attr('class', 'node-value-footer');
-        let resizer_box = this.container.append('div').attr('class', 'node-value-resizer-box inactive-resizer-box')
+        const resizer_box = this.container.append('div').attr('class', 'node-value-resizer-box inactive-resizer-box')
         this.resizer_handle = resizer_box.append('p').attr('class','node-value-resizer-handle inactive-resizer-handle')
 
-        const self = this;
         close_button.on(
             'click',
             function () {
-                self.ui.valueInfoManager.remove(self.name);
+                ui.valueInfoManager.remove(name);
             }
         );
 
@@ -206,9 +184,9 @@ class ValueInfo {
         }
 
         // Construct the table displaying the variable value
-        this.tbody = this.table.append("tbody");
-        let rows = this.tbody.selectAll('tr').data(val).enter().append('tr')
-        let cells = rows.selectAll('td')
+        const tbody = this.table.append("tbody");
+        const rows = tbody.selectAll('tr').data(val).enter().append('tr')
+        const cells = rows.selectAll('td')
             .data(function(row) {
                 return row;
         })
@@ -226,13 +204,13 @@ class ValueInfo {
         this.initial_height = parseInt(this.table.style('height'));
     }
 
-    /** Listen for the event to begin dragging the legend */
+    /** Listen for the event to begin dragging the value the value window */
     _setupDrag() {
         const self = this;
 
         this.title.on('mousedown', function() {
             self.title.style('cursor', 'grabbing');
-            let dragDiv = self.container;
+            const dragDiv = self.container;
             dragDiv.style('cursor', 'grabbing')
                 // top style needs to be set explicitly before releasing bottom:
                 .style('top', dragDiv.style('top'))
@@ -242,7 +220,7 @@ class ValueInfo {
             self._offset = [d3.event.clientX - parseInt(dragDiv.style('left')),
                 d3.event.clientY - parseInt(dragDiv.style('top'))];
 
-            let w = d3.select(window)
+            const w = d3.select(window)
                 .on("mousemove", e => {
                     dragDiv
                         .style('top', (d3.event.clientY - self._offset[1]) + 'px')
@@ -320,7 +298,7 @@ ValueInfo.showMoreButtonDisplayed = function(val) {
     // Handle 2-D array
     if (!Array.isArray(val[0][0])) return true;
 
-    // More than 3-D array - punt for now
+    // More than 2-D array - punt for now - no practical way to display
     return false;
 }
 
@@ -340,7 +318,7 @@ class NodeInfo {
         this.propList = [
             new InfoPropDefault('absPathName', 'Absolute Name'),
             new InfoPropDefault('class', 'Class'),
-            new InfoUpdateType('type', 'Type', true),
+            new InfoPropDefault('type', 'Type', true),
             new InfoPropDefault('dtype', 'DType'),
 
             new InfoPropDefault('units', 'Units'),
@@ -435,7 +413,7 @@ class NodeInfo {
                     let val_string = array_to_string(val)
                     let max_length = ValueInfo.TRUNCATE_LIMIT;
                     let isTruncated = val_string.length > max_length ;
-                    let nodeInfoVal = isTruncated ?
+                    nodeInfoVal = isTruncated ?
                         val_string.substring(0, max_length - 3) + "..." :
                         val_string;
 
@@ -469,7 +447,6 @@ class NodeInfo {
             else {
                 td = newRow.append('td')
                         .text(nodeInfoVal);
-
             }
             if (capitalize) td.attr('class', 'caps');
         } else {
