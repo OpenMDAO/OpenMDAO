@@ -5,7 +5,7 @@ August 07, 2020
 
 OpenMDAO 3.2.1 is a minor update intended to address issues introduced in 3.2.0.
 
-On the use-facing side, there are continuing improvements to the N2 visualization tool.
+On the user-facing side, there are continuing improvements to the N2 visualization tool.
 Version 3.2.0 introduced the ability to use `om.slicer` to specify indices and src_indices via slices.  This update now allows the Ellipsis (`...`) in the specification of slices, which should make connecting subsets of multidimensional outputs much simpler.
 Nonlinear solvers also now have the ability to detect stalls.
 
