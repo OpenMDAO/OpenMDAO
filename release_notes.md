@@ -1,4 +1,45 @@
 **********************************
+# Release Notes for OpenMDAO 3.2.1
+
+August 07, 2020
+
+OpenMDAO 3.2.1 is a minor update intended to address issues introduced in 3.2.0.
+
+On the use-facing side, there are continuing improvements to the N2 visualization tool.
+Version 3.2.0 introduced the ability to use `om.slicer` to specify indices and src_indices via slices.  This update now allows the Ellipsis (`...`) in the specification of slices, which should make connecting subsets of multidimensional outputs much simpler.
+Nonlinear solvers also now have the ability to detect stalls.
+
+## Backwards Incompatible API Changes:
+
+- Removed unused args from IndepVarComp.add_output #1576
+
+## Backwards Incompatible NON-API Changes:
+
+
+## New Features:
+
+- Pinned N2 arrows are now transitioned between updates #1563
+- Update vector API to eliminate the need to access internal vector data structures directly. This is a good idea in general but is mandatory for nocopy transfers, where the internal '_data' array in input vectors no longer contains storage for all of the variables. #1567
+- Support for ellipsis objects in om.Slicer #1564
+- Added Stall Detection to the nonlinear solvers. #1574
+
+## Bug Fixes:
+
+- Reworked error/warning behavior for set_input_defaults so that ambiguities resolved at a higher level trigger a warning instead of an error. #1568
+- The N2 code and several areas of the docs still referenced param/unknown terms instead of input/output. These were updated, and a few other areas of N2 code were cleaned up as well. #1570
+- An error message is now raised if set_val is called before setup. #1578
+- Calls made to set_input_defaults inside of the configure method are no longer ignored. #1583
+- When multiple inputs promoted to the same name were explicitly connected to an output, a units ambiguity error was generated even if all of the inputs had the same units. #1587
+- Fixed bug in directional derivatives of implicit states when checking partials on a matrix-free component. #1589
+- Allow BalanceComp I/O to be sized from rhs_val if val is unavailable #1591
+- Fixed bug in group promotes with input src_indices being ignored. #1595
+
+## Miscellaneous:
+
+- Multiple versions of the TLDR Paraboloid example were consolidated #1555
+- Fix for test failure on AppVeyor. Compare against Numpy integer datatype. #1586
+
+**********************************
 # Release Notes for OpenMDAO 3.2.0
 
 July 21, 2020
