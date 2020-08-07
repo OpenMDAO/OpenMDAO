@@ -171,8 +171,8 @@ class ApproximationScheme(object):
 
         if is_total and system.pathname == '':  # top level approx totals
             of_names = system._owns_approx_of
-            full_wrts = system._var_allprocs_abs_names['output'] + \
-                system._var_allprocs_abs_names['input']
+            full_wrts = list(system._abs_name_iter('output', local=False)) + \
+                list(system._abs_name_iter('input', local=False))
             wrt_names = system._owns_approx_wrt
         else:
             of_names, wrt_names = system._get_partials_varlists()
@@ -190,7 +190,7 @@ class ApproximationScheme(object):
 
         # FIXME: need to deal with mix of local/remote indices
 
-        len_full_ofs = len(system._var_allprocs_abs_names['output'])
+        len_full_ofs = len(list(system._abs_name_iter('output', local=False)))
 
         full_idxs = []
         approx_of_idx = system._owns_approx_of_idx
@@ -530,7 +530,7 @@ def _get_wrt_subjacs(system, approxs):
     ofdict = {}
     nondense = {}
     slicedict = system._outputs.get_slice_dict()
-    abs_out_names = [n for n in system._var_allprocs_abs_names['output'] if n in slicedict]
+    abs_out_names = [n for n in system._abs_name_iter('output', local=False) if n in slicedict]
 
     for key, options in approxs:
         of, wrt = key

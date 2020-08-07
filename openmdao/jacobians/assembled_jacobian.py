@@ -85,7 +85,7 @@ class AssembledJacobian(Jacobian):
         abs2meta = system._var_abs2meta
         ranges = OrderedDict()
         start = end = 0
-        for name in system._var_abs_names[vtype]:
+        for name in system._abs_name_iter(vtype):
             end += abs2meta[name]['size']
             ranges[name] = (start, end)
             start = end
@@ -192,7 +192,7 @@ class AssembledJacobian(Jacobian):
         in_ranges = self._in_ranges
         out_ranges = self._out_ranges
 
-        input_names = system._var_abs_names['input']
+        input_names = list(system._abs_name_iter('input'))
         if input_names:
             min_in_offset = in_ranges[input_names[0]][0]
             max_in_offset = in_ranges[input_names[-1]][1]
@@ -200,7 +200,7 @@ class AssembledJacobian(Jacobian):
             min_in_offset = sys.maxsize
             max_in_offset = 0
 
-        output_names = system._var_abs_names['output']
+        output_names = list(system._abs_name_iter('output'))
         if output_names:
             min_res_offset = out_ranges[output_names[0]][0]
             max_res_offset = out_ranges[output_names[-1]][1]
@@ -230,17 +230,17 @@ class AssembledJacobian(Jacobian):
         sizes = system._var_sizes['linear']['input']
         abs2idx = system._var_allprocs_abs2idx['linear']
         in_offset = {n: np.sum(sizes[iproc, :abs2idx[n]]) for n in
-                     system._var_abs_names['input'] if n not in conns}
+                     system._abs_name_iter('input') if n not in conns}
 
         subjacs_info = self._subjacs_info
 
         sizes = system._var_sizes['linear']['output']
         for s in system.system_iter(recurse=True, include_self=True, typ=Component):
-            for res_abs_name in s._var_abs_names['output']:
+            for res_abs_name in s._abs_name_iter('output'):
                 res_offset = np.sum(sizes[iproc, :abs2idx[res_abs_name]])
                 res_size = abs2meta[res_abs_name]['size']
 
-                for in_abs_name in s._var_abs_names['input']:
+                for in_abs_name in s._abs_name_iter('input'):
                     if in_abs_name not in conns:  # unconnected input
                         abs_key = (res_abs_name, in_abs_name)
 
@@ -277,8 +277,8 @@ class AssembledJacobian(Jacobian):
             else:
                 global_conns = system._conn_global_abs_in2out
 
-            output_names = set(system._var_abs_names['output'])
-            input_names = set(system._var_abs_names['input'])
+            output_names = set(system._abs_name_iter('output'))
+            input_names = set(system._abs_name_iter('input'))
 
             rev_conns = defaultdict(list)
             for tgt, src in global_conns.items():

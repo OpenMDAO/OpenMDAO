@@ -224,11 +224,11 @@ class Group(System):
 
         if excl_sub is None:
             # All outputs
-            scope_out = frozenset(self._var_allprocs_abs_names['output'])
+            scope_out = frozenset(self._abs_name_iter('output', local=False))
 
             # All inputs connected to an output in this system
             scope_in = frozenset(self._conn_global_abs_in2out).intersection(
-                self._var_allprocs_abs_names['input'])
+                self._abs_name_iter('input', local=False))
 
         else:
             # Empty for the excl_sub
@@ -236,7 +236,7 @@ class Group(System):
 
             # All inputs connected to an output in this system but not in excl_sub
             scope_in = set()
-            for abs_in in self._var_allprocs_abs_names['input']:
+            for abs_in in self._abs_name_iter('input', local=False):
                 if abs_in in self._conn_global_abs_in2out:
                     abs_out = self._conn_global_abs_in2out[abs_in]
 
@@ -640,7 +640,7 @@ class Group(System):
 
             # the code below is to handle the case where src_indices were not specified
             # for a distributed input. This update can't happen until sizes are known.
-            dist_ins = [n for n in self._var_allprocs_abs_names['input']
+            dist_ins = [n for n in self._abs_name_iter('input', local=False)
                         if all_abs2meta[n]['distributed']]
             dcomp_names = set(d.rsplit('.', 1)[0] for d in dist_ins)
             if dcomp_names:
@@ -727,10 +727,6 @@ class Group(System):
         super(Group, self)._setup_var_data()
 
         abs_names = self._var_abs_names
-        abs_names_discrete = self._var_abs_names_discrete
-
-        allprocs_abs_names = self._var_allprocs_abs_names
-        allprocs_abs_names_discrete = self._var_allprocs_abs_names_discrete
 
         var_discrete = self._var_discrete
         allprocs_discrete = self._var_allprocs_discrete
@@ -738,8 +734,7 @@ class Group(System):
         abs2meta = self._var_abs2meta
         abs2prom = self._var_abs2prom
 
-        allprocs_abs2meta = self._var_allprocs_abs2meta
-        allprocs_abs2prom = self._var_allprocs_abs2prom
+        allprocs_abs2meta = OrderedDict()
 
         allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
         gatherable = self._gatherable_vars
@@ -754,7 +749,6 @@ class Group(System):
 
             var_maps = subsys._get_maps(subsys._var_allprocs_prom2abs_list)
 
-            # Assemble allprocs_abs2meta and abs2meta
             allprocs_abs2meta.update(subsys._var_allprocs_abs2meta)
             abs2meta.update(subsys._var_abs2meta)
 
@@ -764,20 +758,11 @@ class Group(System):
 
             for type_ in ['input', 'output']:
                 subprom2prom = var_maps[type_]
-                # Assemble abs_names and allprocs_abs_names
-                allprocs_abs_names[type_].extend(
-                    subsys._var_allprocs_abs_names[type_])
-                allprocs_abs_names_discrete[type_].extend(
-                    subsys._var_allprocs_abs_names_discrete[type_])
-
-                abs_names[type_].extend(subsys._var_abs_names[type_])
-                abs_names_discrete[type_].extend(subsys._var_abs_names_discrete[type_])
 
                 allprocs_discrete[type_].update(subsys._var_allprocs_discrete[type_])
                 var_discrete[type_].update({sub_prefix + k: v for k, v in
                                             subsys._var_discrete[type_].items()})
 
-                # Assemble allprocs_prom2abs_list and abs2prom
                 sub_loc_proms = subsys._var_abs2prom[type_]
                 for sub_prom, sub_abs in subsys._var_allprocs_prom2abs_list[type_].items():
                     prom_name = subprom2prom[sub_prom]
@@ -787,7 +772,6 @@ class Group(System):
                     for abs_name in sub_abs:
                         if abs_name in sub_loc_proms:
                             abs2prom[type_][abs_name] = prom_name
-                        allprocs_abs2prom[type_][abs_name] = prom_name
 
             if isinstance(subsys, Group):
                 subprom2prom = var_maps['input']
@@ -802,34 +786,32 @@ class Group(System):
             mysub = self._subsystems_myproc[0] if self._subsystems_myproc else False
             if (mysub and mysub.comm.rank == 0 and (mysub._full_comm is None or
                                                     mysub._full_comm.rank == 0)):
-                raw = (allprocs_abs_names, allprocs_abs_names_discrete, allprocs_discrete,
-                       allprocs_prom2abs_list, allprocs_abs2prom, allprocs_abs2meta,
-                       self._has_output_scaling, self._has_resid_scaling, self._group_inputs)
+                gatherable.update(n for n in allprocs_abs2meta if n not in abs2meta)
+                raw = (allprocs_discrete, allprocs_prom2abs_list, allprocs_abs2meta,
+                       self._has_output_scaling, self._has_resid_scaling, self._group_inputs,
+                       gatherable)
             else:
                 raw = (
-                    {'input': [], 'output': []},
-                    {'input': [], 'output': []},
-                    {'input': {}, 'output': {}},
                     {'input': {}, 'output': {}},
                     {'input': {}, 'output': {}},
                     {},
                     False,
                     False,
-                    {}
+                    {},
+                    set()
                 )
 
             gathered = self.comm.allgather(raw)
 
+            # start with a fresh OrderedDict to keep order the same in all procs
+            allprocs_abs2meta = OrderedDict()
+
             for type_ in ['input', 'output']:
-                allprocs_abs_names[type_] = []
-                allprocs_abs_names_discrete[type_] = []
-                allprocs_abs2prom[type_] = {}
                 allprocs_prom2abs_list[type_] = OrderedDict()
 
             myrank = self.comm.rank
-            for rank, (myproc_abs_names, myproc_abs_names_discrete, myproc_discrete,
-                       myproc_prom2abs_list, all_abs2prom, myproc_abs2meta, oscale,
-                       rscale, ginputs) in enumerate(gathered):
+            for rank, (myproc_discrete, myproc_prom2abs_list, myproc_abs2meta,
+                       oscale, rscale, ginputs, mygatherable) in enumerate(gathered):
                 self._has_output_scaling |= oscale
                 self._has_resid_scaling |= rscale
 
@@ -838,19 +820,15 @@ class Group(System):
                         if p not in self._group_inputs:
                             self._group_inputs[p] = []
                         self._group_inputs[p].extend(mlist)
+                    self._gatherable_vars.update(mygatherable)
 
                 # Assemble in parallel allprocs_abs2meta
-                for n in myproc_abs2meta:
-                    if n not in allprocs_abs2meta:
-                        allprocs_abs2meta[n] = myproc_abs2meta[n]
+                allprocs_abs2meta.update(myproc_abs2meta)
 
                 for type_ in ['input', 'output']:
 
                     # Assemble in parallel allprocs_abs_names
-                    allprocs_abs_names[type_].extend(myproc_abs_names[type_])
-                    allprocs_abs_names_discrete[type_].extend(myproc_abs_names_discrete[type_])
                     allprocs_discrete[type_].update(myproc_discrete[type_])
-                    allprocs_abs2prom[type_].update(all_abs2prom[type_])
 
                     # Assemble in parallel allprocs_prom2abs_list
                     for prom_name, abs_names_list in myproc_prom2abs_list[type_].items():
@@ -858,38 +836,25 @@ class Group(System):
                             allprocs_prom2abs_list[type_][prom_name] = []
                         allprocs_prom2abs_list[type_][prom_name].extend(abs_names_list)
 
-            # determine 'gatherable' vars, i.e., vars that are remote somewhere in the comm
-            locs = {}
-            locs_disc = {}
-            for type_ in ('input', 'output'):
-                locs[type_] = np.array([n in abs2meta and abs2meta[n]['size'] > 0
-                                        for n in allprocs_abs_names[type_]], dtype=bool)
-                locs_disc[type_] = np.array([
-                    n in abs2prom[type_] for n in allprocs_abs_names_discrete[type_]
-                ], dtype=bool)
-
-            raw_locs = (locs, locs_disc)
-            allprocs_raw_locs = self.comm.allgather(raw_locs)
-            for type_ in ('input', 'output'):
-                all_locs = np.ones(len(allprocs_abs_names[type_]), dtype=bool)
-                all_locs_disc = np.ones(len(allprocs_abs_names_discrete[type_]), dtype=bool)
-                for rank, (loc, loc_disc) in enumerate(allprocs_raw_locs):
-                    all_locs &= loc[type_]
-                    all_locs_disc &= loc_disc[type_]
-
-                for i, n in enumerate(allprocs_abs_names[type_]):
-                    if not all_locs[i]:
-                        gatherable.add(n)
-
-                for i, n in enumerate(allprocs_abs_names_discrete[type_]):
-                    if not all_locs_disc[i]:
-                        gatherable.add(n)
+        self._var_allprocs_abs2meta = allprocs_abs2meta
+        for name, meta in self._var_abs2meta.items():
+            abs_names[meta['iotype']].append(name)
 
         for prom_name, abs_list in allprocs_prom2abs_list['output'].items():
             if len(abs_list) > 1:
                 raise RuntimeError("{}: Output name '{}' refers to "
                                    "multiple outputs: {}.".format(self.msginfo, prom_name,
                                                                   sorted(abs_list)))
+
+        for iotype in ('input', 'output'):
+            a2p = self._var_allprocs_abs2prom[iotype]
+            for prom, abslist in self._var_allprocs_prom2abs_list[iotype].items():
+                for abs_name in abslist:
+                    a2p[abs_name] = prom
+
+            self._var_allprocs_abs_names[iotype] = [
+                n for n, m in self._var_allprocs_abs2meta.items() if m['iotype'] == iotype
+            ]
 
         if self._group_inputs:
             p2abs_in = self._var_allprocs_prom2abs_list['input']
@@ -1054,18 +1019,18 @@ class Group(System):
             abs2meta = self._var_allprocs_abs2meta
             owns = self._owning_rank
             self._owned_sizes = self._var_sizes[vec_names[0]]['output'].copy()
-            for type_ in ('input', 'output'):
-                sizes = self._var_sizes[vec_names[0]][type_]
-                for i, name in enumerate(self._var_allprocs_abs_names[type_]):
+            for iotype in ('input', 'output'):
+                sizes = self._var_sizes[vec_names[0]][iotype]
+                for i, name in enumerate(self._abs_name_iter(iotype, local=False)):
                     for rank in range(self.comm.size):
                         if sizes[rank, i] > 0:
                             owns[name] = rank
-                            if type_ == 'output' and not abs2meta[name]['distributed']:
+                            if iotype == 'output' and not abs2meta[name]['distributed']:
                                 self._owned_sizes[rank + 1:, i] = 0  # zero out all dups
                             break
 
-                if self._var_allprocs_discrete[type_]:
-                    local = list(self._var_discrete[type_])
+                if self._var_allprocs_discrete[iotype]:
+                    local = list(self._var_discrete[iotype])
                     for i, names in enumerate(self.comm.allgather(local)):
                         for n in names:
                             if n not in owns:
@@ -2323,7 +2288,7 @@ class Group(System):
             # We current cannot approximate across a group with a distributed component if the
             # inputs are distributed via src_indices.
             abs2meta = self._var_abs2meta
-            for iname in self._var_allprocs_abs_names['input']:
+            for iname in self._abs_name_iter('input', local=False):
                 if abs2meta[iname]['src_indices'] is not None and \
                    abs2meta[iname]['distributed'] and \
                    iname not in self._conn_abs_in2out:
@@ -2475,8 +2440,6 @@ class Group(System):
             return
 
         abs2prom = self._var_allprocs_abs2prom
-        abs_outs = self._var_allprocs_abs_names['output']
-        abs_ins = self._var_allprocs_abs_names['input']
 
         info['wrt_matches'] = wrt_colors_matched = set()
 
@@ -2510,8 +2473,6 @@ class Group(System):
 
         abs2prom = self._var_allprocs_abs2prom
         abs2meta = self._var_allprocs_abs2meta
-        abs_outs = self._var_allprocs_abs_names['output']
-        abs_ins = self._var_allprocs_abs_names['input']
         info = self._coloring_info
 
         if info['coloring'] is not None and (self._owns_approx_of is None or
@@ -2561,8 +2522,10 @@ class Group(System):
             # semi-totals.  Also, the order must match order of vars in the output and
             # input vectors.
             wrtset = set([k[1] for k in approx_keys])
-            self._owns_approx_of = list(abs_outs)
-            self._owns_approx_wrt = [n for n in chain(abs_outs, abs_ins) if n in wrtset]
+            self._owns_approx_of = list(self._abs_name_iter('output', local=False))
+            self._owns_approx_wrt = [n for n in chain(self._owns_approx_of,
+                                                      self._abs_name_iter('input', local=False))
+                                     if n in wrtset]
 
     def _setup_approx_coloring(self):
         """
@@ -2790,7 +2753,7 @@ class Group(System):
         abs2meta = self._var_abs2meta
         all_abs2meta = self._var_allprocs_abs2meta
         conns = self._problem_meta['connections']
-        auto_tgts = [n for n in self._var_allprocs_abs_names['input'] if n not in conns]
+        auto_tgts = [n for n in self._abs_name_iter('input', local=False) if n not in conns]
         for tgt in auto_tgts:
             prom = abs2prom[tgt]
             if prom in prom2auto:
@@ -2876,7 +2839,7 @@ class Group(System):
                                                  self._var_allprocs_abs_names[typ])
             old = self._var_allprocs_prom2abs_list[typ]
             p2abs = OrderedDict()
-            for name in auto_ivc._var_allprocs_abs_names[typ]:
+            for name in auto_ivc._abs_name_iter(typ, local=False):
                 p2abs[name] = [name]
             p2abs.update(old)
             self._var_allprocs_prom2abs_list[typ] = p2abs
@@ -2886,11 +2849,6 @@ class Group(System):
             self._var_allprocs_abs2prom[typ].update({n: n for n in
                                                      auto_ivc._var_allprocs_abs2prom[typ]})
 
-            self._var_allprocs_abs_names_discrete[typ] = (
-                auto_ivc._var_allprocs_abs_names_discrete[typ] +
-                self._var_allprocs_abs_names_discrete[typ])
-            self._var_abs_names_discrete[typ] = (auto_ivc._var_abs_names_discrete[typ] +
-                                                 self._var_abs_names_discrete[typ])
             self._var_discrete[typ].update({'_auto_ivc.' + k: v for k, v in
                                             auto_ivc._var_discrete[typ].items()})
             self._var_allprocs_discrete[typ].update(auto_ivc._var_allprocs_discrete[typ])

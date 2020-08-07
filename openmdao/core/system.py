@@ -73,31 +73,21 @@ _recordable_funcs = frozenset(['_apply_linear', '_apply_nonlinear', '_solve_line
 
 # the following are local metadata that will also be accessible for vars on all procs
 global_meta_names = {
-    'input': ('units', 'shape', 'size', 'distributed', 'tags', 'desc'),
-    'output': ('units', 'shape', 'size', 'desc',
-               'ref', 'ref0', 'res_ref', 'distributed', 'lower', 'upper', 'tags'),
+    'input': ('units', 'shape', 'size', 'distributed', 'tags', 'desc', 'iotype'),
+    'output': ('units', 'shape', 'size', 'desc', 'iotype',
+               'ref', 'ref0', 'res_ref', 'res_units', 'distributed', 'lower', 'upper', 'tags'),
 }
 
 allowed_meta_names = {
     'value',
-    'shape',
     'global_shape',
-    'size',
     'global_size',
     'src_indices',
     'flat_src_indices',
-    'units',
-    'desc',
-    'distributed',
-    'tags',
     'type',
-    'res_units',
-    'ref',
-    'ref0',
-    'res_ref',
-    'lower',
-    'upper',
 }
+allowed_meta_names.update(global_meta_names['input'])
+allowed_meta_names.update(global_meta_names['output'])
 
 
 class System(object):
@@ -161,10 +151,6 @@ class System(object):
         List of absolute names of this system's variables on all procs.
     _var_abs_names : {'input': [str, ...], 'output': [str, ...]}
         List of absolute names of this system's variables existing on current proc.
-    _var_allprocs_abs_names_discrete : {'input': [str, ...], 'output': [str, ...]}
-        List of absolute names of this system's discrete variables on all procs.
-    _var_abs_names_discrete : {'input': [str, ...], 'output': [str, ...]}
-        List of absolute names of this system's discrete variables existing on current proc.
     _var_allprocs_prom2abs_list : {'input': dict, 'output': dict}
         Dictionary mapping promoted names to list of all absolute names.
         For outputs, the list will have length one since promoted output names are unique.
@@ -383,15 +369,13 @@ class System(object):
 
         self._var_allprocs_abs_names = {'input': [], 'output': []}
         self._var_abs_names = {'input': [], 'output': []}
-        self._var_allprocs_abs_names_discrete = {'input': [], 'output': []}
-        self._var_abs_names_discrete = {'input': [], 'output': []}
         self._var_allprocs_prom2abs_list = None
         self._var_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2prom = {'input': {}, 'output': {}}
-        self._var_allprocs_abs2meta = {}
-        self._var_abs2meta = {}
-        self._var_discrete = {'input': {}, 'output': {}}
-        self._var_allprocs_discrete = {'input': {}, 'output': {}}
+        self._var_allprocs_abs2meta = OrderedDict()
+        self._var_abs2meta = OrderedDict()
+        self._var_discrete = {'input': OrderedDict(), 'output': OrderedDict()}
+        self._var_allprocs_discrete = {'input': OrderedDict(), 'output': OrderedDict()}
 
         self._var_allprocs_abs2idx = {}
 
@@ -486,6 +470,21 @@ class System(object):
         if self.name:
             return '{} ({})'.format(type(self).__name__, self.name)
         return type(self).__name__
+
+    def _abs_name_iter(self, iotype, local=True, cont=True, discrete=False):
+        if cont:
+            if local:
+                yield from self._var_abs_names[iotype]
+            else:
+                yield from self._var_allprocs_abs_names[iotype]
+
+        if discrete:
+            if local:
+                prefix = self.pathname + '.' if self.pathname else ''
+                for name in self._var_discrete[iotype]:
+                    yield prefix + name
+            else:
+                yield from self._var_allprocs_discrete[iotype]
 
     def _declare_options(self):
         """
@@ -1041,7 +1040,7 @@ class System(object):
         """
         abs2meta = self._var_allprocs_abs2meta
         offset = end = 0
-        for of in self._var_allprocs_abs_names['output']:
+        for of in self._abs_name_iter('output', local=False):
             end += abs2meta[of]['size']
             yield of, offset, end, _full_slice
             offset = end
@@ -1067,7 +1066,7 @@ class System(object):
                 yield of, offset, end, sub_of_idx
                 offset = end
 
-        for wrt in self._var_allprocs_abs_names['input']:
+        for wrt in self._abs_name_iter('input', local=False):
             if wrt in wrt_matches:
                 end += abs2meta[wrt]['size']
                 yield wrt, offset, end, _full_slice
@@ -1305,8 +1304,8 @@ class System(object):
         self._var_allprocs_prom2abs_list = {'input': OrderedDict(), 'output': OrderedDict()}
         self._var_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2prom = {'input': {}, 'output': {}}
-        self._var_allprocs_abs2meta = {}
-        self._var_abs2meta = {}
+        self._var_allprocs_abs2meta = OrderedDict()
+        self._var_abs2meta = OrderedDict()
         self._var_allprocs_abs2idx = {}
         self._gatherable_vars = set()
         self._owning_rank = defaultdict(int)
@@ -1348,7 +1347,7 @@ class System(object):
         for typ in ('input', 'output'):
             # now set global sizes and shapes into metadata for distributed variables
             sizes = self._var_sizes['nonlinear'][typ]
-            for idx, abs_name in enumerate(self._var_allprocs_abs_names[typ]):
+            for idx, abs_name in enumerate(self._abs_name_iter(typ, local=False)):
                 mymeta = meta[abs_name]
                 local_shape = mymeta['shape']
                 if mymeta['distributed']:
@@ -1606,11 +1605,11 @@ class System(object):
             rel, relsys = relevant[vec_name]['@all']
             if self.pathname in relsys:
                 self._rel_vec_name_list.append(vec_name)
-            for type_ in ('input', 'output'):
-                self._var_allprocs_relevant_names[vec_name][type_].extend(
-                    v for v in self._var_allprocs_abs_names[type_] if v in rel[type_])
-                self._var_relevant_names[vec_name][type_].extend(
-                    v for v in self._var_abs_names[type_] if v in rel[type_])
+            for iotype in ('input', 'output'):
+                self._var_allprocs_relevant_names[vec_name][iotype].extend(
+                    v for v in self._abs_name_iter(iotype, local=False) if v in rel[iotype])
+                self._var_relevant_names[vec_name][iotype].extend(
+                    v for v in self._abs_name_iter(iotype) if v in rel[iotype])
 
         self._rel_vec_names = frozenset(self._rel_vec_name_list)
         self._lin_rel_vec_name_list = self._rel_vec_name_list[1:]
@@ -1690,7 +1689,7 @@ class System(object):
 
         allprocs_meta_out = self._var_allprocs_abs2meta
 
-        for abs_name in self._var_allprocs_abs_names['output']:
+        for abs_name in self._abs_name_iter('output', local=False):
             meta = allprocs_meta_out[abs_name]
             ref0 = meta['ref0']
             res_ref = meta['res_ref']
@@ -1779,10 +1778,10 @@ class System(object):
         Set all input and output variables to their declared initial values.
         """
         abs2meta = self._var_abs2meta
-        for abs_name in self._var_abs_names['input']:
+        for abs_name in self._abs_name_iter('input'):
             self._inputs.set_var(abs_name, abs2meta[abs_name]['value'])
 
-        for abs_name in self._var_abs_names['output']:
+        for abs_name in self._abs_name_iter('output'):
             self._outputs.set_var(abs_name, abs2meta[abs_name]['value'])
 
     def _get_maps(self, prom_names):
@@ -1983,7 +1982,7 @@ class System(object):
         try:
             return self._scope_cache[None]
         except KeyError:
-            self._scope_cache[None] = (frozenset(self._var_abs_names['output']), _empty_frozen_set)
+            self._scope_cache[None] = (frozenset(self._abs_name_iter('output')), _empty_frozen_set)
             return self._scope_cache[None]
 
     def _get_potential_partials_lists(self, include_wrt_outputs=True):

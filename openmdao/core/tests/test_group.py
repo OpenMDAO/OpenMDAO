@@ -2913,6 +2913,7 @@ class TestInConfigMPIpar(Test3Deep):
         p.model.add_get_io('cfg', metadata_keys=('value', 'src_indices', 'shape'), get_remote=True)
         p.model.cfg.add_get_io('sub')
 
+        import wingdbstub
         p.setup()
 
         res = p.model.io_results['cfg']

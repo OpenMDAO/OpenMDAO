@@ -314,11 +314,8 @@ class SqliteRecorder(CaseRecorder):
                 objectives = driver._objs
                 responses = driver._responses
 
-            inputs = system._var_allprocs_abs_names['input'] + \
-                system._var_allprocs_abs_names_discrete['input']
-
-            outputs = system._var_allprocs_abs_names['output'] + \
-                system._var_allprocs_abs_names_discrete['output']
+            inputs = list(system._abs_name_iter('input', local=False, discrete=True))
+            outputs = list(system._abs_name_iter('output', local=False, discrete=True))
 
             var_order = system._get_vars_exec_order(inputs=True, outputs=True)
 
