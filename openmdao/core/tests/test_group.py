@@ -2912,13 +2912,12 @@ class TestInConfigMPIpar(Test3Deep):
         p = self.build_model()
         p.model.add_get_io('cfg', metadata_keys=('value', 'src_indices', 'shape'), get_remote=True)
         p.model.cfg.add_get_io('sub')
-
-        import wingdbstub
+        
         p.setup()
 
         res = p.model.io_results['cfg']
         expected = {'sub.C3.x', 'sub.C3.y', 'sub.C4.x', 'sub.C4.y', 'C1.x', 'C1.y', 'C2.x', 'C2.y'}
-        self.assertEqual(sorted([n for n in res]), sorted(expected))
+        self.assertEqual(sorted(res), sorted(expected))
         self.check_vs_meta(p, 'cfg', res)
 
         res = p.model.cfg.io_results['sub']
@@ -2926,7 +2925,7 @@ class TestInConfigMPIpar(Test3Deep):
             expected = {'C3.y', 'C3.x'}
         else:
             expected = {'C4.y', 'C4.x'}
-        self.assertEqual(sorted([n for n in res]), sorted(expected))
+        self.assertEqual(sorted(res), sorted(expected))
         self.check_vs_meta(p, 'cfg.sub', res)
 
 

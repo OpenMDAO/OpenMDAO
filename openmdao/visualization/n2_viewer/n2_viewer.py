@@ -83,7 +83,7 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
 
         children = []
         for typ in ['input', 'output']:
-            for abs_name in system._abs_name_iter(typ):
+            for abs_name in system._var_abs_names[typ]:
                 children.append(_get_var_dict(system, typ, abs_name))
 
             for prom_name in system._var_discrete[typ]:
