@@ -163,6 +163,7 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
             tree_dict['linear_solver_options'] = options
         else:
             tree_dict['linear_solver'] = ""
+            tree_dict['linear_solver_options'] = None
 
         if system.nonlinear_solver:
             tree_dict['nonlinear_solver'] = system.nonlinear_solver.SOLVER
@@ -173,6 +174,7 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
                 tree_dict['solve_subsystems'] = system._nonlinear_solver.options['solve_subsystems']
         else:
             tree_dict['nonlinear_solver'] = ""
+            tree_dict['nonlinear_solver_options'] = None
 
     tree_dict['children'] = children
 

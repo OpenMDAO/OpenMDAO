@@ -3,8 +3,6 @@
     position: absolute;
     z-index: 10;
     height: auto;
-    /*max-width: 800px;*/
-    /*overflow: scroll;*/
 }
 
 #node-info-table {
@@ -109,10 +107,7 @@
 
 /******************* Node Value Window styling *******************/
 
-#node-value-containers {
-    visibility: hidden;
-}
-
+/* these next two are actually styling used in the node info window but are there for the node value window */
 .show_value_button {
    background-color: #c1c1c1;
 }
@@ -121,18 +116,41 @@
    background-color: #c1c1c1;
 }
 
-.close-value-window-button {
-	color: black;
-	float: right;
-    font-size: 11pt;
-	font-weight: bold;
+#node-value-containers {
+    visibility: hidden;
 }
 
-.close-value-window-button:hover,
-.close-value-window-button:focus {
-	color: #f00;
-	text-decoration: none;
-	cursor: pointer;
+.node-value-container {
+    visibility: visible;
+    overflow: hidden;
+	background-color: white;
+	border-radius: 10px;
+	border: 1px solid #a0a0a0;
+    transition: opacity 0.25s;
+    box-shadow: 3px 3px 3px 1px rgba(0, 0, 0, 0.2);
+    border-collapse: separate;
+    opacity: .95;
+    z-index: 20;
+    position: absolute;
+    top: 400px;
+    left: 700px;
+}
+
+/*.node-value-grabber {*/
+/*    overflow:hidden;*/
+/*    width:100%;*/
+/*    height:100%;*/
+/*}*/
+
+/* Value window header */
+.node-value-header {
+    background-color: #42926b;
+    color: black;
+    margin: 0;
+    padding: 5px;
+    font-size: 11pt;
+    text-align: center;
+    cursor: grab;
 }
 
 .node-value-title {
@@ -156,45 +174,21 @@
     padding-right: 5px;
 }
 
-/****** resize ****/
-.node-value-resizer-box {
-    position: absolute;
-    right: -3px;
+.close-value-window-button {
+	color: black;
+	float: right;
+    font-size: 11pt;
+	font-weight: bold;
 }
 
-.node-value-resizer-handle {
-    position: absolute;
-    right: -2px;
-    bottom: 0;
-    margin: 0;
-    height: 18px;
-    cursor: nwse-resize;
-    pointer-events: initial;
-    overflow: hidden;
+.close-value-window-button:hover,
+.close-value-window-button:focus {
+	color: #f00;
+	text-decoration: none;
+	cursor: pointer;
 }
 
-.node-value-grabber {
-    overflow:hidden;
-    width:100%;
-    height:100%;
-}
-
-.node-value-container {
-    visibility: visible;
-    overflow: hidden;
-	background-color: white;
-	border-radius: 10px;
-	border: 1px solid #a0a0a0;
-    transition: opacity 0.25s;
-    box-shadow: 3px 3px 3px 1px rgba(0, 0, 0, 0.2);
-    border-collapse: separate;
-    opacity: .95;
-    z-index: 20;
-    position: absolute;
-    top: 400px;
-    left: 700px;
-}
-
+/* Value window table */
 .node-value-table-div {
     overflow: auto;
     padding-right: 10px;
@@ -211,21 +205,28 @@
     white-space: nowrap;
 }
 
-.node-value-header {
-    background-color: #42926b;
-    color: black;
-    margin: 0;
-    padding: 5px;
-    font-size: 11pt;
-    text-align: center;
-    cursor: grab;
-}
-
+/* Value window footer */
 .node-value-footer {
     background-color: #42926b;
     color: black;
     margin: 0;
     padding: 5px;
+}
+
+.node-value-resizer-box {
+    position: absolute;
+    right: -3px;
+}
+
+.node-value-resizer-handle {
+    position: absolute;
+    right: -2px;
+    bottom: 0;
+    margin: 0;
+    height: 18px;
+    cursor: nwse-resize;
+    pointer-events: initial;
+    overflow: hidden;
 }
 
 /* this is an off screen element that is used in the strange way you

@@ -52,6 +52,9 @@ class InfoUpdateType extends InfoPropDefault {
     }
 }
 
+// Used to format that floats displayed
+let val_formatter = d3.format("g");
+
 /** Convert an array to a string that is human readable.
  * @param {array} arr The array to convert.
  * @param {level} int The level of nesting in the display.
@@ -60,14 +63,11 @@ class InfoUpdateType extends InfoPropDefault {
 function array_to_string(array, level=0){
     let indent = ' '.repeat(level);
     let s = indent + '[';
-    // Used to format that floats displayed
-    let val_formatter = d3.format("g");
 
     for (const element of array) {
         if (Array.isArray(element)) {
             s += array_to_string(element,level+1);
         } else {
-            // s += element.toString() ;
             s += val_formatter(element) ;
         }
         s += ' ';
@@ -117,10 +117,6 @@ class InfoPropArray extends InfoPropDefault {
     canShow(obj) { return (obj.propExists(this.key) && obj[this.key] != '' )}
 }
 
-// Used to format that floats displayed in the table of the ValueInfo window
-let value_formatter = d3.format("g");
-
-
 /**
  * Manage the windows for displaying the values of a variables.
  * @typedef ValueInfoManager
@@ -134,7 +130,7 @@ class ValueInfoManager {
         this.valueInfoWindows = {};
     }
 
-    add(abs2prom, name, val){
+    add(name, val){
         // Check to see if already exists before opening a new one
         if (!this.valueInfoWindows[name]){
             let valueInfoBox = new ValueInfo( name, val, this.ui);
@@ -181,7 +177,7 @@ class ValueInfo {
         close_button.on(
             'click',
             function () {
-                self.ui.valueInfoManager.remove(self.name); //newway
+                self.ui.valueInfoManager.remove(self.name);
             }
         );
 
@@ -211,15 +207,15 @@ class ValueInfo {
 
         // Construct the table displaying the variable value
         this.tbody = this.table.append("tbody");
-        var rows = this.tbody.selectAll('tr').data(val).enter().append('tr')
-        var cells = rows.selectAll('td')
+        let rows = this.tbody.selectAll('tr').data(val).enter().append('tr')
+        let cells = rows.selectAll('td')
             .data(function(row) {
                 return row;
         })
         .enter()
         .append('td')
         .text(function (d) {
-            return value_formatter(d);
+            return val_formatter(d);
         })
 
         // Save the width and height of the table when it is fully
@@ -305,7 +301,7 @@ class ValueInfo {
     }
 }
 
-// "Class" variable and function
+// "Class" variable and function for ValueInfo
 ValueInfo.TRUNCATE_LIMIT = 80;
 
 /**
@@ -366,23 +362,6 @@ class NodeInfo {
 
         this.propListSolvers = [
             new InfoPropDefault('absPathName', 'Absolute Name'),
-            // new InfoPropDefault('class', 'Class'),
-            // new InfoUpdateType('type', 'Type', true),
-            // new InfoPropDefault('dtype', 'DType'),
-            //
-            // new InfoPropDefault('units', 'Units'),
-            // new InfoPropDefault('shape', 'Shape'),
-            // new InfoPropYesNo('is_discrete', 'Discrete'),
-            // new InfoPropYesNo('distributed', 'Distributed'),
-            // new InfoPropArray('value', 'Value'),
-            //
-            // new InfoPropDefault('subsystem_type', 'Subsystem Type', true),
-            // new InfoPropDefault('component_type', 'Component Type', true),
-            // new InfoPropYesNo('implicit', 'Implicit'),
-            // new InfoPropYesNo('is_parallel', 'Parallel'),
-            // new InfoPropDefault('linear_solver', 'Linear Solver'),
-            // new InfoPropDefault('nonlinear_solver', 'Non-Linear Solver'),
-            // new InfoPropDefault('options', 'Options'),
             new InfoPropDefault('linear_solver_options', 'Linear Solver Options'),
             new InfoPropDefault('nonlinear_solver_options', 'Non-Linear Solver Options'),
         ];
@@ -400,7 +379,6 @@ class NodeInfo {
         const self = this;
         this.pinButton = d3.select('#node-info-pin')
             .on('click', e => { self.unpin(); })
-        this.name = null;
     }
 
     /** Make the info box visible if it's hidden */
@@ -432,9 +410,6 @@ class NodeInfo {
         this.pinned = false;
         this.pinButton.attr('class', 'info-hidden');
         this.clear();
-
-        const d = d3.select("#node-value-div");
-        d.style('visibility', 'hidden');
     }
 
     togglePin() {
@@ -443,73 +418,47 @@ class NodeInfo {
     }
 
     _addPropertyRow(label, val, obj, capitalize = false) {
-
-
-
-
-
         if ( ! ['Options', 'Linear Solver Options', 'Non-Linear Solver Options'].includes(label)){
-        // if ( label != 'Options'){
             const newRow = this.tbody.append('tr');
 
             const th = newRow.append('th')
                 .attr('scope', 'row')
                 .text(label)
 
-            var nodeInfoVal = val ;
+            let nodeInfoVal = val ;
             let td;
             if ( label === 'Value') {
                 if ( val == null ) {
                     td = newRow.append('td')
                             .html("Value too large to include in N2" );
                 } else {
-                    var val_string = array_to_string(val)
-                    var max_length = ValueInfo.TRUNCATE_LIMIT;
-
-
-
-                    var isTruncated = val_string.length > max_length ;
-                    var nodeInfoVal = isTruncated ?
+                    let val_string = array_to_string(val)
+                    let max_length = ValueInfo.TRUNCATE_LIMIT;
+                    let isTruncated = val_string.length > max_length ;
+                    let nodeInfoVal = isTruncated ?
                         val_string.substring(0, max_length - 3) + "..." :
                         val_string;
 
                     let html = nodeInfoVal;
-                    // if ( this.valueInfo.showMoreButtonDisplayed(val) ){
-
-
-
-
-
-                    // if ( isTruncated && this.valueInfo.showMoreButtonDisplayed(val)){
                     if ( isTruncated && ValueInfo.showMoreButtonDisplayed(val)){
                         html += " <button type='button' class='show_value_button'>Show more</button>" ;
                     }
                     html += " <button type='button' class='copy_value_button'>Copy</button>" ;
                     td = newRow.append('td').html(html);
 
-                    // if ( this.valueInfo.showMoreButtonDisplayed(val) ) {
-                    // if ( isTruncated && this.valueInfo.showMoreButtonDisplayed(val)) {
                     if ( isTruncated && ValueInfo.showMoreButtonDisplayed(val)) {
-                        var showValueButton = td.select('.show_value_button');
+                        let showValueButton = td.select('.show_value_button');
                         const self = this;
                         showValueButton.on('click', function () {
-                            // self.valueInfo.update(self.name, val);
-                            // self.valueInfo.show();
-
-                            self.ui.valueInfoManager.add(this.abs2prom, self.name, val); //newway
-
-
-                            // let valueInfo = new ValueInfo(this.abs2prom, self.name, val); //oldway
-                            // self.valueInfo.update(self.name, val);
-                            // self.valueInfo.show();
+                            self.ui.valueInfoManager.add(self.name, val);
                         });
                     }
                     // Copy value button
-                    var copyValueButton = td.select('.copy_value_button');
+                    let copyValueButton = td.select('.copy_value_button');
                     copyValueButton.on('click',
                            function () {
                                 // This is the strange way you can get something on the clipboard
-                                var copyText = document.querySelector("#input-for-pastebuffer");
+                                let copyText = document.querySelector("#input-for-pastebuffer");
                                 copyText.value = 'array(' + array_to_copy_string(val)  + ')';
                                 copyText.select();
                                 document.execCommand("copy");
@@ -587,7 +536,6 @@ class NodeInfo {
         }
 
         for (const prop of this.propList) {
-            // if (obj.propExists(prop.key) && obj[prop.key] != '') {
             if (prop.key === 'value') {
                 if (obj.hasOwnProperty('value')) {
                     this._addPropertyRow(prop.desc, prop.output(obj[prop.key]), obj, prop.capitalize)
@@ -610,7 +558,7 @@ class NodeInfo {
     }
 
         /**
-     * Iterate over the list of known properties and display them
+     * Iterate over the list of known properties of solvers and display them
      * if the specified object contains them.
      * @param {Object} event The related event so we can get position.
      * @param {N2TreeNode} obj The node to examine.
@@ -756,11 +704,9 @@ class N2UserInterface {
         this._setupWindowResizer();
 
         this.legend = new N2Legend(this.n2Diag.modelData);
-        // this.nodeInfoBox = new NodeInfo(this, this.n2Diag.model.abs2prom, this.valueInfoBox);
         this.nodeInfoBox = new NodeInfo(this, this.n2Diag.model.abs2prom);
 
-        this.valueInfoManager = new ValueInfoManager(this); // newway
-
+        this.valueInfoManager = new ValueInfoManager(this);
 
         this.toolbar = new N2Toolbar(this);
     }
