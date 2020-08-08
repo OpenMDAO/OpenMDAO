@@ -23,7 +23,7 @@ from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import convert_neg, array_connection_compatible, \
     _flatten_src_indices
 from openmdao.utils.general_utils import ContainsAll, all_ancestors, simple_warning, \
-    common_subpath, conditional_error, _is_slice, _slice_indices
+    common_subpath, conditional_error, _is_slicer_op, _slice_indices
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 from openmdao.utils.coloring import Coloring, _STD_COLORING_FNAME
@@ -105,9 +105,9 @@ class Group(System):
         self._subgroups_myproc = None
         self._subsystems_proc_range = []
         self._manual_connections = {}
-        self._group_inputs = defaultdict(list)
-        self._pre_config_group_inputs = defaultdict(list)
-        self._static_group_inputs = defaultdict(list)
+        self._group_inputs = {}
+        self._pre_config_group_inputs = {}
+        self._static_group_inputs = {}
         self._static_manual_connections = {}
         self._conn_abs_in2out = {}
         self._conn_discrete_in2out = {}
@@ -182,12 +182,11 @@ class Group(System):
         units : str or None
             Units to assume for the promoted input.
         """
-        meta = {}
+        meta = {'prom': name}
         if val is not _undefined:
             meta['value'] = val
         if units is not None:
             meta['units'] = units
-        meta['prom'] = name
 
         dct = self._static_group_inputs if self._static_mode else self._group_inputs
 
@@ -199,7 +198,7 @@ class Group(System):
                                f"override previously set defaults for {overlap}.")
             old.update(meta)
         else:
-            dct[name].append(meta)
+            dct[name] = [meta]
 
     def _get_scope(self, excl_sub=None):
         """
@@ -326,6 +325,12 @@ class Group(System):
 
         Highest system's settings take precedence.
         """
+        # reset group_inputs back to what it was just after self.setup() in case _configure
+        # is called multiple times.
+        self._group_inputs = self._pre_config_group_inputs.copy()
+        for n, lst in self._group_inputs.items():
+            self._group_inputs[n] = lst.copy()
+
         for subsys in self._subsystems_myproc:
             subsys._configure()
 
@@ -385,7 +390,7 @@ class Group(System):
         self._subsystems_allprocs = self._static_subsystems_allprocs.copy()
         self._manual_connections = self._static_manual_connections.copy()
         self._group_inputs = self._static_group_inputs.copy()
-        # defaultdict doesn't copy the internal list so we have to do it manually (we don't want
+        # copy doesn't copy the internal list so we have to do it manually (we don't want
         # a full deepcopy either because we want the internal metadata dicts to be shared)
         for n, lst in self._group_inputs.items():
             self._group_inputs[n] = lst.copy()
@@ -397,6 +402,8 @@ class Group(System):
         # during the config process and we don't want to wipe out any group_inputs
         # that were added during self.setup()
         self._pre_config_group_inputs = self._group_inputs.copy()
+        for n, lst in self._pre_config_group_inputs.items():
+            self._pre_config_group_inputs[n] = lst.copy()
 
         self._static_mode = True
 
@@ -711,7 +718,6 @@ class Group(System):
 
         allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
 
-        self._group_inputs = self._pre_config_group_inputs.copy()
         for n, lst in self._group_inputs.items():
             lst[0]['path'] = self.pathname  # used for error reporting
             self._group_inputs[n] = lst.copy()  # must copy the list manually
@@ -759,7 +765,10 @@ class Group(System):
             if isinstance(subsys, Group):
                 subprom2prom = var_maps['input']
                 for sub_prom, metalist in subsys._group_inputs.items():
-                    self._group_inputs[subprom2prom[sub_prom]].extend(metalist)
+                    key = subprom2prom[sub_prom]
+                    if key not in self._group_inputs:
+                        self._group_inputs[key] = []
+                    self._group_inputs[key].extend(metalist)
 
         # If running in parallel, allgather
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
@@ -798,6 +807,8 @@ class Group(System):
 
                 if rank != myrank:
                     for p, mlist in ginputs.items():
+                        if p not in self._group_inputs:
+                            self._group_inputs[p] = []
                         self._group_inputs[p].extend(mlist)
 
                 # Assemble in parallel allprocs_abs2meta
@@ -847,22 +858,20 @@ class Group(System):
 
         for prom, metalist in self._group_inputs.items():
             origins = {}
-            fullmeta = {}
             top_origin = metalist[0]['path']
             top_prom = metalist[0]['prom']
+            allmeta = set()
             for meta in metalist:
-                for key in meta:
-                    fullmeta[key] = _undefined
+                allmeta.update(meta)
+            fullmeta = {n: _undefined for n in allmeta - skip}
 
             for key in sorted(fullmeta):
-                if key in skip:
-                    continue
                 for i, submeta in enumerate(metalist):
                     if key in submeta:
                         if fullmeta[key] is _undefined:
-                            val = fullmeta[key] = submeta[key]
                             origin = submeta['path']
                             origin_prom = submeta['prom']
+                            val = fullmeta[key] = submeta[key]
                             if origin != top_origin:
                                 simple_warning(f"Group '{top_origin}' did not set a default "
                                                f"'{key}' for input '{top_prom}', so the value of "
@@ -1398,11 +1407,12 @@ class Group(System):
                             simple_warning(msg)
 
                 elif src_indices is not None:
-                    shape = None
-                    if _is_slice(src_indices):
+                    shape = False
+                    if _is_slicer_op(src_indices):
                         global_size = self._var_allprocs_abs2meta[abs_out]['global_size']
                         global_shape = self._var_allprocs_abs2meta[abs_out]['global_shape']
                         src_indices = _slice_indices(src_indices, global_size, global_shape)
+                        shape = True
                     else:
                         src_indices = np.atleast_1d(src_indices)
 
@@ -1690,13 +1700,13 @@ class Group(System):
                     simple_warning(f"{self.msginfo}: src_indices have been specified with promotes"
                                    " 'any'. Note that src_indices only apply to matching inputs.")
 
-                # src_indices will applied when promotes are resolved
-                if inputs is not None:
-                    for inp in inputs:
-                        subsys._var_promotes_src_indices[inp] = (src_indices, flat_src_indices)
-                if any is not None:
-                    for inp in any:
-                        subsys._var_promotes_src_indices[inp] = (src_indices, flat_src_indices)
+            # src_indices will applied when promotes are resolved
+            if inputs is not None:
+                for inp in inputs:
+                    subsys._var_promotes_src_indices[inp] = (src_indices, flat_src_indices)
+            if any is not None:
+                for inp in any:
+                    subsys._var_promotes_src_indices[inp] = (src_indices, flat_src_indices)
 
         # check for attempt to promote with different alias
         list_comp = [i if isinstance(i, tuple) else (i, i) for i in subsys._var_promotes['input']]
@@ -1838,14 +1848,16 @@ class Group(System):
                             " connect('%s', %s)?" % (self.msginfo, src_name, tgt_name))
 
         if isinstance(src_indices, tuple):
-            if not _is_slice(src_indices):
+            if not _is_slicer_op(src_indices):
                 src_indices = np.atleast_1d(src_indices)
 
         elif isinstance(src_indices, list):
             src_indices = np.atleast_1d(src_indices)
 
         if isinstance(src_indices, np.ndarray):
-            if not np.issubdtype(src_indices.dtype, np.integer):
+            if not np.issubdtype(src_indices.dtype, np.integer) and not \
+                    any(i == ... for i in src_indices):
+
                 raise TypeError("%s: src_indices must contain integers, but src_indices for "
                                 "connection from '%s' to '%s' is %s." %
                                 (self.msginfo, src_name, tgt_name, src_indices.dtype.type))

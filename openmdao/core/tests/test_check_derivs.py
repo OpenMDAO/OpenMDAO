@@ -1817,6 +1817,53 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         self.assertTrue("Relative Error (Jfor  - Jfd) : 1." in lines[8])
 
+    def test_directional_bug_implicit(self):
+        # Test for bug in directional derivative direction for implicit var and matrix-free.
+
+        class Directional(om.ImplicitComponent):
+
+            def setup(self):
+                self.add_input('in',shape=3)
+                self.add_input('in2',shape=3)
+                self.add_output('out',shape=3)
+
+                self.set_check_partial_options(wrt='*', directional=True, method='cs')
+
+                self.mat = np.random.rand(3, 3)
+                self.mat2 = np.random.rand(3, 3)
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                residuals['out'] = self.mat.dot(inputs['in']) + self.mat2.dot(inputs['in2']) - outputs['out']
+
+            def apply_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
+                if mode == 'fwd':
+                    if 'out' in d_residuals:
+                        if 'in' in d_inputs:
+                            d_residuals['out'] += self.mat.dot(d_inputs['in'])
+                        if 'in2' in d_inputs:
+                            d_residuals['out'] += self.mat2.dot(d_inputs['in2'])
+                        if 'out' in d_outputs:
+                            d_residuals['out'] -= d_outputs['out']
+
+                if mode == 'rev':
+                    if 'out' in d_residuals:
+                        if 'in' in d_inputs:
+                            d_inputs['in'] += self.mat.transpose().dot(d_residuals['out'])
+                        if 'in2' in d_inputs:
+                            d_inputs['in2'] += self.mat2.transpose().dot(d_residuals['out'])
+                        if 'out' in d_outputs:
+                            d_outputs['out'] -= d_residuals['out']
+
+        prob = om.Problem()
+        comp = Directional()
+        prob.model.add_subsystem('comp',comp)
+
+        prob.setup(force_alloc_complex=True)
+        prob.run_model()
+        partials = prob.check_partials(method='cs', out_stream=None)
+
+        assert_check_partials(partials)
+
 
 class TestCheckPartialsFeature(unittest.TestCase):
 
