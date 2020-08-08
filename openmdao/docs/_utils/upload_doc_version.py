@@ -10,7 +10,7 @@ def get_tag_info():
     # using a pattern to only grab tags that are in version format "X.Y.Z"
     git_versions = subprocess.Popen(['git', 'tag', '-l', '*.*.*'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     cmd_out, cmd_err = git_versions.communicate()
-    
+
     cmd_out = cmd_out.decode('utf8')
     # take the output of git tag -l *.*.*, and split it from one string into a list.
     version_tags = cmd_out.split()
