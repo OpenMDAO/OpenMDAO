@@ -96,28 +96,20 @@ install:
     echo " >> Installing PETSc";
     conda install -c anaconda mpi4py --yes;
     conda install -c conda-forge petsc=$PETSc petsc4py --yes;
-
   fi
 
   if [ "$PYOPTSPARSE" ]; then
     echo " >> Installing pyOptSparse";
-    # git clone -q https://github.com/OpenMDAO/build_pyoptsparse;
-    git clone -q https://github.com/hschilling/build_pyoptsparse;
+    git clone -q https://github.com/OpenMDAO/build_pyoptsparse;
 
     cd build_pyoptsparse;
-    git checkout add_paropt
     chmod 755 ./build_pyoptsparse.sh;
 
-    # Need to install these for building paropt
-    #    conda install -c anaconda gxx_linux-64 --yes;
-    #    conda install -c anaconda gfortran_linux-64 --yes;
     if [ "$SNOPT" == "7.7" ] && [ "$SNOPT_LOCATION_77" ]; then
       echo "  > Secure copying SNOPT 7.7 over SSH";
-      echo "SNOPT_LOCATION_77 is $SNOPT_LOCATION_77"
       mkdir SNOPT;
       scp -qr "$SNOPT_LOCATION_77" SNOPT;
 
-      ls -l SNOPT
       ./build_pyoptsparse.sh -b "$PYOPTSPARSE" -s SNOPT/src -a;
 
     elif [ "$SNOPT" == "7.2" ] && [ "$SNOPT_LOCATION_72" ]; then
@@ -169,7 +161,6 @@ script:
   else
     testflo -n 1 openmdao --timeout=120 --show_skipped;
   fi
-
 
 after_success:
 # again, only run coverage operations on the upload machine after success.
