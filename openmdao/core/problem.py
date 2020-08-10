@@ -864,7 +864,7 @@ class Problem(object):
             'remote_systems': {},
             'remote_vars': {},  # does not include distrib vars
             'prom2abs': {'input': {}, 'output': {}},  # includes ALL promotes including buried ones
-            '_setup_status': _SetupStatus.PRE_SETUP
+            'setup_status': _SetupStatus.PRE_SETUP
         }
         model._setup(model_comm, mode, self._metadata)
 
