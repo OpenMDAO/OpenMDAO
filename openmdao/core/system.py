@@ -2925,8 +2925,8 @@ class System(object):
             for name, meta in out.items():
 
                 if out_scope_ivc[name]:
-                    abs2idx = self._problem_meta.get('abs2idx', {})['nonlinear']
                     sizes = self._problem_meta.get('sizes', {})['nonlinear']['output']
+                    abs2idx = self._problem_meta.get('abs2idx', {})['nonlinear']
                 else:
                     sizes = self._var_sizes['nonlinear']['output']
                     abs2idx = self._var_allprocs_abs2idx['nonlinear']
