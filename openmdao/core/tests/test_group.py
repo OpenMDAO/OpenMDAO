@@ -583,7 +583,7 @@ class TestGroup(unittest.TestCase):
         assert_near_equal(p['row123_comp.x'], arr_large_4x4[(0, 2, 3), ...].ravel())
         assert_near_equal(p['row123_comp.y'], np.sum(arr_large_4x4[(0, 2, 3), ...]) ** 2.0)
 
-    def test_connect_to_flat_src_indices_with_slice(self):
+    def test_connect_to_flat_src_indices_with_slice_user_warning(self):
         class SlicerComp(om.ExplicitComponent):
             def setup(self):
                 self.add_input('x', np.ones((12,)))
@@ -602,11 +602,14 @@ class TestGroup(unittest.TestCase):
         p.model.connect('indep.x', 'row123_comp.x', src_indices=om.slicer[idxs, ...],
                         flat_src_indices=True)
 
-        p.setup()
+        msg = "Group (<model>): flat_src_indices has no effect when using om_slicer to slice array."
+        with assert_warning(UserWarning, msg):
+            p.setup()
         p.run_model()
 
         assert_near_equal(p['row123_comp.x'], arr_large_4x4[(0, 2, 3), ...].ravel())
         assert_near_equal(p['row123_comp.y'], np.sum(arr_large_4x4[(0, 2, 3), ...]) ** 2.0)
+
 
     def test_connect_to_flat_array(self):
         class SlicerComp(om.ExplicitComponent):
