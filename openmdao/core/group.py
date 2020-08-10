@@ -345,7 +345,7 @@ class Group(System):
             if subsys.matrix_free:
                 self.matrix_free = True
 
-        self._problem_meta['_setup_status'] = _SetupStatus.POST_CONFIGURE
+        self._problem_meta['setup_status'] = _SetupStatus.POST_CONFIGURE
         self.configure()
 
     def _setup_procs(self, pathname, comm, mode, prob_meta):
@@ -1903,7 +1903,7 @@ class Group(System):
             List of system names in desired new execution order.
         """
         if self._problem_meta is not None and \
-                self._problem_meta['_setup_status'] == _SetupStatus.POST_CONFIGURE:
+                self._problem_meta['setup_status'] == _SetupStatus.POST_CONFIGURE:
             raise RuntimeError("%s: Cannot call set_order in the configure method" % (self.msginfo))
 
         # Make sure the new_order is valid. It must contain all subsystems
@@ -1941,7 +1941,7 @@ class Group(System):
 
         self._order_set = True
         if self._problem_meta is not None:
-            self._problem_meta['_setup_status'] = _SetupStatus.PRE_SETUP
+            self._problem_meta['setup_status'] = _SetupStatus.PRE_SETUP
 
     def _get_subsystem(self, name):
         """
