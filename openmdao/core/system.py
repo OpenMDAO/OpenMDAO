@@ -644,13 +644,19 @@ class System(object):
         self._setup_var_index_ranges()
         self._setup_var_sizes()
 
+        # These are used when the driver assembles the design variables.
+        self._problem_meta['abs2idx'] = self._var_allprocs_abs2idx
+        self._problem_meta['sizes'] = self._var_sizes
+        self._problem_meta['owning_rank'] = self._owning_rank
+
         if self.pathname == '':
             self._top_level_setup2()
 
         self._setup_connections()
 
     def _top_level_setup(self, mode):
-        pass
+        self._problem_meta['all_meta'] = self._var_allprocs_abs2meta
+        self._problem_meta['meta'] = self._var_abs2meta
 
     def _top_level_setup2(self):
         pass
@@ -2872,6 +2878,7 @@ class System(object):
         pro2abs_out = self._var_allprocs_prom2abs_list['output']
         pro2abs_in = self._var_allprocs_prom2abs_list['input']
         conns = self._problem_meta.get('connections', {})
+        abs2meta = self._problem_meta['all_meta']
 
         # Human readable error message during Driver setup.
         out = OrderedDict()
@@ -2883,18 +2890,23 @@ class System(object):
                     abs_name = pro2abs_out[name][0]
                     out[abs_name] = data
                     out[abs_name]['ivc_source'] = abs_name
+                    out[abs_name]['distributed'] = \
+                        abs_name in abs2meta and abs2meta[abs_name]['distributed']
 
                 else:  # assume an input name else KeyError
 
                     # Design variable on an auto_ivc input, so use connected output name.
                     in_abs = pro2abs_in[name][0]
                     ivc_path = conns[in_abs]
+                    distrib = ivc_path in abs2meta and abs2meta[ivc_path]['distributed']
                     if use_prom_ivc:
                         out[name] = data
                         out[name]['ivc_source'] = ivc_path
+                        out[name]['distributed'] = distrib
                     else:
                         out[ivc_path] = data
                         out[ivc_path]['ivc_source'] = ivc_path
+                        out[ivc_path]['distributed'] = distrib
 
         except KeyError as err:
             msg = "{}: Output not found for design variable {}."
@@ -2902,8 +2914,10 @@ class System(object):
 
         if get_sizes:
             # Size them all
-            sizes = self._var_sizes['nonlinear']['output']
-            abs2idx = self._var_allprocs_abs2idx['nonlinear']
+            sizes = self._problem_meta['sizes']['nonlinear']['output']
+            abs2idx = self._problem_meta['abs2idx']['nonlinear']
+            owning_rank = self._problem_meta['owning_rank']
+
             for name, meta in out.items():
 
                 src_name = name
@@ -2912,12 +2926,12 @@ class System(object):
 
                 if 'size' not in meta:
                     if src_name in abs2idx:
-                        meta['size'] = sizes[self._owning_rank[src_name], abs2idx[src_name]]
+                        meta['size'] = sizes[owning_rank[src_name], abs2idx[src_name]]
                     else:
                         meta['size'] = 0  # discrete var, don't know size
 
                 if src_name in abs2idx:
-                    meta = self._var_allprocs_abs2meta[src_name]
+                    meta = abs2meta[src_name]
                     out[name]['distributed'] = meta['distributed']
                     out[name]['global_size'] = meta['global_size']
 
@@ -2960,7 +2974,8 @@ class System(object):
         """
         prom2abs = self._var_allprocs_prom2abs_list['output']
         prom2abs_in = self._var_allprocs_prom2abs_list['input']
-        conns = self._problem_meta.get('connections', {})
+        conns = self._problem_meta['connections']
+        abs2meta = self._problem_meta['all_meta']
 
         # Human readable error message during Driver setup.
         try:
@@ -2970,18 +2985,23 @@ class System(object):
                     abs_name = prom2abs[name][0]
                     out[abs_name] = data
                     out[abs_name]['ivc_source'] = abs_name
+                    out[abs_name]['distributed'] = \
+                        abs_name in abs2meta and abs2meta[abs_name]['distributed']
 
                 else:
                     # A constraint can actaully be on an auto_ivc input, so use connected
                     # output name.
                     in_abs = prom2abs_in[name][0]
                     ivc_path = conns[in_abs]
+                    distrib = ivc_path in abs2meta and abs2meta[ivc_path]['distributed']
                     if use_prom_ivc:
                         out[name] = data
                         out[name]['ivc_source'] = ivc_path
+                        out[name]['distributed'] = distrib
                     else:
                         out[ivc_path] = data
                         out[ivc_path]['ivc_source'] = ivc_path
+                        out[ivc_path]['distributed'] = distrib
 
         except KeyError as err:
             msg = "{}: Output not found for response {}."
