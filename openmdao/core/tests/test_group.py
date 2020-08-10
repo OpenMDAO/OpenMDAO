@@ -610,7 +610,6 @@ class TestGroup(unittest.TestCase):
         assert_near_equal(p['row123_comp.x'], arr_large_4x4[(0, 2, 3), ...].ravel())
         assert_near_equal(p['row123_comp.y'], np.sum(arr_large_4x4[(0, 2, 3), ...]) ** 2.0)
 
-
     def test_connect_to_flat_array(self):
         class SlicerComp(om.ExplicitComponent):
             def setup(self):
