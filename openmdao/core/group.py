@@ -1420,8 +1420,16 @@ class Group(System):
                     if np.prod(src_indices.shape) == 0:
                         continue
 
-                    flat_array_slice_check = True if is_slice and \
-                        src_indices.size == np.prod(in_shape) else False
+                    if is_slice and src_indices.size == np.prod(in_shape):
+                        flat_array_slice_check = True
+                    else:
+                        flat_array_slice_check = False
+
+                    if any('flat_src_indices' in subsys._var_abs2meta[name] \
+                           for name in subsys._var_abs2meta):
+                        msg = ("%s: flat_src_indices has no effect when using om_slicer to "
+                                "slice array." % (self.msginfo))
+                        simple_warning(msg)
 
                     # initial dimensions of indices shape must be same shape as target
                     for idx_d, inp_d in zip(src_indices.shape, in_shape):
@@ -1484,7 +1492,7 @@ class Group(System):
                         else:
                             abs2meta[abs_in]['src_indices'] = src_indices
 
-                        if src_indices.shape != in_shape:
+                        if src_indices.shape != in_shape and not flat_array_slice_check:
                             msg = f"{self.msginfo}: src_indices shape " + \
                                   f"{src_indices.shape} does not match {abs_in} shape " + \
                                   f"{in_shape}."
