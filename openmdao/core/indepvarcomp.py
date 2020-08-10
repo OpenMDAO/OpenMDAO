@@ -265,8 +265,8 @@ class _AutoIndepVarComp(IndepVarComp):
         """
         super(_AutoIndepVarComp, self)._setup_var_data()
         if self.comm.size > 1:
-            all_abs2meta = self._var_allprocs_abs2meta
-            abs2meta = self._var_abs2meta
+            all_abs2meta = self._var_allprocs_abs2meta['output']
+            abs2meta = self._var_abs2meta['output']
 
             for name in self._remotes:
                 if name in abs2meta:

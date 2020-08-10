@@ -88,10 +88,10 @@ class Component(System):
         super(Component, self).__init__(**kwargs)
 
         self._var_rel_names = {'input': [], 'output': []}
-        self._var_rel2meta = {}
+        self._var_rel2meta = OrderedDict()
 
         self._static_var_rel_names = {'input': [], 'output': []}
-        self._static_var_rel2meta = {}
+        self._static_var_rel2meta = OrderedDict()
 
         self._declared_partials = defaultdict(dict)
         self._declared_partial_checks = []
@@ -153,7 +153,7 @@ class Component(System):
 
         # Clear out old variable information so that we can call setup on the component.
         self._var_rel_names = {'input': [], 'output': []}
-        self._var_rel2meta = {}
+        self._var_rel2meta = OrderedDict()
 
         self._var_rel2meta.update(self._static_var_rel2meta)
         for type_ in ['input', 'output']:
@@ -212,24 +212,19 @@ class Component(System):
         global global_meta_names
         super(Component, self)._setup_var_data()
 
-        abs_names = self._var_abs_names = self._var_allprocs_abs_names
-
         allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
-
         abs2prom = self._var_allprocs_abs2prom = self._var_abs2prom
-
-        allprocs_abs2meta = self._var_allprocs_abs2meta
-        abs2meta = self._var_abs2meta
 
         # Compute the prefix for turning rel/prom names into abs names
         prefix = self.pathname + '.' if self.pathname else ''
 
         for type_ in ['input', 'output']:
+            abs2meta = self._var_abs2meta[type_]
+            allprocs_abs2meta = self._var_allprocs_abs2meta[type_]
+
             for prom_name in self._var_rel_names[type_]:
                 abs_name = prefix + prom_name
                 abs2meta[abs_name] = metadata = self._var_rel2meta[prom_name]
-
-                abs_names[type_].append(abs_name)
 
                 # Compute allprocs_prom2abs_list, abs2prom
                 allprocs_prom2abs_list[type_][prom_name] = [abs_name]
@@ -285,15 +280,15 @@ class Component(System):
             if self._use_derivatives:
                 relnames = self._var_allprocs_relevant_names[vec_name]
             else:
-                relnames = self._var_allprocs_abs_names
+                relnames = self._var_allprocs_abs2meta
 
             sizes[vec_name] = {}
-            for type_ in ('input', 'output'):
-                sizes[vec_name][type_] = sz = np.zeros((nproc, len(relnames[type_])), int)
+            for io in ('input', 'output'):
+                sizes[vec_name][io] = sz = np.zeros((nproc, len(relnames[io])), int)
 
                 # Compute _var_sizes
-                for idx, abs_name in enumerate(relnames[type_]):
-                    sz[iproc, idx] = abs2meta[abs_name]['size']
+                for idx, abs_name in enumerate(relnames[io]):
+                    sz[iproc, idx] = abs2meta[io][abs_name]['size']
 
         if nproc > 1:
             for vec_name in vec_names:
@@ -775,18 +770,19 @@ class Component(System):
             return set()
 
         iproc = self.comm.rank
-        abs2meta = self._var_abs2meta
+        abs2meta = self._var_abs2meta['input']
+        all_abs2meta = self._var_allprocs_abs2meta
 
         sizes_in = self._var_sizes['nonlinear']['input']
         sizes_out = all_sizes['nonlinear']['output']
         added_src_inds = set()
-        for i, iname in enumerate(self._var_allprocs_abs_names['input']):
+        for i, iname in enumerate(self._var_allprocs_abs2meta['input']):
             if iname in abs2meta and abs2meta[iname]['src_indices'] is None:
                 src = abs_in2out[iname]
                 out_i = all_abs2idx[src]
                 nzs = np.nonzero(sizes_out[:, out_i])[0]
-                if (all_abs2meta[src]['global_size'] == all_abs2meta[iname]['global_size'] or
-                        nzs.size == self.comm.size):
+                if (all_abs2meta['output'][src]['global_size'] ==
+                        all_abs2meta['input'][iname]['global_size'] or nzs.size == self.comm.size):
                     # This offset assumes a 'full' distributed output
                     offset = np.sum(sizes_in[:iproc, i])
                     end = offset + sizes_in[iproc, i]
@@ -803,7 +799,7 @@ class Component(System):
                                "added without src_indices. Setting src_indices to "
                                f"range({offset}, {end}).")
                 abs2meta[iname]['src_indices'] = np.arange(offset, end, dtype=INT_DTYPE)
-                all_abs2meta[iname]['has_src_indices'] = True
+                all_abs2meta['input'][iname]['has_src_indices'] = True
                 added_src_inds.add(iname)
 
         return added_src_inds
@@ -1223,7 +1219,8 @@ class Component(System):
                 cols = None
 
         pattern_matches = self._find_partial_matches(of, wrt)
-        abs2meta = self._var_abs2meta
+        abs2meta_in = self._var_abs2meta['input']
+        abs2meta_out = self._var_abs2meta['output']
 
         is_array = isinstance(val, ndarray)
         patmeta = dict(dct)
@@ -1252,23 +1249,29 @@ class Component(System):
                 else:
                     meta = patmeta.copy()
 
+                of, wrt = abs_key
                 meta['rows'] = rows
                 meta['cols'] = cols
-                meta['shape'] = shape = (abs2meta[abs_key[0]]['size'], abs2meta[abs_key[1]]['size'])
+                csz = abs2meta_in[wrt]['size'] if wrt in abs2meta_in else abs2meta_out[wrt]['size']
+                meta['shape'] = shape = (abs2meta_out[of]['size'], csz)
 
                 if shape[0] == 0 or shape[1] == 0:
                     msg = "{}: '{}' is an array of size 0"
                     if shape[0] == 0:
-                        if not abs2meta[abs_key[0]]['distributed']:
+                        if not abs2meta_out[of]['distributed']:
                             # non-distributed components are not allowed to have zero size inputs
-                            raise ValueError(msg.format(self.msginfo, abs_key[0]))
+                            raise ValueError(msg.format(self.msginfo, of))
                         else:
                             # distributed comp are allowed to have zero size inputs on some procs
                             rows_max = -1
                     if shape[1] == 0:
-                        if not abs2meta[abs_key[1]]['distributed']:
+                        if wrt in abs2meta_in:
+                            distrib = abs2meta_in[wrt]['distributed']
+                        else:
+                            distrib = abs2meta_out[wrt]['distributed']
+                        if not distrib:
                             # non-distributed components are not allowed to have zero size outputs
-                            raise ValueError(msg.format(self.msginfo, abs_key[1]))
+                            raise ValueError(msg.format(self.msginfo, wrt))
                         else:
                             # distributed comp are allowed to have zero size outputs on some procs
                             cols_max = -1

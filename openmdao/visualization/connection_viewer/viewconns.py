@@ -71,19 +71,22 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
     src2tgts = defaultdict(list)
     units = {}
-    for n, data in system._var_allprocs_abs2meta.items():
-        u = data.get('units', '')
-        if u is None:
-            u = ''
-        units[n] = u
+    for io in ('input', 'output'):
+        for n, data in system._var_allprocs_abs2meta[io].items():
+            u = data.get('units', '')
+            if u is None:
+                u = ''
+            units[n] = u
 
     vals = {}
 
+    if system._outputs is None:
+        raise RuntimeError("view_conections must not be called before problem setup is complete.")
+
     with printoptions(precision=precision, suppress=True, threshold=10000):
 
-        for t in system._var_abs_names['input']:
-            tmeta = system._var_abs2meta[t]
-            idxs = tmeta['src_indices']
+        for t, meta in system._var_abs2meta['input'].items():
+            idxs = meta['src_indices']
 
             s = connections[t]
             if show_values:
@@ -109,12 +112,12 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
     src_systems = set()
     tgt_systems = set()
-    for s in system._var_abs_names['output']:
+    for s in system._var_abs2meta['output']:
         parts = s.split('.')
         for i in range(len(parts)):
             src_systems.add('.'.join(parts[:i]))
 
-    for t in system._var_abs_names['input']:
+    for t in system._var_abs2meta['input']:
         parts = t.split('.')
         for i in range(len(parts)):
             tgt_systems.add('.'.join(parts[:i]))
@@ -146,7 +149,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
         idx += 1
 
     # add rows for unconnected sources
-    for src in system._var_abs_names['output']:
+    for src in system._var_abs2meta['output']:
         if src not in src2tgts:
             if show_values:
                 v = _val2str(system._outputs[src])

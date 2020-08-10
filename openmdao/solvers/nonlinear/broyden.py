@@ -182,10 +182,10 @@ class BroydenSolver(NonlinearSolver):
         if len(states) > 0:
             # User has specified states, so we must size them.
             n = 0
-            sizes = system._var_allprocs_abs2meta
+            meta = system._var_allprocs_abs2meta['output']
 
             for i, name in enumerate(states):
-                size = sizes[prom2abs[name][0]]['global_size']
+                size = meta[prom2abs[name][0]]['global_size']
                 self._idx[name] = (n, n + size)
                 n += size
         else:

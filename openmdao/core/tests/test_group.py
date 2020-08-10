@@ -2768,7 +2768,8 @@ class Test3Deep(unittest.TestCase):
 
     def check_vs_meta(self, p, parent, meta_dict):
         system = p.model._get_subsystem(parent)
-        metas = (system._var_allprocs_abs2meta, system._var_abs2meta)
+        metas = (system._var_allprocs_abs2meta['input'], system._var_allprocs_abs2meta['output'],
+                 system._var_abs2meta['input'], system._var_abs2meta['output'])
         for vname, meta in meta_dict.items():
             for key, val in meta.items():
                 for mymeta in metas:
@@ -2912,7 +2913,7 @@ class TestInConfigMPIpar(Test3Deep):
         p = self.build_model()
         p.model.add_get_io('cfg', metadata_keys=('value', 'src_indices', 'shape'), get_remote=True)
         p.model.cfg.add_get_io('sub')
-        
+
         p.setup()
 
         res = p.model.io_results['cfg']

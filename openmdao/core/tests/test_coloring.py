@@ -1001,7 +1001,7 @@ class MatMultMultipointTestCase(unittest.TestCase):
         for i in range(num_pts):
             cname = 'par2.comp%d' % i
             vname = cname + '.A'
-            if vname in model._var_abs_names['input']:
+            if vname in model._var_abs2meta['input']:
                 A1 = p.get_val('par1.comp%d.A'%i)
                 A2 = p.get_val('par2.comp%d.A'%i)
                 norm = np.linalg.norm(J['par2.comp%d.y'%i,'indep%d.x'%i] - A2.dot(A1))

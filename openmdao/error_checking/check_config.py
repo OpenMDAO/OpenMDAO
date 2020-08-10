@@ -320,7 +320,7 @@ def _check_hanging_inputs(problem, logger):
         input_srcs = problem.model._conn_global_abs_in2out
 
     prom_ins = problem.model._var_allprocs_prom2abs_list['input']
-    abs2meta = problem.model._var_allprocs_abs2meta
+    abs2meta = problem.model._var_allprocs_abs2meta['input']
     unconns = []
     nwid = uwid = 0
 

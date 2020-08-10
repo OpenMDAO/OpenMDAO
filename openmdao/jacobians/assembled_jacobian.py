@@ -82,11 +82,10 @@ class AssembledJacobian(Jacobian):
         OrderedDict
             Tuples of the form (start, end) keyed on variable name.
         """
-        abs2meta = system._var_abs2meta
         ranges = OrderedDict()
         start = end = 0
-        for name in system._var_abs_names[vtype]:
-            end += abs2meta[name]['size']
+        for name, meta in system._var_abs2meta[vtype].items():
+            end += meta['size']
             ranges[name] = (start, end)
             start = end
         return ranges
@@ -103,7 +102,7 @@ class AssembledJacobian(Jacobian):
         # var_indices are the *global* indices for variables on this proc
         is_top = system.pathname == ''
 
-        abs2meta = system._var_abs2meta
+        abs2meta_in = system._var_abs2meta['input']
         all_meta = system._var_allprocs_abs2meta
 
         self._int_mtx = int_mtx = self._matrix_class(system.comm, True)
@@ -138,8 +137,8 @@ class AssembledJacobian(Jacobian):
                     if out_abs_name not in out_ranges:
                         continue
 
-                    meta_in = abs2meta[wrt_abs_name]
-                    all_out_meta = all_meta[out_abs_name]
+                    meta_in = abs2meta_in[wrt_abs_name]
+                    all_out_meta = all_meta['output'][out_abs_name]
                     # calculate unit conversion
                     in_units = meta_in['units']
                     out_units = all_out_meta['units']
@@ -153,7 +152,7 @@ class AssembledJacobian(Jacobian):
                     out_offset, out_end = out_ranges[out_abs_name]
                     out_size = out_end - out_offset
                     shape = (res_size, out_size)
-                    src_indices = abs2meta[wrt_abs_name]['src_indices']
+                    src_indices = abs2meta_in[wrt_abs_name]['src_indices']
 
                     if src_indices is not None:
                         # need to add an entry for d(output)/d(source)
@@ -192,7 +191,7 @@ class AssembledJacobian(Jacobian):
         in_ranges = self._in_ranges
         out_ranges = self._out_ranges
 
-        input_names = system._var_abs_names['input']
+        input_names = list(system._var_abs2meta['input'])
         if input_names:
             min_in_offset = in_ranges[input_names[0]][0]
             max_in_offset = in_ranges[input_names[-1]][1]
@@ -200,7 +199,7 @@ class AssembledJacobian(Jacobian):
             min_in_offset = sys.maxsize
             max_in_offset = 0
 
-        output_names = system._var_abs_names['output']
+        output_names = list(system._var_abs2meta['output'])
         if output_names:
             min_res_offset = out_ranges[output_names[0]][0]
             max_res_offset = out_ranges[output_names[-1]][1]
@@ -220,7 +219,7 @@ class AssembledJacobian(Jacobian):
         system : <System>
             The system being solved using a sub-view of the jacobian.
         """
-        abs2meta = system._var_abs2meta
+        abs2meta = system._var_abs2meta['output']
         ranges = self._view_ranges[system.pathname]
 
         ext_mtx = self._matrix_class(system.comm, False)
@@ -230,17 +229,17 @@ class AssembledJacobian(Jacobian):
         sizes = system._var_sizes['linear']['input']
         abs2idx = system._var_allprocs_abs2idx['linear']
         in_offset = {n: np.sum(sizes[iproc, :abs2idx[n]]) for n in
-                     system._var_abs_names['input'] if n not in conns}
+                     system._var_abs2meta['input'] if n not in conns}
 
         subjacs_info = self._subjacs_info
 
         sizes = system._var_sizes['linear']['output']
         for s in system.system_iter(recurse=True, include_self=True, typ=Component):
-            for res_abs_name in s._var_abs_names['output']:
+            for res_abs_name, res_meta in s._var_abs2meta['output'].items():
                 res_offset = np.sum(sizes[iproc, :abs2idx[res_abs_name]])
-                res_size = abs2meta[res_abs_name]['size']
+                res_size = res_meta['size']
 
-                for in_abs_name in s._var_abs_names['input']:
+                for in_abs_name in s._var_abs2meta['input']:
                     if in_abs_name not in conns:  # unconnected input
                         abs_key = (res_abs_name, in_abs_name)
 
@@ -277,8 +276,8 @@ class AssembledJacobian(Jacobian):
             else:
                 global_conns = system._conn_global_abs_in2out
 
-            output_names = set(system._var_abs_names['output'])
-            input_names = set(system._var_abs_names['input'])
+            output_names = set(system._var_abs2meta['output'])
+            input_names = set(system._var_abs2meta['input'])
 
             rev_conns = defaultdict(list)
             for tgt, src in global_conns.items():

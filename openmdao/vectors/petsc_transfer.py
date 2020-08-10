@@ -68,8 +68,9 @@ class PETScTransfer(DefaultTransfer):
         for subsys in group._subgroups_myproc:
             subsys._setup_transfers()
 
-        abs2meta = group._var_abs2meta
-        allprocs_abs2meta = group._var_allprocs_abs2meta
+        abs2meta_in = group._var_abs2meta['input']
+        abs2meta_out = group._var_abs2meta['output']
+        allprocs_abs2meta_out = group._var_allprocs_abs2meta['output']
         myproc = group.comm.rank
 
         transfers = group._transfers = {}
@@ -106,11 +107,11 @@ class PETScTransfer(DefaultTransfer):
                     continue
 
                 # Only continue if the input exists on this processor
-                if abs_in in abs2meta:
+                if abs_in in abs2meta_in:
 
                     # Get meta
-                    meta_in = abs2meta[abs_in]
-                    meta_out = allprocs_abs2meta[abs_out]
+                    meta_in = abs2meta_in[abs_in]
+                    meta_out = allprocs_abs2meta_out[abs_out]
 
                     idx_in = allprocs_abs2idx[abs_in]
                     idx_out = allprocs_abs2idx[abs_out]
@@ -151,7 +152,7 @@ class PETScTransfer(DefaultTransfer):
                                                     out_offset + meta_out['global_size'],
                                                     dtype=INT_DTYPE)
                         else:
-                            rank = myproc if abs_out in abs2meta else owner
+                            rank = myproc if abs_out in abs2meta_out else owner
                             offset = offsets_out[rank, idx_out]
                             output_inds = np.arange(offset, offset + meta_in['size'],
                                                     dtype=INT_DTYPE)

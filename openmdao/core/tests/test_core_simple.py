@@ -57,7 +57,7 @@ class Test(unittest.TestCase):
             system = p.model._get_subsystem(sname) if sname else p.model
             idxs = p.model._var_allprocs_abs2idx['linear']
             return np.array([
-                idxs[name] for name in system._var_abs_names[type_]
+                idxs[name] for name in system._var_abs2meta[type_]
             ])
 
         assert_near_equal(get_inds(self.p, '', 'input'), np.array([0]))

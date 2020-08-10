@@ -105,7 +105,7 @@ class LinesearchSolver(NonlinearSolver):
         """
         super(LinesearchSolver, self)._setup_solvers(system, depth)
         if system._has_bounds:
-            abs2meta = system._var_abs2meta
+            abs2meta = system._var_abs2meta['output']
             start = end = 0
             for abs_name, val in system._outputs._abs_item_iter():
                 end += val.size

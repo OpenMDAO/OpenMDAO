@@ -1571,7 +1571,7 @@ def _get_desvar_info(driver, names=None, use_abs_names=True):
         return abs_names, [desvars[n]['size'] for n in abs_names]
 
     model = driver._problem().model
-    abs2meta = model._var_allprocs_abs2meta
+    abs2meta = model._var_allprocs_abs2meta['output']
 
     if use_abs_names:
         abs_names = names
@@ -1597,7 +1597,7 @@ def _get_response_info(driver, names=None, use_abs_names=True):
         return abs_names, [responses[n]['size'] for n in abs_names]
 
     model = driver._problem().model
-    abs2meta = model._var_allprocs_abs2meta
+    abs2meta = model._var_allprocs_abs2meta['output']
 
     if use_abs_names:
         abs_names = names

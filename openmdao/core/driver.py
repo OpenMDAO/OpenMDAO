@@ -305,10 +305,9 @@ class Driver(object):
             # to bcast to others later
             owning_ranks = model._owning_rank
             sizes = model._var_sizes['nonlinear']['output']
-            abs2meta = model._var_allprocs_abs2meta
             rank = model.comm.rank
             nprocs = model.comm.size
-            for i, vname in enumerate(model._var_allprocs_abs_names['output']):
+            for i, (vname, meta) in enumerate(model._var_allprocs_abs2meta['output'].items()):
                 if vname in responses:
                     indices = responses[vname].get('indices')
                 elif vname in src_design_vars:
@@ -316,7 +315,7 @@ class Driver(object):
                 else:
                     continue
 
-                if abs2meta[vname]['distributed']:
+                if meta['distributed']:
 
                     idx = model._var_allprocs_abs2idx['nonlinear'][vname]
                     dist_sizes = model._var_sizes['nonlinear']['output'][:, idx]

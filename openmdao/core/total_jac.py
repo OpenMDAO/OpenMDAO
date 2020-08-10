@@ -220,7 +220,7 @@ class _TotalJacInfo(object):
         self.output_vec = {'fwd': model._vectors['output'], 'rev': model._vectors['residual']}
         self._dist_driver_vars = driver._dist_driver_vars
 
-        abs2meta = model._var_allprocs_abs2meta
+        abs2meta = model._var_allprocs_abs2meta['output']
 
         constraints = driver._cons
 
@@ -343,10 +343,10 @@ class _TotalJacInfo(object):
             myoffset = rowcol_size * myrank
             owns = self.model._owning_rank
 
+            abs2meta = self.model._var_allprocs_abs2meta['output']
             for vecname in model._lin_vec_names:
                 sizes = self.model._var_sizes[vecname]['output']
                 abs2idx = self.model._var_allprocs_abs2idx[vecname]
-                abs2meta = self.model._var_allprocs_abs2meta
                 full_j_tgts = []
                 full_j_srcs = []
 
@@ -461,7 +461,7 @@ class _TotalJacInfo(object):
         model = self.model
         relevant = model._relevant
         has_par_deriv_color = False
-        abs2meta = model._var_allprocs_abs2meta
+        abs2meta = model._var_allprocs_abs2meta['output']
         var_sizes = model._var_sizes
         var_offsets = model._get_var_offsets()
         abs2idx = model._var_allprocs_abs2idx
@@ -756,7 +756,7 @@ class _TotalJacInfo(object):
 
         return sol_idxs, jac_idxs, name2jinds
 
-    def _get_tuple_map(self, names, vois, abs2meta):
+    def _get_tuple_map(self, names, vois, abs2meta_out):
         """
         Create a dict that maps var name to metadata tuple.
 
@@ -768,8 +768,8 @@ class _TotalJacInfo(object):
             Names of the variables making up the rows or columns of the jacobian.
         vois : dict
             Mapping of variable of interest (desvar or response) name to its metadata.
-        abs2meta : dict
-            Mapping of absolute var name to metadata for that var.
+        abs2meta_out : dict
+            Mapping of absolute output var name to metadata for that var.
 
         Returns
         -------
@@ -792,12 +792,12 @@ class _TotalJacInfo(object):
                     size = voi['size']
                 indices = vois[name]['indices']
             else:
-                size = abs2meta[name]['global_size']
+                size = abs2meta_out[name]['global_size']
                 indices = None
 
             end += size
 
-            idx_map[name] = (slice(start, end), indices, abs2meta[name]['distributed'])
+            idx_map[name] = (slice(start, end), indices, abs2meta_out[name]['distributed'])
             start = end
 
         return idx_map, end  # after the loop, end is the total size

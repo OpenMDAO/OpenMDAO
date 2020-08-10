@@ -43,7 +43,7 @@ class DefaultTransfer(Transfer):
             subsys._setup_transfers()
 
         abs2meta = group._var_abs2meta
-        allprocs_abs2meta = group._var_allprocs_abs2meta
+        allprocs_abs2meta_out = group._var_allprocs_abs2meta['output']
 
         group._transfers = transfers = {}
         vectors = group._vectors
@@ -81,12 +81,12 @@ class DefaultTransfer(Transfer):
                     continue
 
                 # Only continue if the input exists on this processor
-                if abs_in in abs2meta:
+                if abs_in in abs2meta['input']:
 
                     indices = None
                     # Get meta
-                    meta_in = abs2meta[abs_in]
-                    meta_out = allprocs_abs2meta[abs_out]
+                    meta_in = abs2meta['input'][abs_in]
+                    meta_out = allprocs_abs2meta_out[abs_out]
 
                     idx_in = allprocs_abs2idx[abs_in]
                     idx_out = allprocs_abs2idx[abs_out]
@@ -130,7 +130,7 @@ class DefaultTransfer(Transfer):
                     isub = sub_inds[sub_in]
                     fwd_xfer_in[isub].append(input_inds)
                     fwd_xfer_out[isub].append(output_inds)
-                    if rev and abs_out in abs2meta:
+                    if rev and abs_out in abs2meta['output']:
                         sub_out = abs_out[mypathlen:].split('.', 1)[0]
                         isub = sub_inds[sub_out]
                         rev_xfer_in[isub].append(input_inds)

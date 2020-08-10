@@ -714,6 +714,32 @@ class TestDriver(unittest.TestCase):
         msg = "Group (<model>): Target for constraint x has no units, but 'ft' units were specified."
         self.assertEqual(str(context.exception), msg)
 
+    def test_get_desvar_subsystem(self):
+        # Test for a bug where design variables in a subsystem were not fully set up.
+        prob = om.Problem()
+        model = prob.model
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+        sub = model.add_subsystem('sub', om.Group())
+        sub.add_subsystem('comp', Paraboloid(), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
+
+        sub.add_design_var('x', lower=-50.0, upper=50.0)
+        sub.add_design_var('y', lower=-50.0, upper=50.0)
+        sub.add_objective('f_xy')
+        sub.add_constraint('y', lower=-40.0)
+
+        prob.setup()
+
+        prob.set_val('sub.x', 50.)
+        prob.set_val('sub.y', 50.)
+
+        failed = prob.run_driver()
+
+        assert_near_equal(prob['sub.x'], 6.66666667, 1e-6)
+        assert_near_equal(prob['sub.y'], -7.3333333, 1e-6)
 
 class TestDriverFeature(unittest.TestCase):
 

@@ -147,10 +147,6 @@ class System(object):
         (used to calculate promoted names)
     _var_promotes_src_indices : dict
         Dictionary mapping promoted input names/wildcards to (src_indices, flat_src_indices)
-    _var_allprocs_abs_names : {'input': [str, ...], 'output': [str, ...]}
-        List of absolute names of this system's variables on all procs.
-    _var_abs_names : {'input': [str, ...], 'output': [str, ...]}
-        List of absolute names of this system's variables existing on current proc.
     _var_allprocs_prom2abs_list : {'input': dict, 'output': dict}
         Dictionary mapping promoted names to list of all absolute names.
         For outputs, the list will have length one since promoted output names are unique.
@@ -367,13 +363,11 @@ class System(object):
         self._var_promotes = {'input': [], 'output': [], 'any': []}
         self._var_promotes_src_indices = {}
 
-        self._var_allprocs_abs_names = {'input': [], 'output': []}
-        self._var_abs_names = {'input': [], 'output': []}
         self._var_allprocs_prom2abs_list = None
         self._var_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2prom = {'input': {}, 'output': {}}
-        self._var_allprocs_abs2meta = OrderedDict()
-        self._var_abs2meta = OrderedDict()
+        self._var_allprocs_abs2meta = {'input': OrderedDict(), 'output': OrderedDict()}
+        self._var_abs2meta = {'input': OrderedDict(), 'output': OrderedDict()}
         self._var_discrete = {'input': OrderedDict(), 'output': OrderedDict()}
         self._var_allprocs_discrete = {'input': OrderedDict(), 'output': OrderedDict()}
 
@@ -474,9 +468,9 @@ class System(object):
     def _abs_name_iter(self, iotype, local=True, cont=True, discrete=False):
         if cont:
             if local:
-                yield from self._var_abs_names[iotype]
+                yield from self._var_abs2meta[iotype]
             else:
-                yield from self._var_allprocs_abs_names[iotype]
+                yield from self._var_allprocs_abs2meta[iotype]
 
         if discrete:
             if local:
@@ -1040,8 +1034,8 @@ class System(object):
         """
         abs2meta = self._var_allprocs_abs2meta
         offset = end = 0
-        for of in self._var_allprocs_abs_names['output']:
-            end += abs2meta[of]['size']
+        for of, meta in self._var_allprocs_abs2meta['output'].items():
+            end += meta['size']
             yield of, offset, end, _full_slice
             offset = end
 
@@ -1066,9 +1060,9 @@ class System(object):
                 yield of, offset, end, sub_of_idx
                 offset = end
 
-        for wrt in self._var_allprocs_abs_names['input']:
+        for wrt, meta in self._var_allprocs_abs2meta['input'].items():
             if wrt in wrt_matches:
-                end += abs2meta[wrt]['size']
+                end += meta['size']
                 yield wrt, offset, end, _full_slice
                 offset = end
 
@@ -1299,13 +1293,11 @@ class System(object):
         """
         Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
         """
-        self._var_allprocs_abs_names = {'input': [], 'output': []}
-        self._var_abs_names = {'input': [], 'output': []}
         self._var_allprocs_prom2abs_list = {'input': OrderedDict(), 'output': OrderedDict()}
         self._var_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2prom = {'input': {}, 'output': {}}
-        self._var_allprocs_abs2meta = OrderedDict()
-        self._var_abs2meta = OrderedDict()
+        self._var_allprocs_abs2meta = {'input': OrderedDict(), 'output': OrderedDict()}
+        self._var_abs2meta = {'input': OrderedDict(), 'output': OrderedDict()}
         self._var_allprocs_abs2idx = {}
         self._gatherable_vars = set()
         self._owning_rank = defaultdict(int)
@@ -1320,8 +1312,8 @@ class System(object):
 
         for vec_name in vec_names:
             abs2idx[vec_name] = abs2idx_t = {}
-            for type_ in ['input', 'output']:
-                for i, abs_name in enumerate(self._var_allprocs_relevant_names[vec_name][type_]):
+            for io in ['input', 'output']:
+                for i, abs_name in enumerate(self._var_allprocs_relevant_names[vec_name][io]):
                     abs2idx_t[abs_name] = i
 
         if self._use_derivatives:
@@ -1341,14 +1333,12 @@ class System(object):
         """
         Compute the global size and shape of all variables on this system.
         """
-        meta = self._var_allprocs_abs2meta
         loc_meta = self._var_abs2meta
 
         for typ in ('input', 'output'):
             # now set global sizes and shapes into metadata for distributed variables
             sizes = self._var_sizes['nonlinear'][typ]
-            for idx, abs_name in enumerate(self._var_allprocs_abs_names[typ]):
-                mymeta = meta[abs_name]
+            for idx, (abs_name, mymeta) in enumerate(self._var_allprocs_abs2meta[typ].items()):
                 local_shape = mymeta['shape']
                 if mymeta['distributed']:
                     global_size = np.sum(sizes[:, idx])
@@ -1373,9 +1363,9 @@ class System(object):
                     mymeta['global_size'] = mymeta['size']
                     mymeta['global_shape'] = local_shape
 
-                if abs_name in loc_meta:
-                    loc_meta[abs_name]['global_shape'] = mymeta['global_shape']
-                    loc_meta[abs_name]['global_size'] = mymeta['global_size']
+                if abs_name in loc_meta[typ]:
+                    loc_meta[typ][abs_name]['global_shape'] = mymeta['global_shape']
+                    loc_meta[typ][abs_name]['global_size'] = mymeta['global_size']
 
     def _setup_global_connections(self, conns=None):
         """
@@ -1481,7 +1471,7 @@ class System(object):
         """
         Compute unit conversions for driver variables.
         """
-        abs2meta = self._var_abs2meta
+        abs2meta = self._var_abs2meta['output']
         pro2abs = self._var_allprocs_prom2abs_list['output']
         pro2abs_in = self._var_allprocs_prom2abs_list['input']
         conns = self._problem_meta.get('connections', {})
@@ -1605,11 +1595,11 @@ class System(object):
             rel, relsys = relevant[vec_name]['@all']
             if self.pathname in relsys:
                 self._rel_vec_name_list.append(vec_name)
-            for type_ in ('input', 'output'):
-                self._var_allprocs_relevant_names[vec_name][type_].extend(
-                    v for v in self._var_allprocs_abs_names[type_] if v in rel[type_])
-                self._var_relevant_names[vec_name][type_].extend(
-                    v for v in self._var_abs_names[type_] if v in rel[type_])
+            for io in ('input', 'output'):
+                self._var_allprocs_relevant_names[vec_name][io].extend(
+                    v for v in self._var_allprocs_abs2meta[io] if v in rel[io])
+                self._var_relevant_names[vec_name][io].extend(
+                    v for v in self._var_abs2meta[io] if v in rel[io])
 
         self._rel_vec_names = frozenset(self._rel_vec_name_list)
         self._lin_rel_vec_name_list = self._rel_vec_name_list[1:]
@@ -1687,10 +1677,7 @@ class System(object):
             ('input', 'norm'): (0.0, 1.0)
         })
 
-        allprocs_meta_out = self._var_allprocs_abs2meta
-
-        for abs_name in self._var_allprocs_abs_names['output']:
-            meta = allprocs_meta_out[abs_name]
+        for abs_name, meta in self._var_allprocs_abs2meta['output'].items():
             ref0 = meta['ref0']
             res_ref = meta['res_ref']
             a0 = ref0
@@ -1777,12 +1764,11 @@ class System(object):
         """
         Set all input and output variables to their declared initial values.
         """
-        abs2meta = self._var_abs2meta
-        for abs_name in self._var_abs_names['input']:
-            self._inputs.set_var(abs_name, abs2meta[abs_name]['value'])
+        for abs_name, meta in self._var_abs2meta['input'].items():
+            self._inputs.set_var(abs_name, meta['value'])
 
-        for abs_name in self._var_abs_names['output']:
-            self._outputs.set_var(abs_name, abs2meta[abs_name]['value'])
+        for abs_name, meta in self._var_abs2meta['output'].items():
+            self._outputs.set_var(abs_name, meta['value'])
 
     def _get_maps(self, prom_names):
         """
@@ -1853,7 +1839,7 @@ class System(object):
                 src_indices, flat_src_indices = self._var_promotes_src_indices[key]
 
                 abs_name = self._var_allprocs_prom2abs_list['input'][name][0]
-                meta = self._var_abs2meta[abs_name]
+                meta = self._var_abs2meta['input'][abs_name]
 
                 _, _, src_indices = ensure_compatible(name, meta['value'], meta['shape'],
                                                       src_indices)
@@ -1927,7 +1913,8 @@ class System(object):
 
             not_found = (set(names).union(renames).union(patterns)) - found
             if not_found:
-                if not self._var_abs2meta and isinstance(self, openmdao.core.group.Group):
+                if (not self._var_abs2meta['input'] and not self._var_abs2meta['output'] and
+                        isinstance(self, openmdao.core.group.Group)):
                     empty_group_msg = ' Group contains no variables.'
                 else:
                     empty_group_msg = ''
@@ -1982,7 +1969,7 @@ class System(object):
         try:
             return self._scope_cache[None]
         except KeyError:
-            self._scope_cache[None] = (frozenset(self._var_abs_names['output']), _empty_frozen_set)
+            self._scope_cache[None] = (frozenset(self._var_abs2meta['output']), _empty_frozen_set)
             return self._scope_cache[None]
 
     def _get_potential_partials_lists(self, include_wrt_outputs=True):
@@ -2930,7 +2917,7 @@ class System(object):
                         meta['size'] = 0  # discrete var, don't know size
 
                 if src_name in abs2idx:
-                    meta = self._var_allprocs_abs2meta[src_name]
+                    meta = self._var_allprocs_abs2meta['output'][src_name]
                     out[name]['distributed'] = meta['distributed']
                     out[name]['global_size'] = meta['global_size']
 
@@ -3012,7 +2999,7 @@ class System(object):
                     response['size'] = 0  # discrete var, we don't know the size
                     continue
 
-                meta = self._var_allprocs_abs2meta[name]
+                meta = self._var_allprocs_abs2meta['output'][name]
                 response['distributed'] = meta['distributed']
 
                 if response['indices'] is not None:
@@ -3173,6 +3160,7 @@ class System(object):
         it = self._var_allprocs_abs2prom if get_remote else self._var_abs2prom
 
         for iotype in iotypes:
+            cont2meta = metadict[iotype]
             disc2meta = disc_metadict[iotype]
 
             for abs_name, prom in it[iotype].items():
@@ -3181,9 +3169,9 @@ class System(object):
 
                 rel_name = abs_name[rel_idx:]
 
-                if abs_name in all2meta:  # continuous
-                    meta = metadict[abs_name] if abs_name in metadict else None
-                    distrib = all2meta[abs_name]['distributed']
+                if abs_name in all2meta[iotype]:  # continuous
+                    meta = cont2meta[abs_name] if abs_name in cont2meta else None
+                    distrib = all2meta[iotype][abs_name]['distributed']
                 else:  # discrete
                     if need_local_meta:  # use relative name for discretes
                         meta = disc2meta[rel_name] if rel_name in disc2meta else None
@@ -3574,7 +3562,7 @@ class System(object):
         """
         var_list = []
 
-        real_vars = self._var_allprocs_abs_names
+        real_vars = self._var_allprocs_abs2meta
         disc_vars = self._var_allprocs_discrete
 
         in_or_out = []
@@ -4014,13 +4002,14 @@ class System(object):
         """
         discrete = distrib = False
         val = _UNDEFINED
-        typ = 'output' if abs_name in self._var_allprocs_abs2prom['output'] else 'input'
         if from_root:
-            all_meta = self._problem_meta['all_meta']
-            my_meta = self._problem_meta['meta']
+            typ = 'output' if abs_name in self._problem_meta['all_meta']['output'] else 'input'
+            all_meta = self._problem_meta['all_meta'][typ]
+            my_meta = self._problem_meta['meta'][typ]
         else:
-            all_meta = self._var_allprocs_abs2meta
-            my_meta = self._var_abs2meta
+            typ = 'output' if abs_name in self._var_allprocs_abs2meta['output'] else 'input'
+            all_meta = self._var_allprocs_abs2meta[typ]
+            my_meta = self._var_abs2meta[typ]
 
         try:
             if get_remote:
@@ -4102,9 +4091,9 @@ class System(object):
                         tag = self._var_allprocs_abs2idx[vec_name][abs_name]
                         # avoid tag collisions between inputs, outputs, and resids
                         if kind != 'output':
-                            tag += len(self._var_allprocs_abs_names['output'])
+                            tag += len(self._var_allprocs_abs2meta['output'])
                             if kind == 'residual':
-                                tag += len(self._var_allprocs_abs_names['input'])
+                                tag += len(self._var_allprocs_abs2meta['input'])
                         if self.comm.rank == owner:
                             self.comm.send(val, dest=rank, tag=tag)
                         elif self.comm.rank == rank:
@@ -4218,20 +4207,20 @@ class System(object):
                 try:
                     units = self._group_inputs[name][0]['units']
                 except (KeyError, IndexError):
-                    unit0 = self._var_allprocs_abs2meta[abs_ins[0]]['units']
+                    unit0 = self._var_allprocs_abs2meta['input'][abs_ins[0]]['units']
                     for n in abs_ins[1:]:
-                        if unit0 != self._var_allprocs_abs2meta[n]['units']:
+                        if unit0 != self._var_allprocs_abs2meta['input'][n]['units']:
                             self._show_ambiguity_msg(name, ('units',), abs_ins)
                             break
 
         val = self._abs_get_val(src, get_remote, rank, vec_name, 'output', flat, from_root=True)
 
-        if abs_name in self._var_abs2meta:  # input is local
-            vmeta = self._var_abs2meta[abs_name]
+        if abs_name in self._var_abs2meta['input']:  # input is local
+            vmeta = self._var_abs2meta['input'][abs_name]
             src_indices = vmeta['src_indices']
             has_src_indices = src_indices is not None
         else:
-            vmeta = self._var_allprocs_abs2meta[abs_name]
+            vmeta = self._var_allprocs_abs2meta['input'][abs_name]
             src_indices = None  # FIXME: remote var could have src_indices
             has_src_indices = vmeta['has_src_indices']
 
@@ -4268,7 +4257,7 @@ class System(object):
                         val = self.comm.bcast(None, root=self._owning_rank[abs_name])
 
             if distrib and get_remote:
-                val.shape = self._var_allprocs_abs2meta[abs_name]['global_shape']
+                val.shape = self._var_allprocs_abs2meta['input'][abs_name]['global_shape']
             elif val.size > 0:
                 val.shape = vmeta['shape']
         else:
@@ -4277,7 +4266,7 @@ class System(object):
         if indices is not None:
             val = val[indices]
 
-        smeta = self._problem_meta['all_meta'][src]
+        smeta = self._problem_meta['all_meta']['output'][src]
         if units is not None:
             if smeta['units'] is not None:
                 try:
@@ -4500,14 +4489,20 @@ class System(object):
             meta_loc = self._var_abs2meta
 
         meta = None
-        if name in meta_all:
+        if name in meta_all['output']:
             abs_name = name
-            meta = meta_all[name]
+            meta = meta_all['output'][name]
+        elif name in meta_all['input']:
+            abs_name = name
+            meta = meta_all['input'][name]
 
         if meta is None:
             abs_name = name2abs_name(self, name)
-            if abs_name is not None and abs_name in meta_all:
-                meta = meta_all[abs_name]
+            if abs_name is not None:
+                if abs_name in meta_all['output']:
+                    meta = meta_all['output'][abs_name]
+                elif abs_name in meta_all['input']:
+                    meta = meta_all['input'][abs_name]
 
         if meta:
             if key in meta:
@@ -4516,11 +4511,20 @@ class System(object):
                 # key is either bogus or a key into the local metadata dict
                 # (like 'value' or 'src_indices'). If MPI is active, this val may be remote
                 # on some procs
-                if self.comm.size > 1:
-                    pass
-                elif abs_name in meta_loc:
+                if self.comm.size > 1 and abs_name in self._gatherable_varss:
+                    # TODO: fix this
+                    # cause a failure in all procs to avoid a hang
+                    raise RuntimeError(f"{self.msgifo}: No support yet for retrieving local "
+                                       f"metadata key '{key}' from a remote proc.")
+                elif abs_name in meta_loc['output']:
                     try:
-                        return meta_loc[abs_name][key]
+                        return meta_loc['output'][abs_name][key]
+                    except KeyError:
+                        raise KeyError(f"{self.msginfo}: Metadata key '{key}' not found for "
+                                       f"variable '{name}'.")
+                elif abs_name in meta_loc['input']:
+                    try:
+                        return meta_loc['input'][abs_name][key]
                     except KeyError:
                         raise KeyError(f"{self.msginfo}: Metadata key '{key}' not found for "
                                        f"variable '{name}'.")
@@ -4537,9 +4541,9 @@ class System(object):
             rel_idx = len(self.pathname) + 1 if self.pathname else 0
             relname = abs_name[rel_idx:]
             if relname in self._var_discrete['output']:
-                meta = self._var_discrete['output']
+                meta = self._var_discrete['output'][relname]
             elif relname in self._var_discrete['input']:
-                meta = self._var_discrete['input']
+                meta = self._var_discrete['input'][relname]
 
             if meta:
                 try:
