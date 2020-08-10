@@ -36,7 +36,7 @@ from openmdao.utils.name_maps import prom_name2abs_name, name2abs_names
 from openmdao.utils.options_dictionary import OptionsDictionary, _undefined
 from openmdao.utils.units import convert_units
 from openmdao.utils import coloring as coloring_mod
-from openmdao.core.constants import PRE_SETUP, POST_CONFIGURE, POST_SETUP, POST_FINAL_SETUP
+from openmdao.core.constants import _SetupStatus
 from openmdao.utils.name_maps import abs_key2rel_key
 from openmdao.vectors.vector import _full_slice, INT_DTYPE
 from openmdao.vectors.default_vector import DefaultVector
@@ -367,7 +367,7 @@ class Problem(object):
         object
             The value of the requested output/input variable.
         """
-        if self._metadata['_setup_status'] == POST_SETUP:
+        if self._metadata['_setup_status'] == _SetupStatus.POST_SETUP:
             val = self._get_cached_val(name, get_remote=get_remote)
             if val is not _undefined:
                 if indices is not None:
@@ -467,7 +467,7 @@ class Problem(object):
 
                 if units is None:
                     # avoids double unit conversion
-                    if self._metadata['_setup_status'] > POST_SETUP:
+                    if self._metadata['_setup_status'] > _SetupStatus.POST_SETUP:
                         ivalue = value
                         if sunits is not None:
                             if gunits is not None and gunits != tunits:
@@ -479,7 +479,7 @@ class Problem(object):
                         ivalue = model.convert_from_units(abs_name, value, units)
                     else:
                         ivalue = model.convert_units(name, value, units, gunits)
-                    if self._metadata['_setup_status'] == POST_SETUP:
+                    if self._metadata['_setup_status'] == _SetupStatus.POST_SETUP:
                         value = ivalue
                     else:
                         value = model.convert_from_units(src, value, units)
@@ -489,7 +489,7 @@ class Problem(object):
                 value = model.convert_from_units(abs_name, value, units)
 
         # Caching only needed if vectors aren't allocated yet.
-        if self._metadata['_setup_status'] == POST_SETUP:
+        if self._metadata['_setup_status'] == _SetupStatus.POST_SETUP:
             if indices is not None:
                 self._get_cached_val(name)
                 try:
@@ -752,7 +752,7 @@ class Problem(object):
         case_name : str
             Name used to identify this Problem case.
         """
-        if self._metadata['_setup_status'] < POST_FINAL_SETUP:
+        if self._metadata['_setup_status'] < _SetupStatus.POST_FINAL_SETUP:
             raise RuntimeError(f"{self.msginfo}: Problem.record() cannot be called before "
                                "`Problem.run_model()`, `Problem.run_driver()`, or "
                                "`Problem.final_setup()`.")
@@ -864,7 +864,7 @@ class Problem(object):
             'remote_systems': {},
             'remote_vars': {},  # does not include distrib vars
             'prom2abs': {'input': {}, 'output': {}},  # includes ALL promotes including buried ones
-            '_setup_status': PRE_SETUP
+            '_setup_status': _SetupStatus.PRE_SETUP
         }
         model._setup(model_comm, mode, self._metadata)
 
@@ -872,7 +872,7 @@ class Problem(object):
         self._check = check
         self._logger = logger
 
-        self._metadata['_setup_status'] = POST_SETUP
+        self._metadata['_setup_status'] = _SetupStatus.POST_SETUP
 
         return self
 
@@ -897,7 +897,7 @@ class Problem(object):
         else:
             mode = self._orig_mode
 
-        if self._metadata['_setup_status'] < POST_FINAL_SETUP:
+        if self._metadata['_setup_status'] < _SetupStatus.POST_FINAL_SETUP:
             self.model._final_setup(self.comm)
 
         driver._setup_driver(self)
@@ -924,20 +924,20 @@ class Problem(object):
                            "(objectives and nonlinear constraints)." %
                            (mode, desvar_size, response_size), RuntimeWarning)
 
-        if self._metadata['_setup_status'] == PRE_SETUP and \
+        if self._metadata['_setup_status'] == _SetupStatus.PRE_SETUP and \
                 hasattr(self.model, '_order_set') and self.model._order_set:
             raise RuntimeError("%s: Cannot call set_order without calling "
                                "setup after" % (self.msginfo))
 
         # we only want to set up recording once, after problem setup
-        if self._metadata['_setup_status'] == POST_SETUP:
+        if self._metadata['_setup_status'] == _SetupStatus.POST_SETUP:
             driver._setup_recording()
             self._setup_recording()
             record_viewer_data(self)
             record_system_options(self)
 
-        if self._metadata['_setup_status'] < POST_FINAL_SETUP:
-            self._metadata['_setup_status'] = POST_FINAL_SETUP
+        if self._metadata['_setup_status'] < _SetupStatus.POST_FINAL_SETUP:
+            self._metadata['_setup_status'] = _SetupStatus.POST_FINAL_SETUP
             self._set_initial_conditions()
 
         if self._check:
@@ -1009,7 +1009,7 @@ class Problem(object):
             For 'J_fd', 'J_fwd', 'J_rev' the value is: A numpy array representing the computed
                 Jacobian for the three different methods of computation.
         """
-        if self._metadata['_setup_status'] < POST_FINAL_SETUP:
+        if self._metadata['_setup_status'] < _SetupStatus.POST_FINAL_SETUP:
             self.final_setup()
 
         model = self.model
@@ -1427,7 +1427,7 @@ class Problem(object):
             For 'rel error', 'abs error', 'magnitude' the value is: A tuple containing norms for
                 forward - fd, adjoint - fd, forward - adjoint.
         """
-        if self._metadata['_setup_status'] < POST_FINAL_SETUP:
+        if self._metadata['_setup_status'] < _SetupStatus.POST_FINAL_SETUP:
             raise RuntimeError(self.msginfo + ": run_model must be called before total "
                                "derivatives can be checked.")
 
@@ -1533,7 +1533,7 @@ class Problem(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
-        if self._metadata['_setup_status'] < POST_FINAL_SETUP:
+        if self._metadata['_setup_status'] < _SetupStatus.POST_FINAL_SETUP:
             self.final_setup()
 
         if self.model._owns_approx_jac:
