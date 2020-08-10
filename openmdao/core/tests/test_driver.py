@@ -730,6 +730,7 @@ class TestDriver(unittest.TestCase):
         sub.add_design_var('x', lower=-50.0, upper=50.0)
         sub.add_design_var('y', lower=-50.0, upper=50.0)
         sub.add_objective('f_xy')
+        sub.add_constraint('y', lower=-40.0)
 
         prob.setup()
 

@@ -2949,6 +2949,8 @@ class System(object):
 
                     out[name]['distributed'] = meta['distributed']
                     out[name]['global_size'] = meta['global_size']
+                else:
+                    print('what')
 
         if recurse:
             for subsys in self._subsystems_myproc:
@@ -2990,27 +2992,42 @@ class System(object):
         prom2abs = self._var_allprocs_prom2abs_list['output']
         prom2abs_in = self._var_allprocs_prom2abs_list['input']
         conns = self._problem_meta.get('connections', {})
+        if use_prom_ivc:
+            abs2prom = self._problem_meta.get('abs2prom', {})['input']
 
         # Human readable error message during Driver setup.
         try:
             out = {}
+            out_scope_ivc = {}
             for name, data in self._responses.items():
                 if name in prom2abs:
                     abs_name = prom2abs[name][0]
                     out[abs_name] = data
                     out[abs_name]['ivc_source'] = abs_name
+                    out_scope_ivc[abs_name] = False
 
                 else:
                     # A constraint can actaully be on an auto_ivc input, so use connected
                     # output name.
                     in_abs = prom2abs_in[name][0]
                     ivc_path = conns[in_abs]
+
                     if use_prom_ivc:
+
+                        # If we are not at the top, then promoted name needs to be converted to the
+                        # top scope.
+                        if self.pathname and in_abs in abs2prom:
+                            name = abs2prom[in_abs]
+                            out_scope_ivc[name] = True
+                        else:
+                            out_scope_ivc[name] = False
+
                         out[name] = data
                         out[name]['ivc_source'] = ivc_path
                     else:
                         out[ivc_path] = data
                         out[ivc_path]['ivc_source'] = ivc_path
+                        out_scope_ivc[ivc_path] = False
 
         except KeyError as err:
             msg = "{}: Output not found for response {}."
@@ -3018,9 +3035,15 @@ class System(object):
 
         if get_sizes:
             # Size them all
-            sizes = self._var_sizes['nonlinear']['output']
-            abs2idx = self._var_allprocs_abs2idx['nonlinear']
             for prom_name, response in out.items():
+
+                if out_scope_ivc[prom_name]:
+                    sizes = self._problem_meta.get('sizes', {})['nonlinear']['output']
+                    abs2idx = self._problem_meta.get('abs2idx', {})['nonlinear']
+                else:
+                    sizes = self._var_sizes['nonlinear']['output']
+                    abs2idx = self._var_allprocs_abs2idx['nonlinear']
+
                 name = response['ivc_source']
 
                 # Discrete vars
@@ -3028,7 +3051,11 @@ class System(object):
                     response['size'] = 0  # discrete var, we don't know the size
                     continue
 
-                meta = self._var_allprocs_abs2meta[name]
+                if out_scope_ivc[prom_name]:
+                    meta = self._problem_meta.get('all_meta', {})[name]
+                else:
+                    meta = self._var_allprocs_abs2meta[name]
+
                 response['distributed'] = meta['distributed']
 
                 if response['indices'] is not None:
@@ -3042,7 +3069,8 @@ class System(object):
 
         if recurse:
             for subsys in self._subsystems_myproc:
-                out.update(subsys.get_responses(recurse=recurse, get_sizes=get_sizes))
+                out.update(subsys.get_responses(recurse=recurse, get_sizes=get_sizes,
+                                                use_prom_ivc=use_prom_ivc))
 
             if self.comm.size > 1 and self._subsystems_allprocs:
                 all_outs = self.comm.allgather(out)
