@@ -1425,7 +1425,7 @@ class Group(System):
                     else:
                         flat_array_slice_check = False
 
-                    if any('flat_src_indices' in subsys._var_abs2meta[name] \
+                    if any('flat_src_indices' in subsys._var_abs2meta[name]
                            for name in subsys._var_abs2meta):
                         msg = ("%s: flat_src_indices has no effect when using om_slicer to "
                                "slice array." % (self.msginfo))
