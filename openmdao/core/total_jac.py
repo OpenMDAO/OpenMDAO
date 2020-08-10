@@ -1623,10 +1623,10 @@ class _TotalJacInfo(object):
         Print out the derivatives when debug_print is True.
         """
         if self.return_format == 'dict':
-            J = self.J_dict
-            for of in self.of:
-                for wrt in self.wrt:
-                    pprint.pprint({(of, wrt): J[of][wrt]})
+            J_dict = self.J_dict
+            for of, wrt_dict in J_dict.items():
+                for wrt, J_sub in wrt_dict.items():
+                    pprint.pprint({(of, wrt): J_sub})
         else:
             J = self.J
             for i, of in enumerate(self.of):
