@@ -742,6 +742,18 @@ class TestDriver(unittest.TestCase):
         assert_near_equal(prob['sub.x'], 6.66666667, 1e-6)
         assert_near_equal(prob['sub.y'], -7.3333333, 1e-6)
 
+        prob.set_val('sub.x', 50.)
+        prob.set_val('sub.y', 50.)
+
+        prob.run_model()
+
+        totals=prob.check_totals(out_stream=None)
+
+        assert_near_equal(totals['sub.comp.f_xy', 'sub.x']['J_fwd'], [[1.44e2]], 1e-5)
+        assert_near_equal(totals['sub.comp.f_xy', 'sub.y']['J_fwd'], [[1.58e2]], 1e-5)
+        assert_near_equal(totals['sub.comp.f_xy', 'sub.x']['J_fd'], [[1.44e2]], 1e-5)
+        assert_near_equal(totals['sub.comp.f_xy', 'sub.y']['J_fd'], [[1.58e2]], 1e-5)
+
 
 class TestDriverFeature(unittest.TestCase):
 
