@@ -29,6 +29,7 @@ from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_c
 from openmdao.utils.coloring import Coloring, _STD_COLORING_FNAME
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.options_dictionary import _undefined
+from openmdao.core.constants import _SetupStatus
 
 # regex to check for valid names.
 import re
@@ -85,6 +86,8 @@ class Group(System):
         group or distributed component is below a DirectSolver so that we can raise an exception.
     _raise_connection_errors : bool
         Flag indicating whether connection errors are raised as an Exception.
+    _order_set : bool
+        Flag to check if set_order has been called.
     """
 
     def __init__(self, **kwargs):
@@ -118,6 +121,7 @@ class Group(System):
         self._has_distrib_vars = False
         self._contains_parallel_group = False
         self._raise_connection_errors = True
+        self._order_set = False
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -341,6 +345,7 @@ class Group(System):
             if subsys.matrix_free:
                 self.matrix_free = True
 
+        self._problem_meta['setup_status'] = _SetupStatus.POST_CONFIGURE
         self.configure()
 
     def _setup_procs(self, pathname, comm, mode, prob_meta):
@@ -1897,6 +1902,10 @@ class Group(System):
         new_order : list of str
             List of system names in desired new execution order.
         """
+        if self._problem_meta is not None and \
+                self._problem_meta['setup_status'] == _SetupStatus.POST_CONFIGURE:
+            raise RuntimeError("%s: Cannot call set_order in the configure method" % (self.msginfo))
+
         # Make sure the new_order is valid. It must contain all subsystems
         # in this model.
         newset = set(new_order)
@@ -1929,6 +1938,10 @@ class Group(System):
                              (self.msginfo, sorted(dupes)))
 
         subsystems[:] = [olddict[name] for name in new_order]
+
+        self._order_set = True
+        if self._problem_meta is not None:
+            self._problem_meta['setup_status'] = _SetupStatus.PRE_SETUP
 
     def _get_subsystem(self, name):
         """
