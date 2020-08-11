@@ -29,6 +29,7 @@ from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismat
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 from openmdao.utils.coloring import Coloring, _STD_COLORING_FNAME
 import openmdao.utils.coloring as coloring_mod
+from openmdao.core.constants import _SetupStatus
 
 # regex to check for valid names.
 import re
@@ -85,6 +86,8 @@ class Group(System):
         group or distributed component is below a DirectSolver so that we can raise an exception.
     _raise_connection_errors : bool
         Flag indicating whether connection errors are raised as an Exception.
+    _order_set : bool
+        Flag to check if set_order has been called.
     """
 
     def __init__(self, **kwargs):
@@ -118,6 +121,7 @@ class Group(System):
         self._has_distrib_vars = False
         self._contains_parallel_group = False
         self._raise_connection_errors = True
+        self._order_set = False
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -345,6 +349,7 @@ class Group(System):
         conf_info = self._problem_meta['config_info']
         conf_info._reset()
 
+        self._problem_meta['setup_status'] = _SetupStatus.POST_CONFIGURE
         self.configure()
 
         # if our configure() has added or promoted any variables, we have to call
@@ -1750,13 +1755,13 @@ class Group(System):
                     simple_warning(f"{self.msginfo}: src_indices have been specified with promotes"
                                    " 'any'. Note that src_indices only apply to matching inputs.")
 
-                # src_indices will applied when promotes are resolved
-                if inputs is not None:
-                    for inp in inputs:
-                        subsys._var_promotes_src_indices[inp] = (src_indices, flat_src_indices)
-                if any is not None:
-                    for inp in any:
-                        subsys._var_promotes_src_indices[inp] = (src_indices, flat_src_indices)
+            # src_indices will applied when promotes are resolved
+            if inputs is not None:
+                for inp in inputs:
+                    subsys._var_promotes_src_indices[inp] = (src_indices, flat_src_indices)
+            if any is not None:
+                for inp in any:
+                    subsys._var_promotes_src_indices[inp] = (src_indices, flat_src_indices)
 
         # check for attempt to promote with different alias
         list_comp = [i if isinstance(i, tuple) else (i, i) for i in subsys._var_promotes['input']]
@@ -1953,6 +1958,10 @@ class Group(System):
         new_order : list of str
             List of system names in desired new execution order.
         """
+        if self._problem_meta is not None and \
+                self._problem_meta['setup_status'] == _SetupStatus.POST_CONFIGURE:
+            raise RuntimeError("%s: Cannot call set_order in the configure method" % (self.msginfo))
+
         # Make sure the new_order is valid. It must contain all subsystems
         # in this model.
         newset = set(new_order)
@@ -1985,6 +1994,10 @@ class Group(System):
                              (self.msginfo, sorted(dupes)))
 
         subsystems[:] = [olddict[name] for name in new_order]
+
+        self._order_set = True
+        if self._problem_meta is not None:
+            self._problem_meta['setup_status'] = _SetupStatus.PRE_SETUP
 
     def _get_subsystem(self, name):
         """
