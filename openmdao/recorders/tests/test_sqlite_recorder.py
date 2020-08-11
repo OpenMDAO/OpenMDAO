@@ -306,24 +306,16 @@ class TestSqliteRecorder(unittest.TestCase):
 
         cr = om.CaseReader(self.filename)
 
-        driver_cases = cr.list_cases('driver')
-        driver_case = cr.get_case(driver_cases[0])
-        objectives = driver_case.get_objectives()
-        constraints = driver_case.get_constraints()
+        self.assertTrue(cr.system_options['root']['component_options']['assembled_jac_type'], 'csc')
 
-        driver.recording_options['record_constraints'] = False
+        # New option and re run of run_driver
+        prob.model.options['assembled_jac_type'] = 'dense'
         prob.setup()
         prob.run_driver()
-        prob.cleanup()
 
         cr = om.CaseReader(self.filename)
+        self.assertTrue(cr.system_options['root']['component_options']['assembled_jac_type'], 'dense')
 
-        driver_cases = cr.list_cases('driver')
-        driver_case = cr.get_case(driver_cases[0])
-        objectives = driver_case.get_objectives()
-        constraints = driver_case.get_constraints()
-        print(objectives)
-        print(constraints)
 
     def test_simple_driver_recording_with_prefix(self):
         prob = ParaboloidProblem()
