@@ -188,16 +188,20 @@ class ProbRemoteTestCase(unittest.TestCase):
             #
 
             # get the local part of the distributed inputs/outputs
-            assert_near_equal(prob.get_val('dst.x', get_remote=False), [7.])
+            assert_near_equal(prob.get_val('dst.x', get_remote=False), [7.])  # from src ('ivc.x')
+            assert_near_equal(prob.model.get_val('dst.x', get_remote=False, from_src=False), [7.])
             assert_near_equal(prob.get_val('dst.y', get_remote=False), [2., 7.])
 
             # par.c1 is local
-            assert_near_equal(prob.get_val('par.c1.x', get_remote=False), [7.])
+            assert_near_equal(prob.get_val('par.c1.x', get_remote=False), [7.])  # from src ('ivc.x')
+            assert_near_equal(prob.model.get_val('par.c1.x', get_remote=False, from_src=False), [7.])
             assert_near_equal(prob.get_val('par.c1.y', get_remote=False), [14.])
 
             # par.c2 is remote
+            assert_near_equal(prob.get_val('par.c2.x', get_remote=False), [7.])  # from src ('ivc.x')
+
             with self.assertRaises(RuntimeError) as cm:
-                prob.get_val('par.c2.x', get_remote=False)
+                prob.model.get_val('par.c2.x', get_remote=False, from_src=False)
             self.assertEqual(str(cm.exception), remote_msg.format(name='par.c2.x', rank=0))
 
             with self.assertRaises(RuntimeError) as cm:
@@ -208,18 +212,27 @@ class ProbRemoteTestCase(unittest.TestCase):
             # get_remote=None
             #
 
-            assert_near_equal(prob['dst.x'], [7.])
+            # distributed should raise exception, except for input with from_src=True (the default)
+            assert_near_equal(prob['dst.x'], [7.])  # from src ('ivc.x')
+
+            with self.assertRaises(RuntimeError) as cm:
+                assert_near_equal(prob.model.get_val('dst.x', get_remote=None, from_src=False), [7.])
+            self.assertEqual(str(cm.exception), distrib_msg.format(name='dst.x'))
+
             with self.assertRaises(RuntimeError) as cm:
                 prob['dst.y']
             self.assertEqual(str(cm.exception), distrib_msg.format(name='dst.y'))
 
             # par.c1 is local
-            assert_near_equal(prob['par.c1.x'], [7.])
+            assert_near_equal(prob['par.c1.x'], [7.])  # from src ('ivc.x')
+            assert_near_equal(prob.model.get_val('par.c1.x', get_remote=None, from_src=False), [7.])
             assert_near_equal(prob['par.c1.y'], [14.])
 
             # par.c2 is remote
+            assert_near_equal(prob['par.c2.x'], [7.])  # from src ('ivc.x')
+
             with self.assertRaises(RuntimeError) as cm:
-                prob['par.c2.x']
+                prob.model.get_val('par.c2.x', get_remote=None, from_src=False)
             self.assertEqual(str(cm.exception), remote_msg.format(name='par.c2.x', rank=0))
 
             with self.assertRaises(RuntimeError) as cm:
@@ -232,12 +245,15 @@ class ProbRemoteTestCase(unittest.TestCase):
             #
 
             # get the local part of the distributed inputs/outputs
-            assert_near_equal(prob.get_val('dst.x', get_remote=False), [7.])
+            assert_near_equal(prob.get_val('dst.x', get_remote=False), [7.])  # from src ('ivc.x')
+            assert_near_equal(prob.model.get_val('dst.x', get_remote=False, from_src=False), [7.])
             assert_near_equal(prob.get_val('dst.y', get_remote=False), [7.])
 
             # par.c1 is remote
+            prob.get_val('par.c1.x', get_remote=False)  # from src ('ivc.x')
+
             with self.assertRaises(RuntimeError) as cm:
-                prob.get_val('par.c1.x', get_remote=False)
+                prob.model.get_val('par.c1.x', get_remote=False, from_src=False)
             self.assertEqual(str(cm.exception), remote_msg.format(name='par.c1.x', rank=1))
 
             with self.assertRaises(RuntimeError) as cm:
@@ -245,21 +261,30 @@ class ProbRemoteTestCase(unittest.TestCase):
             self.assertEqual(str(cm.exception), remote_msg.format(name='par.c1.y', rank=1))
 
             # par.c2 is local
-            assert_near_equal(prob.get_val('par.c2.x', get_remote=False), [7.])
+            assert_near_equal(prob.get_val('par.c2.x', get_remote=False), [7.])  # from src ('ivc.x')
+            assert_near_equal(prob.model.get_val('par.c2.x', get_remote=False, from_src=False), [7.])
             assert_near_equal(prob.get_val('par.c2.y', get_remote=False), [35.])
 
             #
             # get_remote=None
             #
 
-            assert_near_equal(prob['dst.x'], [7.])
+            # distributed should raise exception, except for input with from_src=True (the default)
+            assert_near_equal(prob['dst.x'], [7.])  # from src ('ivc.x')
+
+            with self.assertRaises(RuntimeError) as cm:
+                assert_near_equal(prob.model.get_val('dst.x', get_remote=None, from_src=False), [7.])
+            self.assertEqual(str(cm.exception), distrib_msg.format(name='dst.x'))
+
             with self.assertRaises(RuntimeError) as cm:
                 prob['dst.y']
             self.assertEqual(str(cm.exception), distrib_msg.format(name='dst.y'))
 
             # par.c1 is remote
+            assert_near_equal(prob['par.c1.x'], [7.])  # from src ('ivc.x')
+
             with self.assertRaises(RuntimeError) as cm:
-                prob['par.c1.x']
+                prob.model.get_val('par.c1.x', get_remote=None, from_src=False)
             self.assertEqual(str(cm.exception), remote_msg.format(name='par.c1.x', rank=1))
 
             with self.assertRaises(RuntimeError) as cm:
@@ -267,7 +292,8 @@ class ProbRemoteTestCase(unittest.TestCase):
             self.assertEqual(str(cm.exception), remote_msg.format(name='par.c1.y', rank=1))
 
             # par.c2 is local
-            assert_near_equal(prob['par.c2.x'], [7.])
+            assert_near_equal(prob['par.c2.x'], [7.])  # from src ('ivc.x')
+            assert_near_equal(prob.model.get_val('par.c2.x', get_remote=None, from_src=False), [7.])
             assert_near_equal(prob['par.c2.y'], [35.])
 
 

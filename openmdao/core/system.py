@@ -4058,11 +4058,18 @@ class System(object):
             all_meta = self._var_allprocs_abs2meta
             my_meta = self._var_abs2meta
 
-        try:
+        # if abs_name is non-discrete it should be found in all_meta
+        if abs_name in all_meta:
             if get_remote:
                 meta = all_meta[abs_name]
                 distrib = meta['distributed']
             else:
+                remote_vars = self._problem_meta['remote_vars']
+                if abs_name in remote_vars and remote_vars[abs_name] != self.comm.rank:
+                    raise RuntimeError(f"{self.msginfo}: Variable '{abs_name}' is not local to "
+                                       f"rank {self.comm.rank}. You can retrieve values from "
+                                       "other processes using `get_val(<name>, get_remote=True)`.")
+
                 meta = my_meta[abs_name]
                 distrib = meta['distributed']
                 if distrib and get_remote is None:
@@ -4070,7 +4077,7 @@ class System(object):
                                        "variable. You can retrieve values from all processes "
                                        "using `get_val(<name>, get_remote=True)` or from the "
                                        "local process using `get_val(<name>, get_remote=False)`.")
-        except KeyError:
+        else:
             discrete = True
             relname = abs_name[len(self.pathname) + 1:] if self.pathname else abs_name
             if relname in self._discrete_outputs:
@@ -4267,6 +4274,7 @@ class System(object):
                             self._show_ambiguity_msg(name, ('units',), abs_ins)
                             break
 
+        # get value of the source
         val = self._abs_get_val(src, get_remote, rank, vec_name, 'output', flat, from_root=True)
 
         if abs_name in self._var_abs2meta:  # input is local
@@ -4278,16 +4286,11 @@ class System(object):
             src_indices = None  # FIXME: remote var could have src_indices
             has_src_indices = vmeta['has_src_indices']
             distrib = vmeta['distributed']
-            if not get_remote:
-                if not distrib:
-                    raise RuntimeError(f"{self.msginfo}: Variable '{abs_name}' is not local to "
-                                       f"rank {self.comm.rank}. You can retrieve values from "
-                                       "other processes using `get_val(<name>, get_remote=True)`.")
-                elif get_remote is None:
-                    raise RuntimeError(f"{self.msginfo}: Variable '{abs_name}' is a distributed "
-                                       "variable. You can retrieve values from all processes "
-                                       "using `get_val(<name>, get_remote=True)` or from the "
-                                       "local process using `get_val(<name>, get_remote=False)`.")
+            if distrib and get_remote is None:
+                raise RuntimeError(f"{self.msginfo}: Variable '{abs_name}' is a distributed "
+                                   "variable. You can retrieve values from all processes "
+                                   "using `get_val(<name>, get_remote=True)` or from the "
+                                   "local process using `get_val(<name>, get_remote=False)`.")
 
         if has_src_indices:
             distrib = vmeta['distributed']
