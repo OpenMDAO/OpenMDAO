@@ -135,65 +135,67 @@ class _TotalJacInfo(object):
         self.par_deriv = {}
         self.par_deriv_printnames = {}
 
-        if not model._use_derivatives:
-            raise RuntimeError("Derivative support has been turned off but compute_totals "
-                               "was called.")
-
         if isinstance(wrt, str):
             wrt = [wrt]
 
         if isinstance(of, str):
             of = [of]
 
-        # convert designvars dict to use auto_ivc names
+        # convert designvar and response dicts to use src names
         # keys will all be absolute names after conversion
         design_vars = prom2ivc_src_dict(driver._designvars)
+        responses = prom2ivc_src_dict(driver._responses)
+
+        if not model._use_derivatives:
+            raise RuntimeError("Derivative support has been turned off but compute_totals "
+                               "was called.")
 
         driver_wrt = list(driver._designvars)
+        driver_of = driver._get_ordered_nl_responses()
+
+        # Convert of and wrt names from promoted to absolute
         if wrt is None:
             if driver_wrt:
                 prom_wrt = driver_wrt
             else:
                 raise RuntimeError("Driver is not providing any design variables "
                                    "for compute_totals.")
-            wrt = list(design_vars)
         else:
             prom_wrt = wrt
-            # Convert 'wrt' names from promoted to absolute
-            wrt = []
-            for name in prom_wrt:
-                if name in prom2abs:
-                    wrt_name = prom2abs[name][0]
-                elif name in prom2abs_in:
-                    in_abs = prom2abs_in[name][0]
-                    wrt_name = conns[in_abs]
-                else:
-                    wrt_name = name
-                wrt.append(wrt_name)
 
-        responses = prom2ivc_src_dict(driver._responses)
-        driver_of = driver._get_ordered_nl_responses()
+        # Convert 'wrt' names from promoted to absolute
+        wrt = []
+        for name in prom_wrt:
+            if name in prom2abs:
+                wrt_name = prom2abs[name][0]
+            elif name in prom2abs_in:
+                in_abs = prom2abs_in[name][0]
+                wrt_name = conns[in_abs]
+            else:
+                wrt_name = name
+            wrt.append(wrt_name)
+
         if of is None:
             if driver_of:
                 prom_of = driver_of
             else:
                 raise RuntimeError("Driver is not providing any response variables "
                                    "for compute_totals.")
-            of = [driver._responses[n]['ivc_source'] for n in driver_of]
         else:
             prom_of = of
-            # Convert 'of' names from promoted to absolute
-            of = []
-            for name in prom_of:
-                if name in prom2abs:
-                    of_name = prom2abs[name][0]
-                elif name in prom2abs_in:
-                    # An auto_ivc design var can be used as a response too.
-                    in_abs = prom2abs_in[name][0]
-                    of_name = conns[in_abs]
-                else:
-                    of_name = name
-                of.append(of_name)
+
+        # Convert 'of' names from promoted to absolute
+        of = []
+        for name in prom_of:
+            if name in prom2abs:
+                of_name = prom2abs[name][0]
+            elif name in prom2abs_in:
+                # An auto_ivc design var can be used as a response too.
+                in_abs = prom2abs_in[name][0]
+                of_name = conns[in_abs]
+            else:
+                of_name = name
+            of.append(of_name)
 
         # raise an exception if we depend on any discrete outputs
         if model._var_allprocs_discrete['output']:

@@ -1,6 +1,5 @@
 """Some miscellaneous utility functions."""
 from contextlib import contextmanager
-from collections import OrderedDict
 import os
 import re
 import sys
@@ -1036,7 +1035,7 @@ def prom2ivc_src_dict(prom_dict):
     dict
         New dict with ivc source pathnames.
     """
-    src_dict = OrderedDict()
+    src_dict = {}
     for name, meta in prom_dict.items():
         if meta['ivc_source'] is not None:
             src_name = meta['ivc_source']
