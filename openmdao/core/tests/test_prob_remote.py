@@ -1,9 +1,11 @@
 import unittest
 
+import os
 import numpy as np
+import openmdao.api as om
 
-from openmdao.api import Problem, ExecComp, Group, ParallelGroup, IndepVarComp
 from openmdao.utils.mpi import MPI
+from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.proc_allocators.default_allocator import DefaultAllocator
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
@@ -23,7 +25,6 @@ if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
 
-
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class ProbRemoteTestCase(unittest.TestCase):
 
@@ -31,14 +32,14 @@ class ProbRemoteTestCase(unittest.TestCase):
 
     def test_remote_var_access(self):
         # build the model
-        prob = Problem()
+        prob = om.Problem()
 
-        group = prob.model.add_subsystem('group', ParallelGroup())
+        group = prob.model.add_subsystem('group', om.ParallelGroup())
 
-        comp = ExecComp('f = (x-3)**2 + x*y + (y+4)**2 - 3', y=2.0)
+        comp = om.ExecComp('f = (x-3)**2 + x*y + (y+4)**2 - 3', y=2.0)
         group.add_subsystem('comp1', comp)
 
-        comp = ExecComp('g = x*y', y=2.0)
+        comp = om.ExecComp('g = x*y', y=2.0)
         group.add_subsystem('comp2', comp)
 
         prob.setup()
@@ -52,15 +53,15 @@ class ProbRemoteTestCase(unittest.TestCase):
         np.testing.assert_almost_equal(prob.get_val('group.comp2.g', get_remote=True), 10., decimal=5)
 
     def test_remote_var_access_prom(self):
-        prob = Problem()
+        prob = om.Problem()
 
-        group = prob.model.add_subsystem('group', ParallelGroup(), promotes=['f', 'g'])
+        group = prob.model.add_subsystem('group', om.ParallelGroup(), promotes=['f', 'g'])
 
-        group.add_subsystem('indep1', IndepVarComp('f'), promotes=['*'])
-        group.add_subsystem('indep2', IndepVarComp('g'), promotes=['*'])
+        group.add_subsystem('indep1', om.IndepVarComp('f'), promotes=['*'])
+        group.add_subsystem('indep2', om.IndepVarComp('g'), promotes=['*'])
 
-        prob.model.add_subsystem('summ', ExecComp('z = f + g'), promotes=['f', 'g'])
-        prob.model.add_subsystem('prod', ExecComp('z = f * g'), promotes=['f', 'g'])
+        prob.model.add_subsystem('summ', om.ExecComp('z = f + g'), promotes=['f', 'g'])
+        prob.model.add_subsystem('prod', om.ExecComp('z = f * g'), promotes=['f', 'g'])
 
         prob.setup()
 
@@ -73,11 +74,11 @@ class ProbRemoteTestCase(unittest.TestCase):
         np.testing.assert_almost_equal(prob['prod.z'], 20., decimal=5)
 
     def test_is_local(self):
-        p = Problem()
-        p.model.add_subsystem('indep', IndepVarComp('x', 1.0))
-        par = p.model.add_subsystem('par', ParallelGroup())
-        par.add_subsystem('C1', ExecComp('y=2*x'))
-        par.add_subsystem('C2', ExecComp('y=3*x'))
+        p = om.Problem()
+        p.model.add_subsystem('indep', om.IndepVarComp('x', 1.0))
+        par = p.model.add_subsystem('par', om.ParallelGroup())
+        par.add_subsystem('C1', om.ExecComp('y=2*x'))
+        par.add_subsystem('C2', om.ExecComp('y=3*x'))
         p.model.connect('indep.x', ['par.C1.x', 'par.C2.x'])
 
         with self.assertRaises(RuntimeError) as cm:
@@ -119,8 +120,185 @@ class ProbRemoteTestCase(unittest.TestCase):
             self.assertTrue(p.is_local('par.C2.x'), 'par.C2.x should be local')
             self.assertTrue(p.is_local('par.C2.y'), 'par.C2.y should be local')
 
-@unittest.skip("FIXME: test is unreliable on CI... (timeout)")
-#@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+    def test_get_remote(self):
+
+        N = 3
+
+        class DistribComp(om.ExplicitComponent):
+
+            def initialize(self):
+                self.options['distributed'] = True
+
+            def setup(self):
+                rank = self.comm.rank
+                sizes, offsets = evenly_distrib_idxs(self.comm.size, N)
+
+                self.add_input('x', shape=1, src_indices=[0])
+                self.add_output('y', shape=sizes[rank])
+
+            def compute(self, inputs, outputs):
+                rank = self.comm.rank
+                sizes, offsets = evenly_distrib_idxs(self.comm.size, N)
+
+                outputs['y'] = inputs['x']*np.ones((sizes[rank],))
+                if rank == 0:
+                    outputs['y'][0] = 2.
+
+        class MyModel(om.Group):
+
+            def setup(self):
+                self.add_subsystem('ivc', om.IndepVarComp('x', 0.), promotes_outputs=['*'])
+                self.add_subsystem('dst', DistribComp(), promotes_inputs=['*'])
+                self.add_subsystem('sum', om.ExecComp('z = sum(y)', y=np.zeros((N,)), z=0.0))
+                self.connect('dst.y', 'sum.y')
+
+                self.add_subsystem('par', om.ParallelGroup(), promotes_inputs=['*'])
+                self.par.add_subsystem('c1', om.ExecComp(['y=2.0*x']), promotes_inputs=['*'])
+                self.par.add_subsystem('c2', om.ExecComp(['y=5.0*x']), promotes_inputs=['*'])
+
+        prob = om.Problem(model=MyModel())
+        prob.setup(mode='fwd')
+
+        prob['x'] = 7.0
+        prob.run_model()
+
+        # get_remote=True
+        assert_near_equal(prob.get_val('x', get_remote=True), [7.])
+        assert_near_equal(prob.get_val('dst.x', get_remote=True), [7., 7.])  # ???????
+        assert_near_equal(prob.get_val('dst.y', get_remote=True), [2., 7., 7.])
+        assert_near_equal(prob.get_val('par.c1.x', get_remote=True), [7.])
+        assert_near_equal(prob.get_val('par.c1.y', get_remote=True), [14.])
+        assert_near_equal(prob.get_val('par.c2.x', get_remote=True), [7.])
+        assert_near_equal(prob.get_val('par.c2.y', get_remote=True), [35.])
+
+        self.maxDiff = None
+
+        remote_msg = ("MyModel (<model>): Variable '{name}' is not local to rank {rank}. "
+                      "You can retrieve values from other processes using "
+                      "`get_val(<name>, get_remote=True)`.")
+
+        distrib_msg = ("MyModel (<model>): Variable '{name}' is a distributed variable. "
+                       "You can retrieve values from all processes using "
+                       "`get_val(<name>, get_remote=True)` or from the local "
+                       "process using `get_val(<name>, get_remote=False)`.")
+
+        if prob.comm.rank == 0:
+            #
+            # get_remote=False
+            #
+
+            # get the local part of the distributed inputs/outputs
+            assert_near_equal(prob.get_val('dst.x', get_remote=False), [7.])  # from src ('ivc.x')
+            assert_near_equal(prob.model.get_val('dst.x', get_remote=False, from_src=False), [7.])
+            assert_near_equal(prob.get_val('dst.y', get_remote=False), [2., 7.])
+
+            # par.c1 is local
+            assert_near_equal(prob.get_val('par.c1.x', get_remote=False), [7.])  # from src ('ivc.x')
+            assert_near_equal(prob.model.get_val('par.c1.x', get_remote=False, from_src=False), [7.])
+            assert_near_equal(prob.get_val('par.c1.y', get_remote=False), [14.])
+
+            # par.c2 is remote
+            assert_near_equal(prob.get_val('par.c2.x', get_remote=False), [7.])  # from src ('ivc.x')
+
+            with self.assertRaises(RuntimeError) as cm:
+                prob.model.get_val('par.c2.x', get_remote=False, from_src=False)
+            self.assertEqual(str(cm.exception), remote_msg.format(name='par.c2.x', rank=0))
+
+            with self.assertRaises(RuntimeError) as cm:
+                prob.get_val('par.c2.y', get_remote=False)
+            self.assertEqual(str(cm.exception), remote_msg.format(name='par.c2.y', rank=0))
+
+            #
+            # get_remote=None
+            #
+
+            # distributed should raise exception, except for input with from_src=True (the default)
+            assert_near_equal(prob['dst.x'], [7.])  # from src ('ivc.x')
+
+            with self.assertRaises(RuntimeError) as cm:
+                assert_near_equal(prob.model.get_val('dst.x', get_remote=None, from_src=False), [7.])
+            self.assertEqual(str(cm.exception), distrib_msg.format(name='dst.x'))
+
+            with self.assertRaises(RuntimeError) as cm:
+                prob['dst.y']
+            self.assertEqual(str(cm.exception), distrib_msg.format(name='dst.y'))
+
+            # par.c1 is local
+            assert_near_equal(prob['par.c1.x'], [7.])  # from src ('ivc.x')
+            assert_near_equal(prob.model.get_val('par.c1.x', get_remote=None, from_src=False), [7.])
+            assert_near_equal(prob['par.c1.y'], [14.])
+
+            # par.c2 is remote
+            assert_near_equal(prob['par.c2.x'], [7.])  # from src ('ivc.x')
+
+            with self.assertRaises(RuntimeError) as cm:
+                prob.model.get_val('par.c2.x', get_remote=None, from_src=False)
+            self.assertEqual(str(cm.exception), remote_msg.format(name='par.c2.x', rank=0))
+
+            with self.assertRaises(RuntimeError) as cm:
+                prob['par.c2.y']
+            self.assertEqual(str(cm.exception), remote_msg.format(name='par.c2.y', rank=0))
+
+        else:
+            #
+            # get_remote=False
+            #
+
+            # get the local part of the distributed inputs/outputs
+            assert_near_equal(prob.get_val('dst.x', get_remote=False), [7.])  # from src ('ivc.x')
+            assert_near_equal(prob.model.get_val('dst.x', get_remote=False, from_src=False), [7.])
+            assert_near_equal(prob.get_val('dst.y', get_remote=False), [7.])
+
+            # par.c1 is remote
+            prob.get_val('par.c1.x', get_remote=False)  # from src ('ivc.x')
+
+            with self.assertRaises(RuntimeError) as cm:
+                prob.model.get_val('par.c1.x', get_remote=False, from_src=False)
+            self.assertEqual(str(cm.exception), remote_msg.format(name='par.c1.x', rank=1))
+
+            with self.assertRaises(RuntimeError) as cm:
+                prob.get_val('par.c1.y', get_remote=False)
+            self.assertEqual(str(cm.exception), remote_msg.format(name='par.c1.y', rank=1))
+
+            # par.c2 is local
+            assert_near_equal(prob.get_val('par.c2.x', get_remote=False), [7.])  # from src ('ivc.x')
+            assert_near_equal(prob.model.get_val('par.c2.x', get_remote=False, from_src=False), [7.])
+            assert_near_equal(prob.get_val('par.c2.y', get_remote=False), [35.])
+
+            #
+            # get_remote=None
+            #
+
+            # distributed should raise exception, except for input with from_src=True (the default)
+            assert_near_equal(prob['dst.x'], [7.])  # from src ('ivc.x')
+
+            with self.assertRaises(RuntimeError) as cm:
+                assert_near_equal(prob.model.get_val('dst.x', get_remote=None, from_src=False), [7.])
+            self.assertEqual(str(cm.exception), distrib_msg.format(name='dst.x'))
+
+            with self.assertRaises(RuntimeError) as cm:
+                prob['dst.y']
+            self.assertEqual(str(cm.exception), distrib_msg.format(name='dst.y'))
+
+            # par.c1 is remote
+            assert_near_equal(prob['par.c1.x'], [7.])  # from src ('ivc.x')
+
+            with self.assertRaises(RuntimeError) as cm:
+                prob.model.get_val('par.c1.x', get_remote=None, from_src=False)
+            self.assertEqual(str(cm.exception), remote_msg.format(name='par.c1.x', rank=1))
+
+            with self.assertRaises(RuntimeError) as cm:
+                prob['par.c1.y']
+            self.assertEqual(str(cm.exception), remote_msg.format(name='par.c1.y', rank=1))
+
+            # par.c2 is local
+            assert_near_equal(prob['par.c2.x'], [7.])  # from src ('ivc.x')
+            assert_near_equal(prob.model.get_val('par.c2.x', get_remote=None, from_src=False), [7.])
+            assert_near_equal(prob['par.c2.y'], [35.])
+
+
+@unittest.skipIf(os.environ.get("TRAVIS"), "Unreliable on Travis CI.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class ProbRemote4TestCase(unittest.TestCase):
 
     N_PROCS = 4
@@ -132,17 +310,17 @@ class ProbRemote4TestCase(unittest.TestCase):
         # split the size 4 comm into 2 size 2 comms
         self.assertEqual(comm.size, 2)
 
-        prob = Problem(comm=comm)
+        prob = om.Problem(comm=comm)
         model = prob.model
 
-        p1 = model.add_subsystem('p1', IndepVarComp('x', 99.0))
+        p1 = model.add_subsystem('p1', om.IndepVarComp('x', 99.0))
         p1.add_design_var('x', lower=-50.0, upper=50.0)
 
-        par = model.add_subsystem('par', ParallelGroup())
-        c1 = par.add_subsystem('C1', ExecComp('y = x*x'))
-        c2 = par.add_subsystem('C2', ExecComp('y = x*x'))
+        par = model.add_subsystem('par', om.ParallelGroup())
+        c1 = par.add_subsystem('C1', om.ExecComp('y = x*x'))
+        c2 = par.add_subsystem('C2', om.ExecComp('y = x*x'))
 
-        model.add_subsystem('obj', ExecComp('o = a + b + 2.'))
+        model.add_subsystem('obj', om.ExecComp('o = a + b + 2.'))
 
         model.connect('p1.x', ['par.C1.x', 'par.C2.x'])
         model.connect('par.C1.y', 'obj.a')
@@ -152,7 +330,7 @@ class ProbRemote4TestCase(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = pyOptSparseDriver()
+        prob.driver = om.pyOptSparseDriver()
         prob.driver.options['optimizer'] = OPTIMIZER
         prob.driver.options['print_results'] = False
 
