@@ -37,48 +37,77 @@ class InfoPropYesNo extends InfoPropDefault {
 // Used to format that floats displayed
 let val_formatter = d3.format("g");
 
-/** Convert an array to a string that is human readable.
- * @param {array} arr The array to convert.
+/** Convert an item to a string that is human readable.
+ * @param {val} arr,string The item to convert.
  * @param {level} int The level of nesting in the display.
  * @returns {str} the string of the converted array.
  */
-function array_to_string(array, level=0){
+function val_to_string(val, level=0){
+    if (!Array.isArray(val)){
+        return JSON.stringify(val);
+    }
     let indent = ' '.repeat(level);
     let s = indent + '[';
 
-    for (const element of array) {
+    for (const element of val) {
         if (Array.isArray(element)) {
             s += array_to_string(element,level+1);
         } else {
-            s += val_formatter(element) ;
+            let val_string;
+
+            if (typeof element === 'number'){
+                if (Number.isInteger(element)) {
+                    val_string = element.toString();
+                } else { /* float */
+                    val_string = val_formatter(element);
+                }
+            } else {
+                val_string = JSON.stringify(element);
+            }
+
+
+            // if (typeof element === 'string') {
+            //     val_string = element;
+            // }
+            // else if (Number.isInteger(element)){
+            //     val_string = element.toString();
+            // } else {
+            //     val_string = val_formatter(element);
+            // }
+
+
+            s += val_string ;
         }
         s += ' ';
     }
-    if (array.length > 0) {
+    if (val.length > 0) {
         s = s.slice(0, -1); // chop off the last space
     }
     s += ']\n';
     return s;
 }
 
-/** Convert an array to a string that can be used in Python code.
- * @param {array} arr The array to convert.
+/** Convert the value to a string that can be used in Python code.
+ * @param {val} array,string The value to convert.
  * @returns {str} the string of the converted array.
  */
-function array_to_copy_string(array){
-    let s = '[';
-    for (const element of array) {
+function val_to_copy_string(val){
+    if (typeof val === 'string'){
+        return "'" + val + "'";
+    }
+    let s = 'array([';
+    for (const element of val) {
         if (Array.isArray(element)) {
-            s += array_to_copy_string(element);
+            s += val_to_copy_string(element);
         } else {
             s += element.toString() ;
         }
         s += ', ';
     }
-    if (array.length > 0) {
+    if (val.length > 0) {
         s = s.slice(0, -2); // chop off the last comma and space
     }
-    s += ']';
+    s += '])';
     return s;
 }
 
@@ -410,7 +439,13 @@ class NodeInfo {
                     td = newRow.append('td')
                             .html("Value too large to include in N2" );
                 } else {
-                    let val_string = array_to_string(val)
+                    let val_string;
+                    // if (typeof val === 'string'){
+                    //     val_string = val;
+                    // } else {
+                    //     val_string = array_to_string(val)
+                    // }
+                    val_string = val_to_string(val)
                     let max_length = ValueInfo.TRUNCATE_LIMIT;
                     let isTruncated = val_string.length > max_length ;
                     nodeInfoVal = isTruncated ?
@@ -437,7 +472,7 @@ class NodeInfo {
                            function () {
                                 // This is the strange way you can get something on the clipboard
                                 let copyText = document.querySelector("#input-for-pastebuffer");
-                                copyText.value = 'array(' + array_to_copy_string(val)  + ')';
+                                copyText.value = val_to_copy_string(val) ;
                                 copyText.select();
                                 document.execCommand("copy");
                            }

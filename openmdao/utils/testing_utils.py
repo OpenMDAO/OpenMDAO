@@ -78,6 +78,7 @@ def use_tempdirs(cls):
     return cls
 
 
+from openmdao.solvers.solver import Solver
 class NumpyEncoder(json.JSONEncoder):
     """ Special json encoder for numpy types """
 
@@ -88,6 +89,13 @@ class NumpyEncoder(json.JSONEncoder):
             return float(obj)
         elif isinstance(obj, np.ndarray):
             return obj.tolist()
+        elif isinstance(obj, type):
+            a = issubclass(obj,Solver)
+            b = isinstance(obj,Solver)
+            if issubclass(obj,Solver) or isinstance(obj,Solver):
+                return obj.SOLVER
+        elif isinstance(obj, Solver):
+            return obj.SOLVER
         return json.JSONEncoder.default(self, obj)
 
 def print_nested_dicts_with_ndarrays(d):

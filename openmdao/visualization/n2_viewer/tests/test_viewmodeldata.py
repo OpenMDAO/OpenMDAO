@@ -21,10 +21,10 @@ from openmdao.utils.assert_utils import assert_warning
 
 
 # Whether to pop up a browser window for each N2
-DEBUG_BROWSER = True
+DEBUG_BROWSER = False
 
 # set DEBUG_FILES to True if you want to view the generated HTML file(s)
-DEBUG_FILES = True
+DEBUG_FILES = False
 
 
 class TestViewModelData(unittest.TestCase):
@@ -43,228 +43,8 @@ class TestViewModelData(unittest.TestCase):
         self.title_html_filename = os.path.join(self.dir, "title_n2.html")
         self.conn_html_filename = os.path.join(self.dir, "conn_n2.html")
 
-        self.expected_tree = json.loads("""
-            {
-               "name":"root",
-               "type":"root",
-               "class":"SellarStateConnection",
-               "expressions":null,
-               "component_type":null,
-               "subsystem_type":"group",
-               "is_parallel":false,
-               "linear_solver":"LN: SCIPY",
-               "nonlinear_solver":"NL: Newton",
-               "solve_subsystems":false,
-               "children":[
-                   {
-                     "name":"sub",
-                     "type":"subsystem",
-                     "class":"Group",
-                     "expressions":null,
-                     "component_type":null,
-                     "subsystem_type":"group",
-                     "is_parallel":false,
-                     "linear_solver":"LN: SCIPY",
-                     "nonlinear_solver":"NL: RUNONCE",
-                     "children":[
-                        {
-                           "name":"state_eq_group",
-                           "type":"subsystem",
-                           "class":"Group",
-                           "expressions":null,
-                           "component_type":null,
-                           "subsystem_type":"group",
-                           "is_parallel":false,
-                           "linear_solver":"LN: SCIPY",
-                           "nonlinear_solver":"NL: RUNONCE",
-                           "children":[
-                              {
-                                 "name":"state_eq",
-                                 "type":"subsystem",
-                                 "class":"StateConnection",
-                                 "expressions":null,
-                                 "subsystem_type":"component",
-                                 "is_parallel":false,
-                                 "component_type":"implicit",
-                                 "linear_solver":"",
-                                 "nonlinear_solver":"",
-                                 "children":[
-                                    {
-                                       "name":"y2_actual",
-                                       "type":"input",
-                                       "dtype":"ndarray"
-                                    },
-                                    {
-                                       "name":"y2_command",
-                                       "type":"output",
-                                       "implicit":true,
-                                       "dtype":"ndarray"
-                                    }
-                                 ]
-                              }
-                           ]
-                        },
-                        {
-                           "name":"d1",
-                           "type":"subsystem",
-                           "class":"SellarDis1withDerivatives",
-                           "expressions":null,
-                           "subsystem_type":"component",
-                           "is_parallel":false,
-                           "component_type":"explicit",
-                           "linear_solver":"",
-                           "nonlinear_solver":"",
-                           "children":[
-                              {
-                                 "name":"z",
-                                 "type":"input",
-                                 "dtype":"ndarray"
-                              },
-                              {
-                                 "name":"x",
-                                 "type":"input",
-                                 "dtype":"ndarray"
-                              },
-                              {
-                                 "name":"y2",
-                                 "type":"input",
-                                 "dtype":"ndarray"
-                              },
-                              {
-                                 "name":"y1",
-                                 "type":"output",
-                                 "implicit":false,
-                                 "dtype":"ndarray"
-                              }
-                           ]
-                        },
-                        {
-                           "name":"d2",
-                           "type":"subsystem",
-                           "class":"SellarDis2withDerivatives",
-                           "expressions":null,
-                           "subsystem_type":"component",
-                           "is_parallel":false,
-                           "component_type":"explicit",
-                           "linear_solver":"",
-                           "nonlinear_solver":"",
-                           "children":[
-                              {
-                                 "name":"z",
-                                 "type":"input",
-                                 "dtype":"ndarray"
-                              },
-                              {
-                                 "name":"y1",
-                                 "type":"input",
-                                 "dtype":"ndarray"
-                              },
-                              {
-                                 "name":"y2",
-                                 "type":"output",
-                                 "implicit":false,
-                                 "dtype":"ndarray"
-                              }
-                           ]
-                        }
-                     ]
-                  },
-                  {
-                     "name":"obj_cmp",
-                     "type":"subsystem",
-                     "class":"ExecComp",
-                     "expressions":[
-                        "obj = x**2 + z[1] + y1 + exp(-y2)"
-                     ],
-                     "subsystem_type":"component",
-                     "is_parallel":false,
-                     "component_type":"exec",
-                     "linear_solver":"",
-                     "nonlinear_solver":"",
-                     "children":[
-                        {
-                           "name":"x",
-                           "type":"input",
-                           "dtype":"ndarray"
-                        },
-                        {
-                           "name":"y1",
-                           "type":"input",
-                           "dtype":"ndarray"
-                        },
-                        {
-                           "name":"y2",
-                           "type":"input",
-                           "dtype":"ndarray"
-                        },
-                        {
-                           "name":"z",
-                           "type":"input",
-                           "dtype":"ndarray"
-                        },
-                        {
-                           "name":"obj",
-                           "type":"output",
-                           "implicit":false,
-                           "dtype":"ndarray"
-                        }
-                     ]
-                  },
-                  {
-                     "name":"con_cmp1",
-                     "type":"subsystem",
-                     "class":"ExecComp",
-                     "expressions":[
-                        "con1 = 3.16 - y1"
-                     ],
-                     "subsystem_type":"component",
-                     "is_parallel":false,
-                     "component_type":"exec",
-                     "linear_solver":"",
-                     "nonlinear_solver":"",
-                     "children":[
-                        {
-                           "name":"y1",
-                           "type":"input",
-                           "dtype":"ndarray"
-                        },
-                        {
-                           "name":"con1",
-                           "type":"output",
-                           "implicit":false,
-                           "dtype":"ndarray"
-                        }
-                     ]
-                  },
-                  {
-                     "name":"con_cmp2",
-                     "type":"subsystem",
-                     "class":"ExecComp",
-                     "expressions":[
-                        "con2 = y2 - 24.0"
-                     ],
-                     "subsystem_type":"component",
-                     "is_parallel":false,
-                     "component_type":"exec",
-                     "linear_solver":"",
-                     "nonlinear_solver":"",
-                     "children":[
-                        {
-                           "name":"y2",
-                           "type":"input",
-                           "dtype":"ndarray"
-                        },
-                        {
-                           "name":"con2",
-                           "type":"output",
-                           "implicit":false,
-                           "dtype":"ndarray"
-                        }
-                     ]
-                  }
-               ]
-            }
-        """)
+        self.parentDir = os.path.dirname(os.path.realpath(__file__))
+
         self.expected_pathnames = json.loads('["sub.d1", "sub.d2", "sub.state_eq_group.state_eq"]')
         self.expected_conns = json.loads("""
             [
@@ -338,7 +118,44 @@ class TestViewModelData(unittest.TestCase):
                                 expected_design_vars_names,
                                 expected_responses_names
                                 ):
-        self.assertDictEqual(model_viewer_data['tree'], expected_tree)
+
+        # from openmdao.utils.testing_utils import print_nested_dicts_with_ndarrays
+        #
+        # from json import loads, dumps
+        # from collections import OrderedDict
+        #
+        # from openmdao.utils.testing_utils import NumpyEncoder
+        # def to_dict(input_ordered_dict):
+        #     d = dumps(input_ordered_dict,cls=NumpyEncoder)
+        #     return loads(dumps(input_ordered_dict,cls=NumpyEncoder))
+        #     return loads(dumps(input_ordered_dict,cls=NumpyEncoder))
+
+        # actual_tree = to_dict(model_viewer_data['tree'])
+        # actual_tree = model_viewer_data['tree']
+
+
+
+
+
+
+
+        # self.assertDictEqual(model_viewer_data['tree'], expected_tree)
+
+        # from openmdao.utils.testing_utils import NumpyEncoder
+
+        # with open('actual_tree.json', 'w') as outfile:
+        #     json.dump(actual_tree, outfile,cls=NumpyEncoder, indent=4)
+        #
+        # with open('expected_tree.json', 'w') as outfile:
+        #     json.dump(expected_tree, outfile,cls=NumpyEncoder, indent=4)
+
+
+
+
+        # self.assertDictEqual(actual_tree, expected_tree)
+        import numpy
+        numpy.testing.assert_equal(model_viewer_data['tree'], expected_tree, err_msg='', verbose=True)
+
 
         # check expected system pathnames
         pathnames = model_viewer_data['sys_pathnames_list']
@@ -386,10 +203,41 @@ class TestViewModelData(unittest.TestCase):
 
         model_viewer_data = _get_viewer_data(p)
 
+        from openmdao.utils.testing_utils import print_nested_dicts_with_ndarrays
+        # print_nested_dicts_with_ndarrays(model_viewer_data['tree'])
+        # print_nested_dicts_with_ndarrays(model_viewer_data['tree'])
+        # with open('data.txt', 'w') as outfile:
+        #     json.dump(data, outfile)
+        from openmdao.utils.testing_utils import NumpyEncoder
+
+        # with open('test_model_viewer_has_correct_data_from_problem.json', 'w') as outfile:
+        #     json.dump(model_viewer_data['tree'], outfile,cls=NumpyEncoder, indent=4)
+        #
+        # with open('test_model_viewer_has_correct_data_from_problem.json') as json_file:
+        #     expected_tree_from_problem = json.load(json_file)
+
+
+        # model_viewer_data['tree'] is an ordered dict!!!!!!!!!!!!!!!!!!
+
+        # from json import loads, dumps
+        # from collections import OrderedDict
+        #
+        # def to_dict(input_ordered_dict):
+        #     return loads(dumps(input_ordered_dict))
+        #
+        # actual_tree = to_dict(model_viewer_data['tree'])
+
+        with open(os.path.join(self.parentDir, 'sellar_tree.json')) as json_file:
+            expected_tree = json.load(json_file)
+
+
+
+
         # check expected model tree
         self.check_model_viewer_data(
             model_viewer_data,
-            self.expected_tree,
+            expected_tree,
+            # expected_tree_from_problem,
             self.expected_pathnames,
             self.expected_conns,
             self.expected_abs2prom,
@@ -415,11 +263,31 @@ class TestViewModelData(unittest.TestCase):
         r.shutdown()
 
         model_viewer_data = _get_viewer_data(self.sqlite_db_filename)
+        # from openmdao.utils.testing_utils import print_nested_dicts_with_ndarrays
+        # print_nested_dicts_with_ndarrays(model_viewer_data['tree'])
+
+
+        from openmdao.utils.testing_utils import NumpyEncoder
+
+        # with open('test_model_viewer_has_correct_data_from_sqlite.json', 'w') as outfile:
+        #     json.dump(model_viewer_data['tree'], outfile,cls=NumpyEncoder, indent=4)
+
+
+        # with open(os.path.join(self.dir, 'test_model_viewer_has_correct_data_from_sqlite.json')) as json_file:
+        #     expected_tree = json.load(json_file)
+
+        with open(os.path.join(self.parentDir, 'sellar_tree.json')) as json_file:
+            expected_tree = json.load(json_file)
+
+
+        # with open('test_model_viewer_has_correct_data_from_sqlite.json') as json_file:
+        #     expected_tree_from_sqlite = json.load(json_file)
 
         # check expected model tree
         self.check_model_viewer_data(
             model_viewer_data,
-            self.expected_tree,
+            expected_tree,
+            # expected_tree_from_sqlite,
             self.expected_pathnames,
             self.expected_conns,
             self.expected_abs2prom,
@@ -458,259 +326,279 @@ class TestViewModelData(unittest.TestCase):
 
         prob.setup()
         prob.final_setup()
-        
+
+
+
         model_viewer_data = _get_viewer_data(prob)
+        from openmdao.utils.testing_utils import NumpyEncoder
+
+        # with open('test_model_viewer_has_correct_data_from_optimization_problem.json', 'w') as outfile:
+            # json.dump(model_viewer_data['tree'], outfile,cls=NumpyEncoder, indent=4)
+
+        # with open('test_model_viewer_has_correct_data_from_optimization_problem.json') as json_file:
+        #     expected_tree_betz = json.load(json_file)
+
+        # with open(os.path.join(self.dir, 'test_model_viewer_has_correct_data_from_optimization_problem.json')) as json_file:
+        #     expected_tree_betz = json.load(json_file)
+
+
+        with open(os.path.join(self.parentDir, 'betz_tree.json')) as json_file:
+            expected_tree_betz = json.load(json_file)
 
         # To get the value to put in this statement, use
         # from openmdao.utils.testing_utils import print_nested_dicts_with_ndarrays
         # print_nested_dicts_with_ndarrays(model_viewer_data['tree'])
-        expected_tree_betz = json.loads("""
-            {
-                "children": [
-                    {
-                        "children": [
-                            {
-                                "distributed": false,
-                                "dtype": "ndarray",
-                                "implicit": false,
-                                "is_discrete": false,
-                                "name": "a",
-                                "shape": "(1,)",
-                                "type": "output",
-                                "units": "None",
-                                "value": [
-                                    0.5
-                                ]
-                            },
-                            {
-                                "distributed": false,
-                                "dtype": "ndarray",
-                                "implicit": false,
-                                "is_discrete": false,
-                                "name": "Area",
-                                "shape": "(1,)",
-                                "type": "output",
-                                "units": "m**2",
-                                "value": [
-                                    10.0
-                                ]
-                            },
-                            {
-                                "distributed": false,
-                                "dtype": "ndarray",
-                                "implicit": false,
-                                "is_discrete": false,
-                                "name": "rho",
-                                "shape": "(1,)",
-                                "type": "output",
-                                "units": "kg/m**3",
-                                "value": [
-                                    1.225
-                                ]
-                            },
-                            {
-                                "distributed": false,
-                                "dtype": "ndarray",
-                                "implicit": false,
-                                "is_discrete": false,
-                                "name": "Vu",
-                                "shape": "(1,)",
-                                "type": "output",
-                                "units": "m/s",
-                                "value": [
-                                    10.0
-                                ]
-                            }
-                        ],
-                        "class": "IndepVarComp",
-                        "component_type": "indep",
-                        "expressions": null,
-                        "is_parallel": false,
-                        "linear_solver": "",
-                        "name": "indeps",
-                        "nonlinear_solver": "",
-                        "options": {
-                            "desc": null,
-                            "distributed": false,
-                            "lower": null,
-                            "name": null,
-                            "ref": 1.0,
-                            "ref0": 0.0,
-                            "res_ref": null,
-                            "res_units": null,
-                            "shape": null,
-                            "tags": null,
-                            "units": null,
-                            "upper": null,
-                            "val": 1.0
-                        },
-                        "subsystem_type": "component",
-                        "type": "subsystem"
-                    },
-                    {
-                        "children": [
-                            {
-                                "distributed": false,
-                                "dtype": "ndarray",
-                                "is_discrete": false,
-                                "name": "a",
-                                "shape": "(1,)",
-                                "type": "input",
-                                "units": "None",
-                                "value": [
-                                    0.5
-                                ]
-                            },
-                            {
-                                "distributed": false,
-                                "dtype": "ndarray",
-                                "is_discrete": false,
-                                "name": "Area",
-                                "shape": "(1,)",
-                                "type": "input",
-                                "units": "m**2",
-                                "value": [
-                                    10.0
-                                ]
-                            },
-                            {
-                                "distributed": false,
-                                "dtype": "ndarray",
-                                "is_discrete": false,
-                                "name": "rho",
-                                "shape": "(1,)",
-                                "type": "input",
-                                "units": "kg/m**3",
-                                "value": [
-                                    1.225
-                                ]
-                            },
-                            {
-                                "distributed": false,
-                                "dtype": "ndarray",
-                                "is_discrete": false,
-                                "name": "Vu",
-                                "shape": "(1,)",
-                                "type": "input",
-                                "units": "m/s",
-                                "value": [
-                                    10.0
-                                ]
-                            },
-                            {
-                                "distributed": false,
-                                "dtype": "ndarray",
-                                "implicit": false,
-                                "is_discrete": false,
-                                "name": "Vr",
-                                "shape": "(1,)",
-                                "type": "output",
-                                "units": "m/s",
-                                "value": [
-                                    0.0
-                                ]
-                            },
-                            {
-                                "distributed": false,
-                                "dtype": "ndarray",
-                                "implicit": false,
-                                "is_discrete": false,
-                                "name": "Vd",
-                                "shape": "(1,)",
-                                "type": "output",
-                                "units": "m/s",
-                                "value": [
-                                    0.0
-                                ]
-                            },
-                            {
-                                "distributed": false,
-                                "dtype": "ndarray",
-                                "implicit": false,
-                                "is_discrete": false,
-                                "name": "Ct",
-                                "shape": "(1,)",
-                                "type": "output",
-                                "units": "None",
-                                "value": [
-                                    0.0
-                                ]
-                            },
-                            {
-                                "distributed": false,
-                                "dtype": "ndarray",
-                                "implicit": false,
-                                "is_discrete": false,
-                                "name": "thrust",
-                                "shape": "(1,)",
-                                "type": "output",
-                                "units": "N",
-                                "value": [
-                                    0.0
-                                ]
-                            },
-                            {
-                                "distributed": false,
-                                "dtype": "ndarray",
-                                "implicit": false,
-                                "is_discrete": false,
-                                "name": "Cp",
-                                "shape": "(1,)",
-                                "type": "output",
-                                "units": "None",
-                                "value": [
-                                    0.0
-                                ]
-                            },
-                            {
-                                "distributed": false,
-                                "dtype": "ndarray",
-                                "implicit": false,
-                                "is_discrete": false,
-                                "name": "power",
-                                "shape": "(1,)",
-                                "type": "output",
-                                "units": "W",
-                                "value": [
-                                    0.0
-                                ]
-                            }
-                        ],
-                        "class": "ActuatorDisc",
-                        "component_type": "explicit",
-                        "expressions": null,
-                        "is_parallel": false,
-                        "linear_solver": "",
-                        "name": "a_disk",
-                        "nonlinear_solver": "",
-                        "options": {
-                            "distributed": false
-                        },
-                        "subsystem_type": "component",
-                        "type": "subsystem"
-                    }
-                ],
-                "class": "Group",
-                "component_type": null,
-                "expressions": null,
-                "is_parallel": false,
-                "linear_solver": "LN: RUNONCE",
-                "linear_solver_options": {
-                    "assemble_jac": false,
-                    "iprint": 1
-                },
-                "name": "root",
-                "nonlinear_solver": "NL: RUNONCE",
-                "nonlinear_solver_options": {
-                    "iprint": 1
-                },
-                "options": {
-                    "assembled_jac_type": "csc"
-                },
-                "subsystem_type": "group",
-                "type": "root"
-            }
-        """)
+#         expected_tree_betz = json.loads("""
+# {
+#     "children": [
+#         {
+#             "children": [
+#                 {
+#                     "distributed": false,
+#                     "dtype": "ndarray",
+#                     "implicit": false,
+#                     "is_discrete": false,
+#                     "name": "a",
+#                     "shape": "(1,)",
+#                     "type": "output",
+#                     "units": "None",
+#                     "value": [
+#                         0.5
+#                     ]
+#                 },
+#                 {
+#                     "distributed": false,
+#                     "dtype": "ndarray",
+#                     "implicit": false,
+#                     "is_discrete": false,
+#                     "name": "Area",
+#                     "shape": "(1,)",
+#                     "type": "output",
+#                     "units": "m**2",
+#                     "value": [
+#                         10.0
+#                     ]
+#                 },
+#                 {
+#                     "distributed": false,
+#                     "dtype": "ndarray",
+#                     "implicit": false,
+#                     "is_discrete": false,
+#                     "name": "rho",
+#                     "shape": "(1,)",
+#                     "type": "output",
+#                     "units": "kg/m**3",
+#                     "value": [
+#                         1.225
+#                     ]
+#                 },
+#                 {
+#                     "distributed": false,
+#                     "dtype": "ndarray",
+#                     "implicit": false,
+#                     "is_discrete": false,
+#                     "name": "Vu",
+#                     "shape": "(1,)",
+#                     "type": "output",
+#                     "units": "m/s",
+#                     "value": [
+#                         10.0
+#                     ]
+#                 }
+#             ],
+#             "class": "IndepVarComp",
+#             "component_type": "indep",
+#             "expressions": null,
+#             "is_parallel": false,
+#             "linear_solver": "",
+#             "linear_solver_options": null,
+#             "name": "indeps",
+#             "nonlinear_solver": "",
+#             "nonlinear_solver_options": null,
+#             "options": {
+#                 "desc": null,
+#                 "distributed": false,
+#                 "lower": null,
+#                 "name": null,
+#                 "ref": 1.0,
+#                 "ref0": 0.0,
+#                 "res_ref": null,
+#                 "res_units": null,
+#                 "shape": null,
+#                 "tags": null,
+#                 "units": null,
+#                 "upper": null,
+#                 "val": 1.0
+#             },
+#             "subsystem_type": "component",
+#             "type": "subsystem"
+#         },
+#         {
+#             "children": [
+#                 {
+#                     "distributed": false,
+#                     "dtype": "ndarray",
+#                     "is_discrete": false,
+#                     "name": "a",
+#                     "shape": "(1,)",
+#                     "type": "input",
+#                     "units": "None",
+#                     "value": [
+#                         0.5
+#                     ]
+#                 },
+#                 {
+#                     "distributed": false,
+#                     "dtype": "ndarray",
+#                     "is_discrete": false,
+#                     "name": "Area",
+#                     "shape": "(1,)",
+#                     "type": "input",
+#                     "units": "m**2",
+#                     "value": [
+#                         10.0
+#                     ]
+#                 },
+#                 {
+#                     "distributed": false,
+#                     "dtype": "ndarray",
+#                     "is_discrete": false,
+#                     "name": "rho",
+#                     "shape": "(1,)",
+#                     "type": "input",
+#                     "units": "kg/m**3",
+#                     "value": [
+#                         1.225
+#                     ]
+#                 },
+#                 {
+#                     "distributed": false,
+#                     "dtype": "ndarray",
+#                     "is_discrete": false,
+#                     "name": "Vu",
+#                     "shape": "(1,)",
+#                     "type": "input",
+#                     "units": "m/s",
+#                     "value": [
+#                         10.0
+#                     ]
+#                 },
+#                 {
+#                     "distributed": false,
+#                     "dtype": "ndarray",
+#                     "implicit": false,
+#                     "is_discrete": false,
+#                     "name": "Vr",
+#                     "shape": "(1,)",
+#                     "type": "output",
+#                     "units": "m/s",
+#                     "value": [
+#                         0.0
+#                     ]
+#                 },
+#                 {
+#                     "distributed": false,
+#                     "dtype": "ndarray",
+#                     "implicit": false,
+#                     "is_discrete": false,
+#                     "name": "Vd",
+#                     "shape": "(1,)",
+#                     "type": "output",
+#                     "units": "m/s",
+#                     "value": [
+#                         0.0
+#                     ]
+#                 },
+#                 {
+#                     "distributed": false,
+#                     "dtype": "ndarray",
+#                     "implicit": false,
+#                     "is_discrete": false,
+#                     "name": "Ct",
+#                     "shape": "(1,)",
+#                     "type": "output",
+#                     "units": "None",
+#                     "value": [
+#                         0.0
+#                     ]
+#                 },
+#                 {
+#                     "distributed": false,
+#                     "dtype": "ndarray",
+#                     "implicit": false,
+#                     "is_discrete": false,
+#                     "name": "thrust",
+#                     "shape": "(1,)",
+#                     "type": "output",
+#                     "units": "N",
+#                     "value": [
+#                         0.0
+#                     ]
+#                 },
+#                 {
+#                     "distributed": false,
+#                     "dtype": "ndarray",
+#                     "implicit": false,
+#                     "is_discrete": false,
+#                     "name": "Cp",
+#                     "shape": "(1,)",
+#                     "type": "output",
+#                     "units": "None",
+#                     "value": [
+#                         0.0
+#                     ]
+#                 },
+#                 {
+#                     "distributed": false,
+#                     "dtype": "ndarray",
+#                     "implicit": false,
+#                     "is_discrete": false,
+#                     "name": "power",
+#                     "shape": "(1,)",
+#                     "type": "output",
+#                     "units": "W",
+#                     "value": [
+#                         0.0
+#                     ]
+#                 }
+#             ],
+#             "class": "ActuatorDisc",
+#             "component_type": "explicit",
+#             "expressions": null,
+#             "is_parallel": false,
+#             "linear_solver": "",
+#             "linear_solver_options": null,
+#             "name": "a_disk",
+#             "nonlinear_solver": "",
+#             "nonlinear_solver_options": null,
+#             "options": {
+#                 "distributed": false
+#             },
+#             "subsystem_type": "component",
+#             "type": "subsystem"
+#         }
+#     ],
+#     "class": "Group",
+#     "component_type": null,
+#     "expressions": null,
+#     "is_parallel": false,
+#     "linear_solver": "LN: RUNONCE",
+#     "linear_solver_options": {
+#         "assemble_jac": false,
+#         "iprint": 1
+#     },
+#     "name": "root",
+#     "nonlinear_solver": "NL: RUNONCE",
+#     "nonlinear_solver_options": {
+#         "iprint": 1
+#     },
+#     "options": {
+#         "assembled_jac_type": "csc"
+#     },
+#     "subsystem_type": "group",
+#     "type": "root"
+# }
+#         """)
 
         expected_pathnames_betz = json.loads('[]')
         expected_conns_betz = json.loads("""
@@ -859,7 +747,7 @@ class TestViewModelData(unittest.TestCase):
 
         from openmdao.api import Group, ScipyKrylov, LinearSystemComp
 
-        SIZE = 1
+        SIZE = 5
 
         model = Group()
 
@@ -927,6 +815,42 @@ class TestViewModelData(unittest.TestCase):
 
         n2(prob, outfile="n2_node_value_rubbish.html", show_browser=DEBUG_BROWSER)
 
+    def test_discrete_int_string_inputs_outputs(self):
+        prob = Problem()
+        model = prob.model
+
+        indep = model.add_subsystem('indep', IndepVarComp())
+
+        indep.add_input('not_d_x', 11)
+
+
+        indep.add_discrete_input('x', 11)
+        indep.add_discrete_output('y', 23)
+
+        indep.add_discrete_input('sin', "gleep")
+        indep.add_discrete_output('sout', "gloop")
+
+        indep.add_discrete_input('lin', [1,])
+        indep.add_discrete_output('lout', [2,])
+
+        from openmdao.core.tests.test_discrete import _DiscreteVal
+        indep.add_discrete_input('din', _DiscreteVal(19))
+        indep.add_discrete_output('dout', _DiscreteVal(19))
+
+        import numpy as np
+        indep.add_discrete_input('nin', np.random.rand(10))
+        indep.add_discrete_output('nout', np.random.rand(10))
+
+        indep.add_discrete_output('mixedout', [ _DiscreteVal(19),])
+
+        indep.add_discrete_output('dict_out', {'a':1, 'b':2 })
+
+        q = _DiscreteVal(19)
+
+        prob = Problem(model)
+        prob.setup()
+
+        n2(prob, outfile="n2_node_value_discrete.html", show_browser=DEBUG_BROWSER)
 
 
 if __name__ == "__main__":

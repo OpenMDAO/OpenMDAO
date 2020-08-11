@@ -66,10 +66,21 @@ def _get_var_dict(system, typ, name):
 
     var_dict['is_discrete'] = is_discrete
 
-    if meta['value'].size < _MAX_ARRAY_SIZE_FOR_REPR_VAL:
-        var_dict['value'] = meta['value']
+    if is_discrete:
+        import numpy as np
+        if isinstance(meta['value'], (int,str,list,dict,complex,np.ndarray)):
+            from collections.abc import Iterable
+            val = meta['value']
+            # if not isinstance(val,Iterable):
+            #     val = [val]
+            var_dict['value'] = val
+        else:
+            var_dict['value'] = type(meta['value']).__name__
     else:
-        var_dict['value'] = None
+        if meta['value'].size < _MAX_ARRAY_SIZE_FOR_REPR_VAL:
+            var_dict['value'] = meta['value']
+        else:
+            var_dict['value'] = None
 
     return var_dict
 
@@ -178,7 +189,19 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
 
     tree_dict['children'] = children
 
-    options = {k: system.options[k] for k in system.options}
+    # options = {k: system.options[k] for k in system.options}
+    options = {}
+    from openmdao.solvers.solver import Solver
+    for k in system.options:
+        # sub = issubclass(system.options[k], Solver)
+        ins = isinstance(system.options[k], Solver)
+        t = isinstance(system.options[k], type)
+        if ins:
+            options[k] = system.options[k].SOLVER
+        elif t:
+            options[k] = system.options[k].SOLVER
+        else:
+            options[k] = system.options[k]
     tree_dict['options'] = options
 
     if not tree_dict['name']:
