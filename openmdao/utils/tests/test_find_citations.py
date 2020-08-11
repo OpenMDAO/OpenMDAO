@@ -159,7 +159,6 @@ class TestFindCitePar(unittest.TestCase):
     @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
     def test_find_cite_petsc(self):
         p = self.prob
-        import wingdbstub
         
         p.setup()
 

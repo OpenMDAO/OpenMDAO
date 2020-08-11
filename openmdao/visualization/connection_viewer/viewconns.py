@@ -80,7 +80,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
     vals = {}
 
-    if system._outputs is None:
+    if show_values and system._outputs is None:
         raise RuntimeError("view_conections must not be called before problem setup is complete.")
 
     with printoptions(precision=precision, suppress=True, threshold=10000):

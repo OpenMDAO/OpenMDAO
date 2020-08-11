@@ -4356,7 +4356,8 @@ class System(object):
                             if val.size > 0:
                                 vdict[ivc_path] = val
             else:
-                meta = self._var_allprocs_abs2meta
+                io = 'input' if kind == 'input' else 'output'
+                meta = self._var_allprocs_abs2meta[io]
                 for name in variables:
                     if self._owning_rank[name] == 0 and not meta[name]['distributed']:
                         # if using a serial recorder and rank 0 owns the variable,

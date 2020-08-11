@@ -275,7 +275,7 @@ def key2abs_key(system, key):
     abs_key = rel_key2abs_key(system, key)
     if abs_key[0] in system._var_abs2meta['output'] and \
             (abs_key[1] in system._var_abs2meta['input'] or
-            abs_key[1] in system._var_abs2meta['output']):
+             abs_key[1] in system._var_abs2meta['output']):
         return abs_key
     else:
         return None

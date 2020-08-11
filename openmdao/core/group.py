@@ -791,7 +791,7 @@ class Group(System):
                 raw = (
                     {'input': {}, 'output': {}},
                     {'input': {}, 'output': {}},
-                    {},
+                    {'input': {}, 'output': {}},
                     False,
                     False,
                     {},
@@ -817,10 +817,8 @@ class Group(System):
                             self._group_inputs[p] = []
                         self._group_inputs[p].extend(mlist)
 
-                # Assemble in parallel allprocs_abs2meta
-                allprocs_abs2meta.update(myproc_abs2meta)
-
                 for type_ in ['input', 'output']:
+                    allprocs_abs2meta[type_].update(myproc_abs2meta[type_])
 
                     # Assemble in parallel allprocs_abs_names
                     allprocs_discrete[type_].update(myproc_discrete[type_])
@@ -832,7 +830,8 @@ class Group(System):
                         allprocs_prom2abs_list[type_][prom_name].extend(abs_names_list)
 
             if isend:
-                raw = set(n for n in allprocs_abs2meta if n not in abs2meta)
+                raw = set(n for n in allprocs_abs2meta['input'] if n not in abs2meta['input'])
+                raw.update(n for n in allprocs_abs2meta['output'] if n not in abs2meta['output'])
             else:
                 raw = set()
             for proc_gatherable in self.comm.allgather(raw):
@@ -2286,7 +2285,7 @@ class Group(System):
             # We current cannot approximate across a group with a distributed component if the
             # inputs are distributed via src_indices.
             for iname, meta in self._var_allprocs_abs2meta['input'].items():
-                if meta['src_indices'] is not None and \
+                if meta['has_src_indices'] and \
                    meta['distributed'] and \
                    iname not in self._conn_abs_in2out:
                     msg = "{} : Approx_totals is not supported on a group with a distributed "
@@ -2850,10 +2849,10 @@ class Group(System):
         # auto_ivc never promotes anything
         self._var_abs2prom[io].update({n: n for n in auto_ivc._var_abs2prom[io]})
         self._var_allprocs_abs2prom[io].update({n: n for n in
-                                                    auto_ivc._var_allprocs_abs2prom[io]})
+                                                auto_ivc._var_allprocs_abs2prom[io]})
 
         self._var_discrete[io].update({'_auto_ivc.' + k: v for k, v in
-                                        auto_ivc._var_discrete[io].items()})
+                                       auto_ivc._var_discrete[io].items()})
         self._var_allprocs_discrete[io].update(auto_ivc._var_allprocs_discrete[io])
 
         old = self._var_abs2meta[io]

@@ -521,7 +521,8 @@ class Problem(object):
             elif abs_name in conns:  # input name given. Set value into output
                 if model._outputs._contains_abs(src):  # src is local
                     if (model._outputs._abs_get_val(src).size == 0 and
-                            src.rsplit('.', 1)[0] == '_auto_ivc' and all_meta[src]['distributed']):
+                            src.rsplit('.', 1)[0] == '_auto_ivc' and
+                            all_meta['output'][src]['distributed']):
                         pass  # special case, auto_ivc dist var with 0 local size
                     elif tmeta['has_src_indices'] and n_proms < 2:
                         if tlocmeta:  # target is local

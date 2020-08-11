@@ -771,7 +771,7 @@ class Component(System):
 
         iproc = self.comm.rank
         abs2meta = self._var_abs2meta['input']
-        all_abs2meta = self._var_allprocs_abs2meta
+        all_abs2meta = self._problem_meta['all_meta']
 
         sizes_in = self._var_sizes['nonlinear']['input']
         sizes_out = all_sizes['nonlinear']['output']
