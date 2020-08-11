@@ -1443,7 +1443,7 @@ class System(object):
         """
         if self._use_derivatives:
             desvars = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
-            responses = self.get_responses(recurse=True, get_sizes=False)
+            responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
             return get_relevant_vars(self._conn_global_abs_in2out, desvars, responses,
                                      mode)
         else:
@@ -2936,9 +2936,21 @@ class System(object):
                     out[name]['global_size'] = meta['global_size']
 
         if recurse:
+            abs2prom_in = self._var_allprocs_abs2prom['input']
             for subsys in self._subsystems_myproc:
-                out.update(subsys.get_design_vars(recurse=recurse, get_sizes=get_sizes,
-                                                  use_prom_ivc=use_prom_ivc))
+                dvs = subsys.get_design_vars(recurse=recurse, get_sizes=get_sizes,
+                                             use_prom_ivc=use_prom_ivc)
+                if use_prom_ivc:
+                    # have to promote subsystem prom name to this level
+                    sub_pro2abs_in = subsys._var_allprocs_prom2abs_list['input']
+                    for dv, meta in dvs.items():
+                        if dv in sub_pro2abs_in:
+                            abs_dv = sub_pro2abs_in[dv][0]
+                            out[abs2prom_in[abs_dv]] = meta
+                        else:
+                            out[dv] = meta
+                else:
+                    out.update(dvs)
 
             if self.comm.size > 1 and self._subsystems_allprocs:
                 allouts = self.comm.allgather(out)
@@ -3032,9 +3044,21 @@ class System(object):
                     response['global_size'] = meta['global_size']
 
         if recurse:
+            abs2prom_in = self._var_allprocs_abs2prom['input']
             for subsys in self._subsystems_myproc:
-                out.update(subsys.get_responses(recurse=recurse, get_sizes=get_sizes,
-                                                use_prom_ivc=use_prom_ivc))
+                resps = subsys.get_responses(recurse=recurse, get_sizes=get_sizes,
+                                             use_prom_ivc=use_prom_ivc)
+                if use_prom_ivc:
+                    # have to promote subsystem prom name to this level
+                    sub_pro2abs_in = subsys._var_allprocs_prom2abs_list['input']
+                    for dv, meta in resps.items():
+                        if dv in sub_pro2abs_in:
+                            abs_resp = sub_pro2abs_in[dv][0]
+                            out[abs2prom_in[abs_resp]] = meta
+                        else:
+                            out[dv] = meta
+                else:
+                    out.update(resps)
 
             if self.comm.size > 1 and self._subsystems_allprocs:
                 all_outs = self.comm.allgather(out)
