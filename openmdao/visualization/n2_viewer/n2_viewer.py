@@ -34,6 +34,7 @@ _IND = 4  # HTML indentation (spaces)
 
 _MAX_ARRAY_SIZE_FOR_REPR_VAL = 1000  # If var has more elements than this do not pass to N2
 
+
 def _get_var_dict(system, typ, name):
     if name in system._var_discrete[typ]:
         meta = system._var_discrete[typ][name]
@@ -69,7 +70,7 @@ def _get_var_dict(system, typ, name):
     var_dict['is_discrete'] = is_discrete
 
     if is_discrete:
-        if isinstance(meta['value'], (int,str,list,dict,complex,np.ndarray)):
+        if isinstance(meta['value'], (int, str, list, dict, complex, np.ndarray)):
             val = meta['value']
             var_dict['value'] = val
         else:
@@ -81,6 +82,7 @@ def _get_var_dict(system, typ, name):
             var_dict['value'] = None
 
     return var_dict
+
 
 def _get_tree_dict(system, component_execution_orders, component_execution_index,
                    is_parallel=False):
@@ -160,7 +162,8 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
             tree_dict['nonlinear_solver_options'] = None
         elif system.nonlinear_solver:
             tree_dict['nonlinear_solver'] = system.nonlinear_solver.SOLVER
-            options = {k: system.nonlinear_solver.options[k] for k in system.nonlinear_solver.options}
+            options = {k: system.nonlinear_solver.options[k]
+                       for k in system.nonlinear_solver.options}
             tree_dict['nonlinear_solver_options'] = options
         else:
             tree_dict['nonlinear_solver'] = ""
@@ -176,7 +179,8 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
 
         if system.nonlinear_solver:
             tree_dict['nonlinear_solver'] = system.nonlinear_solver.SOLVER
-            options = {k: system.nonlinear_solver.options[k] for k in system.nonlinear_solver.options}
+            options = {k: system.nonlinear_solver.options[k]
+                       for k in system.nonlinear_solver.options}
             tree_dict['nonlinear_solver_options'] = options
 
             if system.nonlinear_solver.SOLVER == NewtonSolver.SOLVER:
