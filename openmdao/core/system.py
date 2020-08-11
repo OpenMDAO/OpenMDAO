@@ -2938,7 +2938,7 @@ class System(object):
         if recurse:
             for subsys in self._subsystems_myproc:
                 out.update(subsys.get_design_vars(recurse=recurse, get_sizes=get_sizes,
-                                                  use_prom_ivc=False))
+                                                  use_prom_ivc=use_prom_ivc))
 
             if self.comm.size > 1 and self._subsystems_allprocs:
                 allouts = self.comm.allgather(out)
@@ -3033,7 +3033,8 @@ class System(object):
 
         if recurse:
             for subsys in self._subsystems_myproc:
-                out.update(subsys.get_responses(recurse=recurse, get_sizes=get_sizes))
+                out.update(subsys.get_responses(recurse=recurse, get_sizes=get_sizes,
+                                                use_prom_ivc=use_prom_ivc))
 
             if self.comm.size > 1 and self._subsystems_allprocs:
                 all_outs = self.comm.allgather(out)
