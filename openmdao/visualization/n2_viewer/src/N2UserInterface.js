@@ -54,7 +54,6 @@ function val_to_string(val, level=0){
             s += array_to_string(element,level+1);
         } else {
             let val_string;
-
             if (typeof element === 'number'){
                 if (Number.isInteger(element)) {
                     val_string = element.toString();
@@ -64,18 +63,6 @@ function val_to_string(val, level=0){
             } else {
                 val_string = JSON.stringify(element);
             }
-
-
-            // if (typeof element === 'string') {
-            //     val_string = element;
-            // }
-            // else if (Number.isInteger(element)){
-            //     val_string = element.toString();
-            // } else {
-            //     val_string = val_formatter(element);
-            // }
-
-
             s += val_string ;
         }
         s += ' ';
@@ -439,13 +426,7 @@ class NodeInfo {
                     td = newRow.append('td')
                             .html("Value too large to include in N2" );
                 } else {
-                    let val_string;
-                    // if (typeof val === 'string'){
-                    //     val_string = val;
-                    // } else {
-                    //     val_string = array_to_string(val)
-                    // }
-                    val_string = val_to_string(val)
+                    let val_string = val_to_string(val)
                     let max_length = ValueInfo.TRUNCATE_LIMIT;
                     let isTruncated = val_string.length > max_length ;
                     nodeInfoVal = isTruncated ?

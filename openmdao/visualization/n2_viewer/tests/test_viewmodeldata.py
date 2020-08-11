@@ -11,6 +11,8 @@ import errno
 from shutil import rmtree
 from tempfile import mkdtemp
 
+import numpy
+
 from openmdao.api import Problem, IndepVarComp, ScipyOptimizeDriver
 from openmdao.test_suite.components.sellar import SellarStateConnection
 from openmdao.visualization.n2_viewer.n2_viewer import _get_viewer_data, n2
@@ -119,43 +121,7 @@ class TestViewModelData(unittest.TestCase):
                                 expected_responses_names
                                 ):
 
-        # from openmdao.utils.testing_utils import print_nested_dicts_with_ndarrays
-        #
-        # from json import loads, dumps
-        # from collections import OrderedDict
-        #
-        # from openmdao.utils.testing_utils import NumpyEncoder
-        # def to_dict(input_ordered_dict):
-        #     d = dumps(input_ordered_dict,cls=NumpyEncoder)
-        #     return loads(dumps(input_ordered_dict,cls=NumpyEncoder))
-        #     return loads(dumps(input_ordered_dict,cls=NumpyEncoder))
-
-        # actual_tree = to_dict(model_viewer_data['tree'])
-        # actual_tree = model_viewer_data['tree']
-
-
-
-
-
-
-
-        # self.assertDictEqual(model_viewer_data['tree'], expected_tree)
-
-        # from openmdao.utils.testing_utils import NumpyEncoder
-
-        # with open('actual_tree.json', 'w') as outfile:
-        #     json.dump(actual_tree, outfile,cls=NumpyEncoder, indent=4)
-        #
-        # with open('expected_tree.json', 'w') as outfile:
-        #     json.dump(expected_tree, outfile,cls=NumpyEncoder, indent=4)
-
-
-
-
-        # self.assertDictEqual(actual_tree, expected_tree)
-        import numpy
         numpy.testing.assert_equal(model_viewer_data['tree'], expected_tree, err_msg='', verbose=True)
-
 
         # check expected system pathnames
         pathnames = model_viewer_data['sys_pathnames_list']
@@ -203,41 +169,13 @@ class TestViewModelData(unittest.TestCase):
 
         model_viewer_data = _get_viewer_data(p)
 
-        from openmdao.utils.testing_utils import print_nested_dicts_with_ndarrays
-        # print_nested_dicts_with_ndarrays(model_viewer_data['tree'])
-        # print_nested_dicts_with_ndarrays(model_viewer_data['tree'])
-        # with open('data.txt', 'w') as outfile:
-        #     json.dump(data, outfile)
-        from openmdao.utils.testing_utils import NumpyEncoder
-
-        # with open('test_model_viewer_has_correct_data_from_problem.json', 'w') as outfile:
-        #     json.dump(model_viewer_data['tree'], outfile,cls=NumpyEncoder, indent=4)
-        #
-        # with open('test_model_viewer_has_correct_data_from_problem.json') as json_file:
-        #     expected_tree_from_problem = json.load(json_file)
-
-
-        # model_viewer_data['tree'] is an ordered dict!!!!!!!!!!!!!!!!!!
-
-        # from json import loads, dumps
-        # from collections import OrderedDict
-        #
-        # def to_dict(input_ordered_dict):
-        #     return loads(dumps(input_ordered_dict))
-        #
-        # actual_tree = to_dict(model_viewer_data['tree'])
-
         with open(os.path.join(self.parentDir, 'sellar_tree.json')) as json_file:
             expected_tree = json.load(json_file)
-
-
-
 
         # check expected model tree
         self.check_model_viewer_data(
             model_viewer_data,
             expected_tree,
-            # expected_tree_from_problem,
             self.expected_pathnames,
             self.expected_conns,
             self.expected_abs2prom,
@@ -263,31 +201,14 @@ class TestViewModelData(unittest.TestCase):
         r.shutdown()
 
         model_viewer_data = _get_viewer_data(self.sqlite_db_filename)
-        # from openmdao.utils.testing_utils import print_nested_dicts_with_ndarrays
-        # print_nested_dicts_with_ndarrays(model_viewer_data['tree'])
-
-
-        from openmdao.utils.testing_utils import NumpyEncoder
-
-        # with open('test_model_viewer_has_correct_data_from_sqlite.json', 'w') as outfile:
-        #     json.dump(model_viewer_data['tree'], outfile,cls=NumpyEncoder, indent=4)
-
-
-        # with open(os.path.join(self.dir, 'test_model_viewer_has_correct_data_from_sqlite.json')) as json_file:
-        #     expected_tree = json.load(json_file)
 
         with open(os.path.join(self.parentDir, 'sellar_tree.json')) as json_file:
             expected_tree = json.load(json_file)
-
-
-        # with open('test_model_viewer_has_correct_data_from_sqlite.json') as json_file:
-        #     expected_tree_from_sqlite = json.load(json_file)
 
         # check expected model tree
         self.check_model_viewer_data(
             model_viewer_data,
             expected_tree,
-            # expected_tree_from_sqlite,
             self.expected_pathnames,
             self.expected_conns,
             self.expected_abs2prom,
@@ -327,278 +248,10 @@ class TestViewModelData(unittest.TestCase):
         prob.setup()
         prob.final_setup()
 
-
-
         model_viewer_data = _get_viewer_data(prob)
-        from openmdao.utils.testing_utils import NumpyEncoder
-
-        # with open('test_model_viewer_has_correct_data_from_optimization_problem.json', 'w') as outfile:
-            # json.dump(model_viewer_data['tree'], outfile,cls=NumpyEncoder, indent=4)
-
-        # with open('test_model_viewer_has_correct_data_from_optimization_problem.json') as json_file:
-        #     expected_tree_betz = json.load(json_file)
-
-        # with open(os.path.join(self.dir, 'test_model_viewer_has_correct_data_from_optimization_problem.json')) as json_file:
-        #     expected_tree_betz = json.load(json_file)
-
 
         with open(os.path.join(self.parentDir, 'betz_tree.json')) as json_file:
             expected_tree_betz = json.load(json_file)
-
-        # To get the value to put in this statement, use
-        # from openmdao.utils.testing_utils import print_nested_dicts_with_ndarrays
-        # print_nested_dicts_with_ndarrays(model_viewer_data['tree'])
-#         expected_tree_betz = json.loads("""
-# {
-#     "children": [
-#         {
-#             "children": [
-#                 {
-#                     "distributed": false,
-#                     "dtype": "ndarray",
-#                     "implicit": false,
-#                     "is_discrete": false,
-#                     "name": "a",
-#                     "shape": "(1,)",
-#                     "type": "output",
-#                     "units": "None",
-#                     "value": [
-#                         0.5
-#                     ]
-#                 },
-#                 {
-#                     "distributed": false,
-#                     "dtype": "ndarray",
-#                     "implicit": false,
-#                     "is_discrete": false,
-#                     "name": "Area",
-#                     "shape": "(1,)",
-#                     "type": "output",
-#                     "units": "m**2",
-#                     "value": [
-#                         10.0
-#                     ]
-#                 },
-#                 {
-#                     "distributed": false,
-#                     "dtype": "ndarray",
-#                     "implicit": false,
-#                     "is_discrete": false,
-#                     "name": "rho",
-#                     "shape": "(1,)",
-#                     "type": "output",
-#                     "units": "kg/m**3",
-#                     "value": [
-#                         1.225
-#                     ]
-#                 },
-#                 {
-#                     "distributed": false,
-#                     "dtype": "ndarray",
-#                     "implicit": false,
-#                     "is_discrete": false,
-#                     "name": "Vu",
-#                     "shape": "(1,)",
-#                     "type": "output",
-#                     "units": "m/s",
-#                     "value": [
-#                         10.0
-#                     ]
-#                 }
-#             ],
-#             "class": "IndepVarComp",
-#             "component_type": "indep",
-#             "expressions": null,
-#             "is_parallel": false,
-#             "linear_solver": "",
-#             "linear_solver_options": null,
-#             "name": "indeps",
-#             "nonlinear_solver": "",
-#             "nonlinear_solver_options": null,
-#             "options": {
-#                 "desc": null,
-#                 "distributed": false,
-#                 "lower": null,
-#                 "name": null,
-#                 "ref": 1.0,
-#                 "ref0": 0.0,
-#                 "res_ref": null,
-#                 "res_units": null,
-#                 "shape": null,
-#                 "tags": null,
-#                 "units": null,
-#                 "upper": null,
-#                 "val": 1.0
-#             },
-#             "subsystem_type": "component",
-#             "type": "subsystem"
-#         },
-#         {
-#             "children": [
-#                 {
-#                     "distributed": false,
-#                     "dtype": "ndarray",
-#                     "is_discrete": false,
-#                     "name": "a",
-#                     "shape": "(1,)",
-#                     "type": "input",
-#                     "units": "None",
-#                     "value": [
-#                         0.5
-#                     ]
-#                 },
-#                 {
-#                     "distributed": false,
-#                     "dtype": "ndarray",
-#                     "is_discrete": false,
-#                     "name": "Area",
-#                     "shape": "(1,)",
-#                     "type": "input",
-#                     "units": "m**2",
-#                     "value": [
-#                         10.0
-#                     ]
-#                 },
-#                 {
-#                     "distributed": false,
-#                     "dtype": "ndarray",
-#                     "is_discrete": false,
-#                     "name": "rho",
-#                     "shape": "(1,)",
-#                     "type": "input",
-#                     "units": "kg/m**3",
-#                     "value": [
-#                         1.225
-#                     ]
-#                 },
-#                 {
-#                     "distributed": false,
-#                     "dtype": "ndarray",
-#                     "is_discrete": false,
-#                     "name": "Vu",
-#                     "shape": "(1,)",
-#                     "type": "input",
-#                     "units": "m/s",
-#                     "value": [
-#                         10.0
-#                     ]
-#                 },
-#                 {
-#                     "distributed": false,
-#                     "dtype": "ndarray",
-#                     "implicit": false,
-#                     "is_discrete": false,
-#                     "name": "Vr",
-#                     "shape": "(1,)",
-#                     "type": "output",
-#                     "units": "m/s",
-#                     "value": [
-#                         0.0
-#                     ]
-#                 },
-#                 {
-#                     "distributed": false,
-#                     "dtype": "ndarray",
-#                     "implicit": false,
-#                     "is_discrete": false,
-#                     "name": "Vd",
-#                     "shape": "(1,)",
-#                     "type": "output",
-#                     "units": "m/s",
-#                     "value": [
-#                         0.0
-#                     ]
-#                 },
-#                 {
-#                     "distributed": false,
-#                     "dtype": "ndarray",
-#                     "implicit": false,
-#                     "is_discrete": false,
-#                     "name": "Ct",
-#                     "shape": "(1,)",
-#                     "type": "output",
-#                     "units": "None",
-#                     "value": [
-#                         0.0
-#                     ]
-#                 },
-#                 {
-#                     "distributed": false,
-#                     "dtype": "ndarray",
-#                     "implicit": false,
-#                     "is_discrete": false,
-#                     "name": "thrust",
-#                     "shape": "(1,)",
-#                     "type": "output",
-#                     "units": "N",
-#                     "value": [
-#                         0.0
-#                     ]
-#                 },
-#                 {
-#                     "distributed": false,
-#                     "dtype": "ndarray",
-#                     "implicit": false,
-#                     "is_discrete": false,
-#                     "name": "Cp",
-#                     "shape": "(1,)",
-#                     "type": "output",
-#                     "units": "None",
-#                     "value": [
-#                         0.0
-#                     ]
-#                 },
-#                 {
-#                     "distributed": false,
-#                     "dtype": "ndarray",
-#                     "implicit": false,
-#                     "is_discrete": false,
-#                     "name": "power",
-#                     "shape": "(1,)",
-#                     "type": "output",
-#                     "units": "W",
-#                     "value": [
-#                         0.0
-#                     ]
-#                 }
-#             ],
-#             "class": "ActuatorDisc",
-#             "component_type": "explicit",
-#             "expressions": null,
-#             "is_parallel": false,
-#             "linear_solver": "",
-#             "linear_solver_options": null,
-#             "name": "a_disk",
-#             "nonlinear_solver": "",
-#             "nonlinear_solver_options": null,
-#             "options": {
-#                 "distributed": false
-#             },
-#             "subsystem_type": "component",
-#             "type": "subsystem"
-#         }
-#     ],
-#     "class": "Group",
-#     "component_type": null,
-#     "expressions": null,
-#     "is_parallel": false,
-#     "linear_solver": "LN: RUNONCE",
-#     "linear_solver_options": {
-#         "assemble_jac": false,
-#         "iprint": 1
-#     },
-#     "name": "root",
-#     "nonlinear_solver": "NL: RUNONCE",
-#     "nonlinear_solver_options": {
-#         "iprint": 1
-#     },
-#     "options": {
-#         "assembled_jac_type": "csc"
-#     },
-#     "subsystem_type": "group",
-#     "type": "root"
-# }
-#         """)
 
         expected_pathnames_betz = json.loads('[]')
         expected_conns_betz = json.loads("""
