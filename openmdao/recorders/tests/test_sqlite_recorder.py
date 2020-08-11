@@ -289,6 +289,42 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_data = ((coordinate, (t0, t1), expected_derivs),)
         assertDriverDerivDataRecorded(self, expected_data, self.eps)
 
+    def test_double_run_driver_option_overwrite(self):
+        prob = ParaboloidProblem()
+
+        driver = prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
+        driver.recording_options['record_desvars'] = True
+        driver.recording_options['record_objectives'] = True
+        driver.recording_options['record_constraints'] = True
+        driver.recording_options['record_derivatives'] = True
+        driver.recording_options['includes'] = ['*']
+        driver.add_recorder(self.recorder)
+
+        prob.setup()
+        prob.set_solver_print(0)
+        prob.run_driver()
+
+        cr = om.CaseReader(self.filename)
+
+        driver_cases = cr.list_cases('driver')
+        driver_case = cr.get_case(driver_cases[0])
+        objectives = driver_case.get_objectives()
+        constraints = driver_case.get_constraints()
+
+        driver.recording_options['record_constraints'] = False
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = om.CaseReader(self.filename)
+
+        driver_cases = cr.list_cases('driver')
+        driver_case = cr.get_case(driver_cases[0])
+        objectives = driver_case.get_objectives()
+        constraints = driver_case.get_constraints()
+        print(objectives)
+        print(constraints)
+
     def test_simple_driver_recording_with_prefix(self):
         prob = ParaboloidProblem()
 
