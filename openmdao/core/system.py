@@ -359,6 +359,7 @@ class System(object):
         self._subsystems_allprocs = []
         self._subsystems_myproc = []
         self._subsystems_inds = {}
+        self._remote_comps = set()
 
         self._var_promotes = {'input': [], 'output': [], 'any': []}
         self._var_promotes_src_indices = {}
@@ -1299,7 +1300,8 @@ class System(object):
         self._var_allprocs_abs2meta = {'input': OrderedDict(), 'output': OrderedDict()}
         self._var_abs2meta = {'input': OrderedDict(), 'output': OrderedDict()}
         self._var_allprocs_abs2idx = {}
-        self._gatherable_vars = set()
+        self._remote_comps = set()
+        self._gatherable_vars = {}
         self._owning_rank = defaultdict(int)
 
     def _setup_var_index_maps(self):

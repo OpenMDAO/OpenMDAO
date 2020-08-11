@@ -467,8 +467,10 @@ class Group(System):
             s.pathname = '.'.join((self.pathname, s.name)) if self.pathname else s.name
 
         # Perform recursion
+        loc_systems = prob_meta['local_systems']
         for subsys in self._subsystems_myproc:
             subsys._setup_procs(subsys.pathname, sub_comm, mode, prob_meta)
+            loc_systems.add(subsys.pathname)
 
         # build a list of local subgroups to speed up later loops
         self._subgroups_myproc = [s for s in self._subsystems_myproc if isinstance(s, Group)]
@@ -601,7 +603,7 @@ class Group(System):
         self._problem_meta['all_meta'] = self._var_allprocs_abs2meta
         self._problem_meta['meta'] = self._var_abs2meta
 
-        rsystems = self._find_remote_sys_owners()
+        rsystems = self._find_remote_comp_owners()
         self._problem_meta['remote_vars'] = self._find_remote_var_owners(rsystems)
         self._problem_meta['prom2abs'] = self._get_all_promotes(rsystems)
 
@@ -2629,12 +2631,11 @@ class Group(System):
 
         return graph
 
-    def _find_remote_sys_owners(self):
+    def _find_remote_comp_owners(self):
         """
-        Return a mapping of system pathname to owning rank.
+        Return a mapping of component pathname to owning rank.
 
-        The mapping will contain ONLY systems that are remote on at least one proc.
-        Distributed systems are not included.
+        The mapping will contain ONLY components that are remote on at least one proc.
 
         Returns
         -------
@@ -2642,23 +2643,19 @@ class Group(System):
             The mapping of system pathname to owning rank.
         """
         if self.comm.size > 1:
-            loc_sys = set(s.pathname for s in self.system_iter(recurse=True))
+            loc_sys = self._problem_meta['local_systems']
             # use the allprocs variable dicts to find any remote systems
             remote_sys = set()
-            seen = set()
             for typ in ('input', 'output'):
                 for abspath in self._var_allprocs_abs2prom[typ]:  # includes real and discrete vars
-                    sname, vname = abspath.rsplit('.', 1)
-                    if sname not in seen:
-                        seen.add(sname)
-                        for path in all_ancestors(sname):
-                            if path not in loc_sys:
-                                remote_sys.add(path)
+                    comp_name, vname = abspath.rsplit('.', 1)
+                    if comp_name not in loc_sys:
+                        remote_sys.add(comp_name)
 
             # Find systems that are remote in at least one proc and the owning rank for each.
             gathered = self.comm.gather(remote_sys, root=0)
             if self.comm.rank == 0:
-                remote_systems = {}
+                remote_comps = {}
                 remaining_remotes = set()
                 for remotes in gathered:
                     remaining_remotes.update(remotes)
@@ -2668,29 +2665,29 @@ class Group(System):
                         break
                     diff = remaining_remotes - remotes
                     for name in diff:
-                        remote_systems[name] = rank
+                        remote_comps[name] = rank
 
                     remaining_remotes -= diff
 
-                self.comm.bcast(remote_systems, root=0)
+                self.comm.bcast(remote_comps, root=0)
             else:
-                remote_systems = self.comm.bcast(None, root=0)
+                remote_comps = self.comm.bcast(None, root=0)
         else:
-            remote_systems = {}
+            remote_comps = {}
 
-        return remote_systems
+        return remote_comps
 
-    def _find_remote_var_owners(self, sys_owners):
+    def _find_remote_var_owners(self, comp_owning_ranks):
         """
         Return a mapping of abs var name to owning rank.
 
-        The mapping contains only non-distributed variables that are
-        remote on at least one proc.
+        The mapping contains ONLY non-distributed variables that are remote on at least one proc.
 
         Parameters
         ----------
-        sys_owners : dict
-            Mapping of system pathname to owning rank. Contains remote systems only.
+        comp_owning_ranks : dict
+            Mapping of component pathname to owning rank. Contains only components that are
+            remote on at least one proc in this group's MPI communicator.
 
         Returns
         -------
@@ -2702,10 +2699,10 @@ class Group(System):
         for io in ('input', 'output'):
             a2m = all_abs2meta[io]
             for abs_name in self._var_allprocs_abs2prom[io]:
-                sname, vname = abs_name.rsplit('.', 1)
-                dist = abs_name in a2m and a2m[abs_name]['distributed']
-                if not dist and sname in sys_owners:
-                    owners[abs_name] = sys_owners[sname]
+                comp_name, vname = abs_name.rsplit('.', 1)
+                if comp_name in comp_owning_ranks and not (abs_name in a2m and
+                                                           a2m[abs_name]['distributed']):
+                    owners[abs_name] = comp_owning_ranks[comp_name]
         return owners
 
     def _get_auto_ivc_out_val(self, tgts, remote_vars, all_abs2meta_in, abs2meta_in):
@@ -2727,7 +2724,7 @@ class Group(System):
                 else:
                     info.append((tgt, 0, np.zeros(0), True))
 
-            elif dist:  # distributed and local everywhere
+            elif dist:
                 # OpenMDAO currently can't create an automatic IndepVarComp for inputs on
                 # distributed components.
                 msg = 'Distributed component input "{}" requires an IndepVarComp.'
