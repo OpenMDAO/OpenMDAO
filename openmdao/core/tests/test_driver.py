@@ -12,6 +12,7 @@ import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_partials
 from openmdao.utils.general_utils import printoptions
 from openmdao.utils.testing_utils import use_tempdirs
+from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp, NonSquareArrayComp
 
@@ -718,7 +719,7 @@ class TestDriver(unittest.TestCase):
         # Test for a bug where design variables in a subsystem were not fully set up.
         prob = om.Problem()
         model = prob.model
-        from openmdao.test_suite.components.paraboloid import Paraboloid
+
         sub = model.add_subsystem('sub', om.Group())
         sub.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
@@ -740,6 +741,18 @@ class TestDriver(unittest.TestCase):
 
         assert_near_equal(prob['sub.x'], 6.66666667, 1e-6)
         assert_near_equal(prob['sub.y'], -7.3333333, 1e-6)
+
+        prob.set_val('sub.x', 50.)
+        prob.set_val('sub.y', 50.)
+
+        prob.run_model()
+
+        totals=prob.check_totals(out_stream=None)
+
+        assert_near_equal(totals['sub.comp.f_xy', 'sub.x']['J_fwd'], [[1.44e2]], 1e-5)
+        assert_near_equal(totals['sub.comp.f_xy', 'sub.y']['J_fwd'], [[1.58e2]], 1e-5)
+        assert_near_equal(totals['sub.comp.f_xy', 'sub.x']['J_fd'], [[1.44e2]], 1e-5)
+        assert_near_equal(totals['sub.comp.f_xy', 'sub.y']['J_fd'], [[1.58e2]], 1e-5)
 
 
 class TestDriverFeature(unittest.TestCase):
