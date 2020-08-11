@@ -38,7 +38,7 @@ class InfoPropYesNo extends InfoPropDefault {
 let val_formatter = d3.format("g");
 
 /** Convert an item to a string that is human readable.
- * @param {val} arr,string The item to convert.
+ * @param {val} arr,string, int,... The item to convert.
  * @param {level} int The level of nesting in the display.
  * @returns {str} the string of the converted array.
  */
@@ -51,7 +51,7 @@ function val_to_string(val, level=0){
 
     for (const element of val) {
         if (Array.isArray(element)) {
-            s += array_to_string(element,level+1);
+            s += val_to_string(element,level+1);
         } else {
             let val_string;
             if (typeof element === 'number'){
@@ -75,19 +75,29 @@ function val_to_string(val, level=0){
 }
 
 /** Convert the value to a string that can be used in Python code.
- * @param {val} array,string The value to convert.
+ * @param {val} array,string,int,... The value to convert.
  * @returns {str} the string of the converted array.
  */
 function val_to_copy_string(val){
-    if (typeof val === 'string'){
-        return "'" + val + "'";
+    if (!Array.isArray(val)){
+        return JSON.stringify(val);
     }
     let s = 'array([';
     for (const element of val) {
         if (Array.isArray(element)) {
             s += val_to_copy_string(element);
         } else {
-            s += element.toString() ;
+            let val_string;
+            if (typeof element === 'number'){
+                if (Number.isInteger(element)) {
+                    val_string = element.toString();
+                } else { /* float */
+                    val_string = val_formatter(element);
+                }
+            } else {
+                val_string = JSON.stringify(element);
+            }
+            s += val_string ;
         }
         s += ', ';
     }
@@ -301,9 +311,10 @@ ValueInfo.TRUNCATE_LIMIT = 80;
 /**
  * Based on the number of dimensions of the value,
  * indicate whether a value window display is needed or even practical
- * @param {Number} val The variable value.
- */
-ValueInfo.showMoreButtonDisplayed = function(val) {
+ * @param {val} int, float, list,... The variable value.
+  * @returns {str} the string of the converted array.
+*/
+ValueInfo.canValueBeDisplayedInValueWindow = function(val) {
     if (!val) return false; // if no value, cannot display
 
     if (!Array.isArray(val)) return false; // scalars don't need separate display
@@ -434,13 +445,13 @@ class NodeInfo {
                         val_string;
 
                     let html = nodeInfoVal;
-                    if ( isTruncated && ValueInfo.showMoreButtonDisplayed(val)){
+                    if ( isTruncated && ValueInfo.canValueBeDisplayedInValueWindow(val)){
                         html += " <button type='button' class='show_value_button'>Show more</button>" ;
                     }
                     html += " <button type='button' class='copy_value_button'>Copy</button>" ;
                     td = newRow.append('td').html(html);
 
-                    if ( isTruncated && ValueInfo.showMoreButtonDisplayed(val)) {
+                    if ( isTruncated && ValueInfo.canValueBeDisplayedInValueWindow(val)) {
                         let showValueButton = td.select('.show_value_button');
                         const self = this;
                         showValueButton.on('click', function () {

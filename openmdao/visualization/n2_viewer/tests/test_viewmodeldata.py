@@ -45,7 +45,7 @@ class TestViewModelData(unittest.TestCase):
         self.title_html_filename = os.path.join(self.dir, "title_n2.html")
         self.conn_html_filename = os.path.join(self.dir, "conn_n2.html")
 
-        self.parentDir = os.path.dirname(os.path.realpath(__file__))
+        self.parent_dir = os.path.dirname(os.path.realpath(__file__))
 
         self.expected_pathnames = json.loads('["sub.d1", "sub.d2", "sub.state_eq_group.state_eq"]')
         self.expected_conns = json.loads("""
@@ -169,7 +169,7 @@ class TestViewModelData(unittest.TestCase):
 
         model_viewer_data = _get_viewer_data(p)
 
-        with open(os.path.join(self.parentDir, 'sellar_tree.json')) as json_file:
+        with open(os.path.join(self.parent_dir, 'sellar_tree.json')) as json_file:
             expected_tree = json.load(json_file)
 
         # check expected model tree
@@ -202,7 +202,7 @@ class TestViewModelData(unittest.TestCase):
 
         model_viewer_data = _get_viewer_data(self.sqlite_db_filename)
 
-        with open(os.path.join(self.parentDir, 'sellar_tree.json')) as json_file:
+        with open(os.path.join(self.parent_dir, 'sellar_tree.json')) as json_file:
             expected_tree = json.load(json_file)
 
         # check expected model tree
@@ -250,7 +250,7 @@ class TestViewModelData(unittest.TestCase):
 
         model_viewer_data = _get_viewer_data(prob)
 
-        with open(os.path.join(self.parentDir, 'betz_tree.json')) as json_file:
+        with open(os.path.join(self.parent_dir, 'betz_tree.json')) as json_file:
             expected_tree_betz = json.load(json_file)
 
         expected_pathnames_betz = json.loads('[]')
