@@ -1,7 +1,6 @@
 """
 Unit tests for the BalanceComp.
 """
-import os
 import unittest
 import warnings
 
@@ -896,6 +895,18 @@ class TestBalanceComp(unittest.TestCase):
         cpd = prob.check_partials(out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
+
+    def test_shape_from_rhs_val(self):
+        p = om.Problem()
+        init = np.ones((5, ))
+        p.model.add_subsystem('bal', om.BalanceComp('x', rhs_val=init))
+
+        # Bug was a size mismatch exception raised during setup.
+        p.setup()
+
+        self.assertTrue(p.get_val('bal.x').shape == init.shape)
+        self.assertTrue(p.get_val('bal.lhs:x').shape == init.shape)
+        self.assertTrue(p.get_val('bal.rhs:x').shape == init.shape)
 
 
 if __name__ == '__main__':  # pragma: no cover

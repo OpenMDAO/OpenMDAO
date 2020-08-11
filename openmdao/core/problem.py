@@ -37,6 +37,7 @@ from openmdao.utils.name_maps import prom_name2abs_name, name2abs_names
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import convert_units
 from openmdao.utils import coloring as coloring_mod
+from openmdao.core.constants import _SetupStatus
 from openmdao.utils.name_maps import abs_key2rel_key
 from openmdao.vectors.vector import _full_slice, INT_DTYPE
 from openmdao.vectors.default_vector import DefaultVector
@@ -94,11 +95,6 @@ class Problem(object):
     _initial_condition_cache : dict
         Any initial conditions that are set at the problem level via setitem are cached here
         until they can be processed.
-    _setup_status : int
-        Current status of the setup in _model.
-        0 -- Newly initialized problem or newly added model.
-        1 -- The `setup` method has been called, but vectors not initialized.
-        2 -- The `final_setup` has been run, everything ready to run.
     cite : str
         Listing of relevant citations that should be referenced when
         publishing work that uses this class.
@@ -118,6 +114,8 @@ class Problem(object):
         Problem name.
     _system_options_recorded : bool
         A flag to indicate whether the system options for all the systems have been recorded
+    _metadata : dict
+        Problem level metadata.
     """
 
     def __init__(self, model=None, driver=None, comm=None, name=None, **options):
@@ -170,12 +168,7 @@ class Problem(object):
 
         self._initial_condition_cache = {}
 
-        # Status of the setup of _model.
-        # 0 -- Newly initialized problem or newly added model.
-        # 1 -- The `setup` method has been called, but vectors not initialized.
-        # 2 -- The `final_setup` has been run, everything ready to run.
-        self._setup_status = 0
-
+        self._metadata = None
         self._system_options_recorded = False
         self._rec_mgr = RecordingManager()
 
@@ -275,7 +268,7 @@ class Problem(object):
         bool
             True if the named system or variable is local to this process.
         """
-        if self._setup_status < 1:
+        if self._metadata is None:
             raise RuntimeError("{}: is_local('{}') was called before setup() "
                                "completed.".format(self.msginfo, name))
 
@@ -374,7 +367,7 @@ class Problem(object):
         object
             The value of the requested output/input variable.
         """
-        if self._setup_status == 1:
+        if self._metadata['setup_status'] == _SetupStatus.POST_SETUP:
             val = self._get_cached_val(name, get_remote=get_remote)
             if val is not _UNDEFINED:
                 if indices is not None:
@@ -428,9 +421,9 @@ class Problem(object):
             Indices or slice to set to specified value.
         """
         model = self.model
-        try:
+        if self._metadata is not None:
             conns = self._metadata['connections']
-        except AttributeError:
+        else:
             raise RuntimeError(f"{self.msginfo}: '{name}' Cannot call set_val before setup.")
 
         all_meta = model._var_allprocs_abs2meta
@@ -474,7 +467,8 @@ class Problem(object):
                                 model._show_ambiguity_msg(name, ('units',), abs_names)
 
                 if units is None:
-                    if self._setup_status > 1:  # avoids double unit conversion
+                    # avoids double unit conversion
+                    if self._metadata['setup_status'] > _SetupStatus.POST_SETUP:
                         ivalue = value
                         if sunits is not None:
                             if gunits is not None and gunits != tunits:
@@ -486,7 +480,7 @@ class Problem(object):
                         ivalue = model.convert_from_units(abs_name, value, units)
                     else:
                         ivalue = model.convert_units(name, value, units, gunits)
-                    if self._setup_status == 1:
+                    if self._metadata['setup_status'] == _SetupStatus.POST_SETUP:
                         value = ivalue
                     else:
                         value = model.convert_from_units(src, value, units)
@@ -496,7 +490,7 @@ class Problem(object):
                 value = model.convert_from_units(abs_name, value, units)
 
         # Caching only needed if vectors aren't allocated yet.
-        if self._setup_status == 1:
+        if self._metadata['setup_status'] == _SetupStatus.POST_SETUP:
             if indices is not None:
                 self._get_cached_val(name)
                 try:
@@ -760,7 +754,7 @@ class Problem(object):
         case_name : str
             Name used to identify this Problem case.
         """
-        if self._setup_status < 2:
+        if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
             raise RuntimeError(f"{self.msginfo}: Problem.record() cannot be called before "
                                "`Problem.run_model()`, `Problem.run_driver()`, or "
                                "`Problem.final_setup()`.")
@@ -871,13 +865,15 @@ class Problem(object):
             'connections': {},  # all connections in the model (after setup)
             'remote_vars': {},  # vars that are remote somewhere. does not include distrib vars
             'prom2abs': {'input': {}, 'output': {}},  # includes ALL promotes including buried ones
-            'static_mode': False,  # used to determine where various 'static' and 'dynamic' data
-                                   # structures are stored.  Dynamic ones are added during System
+            'static_mode': False,  # used to determine where various 'static'
+                                   # and 'dynamic' data structures are stored.
+                                   # Dynamic ones are added during System
                                    # setup/configure. They are wiped out and re-created during
                                    # each Problem setup.  Static ones are added outside of
                                    # Problem setup and they are never wiped out or re-created.
             'config_info': None,  # used during config to determine if additional updates required
             'parallel_groups': [],  # list of pathnames of parallel groups in this model (all procs)
+            'setup_status': _SetupStatus.PRE_SETUP,
         }
         model._setup(model_comm, mode, self._metadata)
 
@@ -888,7 +884,7 @@ class Problem(object):
         self._check = check
         self._logger = logger
 
-        self._setup_status = 1
+        self._metadata['setup_status'] = _SetupStatus.POST_SETUP
 
         return self
 
@@ -913,7 +909,7 @@ class Problem(object):
         else:
             mode = self._orig_mode
 
-        if self._setup_status < 2:
+        if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
             self.model._final_setup(self.comm)
 
         driver._setup_driver(self)
@@ -940,15 +936,20 @@ class Problem(object):
                            "(objectives and nonlinear constraints)." %
                            (mode, desvar_size, response_size), RuntimeWarning)
 
+        if self._metadata['setup_status'] == _SetupStatus.PRE_SETUP and \
+                hasattr(self.model, '_order_set') and self.model._order_set:
+            raise RuntimeError("%s: Cannot call set_order without calling "
+                               "setup after" % (self.msginfo))
+
         # we only want to set up recording once, after problem setup
-        if self._setup_status == 1:
+        if self._metadata['setup_status'] == _SetupStatus.POST_SETUP:
             driver._setup_recording()
             self._setup_recording()
             record_viewer_data(self)
             record_system_options(self)
 
-        if self._setup_status < 2:
-            self._setup_status = 2
+        if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
+            self._metadata['setup_status'] = _SetupStatus.POST_FINAL_SETUP
             self._set_initial_conditions()
 
         if self._check:
@@ -1020,7 +1021,7 @@ class Problem(object):
             For 'J_fd', 'J_fwd', 'J_rev' the value is: A numpy array representing the computed
                 Jacobian for the three different methods of computation.
         """
-        if self._setup_status < 2:
+        if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
             self.final_setup()
 
         model = self.model
@@ -1443,7 +1444,7 @@ class Problem(object):
             For 'rel error', 'abs error', 'magnitude' the value is: A tuple containing norms for
                 forward - fd, adjoint - fd, forward - adjoint.
         """
-        if self._setup_status < 2:
+        if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
             raise RuntimeError(self.msginfo + ": run_model must be called before total "
                                "derivatives can be checked.")
 
@@ -1549,7 +1550,7 @@ class Problem(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
-        if self._setup_status < 2:
+        if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
             self.final_setup()
 
         if self.model._owns_approx_jac:

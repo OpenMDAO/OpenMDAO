@@ -1257,6 +1257,84 @@ class TestGroup(unittest.TestCase):
         for key, val in totals.items():
             assert_near_equal(val['rel error'][0], 0.0, 1e-15)
 
+    def test_set_order_in_config_error(self):
+
+        class SimpleGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
+                self.add_subsystem('comp2', om.ExecComp('b=2*a'))
+
+            def configure(self):
+                self.set_order(['C2', 'C1'])
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('C1', SimpleGroup())
+        model.add_subsystem('C2', SimpleGroup())
+
+        msg = "SimpleGroup (C1): Cannot call set_order in the configure method"
+        with self.assertRaises(RuntimeError) as cm:
+            prob.setup()
+
+        self.assertEqual(str(cm.exception), msg)
+
+    def test_set_order_after_setup(self):
+
+        class SimpleGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
+                self.add_subsystem('comp2', om.ExecComp('b=2*a'))
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('C1', SimpleGroup())
+        model.add_subsystem('C2', SimpleGroup())
+
+        prob.setup()
+        prob.model.set_order(['C2', 'C1'])
+
+        msg = "Problem: Cannot call set_order without calling setup after"
+        with self.assertRaises(RuntimeError) as cm:
+            prob.run_model()
+        self.assertEqual(str(cm.exception), msg)
+
+    def test_set_order_normal(self):
+
+        class SimpleGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
+                self.add_subsystem('comp2', om.ExecComp('b=2*a'))
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('C1', SimpleGroup())
+        model.add_subsystem('C2', SimpleGroup())
+
+        prob.model.set_order(['C2', 'C1'])
+        prob.setup()
+        prob.run_model()
+
+    def test_double_setup_for_set_order(self):
+        class SimpleGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
+                self.add_subsystem('comp2', om.ExecComp('b=2*a'))
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('C1', SimpleGroup())
+        model.add_subsystem('C2', SimpleGroup())
+
+        prob.setup()
+        model.set_order(['C2', 'C1'])
+        prob.setup()
+        prob.run_model()
+
+
 @unittest.skipUnless(MPI, "MPI is required.")
 class TestGroupMPISlice(unittest.TestCase):
     N_PROCS = 2
@@ -1734,6 +1812,36 @@ class TestGroupPromotes(unittest.TestCase):
                 self.indep.add_output('x', 2*np.array(range(5)))
                 self.indep.add_output('y', 3*np.array(range(5)))
                 self.promotes('comp1', inputs=['x'], src_indices=[0, 2, 4])
+
+        p = om.Problem(model=SimpleGroup())
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['indep.x'], np.array([0, 2, 4, 6, 8]))
+        assert_near_equal(p['indep.y'], np.array([0, 3, 6, 9, 12]))
+
+        assert_near_equal(p['comp1.x'], np.array([0, 4, 8]))
+        assert_near_equal(p['comp1.y'], np.array([3, 6, 9]))
+        assert_near_equal(p['comp1.z'], np.array([3, 10, 17]))
+
+    def test_promotes_src_indices_mixed_array(self):
+
+        class SimpleGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('indep', om.IndepVarComp(), promotes=['*'])
+                self.add_subsystem('comp1', om.ExecComp('z=x+y',
+                                                        x=np.ones(3),
+                                                        y={'value': np.ones(3),
+                                                           'src_indices': [1, 2, 3]},
+                                                        z=np.ones(3)),
+                                    promotes_inputs=['y'])
+
+            def configure(self):
+                self.indep.add_output('x', 2*np.array(range(5)))
+                self.indep.add_output('y', 3*np.array(range(5)))
+                self.promotes('comp1', inputs=['x'],
+                              src_indices=np.array([0, 2, 4]))
 
         p = om.Problem(model=SimpleGroup())
 
@@ -2600,6 +2708,10 @@ class TestGroupAddInput(unittest.TestCase):
 
 
 class MultComp(om.ExplicitComponent):
+    """
+    This class just performs a list of simple multiplications. It also keeps track of the number
+    of times _setup_var_data is called.
+    """
     def __init__(self, mults=(), inits=None, **kwargs):
         super(MultComp, self).__init__(**kwargs)
         self.mults = list(mults)
@@ -2636,6 +2748,10 @@ class MultComp(om.ExplicitComponent):
 
 
 class ConfigGroup(om.Group):
+    """
+    This group can add IO vars and promotes during configure. It also keeps track of how many
+    times _setup_var_data is called.
+    """
     def __init__(self, parallel=False, *args, **kwargs):
         super(ConfigGroup, self).__init__(*args, **kwargs)
         self.cfgproms = []
@@ -2722,6 +2838,10 @@ class ConfigGroup(om.Group):
 
 
 class Test3Deep(unittest.TestCase):
+    """
+    This creates a system tree with two levels of subgroups below model to allow testing of various
+    changes during configure that may change descendant systems that are not direct children.
+    """
     cfg_par = False
     sub_par = False
 
@@ -2741,6 +2861,9 @@ class Test3Deep(unittest.TestCase):
         return p
 
     def get_matching_var_setup_counts(self, p, count):
+        """
+        Return pathnames of any systems that have a var_setup_count that matches 'count'.
+        """
         result = set()
         for s in p.model.system_iter(include_self=True):
             if hasattr(s, 'var_setup_count') and s.var_setup_count == count:
@@ -2755,6 +2878,10 @@ class Test3Deep(unittest.TestCase):
         return sorted(result)
 
     def get_io_results(self, p, parent, path):
+        """
+        Retrieve results of get_io_metadata calls that occurred during config.
+        Results are retrieved from all procs.
+        """
         s = p.model._get_subsystem(parent)
         if s is None:
             raise RuntimeError(f"No parent named {parent}.")
@@ -2767,6 +2894,9 @@ class Test3Deep(unittest.TestCase):
         return res
 
     def check_vs_meta(self, p, parent, meta_dict):
+        """
+        Compare the given metadata dict to the internal metadata dicts of the given parent.
+        """
         system = p.model._get_subsystem(parent)
         metas = (system._var_allprocs_abs2meta['input'], system._var_allprocs_abs2meta['output'],
                  system._var_abs2meta['input'], system._var_abs2meta['output'])
@@ -3351,6 +3481,7 @@ class TestFeatureSetOrder(unittest.TestCase):
         # reset the shared order list
         order_list[:] = []
 
+        prob.setup()
         # now swap C2 and C1 in the order
         model.set_order(['C2', 'C1', 'C3'])
 

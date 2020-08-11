@@ -7,9 +7,9 @@ from openmdao.utils.general_utils import all_ancestors
 
 def _descendents(mysystem, sysiter):
     """
-    Iterate over system ancestors, but include only mysystem's descendents.
+    Filter given iterator of system paths to include only mysystem's descendants.
 
-    All pathnames are ancestors of my descendents so a simple length comparison
+    All pathnames are ancestors of my descendents so a simple tree depth comparison
     is sufficient to determine if a given path is a descendent.
 
     Parameters
