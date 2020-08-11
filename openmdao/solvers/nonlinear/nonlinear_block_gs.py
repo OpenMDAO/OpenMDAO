@@ -117,7 +117,6 @@ class NonlinearBlockGS(NonlinearSolver):
         residuals = system._residuals
         use_aitken = self.options['use_aitken']
 
-
         if use_aitken:
 
             aitken_min_factor = self.options['aitken_min_factor']
@@ -181,14 +180,13 @@ class NonlinearBlockGS(NonlinearSolver):
                 theta_n = theta_n_1 * (1 - tddo / temp_norm ** 2)
 
             else:
-                # keep the initial the relaxation factor 
+                # keep the initial the relaxation factor
                 pass
 
             # limit relaxation factor to the specified range
             theta_n = max(aitken_min_factor, min(aitken_max_factor, theta_n))
             # save relaxation factor for the next iteration
             self._theta_n_1 = theta_n
-
 
             if not self.options['use_apply_nonlinear']:
                 with system._unscaled_context(outputs=[outputs]):
