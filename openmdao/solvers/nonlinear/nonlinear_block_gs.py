@@ -187,7 +187,7 @@ class NonlinearBlockGS(NonlinearSolver):
             # limit relaxation factor to the specified range
             theta_n = max(aitken_min_factor, min(aitken_max_factor, theta_n))
             # save relaxation factor for the next iteration
-            theta_n_1 = theta_n
+            self._theta_n_1 = theta_n
 
 
             if not self.options['use_apply_nonlinear']:
@@ -229,7 +229,7 @@ class NonlinearBlockGS(NonlinearSolver):
         elif itercount < 1:
             # Run instead of calling apply, so that we don't "waste" the extra run. This also
             # further increments the iteration counter.
-            itercount += 1
+            self._iter_count += 1
             outputs = system._outputs
             residuals = system._residuals
 
