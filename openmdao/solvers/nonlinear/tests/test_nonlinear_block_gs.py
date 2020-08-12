@@ -146,7 +146,6 @@ class TestNLBGaussSeidel(unittest.TestCase):
         prob.run_model()
         self.assertEqual(model.nonlinear_solver._iter_count, 5)
 
-
         #test of number of iterations AND solution after exit at maxiter
         prob.set_val('x', 1.)
         prob.set_val('z', np.array([5.0, 2.0]))
@@ -590,7 +589,7 @@ class ProcTestCase1(unittest.TestCase):
         assert_near_equal(prob.get_val('d2b.y2', get_remote=True), 12.05848819, .00001)
 
         # Test that Aitken accelerated the convergence, normally takes 7.
-        self.assertTrue(model.nonlinear_solver._iter_count == 5)
+        self.assertTrue(model.nonlinear_solver._iter_count == 6)
 
 
 if __name__ == "__main__":
