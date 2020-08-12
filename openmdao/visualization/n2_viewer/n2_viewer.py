@@ -192,7 +192,6 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
     tree_dict['children'] = children
 
     options = {}
-    from openmdao.solvers.solver import Solver
     for k in system.options:
         # need to handle solvers separate because they are classes or instances
         if k in ['linear_solver', 'nonlinear_solver']:
