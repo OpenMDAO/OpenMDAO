@@ -105,8 +105,8 @@ class IndepVarComp(ExplicitComponent):
 
         super(IndepVarComp, self)._configure_check()
 
-    def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                   lower=None, upper=None, ref=None, ref0=None, res_ref=None, tags=None):
+    def add_output(self, name, val=None, shape=None, units=None, res_units=None, desc='',
+                   lower=None, upper=None, ref=None, ref0=None, res_ref=None, tags=None, shape_by_conn=None):
         """
         Add an independent variable to this component.
 
@@ -168,7 +168,7 @@ class IndepVarComp(ExplicitComponent):
 
         kwargs = {'shape': shape, 'units': units, 'res_units': res_units, 'desc': desc,
                   'lower': lower, 'upper': upper, 'ref': ref, 'ref0': ref0,
-                  'res_ref': res_ref, 'tags': tags
+                  'res_ref': res_ref, 'tags': tags, 'shape_by_conn': shape_by_conn
                   }
         super(IndepVarComp, self).add_output(name, val, **kwargs)
 

@@ -147,8 +147,8 @@ class ExplicitComponent(Component):
         if self._has_approx and self._use_derivatives:
             self._set_approx_partials_meta()
 
-    def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, tags=None):
+    def add_output(self, name, val=None, shape=None, units=None, res_units=None, desc='',
+                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, shape_by_conn=False, copy_shape=None, tags=None):
         """
         Add an output variable to the component.
 
@@ -208,6 +208,8 @@ class ExplicitComponent(Component):
                                                          res_units=res_units, desc=desc,
                                                          lower=lower, upper=upper,
                                                          ref=ref, ref0=ref0, res_ref=res_ref,
+                                                         shape_by_conn=shape_by_conn,
+                                                         copy_shape=copy_shape,
                                                          tags=tags)
 
     def _approx_subjac_keys_iter(self):

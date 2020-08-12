@@ -927,7 +927,6 @@ class Group(System):
         nproc = self.comm.size
 
         subsystems_proc_range = self._subsystems_proc_range
-
         # Recursion
         for subsys in self._subsystems_myproc:
             subsys._setup_var_sizes()
@@ -1240,6 +1239,79 @@ class Group(System):
         for inp in src_ind_inputs:
             allprocs_abs2meta[inp]['has_src_indices'] = True
 
+    def _setup_deferred_var_size(self):
+        """
+        add the size infor for inputs and outputs that have been created 
+        with shape_by_conn=True
+        """
+        global_abs_in2out = self._conn_global_abs_in2out
+
+
+        abs_in2out = self._conn_abs_in2out = {}
+        global_abs_in2out = self._conn_global_abs_in2out
+        pathname = self.pathname
+        allprocs_discrete_in = self._var_allprocs_discrete['input']
+        allprocs_discrete_out = self._var_allprocs_discrete['output']
+
+        allprocs_abs2meta = self._var_allprocs_abs2meta
+
+        nproc = self.comm.size
+
+        # check unit/shape compatibility, but only for connections that are
+        # either owned by (implicit) or declared by (explicit) this Group.
+        # This way, we don't repeat the error checking in multiple groups.
+        abs2meta = self._var_abs2meta
+        # import ipdb; ipdb.set_trace()
+
+        for abs_in, abs_out in global_abs_in2out.items():
+            if abs2meta[abs_in]['shape_by_conn'] and abs2meta[abs_out]['shape_by_conn']:
+                msg = f"{self.msginfo}: Both The source and target have been declared" + \
+                        f"with shape_by_conn for the connection '{abs_out}' to '{abs_in}'. " + \
+                        f"Atleast one must not use shape_by_conn "
+                if self._raise_connection_errors:
+                    raise ValueError(msg)
+                else:
+                    simple_warning(msg)
+            
+            elif abs2meta[abs_in]['shape_by_conn']:
+                # print('the input ', abs_in, "will given the shape of ", abs_out )
+                for var in ['value', 'shape', 'size']:
+                    abs2meta[abs_in][var] = abs2meta[abs_out][var]
+                    if var != 'value':
+                        allprocs_abs2meta[abs_in][var] = allprocs_abs2meta[abs_out][var]
+
+                if  abs2meta[abs_out]['distributed']:
+                    # add src indices if sized from a distributed output
+
+                    n_list = self.comm.allgather(abs2meta[abs_out]['size'])
+                    irank  = self.comm.rank
+                    n1 = int(np.sum(n_list[:irank]))
+                    n2 = int(np.sum(n_list[:irank+1]))
+                    # import pdb; pdb.set_trace()
+       
+
+                    abs2meta[abs_in]['src_indices'] = np.arange(n1,n2,dtype=int)
+                    print(abs_in, 'given shape from', abs_out, 'rank', self.comm.rank, 'size', abs2meta[abs_out]['size'], 'indices', n1, n2)
+
+                # import ipdb; ipdb.set_trace()
+            
+            elif abs2meta[abs_out]['shape_by_conn']:
+                # print('the output ', abs_out, "will given the shape of ", abs_in )
+                print(abs_out, 'given shape from', abs_in, 'rank', self.comm.rank, 'size', abs2meta[abs_in]['size'])
+                for var in ['value', 'shape', 'size']:
+                    abs2meta[abs_out][var] = abs2meta[abs_in][var]
+                    if var != 'value':
+                        allprocs_abs2meta[abs_out][var] = allprocs_abs2meta[abs_in][var]
+
+
+        self._setup_determine_shape()
+
+    def _setup_determine_shape(self):
+        
+        for subsys in self._subsystems_myproc:
+            subsys._setup_determine_shape()
+ 
+
     @check_mpi_exceptions
     def _setup_connections(self):
         """
@@ -1394,11 +1466,12 @@ class Group(System):
                 flat = abs2meta[abs_in]['flat_src_indices']
 
                 if src_indices is None and out_shape != in_full_shape:
+
                     # out_shape != in_shape is allowed if
                     # there's no ambiguity in storage order
                     if not array_connection_compatible(in_shape, out_shape):
                         msg = f"{self.msginfo}: The source and target shapes do not match or " + \
-                              f"are ambiguous for the connection '{abs_out}' to '{abs_in}'. " + \
+                              f"are ambiguous for the connection '{abs_out}' (source) to '{abs_in}' (target). " + \
                               f"The source shape is {tuple([int(s) for s in out_shape])} " + \
                               f"but the target shape is {tuple([int(s) for s in in_shape])}."
                         if self._raise_connection_errors:
@@ -1426,7 +1499,7 @@ class Group(System):
                                   f"{src_indices} do not specify a " + \
                                   f"valid shape for the connection '{abs_out}' to " + \
                                   f"'{abs_in}'. The target shape is " + \
-                                  f"{in_shape} but indices are {src_indices.shape}."
+                                  f"{in_shape} for {abs_out} but indices are {src_indices.shape}."
                             if self._raise_connection_errors:
                                 raise ValueError(msg)
                             else:
