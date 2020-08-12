@@ -1416,6 +1416,8 @@ def _get_bool_total_jac(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_ja
         Names of response variables.
     wrt : iter of str or None
         Names of design variables.
+    use_abs_names : bool
+        Set to True when passing in absolute names to skip some translation steps.
 
     Returns
     -------

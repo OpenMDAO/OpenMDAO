@@ -1284,9 +1284,9 @@ class ZeroLengthInputsOutputs(unittest.TestCase):
         prob.run_model()
 
         if model.comm.rank < 3:
-            assert_near_equal(prob['C2.invec'],
+            assert_near_equal(prob.get_val('C2.invec', get_remote=False),
                             np.ones(1) if model.comm.rank == 0 else np.ones(1))
-            assert_near_equal(prob['C2.outvec'],
+            assert_near_equal(prob.get_val('C2.outvec', get_remote=False),
                             2*np.ones(1) if model.comm.rank == 0 else -3*np.ones(1))
         assert_near_equal(prob['C3.sum'], -4.)
 

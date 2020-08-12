@@ -341,7 +341,7 @@ class Problem(object):
         float or ndarray or any python object
             the requested output/input variable.
         """
-        return self.get_val(name)
+        return self.get_val(name, get_remote=None)
 
     def get_val(self, name, units=None, indices=None, get_remote=False):
         """
@@ -357,10 +357,13 @@ class Problem(object):
             Units to convert to before return.
         indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
             Indices or slice to return.
-        get_remote : bool
+        get_remote : bool or None
             If True, retrieve the value even if it is on a remote process.  Note that if the
             variable is remote on ANY process, this function must be called on EVERY process
             in the Problem's MPI communicator.
+            If False, only retrieve the value if it is on the current process, or only the part
+            of the value that's on the current process for a distributed variable.
+            If None and the variable is remote or distributed, a RuntimeError will be raised.
 
         Returns
         -------
@@ -382,11 +385,9 @@ class Problem(object):
             if get_remote:
                 raise KeyError('{}: Variable name "{}" not found.'.format(self.msginfo, name))
             else:
-                raise RuntimeError(
-                    "{}: Variable '{}' is not local to rank {}. You can retrieve values from "
-                    "other processes using "
-                    "`problem.get_val(<name>, get_remote=True)`.".format(self.msginfo, name,
-                                                                         self.comm.rank))
+                raise RuntimeError(f"{self.model.msginfo}: Variable '{name}' is not local to "
+                                   f"rank {self.comm.rank}. You can retrieve values from "
+                                   "other processes using `get_val(<name>, get_remote=True)`.")
 
         return val
 
