@@ -3484,7 +3484,7 @@ class System(object):
         if out_stream is _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
 
-        rel_idx = len(self.name) + 1 if self.name else 0
+        rel_idx = len(self.pathname) + 1 if self.pathname else 0
 
         states = set(self._list_states())
 
