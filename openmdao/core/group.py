@@ -1244,8 +1244,7 @@ class Group(System):
         add the size infor for inputs and outputs that have been created 
         with shape_by_conn=True
         """
-        global_abs_in2out = self._conn_global_abs_in2out
-
+        # global_abs_in2out = self._conn_global_abs_in2out
 
         abs_in2out = self._conn_abs_in2out = {}
         global_abs_in2out = self._conn_global_abs_in2out
@@ -1261,55 +1260,95 @@ class Group(System):
         # either owned by (implicit) or declared by (explicit) this Group.
         # This way, we don't repeat the error checking in multiple groups.
         abs2meta = self._var_abs2meta
-        # import ipdb; ipdb.set_trace()
 
-        for abs_in, abs_out in global_abs_in2out.items():
-            if abs2meta[abs_in]['shape_by_conn'] and abs2meta[abs_out]['shape_by_conn']:
-                msg = f"{self.msginfo}: Both The source and target have been declared" + \
-                        f"with shape_by_conn for the connection '{abs_out}' to '{abs_in}'. " + \
-                        f"Atleast one must not use shape_by_conn "
-                if self._raise_connection_errors:
-                    raise ValueError(msg)
-                else:
-                    simple_warning(msg)
-            
-            elif abs2meta[abs_in]['shape_by_conn']:
-                # print('the input ', abs_in, "will given the shape of ", abs_out )
-                for var in ['value', 'shape', 'size']:
-                    abs2meta[abs_in][var] = abs2meta[abs_out][var]
-                    if var != 'value':
-                        allprocs_abs2meta[abs_in][var] = allprocs_abs2meta[abs_out][var]
+        def copy_var_shape( var_abs_name, var_meta, new_var_meta):
 
-                if  abs2meta[abs_out]['distributed']:
+            for data in ['size', 'shape']:
+                var_meta[data] = new_var_meta[data]
+
+            var_meta['value'] = np.ones(var_meta['size'])
+
+            # take care of distributed components
+            if var_meta['distributed'] and var_abs_name in self._var_abs_names['input']:
+             
                     # add src indices if sized from a distributed output
-
-                    n_list = self.comm.allgather(abs2meta[abs_out]['size'])
+                    n_list = self.comm.allgather(new_var_meta['size'])
                     irank  = self.comm.rank
                     n1 = int(np.sum(n_list[:irank]))
                     n2 = int(np.sum(n_list[:irank+1]))
                     # import pdb; pdb.set_trace()
-       
 
-                    abs2meta[abs_in]['src_indices'] = np.arange(n1,n2,dtype=int)
-                    print(abs_in, 'given shape from', abs_out, 'rank', self.comm.rank, 'size', abs2meta[abs_out]['size'], 'indices', n1, n2)
+                    var_meta['src_indices'] = np.arange(n1,n2,dtype=int)
+                    print(var_abs_name, 'given shape', 'rank', self.comm.rank, 'size', var_meta['size'], 'indices', n1, n2)
 
-                # import ipdb; ipdb.set_trace()
+            # if going from a ditrubuted output to serial input
+            elif not var_meta['distributed'] and new_var_meta['distributed'] and \
+                 var_abs_name in self._var_abs_names['input']:
+                n_list = self.comm.allgather(new_var_meta['size'])
+                total_size = sum(n_list)
+                var_meta['size'] = total_size
+                var_meta['shape'] = total_size
+                var_meta['value'] = np.ones(var_meta['size'])
+
+                # print(var_abs_name, 'given shape', 'rank', self.comm.rank, 'size', var_meta['size'])
+
+
+
+   
+
+
+        def get_var_size_meta( abs_name, var_visited):
+            """
+            get the meta data for the variable. This may involve tracing data back through other variables if 
+            variable has a deferred shape
+            """
+
+            var_meta = abs2meta[abs_name]
+            print(abs_name, var_visited)
+
+            if abs_name in var_visited:
+                var_visited.append(abs_name)
+                raise RuntimeError('deferred shape dependences unresolvables. visited {}'.format(var_visited))
+            else: 
+                var_visited.append(abs_name)
+
+            if var_meta['shape_by_conn']:
+                if abs_name in self._var_abs_names['input']:
+                    abs_out = global_abs_in2out[abs_name]
+                    var_meta = get_var_size_meta(abs_out, var_visited)
+
+                elif abs_name in self._var_abs_names['output']:
+                    # if the var is an output it could be connected to multiple inputs
+                    abs_in = [key for key in global_abs_in2out if global_abs_in2out[key] == abs_name]
+                    
+                    # now we need to choose which of the inputs we should get size information from 
+                    abs_in = abs_in[0]
+                    var_meta = get_var_size_meta(abs_in, var_visited)
+
+                else:
+                    raise KeyError('{} not in {} inputs or outputs'.format(var, subsys.name))
+
+            elif var_meta['copy_shape']:
+                rel_var_len =  len(abs_name.split('.')[-1])
+                pathname = abs_name[:-rel_var_len]
+                abs_out = pathname + var_meta['copy_shape']
+                var_meta = get_var_size_meta(abs_out, var_visited)
+
+            return var_meta
+
             
-            elif abs2meta[abs_out]['shape_by_conn']:
-                # print('the output ', abs_out, "will given the shape of ", abs_in )
-                print(abs_out, 'given shape from', abs_in, 'rank', self.comm.rank, 'size', abs2meta[abs_in]['size'])
-                for var in ['value', 'shape', 'size']:
-                    abs2meta[abs_out][var] = abs2meta[abs_in][var]
-                    if var != 'value':
-                        allprocs_abs2meta[abs_out][var] = allprocs_abs2meta[abs_in][var]
 
-
-        self._setup_determine_shape()
-
-    def _setup_determine_shape(self):
-        
         for subsys in self._subsystems_myproc:
-            subsys._setup_determine_shape()
+            print(subsys.pathname)
+            # if isinstance(subsys, Group):
+            for var, var_meta in subsys._var_abs2meta.items():
+                if var_meta['shape_by_conn'] or var_meta['copy_shape']:
+                    print('changing shape of ',var)
+                    new_meta = get_var_size_meta(var, [])
+                    copy_var_shape(var, var_meta, new_meta)
+         
+
+
  
 
     @check_mpi_exceptions

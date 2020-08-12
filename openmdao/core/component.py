@@ -1417,45 +1417,6 @@ class Component(System):
                         coloring._check_config_partial(self)
                     self._update_subjac_sparsity(coloring.get_subjac_sparsity())
 
-    def _setup_determine_shape(self):
-
-        # if self._static_mode:
-        #     var_rel2meta = self._static_var_rel2meta
-        # else:
-        var_rel2meta = self._var_rel2meta
-
-        self.determine_shape()
-        
-    def determine_shape(self):
-        pass
-
-
-    def copy_var_shape(self, abs_in, abs_out):
-        var1_meta = self._var_rel2meta[abs_in]
-        var2_meta = self._var_rel2meta[abs_out]
-
-        for data in ['size', 'shape']:
-            var2_meta[data] = var1_meta[data]
-
-        var2_meta['value'] = np.ones(var2_meta['size'])
-
-        if 'src_indices' in var1_meta and 'src_indices' in var2_meta:
-            var2_meta['src_indices'] = var1_meta['src_indices']
-            var2_meta['flat_src_indices'] = var1_meta['flat_src_indices']
-
-        # import ipdb; ipdb.set_trace()
-        # allprocs_abs2meta = self._var_allprocs_abs2meta
-        # abs2meta = self._var_abs2meta
-
-        # # import ipdb; ipdb.set_trace()
-     
-        # print(abs_out, 'given shape from', abs_in, 'rank', self.comm.rank, 'size', abs2meta[abs_in]['size'])
-        # for var in ['value', 'shape', 'size']:
-        #     abs2meta[abs_out][var] = abs2meta[abs_in][var]
-        #     if var != 'value':
-        #         allprocs_abs2meta[abs_out][var] = allprocs_abs2meta[abs_in][var]
-            
-
 class _DictValues(object):
     """
     A dict-like wrapper for a dict of metadata, where getitem returns 'value' from metadata.
