@@ -1309,6 +1309,8 @@ class System(object):
         self._var_abs2meta = {'input': OrderedDict(), 'output': OrderedDict()}
         self._var_allprocs_abs2idx = {}
         self._owning_rank = defaultdict(int)
+        self._var_sizes = {}
+        self._owned_sizes = None
 
     def _setup_var_index_maps(self):
         """
@@ -1334,8 +1336,7 @@ class System(object):
         """
         Compute the arrays of local variable sizes for all variables/procs on this system.
         """
-        self._var_sizes = {}
-        self._owned_sizes = None
+        pass
 
     def _setup_global_shapes(self):
         """
@@ -3518,7 +3519,7 @@ class System(object):
         if out_stream is _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
 
-        rel_idx = len(self.name) + 1 if self.name else 0
+        rel_idx = len(self.pathname) + 1 if self.pathname else 0
 
         states = set(self._list_states())
 
