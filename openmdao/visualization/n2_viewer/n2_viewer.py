@@ -197,7 +197,7 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
         if k in ['linear_solver', 'nonlinear_solver']:
             options[k] = system.options[k].SOLVER
         else:
-            options[k] = system.options[k]
+            options[k] = system.options._dict[k]['value']
     tree_dict['options'] = options
 
     if not tree_dict['name']:

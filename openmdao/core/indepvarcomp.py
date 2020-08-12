@@ -55,8 +55,8 @@ class IndepVarComp(ExplicitComponent):
         Declare options.
         """
         opt = self.options
-        opt.declare('name', types=str, default=None,
-                    desc="Name of the variable in this component's namespace.")
+        opt.declare('name', types=str,
+                                desc="Name of the variable in this component's namespace.")
         opt.declare('val', types=(float, list, tuple, np.ndarray), default=1.0,
                     desc="The initial value of the variable being added in user-defined units.")
         opt.declare('shape', types=(int, tuple, list), default=None,
