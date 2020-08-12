@@ -513,3 +513,10 @@ class OptionsDictionary(object):
                 self._raise("Option '{}' is required but has not been set.".format(name))
         except KeyError:
             self._raise("Option '{}' cannot be found".format(name), exc_type=KeyError)
+
+    def items(self):
+        """
+        Yield name and value of options.
+        """
+        for key, val in self._dict.items():
+            yield key, val['value']

@@ -489,6 +489,7 @@ def assertViewerDataRecorded(test, expected):
                 for var in expected['abs2prom'][io]:
                     test.assertEqual(abs2prom[io][var], expected['abs2prom'][io][var])
 
+        return model_viewer_data
 
 def assertSystemMetadataIdsRecorded(test, ids):
 
