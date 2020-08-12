@@ -682,39 +682,39 @@ class Group(System):
             # Here, we count the number of variables in each subsystem.
             # We do this so that we can compute the offset when we recurse into each subsystem.
             allprocs_counters = {}
-            for type_ in ['input', 'output']:
-                allprocs_counters[type_] = np.zeros(nsub_allprocs, INT_DTYPE)
+            for io in ['input', 'output']:
+                allprocs_counters[io] = np.zeros(nsub_allprocs, INT_DTYPE)
                 for subsys in self._subsystems_myproc:
                     if vec_name in subsys._rel_vec_names:
                         comm = subsys.comm if subsys._full_comm is None else subsys._full_comm
                         if comm.rank == 0:
                             isub = self._subsystems_inds[subsys.name]
-                            allprocs_counters[type_][isub] = \
-                                len(subsys._var_allprocs_relevant_names[vec_name][type_])
+                            allprocs_counters[io][isub] = \
+                                len(subsys._var_allprocs_relevant_names[vec_name][io])
 
             # If running in parallel, allgather
             if self.comm.size > 1:
                 gathered = self.comm.allgather(allprocs_counters)
                 allprocs_counters = {
-                    type_: np.zeros(nsub_allprocs, INT_DTYPE) for type_ in ['input', 'output']
+                    io: np.zeros(nsub_allprocs, INT_DTYPE) for io in ['input', 'output']
                 }
                 for myproc_counters in gathered:
-                    for type_ in ['input', 'output']:
-                        allprocs_counters[type_] += myproc_counters[type_]
+                    for io in ['input', 'output']:
+                        allprocs_counters[io] += myproc_counters[io]
 
             # Compute _subsystems_var_range
             subsystems_var_range[vec_name] = {}
 
-            for type_ in ['input', 'output']:
-                subsystems_var_range[vec_name][type_] = {}
+            for io in ['input', 'output']:
+                subsystems_var_range[vec_name][io] = {}
 
                 for subsys in self._subsystems_myproc:
                     if vec_name not in subsys._rel_vec_names:
                         continue
                     isub = self._subsystems_inds[subsys.name]
-                    start = np.sum(allprocs_counters[type_][:isub])
-                    subsystems_var_range[vec_name][type_][subsys.name] = (
-                        start, start + allprocs_counters[type_][isub]
+                    start = np.sum(allprocs_counters[io][:isub])
+                    subsystems_var_range[vec_name][io][subsys.name] = (
+                        start, start + allprocs_counters[io][isub]
                     )
 
         if self._use_derivatives:
@@ -959,32 +959,33 @@ class Group(System):
                                                        INT_DTYPE)
 
                 for ind, subsys in enumerate(self._subsystems_myproc):
+                    if vec_name not in subsys._rel_vec_names:
+                        continue
+
                     if isinstance(subsys, Component):
                         if subsys.options['distributed']:
                             n_distrib_vars += 1
                     elif subsys._has_distrib_vars:
                         n_distrib_vars += 1
 
-                    if vec_name not in subsys._rel_vec_names:
-                        continue
-                    proc_slice = slice(*subsystems_proc_range[ind])
-                    var_slice = slice(*subsystems_var_range[type_][subsys.name])
-                    if proc_slice.stop - proc_slice.start > subsys.comm.size:
+                    pstart, pend = subsystems_proc_range[ind]
+                    vstart, vend = subsystems_var_range[type_][subsys.name]
+                    if pend - pstart > subsys.comm.size:
                         # in this case, we've split the proc for parallel FD, so subsys doesn't
                         # have var_sizes for all the ranks we need. Since each parallel FD comm
                         # has the same size distribution (since all are identical), just 'tile'
                         # the var_sizes from the subsystem to fill in the full rank range we need
                         # at this level.
-                        assert (proc_slice.stop - proc_slice.start) % subsys.comm.size == 0, \
+                        assert (pend - pstart) % subsys.comm.size == 0, \
                             "%s comm size (%d) is not an exact multiple of %s comm size (%d)" % (
                                 self.pathname, self.comm.size, subsys.pathname, subsys.comm.size)
-                        proc_i = proc_slice.start
-                        while proc_i < proc_slice.stop:
-                            sz[proc_i:proc_i + subsys.comm.size, var_slice] = \
+                        proc_i = pstart
+                        while proc_i < pend:
+                            sz[proc_i:proc_i + subsys.comm.size, vstart:vend] = \
                                 subsys._var_sizes[vec_name][type_]
                             proc_i += subsys.comm.size
                     else:
-                        sz[proc_slice, var_slice] = subsys._var_sizes[vec_name][type_]
+                        sz[pstart:pend, vstart:vend] = subsys._var_sizes[vec_name][type_]
 
         # If parallel, all gather
         if self.comm.size > 1:
