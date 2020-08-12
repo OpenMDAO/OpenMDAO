@@ -1044,7 +1044,7 @@ class TestProblem(unittest.TestCase):
         try:
             prob.setup()
         except RuntimeError as err:
-            self.assertEqual(str(err), "Group (<model>): The following inputs, ['C1.x', 'C2.x'], promoted to 'x', are connected but the metadata entries ['units', 'value'] differ. Call <group>.set_input_defaults('x', units=?, value=?), where <group> is the Group named '' to remove the ambiguity.")
+            self.assertEqual(str(err), "Group (<model>): The following inputs, ['C1.x', 'C2.x'], promoted to 'x', are connected but their metadata entries ['units', 'value'] differ. Call <group>.set_input_defaults('x', units=?, value=?), where <group> is the model to remove the ambiguity.")
         else:
             self.fail("Exception expected.")
 
@@ -1151,12 +1151,12 @@ class TestProblem(unittest.TestCase):
 
         assert_near_equal(prob['indeps.x'], 2.0, 1e-6)
 
-        # using the promoted name of the inputs will give the value in the units set in set_input_defaults,
-        # which is 'dm'
+        # using the promoted name of the inputs will give the value
+        # in the units set in set_input_defaults, which is 'dm'
         assert_near_equal(prob['G1.x'], 20.0, 1e-6)
 
-        # test _get_val on lower level group
-        assert_near_equal( G1.get_val('x'), 20.0, 1e-6)
+        # get value from lower level group
+        assert_near_equal(G1.get_val('x'), 20.0, 1e-6)
 
         # using absolute value will give us the value of the input C1.x, in its units of 'inch'
         assert_near_equal(prob['G1.C1.x'], 200.0, 1e-6)
@@ -1201,7 +1201,7 @@ class TestProblem(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             x = prob['G1.x']
 
-        msg = "Group (<model>): The following inputs, ['G1.C1.x', 'G1.C2.x'], promoted to 'G1.x', are connected but the metadata entries ['units'] differ. Call <group>.set_input_defaults('x', units=?), where <group> is the Group named 'G1' to remove the ambiguity."
+        msg = "Group (<model>): The following inputs, ['G1.C1.x', 'G1.C2.x'], promoted to 'G1.x', are connected but their metadata entries ['units'] differ. Call <group>.set_input_defaults('x', units=?), where <group> is the Group named 'G1' to remove the ambiguity."
         self.assertEqual(cm.exception.args[0], msg)
 
     def test_get_set_with_units_error_messages(self):
@@ -2044,6 +2044,14 @@ class TestProblem(unittest.TestCase):
                                           'vectorize_derivs',
                                           'cache_linear_solution'])
 
+    def test_error_msg_set_val_before_setup(self):
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+
+        with self.assertRaises(RuntimeError) as cm:
+            prob.set_val('x', 0.)
+        self.assertEqual(str(cm.exception), "Problem: 'x' Cannot call set_val before setup.")
 
 class NestedProblemTestCase(unittest.TestCase):
 

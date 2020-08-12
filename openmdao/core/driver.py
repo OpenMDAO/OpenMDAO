@@ -539,10 +539,10 @@ class Driver(object):
                 # We check the values here.
                 msg = "Only integer scalars or ndarrays are supported as values for " + \
                       "discrete variables when used as a design variable. "
-                if np.isscalar(val) and not isinstance(val, int):
+                if np.isscalar(val) and not isinstance(val, (int, np.integer)):
                     msg += "A value of type '{}' was specified.".format(val.__class__.__name__)
                     raise ValueError(msg)
-                elif isinstance(val, np.ndarray) and not np.issubdtype(val[0], int):
+                elif isinstance(val, np.ndarray) and not np.issubdtype(val[0], np.integer):
                     msg += "An array of type '{}' was specified.".format(val[0].__class__.__name__)
                     raise ValueError(msg)
 
@@ -745,7 +745,7 @@ class Driver(object):
         response_size = sum(resps[n]['size'] for n in self._get_ordered_nl_responses())
 
         # Gather up the information for design vars.
-        self._designvars = designvars = model.get_design_vars(recurse=True)
+        self._designvars = designvars = model.get_design_vars(recurse=True, use_prom_ivc=True)
         desvar_size = sum(data['size'] for data in designvars.values())
 
         return response_size, desvar_size

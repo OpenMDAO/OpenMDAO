@@ -32,7 +32,7 @@ class DOEDriver(Driver):
 
     def __init__(self, generator=None, **kwargs):
         """
-        Constructor.
+        Construct A DOEDriver.
 
         Parameters
         ----------

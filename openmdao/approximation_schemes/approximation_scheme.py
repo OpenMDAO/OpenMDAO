@@ -471,9 +471,13 @@ def _from_dense(jac, key, subjac, reduced_rows=_full_slice, reduced_cols=_full_s
     jac : Jacobian or None
         Jacobian object.
     key : (str, str)
-        Tuple of absulute names of of and wrt variables.
+        Tuple of absolute names of of and wrt variables.
     subjac : ndarray
         Dense sub-jacobian to be assigned to the subjac corresponding to key.
+    reduced_rows :
+        Reduced row indices.
+    reduced_cols :
+        Reduced column indices.
     """
     if jac is None:  # we're saving deriv to a dict.  Do no conversion.
         return subjac

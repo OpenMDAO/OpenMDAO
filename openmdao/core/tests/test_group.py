@@ -4,6 +4,7 @@ Unit tests for Group.
 
 import itertools
 import unittest
+import warnings
 
 import numpy as np
 
@@ -17,7 +18,7 @@ from openmdao.test_suite.components.sellar import SellarDis2
 from openmdao.utils.mpi import MPI
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.logger_utils import TestLogger
-from openmdao.utils.general_utils import ignore_errors_context
+from openmdao.utils.general_utils import ignore_errors_context, reset_warning_registry
 from openmdao.utils.name_maps import name2abs_names
 
 try:
@@ -30,6 +31,11 @@ try:
 except ImportError:
     PETScVector = None
 
+arr_order_1x1 = np.array([1, 2, 3, 4])
+arr_2x4 = np.array([[0, 1, 2, 3], [10, 11, 12, 13]])
+arr_order_3x3 = np.array([[1, 2, 3], [1, 2, 3], [1, 2, 3]])
+arr_order_4x4 = np.array([[1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4]])
+arr_large_4x4 = np.array([[0, 1, 2, 3], [10, 11, 12, 13], [20, 21, 22, 23], [30, 31, 32, 33]])
 
 class SimpleGroup(om.Group):
 
@@ -98,6 +104,14 @@ class TestSubsystemConfigError(unittest.TestCase):
 
         self.assertEqual(str(cm.exception),
                          "SimpleGroup (<model>): Cannot call add_subsystem in the configure method")
+
+class SlicerComp(om.ExplicitComponent):
+    def setup(self):
+        self.add_input('x', np.ones(4))
+        self.add_output('y', 1.0)
+
+    def compute(self, inputs, outputs):
+        outputs['y'] = np.sum(inputs['x'])**2.0
 
 
 class TestGroup(unittest.TestCase):
@@ -494,18 +508,14 @@ class TestGroup(unittest.TestCase):
         np.testing.assert_allclose(p['comp2.y'], 5.)
 
     def test_double_src_indices(self):
-        class MyComp1(om.ExplicitComponent):
+        class SlicerComp(om.ExplicitComponent):
             def setup(self):
                 self.add_input('x', np.ones(3), src_indices=[0, 1, 2])
-                self.add_output('y', 1.0)
-
-            def compute(self, inputs, outputs):
-                outputs['y'] = np.sum(inputs['x'])*2.0
 
         p = om.Problem()
 
         p.model.add_subsystem('indep', om.IndepVarComp('x', np.ones(5)))
-        p.model.add_subsystem('C1', MyComp1())
+        p.model.add_subsystem('C1', SlicerComp())
         p.model.connect('indep.x', 'C1.x', src_indices=[1, 0, 2])
 
         with self.assertRaises(Exception) as context:
@@ -533,7 +543,6 @@ class TestGroup(unittest.TestCase):
 
                 self.connect('comp1.x', 'comp2.x', src_indices=[1])
 
-
         p = om.Problem()
 
         p.model.add_subsystem('phase', Phase())
@@ -551,82 +560,61 @@ class TestGroup(unittest.TestCase):
             p.setup()
 
     def test_om_slice_in_connect(self):
-        class MyComp1(om.ExplicitComponent):
-            def setup(self):
-                self.add_input('x', np.ones(4))
-                self.add_output('y', 1.0)
-
-            def compute(self, inputs, outputs):
-                outputs['y'] = np.sum(inputs['x'])*2.0
-
-        arr = np.array([[1, 5, 3, 4], [1, 3, 3, 4], [1, 2, 3, 4], [1, 1, 3, 4]])
 
         p = om.Problem()
 
-        p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
-        p.model.add_subsystem('C1', MyComp1())
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr_order_4x4))
+        p.model.add_subsystem('C1', SlicerComp())
         p.model.connect('indep.x', 'C1.x', src_indices=om.slicer[:, 1])
 
         p.setup()
         p.run_model()
 
-        assert_near_equal(p['C1.x'], np.array([5, 3, 2, 1]))
+        assert_near_equal(p['C1.x'], np.array([2, 2, 2, 2]))
 
         p = om.Problem()
 
-        p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
-        p.model.add_subsystem('C1', MyComp1())
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr_order_4x4))
+        p.model.add_subsystem('C1', SlicerComp())
         p.model.connect('indep.x', 'C1.x', src_indices=om.slicer[:, 1], flat_src_indices=True)
 
         p.setup()
         p.run_model()
 
-        assert_near_equal(p['C1.x'], np.array([5, 3, 2, 1]))
+        assert_near_equal(p['C1.x'], np.array([2, 2, 2, 2]))
 
     def test_om_slice_in_promotes(self):
-
-        arr = np.array([[1, 2, 3], [1, 12, 3], [1, 15, 3]])
 
         p = om.Problem()
 
         model = p.model
-        model.add_subsystem('indep', om.IndepVarComp('a', arr), promotes=['*'])
+        model.add_subsystem('indep', om.IndepVarComp('a', arr_order_3x3), promotes=['*'])
         model.add_subsystem('comp1', om.ExecComp('b=2*a', a=np.ones(3), b=np.ones(3)))
         model.promotes('comp1', inputs=['a'], src_indices=om.slicer[:, 1])
 
         p.setup()
         p.run_model()
 
-        assert_near_equal(p['comp1.a'], [2., 12, 15])
+        assert_near_equal(p['comp1.a'], [2, 2, 2])
 
         p = om.Problem()
 
         model = p.model
-        model.add_subsystem('indep', om.IndepVarComp('a', arr), promotes=['*'])
+        model.add_subsystem('indep', om.IndepVarComp('a', arr_order_3x3), promotes=['*'])
         model.add_subsystem('comp1', om.ExecComp('b=2*a', a=np.ones(3), b=np.ones(3)))
         model.promotes('comp1', inputs=['a'], src_indices=om.slicer[:, 1], flat_src_indices=True)
 
         p.setup()
         p.run_model()
 
-        assert_near_equal(p['comp1.a'], [2., 12, 15])
+        assert_near_equal(p['comp1.a'], [2, 2, 2])
 
     def test_desvar_indice_slice(self):
 
-        class MyComp(om.ExplicitComponent):
-            def setup(self):
-                self.add_input('x', np.ones(4))
-                self.add_output('y', 1.0)
-
-            def compute(self, inputs, outputs):
-                outputs['y'] = np.sum(inputs['x'])**2.0
-
         p = om.Problem()
 
-        arr = np.array([1, 2, 3, 4])
-
-        p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
-        p.model.add_subsystem('C1', MyComp())
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr_order_1x1))
+        p.model.add_subsystem('C1', SlicerComp())
         p.model.connect('indep.x', 'C1.x')
         p.model.add_design_var('indep.x', indices=om.slicer[2:])
 
@@ -635,24 +623,14 @@ class TestGroup(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(arr[p.model._design_vars['indep.x']['indices']], np.array([3., 4]))
+        assert_near_equal(arr_order_1x1[p.model._design_vars['indep.x']['indices']], np.array([3., 4]))
 
     def test_om_slice_in_add_response(self):
 
-        class MyComp(om.ExplicitComponent):
-            def setup(self):
-                self.add_input('x', np.ones(4))
-                self.add_output('y', 1.0)
-
-            def compute(self, inputs, outputs):
-                outputs['y'] = np.sum(inputs['x'])**2.0
-
         p = om.Problem()
 
-        arr = np.array([1, 2, 3, 4])
-
-        p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
-        p.model.add_subsystem('C1', MyComp())
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr_order_1x1))
+        p.model.add_subsystem('C1', SlicerComp())
         p.model.connect('indep.x', 'C1.x')
         p.model.add_response('indep.x', type_='con', indices=om.slicer[2:])
 
@@ -661,25 +639,15 @@ class TestGroup(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(arr[tuple(p.model._responses['indep.x']['indices'])], np.array([3, 4]))
+        assert_near_equal(arr_order_1x1[tuple(p.model._responses['indep.x']['indices'])], np.array([3, 4]))
         self.assertTrue(p.model._responses['indep.x']['indices'][0], slice(2, None, None))
 
     def test_om_slice_in_add_constraint(self):
 
-        class MyComp(om.ExplicitComponent):
-            def setup(self):
-                self.add_input('x', np.ones(4))
-                self.add_output('y', 1.0)
-
-            def compute(self, inputs, outputs):
-                outputs['y'] = np.sum(inputs['x'])**2.0
-
         p = om.Problem()
 
-        arr = np.array([1, 2, 3, 4])
-
-        p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
-        p.model.add_subsystem('C1', MyComp())
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr_order_1x1))
+        p.model.add_subsystem('C1', SlicerComp())
         p.model.connect('indep.x', 'C1.x')
         p.model.add_constraint('indep.x', indices=om.slicer[2:])
 
@@ -688,24 +656,18 @@ class TestGroup(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(arr[tuple(p.model._responses['indep.x']['indices'])], np.array([3, 4]))
+        assert_near_equal(arr_order_1x1[tuple(p.model._responses['indep.x']['indices'])], np.array([3, 4]))
         self.assertTrue(p.model._responses['indep.x']['indices'][0], slice(2, None, None))
 
     def test_om_slice_in_add_input(self):
-        class MyComp1(om.ExplicitComponent):
+        class SlicerComp(om.ExplicitComponent):
             def setup(self):
                 self.add_input('x', np.ones(4), src_indices=om.slicer[:, 2])
-                self.add_output('y', 1.0)
-
-            def compute(self, inputs, outputs):
-                outputs['y'] = np.sum(inputs['x'])*2.0
-
-        arr = np.array([[1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4]])
 
         p = om.Problem()
 
-        p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
-        p.model.add_subsystem('C1', MyComp1())
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr_order_4x4))
+        p.model.add_subsystem('C1', SlicerComp())
         p.model.connect('indep.x', 'C1.x')
 
         p.setup()
@@ -714,20 +676,14 @@ class TestGroup(unittest.TestCase):
         assert_near_equal(p['C1.x'], np.array([3, 3, 3, 3]))
 
     def test_om_slice_negative_stop(self):
-        class MyComp1(om.ExplicitComponent):
+        class SlicerComp(om.ExplicitComponent):
             def setup(self):
-                self.add_input('x', np.ones(4), src_indices=om.slicer[:,-1])
-                self.add_output('y', 1.0)
-
-            def compute(self, inputs, outputs):
-                outputs['y'] = np.sum(inputs['x'])*2.0
-
-        arr = np.array([[1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4]])
+                self.add_input('x', np.ones(4), src_indices=om.slicer[:, -1])
 
         p = om.Problem()
 
-        p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
-        p.model.add_subsystem('C1', MyComp1())
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr_order_4x4))
+        p.model.add_subsystem('C1', SlicerComp())
         p.model.connect('indep.x', 'C1.x')
 
         p.setup()
@@ -736,26 +692,274 @@ class TestGroup(unittest.TestCase):
         assert_near_equal(p['C1.x'], np.array([4, 4, 4, 4]))
 
     def test_om_slice_3d(self):
-        class MyComp1(om.ExplicitComponent):
+        class SlicerComp(om.ExplicitComponent):
             def setup(self):
                 self.add_input('x', np.ones(4), src_indices=om.slicer[:, 1, 2])
-                self.add_output('y', 1.0)
-
-            def compute(self, inputs, outputs):
-                outputs['y'] = np.sum(inputs['x'])*2.0
 
         arr = np.arange(64, dtype=int).reshape(4, 4, 4)
 
         p = om.Problem()
 
         p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
-        p.model.add_subsystem('C1', MyComp1())
+        p.model.add_subsystem('C1', SlicerComp())
         p.model.connect('indep.x', 'C1.x')
 
         p.setup()
         p.run_model()
 
         assert_near_equal(p['C1.x'], np.array([6, 22, 38, 54]))
+
+    def test_om_slice_with_ellipsis_in_connect(self):
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr_large_4x4))
+        p.model.add_subsystem('row1_comp', SlicerComp())
+        p.model.add_subsystem('row4_comp', SlicerComp())
+
+        p.model.connect('indep.x', 'row1_comp.x', src_indices=om.slicer[0, ...])
+        p.model.connect('indep.x', 'row4_comp.x', src_indices=om.slicer[3, ...])
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['row1_comp.x'], arr_large_4x4[0, ...])
+        assert_near_equal(p['row4_comp.x'], arr_large_4x4[3, ...])
+
+    def test_om_slice_4D_with_ellipsis(self):
+
+        class SlicerComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones(shape=(5, 3)))
+
+        # Connect
+        p = om.Problem()
+
+        arr = np.random.randint(5, size=(3, 5, 3, 2))
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
+        p.model.add_subsystem('row1_comp', SlicerComp())
+        p.model.add_subsystem('row4_comp', SlicerComp())
+
+        p.model.connect('indep.x', 'row1_comp.x', src_indices=om.slicer[1, ..., 1])
+        p.model.connect('indep.x', 'row4_comp.x', src_indices=om.slicer[2, ..., 1])
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p.get_val('row1_comp.x'), arr[1, ..., 1])
+        assert_near_equal(p.get_val('row4_comp.x'), arr[2, ..., 1])
+
+        # Promotes
+        p = om.Problem()
+
+        arr = np.random.randint(5, size=(3, 5, 3, 2))
+
+        p.model.add_subsystem('indep', om.IndepVarComp('a', arr), promotes=['*'])
+        p.model.add_subsystem('row1_comp', om.ExecComp('b=2*a', a=np.ones((5,3)), b=np.ones((5,3))))
+
+        p.model.promotes('row1_comp', inputs=['a'], src_indices=om.slicer[1, ..., 1])
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p.get_val('row1_comp.a'), arr[1, ..., 1])
+
+        # Design Variable
+        p = om.Problem()
+
+        arr = np.random.randint(5, size=(3, 5, 3, 2))
+
+        p.model.add_subsystem('indep', om.IndepVarComp('a', arr))
+        p.model.add_subsystem('row1_comp', om.ExecComp('b=2*a', a=np.ones((3,5,3)), b=np.ones((3,5,3))))
+        p.model.connect('indep.a', 'row1_comp.a', src_indices=om.slicer[..., 1])
+        p.model.add_design_var('indep.a', indices=om.slicer[1, ..., 1])
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(arr[p.model._design_vars['indep.a']['indices']], arr[1, ..., 1])
+
+        # Response
+        p = om.Problem()
+
+        arr = np.random.randint(5, size=(3, 5, 3, 2))
+
+        p.model.add_subsystem('indep', om.IndepVarComp('a', arr))
+        p.model.add_subsystem('row1_comp', om.ExecComp('b=2*a', a=np.ones((3,5,3)), b=np.ones((3,5,3))))
+        p.model.connect('indep.a', 'row1_comp.a', src_indices=om.slicer[..., 1])
+        p.model.add_response('indep.a', type_='con', indices=om.slicer[1, ..., 1])
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(arr[tuple(p.model._responses['indep.a']['indices'])], arr[1, ..., 1])
+
+        # Constraint
+        p = om.Problem()
+
+        arr = np.random.randint(5, size=(3, 5, 3, 2))
+
+        p.model.add_subsystem('indep', om.IndepVarComp('a', arr))
+        p.model.add_subsystem('row1_comp', om.ExecComp('b=2*a', a=np.ones((3,5,3)), b=np.ones((3,5,3))))
+        p.model.connect('indep.a', 'row1_comp.a', src_indices=om.slicer[..., 1])
+        p.model.add_constraint('indep.a', indices=om.slicer[1, ..., 1])
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(arr[tuple(p.model._responses['indep.a']['indices'])], arr[1, ..., 1])
+
+    def test_om_slice_with_ellipsis_in_promotes(self):
+
+        p = om.Problem()
+
+        model = p.model
+        model.add_subsystem('indep', om.IndepVarComp('a', arr_large_4x4), promotes=['*'])
+        model.add_subsystem('comp1', om.ExecComp('b=2*a', a=np.ones(4), b=np.ones(4)))
+        model.add_subsystem('comp2', om.ExecComp('b=2*a', a=np.ones(4), b=np.ones(4)))
+        model.add_subsystem('comp3', om.ExecComp('b=2*a', a=np.ones(4), b=np.ones(4)))
+
+        model.promotes('comp1', inputs=['a'], src_indices=om.slicer[0, ...])
+        model.promotes('comp2', inputs=['a'], src_indices=om.slicer[3, ...])
+        model.promotes('comp3', inputs=['a'], src_indices=om.slicer[..., 3])
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['comp1.a'], np.array([0,  1,  2,  3]))
+        assert_near_equal(p['comp2.a'], np.array([30, 31, 32, 33]))
+        assert_near_equal(p['comp3.a'], np.array([ 3, 13, 23, 33]))
+
+    def test_om_slice_with_ellipsis_in_desvar(self):
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr_2x4))
+        p.model.add_subsystem('C1', SlicerComp())
+        p.model.connect('indep.x', 'C1.x', src_indices=om.slicer[1, ...])
+        p.model.add_design_var('indep.x', indices=om.slicer[1, ...])
+
+        p.model.add_objective('C1.y')
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(arr_2x4[p.model._design_vars['indep.x']['indices']][0], 10)
+
+    def test_om_slice_with_ellipsis_in_add_response(self):
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr_2x4))
+        p.model.add_subsystem('C1', SlicerComp())
+        p.model.connect('indep.x', 'C1.x', src_indices=om.slicer[1, ...])
+        p.model.add_response('indep.x', type_='con', indices=om.slicer[1, ...])
+
+        p.model.add_objective('C1.y')
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(arr_2x4[tuple(p.model._responses['indep.x']['indices'])],
+                          np.array([10, 11, 12, 13]))
+        self.assertTrue(p.model._responses['indep.x']['indices'][0], 1)
+        self.assertTrue(p.model._responses['indep.x']['indices'][1], ...)
+
+    def test_om_slice_with_ellipsis_in_add_constraint(self):
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr_2x4))
+        p.model.add_subsystem('C1', SlicerComp())
+        p.model.connect('indep.x', 'C1.x', src_indices=om.slicer[1, ...])
+        p.model.add_constraint('indep.x', indices=om.slicer[1, ...])
+
+        p.model.add_objective('C1.y')
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(arr_2x4[tuple(p.model._responses['indep.x']['indices'])],
+                          np.array([10, 11, 12, 13]))
+        self.assertTrue(p.model._responses['indep.x']['indices'][0], 1)
+        self.assertTrue(p.model._responses['indep.x']['indices'][1], ...)
+
+    def test_om_slice_with_ellipsis_auto_ivc(self):
+
+        # Add_constraint
+        p = om.Problem()
+
+        p.model.add_subsystem('C1', SlicerComp(), promotes_inputs=['x'])
+        p.model.add_constraint('x', indices=om.slicer[1, ...])
+
+        p.model.add_objective('C1.y')
+
+        p.setup()
+        p.set_val('x', arr_2x4, indices=om.slicer[1, ...])
+        p.run_model()
+
+        assert_near_equal(arr_2x4[tuple(p.model._responses['x']['indices'])],
+                          np.array([10, 11, 12, 13]))
+        self.assertTrue(p.model._responses['x']['indices'][0], 1)
+        self.assertTrue(p.model._responses['x']['indices'][1], ...)
+
+        # Add_response
+        p = om.Problem()
+
+        p.model.add_subsystem('C1', SlicerComp(), promotes_inputs=['x'])
+        p.model.add_response('x', type_='con', indices=om.slicer[1, ...])
+
+        p.model.add_objective('C1.y')
+
+        p.setup()
+        p.set_val('x', arr_2x4, indices=om.slicer[1, ...])
+        p.run_model()
+
+        assert_near_equal(arr_2x4[tuple(p.model._responses['x']['indices'])],
+                          np.array([10, 11, 12, 13]))
+        self.assertTrue(p.model._responses['x']['indices'][0], 1)
+        self.assertTrue(p.model._responses['x']['indices'][1], ...)
+
+        # Add_design_var
+        p = om.Problem()
+
+        p.model.add_subsystem('C1', SlicerComp(), promotes_inputs=['x'])
+        p.model.add_design_var('x', indices=om.slicer[1, ...])
+
+        p.setup()
+        p.set_val('x', arr_2x4, indices=om.slicer[1, ...])
+        p.run_model()
+
+        assert_near_equal(arr_2x4[p.model._design_vars['x']['indices']],
+                          np.array([10, 11, 12, 13]))
+        self.assertTrue(p.model._design_vars['x']['indices'][0], 1)
+        self.assertTrue(p.model._design_vars['x']['indices'][1], ...)
+        self.assertTrue(p.driver.get_design_var_values()['x'], np.array(11.))
+
+    def test_om_slice_with_indices_and_ellipsis_in_connect(self):
+        class SlicerComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones((3, 4)))
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x']) ** 2.0
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr_large_4x4))
+        p.model.add_subsystem('row134_comp', SlicerComp())
+
+        idxs = np.array([0, 2, 3], dtype=int)
+
+        p.model.connect('indep.x', 'row134_comp.x', src_indices=om.slicer[idxs, ...])
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['row134_comp.x'], arr_large_4x4[(0, 2, 3), ...])
+        assert_near_equal(p['row134_comp.y'], np.sum(arr_large_4x4[(0, 2, 3), ...])**2)
 
     def test_promote_not_found1(self):
         p = om.Problem()
@@ -1053,6 +1257,84 @@ class TestGroup(unittest.TestCase):
         for key, val in totals.items():
             assert_near_equal(val['rel error'][0], 0.0, 1e-15)
 
+    def test_set_order_in_config_error(self):
+
+        class SimpleGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
+                self.add_subsystem('comp2', om.ExecComp('b=2*a'))
+
+            def configure(self):
+                self.set_order(['C2', 'C1'])
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('C1', SimpleGroup())
+        model.add_subsystem('C2', SimpleGroup())
+
+        msg = "SimpleGroup (C1): Cannot call set_order in the configure method"
+        with self.assertRaises(RuntimeError) as cm:
+            prob.setup()
+
+        self.assertEqual(str(cm.exception), msg)
+
+    def test_set_order_after_setup(self):
+
+        class SimpleGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
+                self.add_subsystem('comp2', om.ExecComp('b=2*a'))
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('C1', SimpleGroup())
+        model.add_subsystem('C2', SimpleGroup())
+
+        prob.setup()
+        prob.model.set_order(['C2', 'C1'])
+
+        msg = "Problem: Cannot call set_order without calling setup after"
+        with self.assertRaises(RuntimeError) as cm:
+            prob.run_model()
+        self.assertEqual(str(cm.exception), msg)
+
+    def test_set_order_normal(self):
+
+        class SimpleGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
+                self.add_subsystem('comp2', om.ExecComp('b=2*a'))
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('C1', SimpleGroup())
+        model.add_subsystem('C2', SimpleGroup())
+
+        prob.model.set_order(['C2', 'C1'])
+        prob.setup()
+        prob.run_model()
+
+    def test_double_setup_for_set_order(self):
+        class SimpleGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
+                self.add_subsystem('comp2', om.ExecComp('b=2*a'))
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('C1', SimpleGroup())
+        model.add_subsystem('C2', SimpleGroup())
+
+        prob.setup()
+        model.set_order(['C2', 'C1'])
+        prob.setup()
+        prob.run_model()
+
+
 @unittest.skipUnless(MPI, "MPI is required.")
 class TestGroupMPISlice(unittest.TestCase):
     N_PROCS = 2
@@ -1106,6 +1388,30 @@ class TestGroupMPISlice(unittest.TestCase):
         p.run_model()
 
         assert_near_equal(p['C1.x'], np.array([6, 22, 38, 54]))
+
+    def test_om_slice_4D_with_ellipsis_mpi(self):
+
+        class SlicerComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones(shape=(5, 3)))
+
+        # Connect
+        p = om.Problem()
+
+        arr = np.random.randint(5, size=(3, 5, 3, 2))
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
+        p.model.add_subsystem('row1_comp', SlicerComp())
+        p.model.add_subsystem('row4_comp', SlicerComp())
+
+        p.model.connect('indep.x', 'row1_comp.x', src_indices=om.slicer[1, ..., 1])
+        p.model.connect('indep.x', 'row4_comp.x', src_indices=om.slicer[2, ..., 1])
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p.get_val('row1_comp.x'), arr[1, ..., 1])
+        assert_near_equal(p.get_val('row4_comp.x'), arr[2, ..., 1])
 
     def test_om_slice_negative_stop_mpi(self):
         class MyComp1(om.ExplicitComponent):
@@ -1519,6 +1825,36 @@ class TestGroupPromotes(unittest.TestCase):
         assert_near_equal(p['comp1.y'], np.array([3, 6, 9]))
         assert_near_equal(p['comp1.z'], np.array([3, 10, 17]))
 
+    def test_promotes_src_indices_mixed_array(self):
+
+        class SimpleGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('indep', om.IndepVarComp(), promotes=['*'])
+                self.add_subsystem('comp1', om.ExecComp('z=x+y',
+                                                        x=np.ones(3),
+                                                        y={'value': np.ones(3),
+                                                           'src_indices': [1, 2, 3]},
+                                                        z=np.ones(3)),
+                                    promotes_inputs=['y'])
+
+            def configure(self):
+                self.indep.add_output('x', 2*np.array(range(5)))
+                self.indep.add_output('y', 3*np.array(range(5)))
+                self.promotes('comp1', inputs=['x'],
+                              src_indices=np.array([0, 2, 4]))
+
+        p = om.Problem(model=SimpleGroup())
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['indep.x'], np.array([0, 2, 4, 6, 8]))
+        assert_near_equal(p['indep.y'], np.array([0, 3, 6, 9, 12]))
+
+        assert_near_equal(p['comp1.x'], np.array([0, 4, 8]))
+        assert_near_equal(p['comp1.y'], np.array([3, 6, 9]))
+        assert_near_equal(p['comp1.z'], np.array([3, 10, 17]))
+
     def test_promotes_src_indices_wildcard(self):
 
         class SimpleGroup(om.Group):
@@ -1747,6 +2083,18 @@ class TestConnect(unittest.TestCase):
 
         with assert_warning(UserWarning, msg):
             self.prob.setup()
+
+    def test_explicit_conn_to_prom_inputs(self):
+        p = om.Problem()
+        p.model.add_subsystem('indeps', om.IndepVarComp('foo', val=10., units='ft'))
+        p.model.add_subsystem('C1', om.ExecComp('y=3*x', x={'units': 'ft', 'value': 1.}), promotes_inputs=['x'])
+        p.model.add_subsystem('C2', om.ExecComp('y=4*x', x={'units': 'ft', 'value': 1.}), promotes_inputs=['x'])
+        p.model.connect('indeps.foo', 'x')
+        p.setup()
+        p.final_setup()
+
+        # before bug fix, the following generated an ambiguity error
+        p['x']
 
     def test_invalid_target(self):
         msg = "Group (sub): Attempted to connect from 'src.x' to 'tgt.z', but 'tgt.z' doesn't exist."
@@ -2163,7 +2511,7 @@ class TestGroupAddInput(unittest.TestCase):
            p.setup()
 
         self.assertEqual(cm.exception.args[0],
-                         "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but the metadata entries ['units', 'value'] differ. Call <group>.set_input_defaults('x', units=?, value=?), where <group> is the Group named 'par' to remove the ambiguity.")
+                         "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but their metadata entries ['units', 'value'] differ. Call <group>.set_input_defaults('x', units=?, value=?), where <group> is the Group named 'par' to remove the ambiguity.")
 
     def test_missing_diff_vals(self):
         p = om.Problem()
@@ -2177,11 +2525,11 @@ class TestGroupAddInput(unittest.TestCase):
            p.setup()
 
         self.assertEqual(cm.exception.args[0],
-                         "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but the metadata entries ['value'] differ. Call <group>.set_input_defaults('x', value=?), where <group> is the Group named 'par' to remove the ambiguity.")
+                         "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but their metadata entries ['value'] differ. Call <group>.set_input_defaults('x', value=?), where <group> is the Group named 'par' to remove the ambiguity.")
 
     def test_conflicting_units(self):
         # multiple Group.set_input_defaults calls at same tree level with conflicting units args
-        p = self._make_tree_model(diff_units=True)
+        p = self._make_tree_model()
         model = p.model
         g2 = model._get_subsystem('G1.G2')
         g2.set_input_defaults('x', units='ft')
@@ -2198,14 +2546,14 @@ class TestGroupAddInput(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             p.setup()
 
-        self.assertEqual(cm.exception.args[0], "Groups 'par.G4' and 'par.G5' added the input 'x' with conflicting 'units'.")
+        self.assertEqual(cm.exception.args[0], "Group (<model>): The subsystems G1.G2 and par.G4 called set_input_defaults for promoted input 'x' with conflicting values for 'units'. Call <group>.set_input_defaults('x', units=?), where <group> is the model to remove the ambiguity.")
 
     def test_conflicting_units_multi_level(self):
         # multiple Group.set_input_defaults calls at different tree levels with conflicting units args
         p = self._make_tree_model(diff_units=True)
         model = p.model
         g2 = model._get_subsystem('G1.G2')
-        g2.set_input_defaults('x', units='ft')
+        g2.set_input_defaults('x', units='km')
 
         g3 = model._get_subsystem('G1.G3')
         g3.set_input_defaults('x', units='ft')
@@ -2222,7 +2570,74 @@ class TestGroupAddInput(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             p.setup()
 
-        self.assertEqual(cm.exception.args[0], "Groups 'G1' and 'G1.G2' added the input 'x' with conflicting 'units'.")
+        self.assertEqual(cm.exception.args[0], "Group (<model>): The subsystems G1 and par.G4 called set_input_defaults for promoted input 'x' with conflicting values for 'units'. Call <group>.set_input_defaults('x', units=?), where <group> is the model to remove the ambiguity.")
+
+    def test_override_units(self):
+        # multiple Group.set_input_defaults calls at different tree levels with conflicting units args
+        p = self._make_tree_model()
+        model = p.model
+        g2 = model._get_subsystem('G1.G2')
+        g2.set_input_defaults('x', units='km')
+
+        g1 = model._get_subsystem('G1')
+        g1.set_input_defaults('x', units='inch', val=2.)
+
+        msg = "Groups 'G1' and 'G1.G2' called set_input_defaults for the input 'x' with conflicting 'units'. The value (inch) from 'G1' will be used."
+        with assert_warning(UserWarning, msg):
+            p.setup()
+
+    def test_sub_sub_override(self):
+        p = om.Problem()
+        model = p.model
+        G1 = model.add_subsystem('G1', om.Group())
+        G1.set_input_defaults('x', units='mm', val=1.)
+        G2 = G1.add_subsystem('G2', om.Group(), promotes=['x'])
+        G3 = G2.add_subsystem('G3', om.Group(), promotes=['x'])
+        G3.add_subsystem('C1', om.ExecComp('y = 3.*x', x={'units': 'm'}), promotes=['x'])
+        G3.add_subsystem('C2', om.ExecComp('y = 4.*x', x={'units': 'cm'}), promotes=['x'])
+        G3.set_input_defaults('x', units='cm')
+        msg = "Groups 'G1' and 'G1.G2.G3' called set_input_defaults for the input 'x' with conflicting 'units'. The value (mm) from 'G1' will be used."
+        with assert_warning(UserWarning, msg):
+            p.setup()
+
+    def test_sub_sets_parent_meta(self):
+        p = om.Problem()
+        model = p.model
+        G1 = model.add_subsystem('G1', om.Group())
+        G1.set_input_defaults('x', val=2.)
+        G2 = G1.add_subsystem('G2', om.Group(), promotes=['x'])
+        G2.add_subsystem('C1', om.ExecComp('y = 3.*x', x={'units': 'm'}), promotes=['x'])
+        G2.set_input_defaults('x', units='cm')
+        msg = "Group 'G1' did not set a default 'units' for input 'x', so the value of (cm) from group 'G1.G2' will be used."
+        with assert_warning(UserWarning, msg):
+            p.setup()
+
+    def test_sub_sub_override2(self):
+        p = om.Problem()
+        model = p.model
+        G1 = model.add_subsystem('G1', om.Group())
+        G1.set_input_defaults('x', units='mm', val=1.)
+        G2 = G1.add_subsystem('G2', om.Group(), promotes=['x'])
+        G2.set_input_defaults('x', units='km')
+        G3 = G2.add_subsystem('G3', om.Group(), promotes=['x'])
+        G3.add_subsystem('C1', om.ExecComp('y = 3.*x', x={'units': 'm'}), promotes=['x'])
+        G3.add_subsystem('C2', om.ExecComp('y = 4.*x', x={'units': 'cm'}), promotes=['x'])
+        G3.set_input_defaults('x', units='cm')
+        msgs = [
+            "Groups 'G1' and 'G1.G2' called set_input_defaults for the input 'x' with conflicting 'units'. The value (mm) from 'G1' will be used.",
+            "Groups 'G1' and 'G1.G2.G3' called set_input_defaults for the input 'x' with conflicting 'units'. The value (mm) from 'G1' will be used."
+        ]
+        with reset_warning_registry():
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter("always")
+                p.setup()
+
+        for msg in msgs:
+            for warn in w:
+                if (issubclass(warn.category, UserWarning) and str(warn.message) == msg):
+                    break
+            else:
+                raise AssertionError("Did not see expected UserWarning: %s" % msg)
 
     def test_conflicting_units_multi_level_par(self):
         # multiple Group.set_input_defaults calls at different tree levels with conflicting units args
@@ -2246,7 +2661,7 @@ class TestGroupAddInput(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             p.setup()
 
-        self.assertEqual(cm.exception.args[0], "Groups 'par' and 'par.G4' added the input 'x' with conflicting 'units'.")
+        self.assertEqual(cm.exception.args[0], "Group (<model>): The subsystems G1.G2 and par called set_input_defaults for promoted input 'x' with conflicting values for 'units'. Call <group>.set_input_defaults('x', units=?), where <group> is the model to remove the ambiguity.")
 
     def test_group_input_not_found(self):
         p = self._make_tree_model(diff_units=True)
@@ -2266,7 +2681,7 @@ class TestGroupAddInput(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             p.setup()
 
-        self.assertEqual(cm.exception.args[0], "Group (G1.G2): The following group inputs could not be found: ['xx'].")
+        self.assertEqual(cm.exception.args[0], "Group (G1.G2): The following group inputs, passed to set_input_defaults(), could not be found: ['xx'].")
 
     def test_conflicting_val(self):
         p = self._make_tree_model(diff_vals=True)
@@ -2289,7 +2704,7 @@ class TestGroupAddInput(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             p.setup()
 
-        self.assertEqual(cm.exception.args[0], "Groups 'G1' and 'G1.G2' added the input 'x' with conflicting 'value'.")
+        self.assertEqual(cm.exception.args[0], "Group (<model>): The subsystems G1 and par.G4 called set_input_defaults for promoted input 'x' with conflicting values for 'value'. Call <group>.set_input_defaults('x', value=?), where <group> is the model to remove the ambiguity.")
 
 
 #
@@ -2706,6 +3121,7 @@ class TestFeatureSetOrder(unittest.TestCase):
         # reset the shared order list
         order_list[:] = []
 
+        prob.setup()
         # now swap C2 and C1 in the order
         model.set_order(['C2', 'C1', 'C3'])
 
@@ -2776,6 +3192,18 @@ class TestFeatureConfigure(unittest.TestCase):
 
         self.assertTrue(isinstance(top.model.sub.nonlinear_solver, om.NewtonSolver))
         self.assertTrue(isinstance(top.model.sub.linear_solver, om.ScipyKrylov))
+
+    def test_configure_set_input_defaults(self):
+        class ConfigGroup(om.Group):
+            def configure(self):
+                self.set_input_defaults('x', val=99.)
+
+        p = om.Problem(model=ConfigGroup())
+        C1 = p.model.add_subsystem('C1', om.ExecComp('y=2*x'), promotes_inputs=['x'])
+        C2 = p.model.add_subsystem('C2', om.ExecComp('y=3*x'), promotes_inputs=['x'])
+
+        p.setup()
+        self.assertEqual(p['x'], 99.)
 
     def test_configure_add_input_output(self):
         """
