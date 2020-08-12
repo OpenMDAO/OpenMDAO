@@ -1005,13 +1005,24 @@ class Group(System):
                 else:
                     raise RuntimeError("{}: Distributed vectors are required but no distributed "
                                        "vector type has been set.".format(self.msginfo))
+        else:
+            self._vector_class = self._local_vector_class
 
-            # compute owning ranks and owned sizes
+        if self._use_derivatives:
+            self._var_sizes['nonlinear'] = self._var_sizes['linear']
+
+        self._compute_owning_ranks()
+
+        if self.comm.size > 1:
+            self._setup_global_shapes()
+
+    def _compute_owning_ranks(self):
+        if self.comm.size > 1:
             abs2meta = self._var_allprocs_abs2meta
             owns = self._owning_rank
-            self._owned_sizes = self._var_sizes[vec_names[0]]['output'].copy()
+            self._owned_sizes = self._var_sizes['nonlinear']['output'].copy()
             for io in ('input', 'output'):
-                sizes = self._var_sizes[vec_names[0]][io]
+                sizes = self._var_sizes['nonlinear'][io]
                 for i, (name, meta) in enumerate(self._var_allprocs_abs2meta[io].items()):
                     for rank in range(self.comm.size):
                         if sizes[rank, i] > 0:
@@ -1027,14 +1038,7 @@ class Group(System):
                             if n not in owns:
                                 owns[n] = i
         else:
-            self._owned_sizes = self._var_sizes[vec_names[0]]['output']
-            self._vector_class = self._local_vector_class
-
-        if self._use_derivatives:
-            self._var_sizes['nonlinear'] = self._var_sizes['linear']
-
-        if self.comm.size > 1:
-            self._setup_global_shapes()
+            self._owned_sizes = self._var_sizes['nonlinear']['output']
 
     def _setup_global_connections(self, conns=None):
         """
