@@ -458,11 +458,11 @@ class TestViewModelData(unittest.TestCase):
 
         prob.setup()
         prob.final_setup()
-        
+
         model_viewer_data = _get_viewer_data(prob)
 
         expected_tree_betz = json.loads("""
-            { 
+            {
                "name":"root",
                "type":"root",
                "class":"Group",
@@ -472,8 +472,8 @@ class TestViewModelData(unittest.TestCase):
                "is_parallel":false,
                "linear_solver":"LN: RUNONCE",
                "nonlinear_solver":"NL: RUNONCE",
-               "children":[ 
-                  { 
+               "children":[
+                  {
                      "name":"indeps",
                      "type":"subsystem",
                      "class":"IndepVarComp",
@@ -483,26 +483,26 @@ class TestViewModelData(unittest.TestCase):
                      "component_type":"indep",
                      "linear_solver":"",
                      "nonlinear_solver":"",
-                     "children":[ 
-                        { 
+                     "children":[
+                        {
                            "name":"a",
                            "type":"output",
                            "implicit":false,
                            "dtype":"ndarray"
                         },
-                        { 
+                        {
                            "name":"Area",
                            "type":"output",
                            "implicit":false,
                            "dtype":"ndarray"
                         },
-                        { 
+                        {
                            "name":"rho",
                            "type":"output",
                            "implicit":false,
                            "dtype":"ndarray"
                         },
-                        { 
+                        {
                            "name":"Vu",
                            "type":"output",
                            "implicit":false,
@@ -510,7 +510,7 @@ class TestViewModelData(unittest.TestCase):
                         }
                      ]
                   },
-                  { 
+                  {
                      "name":"a_disk",
                      "type":"subsystem",
                      "class":"ActuatorDisc",
@@ -520,58 +520,58 @@ class TestViewModelData(unittest.TestCase):
                      "component_type":"explicit",
                      "linear_solver":"",
                      "nonlinear_solver":"",
-                     "children":[ 
-                        { 
+                     "children":[
+                        {
                            "name":"a",
                            "type":"input",
                            "dtype":"ndarray"
                         },
-                        { 
+                        {
                            "name":"Area",
                            "type":"input",
                            "dtype":"ndarray"
                         },
-                        { 
+                        {
                            "name":"rho",
                            "type":"input",
                            "dtype":"ndarray"
                         },
-                        { 
+                        {
                            "name":"Vu",
                            "type":"input",
                            "dtype":"ndarray"
                         },
-                        { 
+                        {
                            "name":"Vr",
                            "type":"output",
                            "implicit":false,
                            "dtype":"ndarray"
                         },
-                        { 
+                        {
                            "name":"Vd",
                            "type":"output",
                            "implicit":false,
                            "dtype":"ndarray"
                         },
-                        { 
+                        {
                            "name":"Ct",
                            "type":"output",
                            "implicit":false,
                            "dtype":"ndarray"
                         },
-                        { 
+                        {
                            "name":"thrust",
                            "type":"output",
                            "implicit":false,
                            "dtype":"ndarray"
                         },
-                        { 
+                        {
                            "name":"Cp",
                            "type":"output",
                            "implicit":false,
                            "dtype":"ndarray"
                         },
-                        { 
+                        {
                            "name":"power",
                            "type":"output",
                            "implicit":false,
@@ -615,6 +615,32 @@ class TestViewModelData(unittest.TestCase):
             expected_responses_names,
         )
 
+    def test_viewer_data_from_subgroup(self):
+        """
+        Test error message when asking for viewer data on for a subgroup.
+        """
+        p = Problem(model=SellarStateConnection())
+        p.setup()
+
+        msg = "Viewer data is not available for sub-Group 'sub'."
+        with assert_warning(UserWarning, msg):
+            _get_viewer_data(p.model.sub)
+
+    def test_viewer_data_from_None(self):
+        """
+        Test error message when asking for viewer data on for invalid source.
+        """
+        p = Problem(model=SellarStateConnection())
+        p.setup()
+
+        msg = "Viewer data is not available for 'None'." + \
+              "The source must be a Problem, Group or the filename of a recording."
+
+        with self.assertRaises(TypeError) as cm:
+            _get_viewer_data(None)
+
+        self.assertEquals(str(cm.exception), msg)
+
     def test_n2_from_problem(self):
         """
         Test that an n2 html file is generated from a Problem.
@@ -623,6 +649,20 @@ class TestViewModelData(unittest.TestCase):
         p.model = SellarStateConnection()
         p.setup()
         n2(p, outfile=self.problem_html_filename, show_browser=DEBUG_BROWSER)
+
+        # Check that the html file has been created and has something in it.
+        self.assertTrue(os.path.isfile(self.problem_html_filename),
+                        (self.problem_html_filename + " is not a valid file."))
+        self.assertGreater(os.path.getsize(self.problem_html_filename), 100)
+
+    def test_n2_from_model(self):
+        """
+        Test that an n2 html file is generated from a model.
+        """
+        p = Problem()
+        p.model = SellarStateConnection()
+        p.setup()
+        n2(p.model, outfile=self.problem_html_filename, show_browser=DEBUG_BROWSER)
 
         # Check that the html file has been created and has something in it.
         self.assertTrue(os.path.isfile(self.problem_html_filename),
@@ -638,7 +678,7 @@ class TestViewModelData(unittest.TestCase):
             if re.search('var compressedModel', line):
                 b64_data = line.replace('var compressedModel = "', '').replace('";', '')
                 break
-        
+
         file.close()
         compressed_data = base64.b64decode(b64_data)
         model_data = json.loads(zlib.decompress(compressed_data).decode("utf-8"))
@@ -702,7 +742,7 @@ class TestViewModelData(unittest.TestCase):
         """
         Test that an n2 html file is generated from a Problem even if it has connection errors.
         """
-        from openmdao.test_suite.scripts.bad_connection import BadConnectionModel 
+        from openmdao.test_suite.scripts.bad_connection import BadConnectionModel
 
         p = Problem(BadConnectionModel())
 

@@ -378,34 +378,6 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_data = ((coordinate, (t0, t1), expected_outputs, expected_inputs, None),)
         assertDriverIterDataRecorded(self, expected_data, self.eps)
 
-    def test_deprecated_option(self):
-        # check that deprecated options are recorded but no warning is issued
-        from openmdao.core.driver import Driver
-        class MyDriver(Driver):
-            def _declare_options(self):
-                # Deprecated option
-                self.options.declare('user_teriminate_signal', default=None, desc='Oops.',
-                                     deprecation="The option was misspelled and is deprecated.")
-
-        prob = om.Problem(driver=MyDriver())
-        prob.driver.add_recorder(om.SqliteRecorder(self.filename))
-
-        prob.setup()
-        with assert_no_warning(DeprecationWarning):
-            prob.final_setup()
-        prob.cleanup()
-
-        expected_problem_metadata = {
-            'connections_list_length': 0,
-            'tree_length': 10,
-            'tree_children_length': 0,
-            'abs2prom': {}
-        }
-        data = assertViewerDataRecorded(self, expected_problem_metadata)
-
-        self.assertTrue('user_teriminate_signal' in data['driver']['options'],
-                        'Deprecated key not found in recorded options')
-
     def test_driver_records_metadata(self):
         prob = SellarProblem()
 
@@ -470,6 +442,34 @@ class TestSqliteRecorder(unittest.TestCase):
             'abs2prom': abs2prom,
         }
         assertViewerDataRecorded(self, expected_problem_metadata)
+
+    def test_deprecated_option(self):
+        # check that deprecated options are recorded but no warning is issued
+        from openmdao.core.driver import Driver
+        class MyDriver(Driver):
+            def _declare_options(self):
+                # Deprecated option
+                self.options.declare('user_teriminate_signal', default=None, desc='Oops.',
+                                     deprecation="The option was misspelled and is deprecated.")
+
+        prob = om.Problem(driver=MyDriver())
+        prob.driver.add_recorder(om.SqliteRecorder(self.filename))
+
+        prob.setup()
+        with assert_no_warning(DeprecationWarning):
+            prob.final_setup()
+        prob.cleanup()
+
+        expected_problem_metadata = {
+            'connections_list_length': 0,
+            'tree_length': 10,
+            'tree_children_length': 0,
+            'abs2prom': {}
+        }
+        data = assertViewerDataRecorded(self, expected_problem_metadata)
+
+        self.assertTrue('user_teriminate_signal' in data['driver']['options'],
+                        'Deprecated key not found in recorded options')
 
     def test_system_record_model_metadata(self):
         # first check to see if recorded recursively, which is the default
