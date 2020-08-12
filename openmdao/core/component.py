@@ -138,7 +138,7 @@ class Component(System):
         """
         super(Component, self)._setup_procs(pathname, comm, mode, prob_meta)
 
-        prob_meta['local_systems'].add(pathname)
+        prob_meta['local_components'].add(pathname)
 
         self._vectors = {}
 

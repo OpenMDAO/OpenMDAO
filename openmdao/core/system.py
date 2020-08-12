@@ -165,6 +165,8 @@ class System(object):
         Dictionary of discrete var metadata and values local to this process.
     _var_allprocs_discrete : dict
         Dictionary of discrete var metadata and values for all processes.
+    _vars_to_gather : dict
+        Mapping of variables that are remote in some proc(s) to their owning rank.
     _discrete_inputs : dict-like or None
         Storage for discrete input values.
     _discrete_outputs : dict-like or None
@@ -359,7 +361,7 @@ class System(object):
         self._subsystems_allprocs = []
         self._subsystems_myproc = []
         self._subsystems_inds = {}
-        self._remote_comps = set()
+        self._vars_to_gather = {}
 
         self._var_promotes = {'input': [], 'output': [], 'any': []}
         self._var_promotes_src_indices = {}
@@ -1300,8 +1302,6 @@ class System(object):
         self._var_allprocs_abs2meta = {'input': OrderedDict(), 'output': OrderedDict()}
         self._var_abs2meta = {'input': OrderedDict(), 'output': OrderedDict()}
         self._var_allprocs_abs2idx = {}
-        self._remote_comps = set()
-        self._gatherable_vars = {}
         self._owning_rank = defaultdict(int)
 
     def _setup_var_index_maps(self):
@@ -3195,7 +3195,7 @@ class System(object):
                                 ret_meta[key] = 'Unavailable'
 
                 if need_gather:
-                    if distrib or abs_name in self._gatherable_vars:
+                    if distrib or abs_name in self._vars_to_gather:
                         if rank is None:
                             allproc_metas = self.comm.allgather(ret_meta)
                         else:
@@ -3222,7 +3222,7 @@ class System(object):
                                     else:
                                         ret_meta['src_indices'] = np.zeros(0, dtype=INT_DTYPE)
 
-                            elif abs_name in self._gatherable_vars:
+                            elif abs_name in self._vars_to_gather:
                                 for m in allproc_metas:
                                     if m is not None:
                                         ret_meta = m
@@ -4514,7 +4514,7 @@ class System(object):
                 # key is either bogus or a key into the local metadata dict
                 # (like 'value' or 'src_indices'). If MPI is active, this val may be remote
                 # on some procs
-                if self.comm.size > 1 and abs_name in self._gatherable_varss:
+                if self.comm.size > 1 and abs_name in self._vars_to_gathers:
                     # TODO: fix this
                     # cause a failure in all procs to avoid a hang
                     raise RuntimeError(f"{self.msgifo}: No support yet for retrieving local "

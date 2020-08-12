@@ -88,6 +88,8 @@ class Group(System):
         Flag indicating whether connection errors are raised as an Exception.
     _order_set : bool
         Flag to check if set_order has been called.
+    _remote_comps : dict
+        Mapping of components that are remote on some proc(s) to their owning rank.
     """
 
     def __init__(self, **kwargs):
@@ -122,6 +124,7 @@ class Group(System):
         self._contains_parallel_group = False
         self._raise_connection_errors = True
         self._order_set = False
+        self._remote_comps = {}
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -467,10 +470,8 @@ class Group(System):
             s.pathname = '.'.join((self.pathname, s.name)) if self.pathname else s.name
 
         # Perform recursion
-        loc_systems = prob_meta['local_systems']
         for subsys in self._subsystems_myproc:
             subsys._setup_procs(subsys.pathname, sub_comm, mode, prob_meta)
-            loc_systems.add(subsys.pathname)
 
         # build a list of local subgroups to speed up later loops
         self._subgroups_myproc = [s for s in self._subsystems_myproc if isinstance(s, Group)]
@@ -538,55 +539,53 @@ class Group(System):
         else:
             return self._list_states()
 
-    def _get_all_promotes(self, remote_systems):
+    # def _get_all_promotes(self, remote_systems):
+    def _get_all_promotes(self):
         """
-        Create the top level mapping of all promoted names to absolute names.
+        Create the top level mapping of all promoted names to absolute names for all local systems.
 
         This includes all buried promoted names.
-
-        Parameters
-        ----------
-        remote_systems : dict
-            Mapping of system pathname to owning rank.  Includes only systems that are
-            remote in at least one MPI process.
 
         Returns
         -------
         dict
             Mapping of all promoted names to absolute names.
         """
-        myrank = self.comm.rank
-        mysys = set(n for n, rank in remote_systems.items() if rank == myrank)
         iotypes = ('input', 'output')
         if self.comm.size > 1:
             prom2abs = {'input': defaultdict(set), 'output': defaultdict(set)}
+            rem_prom2abs = {'input': defaultdict(set), 'output': defaultdict(set)}
+            myrank = self.comm.rank
+            vars_to_gather = self._vars_to_gather
 
             for s in self.system_iter(recurse=True):
-                if s.pathname in mysys:  # we 'own' this system
-                    prefix = s.pathname + '.' if s.pathname else ''
-                    for typ in iotypes:
-                        # use abs2prom to determine locality since prom2abs is for allprocs
-                        sys_abs2prom = s._var_abs2prom[typ]
-                        t_prom2abs = prom2abs[typ]
-                        for prom, alist in s._var_allprocs_prom2abs_list[typ].items():
-                            t_prom2abs[prefix + prom].update(n for n in alist if n in sys_abs2prom)
+                prefix = s.pathname + '.' if s.pathname else ''
+                for typ in iotypes:
+                    # use abs2prom to determine locality since prom2abs is for allprocs
+                    sys_abs2prom = s._var_abs2prom[typ]
+                    t_remprom2abs = rem_prom2abs[typ]
+                    t_prom2abs = prom2abs[typ]
+                    for prom, alist in s._var_allprocs_prom2abs_list[typ].items():
+                        abs_names = [n for n in alist if n in sys_abs2prom]
+                        t_prom2abs[prefix + prom].update(abs_names)
+                        t_remprom2abs[prefix + prom].update(n for n in abs_names
+                                                            if n in vars_to_gather
+                                                            and vars_to_gather[n] == myrank)
 
-            all_proms = self.comm.gather(prom2abs, root=0)
+            all_proms = self.comm.gather(rem_prom2abs, root=0)
             if myrank == 0:
-                prom2abs = {'input': defaultdict(list), 'output': defaultdict(list)}
                 for typ in iotypes:
                     t_prom2abs = prom2abs[typ]
                     for rankproms in all_proms:
                         for prom, absnames in rankproms[typ].items():
-                            t_prom2abs[prom].extend(absnames)
+                            t_prom2abs[prom].update(absnames)
 
-                t_prom2abs = prom2abs['input']
-                for prom, absnames in t_prom2abs.items():
-                    t_prom2abs[prom] = sorted(absnames)  # sort to keep order the same on all procs
+                    for prom, absnames in t_prom2abs.items():
+                        t_prom2abs[prom] = sorted(absnames)  # sort to keep order same on all procs
 
                 self.comm.bcast(prom2abs, root=0)
             else:
-                prom2abs = self.comm.bcast(prom2abs, root=0)
+                prom2abs = self.comm.bcast(None, root=0)
         else:  # serial
             prom2abs = {'input': defaultdict(list), 'output': defaultdict(list)}
             for s in self.system_iter(recurse=True):
@@ -602,10 +601,8 @@ class Group(System):
         self._problem_meta['connections'] = conns = self._conn_global_abs_in2out
         self._problem_meta['all_meta'] = self._var_allprocs_abs2meta
         self._problem_meta['meta'] = self._var_abs2meta
-
-        rsystems = self._find_remote_comp_owners()
-        self._problem_meta['remote_vars'] = self._find_remote_var_owners(rsystems)
-        self._problem_meta['prom2abs'] = self._get_all_promotes(rsystems)
+        self._problem_meta['vars_to_gather'] = self._vars_to_gather
+        self._problem_meta['prom2abs'] = self._get_all_promotes()
 
         self._resolve_group_input_defaults()
         auto_ivc = self._setup_auto_ivcs(mode)
@@ -743,7 +740,6 @@ class Group(System):
         allprocs_abs2meta = {'input': OrderedDict(), 'output': OrderedDict()}
 
         allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
-        gatherable = self._gatherable_vars
 
         for n, lst in self._group_inputs.items():
             lst[0]['path'] = self.pathname  # used for error reporting
@@ -754,8 +750,6 @@ class Group(System):
             self._has_resid_scaling |= subsys._has_resid_scaling
 
             var_maps = subsys._get_maps(subsys._var_allprocs_prom2abs_list)
-
-            gatherable.update(subsys._gatherable_vars)
 
             sub_prefix = subsys.name + '.'
 
@@ -836,14 +830,6 @@ class Group(System):
                             allprocs_prom2abs_list[type_][prom_name] = []
                         allprocs_prom2abs_list[type_][prom_name].extend(abs_names_list)
 
-            if isend:
-                raw = set(n for n in allprocs_abs2meta['input'] if n not in abs2meta['input'])
-                raw.update(n for n in allprocs_abs2meta['output'] if n not in abs2meta['output'])
-            else:
-                raw = set()
-            for proc_gatherable in self.comm.allgather(raw):
-                gatherable.update(proc_gatherable)
-
         self._var_allprocs_abs2meta = allprocs_abs2meta
 
         for prom_name, abs_list in allprocs_prom2abs_list['output'].items():
@@ -864,6 +850,9 @@ class Group(System):
             if extra:
                 raise RuntimeError(f"{self.msginfo}: The following group inputs, passed to "
                                    f"set_input_defaults(), could not be found: {sorted(extra)}.")
+
+        self._setup_remote_comp_owners()
+        self._setup_remote_var_owners()
 
         if self._var_discrete['input'] or self._var_discrete['output']:
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
@@ -2631,81 +2620,72 @@ class Group(System):
 
         return graph
 
-    def _find_remote_comp_owners(self):
+    def _setup_remote_comp_owners(self):
         """
-        Return a mapping of component pathname to owning rank.
+        Compute a mapping of component pathname to owning rank.
 
         The mapping will contain ONLY components that are remote on at least one proc.
-
-        Returns
-        -------
-        dict
-            The mapping of system pathname to owning rank.
         """
         if self.comm.size > 1:
-            loc_sys = self._problem_meta['local_systems']
-            # use the allprocs variable dicts to find any remote systems
-            remote_sys = set()
-            for typ in ('input', 'output'):
-                for abspath in self._var_allprocs_abs2prom[typ]:  # includes real and discrete vars
-                    comp_name, vname = abspath.rsplit('.', 1)
-                    if comp_name not in loc_sys:
-                        remote_sys.add(comp_name)
+            if self._mpi_proc_allocator.parallel:
+                loc_comps = self._problem_meta['local_components']
+                # use the allprocs variable dicts to find any remote systems
+                remote_comps = set()
+                for typ in ('input', 'output'):
+                    for abspath in self._var_allprocs_abs2prom[typ]:  # includes real and discrete
+                        comp_name, vname = abspath.rsplit('.', 1)
+                        if comp_name not in loc_comps:
+                            remote_comps.add(comp_name)
 
-            # Find systems that are remote in at least one proc and the owning rank for each.
-            gathered = self.comm.gather(remote_sys, root=0)
-            if self.comm.rank == 0:
+                # Find systems that are remote in at least one proc and the owning rank for each.
+                gathered = self.comm.gather(remote_comps, root=0)
+                if self.comm.rank == 0:
+                    remote_comps = {}
+                    remaining_remotes = set()
+                    for remotes in gathered:
+                        remaining_remotes.update(remotes)
+
+                    for rank, remotes in enumerate(gathered):
+                        if not remaining_remotes:
+                            break
+                        diff = remaining_remotes - remotes
+                        for name in diff:
+                            remote_comps[name] = rank
+
+                        remaining_remotes -= diff
+
+                    self.comm.bcast(remote_comps, root=0)
+                else:
+                    remote_comps = self.comm.bcast(None, root=0)
+            else:  # not a parallel group, so just use remote comps from children
                 remote_comps = {}
-                remaining_remotes = set()
-                for remotes in gathered:
-                    remaining_remotes.update(remotes)
-
-                for rank, remotes in enumerate(gathered):
-                    if not remaining_remotes:
-                        break
-                    diff = remaining_remotes - remotes
-                    for name in diff:
-                        remote_comps[name] = rank
-
-                    remaining_remotes -= diff
-
-                self.comm.bcast(remote_comps, root=0)
-            else:
-                remote_comps = self.comm.bcast(None, root=0)
+                for sub in self._subsystems_myproc:
+                    if isinstance(sub, Group):
+                        remote_comps.update(sub._remote_comps)
         else:
             remote_comps = {}
 
-        return remote_comps
+        self._remote_comps = remote_comps
 
-    def _find_remote_var_owners(self, comp_owning_ranks):
+    def _setup_remote_var_owners(self):
         """
-        Return a mapping of abs var name to owning rank.
+        Compute a mapping of abs var name to owning rank for variables that are remote somewhere.
 
         The mapping contains ONLY non-distributed variables that are remote on at least one proc.
-
-        Parameters
-        ----------
-        comp_owning_ranks : dict
-            Mapping of component pathname to owning rank. Contains only components that are
-            remote on at least one proc in this group's MPI communicator.
-
-        Returns
-        -------
-        dict
-            The mapping of variable pathname to owning rank.
         """
         owners = {}
-        all_abs2meta = self._var_allprocs_abs2meta
+        comp_owning_ranks = self._remote_comps
         for io in ('input', 'output'):
-            a2m = all_abs2meta[io]
+            abs2meta = self._var_allprocs_abs2meta[io]
             for abs_name in self._var_allprocs_abs2prom[io]:
                 comp_name, vname = abs_name.rsplit('.', 1)
-                if comp_name in comp_owning_ranks and not (abs_name in a2m and
-                                                           a2m[abs_name]['distributed']):
+                if comp_name in comp_owning_ranks and not (abs_name in abs2meta and
+                                                           abs2meta[abs_name]['distributed']):
                     owners[abs_name] = comp_owning_ranks[comp_name]
-        return owners
 
-    def _get_auto_ivc_out_val(self, tgts, remote_vars, all_abs2meta_in, abs2meta_in):
+        self._vars_to_gather = owners
+
+    def _get_auto_ivc_out_val(self, tgts, vars_to_gather, all_abs2meta_in, abs2meta_in):
         info = []
         src_idx_found = []
         for tgt in tgts:
@@ -2713,8 +2693,8 @@ class Group(System):
             dist = all_meta['distributed']
             has_src_inds = all_meta['has_src_indices']
 
-            if tgt in remote_vars:  # remote somewhere
-                if self.comm.rank == remote_vars[tgt]:
+            if tgt in vars_to_gather:  # remote somewhere
+                if self.comm.rank == vars_to_gather[tgt]:
                     meta = abs2meta_in[tgt]
                     val = meta['value']
                     if has_src_inds:
@@ -2756,9 +2736,9 @@ class Group(System):
         auto_ivc.name = '_auto_ivc'
         auto_ivc.pathname = auto_ivc.name
 
-        # NOTE: remote_vars does NOT include distributed inputs.
+        # NOTE: vars_to_gather does NOT include distributed inputs.
         # NOTE: some distributed inputs do not have src_indices yet
-        remote_vars = self._problem_meta['remote_vars']
+        vars_to_gather = self._problem_meta['vars_to_gather']
 
         prom2auto = {}
         count = 0
@@ -2785,7 +2765,7 @@ class Group(System):
         myrank = self.comm.rank
         with multi_proc_exception_check(self.comm):
             for src, tgts in auto2tgt.items():
-                tgt, sz, val, remote = self._get_auto_ivc_out_val(tgts, remote_vars,
+                tgt, sz, val, remote = self._get_auto_ivc_out_val(tgts, vars_to_gather,
                                                                   all_abs2meta, abs2meta)
                 prom = abs2prom[tgt]
                 if prom not in self._group_inputs:
@@ -2826,11 +2806,11 @@ class Group(System):
                         val = self._var_discrete['input'][abs_in]['value']
                     else:
                         val = None
-                    if abs_in in remote_vars:
-                        if remote_vars[abs_in] == self.comm.rank:
-                            self.comm.bcast(val, root=remote_vars[abs_in])
+                    if abs_in in vars_to_gather:
+                        if vars_to_gather[abs_in] == self.comm.rank:
+                            self.comm.bcast(val, root=vars_to_gather[abs_in])
                         else:
-                            val = self.comm.bcast(None, root=remote_vars[abs_in])
+                            val = self.comm.bcast(None, root=vars_to_gather[abs_in])
                     auto_ivc.add_discrete_output(loc_out_name, val=val)
 
         if not prom2auto:

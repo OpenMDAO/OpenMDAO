@@ -301,7 +301,7 @@ class Problem(object):
                 raise KeyError('{}: Variable "{}" not found.'.format(self.model.msginfo, name))
 
             abs_name = abs_names[0]
-            remote_vars = self._metadata['remote_vars']
+            vars_to_gather = self._metadata['vars_to_gather']
 
             io = 'output' if abs_name in meta['output'] else 'input'
             if abs_name in meta[io]:
@@ -310,8 +310,8 @@ class Problem(object):
                 else:
                     val = meta[io][abs_name]['value']
 
-            if get_remote and abs_name in remote_vars:
-                owner = remote_vars[abs_name]
+            if get_remote and abs_name in vars_to_gather:
+                owner = vars_to_gather[abs_name]
                 if self.model.comm.rank == owner:
                     self.model.comm.bcast(val, root=owner)
                 else:
@@ -863,7 +863,8 @@ class Problem(object):
             'use_derivatives': derivatives,
             'force_alloc_complex': force_alloc_complex,
             'connections': {},  # all connections in the model (after setup)
-            'remote_vars': {},  # vars that are remote somewhere. does not include distrib vars
+            'local_components': set(),  # pathnames of local components
+            'vars_to_gather': {},  # vars that are remote somewhere. does not include distrib vars
             'prom2abs': {'input': {}, 'output': {}},  # includes ALL promotes including buried ones
             'static_mode': False,  # used to determine where various 'static'
                                    # and 'dynamic' data structures are stored.
