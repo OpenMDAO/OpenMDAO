@@ -640,6 +640,10 @@ class Problem(object):
             self.driver.iter_count = 0
             self.model._reset_iter_counts()
 
+        self._run_counter = 0
+        if self._setup_already_called:
+            self._run_counter += 1
+
         self.final_setup()
         self.model._clear_iprint()
         return self.driver.run()
@@ -876,6 +880,11 @@ class Problem(object):
         # Cache all args for final setup.
         self._check = check
         self._logger = logger
+
+        if self._setup_status == 2:
+            self._setup_already_called = True
+        else:
+            self._setup_already_called = False
 
         self._setup_status = 1
 

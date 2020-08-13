@@ -306,16 +306,20 @@ class TestSqliteRecorder(unittest.TestCase):
 
         cr = om.CaseReader(self.filename)
 
-        self.assertTrue(cr.system_options['root']['component_options']['assembled_jac_type'], 'csc')
+        self.assertTrue(cr.system_options['root_0']['component_options']['assembled_jac_type'], 'csc')
 
-        # New option and re run of run_driver
+        # New option and re-run of run_driver
         prob.model.options['assembled_jac_type'] = 'dense'
         prob.setup()
         prob.run_driver()
 
         cr = om.CaseReader(self.filename)
-        self.assertTrue(cr.system_options['root']['component_options']['assembled_jac_type'], 'dense')
+        self.assertTrue(cr.system_options['root_1']['component_options']['assembled_jac_type'], 'dense')
 
+        # cr.list_metadata()
+        cr.list_model_metadata(run_number=1)
+        print('None')
+        cr.list_model_metadata()
 
     def test_simple_driver_recording_with_prefix(self):
         prob = ParaboloidProblem()

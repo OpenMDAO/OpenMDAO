@@ -260,13 +260,14 @@ class SqliteCaseReader(BaseCaseReader):
         cur : sqlite3.Cursor
             Database cursor to use for reading the data.
         """
-        cur.execute("SELECT id, scaling_factors, component_metadata FROM system_metadata")
+        cur.execute("SELECT id, run_num, scaling_factors, component_metadata FROM system_metadata")
         for row in cur:
             id = row[0]
             self.system_options[id] = {}
 
-            self.system_options[id]['scaling_factors'] = pickle.loads(row[1])
-            self.system_options[id]['component_options'] = pickle.loads(row[2])
+            self.system_options[id]['run_num'] = row[1]
+            self.system_options[id]['scaling_factors'] = pickle.loads(row[2])
+            self.system_options[id]['component_options'] = pickle.loads(row[3])
 
     def _collect_solver_metadata(self, cur):
         """
@@ -409,6 +410,28 @@ class SqliteCaseReader(BaseCaseReader):
             write_source_table(dct, out_stream)
 
         return dct
+
+    def list_model_metadata(self, run_number=None, out_stream=_DEFAULT_OUT_STREAM):
+
+        if out_stream:
+            if out_stream is _DEFAULT_OUT_STREAM:
+                out_stream = sys.stdout
+
+            for i in self.system_options:
+                subsys, num = i.rsplit('_', 1)
+
+                # subs
+
+                if (run_number is not None and run_number == int(num) and subsys == 'root') or \
+                        (subsys == 'root' and run_number is None):
+                    out_stream.write(
+                        'Run Number: {}\n    Subsystem: {}'.format(
+                            self.system_options[i]['run_num'], subsys))
+
+                    for j in self.system_options[i]['component_options']:
+                        option = "{0} : {1}".format(
+                            j, self.system_options[i]['component_options'][j])
+                        out_stream.write('\n        {}\n'.format(option))
 
     def list_cases(self, source=None, recurse=True, flat=True, out_stream=_DEFAULT_OUT_STREAM):
         """
