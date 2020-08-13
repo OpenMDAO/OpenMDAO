@@ -12,6 +12,7 @@ import numpy as np
 from openmdao.recorders.base_case_reader import BaseCaseReader
 from openmdao.recorders.case import Case
 
+from openmdao.core.constants import _DEFAULT_OUT_STREAM
 from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.variable_table import write_source_table
 from openmdao.utils.record_util import check_valid_sqlite3_db, get_source_system
@@ -20,8 +21,6 @@ from openmdao.recorders.sqlite_recorder import format_version
 
 import pickle
 from json import loads as json_loads
-
-_DEFAULT_OUT_STREAM = object()
 
 
 class SqliteCaseReader(BaseCaseReader):

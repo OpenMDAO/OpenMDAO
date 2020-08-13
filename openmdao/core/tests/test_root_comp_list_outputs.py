@@ -20,7 +20,7 @@ class TestRootComponentListOutputs(unittest.TestCase):
         stream = StringIO()
         outputs = prob.model.list_outputs(hierarchical=False, out_stream=stream)
 
-        self.assertEqual(sorted(outputs), [
+        self.assertEqual(sorted(outputs.items()), [
             ('comp1_a', {'value': [1.]}),
             ('comp1_b', {'value': [2.]}),
             ('comp1_c', {'value': [3.]})

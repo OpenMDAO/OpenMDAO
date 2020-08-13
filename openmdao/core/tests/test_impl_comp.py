@@ -144,13 +144,16 @@ class ImplicitCompTestCase(unittest.TestCase):
 
     def test_list_inputs_before_run(self):
         # cannot list_inputs on a Group before running
-        msg = "Group (<model>): Unable to list inputs on a Group until model has been run."
-        try:
-            self.prob.model.list_inputs()
-        except Exception as err:
-            self.assertEqual(str(err), msg)
-        else:
-            self.fail("Exception expected")
+        model_inputs = self.prob.model.list_inputs(desc=True, out_stream=None)
+        expected = {
+            'comp1.a': {'value': [1.], 'desc': ''},
+            'comp1.b': {'value': [1.], 'desc': ''},
+            'comp1.c': {'value': [1.], 'desc': ''},
+            'comp2.a': {'value': [1.], 'desc': ''},
+            'comp2.b': {'value': [1.], 'desc': ''},
+            'comp2.c': {'value': [1.], 'desc': ''},
+        }
+        self.assertEqual(dict(model_inputs), expected)
 
         # list_inputs on a component before running is okay
         c2_inputs = self.prob.model.comp2.list_inputs(desc=True, out_stream=None)
@@ -186,13 +189,12 @@ class ImplicitCompTestCase(unittest.TestCase):
 
     def test_list_outputs_before_run(self):
         # cannot list_outputs on a Group before running
-        msg = "Group (<model>): Unable to list outputs on a Group until model has been run."
-        try:
-            self.prob.model.list_outputs()
-        except Exception as err:
-            self.assertEqual(str(err), msg)
-        else:
-            self.fail("Exception expected")
+        model_outputs = self.prob.model.list_outputs(out_stream=None)
+        expected = {
+            'comp1.x': {'value': [0.]},
+            'comp2.x': {'value': [0.]},
+        }
+        self.assertEqual(dict(model_outputs), expected)
 
         # list_outputs on a component before running is okay
         c2_outputs = self.prob.model.comp2.list_outputs(out_stream=None)
@@ -227,7 +229,7 @@ class ImplicitCompTestCase(unittest.TestCase):
 
         stream = StringIO()
         inputs = self.prob.model.list_inputs(hierarchical=False, desc=True, out_stream=stream)
-        self.assertEqual(sorted(inputs), [
+        self.assertEqual(sorted(inputs.items()), [
             ('comp1.a', {'value':  [1.], 'desc': ''}),
             ('comp1.b', {'value': [-4.], 'desc': ''}),
             ('comp1.c', {'value':  [3.], 'desc': ''}),
@@ -245,7 +247,7 @@ class ImplicitCompTestCase(unittest.TestCase):
 
         # No tags
         inputs = self.prob.model.list_inputs(values=False, hierarchical=False, out_stream=None)
-        self.assertEqual(sorted(inputs), [
+        self.assertEqual(sorted(inputs.items()), [
             ('comp1.a', {}),
             ('comp1.b', {}),
             ('comp1.c', {}),
@@ -256,7 +258,7 @@ class ImplicitCompTestCase(unittest.TestCase):
 
         # With tag
         inputs = self.prob.model.list_inputs(values=False, hierarchical=False, out_stream=None, tags='tag_a')
-        self.assertEqual(sorted(inputs), [
+        self.assertEqual(sorted(inputs.items()), [
             ('comp1.a', {}),
             ('comp2.a', {}),
         ])
@@ -280,7 +282,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.assertEqual(text.count('  c  '), 4)
 
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(num_non_empty_lines, 13)
+        self.assertEqual(num_non_empty_lines, 12)
 
     def test_list_explicit_outputs(self):
         self.prob.run_model()
@@ -296,7 +298,7 @@ class ImplicitCompTestCase(unittest.TestCase):
 
         # No tags
         outputs = self.prob.model.list_outputs(explicit=False, hierarchical=False, out_stream=None)
-        self.assertEqual(sorted(outputs), [
+        self.assertEqual(sorted(outputs.items()), [
             ('comp1.x', {'value': [3.]}),
             ('comp2.x', {'value': [3.]}),
         ])
@@ -304,7 +306,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         # With tag
         outputs = self.prob.model.list_outputs(explicit=False, hierarchical=False, out_stream=None,
                                                tags="tag_x")
-        self.assertEqual(sorted(outputs), [
+        self.assertEqual(sorted(outputs.items()), [
             ('comp1.x', {'value': [3.]}),
             ('comp2.x', {'value': [3.]}),
         ])
@@ -320,8 +322,8 @@ class ImplicitCompTestCase(unittest.TestCase):
         stream = StringIO()
         states = self.prob.model.list_outputs(explicit=False, residuals=True,
                                               hierarchical=False, out_stream=stream)
-        self.assertTrue(('comp1.x', {'value': [3.], 'resids': [0.]}) in states, msg=None)
-        self.assertTrue(('comp2.x', {'value': [3.], 'resids': [0.]}) in states, msg=None)
+        self.assertEqual([('comp1.x', {'value': [3.], 'resids': [0.]}),
+                          ('comp2.x', {'value': [3.], 'resids': [0.]})], sorted(states.items()))
         text = stream.getvalue()
         self.assertEqual(1, text.count('comp1.x'))
         self.assertEqual(1, text.count('comp2.x'))
@@ -340,7 +342,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.assertEqual(text.count('comp1.x'), 1)
         self.assertEqual(text.count('comp2.x'), 1)
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(num_non_empty_lines, 9)
+        self.assertEqual(num_non_empty_lines, 8)
 
     def test_list_residuals(self):
         self.prob.run_model()
@@ -348,7 +350,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         stream = StringIO()
         resids = self.prob.model.list_outputs(values=False, residuals=True, hierarchical=False,
                                               out_stream=stream)
-        self.assertEqual(sorted(resids), [
+        self.assertEqual(sorted(resids.items()), [
             ('comp1.x', {'resids': [0.]}),
             ('comp2.x', {'resids': [0.]})
         ])
@@ -1239,7 +1241,7 @@ class ListFeatureTestCase(unittest.TestCase):
     def test_list_return_value(self):
         # list inputs
         inputs = prob.model.list_inputs(out_stream=None)
-        self.assertEqual(sorted(inputs), [
+        self.assertEqual(sorted(inputs.items()), [
             ('sub.comp1.a', {'value': [1.]}),
             ('sub.comp1.b', {'value': [-4.]}),
             ('sub.comp1.c', {'value': [3.]}),
@@ -1267,7 +1269,7 @@ class ListFeatureTestCase(unittest.TestCase):
     def test_list_no_values(self):
         # list inputs
         inputs = prob.model.list_inputs(values=False)
-        self.assertEqual([n[0] for n in sorted(inputs)], [
+        self.assertEqual([n[0] for n in sorted(inputs.items())], [
             'sub.comp1.a',
             'sub.comp1.b',
             'sub.comp1.c',
@@ -1344,7 +1346,7 @@ class ListFeatureTestCase(unittest.TestCase):
         stream = StringIO()
         inputs = prob.model.list_inputs(values=False, out_stream=stream)
         text = stream.getvalue()
-        self.assertEqual(sorted(inputs), [
+        self.assertEqual(sorted(inputs.items()), [
             ('sub.comp2.a', {}),
             ('sub.comp2.b', {}),
             ('sub.comp2.c', {}),
@@ -1353,25 +1355,24 @@ class ListFeatureTestCase(unittest.TestCase):
             ('sub.comp3.c', {}),
         ])
         self.assertEqual(1, text.count("6 Input(s) in 'model'"))
-        self.assertEqual(1, text.count("\nmodel"))
-        self.assertEqual(1, text.count("\n  sub"))
-        self.assertEqual(1, text.count("\n    comp2"))
-        self.assertEqual(2, text.count("\n      a"))
+        self.assertEqual(1, text.count("\nsub"))
+        self.assertEqual(1, text.count("\n  comp2"))
+        self.assertEqual(2, text.count("\n    a"))
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(num_non_empty_lines, 14)
+        self.assertEqual(num_non_empty_lines, 13)
 
         # list_outputs tests
         # list implicit outputs
         outputs = prob.model.list_outputs(explicit=False, out_stream=None)
         text = stream.getvalue()
-        self.assertEqual(sorted(outputs), [
+        self.assertEqual(sorted(outputs.items()), [
             ('sub.comp2.x', {'value': [3.]}),
             ('sub.comp3.x', {'value': [3.]})
         ])
         # list explicit outputs
         stream = StringIO()
         outputs = prob.model.list_outputs(implicit=False, out_stream=None)
-        self.assertEqual(sorted(outputs), [
+        self.assertEqual(sorted(outputs.items()), [
             ('comp1.a', {'value': [1.]}),
             ('comp1.b', {'value': [-4.]}),
             ('comp1.c', {'value': [3.]}),
