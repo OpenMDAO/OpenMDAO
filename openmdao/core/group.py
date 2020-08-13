@@ -15,7 +15,6 @@ import networkx as nx
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.core.system import System, INT_DTYPE
 from openmdao.core.component import Component, _DictValues, _full_slice
-from openmdao.core.constants import _UNDEFINED
 from openmdao.proc_allocators.default_allocator import DefaultAllocator, ProcAllocationError
 from openmdao.jacobians.jacobian import SUBJAC_META_DEFAULTS
 from openmdao.recorders.recording_iteration_stack import Recording
@@ -29,6 +28,7 @@ from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismat
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 from openmdao.utils.coloring import Coloring, _STD_COLORING_FNAME
 import openmdao.utils.coloring as coloring_mod
+from openmdao.utils.options_dictionary import _undefined
 from openmdao.core.constants import _SetupStatus
 
 # regex to check for valid names.
@@ -173,7 +173,7 @@ class Group(System):
         """
         pass
 
-    def set_input_defaults(self, name, val=_UNDEFINED, units=None):
+    def set_input_defaults(self, name, val=_undefined, units=None):
         """
         Specify metadata to be assumed when multiple inputs are promoted to the same name.
 
@@ -187,15 +187,12 @@ class Group(System):
             Units to assume for the promoted input.
         """
         meta = {'prom': name}
-        if val is not _UNDEFINED:
+        if val is not _undefined:
             meta['value'] = val
         if units is not None:
             meta['units'] = units
 
-        if self._static_mode:
-            dct = self._static_group_inputs
-        else:
-            dct = self._group_inputs
+        dct = self._static_group_inputs if self._static_mode else self._group_inputs
 
         if name in dct:
             old = dct[name][0]
@@ -340,23 +337,16 @@ class Group(System):
 
         for subsys in self._subsystems_myproc:
             subsys._configure()
-            subsys._setup_var_data()
 
-            self._has_guess |= subsys._has_guess
-            self._has_bounds |= subsys._has_bounds
-            self.matrix_free |= subsys.matrix_free
-
-        conf_info = self._problem_meta['config_info']
-        conf_info._reset()
+            if subsys._has_guess:
+                self._has_guess = True
+            if subsys._has_bounds:
+                self._has_bounds = True
+            if subsys.matrix_free:
+                self.matrix_free = True
 
         self._problem_meta['setup_status'] = _SetupStatus.POST_CONFIGURE
         self.configure()
-
-        # if our configure() has added or promoted any variables, we have to call
-        # _setup_var_data again on any modified systems and their ancestors (only those that
-        # are our descendents).
-        for s in conf_info._modified_system_iter(self):
-            s._setup_var_data()
 
     def _setup_procs(self, pathname, comm, mode, prob_meta):
         """
@@ -381,7 +371,6 @@ class Group(System):
         self._setup_procs_finished = False
 
         self._vectors = {}
-        nproc = comm.size
 
         if self._num_par_fd > 1:
             info = self._coloring_info
@@ -402,6 +391,7 @@ class Group(System):
 
         self._approx_subjac_keys = None
 
+        self._static_mode = False
         self._subsystems_allprocs = self._static_subsystems_allprocs.copy()
         self._manual_connections = self._static_manual_connections.copy()
         self._group_inputs = self._static_group_inputs.copy()
@@ -420,8 +410,9 @@ class Group(System):
         for n, lst in self._pre_config_group_inputs.items():
             self._pre_config_group_inputs[n] = lst.copy()
 
-        if MPI:
+        self._static_mode = True
 
+        if MPI:
             proc_info = [self._proc_info[s.name] for s in self._subsystems_allprocs]
 
             # Call the load balancing algorithm
@@ -474,23 +465,6 @@ class Group(System):
         self._subgroups_myproc = [s for s in self._subsystems_myproc if isinstance(s, Group)]
 
         self._loc_subsys_map = {s.name: s for s in self._subsystems_myproc}
-
-        if MPI and nproc > 1:
-            if self._mpi_proc_allocator.parallel:
-                self._problem_meta['parallel_groups'].append(self.pathname)
-
-            allpars = self.comm.allgather(self._problem_meta['parallel_groups'])
-            full = set()
-            for p in allpars:
-                full.update(p)
-            self._problem_meta['parallel_groups'] = sorted(full)
-
-        if self._problem_meta['parallel_groups']:
-            prefix = self.pathname + '.' if self.pathname else ''
-            for par in self._problem_meta['parallel_groups']:
-                if par.startswith(prefix) and par != prefix:
-                    self._contains_parallel_group = True
-                    break
 
         self._setup_procs_finished = True
 
@@ -598,11 +572,12 @@ class Group(System):
 
     def _top_level_setup(self, mode):
         self._problem_meta['connections'] = conns = self._conn_global_abs_in2out
-        self._problem_meta['all_meta'] = self._var_allprocs_abs2meta
+        self._problem_meta['all_meta'] = abs2meta = self._var_allprocs_abs2meta
         self._problem_meta['meta'] = self._var_abs2meta
 
-        rsystems = self._find_remote_sys_owners()
-        self._problem_meta['remote_vars'] = self._find_remote_var_owners(rsystems)
+        self._problem_meta['remote_systems'] = rsystems = self._find_remote_sys_owners()
+        self._problem_meta['remote_vars'] = \
+            self._find_remote_var_owners(self._problem_meta['remote_systems'])
         self._problem_meta['prom2abs'] = self._get_all_promotes(rsystems)
 
         self._resolve_group_input_defaults()
@@ -747,13 +722,13 @@ class Group(System):
         allprocs_abs2prom = self._var_allprocs_abs2prom
 
         allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
-        gatherable = self._gatherable_vars
 
         for n, lst in self._group_inputs.items():
             lst[0]['path'] = self.pathname  # used for error reporting
             self._group_inputs[n] = lst.copy()  # must copy the list manually
 
         for subsys in self._subsystems_myproc:
+            subsys._setup_var_data()
             self._has_output_scaling |= subsys._has_output_scaling
             self._has_resid_scaling |= subsys._has_resid_scaling
 
@@ -762,8 +737,6 @@ class Group(System):
             # Assemble allprocs_abs2meta and abs2meta
             allprocs_abs2meta.update(subsys._var_allprocs_abs2meta)
             abs2meta.update(subsys._var_abs2meta)
-
-            gatherable.update(subsys._gatherable_vars)
 
             sub_prefix = subsys.name + '.'
 
@@ -822,7 +795,6 @@ class Group(System):
                     False,
                     {}
                 )
-
             gathered = self.comm.allgather(raw)
 
             for type_ in ['input', 'output']:
@@ -863,33 +835,6 @@ class Group(System):
                             allprocs_prom2abs_list[type_][prom_name] = []
                         allprocs_prom2abs_list[type_][prom_name].extend(abs_names_list)
 
-            # determine 'gatherable' vars, i.e., vars that are remote somewhere in the comm
-            locs = {}
-            locs_disc = {}
-            for type_ in ('input', 'output'):
-                locs[type_] = np.array([n in abs2meta and abs2meta[n]['size'] > 0
-                                        for n in allprocs_abs_names[type_]], dtype=bool)
-                locs_disc[type_] = np.array([
-                    n in abs2prom[type_] for n in allprocs_abs_names_discrete[type_]
-                ], dtype=bool)
-
-            raw_locs = (locs, locs_disc)
-            allprocs_raw_locs = self.comm.allgather(raw_locs)
-            for type_ in ('input', 'output'):
-                all_locs = np.ones(len(allprocs_abs_names[type_]), dtype=bool)
-                all_locs_disc = np.ones(len(allprocs_abs_names_discrete[type_]), dtype=bool)
-                for rank, (loc, loc_disc) in enumerate(allprocs_raw_locs):
-                    all_locs &= loc[type_]
-                    all_locs_disc &= loc_disc[type_]
-
-                for i, n in enumerate(allprocs_abs_names[type_]):
-                    if not all_locs[i]:
-                        gatherable.add(n)
-
-                for i, n in enumerate(allprocs_abs_names_discrete[type_]):
-                    if not all_locs_disc[i]:
-                        gatherable.add(n)
-
         for prom_name, abs_list in allprocs_prom2abs_list['output'].items():
             if len(abs_list) > 1:
                 raise RuntimeError("{}: Output name '{}' refers to "
@@ -917,17 +862,18 @@ class Group(System):
         prom2abs_in = self._var_allprocs_prom2abs_list['input']
 
         for prom, metalist in self._group_inputs.items():
+            origins = {}
             top_origin = metalist[0]['path']
             top_prom = metalist[0]['prom']
             allmeta = set()
             for meta in metalist:
                 allmeta.update(meta)
-            fullmeta = {n: _UNDEFINED for n in allmeta - skip}
+            fullmeta = {n: _undefined for n in allmeta - skip}
 
             for key in sorted(fullmeta):
                 for i, submeta in enumerate(metalist):
                     if key in submeta:
-                        if fullmeta[key] is _UNDEFINED:
+                        if fullmeta[key] is _undefined:
                             origin = submeta['path']
                             origin_prom = submeta['prom']
                             val = fullmeta[key] = submeta[key]
@@ -997,6 +943,7 @@ class Group(System):
         vec_names = self._lin_rel_vec_name_list if self._use_derivatives else self._vec_names
 
         n_distrib_vars = 0
+        n_parallel_sub = 0
 
         # Compute _var_sizes
         for vec_name in vec_names:
@@ -1013,6 +960,8 @@ class Group(System):
                             n_distrib_vars += 1
                     elif subsys._has_distrib_vars:
                         n_distrib_vars += 1
+                    elif subsys._contains_parallel_group or subsys._mpi_proc_allocator.parallel:
+                        n_parallel_sub += 1
 
                     if vec_name not in subsys._rel_vec_names:
                         continue
@@ -1044,6 +993,7 @@ class Group(System):
                     self.comm.Allgather(sizes_in, sizes[type_])
 
             self._has_distrib_vars = self.comm.allreduce(n_distrib_vars) > 0
+            self._contains_parallel_group = self.comm.allreduce(n_parallel_sub) > 0
 
             if (self._has_distrib_vars or self._contains_parallel_group or
                 not np.all(self._var_sizes[vec_names[0]]['output']) or
@@ -1771,12 +1721,6 @@ class Group(System):
                 if original == original_inside and new != new_inside:
                     raise RuntimeError("%s: Trying to promote '%s' when it has been aliased to "
                                        "'%s'." % (self.msginfo, original_inside, new))
-
-        # if this was called during configure(), mark this group as modified
-        if self._problem_meta is not None:
-            if self._problem_meta['config_info'] is not None:
-                self._problem_meta['config_info']._prom_added(self.pathname, any=any,
-                                                              inputs=inputs, outputs=outputs)
 
     def add_subsystem(self, name, subsys, promotes=None,
                       promotes_inputs=None, promotes_outputs=None,
@@ -2741,6 +2685,13 @@ class Group(System):
                     owners[abs_name] = sys_owners[sname]
         return owners
 
+    def _get_src_inds_max(self, tgt, meta):
+        inds = meta['src_indices']
+        if np.min(inds) < 0:
+            raise RuntimeError(f"{self.msginfo}: Can't connect '{tgt}' to an "
+                               "auto_ivc using negative src_indices.")
+        return inds, np.max(inds)
+
     def _get_auto_ivc_out_val(self, tgts, remote_vars, all_abs2meta, abs2meta):
         info = []
         src_idx_found = []
@@ -2844,7 +2795,7 @@ class Group(System):
         for abs_in in sorted(self._var_allprocs_discrete['input']):
             if abs_in not in conns:  # unconnected, so connect the input to an _auto_ivc output
                 prom = abs2prom[abs_in]
-                val = _UNDEFINED
+                val = _undefined
 
                 if prom in prom2auto:
                     # multiple connected inputs w/o a src. Connect them to the same IVC
@@ -2873,8 +2824,12 @@ class Group(System):
             return auto_ivc
 
         auto_ivc._setup_procs(auto_ivc.pathname, self.comm, mode, self._problem_meta)
-        auto_ivc._configure()
-        auto_ivc._configure_check()
+        auto_ivc._static_mode = False
+        try:
+            auto_ivc._configure()
+            auto_ivc._configure_check()
+        finally:
+            auto_ivc._static_mode = True
         auto_ivc._setup_var_data()
 
         # now update our own data structures based on the new auto_ivc component variables
