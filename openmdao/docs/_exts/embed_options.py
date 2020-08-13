@@ -7,7 +7,7 @@ from docutils.statemachine import ViewList
 import sphinx
 from docutils.parsers.rst import Directive
 from sphinx.util.nodes import nested_parse_with_titles
-from openmdao.utils.options_dictionary import OptionsDictionary
+from openmdao.utils.options_dictionary import OptionsDictionary, _undefined
 
 
 class EmbedOptionsDirective(Directive):

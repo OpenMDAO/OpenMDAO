@@ -85,25 +85,25 @@ class TestIndepVarComp(unittest.TestCase):
 
         # Outputs no tags
         outputs = prob.model.list_outputs(values=False, out_stream=None)
-        self.assertEqual(sorted(outputs.items()), [
+        self.assertEqual(sorted(outputs), [
             ('indep_var', {}),
         ])
 
         # Outputs with automatically added indep_var_comp tag
         outputs = prob.model.list_outputs(values=False, out_stream=None, tags="indep_var")
-        self.assertEqual(sorted(outputs.items()), [
+        self.assertEqual(sorted(outputs), [
             ('indep_var', {}),
         ])
 
         # Outputs with tag
         outputs = prob.model.list_outputs(values=False, out_stream=None, tags="tag1")
-        self.assertEqual(sorted(outputs.items()), [
+        self.assertEqual(sorted(outputs), [
             ('indep_var', {}),
         ])
 
         # Outputs with wrong tag
         outputs = prob.model.list_outputs(values=False, out_stream=None, tags="tag_wrong")
-        self.assertEqual(sorted(outputs.items()), [])
+        self.assertEqual(sorted(outputs), [])
 
     def test_add_output_with_tags(self):
         """Define two independent variables using the add_output method.
@@ -119,34 +119,34 @@ class TestIndepVarComp(unittest.TestCase):
 
         # Outputs no tags
         outputs = prob.model.list_outputs(out_stream=None)
-        self.assertEqual(sorted(outputs.items()), [
+        self.assertEqual(sorted(outputs), [
             ('indep_var_1', {'value': [1.]}),
             ('indep_var_2', {'value': [2.]}),
         ])
 
         # Outputs with tags
         outputs = prob.model.list_outputs(out_stream=None, tags="tag1")
-        self.assertEqual(sorted(outputs.items()), [
+        self.assertEqual(sorted(outputs), [
             ('indep_var_1', {'value': [1.]}),
         ])
 
         # Outputs with the indep_var tags
         outputs = prob.model.list_outputs(out_stream=None, tags="indep_var")
-        self.assertEqual(sorted(outputs.items()), [
+        self.assertEqual(sorted(outputs), [
             ('indep_var_1', {'value': [1.]}),
             ('indep_var_2', {'value': [2.]}),
         ])
 
         # Outputs with multiple tags
         outputs = prob.model.list_outputs(out_stream=None, tags=["tag1", "tag2"])
-        self.assertEqual(sorted(outputs.items()), [
+        self.assertEqual(sorted(outputs), [
             ('indep_var_1', {'value': [1.]}),
             ('indep_var_2', {'value': [2.]}),
         ])
 
         # Outputs with tag that does not match
         outputs = prob.model.list_outputs(out_stream=None, tags="tag3")
-        self.assertEqual(sorted(outputs.items()), [])
+        self.assertEqual(sorted(outputs), [])
 
     def test_error_novars(self):
         try:
