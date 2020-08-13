@@ -237,7 +237,7 @@ def _get_viewer_data(data_source):
 
     else:
         raise TypeError(f"Viewer data is not available for '{data_source}'."
-                        "The source must be a Problem, Group or the filename of a recording.")
+                        "The source must be a Problem, model or the filename of a recording.")
 
     data_dict = {}
     comp_exec_idx = [0]  # list so pass by ref

@@ -617,7 +617,7 @@ class TestViewModelData(unittest.TestCase):
 
     def test_viewer_data_from_subgroup(self):
         """
-        Test error message when asking for viewer data on for a subgroup.
+        Test error message when asking for viewer data for a subgroup.
         """
         p = Problem(model=SellarStateConnection())
         p.setup()
@@ -628,13 +628,13 @@ class TestViewModelData(unittest.TestCase):
 
     def test_viewer_data_from_None(self):
         """
-        Test error message when asking for viewer data on for invalid source.
+        Test error message when asking for viewer data for an invalid source.
         """
         p = Problem(model=SellarStateConnection())
         p.setup()
 
         msg = "Viewer data is not available for 'None'." + \
-              "The source must be a Problem, Group or the filename of a recording."
+              "The source must be a Problem, model or the filename of a recording."
 
         with self.assertRaises(TypeError) as cm:
             _get_viewer_data(None)
