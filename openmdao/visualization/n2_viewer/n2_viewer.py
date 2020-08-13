@@ -207,8 +207,7 @@ def _get_viewer_data(data_source):
         driver_name = driver.__class__.__name__
         driver_type = 'doe' if isinstance(driver, DOEDriver) else 'optimization'
 
-        opts = driver.options
-        driver_options = {k: v for k, v in opts.items()}
+        driver_options = {key: val for key, val in driver.options.items()}
 
         if driver_type == 'optimization' and 'opt_settings' in dir(driver):
             driver_opt_settings = driver.opt_settings
