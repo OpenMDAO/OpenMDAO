@@ -79,21 +79,21 @@ class PETScTransfer(DefaultTransfer):
 
         vec_names = group._lin_rel_vec_name_list if group._use_derivatives else group._vec_names
 
-        mypathlen = len(group.pathname + '.' if group.pathname else '')
-        sub_inds = group._subsystems_inds
+        mypathlen = len(group.pathname) + 1 if group.pathname else 0
+        allsubs = group._subsystems_allprocs
 
         for vec_name in vec_names:
             relvars, _ = group._relevant[vec_name]['@all']
 
             # Initialize empty lists for the transfer indices
-            nsub_allprocs = len(group._subsystems_allprocs)
+            nsub_allprocs = len(allsubs)
             xfer_in = []
             xfer_out = []
-            fwd_xfer_in = [[] for s in group._subsystems_allprocs]
-            fwd_xfer_out = [[] for s in group._subsystems_allprocs]
+            fwd_xfer_in = defaultdict(list)
+            fwd_xfer_out = defaultdict(list)
             if rev:
-                rev_xfer_in = [[] for s in group._subsystems_allprocs]
-                rev_xfer_out = [[] for s in group._subsystems_allprocs]
+                rev_xfer_in = defaultdict(list)
+                rev_xfer_out = defaultdict(list)
 
             allprocs_abs2idx = group._var_allprocs_abs2idx[vec_name]
             sizes_in = group._var_sizes[vec_name]['input']
@@ -188,44 +188,59 @@ class PETScTransfer(DefaultTransfer):
 
                     # Now the indices are ready - input_inds, output_inds
                     sub_in = abs_in[mypathlen:].split('.', 1)[0]
-                    isub = sub_inds[sub_in]
-                    fwd_xfer_in[isub].append(input_inds)
-                    fwd_xfer_out[isub].append(output_inds)
+                    fwd_xfer_in[sub_in].append(input_inds)
+                    fwd_xfer_out[sub_in].append(output_inds)
                     if rev:
                         sub_out = abs_out[mypathlen:].split('.', 1)[0]
-                        isub = sub_inds[sub_out]
-                        rev_xfer_in[isub].append(input_inds)
-                        rev_xfer_out[isub].append(output_inds)
+                        rev_xfer_in[sub_out].append(input_inds)
+                        rev_xfer_out[sub_out].append(output_inds)
+                else:
+                    # not a local input but still need entries in the transfer dicts to
+                    # avoid hangs
+                    sub_in = abs_in[mypathlen:].split('.', 1)[0]
+                    fwd_xfer_in[sub_in]  # defaultdict will create an empty list there
+                    fwd_xfer_out[sub_in]
+                    if rev:
+                        sub_out = abs_out[mypathlen:].split('.', 1)[0]
+                        rev_xfer_in[sub_out]
+                        rev_xfer_out[sub_out]
 
             transfers[vec_name] = {}
 
-            for isub in range(nsub_allprocs):
-                fwd_xfer_in[isub] = _merge(fwd_xfer_in[isub])
-                fwd_xfer_out[isub] = _merge(fwd_xfer_out[isub])
-                if rev:
-                    rev_xfer_in[isub] = _merge(rev_xfer_in[isub])
-                    rev_xfer_out[isub] = _merge(rev_xfer_out[isub])
+            for sname, inds in fwd_xfer_in.items():
+                fwd_xfer_in[sname] = _merge(inds)
+                fwd_xfer_out[sname] = _merge(fwd_xfer_out[sname])
+            if rev:
+                for sname, inds in rev_xfer_out.items():
+                    rev_xfer_in[sname] = _merge(rev_xfer_in[sname])
+                    rev_xfer_out[sname] = _merge(inds)
 
-            xfer_in = np.concatenate(fwd_xfer_in)
-            xfer_out = np.concatenate(fwd_xfer_out)
+            if fwd_xfer_in:
+                xfer_in = np.concatenate(list(fwd_xfer_in.values()))
+                xfer_out = np.concatenate(list(fwd_xfer_out.values()))
+            else:
+                xfer_in = xfer_out = np.zeros(0, dtype=INT_DTYPE)
 
             out_vec = vectors['output'][vec_name]
 
             xfer_all = PETScTransfer(vectors['input'][vec_name], out_vec,
                                      xfer_in, xfer_out, group.comm)
 
-            transfers[vec_name]['fwd', None] = xfer_all
+            transfers[vec_name]['fwd'] = xfwd = {}
+            xfwd[None] = xfer_all
             if rev:
-                transfers[vec_name]['rev', None] = xfer_all
+                transfers[vec_name]['rev'] = xrev = {}
+                xrev[None] = xfer_all
 
-            for isub in range(nsub_allprocs):
-                transfers[vec_name]['fwd', isub] = PETScTransfer(
+            for sname, inds in fwd_xfer_in.items():
+                transfers[vec_name]['fwd'][sname] = PETScTransfer(
                     vectors['input'][vec_name], vectors['output'][vec_name],
-                    fwd_xfer_in[isub], fwd_xfer_out[isub], group.comm)
-                if rev:
-                    transfers[vec_name]['rev', isub] = PETScTransfer(
+                    inds, fwd_xfer_out[sname], group.comm)
+            if rev:
+                for sname, inds in rev_xfer_out.items():
+                    transfers[vec_name]['rev'][sname] = PETScTransfer(
                         vectors['input'][vec_name], vectors['output'][vec_name],
-                        rev_xfer_in[isub], rev_xfer_out[isub], group.comm)
+                        rev_xfer_in[sname], inds, group.comm)
 
         if group._use_derivatives:
             transfers['nonlinear'] = transfers['linear']

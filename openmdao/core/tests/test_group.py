@@ -1146,7 +1146,7 @@ class TestGroup(unittest.TestCase):
         prob.set_solver_print(level=0)
 
         self.assertEqual(['C1', 'C2', 'C3'],
-                         [s.name for s in model._static_subsystems_allprocs])
+                         [s.name for s, _, _ in model._static_subsystems_allprocs.values()])
 
         prob.setup()
         prob.set_val('x', 1.)

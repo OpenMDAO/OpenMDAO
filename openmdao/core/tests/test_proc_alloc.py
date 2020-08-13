@@ -40,6 +40,7 @@ def _build_model(nsubs, min_procs=None, max_procs=None, weights=None, top=None, 
     model.add_design_var('indep.x')
     model.add_objective('objective.y')
 
+    import wingdbstub
     p.setup(mode=mode, check=False)
     p.final_setup()
 
@@ -47,7 +48,7 @@ def _build_model(nsubs, min_procs=None, max_procs=None, weights=None, top=None, 
 
 
 def _get_which_procs(group):
-    sub_inds = [i for i, s in enumerate(group._subsystems_allprocs)
+    sub_inds = [i for s, i, _ in group._subsystems_allprocs.values()
                 if s in group._subsystems_myproc]
     return MPI.COMM_WORLD.allgather(sub_inds)
 

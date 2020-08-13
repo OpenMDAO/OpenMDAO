@@ -136,12 +136,10 @@ class System(object):
         MPI communicator object used when System's comm is split for parallel FD.
     _solver_print_cache : list
         Allows solver iprints to be set to requested values after setup calls.
-    _subsystems_allprocs : [<System>, ...]
-        List of all subsystems (children of this system).
+    _subsystems_allprocs : OrderedDict
+        Dict mapping subsystem name to (system, index, meta) for children of this system.
     _subsystems_myproc : [<System>, ...]
         List of local subsystems that exist on this proc.
-    _subsystems_inds : dict
-        Dict mapping subsystem name to index into _subsystems_allprocs.
     _var_promotes : { 'any': [], 'input': [], 'output': [] }
         Dictionary of lists of variable names/wildcards specifying promotion
         (used to calculate promoted names)
@@ -237,8 +235,8 @@ class System(object):
         dict of all driver responses added to the system.
     _rec_mgr : <RecordingManager>
         object that manages all recorders added to this system.
-    _static_subsystems_allprocs : [<System>, ...]
-        List of subsystems that stores all subsystems added outside of setup.
+    _static_subsystems_allprocs : OrderedDict
+        Dict of (subsys, index, meta) that stores all subsystems added outside of setup.
     _static_design_vars : dict of dict
         Driver design variables added outside of setup.
     _static_responses : dict of dict
@@ -358,9 +356,8 @@ class System(object):
 
         self._solver_print_cache = []
 
-        self._subsystems_allprocs = []
+        self._subsystems_allprocs = OrderedDict()
         self._subsystems_myproc = []
-        self._subsystems_inds = {}
         self._vars_to_gather = {}
 
         self._var_promotes = {'input': [], 'output': [], 'any': []}
@@ -414,7 +411,7 @@ class System(object):
 
         self._conn_global_abs_in2out = {}
 
-        self._static_subsystems_allprocs = []
+        self._static_subsystems_allprocs = OrderedDict()
         self._static_design_vars = OrderedDict()
         self._static_responses = OrderedDict()
 
@@ -2290,7 +2287,7 @@ class System(object):
         if self.nonlinear_solver is not None and type_ != 'LN':
             self.nonlinear_solver._set_solver_print(level=level, type_=type_)
 
-        for subsys in self._subsystems_allprocs:
+        for subsys, _, _ in self._subsystems_allprocs.values():
 
             current_depth = subsys.pathname.count('.')
             if current_depth >= depth:
@@ -3620,7 +3617,7 @@ class System(object):
             in_or_out.append('output')
 
         if self._subsystems_allprocs:
-            for subsys in self._subsystems_allprocs:
+            for subsys, _, _ in self._subsystems_allprocs.values():
                 prefix = subsys.pathname + '.'
                 for var_type in in_or_out:
                     for var_name in chain(real_vars[var_type], disc_vars[var_type]):

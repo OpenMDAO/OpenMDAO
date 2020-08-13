@@ -2042,7 +2042,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(cr._format_version, format_version)
 
         self.assertEqual(set(cr.system_options.keys()),
-                         set(['root'] + [sys.name for sys in prob.model._subsystems_allprocs]))
+                         set(['root'] + list(prob.model._subsystems_allprocs)))
 
         self.assertEqual(set(cr.problem_metadata.keys()), {
             'tree', 'sys_pathnames_list', 'connections_list', 'variables', 'abs2prom',
@@ -2070,7 +2070,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(cr._format_version, format_version)
 
         self.assertEqual(set(cr.system_options.keys()),
-                         set(['root'] + [sys.name for sys in prob.model._subsystems_allprocs]))
+                         set(['root'] + list(prob.model._subsystems_allprocs)))
 
         self.assertEqual(set(cr.problem_metadata.keys()), {
             'tree', 'sys_pathnames_list', 'connections_list', 'variables', 'abs2prom',

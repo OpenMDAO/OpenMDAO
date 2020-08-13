@@ -1,6 +1,6 @@
 """Define the Group class."""
 import os
-from collections import Counter, OrderedDict, defaultdict
+from collections import Counter, OrderedDict, defaultdict, namedtuple
 from collections.abc import Iterable
 
 from itertools import product, chain
@@ -35,6 +35,8 @@ from openmdao.core.constants import _SetupStatus
 import re
 namecheck_rgx = re.compile('[a-zA-Z][_a-zA-Z0-9]*')
 
+SysTup = namedtuple('SysTup', ['system', 'index', 'meta'])
+
 
 class Group(System):
     """
@@ -66,10 +68,10 @@ class Group(System):
     _conn_discrete_in2out : {'abs_in': 'abs_out'}
         Dictionary containing all explicit & implicit discrete var connections owned
         by this system only. The data is the same across all processors.
-    _transfers : dict of dict of Transfers
-        First key is the vec_name, second key is (mode, isub) where
-        mode is 'fwd' or 'rev' and isub is the subsystem index among allprocs subsystems
-        or isub can be None for the full, simultaneous transfer.
+    _transfers : dict of dict of dict of Transfers
+        First key is the vec_name, second key is mode, third is subname where
+        mode is 'fwd' or 'rev' and subname is the subsystem name
+        or subname can be None for the full, simultaneous transfer.
     _discrete_transfers : dict of discrete transfer metadata
         Key is system pathname or None for the full, simultaneous transfer.
     _loc_subsys_map : dict
@@ -425,53 +427,55 @@ class Group(System):
 
         if MPI:
 
-            proc_info = [self._proc_info[s.name] for s in self._subsystems_allprocs]
+            allsubs = list(self._subsystems_allprocs.values())
+            proc_info = [self._proc_info[s.name] for s, _, _ in allsubs]
 
             # Call the load balancing algorithm
             try:
                 sub_inds, sub_comm, sub_proc_range = self._mpi_proc_allocator(
-                    proc_info, len(self._subsystems_allprocs), comm)
+                    proc_info, len(allsubs), comm)
             except ProcAllocationError as err:
-                subs = self._subsystems_allprocs
                 if err.sub_inds is None:
                     raise RuntimeError("%s: %s" % (self.msginfo, err.msg))
                 else:
                     raise RuntimeError("%s: MPI process allocation failed: %s for the following "
-                                       "subsystems: %s" % (self.msginfo, err.msg,
-                                                           [subs[i].name for i in err.sub_inds]))
+                                       "subsystems: %s" %
+                                       (self.msginfo, err.msg,
+                                        [allsubs[i].system.name for i in err.sub_inds]))
 
-            self._subsystems_myproc = [self._subsystems_allprocs[ind] for ind in sub_inds]
+            self._subsystems_myproc = [allsubs[ind].system for ind in sub_inds]
 
             # Define local subsystems
             if not (np.sum([minp for minp, _, _ in proc_info]) <= comm.size):
                 # reorder the subsystems_allprocs based on which procs they live on. If we don't
                 # do this, we can get ordering mismatches in some of our data structures.
-                new_allsubs = []
+                new_allsubs = OrderedDict()
                 seen = set()
                 gathered = self.comm.allgather(sub_inds)
                 for rank, inds in enumerate(gathered):
                     for ind in inds:
                         if ind not in seen:
-                            new_allsubs.append(self._subsystems_allprocs[ind])
+                            old = allsubs[ind]
+                            new_allsubs[old.system.name] = old
                             seen.add(ind)
                 self._subsystems_allprocs = new_allsubs
         else:
             sub_comm = comm
-            self._subsystems_myproc = self._subsystems_allprocs
+            self._subsystems_myproc = [tup.system for tup in self._subsystems_allprocs.values()]
             sub_proc_range = (0, 1)
 
         # Compute _subsystems_proc_range
         self._subsystems_proc_range = [sub_proc_range] * len(self._subsystems_myproc)
-        self._subsystems_inds = inds = {}
 
         # need to set pathname correctly even for non-local subsystems
-        for i, s in enumerate(self._subsystems_allprocs):
-            inds[s.name] = i
+        for s, _, _ in self._subsystems_allprocs.values():
             s.pathname = '.'.join((self.pathname, s.name)) if self.pathname else s.name
 
         # Perform recursion
+        allsubs = self._subsystems_allprocs
         for subsys in self._subsystems_myproc:
             subsys._setup_procs(subsys.pathname, sub_comm, mode, prob_meta)
+            allsubs[subsys.name].meta['local'] = True
 
         # build a list of local subgroups to speed up later loops
         self._subgroups_myproc = [s for s in self._subsystems_myproc if isinstance(s, Group)]
@@ -539,7 +543,6 @@ class Group(System):
         else:
             return self._list_states()
 
-    # def _get_all_promotes(self, remote_systems):
     def _get_all_promotes(self):
         """
         Create the top level mapping of all promoted names to absolute names for all local systems.
@@ -683,20 +686,19 @@ class Group(System):
             # We do this so that we can compute the offset when we recurse into each subsystem.
             allprocs_counters = {}
             for io in ['input', 'output']:
-                allprocs_counters[io] = np.zeros(nsub_allprocs, INT_DTYPE)
+                allprocs_counters[io] = np.zeros(nsub_allprocs, dtype=INT_DTYPE)
                 for subsys in self._subsystems_myproc:
                     if vec_name in subsys._rel_vec_names:
                         comm = subsys.comm if subsys._full_comm is None else subsys._full_comm
                         if comm.rank == 0:
-                            isub = self._subsystems_inds[subsys.name]
-                            allprocs_counters[io][isub] = \
+                            allprocs_counters[io][self._subsystems_allprocs[subsys.name].index] = \
                                 len(subsys._var_allprocs_relevant_names[vec_name][io])
 
             # If running in parallel, allgather
             if self.comm.size > 1:
                 gathered = self.comm.allgather(allprocs_counters)
                 allprocs_counters = {
-                    io: np.zeros(nsub_allprocs, INT_DTYPE) for io in ['input', 'output']
+                    io: np.zeros(nsub_allprocs, dtype=INT_DTYPE) for io in ['input', 'output']
                 }
                 for myproc_counters in gathered:
                     for io in ['input', 'output']:
@@ -711,7 +713,7 @@ class Group(System):
                 for subsys in self._subsystems_myproc:
                     if vec_name not in subsys._rel_vec_names:
                         continue
-                    isub = self._subsystems_inds[subsys.name]
+                    isub = self._subsystems_allprocs[subsys.name].index
                     start = np.sum(allprocs_counters[io][:isub])
                     subsystems_var_range[vec_name][io][subsys.name] = (
                         start, start + allprocs_counters[io][isub]
@@ -1536,12 +1538,12 @@ class Group(System):
             If True, connection errors will raise an Exception. If False, connection errors
             will issue a warning and the offending connection will be ignored.
         """
-        for sub in self._subsystems_allprocs:
+        for sub, _, _ in self._subsystems_allprocs.values():
             if isinstance(sub, Group):
                 sub._raise_connection_errors = val
                 sub._set_subsys_connection_errors(val)
 
-    def _transfer(self, vec_name, mode, isub=None):
+    def _transfer(self, vec_name, mode, sub=None):
         """
         Perform a vector transfer.
 
@@ -1551,13 +1553,19 @@ class Group(System):
             Name of the vector RHS on which to perform a transfer.
         mode : str
             Either 'fwd' or 'rev'
-        isub : None or int
+        sub : None or str
             If None, perform a full transfer.
-            If int, perform a partial transfer for linear Gauss--Seidel.
+            If str, perform a partial transfer to named subsystem for linear Gauss--Seidel.
         """
-        vec_inputs = self._vectors['input'][vec_name]
+        xfer = self._transfers[vec_name][mode]
+        if sub in xfer:
+            xfer = xfer[sub]
+        else:
+            if mode == 'fwd' and self._conn_discrete_in2out and vec_name == 'nonlinear':
+                self._discrete_transfer(sub)
+            return
 
-        xfer = self._transfers[vec_name][mode, isub]
+        vec_inputs = self._vectors['input'][vec_name]
 
         if mode == 'fwd':
             if xfer is not None:
@@ -1568,7 +1576,7 @@ class Group(System):
                 else:
                     xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
             if self._conn_discrete_in2out and vec_name == 'nonlinear':
-                self._discrete_transfer(isub)
+                self._discrete_transfer(sub)
 
         else:  # rev
             if xfer is not None:
@@ -1579,18 +1587,18 @@ class Group(System):
                 else:
                     xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
 
-    def _discrete_transfer(self, isub):
+    def _discrete_transfer(self, sub):
         """
         Transfer discrete variables between components.  This only occurs in fwd mode.
 
         Parameters
         ----------
-        isub : None or int
+        sub : None or str
             If None, perform a full transfer.
-            If int, perform a partial transfer for linear Gauss--Seidel.
+            If not, perform a partial transfer for linear Gauss--Seidel.
         """
         comm = self.comm
-        key = None if isub is None else self._subsystems_allprocs[isub].name
+        key = None if sub is None else self._subsystems_allprocs[sub].system.name
 
         if comm.size == 1:
             for src_sys_name, src, tgt_sys_name, tgt in self._discrete_transfers[key]:
@@ -1787,9 +1795,9 @@ class Group(System):
             raise TypeError("%s: Subsystem '%s' should be an instance, but a %s class object was "
                             "found." % (self.msginfo, name, subsys.__name__))
 
-        for sub in chain(self._subsystems_allprocs,
-                         self._static_subsystems_allprocs):
-            if name == sub.name:
+        for tup in chain(self._subsystems_allprocs.values(),
+                         self._static_subsystems_allprocs.values()):
+            if name == tup.system.name:
                 raise RuntimeError("%s: Subsystem name '%s' is already used." %
                                    (self.msginfo, name))
 
@@ -1821,7 +1829,8 @@ class Group(System):
         else:
             subsystems_allprocs = self._subsystems_allprocs
 
-        subsystems_allprocs.append(subsys)
+        subsystems_allprocs[subsys.name] = SysTup(subsys, len(subsystems_allprocs),
+                                                  {'local': False})
 
         if not isinstance(min_procs, int) or min_procs < 1:
             raise TypeError("%s: min_procs must be an int > 0 but (%s) was given." %
@@ -1924,10 +1933,9 @@ class Group(System):
         # in this model.
         newset = set(new_order)
         if self._static_mode:
-            subsystems = self._static_subsystems_allprocs
+            olddict = self._static_subsystems_allprocs
         else:
-            subsystems = self._subsystems_allprocs
-        olddict = {s.name: s for s in subsystems}
+            olddict = self._subsystems_allprocs
         oldset = set(olddict)
 
         if oldset != newset:
@@ -1951,10 +1959,19 @@ class Group(System):
             raise ValueError("%s: Duplicate name(s) found in subsystem order list: %s" %
                              (self.msginfo, sorted(dupes)))
 
-        subsystems[:] = [olddict[name] for name in new_order]
+        subsystems = OrderedDict()  # need a fresh one to keep the right order
+        if self._static_mode:
+            self._static_subsystems_allprocs = subsystems
+        else:
+            self._subsystems_allprocs = subsystems
+
+        for i, name in enumerate(new_order):
+            s, _, meta = olddict[name]
+            subsystems[name] = SysTup(s, i, meta)
 
         self._order_set = True
         if self._problem_meta is not None:
+            # order has been changed so we need a new full setup
             self._problem_meta['setup_status'] = _SetupStatus.PRE_SETUP
 
     def _get_subsystem(self, name):
@@ -1976,10 +1993,10 @@ class Group(System):
 
         system = self
         for subname in name.split('.'):
-            for sub in chain(system._static_subsystems_allprocs,
-                             system._subsystems_allprocs):
-                if sub.name == subname:
-                    system = sub
+            for tup in chain(system._static_subsystems_allprocs.values(),
+                             system._subsystems_allprocs.values()):
+                if tup.system.name == subname:
+                    system = tup.system
                     break
             else:
                 return None
@@ -2012,10 +2029,11 @@ class Group(System):
         """
         # let any lower level systems do their guessing first
         if self._has_guess:
-            for isub, sub in enumerate(self._subsystems_allprocs):
+            for sname, tup in self._subsystems_allprocs.items():
+                sub = tup.system
                 # TODO: could gather 'has_guess' information during setup and be able to
                 # skip transfer for subs that don't have guesses...
-                self._transfer('nonlinear', 'fwd', isub)
+                self._transfer('nonlinear', 'fwd', sname)
                 if sub._is_local and sub._has_guess:
                     sub._guess_nonlinear()
 
@@ -2828,10 +2846,15 @@ class Group(System):
 
         # now update our own data structures based on the new auto_ivc component variables
         self._loc_subsys_map[auto_ivc.name] = auto_ivc
-        self._subsystems_allprocs = [auto_ivc] + self._subsystems_allprocs
+
+        old = self._subsystems_allprocs
+        self._subsystems_allprocs = allsubs = OrderedDict()
+        allsubs['_auto_ivc'] = SysTup(auto_ivc, 0, {'local': True})
+        for i, (s, _, meta) in enumerate(old.values()):
+            allsubs[s.name] = SysTup(s, i + 1, meta)
+
         self._subsystems_myproc = [auto_ivc] + self._subsystems_myproc
         self._subsystems_proc_range = [(0, self.comm.size)] + self._subsystems_proc_range
-        self._subsystems_inds = {s.name: i for i, s in enumerate(self._subsystems_allprocs)}
 
         io = 'output'  # auto_ivc has only output vars
         old = self._var_allprocs_prom2abs_list[io]

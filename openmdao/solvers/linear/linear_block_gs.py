@@ -19,12 +19,12 @@ class LinearBlockGS(BlockLinearSolver):
         vec_names = self._vec_names
 
         if mode == 'fwd':
-            for isub, subsys in enumerate(system._subsystems_allprocs):
+            for subsys, _, _ in system._subsystems_allprocs.values():
                 if self._rel_systems is not None and subsys.pathname not in self._rel_systems:
                     continue
                 for vec_name in vec_names:
                     # must always do the transfer on all procs even if subsys not local
-                    system._transfer(vec_name, mode, isub)
+                    system._transfer(vec_name, mode, subsys.name)
 
                 if not subsys._is_local:
                     continue
@@ -39,9 +39,10 @@ class LinearBlockGS(BlockLinearSolver):
                 subsys._solve_linear(vec_names, mode, self._rel_systems)
 
         else:  # rev
-            subsystems = system._subsystems_allprocs
-            for isub in range(len(system._subsystems_allprocs) - 1, -1, -1):
-                subsys = subsystems[isub]
+            subsystems = list(system._subsystems_allprocs)
+            subsystems.reverse()
+            for sname in subsystems:
+                subsys, _, _ = system._subsystems_allprocs[sname]
 
                 if self._rel_systems is not None and subsys.pathname not in self._rel_systems:
                     continue
@@ -51,7 +52,7 @@ class LinearBlockGS(BlockLinearSolver):
                         if vec_name in subsys._rel_vec_names:
                             b_vec = system._vectors['output'][vec_name]
                             b_vec.set_val(0.0)
-                            system._transfer(vec_name, mode, isub)
+                            system._transfer(vec_name, mode, sname)
                             b_vec *= -1.0
                             b_vec += self._rhs_vecs[vec_name]
 
@@ -61,4 +62,4 @@ class LinearBlockGS(BlockLinearSolver):
                                          scope_out, scope_in)
                 else:   # subsys not local
                     for vec_name in vec_names:
-                        system._transfer(vec_name, mode, isub)
+                        system._transfer(vec_name, mode, sname)
