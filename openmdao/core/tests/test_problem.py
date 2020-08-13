@@ -1734,13 +1734,13 @@ class TestProblem(unittest.TestCase):
             p.run_model()
 
             inputs = p.model.list_inputs(out_stream=None)
-            self.assertEqual(sorted(inputs), [
+            self.assertEqual(sorted(inputs.items()), [
                 ('comp3.a', {'value': [2.]}),
                 ('comp3.b', {'value': [3.]})
             ], "Inputs don't match when added in %s." % where)
 
             outputs = p.model.list_outputs(out_stream=None)
-            self.assertEqual(sorted(outputs), [
+            self.assertEqual(sorted(outputs.items()), [
                 ('comp1.a',   {'value': [2.]}),
                 ('comp1.foo', {'value': [1.]}),
                 ('comp2.b',   {'value': [3.]}),
@@ -1790,13 +1790,13 @@ class TestProblem(unittest.TestCase):
         p.run_model()
 
         inputs = p.model.list_inputs(out_stream=None)
-        self.assertEqual(sorted(inputs), [
+        self.assertEqual(sorted(inputs.items()), [
             ('mcomp.a',     {'value': [2.]}),
             ('sub.mcomp.a', {'value': [2.]}),
         ])
 
         outputs = p.model.list_outputs(out_stream=None)
-        self.assertEqual(sorted(outputs), [
+        self.assertEqual(sorted(outputs.items()), [
             ('indep.a',      {'value': [2.]}),
             ('mcomp.a2',     {'value': [4.]}),
             ('sub.mcomp.a2', {'value': [4.]}),
@@ -1808,7 +1808,7 @@ class TestProblem(unittest.TestCase):
         p.run_model()
 
         inputs = p.model.list_inputs(out_stream=None)
-        self.assertEqual(sorted(inputs), [
+        self.assertEqual(sorted(inputs.items()), [
             ('mcomp.a',     {'value': [2.]}),
             ('mcomp.b',     {'value': [3.]}),
             ('sub.mcomp.a', {'value': [2.]}),
@@ -1816,7 +1816,7 @@ class TestProblem(unittest.TestCase):
         ])
 
         outputs= p.model.list_outputs(out_stream=None)
-        self.assertEqual(sorted(outputs), [
+        self.assertEqual(sorted(outputs.items()), [
             ('indep.a',      {'value': [2.]}),
             ('indep.b',      {'value': [3.]}),
             ('mcomp.a2',     {'value': [4.]}),

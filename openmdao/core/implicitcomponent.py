@@ -436,14 +436,9 @@ class ImplicitComponent(Component):
         list
             List of all states.
         """
-        if self._outputs is not None:
-            # final setup has been performed, return absolute names
-            return [name for name in self._outputs._names] + \
-                   [name for name in self._var_allprocs_discrete['output']]
-        else:
-            # final setup has not been performed, return relative names for this system only
-            return [name for name in self._var_rel_names['output']] + \
-                   [name for name in self._var_discrete['output']]
+        prefix = self.pathname + '.' if self.pathname else ''
+        return sorted(self._var_allprocs_abs_names['output'] +
+                      [prefix + n for n in self._var_discrete['output']])
 
     def _list_states_allprocs(self):
         """

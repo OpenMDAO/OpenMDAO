@@ -295,11 +295,10 @@ class DiscreteTestCase(unittest.TestCase):
         text = stream.getvalue()
 
         self.assertEqual(1, text.count("3 Input(s) in 'model'"))
-        self.assertEqual(1, text.count('\nmodel'))
-        self.assertEqual(1, text.count('\n  expl'))
-        self.assertEqual(1, text.count('\n    a'))
-        self.assertEqual(1, text.count('\n  impl'))
-        self.assertEqual(2, text.count('\n    x'))      # both implicit & explicit
+        self.assertEqual(1, text.count('\nexpl'))
+        self.assertEqual(1, text.count('\n  a'))
+        self.assertEqual(1, text.count('\nimpl'))
+        self.assertEqual(2, text.count('\n  x'))      # both implicit & explicit
 
         #
         # list outputs, not hierarchical
@@ -322,13 +321,12 @@ class DiscreteTestCase(unittest.TestCase):
         prob.model.list_outputs(values=True, residuals=True, hierarchical=True, out_stream=stream)
         text = stream.getvalue()
 
-        self.assertEqual(text.count('\nmodel'), 2)      # both implicit & explicit
-        self.assertEqual(text.count('\n  indep'), 1)
-        self.assertEqual(text.count('\n    x'), 1)
-        self.assertEqual(text.count('\n  expl'), 1)
-        self.assertEqual(text.count('\n    b'), 1)
-        self.assertEqual(text.count('\n  impl'), 1)
-        self.assertEqual(text.count('\n    y'), 2)      # both implicit & explicit
+        self.assertEqual(text.count('\nindep'), 1)
+        self.assertEqual(text.count('\n  x'), 1)
+        self.assertEqual(text.count('\nexpl'), 1)
+        self.assertEqual(text.count('\n  b'), 1)
+        self.assertEqual(text.count('\nimpl'), 1)
+        self.assertEqual(text.count('\n  y'), 2)      # both implicit & explicit
 
     def test_list_inputs_outputs_promoted(self):
         model = om.Group()
@@ -382,13 +380,12 @@ class DiscreteTestCase(unittest.TestCase):
             "",
             "varname  value  prom_name",
             "-------  -----  ---------",
-            "model",
-            "  _auto_ivc",
-            "    v0    [10.]  _auto_ivc.v0",
-            "    v1    11     _auto_ivc.v1",
-            "  expl",
-            "    b    [20.]  expl.b",
-            "    y    2      expl.y",
+            "_auto_ivc",
+            "  v0    [10.]  _auto_ivc.v0",
+            "  v1    11     _auto_ivc.v1",
+            "expl",
+            "  b    [20.]  expl.b",
+            "  y    2      expl.y",
             "",
             "",
             "1 Implicit Output(s) in 'model'",
@@ -396,9 +393,8 @@ class DiscreteTestCase(unittest.TestCase):
             "",
             "varname  value  prom_name",
             "-------  -----  ---------",
-            "model",
-            "  impl",
-            "    y    2      impl.y",
+            "impl",
+            "  y    2      impl.y",
         ]
 
         for i, line in enumerate(expected):
@@ -422,7 +418,7 @@ class DiscreteTestCase(unittest.TestCase):
 
         # list inputs, no tags
         inputs = prob.model.list_inputs(values=False, out_stream=None)
-        self.assertEqual(sorted(inputs), [
+        self.assertEqual(sorted(inputs.items()), [
             ('expl.a', {}),
             ('expl.x', {}),
             ('impl.x', {}),
@@ -430,14 +426,14 @@ class DiscreteTestCase(unittest.TestCase):
 
         # list inputs, with tags
         inputs = prob.model.list_inputs(values=False, out_stream=None, tags='tagx')
-        self.assertEqual(sorted(inputs), [
+        self.assertEqual(sorted(inputs.items()), [
             ('expl.x', {}),
             ('impl.x', {}),
         ])
 
         # list outputs, no tags
         outputs = prob.model.list_outputs(values=False, out_stream=None)
-        self.assertEqual(sorted(outputs), [
+        self.assertEqual(sorted(outputs.items()), [
             ('expl.b', {}),
             ('expl.y', {}),
             ('impl.y', {}),
@@ -446,7 +442,7 @@ class DiscreteTestCase(unittest.TestCase):
 
         # list outputs, with tags
         outputs = prob.model.list_outputs(values=False, out_stream=None, tags='tagy')
-        self.assertEqual(sorted(outputs), [
+        self.assertEqual(sorted(outputs.items()), [
             ('expl.y', {}),
             ('impl.y', {}),
         ])

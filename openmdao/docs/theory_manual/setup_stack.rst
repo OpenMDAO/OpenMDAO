@@ -28,8 +28,8 @@ addition to `stdout`.  Checks can also be performed by calling the `check_config
 your problem object.
 
 
-The OpenMDAO `Group` API includes three methods that are invoked during the `setup` process: `setup`, `configure`, and
-`initialize`. Most of the time, `setup` is all you need to build a group. The specific use case for
+The OpenMDAO `Group` API includes three methods that are invoked during the `setup` process:
+`initialize`, `setup`, and `configure`. Most of the time, `setup` is all you need to build a group. The specific use case for
 `configure` is shown below in the next section. The `initialize` method is only used for declaring options for your
 group (and also in `Component`), and their placement here allows them to be passed into the group as
 instantiation arguments.
@@ -39,10 +39,10 @@ One question that is often asked is: why can't we just put all of our model buil
 running a parallel model under MPI, certain systems might only be executed on certain processors.
 To save memory across the model, these systems are not fully set up on processors where they are
 not local. The only way to do this is to isolate the model building process into a custom method
-(`setup`) and only call it on the processors where you need the footprint for that group. While
+(`setup`) and only call it on the processors where that system is active. While
 not everyone will run their models in parallel, it is a good practice to follow the stricter
 guideline so that, if someone wants to include your model in a larger parallel model, they won't
-be forced to refactor it.
+be forced to allocate any unnecessary memory.
 
 .. _theory_setup_vs_configure:
 
@@ -50,7 +50,7 @@ Usage of setup vs. configure
 ----------------------------
 
 The need for two methods for setting up a group arose from a need to sometimes change the linear or
-nonlinear solvers in a subgroup after it has been added. When `setup` is called on the `problem`, the
+nonlinear solvers in a subgroup after it had been added. When `setup` is called on the `problem`, the
 `setup` method in each group is called recursively from top to bottom of the hierarchy. For example,
 a group may contain several components and groups. Setup is first called in that top group, during
 which, those components and groups are instantiated. However, the `setup` methods belonging to those sub-components
@@ -74,10 +74,9 @@ Here is a quick guide covering what you can do in the `setup` and `configure` me
 Action                                                                               setup   configure
 ==================================================================================== ======= ===========
 Add subsystems                                                                          o
-Delete subsystems                                                                       o
 Issue connections                                                                       o        o
-Set system execution order                                                              o        o
-Directly add inputs and outputs to components within this group                         o        o
+Set system execution order                                                              o
+Add inputs and outputs to components within this group                                  o        o
 Promote variables from subsystems                                                       o        o
 Assign solvers at **this** group level                                                  o        o
 Assign solvers within subsystems                                                                 o
@@ -92,8 +91,8 @@ Add a case recorder to the group or to a solver in a subsystem                  
 ==================================================================================== ======= ===========
 
  Keep in mind that, when `configure` is being run, you are already done calling `setup` on every group
- and component in the model, so if you add something here, setup will never be called, and it will
- never be fully integrated into the model hierarchy.
+ and component in the model, so if you add a new subsystem here, setup will never be called on it,
+ and it will not be properly integrated into the model hierarchy.
 
 
 Problem setup and final_setup
@@ -107,15 +106,15 @@ phases is to allow you to perform certain actions after `setup`:
 
 **Post-setup actions**
 
- - Set values of unconnected inputs and indepvarcomps
+ - Set values of inputs and indepvarcomps
  - Change settings on solvers
  - Change options on systems
  - Add recorders
  - Assign Jacobians
  - Add training data to metamodels
 
-If you do anything that changes the model hierarchy, such as adding a component to a group, then you will need to
-run `setup` again.
+If you do anything that changes the model hierarchy, such as adding a component to a group, then
+you will need to run `setup` again.
 
 During setup, the following things happen:
 
@@ -123,8 +122,8 @@ During setup, the following things happen:
  - For each custom Group, setup function is called recursively from top to bottom
  - Model hierarchy is created
  - For each custom Group, configure function is called recursively from bottom to top
- - Variables are sized
  - Connections are assembled and verified
+ - Variables are sized
 
 This is just enough to allow you to perform the post-setup actions listed above, but there are
 still more things to do before the model can run. In `final_setup`, the following happens:
