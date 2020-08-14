@@ -84,7 +84,7 @@
             ],
             "options": {
                 "distributed": false,
-                "name": null,
+                "name": "undefined",
                 "val": 1.0,
                 "shape": null,
                 "units": null,

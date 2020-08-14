@@ -197,7 +197,11 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
         if k in ['linear_solver', 'nonlinear_solver']:
             options[k] = system.options[k].SOLVER
         else:
-            options[k] = system.options._dict[k]['value']
+            from openmdao.utils.options_dictionary import Undefined
+            if isinstance(system.options._dict[k]['value'], Undefined):
+                options[k] = str(system.options._dict[k]['value'])
+            else:
+                options[k] = system.options._dict[k]['value']
     tree_dict['options'] = options
 
     if not tree_dict['name']:
