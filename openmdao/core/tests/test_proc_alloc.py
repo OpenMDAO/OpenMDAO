@@ -40,7 +40,7 @@ def _build_model(nsubs, min_procs=None, max_procs=None, weights=None, top=None, 
     model.add_design_var('indep.x')
     model.add_objective('objective.y')
 
-    import wingdbstub
+    #import wingdbstub
     p.setup(mode=mode, check=False)
     p.final_setup()
 

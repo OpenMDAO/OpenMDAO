@@ -455,8 +455,8 @@ class Group(System):
                 for rank, inds in enumerate(gathered):
                     for ind in inds:
                         if ind not in seen:
-                            old = allsubs[ind]
-                            new_allsubs[old.system.name] = old
+                            s, _, meta = allsubs[ind]
+                            new_allsubs[s.name] = SysTup(s, len(new_allsubs), meta)
                             seen.add(ind)
                 self._subsystems_allprocs = new_allsubs
         else:
