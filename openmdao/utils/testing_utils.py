@@ -3,9 +3,6 @@ import json
 
 import numpy as np
 
-from openmdao.solvers.solver import Solver
-from openmdao.utils.options_dictionary import Undefined
-
 
 def _new_setup(self):
     import os
@@ -92,6 +89,4 @@ class _ModelViewerDataTreeEncoder(json.JSONEncoder):
             return float(obj)
         elif isinstance(obj, np.ndarray):
             return obj.tolist()
-        elif isinstance(obj, Undefined):
-            return "undefined"
         return json.JSONEncoder.default(self, obj)
