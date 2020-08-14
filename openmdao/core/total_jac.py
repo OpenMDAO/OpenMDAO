@@ -71,6 +71,8 @@ class _TotalJacInfo(object):
     wrt_meta : dict
         Map of absolute output 'wrt' var name to tuples of the form
         (row/column slice, indices, distrib).
+    ivc_print_names :dict
+        Dictionary that maps auto_ivc names back to their promoted input names.
     output_list : list of str
         List of names of output variables for this total jacobian.  In fwd mode, outputs
         are responses.  In rev mode, outputs are design variables.
@@ -171,6 +173,7 @@ class _TotalJacInfo(object):
             elif name in prom2abs_in:
                 in_abs = prom2abs_in[name][0]
                 wrt_name = conns[in_abs]
+                self.ivc_print_names[wrt_name] = in_abs
             else:
                 wrt_name = name
             wrt.append(wrt_name)
