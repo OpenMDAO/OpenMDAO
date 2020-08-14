@@ -1,0 +1,454 @@
+{
+    "name": "root",
+    "type": "root",
+    "class": "SellarStateConnection",
+    "expressions": null,
+    "component_type": null,
+    "subsystem_type": "group",
+    "is_parallel": false,
+    "linear_solver": "LN: SCIPY",
+    "linear_solver_options": {
+        "maxiter": 1000,
+        "atol": 1e-12,
+        "rtol": 1e-10,
+        "iprint": 1,
+        "err_on_non_converge": false,
+        "assemble_jac": false,
+        "solver": "gmres",
+        "restart": 20
+    },
+    "nonlinear_solver": "NL: Newton",
+    "nonlinear_solver_options": {
+        "maxiter": 10,
+        "atol": 1e-10,
+        "rtol": 1e-10,
+        "iprint": 1,
+        "err_on_non_converge": false,
+        "debug_print": false,
+        "stall_limit": 0,
+        "stall_tol": 1e-12,
+        "solve_subsystems": false,
+        "max_sub_solves": 10,
+        "cs_reconverge": true,
+        "reraise_child_analysiserror": false
+    },
+    "solve_subsystems": false,
+    "children": [
+        {
+            "name": "sub",
+            "type": "subsystem",
+            "class": "Group",
+            "expressions": null,
+            "component_type": null,
+            "subsystem_type": "group",
+            "is_parallel": false,
+            "linear_solver": "LN: SCIPY",
+            "linear_solver_options": {
+                "maxiter": 1000,
+                "atol": 1e-12,
+                "rtol": 1e-10,
+                "iprint": 1,
+                "err_on_non_converge": false,
+                "assemble_jac": false,
+                "solver": "gmres",
+                "restart": 20
+            },
+            "nonlinear_solver": "NL: RUNONCE",
+            "nonlinear_solver_options": {
+                "iprint": 1
+            },
+            "children": [
+                {
+                    "name": "state_eq_group",
+                    "type": "subsystem",
+                    "class": "Group",
+                    "expressions": null,
+                    "component_type": null,
+                    "subsystem_type": "group",
+                    "is_parallel": false,
+                    "linear_solver": "LN: SCIPY",
+                    "linear_solver_options": {
+                        "maxiter": 1000,
+                        "atol": 1e-12,
+                        "rtol": 1e-10,
+                        "iprint": 1,
+                        "err_on_non_converge": false,
+                        "assemble_jac": false,
+                        "solver": "gmres",
+                        "restart": 20
+                    },
+                    "nonlinear_solver": "NL: RUNONCE",
+                    "nonlinear_solver_options": {
+                        "iprint": 1
+                    },
+                    "children": [
+                        {
+                            "name": "state_eq",
+                            "type": "subsystem",
+                            "class": "StateConnection",
+                            "expressions": null,
+                            "subsystem_type": "component",
+                            "is_parallel": false,
+                            "component_type": "implicit",
+                            "linear_solver": "",
+                            "linear_solver_options": null,
+                            "nonlinear_solver": "",
+                            "nonlinear_solver_options": null,
+                            "children": [
+                                {
+                                    "name": "y2_actual",
+                                    "type": "input",
+                                    "dtype": "ndarray",
+                                    "units": "None",
+                                    "shape": "(1,)",
+                                    "distributed": false,
+                                    "is_discrete": false,
+                                    "value": [
+                                        1.0
+                                    ]
+                                },
+                                {
+                                    "name": "y2_command",
+                                    "type": "output",
+                                    "implicit": true,
+                                    "dtype": "ndarray",
+                                    "units": "None",
+                                    "shape": "(1,)",
+                                    "distributed": false,
+                                    "is_discrete": false,
+                                    "value": [
+                                        1.0
+                                    ]
+                                }
+                            ],
+                            "options": {
+                                "assembled_jac_type": "csc",
+                                "distributed": false
+                            }
+                        }
+                    ],
+                    "options": {
+                        "assembled_jac_type": "csc"
+                    }
+                },
+                {
+                    "name": "d1",
+                    "type": "subsystem",
+                    "class": "SellarDis1withDerivatives",
+                    "expressions": null,
+                    "subsystem_type": "component",
+                    "is_parallel": false,
+                    "component_type": "explicit",
+                    "linear_solver": "",
+                    "linear_solver_options": null,
+                    "nonlinear_solver": "",
+                    "nonlinear_solver_options": null,
+                    "children": [
+                        {
+                            "name": "z",
+                            "type": "input",
+                            "dtype": "ndarray",
+                            "units": "None",
+                            "shape": "(2,)",
+                            "distributed": false,
+                            "is_discrete": false,
+                            "value": [
+                                0.0,
+                                0.0
+                            ]
+                        },
+                        {
+                            "name": "x",
+                            "type": "input",
+                            "dtype": "ndarray",
+                            "units": "None",
+                            "shape": "(1,)",
+                            "distributed": false,
+                            "is_discrete": false,
+                            "value": [
+                                0.0
+                            ]
+                        },
+                        {
+                            "name": "y2",
+                            "type": "input",
+                            "dtype": "ndarray",
+                            "units": "None",
+                            "shape": "(1,)",
+                            "distributed": false,
+                            "is_discrete": false,
+                            "value": [
+                                1.0
+                            ]
+                        },
+                        {
+                            "name": "y1",
+                            "type": "output",
+                            "implicit": false,
+                            "dtype": "ndarray",
+                            "units": "None",
+                            "shape": "(1,)",
+                            "distributed": false,
+                            "is_discrete": false,
+                            "value": [
+                                1.0
+                            ]
+                        }
+                    ],
+                    "options": {
+                        "distributed": false
+                    }
+                },
+                {
+                    "name": "d2",
+                    "type": "subsystem",
+                    "class": "SellarDis2withDerivatives",
+                    "expressions": null,
+                    "subsystem_type": "component",
+                    "is_parallel": false,
+                    "component_type": "explicit",
+                    "linear_solver": "",
+                    "linear_solver_options": null,
+                    "nonlinear_solver": "",
+                    "nonlinear_solver_options": null,
+                    "children": [
+                        {
+                            "name": "z",
+                            "type": "input",
+                            "dtype": "ndarray",
+                            "units": "None",
+                            "shape": "(2,)",
+                            "distributed": false,
+                            "is_discrete": false,
+                            "value": [
+                                0.0,
+                                0.0
+                            ]
+                        },
+                        {
+                            "name": "y1",
+                            "type": "input",
+                            "dtype": "ndarray",
+                            "units": "None",
+                            "shape": "(1,)",
+                            "distributed": false,
+                            "is_discrete": false,
+                            "value": [
+                                1.0
+                            ]
+                        },
+                        {
+                            "name": "y2",
+                            "type": "output",
+                            "implicit": false,
+                            "dtype": "ndarray",
+                            "units": "None",
+                            "shape": "(1,)",
+                            "distributed": false,
+                            "is_discrete": false,
+                            "value": [
+                                1.0
+                            ]
+                        }
+                    ],
+                    "options": {
+                        "distributed": false
+                    }
+                }
+            ],
+            "options": {
+                "assembled_jac_type": "csc"
+            }
+        },
+        {
+            "name": "obj_cmp",
+            "type": "subsystem",
+            "class": "ExecComp",
+            "expressions": [
+                "obj = x**2 + z[1] + y1 + exp(-y2)"
+            ],
+            "subsystem_type": "component",
+            "is_parallel": false,
+            "component_type": "exec",
+            "linear_solver": "",
+            "linear_solver_options": null,
+            "nonlinear_solver": "",
+            "nonlinear_solver_options": null,
+            "children": [
+                {
+                    "name": "x",
+                    "type": "input",
+                    "dtype": "ndarray",
+                    "units": "None",
+                    "shape": "(1,)",
+                    "distributed": false,
+                    "is_discrete": false,
+                    "value": [
+                        0.0
+                    ]
+                },
+                {
+                    "name": "y1",
+                    "type": "input",
+                    "dtype": "ndarray",
+                    "units": "None",
+                    "shape": "(1,)",
+                    "distributed": false,
+                    "is_discrete": false,
+                    "value": [
+                        0.0
+                    ]
+                },
+                {
+                    "name": "y2",
+                    "type": "input",
+                    "dtype": "ndarray",
+                    "units": "None",
+                    "shape": "(1,)",
+                    "distributed": false,
+                    "is_discrete": false,
+                    "value": [
+                        0.0
+                    ]
+                },
+                {
+                    "name": "z",
+                    "type": "input",
+                    "dtype": "ndarray",
+                    "units": "None",
+                    "shape": "(2,)",
+                    "distributed": false,
+                    "is_discrete": false,
+                    "value": [
+                        0.0,
+                        0.0
+                    ]
+                },
+                {
+                    "name": "obj",
+                    "type": "output",
+                    "implicit": false,
+                    "dtype": "ndarray",
+                    "units": "None",
+                    "shape": "(1,)",
+                    "distributed": false,
+                    "is_discrete": false,
+                    "value": [
+                        1.0
+                    ]
+                }
+            ],
+            "options": {
+                "distributed": false,
+                "has_diag_partials": false,
+                "units": null,
+                "shape": null
+            }
+        },
+        {
+            "name": "con_cmp1",
+            "type": "subsystem",
+            "class": "ExecComp",
+            "expressions": [
+                "con1 = 3.16 - y1"
+            ],
+            "subsystem_type": "component",
+            "is_parallel": false,
+            "component_type": "exec",
+            "linear_solver": "",
+            "linear_solver_options": null,
+            "nonlinear_solver": "",
+            "nonlinear_solver_options": null,
+            "children": [
+                {
+                    "name": "y1",
+                    "type": "input",
+                    "dtype": "ndarray",
+                    "units": "None",
+                    "shape": "(1,)",
+                    "distributed": false,
+                    "is_discrete": false,
+                    "value": [
+                        1.0
+                    ]
+                },
+                {
+                    "name": "con1",
+                    "type": "output",
+                    "implicit": false,
+                    "dtype": "ndarray",
+                    "units": "None",
+                    "shape": "(1,)",
+                    "distributed": false,
+                    "is_discrete": false,
+                    "value": [
+                        1.0
+                    ]
+                }
+            ],
+            "options": {
+                "distributed": false,
+                "has_diag_partials": false,
+                "units": null,
+                "shape": null
+            }
+        },
+        {
+            "name": "con_cmp2",
+            "type": "subsystem",
+            "class": "ExecComp",
+            "expressions": [
+                "con2 = y2 - 24.0"
+            ],
+            "subsystem_type": "component",
+            "is_parallel": false,
+            "component_type": "exec",
+            "linear_solver": "",
+            "linear_solver_options": null,
+            "nonlinear_solver": "",
+            "nonlinear_solver_options": null,
+            "children": [
+                {
+                    "name": "y2",
+                    "type": "input",
+                    "dtype": "ndarray",
+                    "units": "None",
+                    "shape": "(1,)",
+                    "distributed": false,
+                    "is_discrete": false,
+                    "value": [
+                        1.0
+                    ]
+                },
+                {
+                    "name": "con2",
+                    "type": "output",
+                    "implicit": false,
+                    "dtype": "ndarray",
+                    "units": "None",
+                    "shape": "(1,)",
+                    "distributed": false,
+                    "is_discrete": false,
+                    "value": [
+                        1.0
+                    ]
+                }
+            ],
+            "options": {
+                "distributed": false,
+                "has_diag_partials": false,
+                "units": null,
+                "shape": null
+            }
+        }
+    ],
+    "options": {
+        "assembled_jac_type": "csc",
+        "nonlinear_solver": "NL: Newton",
+        "nl_atol": null,
+        "nl_maxiter": null,
+        "linear_solver": "LN: SCIPY",
+        "ln_atol": null,
+        "ln_maxiter": null
+    }
+}
