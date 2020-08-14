@@ -48,7 +48,7 @@ def _build_model(nsubs, min_procs=None, max_procs=None, weights=None, top=None, 
 
 
 def _get_which_procs(group):
-    sub_inds = [i for s, i, _ in group._subsystems_allprocs.values()
+    sub_inds = [i for s, i in group._subsystems_allprocs.values()
                 if s in group._subsystems_myproc]
     return MPI.COMM_WORLD.allgather(sub_inds)
 

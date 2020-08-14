@@ -720,7 +720,7 @@ class NonlinearSolver(Solver):
         Perform a Gauss-Seidel iteration over this Solver's subsystems.
         """
         system = self._system()
-        for subsys, _, _ in system._subsystems_allprocs.values():
+        for subsys, _ in system._subsystems_allprocs.values():
             system._transfer('nonlinear', 'fwd', subsys.name)
 
             if subsys._is_local:

@@ -1,6 +1,6 @@
 """Define the Group class."""
 import os
-from collections import Counter, OrderedDict, defaultdict, namedtuple
+from collections import Counter, OrderedDict, defaultdict
 from collections.abc import Iterable
 
 from itertools import product, chain
@@ -35,7 +35,18 @@ from openmdao.core.constants import _SetupStatus
 import re
 namecheck_rgx = re.compile('[a-zA-Z][_a-zA-Z0-9]*')
 
-SysTup = namedtuple('SysTup', ['system', 'index', 'meta'])
+
+class _SysInfo(object):
+
+    __slots__ = ['system', 'index']
+
+    def __init__(self, system, index):
+        self.system = system
+        self.index = index
+
+    def __iter__(self):
+        yield self.system
+        yield self.index
 
 
 class Group(System):
@@ -426,7 +437,7 @@ class Group(System):
         if MPI:
 
             allsubs = list(self._subsystems_allprocs.values())
-            proc_info = [self._proc_info[s.name] for s, _, _ in allsubs]
+            proc_info = [self._proc_info[s.name] for s, _ in allsubs]
 
             # Call the load balancing algorithm
             try:
@@ -453,27 +464,27 @@ class Group(System):
                 for rank, inds in enumerate(gathered):
                     for ind in inds:
                         if ind not in seen:
-                            s, _, meta = allsubs[ind]
-                            new_allsubs[s.name] = SysTup(s, len(new_allsubs), meta)
+                            sinfo = allsubs[ind]
+                            sinfo.index = len(new_allsubs)
+                            new_allsubs[sinfo.system.name] = sinfo
                             seen.add(ind)
                 self._subsystems_allprocs = new_allsubs
         else:
             sub_comm = comm
-            self._subsystems_myproc = [tup.system for tup in self._subsystems_allprocs.values()]
+            self._subsystems_myproc = [s for s, _ in self._subsystems_allprocs.values()]
             sub_proc_range = (0, 1)
 
         # Compute _subsystems_proc_range
         self._subsystems_proc_range = [sub_proc_range] * len(self._subsystems_myproc)
 
         # need to set pathname correctly even for non-local subsystems
-        for s, _, _ in self._subsystems_allprocs.values():
+        for s, _ in self._subsystems_allprocs.values():
             s.pathname = '.'.join((self.pathname, s.name)) if self.pathname else s.name
 
         # Perform recursion
         allsubs = self._subsystems_allprocs
         for subsys in self._subsystems_myproc:
             subsys._setup_procs(subsys.pathname, sub_comm, mode, prob_meta)
-            allsubs[subsys.name].meta['local'] = True
 
         # build a list of local subgroups to speed up later loops
         self._subgroups_myproc = [s for s in self._subsystems_myproc if isinstance(s, Group)]
@@ -1534,7 +1545,7 @@ class Group(System):
             If True, connection errors will raise an Exception. If False, connection errors
             will issue a warning and the offending connection will be ignored.
         """
-        for sub, _, _ in self._subsystems_allprocs.values():
+        for sub, _ in self._subsystems_allprocs.values():
             if isinstance(sub, Group):
                 sub._raise_connection_errors = val
                 sub._set_subsys_connection_errors(val)
@@ -1631,14 +1642,14 @@ class Group(System):
                     data = None
 
                 for src_sys_name, src, tgt_sys_name, tgt in xfers:
-                    tgt_sys, _, meta = self._subsystems_allprocs[tgt_sys_name]
-                    if meta['local']:
+                    tgt_sys, _ = self._subsystems_allprocs[tgt_sys_name]
+                    if tgt_sys._is_local:
                         if tgt in tgt_sys._discrete_inputs:
                             abs_src = '.'.join((src_sys_name, src))
                             if data is not None and abs_src in data:
                                 src_val = data[abs_src]
                             else:
-                                src_sys, _, _ = self._subsystems_allprocs[src_sys_name]
+                                src_sys, _ = self._subsystems_allprocs[src_sys_name]
                                 src_val = src_sys._discrete_outputs[src]
                             tgt_sys._discrete_inputs[tgt] = src_val
 
@@ -1826,8 +1837,7 @@ class Group(System):
         else:
             subsystems_allprocs = self._subsystems_allprocs
 
-        subsystems_allprocs[subsys.name] = SysTup(subsys, len(subsystems_allprocs),
-                                                  {'local': False})
+        subsystems_allprocs[subsys.name] = _SysInfo(subsys, len(subsystems_allprocs))
 
         if not isinstance(min_procs, int) or min_procs < 1:
             raise TypeError("%s: min_procs must be an int > 0 but (%s) was given." %
@@ -1963,8 +1973,9 @@ class Group(System):
             self._subsystems_allprocs = subsystems
 
         for i, name in enumerate(new_order):
-            s, _, meta = olddict[name]
-            subsystems[name] = SysTup(s, i, meta)
+            sinfo = olddict[name]
+            subsystems[name] = sinfo
+            sinfo.index = i
 
         self._order_set = True
         if self._problem_meta is not None:
@@ -2026,8 +2037,8 @@ class Group(System):
         """
         # let any lower level systems do their guessing first
         if self._has_guess:
-            for sname, tup in self._subsystems_allprocs.items():
-                sub = tup.system
+            for sname, sinfo in self._subsystems_allprocs.items():
+                sub = sinfo.system
                 # TODO: could gather 'has_guess' information during setup and be able to
                 # skip transfer for subs that don't have guesses...
                 self._transfer('nonlinear', 'fwd', sname)
@@ -2844,9 +2855,10 @@ class Group(System):
         # now update our own data structures based on the new auto_ivc component variables
         old = self._subsystems_allprocs
         self._subsystems_allprocs = allsubs = OrderedDict()
-        allsubs['_auto_ivc'] = SysTup(auto_ivc, 0, {'local': True})
-        for i, (s, _, meta) in enumerate(old.values()):
-            allsubs[s.name] = SysTup(s, i + 1, meta)
+        allsubs['_auto_ivc'] = _SysInfo(auto_ivc, 0)
+        for i, (name, s) in enumerate(old.items()):
+            allsubs[name] = s
+            s.index = i + 1
 
         self._subsystems_myproc = [auto_ivc] + self._subsystems_myproc
         self._subsystems_proc_range = [(0, self.comm.size)] + self._subsystems_proc_range

@@ -19,7 +19,7 @@ class LinearBlockGS(BlockLinearSolver):
         vec_names = self._vec_names
 
         if mode == 'fwd':
-            for subsys, _, _ in system._subsystems_allprocs.values():
+            for subsys, _ in system._subsystems_allprocs.values():
                 if self._rel_systems is not None and subsys.pathname not in self._rel_systems:
                     continue
                 for vec_name in vec_names:
@@ -42,7 +42,7 @@ class LinearBlockGS(BlockLinearSolver):
             subsystems = list(system._subsystems_allprocs)
             subsystems.reverse()
             for sname in subsystems:
-                subsys, _, _ = system._subsystems_allprocs[sname]
+                subsys, _ = system._subsystems_allprocs[sname]
 
                 if self._rel_systems is not None and subsys.pathname not in self._rel_systems:
                     continue

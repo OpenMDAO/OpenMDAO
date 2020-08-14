@@ -157,7 +157,7 @@ def _get_used_before_calc_subs(group, input_srcs):
     """
     parallel_solver = {}
     allsubs = group._subsystems_allprocs
-    for sub, i, _ in allsubs.values():
+    for sub, i in allsubs.values():
         if hasattr(sub, '_mpi_proc_allocator') and sub._mpi_proc_allocator.parallel:
             parallel_solver[sub.name] = sub.nonlinear_solver.SOLVER
 
@@ -687,7 +687,7 @@ def check_allocate_complex_ln(model, under_cs):
        model.nonlinear_solver.supports['gradients']:
         return True
 
-    for sub, _, _ in model._subsystems_allprocs.values():
+    for sub, _ in model._subsystems_allprocs.values():
         chk = check_allocate_complex_ln(sub, under_cs)
 
         if chk:

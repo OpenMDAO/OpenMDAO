@@ -2287,7 +2287,7 @@ class System(object):
         if self.nonlinear_solver is not None and type_ != 'LN':
             self.nonlinear_solver._set_solver_print(level=level, type_=type_)
 
-        for subsys, _, _ in self._subsystems_allprocs.values():
+        for subsys, _ in self._subsystems_allprocs.values():
 
             current_depth = subsys.pathname.count('.')
             if current_depth >= depth:
@@ -3617,7 +3617,7 @@ class System(object):
             in_or_out.append('output')
 
         if self._subsystems_allprocs:
-            for subsys, _, _ in self._subsystems_allprocs.values():
+            for subsys, _ in self._subsystems_allprocs.values():
                 prefix = subsys.pathname + '.'
                 for var_type in in_or_out:
                     for var_name in chain(real_vars[var_type], disc_vars[var_type]):
