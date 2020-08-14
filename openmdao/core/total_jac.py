@@ -245,7 +245,8 @@ class _TotalJacInfo(object):
                 self.simul_coloring = driver._coloring_info['coloring']
 
                 # if we don't get wrt and of from driver, turn off coloring
-                if self.simul_coloring is not None and (wrt != driver_wrt or of != driver_of):
+                if self.simul_coloring is not None and \
+                   (prom_wrt != driver_wrt or prom_of != driver_of):
                     msg = ("compute_totals called using a different list of design vars and/or "
                            "responses than those used to define coloring, so coloring will "
                            "be turned off.\ncoloring design vars: %s, current design vars: "
@@ -1387,7 +1388,13 @@ class _TotalJacInfo(object):
                                                                                   mode=self.mode):
                                     print("   {}".format(local_ind))
                             else:
-                                print("('{0}', [{1}])".format(key, inds))
+                                print_key = key
+                                if key.startswith('_auto_ivc'):
+                                    conns = model._problem_meta['connections']
+                                    for src, tgt in conns.items():
+                                        if tgt == key:
+                                            print_key = model._var_allprocs_abs2prom['input'][src]
+                                print("('{0}', [{1}])".format(print_key, inds))
 
                         sys.stdout.flush()
                         t0 = time.time()
