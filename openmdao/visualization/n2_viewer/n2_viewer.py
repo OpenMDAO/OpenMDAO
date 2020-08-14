@@ -25,10 +25,10 @@ from openmdao.recorders.case_reader import CaseReader
 from openmdao.solvers.nonlinear.newton import NewtonSolver
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import simple_warning, make_serializable
-from openmdao.utils.record_util import check_valid_sqlite3_db
 from openmdao.utils.mpi import MPI
 from openmdao.visualization.html_utils import read_files, write_script, DiagramWriter
 from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.options_dictionary import Undefined
 
 _IND = 4  # HTML indentation (spaces)
 
@@ -197,7 +197,6 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
         if k in ['linear_solver', 'nonlinear_solver']:
             options[k] = system.options[k].SOLVER
         else:
-            from openmdao.utils.options_dictionary import Undefined
             if isinstance(system.options._dict[k]['value'], Undefined):
                 options[k] = str(system.options._dict[k]['value'])
             else:

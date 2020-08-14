@@ -250,6 +250,7 @@ class TestViewModelData(unittest.TestCase):
 
         model_viewer_data = _get_viewer_data(prob)
 
+        # To generate the reference JSON file, use this code
         # from openmdao.utils.testing_utils import _ModelViewerDataTreeEncoder
         # with open('betz_tree_new.json', 'w') as outfile:
         #     json.dump(model_viewer_data['tree'], outfile,cls=_ModelViewerDataTreeEncoder, indent=4)
