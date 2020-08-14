@@ -74,8 +74,6 @@ class Group(System):
         or subname can be None for the full, simultaneous transfer.
     _discrete_transfers : dict of discrete transfer metadata
         Key is system pathname or None for the full, simultaneous transfer.
-    _loc_subsys_map : dict
-        Mapping of local subsystem names to their corresponding System.
     _approx_subjac_keys : list
         List of subjacobian keys used for approximated derivatives.
     _setup_procs_finished : bool
@@ -479,8 +477,6 @@ class Group(System):
 
         # build a list of local subgroups to speed up later loops
         self._subgroups_myproc = [s for s in self._subsystems_myproc if isinstance(s, Group)]
-
-        self._loc_subsys_map = {s.name: s for s in self._subsystems_myproc}
 
         if MPI and nproc > 1:
             if self._mpi_proc_allocator.parallel:
@@ -1602,8 +1598,8 @@ class Group(System):
 
         if comm.size == 1:
             for src_sys_name, src, tgt_sys_name, tgt in self._discrete_transfers[key]:
-                tgt_sys = self._loc_subsys_map[tgt_sys_name]
-                src_sys = self._loc_subsys_map[src_sys_name]
+                tgt_sys = self._subsystems_allprocs[tgt_sys_name].system
+                src_sys = self._subsystems_allprocs[src_sys_name].system
                 # note that we are not copying the discrete value here, so if the
                 # discrete value is some mutable object, for example not an int or str,
                 # the downstream system will have a reference to the same object
@@ -1635,14 +1631,15 @@ class Group(System):
                     data = None
 
                 for src_sys_name, src, tgt_sys_name, tgt in xfers:
-                    if tgt_sys_name in self._loc_subsys_map:
-                        tgt_sys = self._loc_subsys_map[tgt_sys_name]
+                    tgt_sys, _, meta = self._subsystems_allprocs[tgt_sys_name]
+                    if meta['local']:
                         if tgt in tgt_sys._discrete_inputs:
                             abs_src = '.'.join((src_sys_name, src))
                             if data is not None and abs_src in data:
                                 src_val = data[abs_src]
                             else:
-                                src_val = self._loc_subsys_map[src_sys_name]._discrete_outputs[src]
+                                src_sys, _, _ = self._subsystems_allprocs[src_sys_name]
+                                src_val = src_sys._discrete_outputs[src]
                             tgt_sys._discrete_inputs[tgt] = src_val
 
     def _setup_transfers(self):
@@ -2845,8 +2842,6 @@ class Group(System):
         auto_ivc._setup_var_data()
 
         # now update our own data structures based on the new auto_ivc component variables
-        self._loc_subsys_map[auto_ivc.name] = auto_ivc
-
         old = self._subsystems_allprocs
         self._subsystems_allprocs = allsubs = OrderedDict()
         allsubs['_auto_ivc'] = SysTup(auto_ivc, 0, {'local': True})
