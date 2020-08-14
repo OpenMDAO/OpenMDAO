@@ -65,4 +65,3 @@ _UNDEFINED = _ReprClass("UNDEFINED")
 # Use this as a special value to be able to tell if the caller set a value for the optional
 # out_stream argument. We run into problems running testflo if we use a default of sys.stdout.
 _DEFAULT_OUT_STREAM = _ReprClass("DEFAULT_OUT_STREAM")
-
