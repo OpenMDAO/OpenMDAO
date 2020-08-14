@@ -3021,8 +3021,9 @@ class System(object):
 
         if get_sizes:
             # Size them all
-            sizes = self._var_sizes['nonlinear']['output']
-            abs2idx = self._var_allprocs_abs2idx['nonlinear']
+            sizes = self._problem_meta['sizes']['nonlinear']['output']
+            abs2idx = self._problem_meta['abs2idx']['nonlinear']
+            owning_rank = self._problem_meta['owning_rank']
             for prom_name, response in out.items():
                 name = response['ivc_source']
 
@@ -3031,7 +3032,7 @@ class System(object):
                     response['size'] = 0  # discrete var, we don't know the size
                     continue
 
-                meta = self._var_allprocs_abs2meta[name]
+                meta = abs2meta[name]
                 response['distributed'] = meta['distributed']
 
                 if response['indices'] is not None:
@@ -3040,7 +3041,7 @@ class System(object):
                         else meta['global_size']
 
                 else:
-                    response['size'] = sizes[self._owning_rank[name], abs2idx[name]]
+                    response['size'] = sizes[owning_rank[name], abs2idx[name]]
                     response['global_size'] = meta['global_size']
 
         if recurse:
