@@ -1849,8 +1849,8 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_near_equal(J['obj', 'z'][0][1], 1.78448534, .00001)
 
         outs = prob.model.list_outputs(residuals=True, out_stream=None)
-        for j in range(len(outs)):
-            val = np.linalg.norm(outs[j][1]['resids'])
+        for name, meta in outs:
+            val = np.linalg.norm(meta['resids'])
             self.assertLess(val, 1e-8, msg="Check if CS cleans up after itself.")
 
 
@@ -1962,8 +1962,8 @@ class TestComponentComplexStep(unittest.TestCase):
         assert_near_equal(J['obj', 'z'][0][1], 1.78448534, .00001)
 
         outs = prob.model.list_outputs(residuals=True, out_stream=None)
-        for j in range(len(outs)):
-            val = np.linalg.norm(outs[j][1]['resids'])
+        for name, meta in outs:
+            val = np.linalg.norm(meta['resids'])
             self.assertLess(val, 1e-8, msg="Check if CS cleans up after itself.")
 
     def test_stepsizes_under_complex_step(self):

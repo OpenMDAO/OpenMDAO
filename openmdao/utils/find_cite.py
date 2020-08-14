@@ -5,9 +5,7 @@ from collections import OrderedDict
 import inspect
 import sys
 
-# Use this as a special value to be able to tell if the caller set a value for the optional
-#   out_stream argument. We run into problems running testflo if we use a default of sys.stdout.
-_DEFAULT_OUT_STREAM = object()
+from openmdao.core.constants import _DEFAULT_OUT_STREAM
 
 
 def _check_cite(obj, citations):

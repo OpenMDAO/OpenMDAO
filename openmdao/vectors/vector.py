@@ -118,7 +118,6 @@ class Vector(object):
 
         self._system = weakref.ref(system)
 
-        self._iproc = system.comm.rank
         self._views = {}
         self._views_flat = {}
 

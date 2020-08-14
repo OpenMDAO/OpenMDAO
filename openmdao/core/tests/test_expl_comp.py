@@ -98,21 +98,17 @@ class ExplCompTestCase(unittest.TestCase):
         prob = om.Problem(RectangleGroup())
         prob.setup()
 
-        msg = "RectangleGroup (<model>): Unable to list inputs on a Group until model has been run."
-        try:
-            prob.model.list_inputs()
-        except Exception as err:
-            self.assertEqual(str(err), msg)
-        else:
-            self.fail("Exception expected")
+        # list explicit outputs
+        outputs = prob.model.list_outputs(implicit=False, out_stream=None)
+        expected = {
+            'comp1.area': {'value': np.array([1.])},
+            'comp2.area': {'value': np.array([1.])}
+        }
+        self.assertEqual(dict(outputs), expected)
 
-        msg = "RectangleGroup (<model>): Unable to list outputs on a Group until model has been run."
-        try:
-            prob.model.list_outputs()
-        except Exception as err:
-            self.assertTrue(msg == str(err))
-        else:
-            self.fail("Exception expected")
+        # list states
+        states = prob.model.list_outputs(explicit=False, out_stream=None)
+        self.assertEqual(states, [])
 
         prob.set_val('length', 3.)
         prob.set_val('width', 2.)
@@ -183,13 +179,13 @@ class ExplCompTestCase(unittest.TestCase):
         prob.setup()
 
         # list outputs before model has been run will raise an exception
-        msg = "Group (<model>): Unable to list outputs on a Group until model has been run."
-        try:
-            prob.model.list_outputs()
-        except Exception as err:
-            self.assertEqual(str(err), msg)
-        else:
-            self.fail("Exception expected")
+        outputs = dict(prob.model.list_outputs(out_stream=None))
+        expected = {
+            'p1.x': {'value': 12.},
+            'p2.y': {'value': 1.},
+            'comp.z': {'value': 0.},
+        }
+        self.assertEqual(outputs, expected)
 
         # list_inputs on a component before run is okay, using relative names
         expl_inputs = prob.model.comp.list_inputs(out_stream=None)
@@ -227,8 +223,7 @@ class ExplCompTestCase(unittest.TestCase):
             "",
             "varname  value",
             "-------  -----",
-            "p1",
-            "  x      [12.]",
+            "x        [12.]",
             "",
             "",
             "0 Implicit Output(s) in 'p1'",
@@ -279,10 +274,9 @@ class ExplCompTestCase(unittest.TestCase):
             "",
             "varname  value  units  shape",
             "-------  -----  -----  -----",
-            "model",
-            "  comp",
-            "    x    [12.]  inch   (1,)",
-            "    y    [12.]  inch   (1,)"
+            "comp",
+            "  x    [12.]  inch   (1,)",
+            "  y    [12.]  inch   (1,)"
         ]
         for i, line in enumerate(expected_text):
             if line and not line.startswith('-'):
@@ -322,13 +316,12 @@ class ExplCompTestCase(unittest.TestCase):
             "",
             "varname  value  resids  units  shape  lower  upper   ref  ref0  res_ref  desc",
             "-------  -----  ------  -----  -----  -----  ------  ---  ----  -------  -------",
-            "model",
-            "  p1",
-            "    x    [12.]  [0.]    inch   (1,)   [1.]   [100.]  1.1  2.1   1.1      indep x",
-            "  p2",
-            "    y    [1.]   [0.]    ft     (1,)   [2.]   [200.]  1.2  0.0   2.2      indep y",
-            "  comp",
-            "    z    [24.]  [0.]    inch   (1,)   None   None    1.0  0.0   1.0",
+            "p1",
+            "  x    [12.]  [0.]    inch   (1,)   [1.]   [100.]  1.1  2.1   1.1      indep x",
+            "p2",
+            "  y    [1.]   [0.]    ft     (1,)   [2.]   [200.]  1.2  0.0   2.2      indep y",
+            "comp",
+            "  z    [24.]  [0.]    inch   (1,)   None   None    1.0  0.0   1.0",
             "",
             "",
             "0 Implicit Output(s) in 'model'",
@@ -464,13 +457,12 @@ class ExplCompTestCase(unittest.TestCase):
         text = stream.getvalue()
         self.assertEqual(1, text.count("10 Input(s) in 'model'"))
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(23, num_non_empty_lines)
-        self.assertEqual(1, text.count('\nmodel'))
-        self.assertEqual(1, text.count('\n  sub1'))
-        self.assertEqual(1, text.count('\n    sub2'))
-        self.assertEqual(1, text.count('\n      g1'))
-        self.assertEqual(1, text.count('\n        d1'))
-        self.assertEqual(2, text.count('\n          z'))
+        self.assertEqual(22, num_non_empty_lines)
+        self.assertEqual(1, text.count('\nsub1'))
+        self.assertEqual(1, text.count('\n  sub2'))
+        self.assertEqual(1, text.count('\n    g1'))
+        self.assertEqual(1, text.count('\n      d1'))
+        self.assertEqual(2, text.count('\n        z'))
 
         # logging outputs
         # out_stream - not hierarchical - extras - no print_arrays
@@ -505,11 +497,10 @@ class ExplCompTestCase(unittest.TestCase):
                                 print_arrays=False,
                                 out_stream=stream)
         text = stream.getvalue()
-        self.assertEqual(text.count('\nmodel'), 1)
-        self.assertEqual(text.count('\n          y1'), 1)
-        self.assertEqual(text.count('\n  g2'), 1)
+        self.assertEqual(text.count('\n        y1'), 1)
+        self.assertEqual(text.count('\ng2'), 1)
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(num_non_empty_lines, 21)
+        self.assertEqual(num_non_empty_lines, 20)
 
     def test_array_list_vars_options(self):
 
@@ -567,10 +558,9 @@ class ExplCompTestCase(unittest.TestCase):
         text = stream.getvalue()
         self.assertEqual(1, text.count("1 Input(s) in 'model'"))
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(7, num_non_empty_lines)
-        self.assertEqual(1, text.count('\nmodel'))
-        self.assertEqual(1, text.count('\n  mult'))
-        self.assertEqual(1, text.count('\n    x'))
+        self.assertEqual(6, num_non_empty_lines)
+        self.assertEqual(1, text.count('\nmult'))
+        self.assertEqual(1, text.count('\n  x'))
 
         # logging outputs
         # out_stream - not hierarchical - extras - no print_arrays
@@ -598,10 +588,10 @@ class ExplCompTestCase(unittest.TestCase):
                                 print_arrays=False,
                                 out_stream=stream)
         text = stream.getvalue()
-        self.assertEqual(text.count('    x       |10.0|   x'), 1)
-        self.assertEqual(text.count('    y       |110.0|  y'), 1)
+        self.assertEqual(text.count('  x       |10.0|   x'), 1)
+        self.assertEqual(text.count('  y       |110.0|  y'), 1)
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(num_non_empty_lines, 11)
+        self.assertEqual(num_non_empty_lines, 10)
 
         # Hierarchical - no print arrays
         stream = StringIO()
@@ -615,13 +605,12 @@ class ExplCompTestCase(unittest.TestCase):
                                 print_arrays=False,
                                 out_stream=stream)
         text = stream.getvalue()
-        self.assertEqual(text.count('\nmodel'), 1)
-        self.assertEqual(text.count('\n  des_vars'), 1)
-        self.assertEqual(text.count('\n    x'), 1)
-        self.assertEqual(text.count('\n  mult'), 1)
-        self.assertEqual(text.count('\n    y'), 1)
+        self.assertEqual(text.count('\ndes_vars'), 1)
+        self.assertEqual(text.count('\n  x'), 1)
+        self.assertEqual(text.count('\nmult'), 1)
+        self.assertEqual(text.count('\n  y'), 1)
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(num_non_empty_lines, 11)
+        self.assertEqual(num_non_empty_lines, 10)
 
         # Need to explicitly set this to make sure all ways of running this test
         #   result in the same format of the output. When running this test from the
@@ -680,13 +669,12 @@ class ExplCompTestCase(unittest.TestCase):
             self.assertEqual(text.count('value:'), 2)
             self.assertEqual(text.count('resids:'), 2)
             self.assertEqual(text.count('['), 4)
-            self.assertEqual(text.count('\nmodel'), 1)
-            self.assertEqual(text.count('\n  des_vars'), 1)
-            self.assertEqual(text.count('\n    x'), 1)
-            self.assertEqual(text.count('\n  mult'), 1)
-            self.assertEqual(text.count('\n    y'), 1)
+            self.assertEqual(text.count('\ndes_vars'), 1)
+            self.assertEqual(text.count('\n  x'), 1)
+            self.assertEqual(text.count('\nmult'), 1)
+            self.assertEqual(text.count('\n  y'), 1)
             num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-            self.assertEqual(num_non_empty_lines, 49)
+            self.assertEqual(num_non_empty_lines, 48)
 
     def test_for_docs_array_list_vars_options(self):
 
@@ -1023,18 +1011,17 @@ class TestMPIExplComp(unittest.TestCase):
                 "",
                 "varname     value",
                 "----------  -----",
-                "model",
                 "p1",
-                "    x       [1.]",
+                "  x       [1.]",
                 "p2",
-                "    x       [1.]",
+                "  x       [1.]",
                 "parallel",
-                "    c1",
-                "   y     [1.]",
-                "    c2",
+                "  c1",
+                "    y     [1.]",
+                "  c2",
                 "    y     [1.]",
                 "c3",
-                "    y       [10.]",
+                "  y       [10.]",
                 "",
                 "",
                 "0 Implicit Output(s) in 'model'",
@@ -1056,15 +1043,14 @@ class TestMPIExplComp(unittest.TestCase):
                 "",
                 "varname     value",
                 "----------  -----",
-                "model",
                 "parallel",
-                "    c1",
+                "  c1",
                 "    x     [1.]",
-                "    c2",
+                "  c2",
                 "    x     [1.]",
                 "c3",
-                "    x1      [1.]",
-                "    x2      [1.]",
+                "  x1      [1.]",
+                "  x2      [1.]",
             ]
 
             for i, line in enumerate(expected_text):

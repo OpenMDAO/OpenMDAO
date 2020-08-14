@@ -173,7 +173,7 @@ def multi_proc_exception_check(comm):
     comm : MPI communicator or None
         Communicator from the ParallelGroup that owns the calling solver.
     """
-    if MPI is None or comm.size == 1:
+    if MPI is None or comm is None or comm.size == 1:
         yield
     else:
         try:
@@ -187,10 +187,17 @@ def multi_proc_exception_check(comm):
         failed = comm.allreduce(fail)
         if failed:
             if fail:
+                msg = f"{exc[1]}"
+            else:
+                msg = None
+            allmsgs = comm.allgather(msg)
+            if fail:
                 msg = f"Exception raised on rank {comm.rank}: {exc[1]}"
                 raise exc[0](msg).with_traceback(exc[2])
             else:
-                raise exc[0]("Exception raised on other rank.")
+                for m in allmsgs:
+                    if m is not None:
+                        raise RuntimeError(f"Exception raised on other rank: {m}.")
 
 
 if MPI:
