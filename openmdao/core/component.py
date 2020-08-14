@@ -8,7 +8,8 @@ import numpy as np
 from numpy import ndarray, isscalar, atleast_1d, atleast_2d, promote_types
 from scipy.sparse import issparse
 
-from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_META
+from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_META, \
+    global_meta_names
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.vectors.vector import INT_DTYPE, _full_slice
 from openmdao.utils.units import valid_units
@@ -18,13 +19,6 @@ from openmdao.utils.general_utils import format_as_float_or_array, ensure_compat
     find_matches, simple_warning, make_set, _is_slicer_op
 import openmdao.utils.coloring as coloring_mod
 
-
-# the following metadata will be accessible for vars on all procs
-global_meta_names = {
-    'input': ('units', 'shape', 'size', 'distributed', 'tags', 'desc'),
-    'output': ('units', 'shape', 'size', 'desc',
-               'ref', 'ref0', 'res_ref', 'distributed', 'lower', 'upper', 'tags'),
-}
 
 _forbidden_chars = ['.', '*', '?', '!', '[', ']']
 _whitespace = set([' ', '\t', '\r', '\n'])
@@ -161,7 +155,6 @@ class Component(System):
         self._var_rel_names = {'input': [], 'output': []}
         self._var_rel2meta = {}
 
-        self._static_mode = False
         self._var_rel2meta.update(self._static_var_rel2meta)
         for type_ in ['input', 'output']:
             self._var_rel_names[type_].extend(self._static_var_rel_names[type_])
@@ -175,8 +168,6 @@ class Component(System):
         if self._num_par_fd > 1 and orig_comm.size > 1 and not (self._owns_approx_jac or
                                                                 self._approx_schemes):
             raise RuntimeError("%s: num_par_fd is > 1 but no FD is active." % self.msginfo)
-
-        self._static_mode = True
 
         self._set_vector_class()
 
@@ -221,12 +212,12 @@ class Component(System):
         global global_meta_names
         super(Component, self)._setup_var_data()
 
-        allprocs_abs_names = self._var_allprocs_abs_names
-        allprocs_abs_names_discrete = self._var_allprocs_abs_names_discrete
+        abs_names = self._var_abs_names = self._var_allprocs_abs_names
+        abs_names_discrete = self._var_abs_names_discrete = self._var_allprocs_abs_names_discrete
 
         allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
 
-        abs2prom = self._var_abs2prom
+        abs2prom = self._var_allprocs_abs2prom = self._var_abs2prom
 
         allprocs_abs2meta = self._var_allprocs_abs2meta
         abs2meta = self._var_abs2meta
@@ -237,10 +228,9 @@ class Component(System):
         for type_ in ['input', 'output']:
             for prom_name in self._var_rel_names[type_]:
                 abs_name = prefix + prom_name
-                metadata = self._var_rel2meta[prom_name]
+                abs2meta[abs_name] = metadata = self._var_rel2meta[prom_name]
 
-                # Compute allprocs_abs_names
-                allprocs_abs_names[type_].append(abs_name)
+                abs_names[type_].append(abs_name)
 
                 # Compute allprocs_prom2abs_list, abs2prom
                 allprocs_prom2abs_list[type_][prom_name] = [abs_name]
@@ -251,18 +241,12 @@ class Component(System):
                     meta_name: metadata[meta_name]
                     for meta_name in global_meta_names[type_]
                 }
-                if type_ == 'input':
-                    src_indices = metadata['src_indices']
-                    allprocs_abs2meta[abs_name]['has_src_indices'] = src_indices is not None
-
-                # Compute abs2meta
-                abs2meta[abs_name] = metadata
 
             for prom_name, val in self._var_discrete[type_].items():
                 abs_name = prefix + prom_name
 
                 # Compute allprocs_abs_names_discrete
-                allprocs_abs_names_discrete[type_].append(abs_name)
+                abs_names_discrete[type_].append(abs_name)
 
                 # Compute allprocs_prom2abs_list, abs2prom
                 allprocs_prom2abs_list[type_][prom_name] = [abs_name]
@@ -272,10 +256,9 @@ class Component(System):
                 self._var_allprocs_discrete[type_][abs_name] = v = val.copy()
                 del v['value']
 
-        self._var_allprocs_abs2prom = abs2prom
-
-        self._var_abs_names = allprocs_abs_names
-        self._var_abs_names_discrete = allprocs_abs_names_discrete
+        for abs_name in abs_names['input']:
+            allprocs_abs2meta[abs_name]['has_src_indices'] = \
+                abs2meta[abs_name]['src_indices'] is not None
 
         if self._var_discrete['input'] or self._var_discrete['output']:
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
@@ -496,6 +479,8 @@ class Component(System):
         var_rel2meta[name] = metadata
         var_rel_names['input'].append(name)
 
+        self._var_added(name)
+
         return metadata
 
     def add_discrete_input(self, name, val, desc='', tags=None):
@@ -547,6 +532,8 @@ class Component(System):
             raise ValueError("{}: Variable name '{}' already exists.".format(self.msginfo, name))
 
         var_rel2meta[name] = self._var_discrete['input'][name] = metadata
+
+        self._var_added(name)
 
         return metadata
 
@@ -697,6 +684,8 @@ class Component(System):
         var_rel2meta[name] = metadata
         var_rel_names['output'].append(name)
 
+        self._var_added(name)
+
         return metadata
 
     def add_discrete_output(self, name, val, desc='', tags=None):
@@ -748,7 +737,21 @@ class Component(System):
 
         var_rel2meta[name] = self._var_discrete['output'][name] = metadata
 
+        self._var_added(name)
+
         return metadata
+
+    def _var_added(self, name):
+        """
+        Notify config that a variable has been added to this Component.
+
+        Parameters
+        ----------
+        name : str
+            Name of the added variable.
+        """
+        if self._problem_meta is not None and self._problem_meta['config_info'] is not None:
+            self._problem_meta['config_info']._var_added(self.pathname, name)
 
     def _update_dist_src_indices(self, abs_in2out, all_abs2meta, all_abs2idx, all_sizes):
         """

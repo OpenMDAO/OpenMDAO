@@ -883,7 +883,43 @@ def make_set(str_data, name=None):
         raise TypeError("The argument should be str, set, or list: {}".format(str_data))
 
 
-def match_includes_excludes(name, prom_name, includes, excludes):
+def match_includes_excludes(name, includes=None, excludes=None):
+    """
+    Check to see if the variable names pass through the includes and excludes filter.
+
+    Parameters
+    ----------
+    name : str
+        Name to be checked for match.
+    includes : iter of str or None
+        Glob patterns for name to include in the filtering.  None, the default, means
+        include all.
+    excludes : iter of str or None
+        Glob patterns for name to exclude in the filtering.
+
+    Returns
+    -------
+    bool
+        Return True if the name passes through the filtering of includes and excludes.
+    """
+    # Process excludes
+    if excludes is not None:
+        for pattern in excludes:
+            if fnmatchcase(name, pattern):
+                return False
+
+    # Process includes
+    if includes is None:
+        return True
+    else:
+        for pattern in includes:
+            if fnmatchcase(name, pattern):
+                return True
+
+    return False
+
+
+def match_prom_or_abs(name, prom_name, includes=None, excludes=None):
     """
     Check to see if the variable names pass through the includes and excludes filter.
 
@@ -893,34 +929,34 @@ def match_includes_excludes(name, prom_name, includes, excludes):
         Unpromoted variable name to be checked for match.
     prom_name : str
         Promoted variable name to be checked for match.
-    includes : None or list_like
-        List of glob patterns for name to include in the filtering.
-    excludes : None or list_like
-        List of glob patterns for name to exclude in the filtering.
+    includes : iter of str or None
+        Glob patterns for name to include in the filtering.  None, the default, means
+        to include all.
+    excludes : iter of str or None
+        Glob patterns for name to exclude in the filtering.
 
     Returns
     -------
     bool
         Return True if the name passes through the filtering of includes and excludes.
     """
-    # Process includes
-    if includes is not None:
-        for pattern in includes:
-            if fnmatchcase(name, pattern) or fnmatchcase(prom_name, pattern):
-                break
-        else:  # didn't find any match
-            return False
+    diff = name != prom_name
 
     # Process excludes
     if excludes is not None:
-        match = False
         for pattern in excludes:
-            if fnmatchcase(name, pattern) or fnmatchcase(prom_name, pattern):
-                match = True
-                break
-        return not match
+            if fnmatchcase(name, pattern) or (diff and fnmatchcase(prom_name, pattern)):
+                return False
 
-    return True
+    # Process includes
+    if includes is None:
+        return True
+    else:
+        for pattern in includes:
+            if fnmatchcase(name, pattern) or (diff and fnmatchcase(prom_name, pattern)):
+                return True
+
+    return False
 
 
 def env_truthy(env_var):

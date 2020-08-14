@@ -367,7 +367,7 @@ class SplineCompTestCase(unittest.TestCase):
         prob.setup(force_alloc_complex=True)
         prob.run_model()
 
-        output = prob.model.list_inputs(units=True)
+        output = sorted(prob.model.list_inputs(units=True))
         self.assertEqual(output[0][1]['units'], 'kft')
 
 class SplineCompFeatureTestCase(unittest.TestCase):
