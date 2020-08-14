@@ -5,7 +5,7 @@ import time
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.mpi import MPI
+from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.array_utils import evenly_distrib_idxs, take_nth
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 
@@ -395,19 +395,6 @@ class MPITests(unittest.TestCase):
 
         test = self
 
-        def verify(inputs, outputs, in_vals=1., out_vals=1., pathnames=False):
-            test.assertEqual(len(inputs), 1)
-            name, meta = inputs[0]
-            test.assertEqual(name, 'C2.invec' if pathnames else 'invec')
-            test.assertTrue(meta['shape'] == (size,))
-            test.assertTrue(all(meta['value'] == in_vals*np.ones(size)))
-
-            test.assertEqual(len(outputs), 1)
-            name, meta = outputs[0]
-            test.assertEqual(name, 'C2.outvec' if pathnames else 'outvec')
-            test.assertTrue(meta['shape'] == (size,))
-            test.assertTrue(all(meta['value'] == out_vals*np.ones(size)))
-
         class Model(om.Group):
             def setup(self):
                 C1 = self.add_subsystem("C1", InOutArrayComp(arr_size=size))
@@ -418,15 +405,43 @@ class MPITests(unittest.TestCase):
                 # verify list_inputs/list_outputs work in configure
                 inputs = self.C2.list_inputs(shape=True, values=True, out_stream=None)
                 outputs = self.C2.list_outputs(shape=True, values=True, out_stream=None)
-                verify(inputs, outputs, pathnames=False)
+                verify(inputs, outputs, full_size=size*2, loc_size=size, pathnames=False, rank=0)
+
+                inputs = self.C2.list_inputs(shape=True, values=True, all_procs=True, out_stream=None)
+                outputs = self.C2.list_outputs(shape=True, values=True, all_procs=True, out_stream=None)
+                verify(inputs, outputs, full_size=size*2, loc_size=size, pathnames=False)
 
         p = om.Problem(Model())
+
+        def verify(inputs, outputs, full_size, loc_size, in_vals=1., out_vals=1., pathnames=False, rank=None):
+            inputs = sorted(inputs)
+            outputs = sorted(outputs)
+
+            with multi_proc_exception_check(p.comm):
+                if rank is None or p.comm.rank == rank:
+                    test.assertEqual(len(inputs), 1)
+                    name, meta = inputs[0]
+                    test.assertEqual(name, 'C2.invec' if pathnames else 'invec')
+                    test.assertTrue(meta['shape'] == (loc_size,))
+                    test.assertEqual(meta['value'].size, full_size)
+                    test.assertTrue(all(meta['value'] == in_vals*np.ones(full_size)))
+
+                    test.assertEqual(len(outputs), 1)
+                    name, meta = outputs[0]
+                    test.assertEqual(name, 'C2.outvec' if pathnames else 'outvec')
+                    test.assertTrue(meta['shape'] == (loc_size,))
+                    test.assertTrue(all(meta['value'] == out_vals*np.ones(full_size)))
+
         p.setup()
 
         # verify list_inputs/list_outputs work before final_setup
         inputs = p.model.C2.list_inputs(shape=True, values=True, out_stream=None)
         outputs = p.model.C2.list_outputs(shape=True, values=True, out_stream=None)
-        verify(inputs, outputs, pathnames=False)
+        verify(inputs, outputs, size*2, size, pathnames=False, rank=0)
+
+        inputs = p.model.C2.list_inputs(shape=True, values=True, all_procs=True, out_stream=None)
+        outputs = p.model.C2.list_outputs(shape=True, values=True, all_procs=True, out_stream=None)
+        verify(inputs, outputs, size*2, size, pathnames=False)
 
         p.final_setup()
 
@@ -435,42 +450,55 @@ class MPITests(unittest.TestCase):
         # verify list_inputs/list_outputs work before run
         inputs = p.model.C2.list_inputs(shape=True, values=True, out_stream=None)
         outputs = p.model.C2.list_outputs(shape=True, values=True, out_stream=None)
-        verify(inputs, outputs, pathnames=True)
+        verify(inputs, outputs, size*2, size, pathnames=False, rank=0)
+
+        inputs = p.model.C2.list_inputs(shape=True, values=True, all_procs=True, out_stream=None)
+        outputs = p.model.C2.list_outputs(shape=True, values=True, all_procs=True, out_stream=None)
+        verify(inputs, outputs, size*2, size, pathnames=False)
 
         p.run_model()
 
         # verify list_inputs/list_outputs work after run
         inputs = p.model.C2.list_inputs(shape=True, values=True, out_stream=None)
         outputs = p.model.C2.list_outputs(shape=True, values=True, out_stream=None)
-        verify(inputs, outputs, in_vals=10., out_vals=7.5, pathnames=True)
+        verify(inputs, outputs, size*2, size, in_vals=10., out_vals=7.5, pathnames=False, rank=0)
+
+        inputs = p.model.C2.list_inputs(shape=True, values=True, all_procs=True, out_stream=None)
+        outputs = p.model.C2.list_outputs(shape=True, values=True, all_procs=True, out_stream=None)
+        verify(inputs, outputs, size*2, size, in_vals=10., out_vals=7.5, pathnames=False)
 
     def test_distrib_list_inputs_outputs(self):
         size = 11
 
         test = self
 
-        def verify(inputs, outputs, in_vals=1., out_vals=1., pathnames=False, comm=None, final=True):
+        def verify(inputs, outputs, in_vals=1., out_vals=1., pathnames=False, comm=None, final=True, rank=None):
             global_shape = (size, ) if final else 'Unavailable'
 
-            if comm is not None:
-                sizes, offsets = evenly_distrib_idxs(comm.size, size)
-                local_size = sizes[comm.rank]
-            else:
-                local_size = size
+            inputs = sorted(inputs)
+            outputs = sorted(outputs)
 
-            test.assertEqual(len(inputs), 1)
-            name, meta = inputs[0]
-            test.assertEqual(name, 'C2.invec' if pathnames else 'invec')
-            test.assertEqual(meta['shape'], (local_size,))
-            test.assertEqual(meta['global_shape'], global_shape)
-            test.assertTrue(all(meta['value'] == in_vals*np.ones(local_size)))
+            with multi_proc_exception_check(comm):
+                if comm is not None:
+                    sizes, offsets = evenly_distrib_idxs(comm.size, size)
+                    local_size = sizes[comm.rank]
+                else:
+                    local_size = size
 
-            test.assertEqual(len(outputs), 1)
-            name, meta = outputs[0]
-            test.assertEqual(name, 'C2.outvec' if pathnames else 'outvec')
-            test.assertEqual(meta['shape'], (local_size,))
-            test.assertEqual(meta['global_shape'], global_shape)
-            test.assertTrue(all(meta['value'] == out_vals*np.ones(local_size)))
+                if rank is None or comm is None or rank == comm.rank:
+                    test.assertEqual(len(inputs), 1)
+                    name, meta = inputs[0]
+                    test.assertEqual(name, 'C2.invec' if pathnames else 'invec')
+                    test.assertEqual(meta['shape'], (local_size,))
+                    test.assertEqual(meta['global_shape'], global_shape)
+                    test.assertTrue(all(meta['value'] == in_vals*np.ones(size)))
+
+                    test.assertEqual(len(outputs), 1)
+                    name, meta = outputs[0]
+                    test.assertEqual(name, 'C2.outvec' if pathnames else 'outvec')
+                    test.assertEqual(meta['shape'], (local_size,))
+                    test.assertEqual(meta['global_shape'], global_shape)
+                    test.assertTrue(all(meta['value'] == out_vals*np.ones(size)))
 
         class Model(om.Group):
             def setup(self):
@@ -481,34 +509,54 @@ class MPITests(unittest.TestCase):
                 self.connect('C2.outvec', 'C3.invec')
 
             def configure(self):
-                # verify list_inputs/list_outputs work in configure for distributed comp
+                # verify list_inputs/list_outputs work in configure for distributed comp on rank 0 only
                 inputs = self.C2.list_inputs(shape=True, global_shape=True, values=True, out_stream=None)
                 outputs = self.C2.list_outputs(shape=True, global_shape=True, values=True, out_stream=None)
+                verify(inputs, outputs, pathnames=False, comm=self.comm, final=False, rank=0)
+
+                # verify list_inputs/list_outputs work in configure for distributed comp on all ranks
+                inputs = self.C2.list_inputs(shape=True, global_shape=True, values=True, all_procs=True, out_stream=None)
+                outputs = self.C2.list_outputs(shape=True, global_shape=True, values=True, all_procs=True, out_stream=None)
                 verify(inputs, outputs, pathnames=False, comm=self.comm, final=False)
 
         p = om.Problem(Model())
         p.setup()
 
-        # verify list_inputs/list_outputs work before final_setup for distributed comp
+        # verify list_inputs/list_outputs work before final_setup for distributed comp on rank 0 only
         inputs = p.model.C2.list_inputs(shape=True, global_shape=True, values=True, out_stream=None)
         outputs = p.model.C2.list_outputs(shape=True, global_shape=True, values=True, out_stream=None)
-        verify(inputs, outputs, pathnames=False, comm=p.comm, final=False)
+        verify(inputs, outputs, pathnames=False, comm=p.comm, final=True, rank=0)
+
+        # verify list_inputs/list_outputs work before final_setup for distributed comp on all ranks
+        inputs = p.model.C2.list_inputs(shape=True, global_shape=True, values=True, all_procs=True, out_stream=None)
+        outputs = p.model.C2.list_outputs(shape=True, global_shape=True, values=True, all_procs=True, out_stream=None)
+        verify(inputs, outputs, pathnames=False, comm=p.comm, final=True)
 
         p.final_setup()
 
         p['C1.invec'] = np.ones(size, float) * 5.0
 
-        # verify list_inputs/list_outputs work before run for distributed comp
+        # verify list_inputs/list_outputs work before run for distributed comp on rank 0 only
         inputs = p.model.C2.list_inputs(shape=True, global_shape=True, values=True, out_stream=None)
         outputs = p.model.C2.list_outputs(shape=True, global_shape=True, values=True, out_stream=None)
-        verify(inputs, outputs, pathnames=True, comm=p.comm, final=True)
+        verify(inputs, outputs, pathnames=False, comm=p.comm, final=True, rank=0)
+
+        # verify list_inputs/list_outputs work before run for distributed comp on all ranks
+        inputs = p.model.C2.list_inputs(shape=True, global_shape=True, values=True, all_procs=True, out_stream=None)
+        outputs = p.model.C2.list_outputs(shape=True, global_shape=True, values=True, all_procs=True, out_stream=None)
+        verify(inputs, outputs, pathnames=False, comm=p.comm, final=True)
 
         p.run_model()
 
-        # verify list_inputs/list_outputs work after run for distributed comp
+        # verify list_inputs/list_outputs work after run for distributed comp on rank 0 only
         inputs = p.model.C2.list_inputs(shape=True, global_shape=True, values=True, out_stream=None)
         outputs = p.model.C2.list_outputs(shape=True, global_shape=True, values=True, out_stream=None)
-        verify(inputs, outputs, in_vals=10., out_vals=20., pathnames=True, comm=p.comm, final=True)
+        verify(inputs, outputs, in_vals=10., out_vals=20., pathnames=False, comm=p.comm, final=True, rank=0)
+
+        # verify list_inputs/list_outputs work after run for distributed comp on all ranks
+        inputs = p.model.C2.list_inputs(shape=True, global_shape=True, values=True, all_procs=True, out_stream=None)
+        outputs = p.model.C2.list_outputs(shape=True, global_shape=True, values=True, all_procs=True, out_stream=None)
+        verify(inputs, outputs, in_vals=10., out_vals=20., pathnames=False, comm=p.comm, final=True)
 
     def test_distrib_idx_in_full_out(self):
         size = 11

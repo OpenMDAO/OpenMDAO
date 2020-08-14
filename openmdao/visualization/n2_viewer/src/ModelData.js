@@ -16,6 +16,7 @@ class ModelData {
         this.autoivcSources = 0;
         this.nodePaths = {};
         this.nodeIds = [];
+        this.depthCount = [];
 
         startTimer('ModelData._convertToN2TreeNodes');
         this.root = this.tree = modelJSON.tree = this._convertToN2TreeNodes(modelJSON.tree);
@@ -99,6 +100,10 @@ class ModelData {
         node.parent = parent;
         node.id = this.nodeIds.length;
         this.nodeIds.push(node);
+
+        // Track # of nodes at each depth
+        if (depth > this.depthCount.length) { this.depthCount.push(1); }
+        else { this.depthCount[depth - 1]++; }
 
         if (node.parent) { // not root node? node.parent.absPathName : "";
             if (node.parent.absPathName != "") {
