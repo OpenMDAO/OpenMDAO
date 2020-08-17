@@ -31,7 +31,7 @@ class TestComp(om.ExplicitComponent):
         outputs['bar'] = float(discrete_inputs['foo'])
 
 
-# @use_tempdirs
+@use_tempdirs
 class TestDiscreteViewConns(unittest.TestCase):
     def test_discrete(self):
         p = om.Problem()
