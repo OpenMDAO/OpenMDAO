@@ -14,6 +14,7 @@ from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 import openmdao.utils.hooks as hooks
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives
+from openmdao.utils.units import convert_units
 
 try:
     from parameterized import parameterized
@@ -116,6 +117,29 @@ class SellarOneComp(om.ImplicitComponent):
 
 
 class TestProblem(unittest.TestCase):
+
+    def test_simple_component_model_with_units(self):
+        class TestComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('foo', units='N')
+                self.add_output('bar', units='N')
+                self.declare_partials('bar', 'foo')
+
+            def compute(self, inputs, outputs):
+                outputs['bar'] = inputs['foo']
+
+            def compute_partials(self, inputs, J):
+                J['bar', 'foo'] = 1.
+
+        p = om.Problem(model=TestComp())
+        p.setup()
+
+        p.set_val('foo', 5, units='lbf')
+        p.run_model()
+
+        lbf_val = convert_units(5, 'lbf', 'N')
+        self.assertEqual(p.get_val('foo'), lbf_val)
+        self.assertEqual(p.get_val('bar'), lbf_val)
 
     def test_feature_simple_run_once_no_promote(self):
         import openmdao.api as om
@@ -2052,6 +2076,7 @@ class TestProblem(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.set_val('x', 0.)
         self.assertEqual(str(cm.exception), "Problem: 'x' Cannot call set_val before setup.")
+
 
 class NestedProblemTestCase(unittest.TestCase):
 
