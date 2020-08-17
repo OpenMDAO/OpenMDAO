@@ -197,7 +197,7 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
         if k in ['linear_solver', 'nonlinear_solver']:
             options[k] = system.options[k].SOLVER
         else:
-            if str(system.options._dict[k]['value']) == "UNDEFINED":
+            if system.options._dict[k]['value'] is _UNDEFINED:
                 options[k] = str(system.options._dict[k]['value'])
             else:
                 options[k] = system.options._dict[k]['value']
