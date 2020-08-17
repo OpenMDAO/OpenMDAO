@@ -167,13 +167,14 @@ class _TotalJacInfo(object):
 
         # Convert 'wrt' names from promoted to absolute
         wrt = []
+        self.ivc_print_names = {}
         for name in prom_wrt:
             if name in prom2abs:
                 wrt_name = prom2abs[name][0]
             elif name in prom2abs_in:
                 in_abs = prom2abs_in[name][0]
                 wrt_name = conns[in_abs]
-                self.ivc_print_names[wrt_name] = in_abs
+                self.ivc_print_names[wrt_name] = name
             else:
                 wrt_name = name
             wrt.append(wrt_name)
@@ -196,6 +197,7 @@ class _TotalJacInfo(object):
                 # An auto_ivc design var can be used as a response too.
                 in_abs = prom2abs_in[name][0]
                 of_name = conns[in_abs]
+                self.ivc_print_names[of_name] = name
             else:
                 of_name = name
             of.append(of_name)
@@ -522,11 +524,8 @@ class _TotalJacInfo(object):
                         self.par_deriv[parallel_deriv_color].append(name)
 
                         print_name = name
-                        if name.startswith('_auto_ivc'):
-                            conns = model._problem_meta['connections']
-                            for src, tgt in conns.items():
-                                if tgt == name:
-                                    print_name = model._var_allprocs_abs2prom['input'][src]
+                        if name in self.ivc_print_names:
+                            print_name = self.ivc_print_names[name]
 
                         self.par_deriv_printnames[parallel_deriv_color].append(print_name)
 
@@ -1392,11 +1391,8 @@ class _TotalJacInfo(object):
                                     print("   {}".format(local_ind))
                             else:
                                 print_key = key
-                                if key.startswith('_auto_ivc'):
-                                    conns = model._problem_meta['connections']
-                                    for src, tgt in conns.items():
-                                        if tgt == key:
-                                            print_key = model._var_allprocs_abs2prom['input'][src]
+                                if key in self.ivc_print_names:
+                                    print_key = self.ivc_print_names[key]
                                 print("('{0}', [{1}])".format(print_key, inds))
 
                         sys.stdout.flush()
