@@ -1103,9 +1103,9 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # check that output from the Case method matches output from the System method
         # the system for the case should be properly identified as 'd1'
-        estream = StringIO()
-        d1.list_inputs(prom_name=True, desc=True, out_stream=estream)
-        expected = estream.getvalue().split('\n')
+        stream = StringIO()
+        d1.list_inputs(prom_name=True, desc=True, out_stream=stream)
+        expected = stream.getvalue().split('\n')
 
         stream = StringIO()
         case.list_inputs(prom_name=True, desc=True, out_stream=stream)
@@ -1870,8 +1870,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        inputs_before = prob.model.list_inputs(values=True, units=True, out_stream=None).items()
-        outputs_before = prob.model.list_outputs(values=True, units=True, out_stream=None).items()
+        inputs_before = prob.model.list_inputs(values=True, units=True, out_stream=None)
+        outputs_before = prob.model.list_outputs(values=True, units=True, out_stream=None)
 
         cr = om.CaseReader(self.filename)
 
@@ -1894,8 +1894,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        inputs_after = prob.model.list_inputs(values=True, units=True, out_stream=None).items()
-        outputs_after = prob.model.list_outputs(values=True, units=True, out_stream=None).items()
+        inputs_after = prob.model.list_inputs(values=True, units=True, out_stream=None)
+        outputs_after = prob.model.list_outputs(values=True, units=True, out_stream=None)
 
         iter_count_after = driver.iter_count
 

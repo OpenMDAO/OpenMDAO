@@ -82,10 +82,10 @@ not wish to see via the :code:`implicit` and :code:`explicit` arguments.
     :layout: interleave
 
 
-*Get Variable Info via Return Value*
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*Get List via Return Value*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Both of these methods also return the information in the form of a dict.
+Both of these methods also return the information in the form of a list.
 You can disable the display of the information by setting the argument :code:`out_stream`
 to :code:`None` and then access the data instead via the return value.
 
@@ -95,7 +95,7 @@ to :code:`None` and then access the data instead via the return value.
 
 
 The :code:`System.get_io_metadata` method, which is used internally by :code:`list_inputs` and
-:code:`list_outputs`, will also return the specified variable information as a dict.
+:code:`list_outputs`, returns the specified variable information as a dict.
 
 
 *List Names Only*

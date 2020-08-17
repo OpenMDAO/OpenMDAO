@@ -353,19 +353,19 @@ Solvers.
 
 .. |variable_node_info| image:: images/variable_node_info.png
     :align: middle
-    :scale: 30 %
+    :scale: 60 %
 
 .. |system_node_info| image:: images/system_node_info.png
     :align: middle
-    :scale: 30 %
+    :scale: 60 %
 
 .. |cell_node_info| image:: images/cell_node_info.png
     :align: middle
-    :scale: 30 %
+    :scale: 60 %
 
 .. |solver_node_info| image:: images/solver_node_info.png
     :align: middle
-    :scale: 30 %
+    :scale: 60 %
 
 |
 

@@ -55,7 +55,8 @@ The shape information is collected using :code:`get_io_metadata`.
 
 Variable information may also be collected using :code:`list_inputs` and :code:`list_outputs`
 which provide a somewhat simpler interface with a little less flexibility and a little more
-overhead.
+overhead.  Also, :code:`list_inputs` and :code:`list_outputs` return their data as a list
+of (name, metadata) tuples rather than as a dictionary.
 
 
 Uses of setup vs. configure

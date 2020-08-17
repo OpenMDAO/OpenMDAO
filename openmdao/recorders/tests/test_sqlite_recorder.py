@@ -437,7 +437,7 @@ class TestSqliteRecorder(unittest.TestCase):
         assertMetadataRecorded(self, prom2abs, abs2prom)
         expected_problem_metadata = {
             'connections_list_length': 11,
-            'tree_length': 10,
+            'tree_length': 13,
             'tree_children_length': 5,
             'abs2prom': abs2prom,
         }
@@ -2393,9 +2393,10 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         # access the model tree stored in metadata
         self.assertEqual(set(cr.problem_metadata['tree'].keys()),
-                         {'name', 'type', 'subsystem_type', 'children', 'linear_solver',
-                          'nonlinear_solver', 'is_parallel', 'component_type', 'class',
-                          'expressions'})
+                         {'name', 'type', 'class', 'expressions', 'component_type',
+                          'subsystem_type', 'is_parallel', 'linear_solver', 'linear_solver_options',
+                          'nonlinear_solver', 'nonlinear_solver_options', 'children', 'options'})
+
         self.assertEqual(cr.problem_metadata['tree']['name'], 'root')
         self.assertEqual(sorted([child["name"] for child in cr.problem_metadata['tree']["children"]]),
                          ['con_cmp1', 'con_cmp2', 'd1', 'd2', 'obj_cmp'])

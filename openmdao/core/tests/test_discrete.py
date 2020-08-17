@@ -418,7 +418,7 @@ class DiscreteTestCase(unittest.TestCase):
 
         # list inputs, no tags
         inputs = prob.model.list_inputs(values=False, out_stream=None)
-        self.assertEqual(sorted(inputs.items()), [
+        self.assertEqual(sorted(inputs), [
             ('expl.a', {}),
             ('expl.x', {}),
             ('impl.x', {}),
@@ -426,14 +426,14 @@ class DiscreteTestCase(unittest.TestCase):
 
         # list inputs, with tags
         inputs = prob.model.list_inputs(values=False, out_stream=None, tags='tagx')
-        self.assertEqual(sorted(inputs.items()), [
+        self.assertEqual(sorted(inputs), [
             ('expl.x', {}),
             ('impl.x', {}),
         ])
 
         # list outputs, no tags
         outputs = prob.model.list_outputs(values=False, out_stream=None)
-        self.assertEqual(sorted(outputs.items()), [
+        self.assertEqual(sorted(outputs), [
             ('expl.b', {}),
             ('expl.y', {}),
             ('impl.y', {}),
@@ -442,7 +442,7 @@ class DiscreteTestCase(unittest.TestCase):
 
         # list outputs, with tags
         outputs = prob.model.list_outputs(values=False, out_stream=None, tags='tagy')
-        self.assertEqual(sorted(outputs.items()), [
+        self.assertEqual(sorted(outputs), [
             ('expl.y', {}),
             ('impl.y', {}),
         ])
