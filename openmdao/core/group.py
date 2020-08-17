@@ -608,7 +608,7 @@ class Group(System):
         return prom2abs
 
     def _top_level_setup(self, mode):
-        self._problem_meta['connections'] = conns = self._conn_global_abs_in2out
+        self._problem_meta['connections'] = self._conn_global_abs_in2out
         self._problem_meta['all_meta'] = self._var_allprocs_abs2meta
         self._problem_meta['meta'] = self._var_abs2meta
         self._problem_meta['vars_to_gather'] = self._vars_to_gather

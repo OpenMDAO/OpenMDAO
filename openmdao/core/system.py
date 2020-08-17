@@ -634,30 +634,11 @@ class System(object):
 
         self._setup_var_data()
 
-        self._setup_vec_names(mode)
         self._setup_global_connections()
 
-        if self.pathname == '':
-            self._top_level_setup(mode)
+        self._top_level_setup(mode)
 
-        # Now that connections are setup, we need to convert relevant vector names into their
-        # auto_ivc source where applicable.
-        new_names = []
-        conns = self._conn_global_abs_in2out
-        for vec_name in self._vec_names:
-            if vec_name in conns:
-                new_names.append(conns[vec_name])
-            else:
-                new_names.append(vec_name)
-        self._problem_meta['vec_names'] = new_names
-
-        new_names = []
-        for vec_name in self._lin_vec_names:
-            if vec_name in conns:
-                new_names.append(conns[vec_name])
-            else:
-                new_names.append(vec_name)
-        self._problem_meta['lin_vec_names'] = new_names
+        self._setup_vec_names(mode)
 
         self._setup_relevance(mode, self._relevant)
         self._setup_var_index_ranges()
@@ -668,8 +649,7 @@ class System(object):
         self._problem_meta['sizes'] = self._var_sizes
         self._problem_meta['owning_rank'] = self._owning_rank
 
-        if self.pathname == '':
-            self._top_level_setup2()
+        self._top_level_setup2()
 
         self._setup_connections()
 
@@ -1401,16 +1381,23 @@ class System(object):
         mode : str
             Derivative direction, either 'fwd' or 'rev'.
         """
+        vois = {}
+        conns = self._problem_meta['connections']
+
         if self._use_derivatives:
             vec_names = ['nonlinear', 'linear']
-            vois = {}
+            # Now that connections are setup, we need to convert relevant vector names into their
+            # auto_ivc source where applicable.
             for system in self.system_iter(include_self=True, recurse=True):
-                vois.update(tup for tup in system._get_vec_names_from_vois(mode))
+                for name, meta in system._get_vec_names_from_vois(mode):
+                    if name in conns:
+                        vois[conns[name]] = meta
+                    else:
+                        vois[name] = meta
 
             vec_names.extend(sorted(vois))
         else:
             vec_names = ['nonlinear']
-            vois = {}
 
         self._problem_meta['vec_names'] = vec_names
         self._problem_meta['lin_vec_names'] = vec_names[1:]
@@ -1428,24 +1415,19 @@ class System(object):
         mode : str
             Derivative direction, either 'fwd' or 'rev'.
         """
-        if mode == 'fwd':
-            vois = self._design_vars
-            typ = "design variable"
-        else:
-            vois = self._responses
-            typ = "response"
+        vois = self._design_vars if mode == 'fwd' else self._responses
 
-        pro2abs = self._var_allprocs_prom2abs_list['output']
-        pro2abs_in = self._var_allprocs_prom2abs_list['input']
+        pro2abs = self._var_allprocs_prom2abs_list
         try:
             for prom_name, data in vois.items():
                 if data['parallel_deriv_color'] is not None or data['vectorize_derivs']:
-                    if prom_name in pro2abs:
-                        yield pro2abs[prom_name][0], data
+                    if prom_name in pro2abs['output']:
+                        yield pro2abs['output'][prom_name][0], data
                     else:
-                        yield pro2abs_in[prom_name][0], data
+                        yield pro2abs['input'][prom_name][0], data
 
         except KeyError as err:
+            typ = 'design variable' if mode == 'fwd' else 'response'
             raise RuntimeError(f"{self.msginfo}: Output not found for {typ} {str(err)}.")
 
     def _init_relevance(self, mode):
@@ -1465,8 +1447,7 @@ class System(object):
         if self._use_derivatives:
             desvars = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
             responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
-            return get_relevant_vars(self._conn_global_abs_in2out, desvars, responses,
-                                     mode)
+            return self.get_relevant_vars(desvars, responses, mode)
         else:
             relevant = defaultdict(dict)
             relevant['nonlinear'] = {'@all': ({'input': ContainsAll(), 'output': ContainsAll()},
@@ -4636,160 +4617,164 @@ class System(object):
     def _resolve_ambiguous_input_meta(self):
         pass
 
+    def get_relevant_vars(self, desvars, responses, mode):
+        """
+        Find all relevant vars between desvars and responses.
 
-def get_relevant_vars(connections, desvars, responses, mode):
-    """
-    Find all relevant vars between desvars and responses.
+        Both vars are assumed to be outputs (either design vars or responses).
 
-    Both vars are assumed to be outputs (either design vars or responses).
+        Parameters
+        ----------
+        desvars : list of str
+            Names of design variables.
+        responses : list of str
+            Names of response variables.
+        mode : str
+            Direction of derivatives, either 'fwd' or 'rev'.
 
-    Parameters
-    ----------
-    connections : dict
-        Mapping of targets to their sources.
-    desvars : list of str
-        Names of design variables.
-    responses : list of str
-        Names of response variables.
-    mode : str
-        Direction of derivatives, either 'fwd' or 'rev'.
+        Returns
+        -------
+        dict
+            Dict of ({'outputs': dep_outputs, 'inputs': dep_inputs, dep_systems)
+            keyed by design vars and responses.
+        """
+        conns = self._conn_global_abs_in2out
+        relevant = defaultdict(dict)
 
-    Returns
-    -------
-    dict
-        Dict of ({'outputs': dep_outputs, 'inputs': dep_inputs, dep_systems)
-        keyed by design vars and responses.
-    """
-    relevant = defaultdict(dict)
+        # Create a hybrid graph with components and all connected vars.  If a var is connected,
+        # also connect it to its corresponding component.
+        graph = nx.DiGraph()
+        for tgt, src in conns.items():
+            if src not in graph:
+                graph.add_node(src, type_='out')
+            graph.add_node(tgt, type_='in')
 
-    # Create a hybrid graph with components and all connected vars.  If a var is connected,
-    # also connect it to its corresponding component.
-    graph = nx.DiGraph()
-    for tgt, src in connections.items():
-        if src not in graph:
-            graph.add_node(src, type_='out')
-        graph.add_node(tgt, type_='in')
+            src_sys = src.rsplit('.', 1)[0]
+            graph.add_edge(src_sys, src)
 
-        src_sys = src.rsplit('.', 1)[0]
-        graph.add_edge(src_sys, src)
+            tgt_sys = tgt.rsplit('.', 1)[0]
+            graph.add_edge(tgt, tgt_sys)
 
-        tgt_sys = tgt.rsplit('.', 1)[0]
-        graph.add_edge(tgt, tgt_sys)
+            graph.add_edge(src, tgt)
 
-        graph.add_edge(src, tgt)
-
-    for dv in desvars:
-        if dv not in graph:
-            graph.add_node(dv, type_='out')
-            parts = dv.rsplit('.', 1)
-            if len(parts) == 1:
-                system = ''  # this happens when a component is the model
-                graph.add_edge(dv, system)
-            else:
-                system = parts[0]
-                graph.add_edge(system, dv)
-
-    for res in responses:
-        if res not in graph:
-            graph.add_node(res, type_='out')
-            parts = res.rsplit('.', 1)
-            if len(parts) == 1:
-                system = ''  # this happens when a component is the model
-            else:
-                system = parts[0]
-            graph.add_edge(system, res)
-
-    nodes = graph.nodes
-    grev = graph.reverse(copy=False)
-    dvcache = {}
-    rescache = {}
-
-    for desvar in desvars:
-        if desvar not in dvcache:
-            dvcache[desvar] = set(all_connected_nodes(graph, desvar))
-
-        for response in responses:
-            if response not in rescache:
-                rescache[response] = set(all_connected_nodes(grev, response))
-
-            common = dvcache[desvar].intersection(rescache[response])
-
-            if common:
-                input_deps = set()
-                output_deps = set()
-                sys_deps = set()
-                for node in common:
-                    if 'type_' in nodes[node]:
-                        typ = nodes[node]['type_']
-                        parts = node.rsplit('.', 1)
-                        if len(parts) == 1:
-                            system = ''
-                        else:
-                            system = parts[0]
-                        if typ == 'in':  # input var
-                            input_deps.add(node)
-                            if system not in sys_deps:
-                                sys_deps.update(all_ancestors(system))
-                        else:  # output var
-                            output_deps.add(node)
-                            if system not in sys_deps:
-                                sys_deps.update(all_ancestors(system))
-
-            elif desvar == response:
-                input_deps = set()
-                output_deps = set([response])
-                parts = desvar.rsplit('.', 1)
+        for dv in desvars:
+            if dv not in graph:
+                graph.add_node(dv, type_='out')
+                parts = dv.rsplit('.', 1)
                 if len(parts) == 1:
-                    s = ''
+                    system = ''  # this happens when a component is the model
+                    graph.add_edge(dv, system)
                 else:
-                    s = parts[0]
-                sys_deps = set(all_ancestors(s))
+                    system = parts[0]
+                    graph.add_edge(system, dv)
 
-            if common or desvar == response:
-                if mode == 'fwd' or mode == 'auto':
-                    relevant[desvar][response] = ({'input': input_deps,
-                                                   'output': output_deps}, sys_deps)
-                if mode == 'rev' or mode == 'auto':
-                    relevant[response][desvar] = ({'input': input_deps,
-                                                   'output': output_deps}, sys_deps)
-
-                sys_deps.add('')  # top level Group is always relevant
-
-    voi_lists = []
-    if mode == 'fwd' or mode == 'auto':
-        voi_lists.append((desvars, responses))
-    if mode == 'rev' or mode == 'auto':
-        voi_lists.append((responses, desvars))
-
-    # now calculate dependencies between each VOI and all other VOIs of the
-    # other type, e.g for each input VOI wrt all output VOIs.  This is only
-    # done for design vars in fwd mode or responses in rev mode. In auto mode,
-    # we combine the results for fwd and rev modes.
-    for inputs, outputs in voi_lists:
-        for inp in inputs:
-            relinp = relevant[inp]
-            if relinp:
-                if '@all' in relinp:
-                    dct, total_systems = relinp['@all']
-                    total_inps = dct['input']
-                    total_outs = dct['output']
+        for res in responses:
+            if res not in graph:
+                graph.add_node(res, type_='out')
+                parts = res.rsplit('.', 1)
+                if len(parts) == 1:
+                    system = ''  # this happens when a component is the model
                 else:
-                    total_inps = set()
-                    total_outs = set()
-                    total_systems = set()
-                for out in outputs:
-                    if out in relinp:
-                        dct, systems = relinp[out]
-                        total_inps.update(dct['input'])
-                        total_outs.update(dct['output'])
-                        total_systems.update(systems)
-                relinp['@all'] = ({'input': total_inps, 'output': total_outs},
-                                  total_systems)
-            else:
-                relinp['@all'] = ({'input': set(), 'output': set()}, set())
+                    system = parts[0]
+                graph.add_edge(system, res)
 
-    relevant['linear'] = {'@all': ({'input': ContainsAll(), 'output': ContainsAll()},
-                                   ContainsAll())}
-    relevant['nonlinear'] = relevant['linear']
+        nodes = graph.nodes
+        grev = graph.reverse(copy=False)
+        dvcache = {}
+        rescache = {}
 
-    return relevant
+        for desvar in desvars:
+            if desvar not in dvcache:
+                dvcache[desvar] = set(all_connected_nodes(graph, desvar))
+
+            for response in responses:
+                if response not in rescache:
+                    rescache[response] = set(all_connected_nodes(grev, response))
+
+                common = dvcache[desvar].intersection(rescache[response])
+
+                if common:
+                    input_deps = set()
+                    output_deps = set()
+                    sys_deps = set()
+                    for node in common:
+                        if 'type_' in nodes[node]:
+                            typ = nodes[node]['type_']
+                            parts = node.rsplit('.', 1)
+                            if len(parts) == 1:
+                                system = ''
+                            else:
+                                system = parts[0]
+                            if typ == 'in':  # input var
+                                input_deps.add(node)
+                                if system not in sys_deps:
+                                    sys_deps.update(all_ancestors(system))
+                            else:  # output var
+                                output_deps.add(node)
+                                if system not in sys_deps:
+                                    sys_deps.update(all_ancestors(system))
+
+                elif desvar == response:
+                    input_deps = set()
+                    output_deps = set([response])
+                    parts = desvar.rsplit('.', 1)
+                    if len(parts) == 1:
+                        s = ''
+                    else:
+                        s = parts[0]
+                    sys_deps = set(all_ancestors(s))
+
+                if common or desvar == response:
+                    if desvar in conns:
+                        desvar = conns[desvar]
+                    if response in conns:
+                        response = conns[response]
+                    if mode != 'rev':  # fwd or auto
+                        relevant[desvar][response] = ({'input': input_deps,
+                                                       'output': output_deps}, sys_deps)
+                    if mode != 'fwd':  # rev or auto
+                        relevant[response][desvar] = ({'input': input_deps,
+                                                       'output': output_deps}, sys_deps)
+
+                    sys_deps.add('')  # top level Group is always relevant
+
+        voi_lists = []
+        if mode != 'rev':
+            voi_lists.append((desvars, responses))
+        if mode != 'fwd':
+            voi_lists.append((responses, desvars))
+
+        # now calculate dependencies between each VOI and all other VOIs of the
+        # other type, e.g for each input VOI wrt all output VOIs.  This is only
+        # done for design vars in fwd mode or responses in rev mode. In auto mode,
+        # we combine the results for fwd and rev modes.
+        for inputs, outputs in voi_lists:
+            for inp in inputs:
+                if inp in conns:
+                    inp = conns[inp]
+                relinp = relevant[inp]
+                if relinp:
+                    if '@all' in relinp:
+                        dct, total_systems = relinp['@all']
+                        total_inps = dct['input']
+                        total_outs = dct['output']
+                    else:
+                        total_inps = set()
+                        total_outs = set()
+                        total_systems = set()
+                    for out in outputs:
+                        if out in relinp:
+                            dct, systems = relinp[out]
+                            total_inps.update(dct['input'])
+                            total_outs.update(dct['output'])
+                            total_systems.update(systems)
+                    relinp['@all'] = ({'input': total_inps, 'output': total_outs},
+                                      total_systems)
+                else:
+                    relinp['@all'] = ({'input': set(), 'output': set()}, set())
+
+        relevant['linear'] = {'@all': ({'input': ContainsAll(), 'output': ContainsAll()},
+                                       ContainsAll())}
+        relevant['nonlinear'] = relevant['linear']
+
+        return relevant
