@@ -473,7 +473,7 @@ class MPITests(unittest.TestCase):
         test = self
 
         def verify(inputs, outputs, in_vals=1., out_vals=1., pathnames=False, comm=None, final=True, rank=None):
-            global_shape = (size, )
+            global_shape = (size, ) if final else 'Unavailable'
 
             inputs = sorted(inputs)
             outputs = sorted(outputs)

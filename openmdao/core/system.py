@@ -137,7 +137,7 @@ class System(object):
     _solver_print_cache : list
         Allows solver iprints to be set to requested values after setup calls.
     _subsystems_allprocs : OrderedDict
-        Dict mapping subsystem name to (system, index, meta) for children of this system.
+        Dict mapping subsystem name to SysInfo(system, index) for children of this system.
     _subsystems_myproc : [<System>, ...]
         List of local subsystems that exist on this proc.
     _var_promotes : { 'any': [], 'input': [], 'output': [] }
@@ -236,7 +236,7 @@ class System(object):
     _rec_mgr : <RecordingManager>
         object that manages all recorders added to this system.
     _static_subsystems_allprocs : OrderedDict
-        Dict of (subsys, index, meta) that stores all subsystems added outside of setup.
+        Dict of SysInfo(subsys, index) that stores all subsystems added outside of setup.
     _static_design_vars : dict of dict
         Driver design variables added outside of setup.
     _static_responses : dict of dict
