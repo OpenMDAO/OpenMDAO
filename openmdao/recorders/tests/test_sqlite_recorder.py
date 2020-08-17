@@ -437,7 +437,6 @@ class TestSqliteRecorder(unittest.TestCase):
         assertMetadataRecorded(self, prom2abs, abs2prom)
         expected_problem_metadata = {
             'connections_list_length': 11,
-            'tree_length': 13,
             'tree_children_length': 5,
             'abs2prom': abs2prom,
         }
@@ -462,12 +461,10 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_problem_metadata = {
             'connections_list_length': 0,
-            'tree_length': 10,
             'tree_children_length': 0,
             'abs2prom': {}
         }
         data = assertViewerDataRecorded(self, expected_problem_metadata)
-
         self.assertTrue('user_teriminate_signal' in data['driver']['options'],
                         'Deprecated key not found in recorded options')
 

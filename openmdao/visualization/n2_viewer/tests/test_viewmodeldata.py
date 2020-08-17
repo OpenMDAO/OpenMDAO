@@ -13,7 +13,7 @@ from tempfile import mkdtemp
 
 import numpy
 
-from openmdao.api import Problem, IndepVarComp, ScipyOptimizeDriver
+from openmdao.api import Problem, IndepVarComp, ScipyOptimizeDriver, ExplicitComponent
 from openmdao.test_suite.components.sellar import SellarStateConnection
 from openmdao.visualization.n2_viewer.n2_viewer import _get_viewer_data, n2
 from openmdao.recorders.sqlite_recorder import SqliteRecorder
@@ -316,6 +316,26 @@ class TestViewModelData(unittest.TestCase):
             _get_viewer_data(None)
 
         self.assertEquals(str(cm.exception), msg)
+
+    def test_handle_ndarray_system_option(self):
+        class SystemWithNdArrayOption(ExplicitComponent):
+            def initialize(self):
+                self.options.declare('arr', types=(numpy.ndarray,))
+
+            def setup(self):
+                self.add_input('x', val=0.0)
+                self.add_output('f_x', val=0.0)
+
+            def compute(self, inputs, outputs):
+                x = inputs['x']
+                outputs['f_x'] = (x - 3.0) ** 2
+
+        prob = Problem()
+        prob.model.add_subsystem('comp', SystemWithNdArrayOption(arr=numpy.ones(2)))
+        prob.setup()
+        model_viewer_data = _get_viewer_data(prob)
+        numpy.testing.assert_equal(model_viewer_data['tree']['children'][0]['options']['arr'],
+                                   numpy.ones(2))
 
     def test_n2_from_problem(self):
         """
