@@ -210,6 +210,39 @@ class SerialTests(unittest.TestCase):
         else:
             self.fail("Exception expected.")
 
+    def test_obj_using_input_name(self):
+        class Phase(om.Group):
+            def setup(self):
+                self.add_subsystem('C1', om.ExecComp('y=.5*x'))
+                self.add_subsystem('C2', om.ExecComp('y=g*x'))
+                self.add_subsystem('C3', om.ExecComp('y=-x'))
+
+                # this is the culprit.  Bug when objective is added in group using input name
+                self.add_objective('C2.g')
+                self.add_design_var('C2.g')
+
+                self.connect('C1.y', 'C2.x')
+                self.connect('C2.y', 'C3.x')
+
+        p = om.Problem()
+        indep = p.model.add_subsystem('indep', om.IndepVarComp('x'))
+        indep.add_output('g')
+
+        p.model.add_subsystem('phase0', Phase())
+
+        p.model.connect('indep.x', 'phase0.C1.x')
+
+        p.model.add_design_var('indep.x')
+        p.model.add_constraint('phase0.C3.y', equals=0.0)
+
+        p.setup(force_alloc_complex=True)
+        p['indep.x'] = [9.9]
+        p['indep.g'] = 9.80665
+        p.run_model()
+        totals = p.check_totals(compact_print=True, method='cs', out_stream=None)
+        for key, meta in totals.items():
+            np.testing.assert_allclose(meta['abs error'][0], 0.)
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class MPITests(SerialTests):

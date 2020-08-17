@@ -434,7 +434,8 @@ class Case(object):
             Glob patterns for pathnames to include in the check. Default is None, which
             includes all.
         excludes : iter of str or None
-            Glob patterns for pathnames to exclude from the check.
+            Glob patterns for pathnames to exclude from the check. Default is None, which
+            excludes nothing.
         out_stream : file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
@@ -550,7 +551,8 @@ class Case(object):
             Glob patterns for pathnames to include in the check. Default is None, which
             includes all.
         excludes : iter of str or None
-            Glob patterns for pathnames to exclude from the check.
+            Glob patterns for pathnames to exclude from the check. Default is None, which
+            excludes nothing.
         list_autoivcs : bool
             If True, include auto_ivc outputs in the listing.  Defaults to False.
         out_stream : file-like

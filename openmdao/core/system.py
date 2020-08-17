@@ -3021,8 +3021,9 @@ class System(object):
 
         if get_sizes:
             # Size them all
-            sizes = self._var_sizes['nonlinear']['output']
-            abs2idx = self._var_allprocs_abs2idx['nonlinear']
+            sizes = self._problem_meta['sizes']['nonlinear']['output']
+            abs2idx = self._problem_meta['abs2idx']['nonlinear']
+            owning_rank = self._problem_meta['owning_rank']
             for prom_name, response in out.items():
                 name = response['ivc_source']
 
@@ -3031,7 +3032,7 @@ class System(object):
                     response['size'] = 0  # discrete var, we don't know the size
                     continue
 
-                meta = self._var_allprocs_abs2meta['output'][name]
+                meta = abs2meta['output'][name]
                 response['distributed'] = meta['distributed']
 
                 if response['indices'] is not None:
@@ -3040,7 +3041,7 @@ class System(object):
                         else meta['global_size']
 
                 else:
-                    response['size'] = sizes[self._owning_rank[name], abs2idx[name]]
+                    response['size'] = sizes[owning_rank[name], abs2idx[name]]
                     response['global_size'] = meta['global_size']
 
         if recurse:
@@ -3297,7 +3298,7 @@ class System(object):
                     print_arrays=False,
                     tags=None,
                     includes=None,
-                    excludes=(),
+                    excludes=None,
                     all_procs=False,
                     out_stream=_DEFAULT_OUT_STREAM):
         """
@@ -3306,18 +3307,18 @@ class System(object):
         Parameters
         ----------
         values : bool, optional
-            When True, display input values. Default is True.
+            When True, display/return input values. Default is True.
         prom_name : bool, optional
-            When True, display the promoted name of the variable.
+            When True, display/return the promoted name of the variable.
             Default is False.
         units : bool, optional
-            When True, display units. Default is False.
+            When True, display/return units. Default is False.
         shape : bool, optional
-            When True, display the shape of the value. Default is False.
+            When True, display/return the shape of the value. Default is False.
         global_shape : bool, optional
-            When True, display the global shape of the value. Default is False.
+            When True, display/return the global shape of the value. Default is False.
         desc : bool, optional
-            When True, display description. Default is False.
+            When True, display/return description. Default is False.
         hierarchical : bool, optional
             When True, human readable output shows variables in hierarchical format.
         print_arrays : bool, optional
@@ -3334,7 +3335,7 @@ class System(object):
             Collection of glob patterns for pathnames of variables to include. Default is None,
             which includes all input variables.
         excludes : None or iter of str
-            Collection of glob patterns for pathnames of variables to exclude. Default is ().
+            Collection of glob patterns for pathnames of variables to exclude. Default is None.
         all_procs : bool, optional
             When True, display output on all ranks. Default is False, which will display
             output only from rank 0.
@@ -3344,8 +3345,8 @@ class System(object):
 
         Returns
         -------
-        dict
-            Dict of input names keyed to other optional information about those inputs.
+        list of (name, metadata)
+            List of input names and other optional information about those inputs.
         """
         metavalues = values and self._inputs is None
         keynames = ['value', 'units', 'shape', 'global_shape', 'desc', 'tags']
@@ -3375,7 +3376,7 @@ class System(object):
                                                   rank=None if all_procs else 0, kind='input')
 
         if not inputs or (not all_procs and self.comm.rank != 0):
-            return {}
+            return []
 
         if out_stream is _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
@@ -3386,7 +3387,9 @@ class System(object):
         if self.pathname:
             # convert to relative names
             rel_idx = len(self.pathname) + 1
-            inputs = {n[rel_idx:]: meta for n, meta in inputs.items()}
+            inputs = [(n[rel_idx:], meta) for n, meta in inputs.items()]
+        else:
+            inputs = list(inputs.items())
 
         return inputs
 
@@ -3406,7 +3409,7 @@ class System(object):
                      print_arrays=False,
                      tags=None,
                      includes=None,
-                     excludes=(),
+                     excludes=None,
                      all_procs=False,
                      list_autoivcs=False,
                      out_stream=_DEFAULT_OUT_STREAM):
@@ -3433,15 +3436,15 @@ class System(object):
         units : bool, optional
             When True, display units. Default is False.
         shape : bool, optional
-            When True, display the shape of the value. Default is False.
+            When True, display/return the shape of the value. Default is False.
         global_shape : bool, optional
-            When True, display the global shape of the value. Default is False.
+            When True, display/return the global shape of the value. Default is False.
         bounds : bool, optional
-            When True, display bounds (lower and upper). Default is False.
+            When True, display/return bounds (lower and upper). Default is False.
         scaling : bool, optional
-            When True, display scaling (ref, ref0, and res_ref). Default is False.
+            When True, display/return scaling (ref, ref0, and res_ref). Default is False.
         desc : bool, optional
-            When True, display description. Default is False.
+            When True, display/return description. Default is False.
         hierarchical : bool, optional
             When True, human readable output shows variables in hierarchical format.
         print_arrays : bool, optional
@@ -3458,7 +3461,7 @@ class System(object):
             Collection of glob patterns for pathnames of variables to include. Default is None,
             which includes all output variables.
         excludes : None or iter of str
-            Collection of glob patterns for pathnames of variables to exclude. Default is ().
+            Collection of glob patterns for pathnames of variables to exclude. Default is None.
         all_procs : bool, optional
             When True, display output on all processors. Default is False.
         list_autoivcs : bool
@@ -3469,8 +3472,8 @@ class System(object):
 
         Returns
         -------
-        dict
-            Dict of output names keyed to optional information about those outputs.
+        list of (name, metadata)
+            List of output names and other optional information about those outputs.
         """
         keynames = np.array(['value', 'units', 'shape', 'global_shape', 'desc', 'tags'])
         keys = [str(n) for n in keynames[np.array([values, units, shape, global_shape, desc, tags],
@@ -3511,7 +3514,7 @@ class System(object):
                                                        kind='residual')
 
         if not outputs or (not all_procs and self.comm.rank != 0):
-            return {}
+            return []
 
         if out_stream is _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
@@ -3526,7 +3529,9 @@ class System(object):
                 self._write_table('explicit', expl_outputs, hierarchical, print_arrays,
                                   all_procs, out_stream)
             if self.name:  # convert to relative name
-                expl_outputs = {n[rel_idx:]: meta for n, meta in expl_outputs.items()}
+                expl_outputs = [(n[rel_idx:], meta) for n, meta in expl_outputs.items()]
+            else:
+                expl_outputs = list(expl_outputs.items())
 
         if implicit:
             impl_outputs = {n: m for n, m in outputs.items() if n in states}
@@ -3534,11 +3539,13 @@ class System(object):
                 self._write_table('implicit', impl_outputs, hierarchical, print_arrays,
                                   all_procs, out_stream)
             if self.name:  # convert to relative name
-                impl_outputs = {n[rel_idx:]: meta for n, meta in impl_outputs.items()}
+                impl_outputs = [(n[rel_idx:], meta) for n, meta in impl_outputs.items()]
+            else:
+                impl_outputs = list(impl_outputs.items())
 
         if explicit:
             if implicit:
-                expl_outputs.update(impl_outputs)
+                return expl_outputs + impl_outputs
             return expl_outputs
         elif implicit:
             return impl_outputs
@@ -4142,10 +4149,7 @@ class System(object):
                     offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
                     offsets[1:] = np.cumsum(sizes[:-1])
                     loc_val = val if val is not _UNDEFINED else np.zeros(sizes[idx])
-                    if rank == self.comm.rank:
-                        val = np.zeros(np.sum(sizes))
-                    else:
-                        val = _UNDEFINED
+                    val = np.zeros(np.sum(sizes))
                     self.comm.Gatherv(loc_val, [val, sizes, offsets, MPI.DOUBLE], root=rank)
                 else:
                     if rank != owner:

@@ -283,7 +283,7 @@ class N2Toolbar {
             });
 
         new N2ToolbarButtonToggle('#linear-solver-button', tooltipBox,
-            ["Show non-linear solvers", "Show linear solvers"],
+            ["Show linear solvers", "Show non-linear solvers"],
             pred => { return !n2ui.n2Diag.showLinearSolverNames; },
             e => { n2ui.toggleSolverNamesCheckboxChange(); }
         );
