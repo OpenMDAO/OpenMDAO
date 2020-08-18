@@ -291,6 +291,32 @@ class TestViewModelData(unittest.TestCase):
             expected_responses_names,
         )
 
+    def test_viewer_data_from_subgroup(self):
+        """
+        Test error message when asking for viewer data for a subgroup.
+        """
+        p = Problem(model=SellarStateConnection())
+        p.setup()
+
+        msg = "Viewer data is not available for sub-Group 'sub'."
+        with assert_warning(UserWarning, msg):
+            _get_viewer_data(p.model.sub)
+
+    def test_viewer_data_from_None(self):
+        """
+        Test error message when asking for viewer data for an invalid source.
+        """
+        p = Problem(model=SellarStateConnection())
+        p.setup()
+
+        msg = "Viewer data is not available for 'None'." + \
+              "The source must be a Problem, model or the filename of a recording."
+
+        with self.assertRaises(TypeError) as cm:
+            _get_viewer_data(None)
+
+        self.assertEquals(str(cm.exception), msg)
+
     def test_handle_ndarray_system_option(self):
         class SystemWithNdArrayOption(ExplicitComponent):
             def initialize(self):
@@ -325,6 +351,20 @@ class TestViewModelData(unittest.TestCase):
                         (self.problem_html_filename + " is not a valid file."))
         self.assertGreater(os.path.getsize(self.problem_html_filename), 100)
 
+    def test_n2_from_model(self):
+        """
+        Test that an n2 html file is generated from a model.
+        """
+        p = Problem()
+        p.model = SellarStateConnection()
+        p.setup()
+        n2(p.model, outfile=self.problem_html_filename, show_browser=DEBUG_BROWSER)
+
+        # Check that the html file has been created and has something in it.
+        self.assertTrue(os.path.isfile(self.problem_html_filename),
+                        (self.problem_html_filename + " is not a valid file."))
+        self.assertGreater(os.path.getsize(self.problem_html_filename), 100)
+
     def _extract_compressed_model(self, filename):
         """
         Load an N2 html, find the compressed data string, uncompress and decode it.
@@ -334,7 +374,7 @@ class TestViewModelData(unittest.TestCase):
             if re.search('var compressedModel', line):
                 b64_data = line.replace('var compressedModel = "', '').replace('";', '')
                 break
-        
+
         file.close()
         compressed_data = base64.b64decode(b64_data)
         model_data = json.loads(zlib.decompress(compressed_data).decode("utf-8"))
@@ -398,7 +438,7 @@ class TestViewModelData(unittest.TestCase):
         """
         Test that an n2 html file is generated from a Problem even if it has connection errors.
         """
-        from openmdao.test_suite.scripts.bad_connection import BadConnectionModel 
+        from openmdao.test_suite.scripts.bad_connection import BadConnectionModel
 
         p = Problem(BadConnectionModel())
 

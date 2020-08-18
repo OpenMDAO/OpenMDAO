@@ -47,7 +47,7 @@ def assert_warning(category, msg):
 
 
 @contextmanager
-def assert_no_warning(category, msg):
+def assert_no_warning(category, msg=None):
     """
     Context manager asserting that a warning is not issued.
 
@@ -55,8 +55,8 @@ def assert_no_warning(category, msg):
     ----------
     category : class
         The class of the warning.
-    msg : str
-        The text of the warning.
+    msg : str or None
+        The text of the warning. If None then only the warning class will be checked.
 
     Raises
     ------
@@ -69,8 +69,11 @@ def assert_no_warning(category, msg):
             yield
 
     for warn in w:
-        if (issubclass(warn.category, category) and str(warn.message) == msg):
-            raise AssertionError("Found warning: ", msg)
+        if issubclass(warn.category, category):
+            if msg is None:
+                raise AssertionError(f"Found warning: {category} {str(warn.message)}")
+            elif str(warn.message) == msg:
+                raise AssertionError(f"Found warning: {category} {msg}")
 
 
 def assert_check_partials(data, atol=1e-6, rtol=1e-6):
