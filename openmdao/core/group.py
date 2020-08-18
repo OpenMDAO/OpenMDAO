@@ -1270,13 +1270,12 @@ class Group(System):
 
             # take care of distributed components
             if var_meta['distributed'] and var_abs_name in self._var_abs_names['input']:
-             
+
                     # add src indices if sized from a distributed output
                     n_list = self.comm.allgather(new_var_meta['size'])
                     irank  = self.comm.rank
                     n1 = int(np.sum(n_list[:irank]))
                     n2 = int(np.sum(n_list[:irank+1]))
-                    # import pdb; pdb.set_trace()
 
                     var_meta['src_indices'] = np.arange(n1,n2,dtype=int)
                     print(var_abs_name, 'given shape', 'rank', self.comm.rank, 'size', var_meta['size'], 'indices', n1, n2)
@@ -1290,12 +1289,6 @@ class Group(System):
                 var_meta['shape'] = total_size
                 var_meta['value'] = np.ones(var_meta['size'])
 
-                # print(var_abs_name, 'given shape', 'rank', self.comm.rank, 'size', var_meta['size'])
-
-
-
-   
-
 
         def get_var_size_meta( abs_name, var_visited):
             """
@@ -1304,7 +1297,7 @@ class Group(System):
             """
 
             var_meta = abs2meta[abs_name]
-            print(abs_name, var_visited)
+            # print(abs_name, var_visited)
 
             if abs_name in var_visited:
                 var_visited.append(abs_name)

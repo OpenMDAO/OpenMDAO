@@ -646,8 +646,7 @@ class System(object):
 
         self._setup_relevance(mode, self._relevant)
         self._setup_var_index_ranges()
-        self._setup_var_sizes() 
-
+        self._setup_var_sizes()
         if self.pathname == '':
             self._top_level_setup2()
 
@@ -4357,6 +4356,7 @@ class System(object):
         conns = self._problem_meta.get('connections', {})
         vdict = {}
         variables = filtered_vars.get(kind)
+        variables = variables.sort()
         if variables:
             vec = self._vectors[kind][vec_name]
             srcget = self._vectors['output'][vec_name]._abs_get_val
