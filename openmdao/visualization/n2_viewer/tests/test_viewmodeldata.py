@@ -13,7 +13,7 @@ from tempfile import mkdtemp
 
 import numpy
 
-from openmdao.api import Problem, IndepVarComp, ScipyOptimizeDriver
+from openmdao.api import Problem, IndepVarComp, ScipyOptimizeDriver, ExplicitComponent
 from openmdao.test_suite.components.sellar import SellarStateConnection
 from openmdao.visualization.n2_viewer.n2_viewer import _get_viewer_data, n2
 from openmdao.recorders.sqlite_recorder import SqliteRecorder
@@ -291,6 +291,52 @@ class TestViewModelData(unittest.TestCase):
             expected_responses_names,
         )
 
+    def test_viewer_data_from_subgroup(self):
+        """
+        Test error message when asking for viewer data for a subgroup.
+        """
+        p = Problem(model=SellarStateConnection())
+        p.setup()
+
+        msg = "Viewer data is not available for sub-Group 'sub'."
+        with assert_warning(UserWarning, msg):
+            _get_viewer_data(p.model.sub)
+
+    def test_viewer_data_from_None(self):
+        """
+        Test error message when asking for viewer data for an invalid source.
+        """
+        p = Problem(model=SellarStateConnection())
+        p.setup()
+
+        msg = "Viewer data is not available for 'None'." + \
+              "The source must be a Problem, model or the filename of a recording."
+
+        with self.assertRaises(TypeError) as cm:
+            _get_viewer_data(None)
+
+        self.assertEquals(str(cm.exception), msg)
+
+    def test_handle_ndarray_system_option(self):
+        class SystemWithNdArrayOption(ExplicitComponent):
+            def initialize(self):
+                self.options.declare('arr', types=(numpy.ndarray,))
+
+            def setup(self):
+                self.add_input('x', val=0.0)
+                self.add_output('f_x', val=0.0)
+
+            def compute(self, inputs, outputs):
+                x = inputs['x']
+                outputs['f_x'] = (x - 3.0) ** 2
+
+        prob = Problem()
+        prob.model.add_subsystem('comp', SystemWithNdArrayOption(arr=numpy.ones(2)))
+        prob.setup()
+        model_viewer_data = _get_viewer_data(prob)
+        numpy.testing.assert_equal(model_viewer_data['tree']['children'][0]['options']['arr'],
+                                   numpy.ones(2))
+
     def test_n2_from_problem(self):
         """
         Test that an n2 html file is generated from a Problem.
@@ -299,6 +345,20 @@ class TestViewModelData(unittest.TestCase):
         p.model = SellarStateConnection()
         p.setup()
         n2(p, outfile=self.problem_html_filename, show_browser=DEBUG_BROWSER)
+
+        # Check that the html file has been created and has something in it.
+        self.assertTrue(os.path.isfile(self.problem_html_filename),
+                        (self.problem_html_filename + " is not a valid file."))
+        self.assertGreater(os.path.getsize(self.problem_html_filename), 100)
+
+    def test_n2_from_model(self):
+        """
+        Test that an n2 html file is generated from a model.
+        """
+        p = Problem()
+        p.model = SellarStateConnection()
+        p.setup()
+        n2(p.model, outfile=self.problem_html_filename, show_browser=DEBUG_BROWSER)
 
         # Check that the html file has been created and has something in it.
         self.assertTrue(os.path.isfile(self.problem_html_filename),
@@ -314,7 +374,7 @@ class TestViewModelData(unittest.TestCase):
             if re.search('var compressedModel', line):
                 b64_data = line.replace('var compressedModel = "', '').replace('";', '')
                 break
-        
+
         file.close()
         compressed_data = base64.b64decode(b64_data)
         model_data = json.loads(zlib.decompress(compressed_data).decode("utf-8"))
@@ -378,7 +438,7 @@ class TestViewModelData(unittest.TestCase):
         """
         Test that an n2 html file is generated from a Problem even if it has connection errors.
         """
-        from openmdao.test_suite.scripts.bad_connection import BadConnectionModel 
+        from openmdao.test_suite.scripts.bad_connection import BadConnectionModel
 
         p = Problem(BadConnectionModel())
 

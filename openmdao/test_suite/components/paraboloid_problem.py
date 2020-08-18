@@ -7,8 +7,8 @@ class ParaboloidProblem(om.Problem):
     Paraboloid problem with Constraint.
     """
 
-    def __init__(self):
-        super(ParaboloidProblem, self).__init__()
+    def __init__(self, **kwargs):
+        super(ParaboloidProblem, self).__init__(**kwargs)
 
         model = self.model
         model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])

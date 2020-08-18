@@ -28,7 +28,7 @@ from openmdao.utils.general_utils import simple_warning, make_serializable
 from openmdao.utils.mpi import MPI
 from openmdao.visualization.html_utils import read_files, write_script, DiagramWriter
 from openmdao.utils.general_utils import warn_deprecation
-from openmdao.utils.options_dictionary import Undefined
+from openmdao.core.constants import _UNDEFINED
 
 _IND = 4  # HTML indentation (spaces)
 
@@ -197,7 +197,7 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
         if k in ['linear_solver', 'nonlinear_solver']:
             options[k] = system.options[k].SOLVER
         else:
-            if isinstance(system.options._dict[k]['value'], Undefined):
+            if system.options._dict[k]['value'] is _UNDEFINED:
                 options[k] = str(system.options._dict[k]['value'])
             else:
                 options[k] = system.options._dict[k]['value']
@@ -260,18 +260,19 @@ def _get_viewer_data(data_source):
         root_group = data_source.model
 
         if not isinstance(root_group, Group):
-            simple_warning(
-                "The model is not a Group, viewer data is unavailable.")
+            simple_warning("The model is not a Group, viewer data is unavailable.")
             return {}
 
         driver = data_source.driver
         driver_name = driver.__class__.__name__
-        driver_type = 'doe' if isinstance(
-            driver, DOEDriver) else 'optimization'
-        driver_options = {k: driver.options[k] for k in driver.options}
-        driver_opt_settings = None
+        driver_type = 'doe' if isinstance(driver, DOEDriver) else 'optimization'
+
+        driver_options = {key: val for key, val in driver.options.items()}
+
         if driver_type == 'optimization' and 'opt_settings' in dir(driver):
             driver_opt_settings = driver.opt_settings
+        else:
+            driver_opt_settings = None
 
     elif isinstance(data_source, Group):
         if not data_source.pathname:  # root group
@@ -282,6 +283,7 @@ def _get_viewer_data(data_source):
             driver_opt_settings = None
         else:
             # this function only makes sense when it is at the root
+            simple_warning(f"Viewer data is not available for sub-Group '{data_source.pathname}'.")
             return {}
 
     elif isinstance(data_source, str):
@@ -294,8 +296,8 @@ def _get_viewer_data(data_source):
         return data_dict
 
     else:
-        raise TypeError(
-            '_get_viewer_data only accepts Problems, Groups or filenames')
+        raise TypeError(f"Viewer data is not available for '{data_source}'."
+                        "The source must be a Problem, model or the filename of a recording.")
 
     data_dict = {}
     comp_exec_idx = [0]  # list so pass by ref
@@ -355,8 +357,12 @@ def _get_viewer_data(data_source):
     data_dict['connections_list'] = connections_list
     data_dict['abs2prom'] = root_group._var_abs2prom
 
-    data_dict['driver'] = {'name': driver_name, 'type': driver_type,
-                           'options': driver_options, 'opt_settings': driver_opt_settings}
+    data_dict['driver'] = {
+        'name': driver_name,
+        'type': driver_type,
+        'options': driver_options,
+        'opt_settings': driver_opt_settings
+    }
     data_dict['design_vars'] = root_group.get_design_vars(use_prom_ivc=False)
     data_dict['responses'] = root_group.get_responses()
 

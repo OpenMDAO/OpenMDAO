@@ -4526,7 +4526,7 @@ class System(object):
 
     def convert_units(self, name, val, units_from, units_to):
         """
-        Wrap the utilty convert_units and give a good error message.
+        Wrap the utility convert_units and give a good error message.
 
         Parameters
         ----------

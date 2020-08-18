@@ -2265,6 +2265,9 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         lines = stream.getvalue().splitlines()
 
+        # Make sure auto-ivc sources are translated to promoted input names.
+        self.assertTrue('x' in lines[3])
+
         self.assertTrue('9.80614' in lines[4], "'9.80614' not found in '%s'" % lines[4])
         self.assertTrue('9.80614' in lines[5], "'9.80614' not found in '%s'" % lines[5])
         self.assertTrue('cs:None' in lines[5], "'cs:None not found in '%s'" % lines[5])
