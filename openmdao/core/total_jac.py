@@ -71,6 +71,8 @@ class _TotalJacInfo(object):
     wrt_meta : dict
         Map of absolute output 'wrt' var name to tuples of the form
         (row/column slice, indices, distrib).
+    ivc_print_names :dict
+        Dictionary that maps auto_ivc names back to their promoted input names.
     output_list : list of str
         List of names of output variables for this total jacobian.  In fwd mode, outputs
         are responses.  In rev mode, outputs are design variables.
@@ -165,12 +167,14 @@ class _TotalJacInfo(object):
 
         # Convert 'wrt' names from promoted to absolute
         wrt = []
+        self.ivc_print_names = {}
         for name in prom_wrt:
             if name in prom2abs:
                 wrt_name = prom2abs[name][0]
             elif name in prom2abs_in:
                 in_abs = prom2abs_in[name][0]
                 wrt_name = conns[in_abs]
+                self.ivc_print_names[wrt_name] = name
             else:
                 wrt_name = name
             wrt.append(wrt_name)
@@ -193,6 +197,7 @@ class _TotalJacInfo(object):
                 # An auto_ivc design var can be used as a response too.
                 in_abs = prom2abs_in[name][0]
                 of_name = conns[in_abs]
+                self.ivc_print_names[of_name] = name
             else:
                 of_name = name
             of.append(of_name)
@@ -245,7 +250,8 @@ class _TotalJacInfo(object):
                 self.simul_coloring = driver._coloring_info['coloring']
 
                 # if we don't get wrt and of from driver, turn off coloring
-                if self.simul_coloring is not None and (wrt != driver_wrt or of != driver_of):
+                if self.simul_coloring is not None and \
+                   (prom_wrt != driver_wrt or prom_of != driver_of):
                     msg = ("compute_totals called using a different list of design vars and/or "
                            "responses than those used to define coloring, so coloring will "
                            "be turned off.\ncoloring design vars: %s, current design vars: "
@@ -518,11 +524,8 @@ class _TotalJacInfo(object):
                         self.par_deriv[parallel_deriv_color].append(name)
 
                         print_name = name
-                        if name.startswith('_auto_ivc'):
-                            conns = model._problem_meta['connections']
-                            for src, tgt in conns.items():
-                                if tgt == name:
-                                    print_name = model._var_allprocs_abs2prom['input'][src]
+                        if name in self.ivc_print_names:
+                            print_name = self.ivc_print_names[name]
 
                         self.par_deriv_printnames[parallel_deriv_color].append(print_name)
 
@@ -1387,7 +1390,10 @@ class _TotalJacInfo(object):
                                                                                   mode=self.mode):
                                     print("   {}".format(local_ind))
                             else:
-                                print("('{0}', [{1}])".format(key, inds))
+                                print_key = key
+                                if key in self.ivc_print_names:
+                                    print_key = self.ivc_print_names[key]
+                                print("('{0}', [{1}])".format(print_key, inds))
 
                         sys.stdout.flush()
                         t0 = time.time()
