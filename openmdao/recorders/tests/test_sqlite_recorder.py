@@ -2,6 +2,7 @@
 import errno
 import os
 import unittest
+from io import StringIO
 import numpy as np
 
 import sqlite3
@@ -27,7 +28,7 @@ from openmdao.recorders.tests.sqlite_recorder_test_utils import assertMetadataRe
 
 from openmdao.recorders.tests.recorder_test_utils import run_driver
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_equal_arrays
-from openmdao.utils.general_utils import determine_adder_scaler
+from openmdao.utils.general_utils import determine_adder_scaler, remove_whitespace
 from openmdao.utils.testing_utils import use_tempdirs
 
 # check that pyoptsparse is installed. if it is, try to use SLSQP.
@@ -316,10 +317,41 @@ class TestSqliteRecorder(unittest.TestCase):
         cr = om.CaseReader(self.filename)
         self.assertTrue(cr._system_options['root_1']['component_options']['assembled_jac_type'], 'dense')
 
-        # cr.list_metadata()
-        cr.list_model_metadata(run_number=1)
-        print('None')
-        cr.list_model_metadata()
+        stream = StringIO()
+
+        cr.list_model_metadata(out_stream=stream)
+
+        text = stream.getvalue().split('\n')
+
+        expected = [
+            "Run Number: 0",
+            "    Subsystem: root",
+            "        assembled_jac_type : csc",
+            "Run Number: 1",
+            "    Subsystem: root",
+            "        assembled_jac_type : dense"
+        ]
+
+        for i, line in enumerate(expected):
+            if line and not line.startswith('-'):
+                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
+
+        stream = StringIO()
+
+        cr.list_model_metadata(run_number=1, out_stream=stream)
+
+        text = stream.getvalue().split('\n')
+
+        expected = [
+            "Run Number: 1",
+            "    Subsystem: root",
+            "        assembled_jac_type : dense"
+        ]
+
+        for i, line in enumerate(expected):
+            if line and not line.startswith('-'):
+                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
+
 
     def test_simple_driver_recording_with_prefix(self):
         prob = ParaboloidProblem()
