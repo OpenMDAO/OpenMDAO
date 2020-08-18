@@ -294,12 +294,8 @@ class TestSqliteRecorder(unittest.TestCase):
         prob = ParaboloidProblem()
 
         driver = prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
-        driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_objectives'] = True
-        driver.recording_options['record_constraints'] = True
-        driver.recording_options['record_derivatives'] = True
-        driver.recording_options['includes'] = ['*']
-        driver.add_recorder(self.recorder)
+
+        prob.model.add_recorder(self.recorder)
 
         prob.setup()
         prob.set_solver_print(0)
@@ -338,7 +334,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         stream = StringIO()
 
-        cr.list_model_metadata(run_number=1, out_stream=stream)
+        cr.list_model_metadata(run_counter=1, out_stream=stream)
 
         text = stream.getvalue().split('\n')
 
@@ -351,7 +347,6 @@ class TestSqliteRecorder(unittest.TestCase):
         for i, line in enumerate(expected):
             if line and not line.startswith('-'):
                 self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
-
 
     def test_simple_driver_recording_with_prefix(self):
         prob = ParaboloidProblem()

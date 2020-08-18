@@ -410,19 +410,36 @@ class SqliteCaseReader(BaseCaseReader):
 
         return dct
 
-    def list_model_metadata(self, run_number=None, out_stream=_DEFAULT_OUT_STREAM):
+    def list_model_metadata(self, run_counter=None, out_stream=_DEFAULT_OUT_STREAM):
+        """
+        List of all model options.
 
+        Parameters
+        ----------
+        run_counter : int or None
+            Run_driver iteration to inspect
+        out_stream : file-like object
+            Where to send human readable output. Default is sys.stdout.
+            Set to None to suppress.
+
+        Returns
+        -------
+        dict
+            {'root':{key val}}
+        """
         if out_stream:
             if out_stream is _DEFAULT_OUT_STREAM:
                 out_stream = sys.stdout
 
+            dct = {}
+
             for i in self._system_options:
                 subsys, num = i.rsplit('_', 1)
 
-                # subs
+                if (run_counter is not None and run_counter == int(num) and subsys == 'root') or \
+                        (subsys == 'root' and run_counter is None):
+                    print("yes")
 
-                if (run_number is not None and run_number == int(num) and subsys == 'root') or \
-                        (subsys == 'root' and run_number is None):
                     out_stream.write(
                         'Run Number: {}\n    Subsystem: {}'.format(num, subsys))
 
@@ -430,6 +447,11 @@ class SqliteCaseReader(BaseCaseReader):
                         option = "{0} : {1}".format(
                             j, self._system_options[i]['component_options'][j])
                         out_stream.write('\n        {}\n'.format(option))
+
+                        dct[subsys] = {}
+                        dct[subsys][j] = self._system_options[i]['component_options'][j]
+
+        return dct
 
     def list_cases(self, source=None, recurse=True, flat=True, out_stream=_DEFAULT_OUT_STREAM):
         """

@@ -672,7 +672,7 @@ class SqliteRecorder(CaseRecorder):
                 c.execute("INSERT OR IGNORE INTO system_metadata"
                           "(id, scaling_factors, component_metadata) "
                           "VALUES(?,?,?)", (path + '_' + str(run_counter), scaling_factors,
-                                              pickled_metadata))
+                                            pickled_metadata))
 
     def record_metadata_solver(self, recording_requester):
         """
