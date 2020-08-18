@@ -453,8 +453,9 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # check that the case keys (iteration coords) come back correctly
         for i, iter_coord in enumerate(solver_cases):
+            iter_num = i + 1
             self.assertEqual(iter_coord,
-                             'rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|%d' % i)
+                             'rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|%d' % iter_num)
 
     def test_reading_solver_metadata(self):
         prob = SellarProblem(linear_solver=om.LinearBlockGS())
@@ -646,7 +647,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(case.parent, parent_coord)
 
         expected_coords = [
-            parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|2|NonlinearBlockGS|0',
             parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|2|NonlinearBlockGS|1',
             parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|2|NonlinearBlockGS|2',
             parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|2|NonlinearBlockGS|3',
@@ -654,6 +654,7 @@ class TestSqliteCaseReader(unittest.TestCase):
             parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|2|NonlinearBlockGS|5',
             parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|2|NonlinearBlockGS|6',
             parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|2|NonlinearBlockGS|7',
+            parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|2|NonlinearBlockGS|8',
             parent_coord + '|NLRunOnce|0',
             parent_coord
         ]
