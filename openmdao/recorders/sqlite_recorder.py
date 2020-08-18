@@ -228,7 +228,7 @@ class SqliteRecorder(CaseRecorder):
                 c.execute("CREATE TABLE driver_metadata(id TEXT PRIMARY KEY, "
                           "model_viewer_data TEXT)")
                 c.execute("CREATE TABLE system_metadata(id TEXT PRIMARY KEY, "
-                          "run_num INT, scaling_factors BLOB, component_metadata BLOB)")
+                          "scaling_factors BLOB, component_metadata BLOB)")
                 c.execute("CREATE TABLE solver_metadata(id TEXT PRIMARY KEY, "
                           "solver_options BLOB, solver_class TEXT)")
 
@@ -622,7 +622,7 @@ class SqliteRecorder(CaseRecorder):
             except sqlite3.IntegrityError:
                 print("Model viewer data has already has already been recorded for %s." % key)
 
-    def record_metadata_system(self, recording_requester, run_counter):
+    def record_metadata_system(self, recording_requester, run_counter=None):
         """
         Record system metadata.
 
@@ -634,6 +634,9 @@ class SqliteRecorder(CaseRecorder):
             The number of times run_driver has been called.
         """
         if self.connection:
+            if run_counter is None:
+                run_counter = self._counter
+
             scaling_vecs, user_options = self._get_metadata_system(recording_requester)
 
             if scaling_vecs is None:
@@ -666,10 +669,10 @@ class SqliteRecorder(CaseRecorder):
             #   SQL errors for "UNIQUE constraint failed: system_metadata.id"
             # Future versions of OpenMDAO will handle this better.
             with self.connection as c:
-                c.execute("INSERT INTO system_metadata"
-                          "(id, run_num, scaling_factors, component_metadata) "
-                          "VALUES(?,?,?,?)", (path + '_' + str(run_counter),
-                                              run_counter, scaling_factors, pickled_metadata))
+                c.execute("INSERT OR IGNORE INTO system_metadata"
+                          "(id, scaling_factors, component_metadata) "
+                          "VALUES(?,?,?)", (path + '_' + str(run_counter), scaling_factors,
+                                              pickled_metadata))
 
     def record_metadata_solver(self, recording_requester):
         """

@@ -2009,7 +2009,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         prob.cleanup()
         cr = om.CaseReader(self.filename)
-        subs_options = cr.system_options['subs']['component_options']
+        subs_options = cr._system_options['subs_0']['component_options']
 
         # no options should have been recorded for d1
         self.assertEqual(len(subs_options._dict), 0)
@@ -2045,8 +2045,8 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         self.assertEqual(cr._format_version, format_version)
 
-        self.assertEqual(set(cr.system_options.keys()),
-                         set(['root'] + [sys.name for sys in prob.model._subsystems_allprocs]))
+        self.assertEqual(set(cr._system_options.keys()),
+                         set(['root_0'] + [sys.name + '_0' for sys in prob.model._subsystems_allprocs]))
 
         self.assertEqual(set(cr.problem_metadata.keys()), {
             'tree', 'sys_pathnames_list', 'connections_list', 'variables', 'abs2prom',
@@ -2073,8 +2073,8 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         self.assertEqual(cr._format_version, format_version)
 
-        self.assertEqual(set(cr.system_options.keys()),
-                         set(['root'] + [sys.name for sys in prob.model._subsystems_allprocs]))
+        self.assertEqual(set(cr._system_options.keys()),
+                         set(['root_0'] + [sys.name + '_0' for sys in prob.model._subsystems_allprocs]))
 
         self.assertEqual(set(cr.problem_metadata.keys()), {
             'tree', 'sys_pathnames_list', 'connections_list', 'variables', 'abs2prom',

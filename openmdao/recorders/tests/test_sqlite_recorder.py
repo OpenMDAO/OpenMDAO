@@ -306,7 +306,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         cr = om.CaseReader(self.filename)
 
-        self.assertTrue(cr.system_options['root_0']['component_options']['assembled_jac_type'], 'csc')
+        self.assertTrue(cr._system_options['root_0']['component_options']['assembled_jac_type'], 'csc')
 
         # New option and re-run of run_driver
         prob.model.options['assembled_jac_type'] = 'dense'
@@ -314,7 +314,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.run_driver()
 
         cr = om.CaseReader(self.filename)
-        self.assertTrue(cr.system_options['root_1']['component_options']['assembled_jac_type'], 'dense')
+        self.assertTrue(cr._system_options['root_1']['component_options']['assembled_jac_type'], 'dense')
 
         # cr.list_metadata()
         cr.list_model_metadata(run_number=1)
@@ -489,18 +489,18 @@ class TestSqliteRecorder(unittest.TestCase):
 
         cr = om.CaseReader("cases.sql")
         # Quick check to see that keys and values were recorded
-        for key in ['root', '_auto_ivc', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']:
-            self.assertTrue(key in cr.system_options.keys())
+        for key in ['root_0', '_auto_ivc_0', 'd1_0', 'd2_0', 'obj_cmp_0', 'con_cmp1_0', 'con_cmp2_0']:
+            self.assertTrue(key in cr._system_options.keys())
 
-        value = cr.system_options['root']['component_options']['assembled_jac_type']
+        value = cr._system_options['root_0']['component_options']['assembled_jac_type']
         self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
 
     def test_record_system_options(self):
         # Regardless what object the case recorder is attached to, system options
         #  should be recorded for all systems in the model
 
-        expected_system_options_keys = ['root', '_auto_ivc', 'd1', 'd2', 'obj_cmp', 'con_cmp1',
-                                        'con_cmp2']
+        expected_system_options_keys = ['root_0', '_auto_ivc_0', 'd1_0', 'd2_0', 'obj_cmp_0', 'con_cmp1_0',
+                                        'con_cmp2_0']
 
         # Recorder on Driver
         prob = om.Problem(model=SellarDerivatives())
@@ -513,8 +513,8 @@ class TestSqliteRecorder(unittest.TestCase):
         cr = om.CaseReader("cases_driver.sql")
         # Quick check to see that keys and values were recorded
         for key in expected_system_options_keys:
-            self.assertTrue(key in cr.system_options.keys())
-        value = cr.system_options['root']['component_options']['assembled_jac_type']
+            self.assertTrue(key in cr._system_options.keys())
+        value = cr._system_options['root_0']['component_options']['assembled_jac_type']
         self.assertEqual('csc', value)  # quick check only. Too much to check exhaustively
 
         # Recorder on Problem
@@ -528,8 +528,8 @@ class TestSqliteRecorder(unittest.TestCase):
         cr = om.CaseReader("cases_problem.sql")
         # Quick check to see that keys and values were recorded
         for key in expected_system_options_keys:
-            self.assertTrue(key in cr.system_options.keys())
-        value = cr.system_options['root']['component_options']['assembled_jac_type']
+            self.assertTrue(key in cr._system_options.keys())
+        value = cr._system_options['root_0']['component_options']['assembled_jac_type']
         self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
 
         # Recorder on a subsystem
@@ -543,8 +543,8 @@ class TestSqliteRecorder(unittest.TestCase):
         cr = om.CaseReader("cases_subsystem.sql")
         # Quick check to see that keys and values were recorded
         for key in expected_system_options_keys:
-            self.assertTrue(key in cr.system_options.keys())
-        value = cr.system_options['root']['component_options']['assembled_jac_type']
+            self.assertTrue(key in cr._system_options.keys())
+        value = cr._system_options['root_0']['component_options']['assembled_jac_type']
         self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
 
         # Recorder on a solver
@@ -558,11 +558,11 @@ class TestSqliteRecorder(unittest.TestCase):
         cr = om.CaseReader("cases_solver.sql")
         # Quick check to see that keys and values were recorded
         for key in expected_system_options_keys:
-            self.assertTrue(key in cr.system_options.keys())
-        value = cr.system_options['root']['component_options']['assembled_jac_type']
+            self.assertTrue(key in cr._system_options.keys())
+        value = cr._system_options['root_0']['component_options']['assembled_jac_type']
         self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
 
-    def test_warning_system_options_overwriting(self):
+    def test_warning__system_options_overwriting(self):
 
         prob = ParaboloidProblem()
         prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
@@ -1505,14 +1505,14 @@ class TestSqliteRecorder(unittest.TestCase):
 
         # Just make sure all Systems had some metadata recorded
         assertSystemMetadataIdsRecorded(self, [
-            'root',
-            '_auto_ivc',
-            'mda',
-            'mda.d1',
-            'mda.d2',
-            'obj_cmp',
-            'con_cmp1',
-            'con_cmp2'
+            'root_0',
+            '_auto_ivc_0',
+            'mda_0',
+            'mda.d1_0',
+            'mda.d2_0',
+            'obj_cmp_0',
+            'con_cmp1_0',
+            'con_cmp2_0'
         ])
 
         # Make sure all the Systems are recorded
@@ -1541,14 +1541,14 @@ class TestSqliteRecorder(unittest.TestCase):
 
         # Just make sure all Systems had some metadata recorded
         assertSystemMetadataIdsRecorded(self, [
-            'root',
-            '_auto_ivc',
-            'mda',
-            'mda.d1',
-            'mda.d2',
-            'obj_cmp',
-            'con_cmp1',
-            'con_cmp2'
+            'root_0',
+            '_auto_ivc_0',
+            'mda_0',
+            'mda.d1_0',
+            'mda.d2_0',
+            'obj_cmp_0',
+            'con_cmp1_0',
+            'con_cmp2_0'
         ])
 
         # Make sure all the Systems are recorded at least once
@@ -2508,14 +2508,15 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         cr = om.CaseReader("cases.sql")
 
         # metadata for all the systems in the model
-        metadata = cr.system_options
+        metadata = cr._system_options
 
         self.assertEqual(sorted(metadata.keys()),
-                         sorted(['root', '_auto_ivc', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']))
+                         sorted(['root_0', '_auto_ivc_0', 'd1_0', 'd2_0', 'obj_cmp_0', 'con_cmp1_0',
+                                 'con_cmp2_0']))
 
         # options for system 'd1', with second option excluded
-        self.assertEqual(metadata['d1']['component_options']['distributed'], False)
-        self.assertEqual(metadata['d1']['component_options']['options value 1'], 1)
+        self.assertEqual(metadata['d1_0']['component_options']['distributed'], False)
+        self.assertEqual(metadata['d1_0']['component_options']['options value 1'], 1)
 
     def test_feature_system_recording_options(self):
         import openmdao.api as om
