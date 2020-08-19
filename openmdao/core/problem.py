@@ -116,6 +116,8 @@ class Problem(object):
         A flag to indicate whether the system options for all the systems have been recorded
     _metadata : dict
         Problem level metadata.
+    _run_counter : int
+        The number of times run_driver or run_model has been called.
     """
 
     def __init__(self, model=None, driver=None, comm=None, name=None, **options):

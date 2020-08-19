@@ -416,7 +416,7 @@ class SqliteCaseReader(BaseCaseReader):
         Parameters
         ----------
         run_counter : int or None
-            Run_driver iteration to inspect
+            Run_driver or run_model iteration to inspect
         out_stream : file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.

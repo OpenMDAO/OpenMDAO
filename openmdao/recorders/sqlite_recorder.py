@@ -631,7 +631,7 @@ class SqliteRecorder(CaseRecorder):
         recording_requester : System
             The System that would like to record its metadata.
         run_counter : int or None
-            The number of times run_driver has been called.
+            The number of times run_driver or run_model has been called.
         """
         if self.connection:
             if run_counter is None:

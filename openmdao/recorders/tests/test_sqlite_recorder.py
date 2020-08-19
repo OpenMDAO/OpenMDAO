@@ -410,12 +410,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob = ParaboloidProblem()
 
         driver = prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
-        driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_objectives'] = True
-        driver.recording_options['record_constraints'] = True
-        driver.recording_options['record_derivatives'] = True
-        driver.recording_options['includes'] = ['*']
-        driver.add_recorder(self.recorder)
+        prob.model.add_recorder(self.recorder)
 
         prob.setup()
         prob.set_solver_print(0)
