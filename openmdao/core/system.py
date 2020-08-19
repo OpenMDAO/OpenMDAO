@@ -1954,9 +1954,10 @@ class System(object):
                         if fnmatchcase(i, p):
                             break
                     else:
-                        raise RuntimeError("%s: '%s' failed to find any matches for the following "
-                                           "pattern: '%s'.%s" %
-                                           (self.msginfo, call, p, empty_group_msg))
+                        if names and p != '*':
+                            raise RuntimeError("%s: '%s' failed to find any matches for the following "
+                                            "pattern: '%s'.%s" %
+                                            (self.msginfo, call, p, empty_group_msg))
                     if p == patterns[-1]:
                         break
                 else:
