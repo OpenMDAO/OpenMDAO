@@ -15,7 +15,7 @@ except ImportError:
 
 import openmdao.api as om
 from openmdao.test_suite.components.sellar import SellarDis2
-from openmdao.utils.mpi import MPI
+from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.logger_utils import TestLogger
 from openmdao.utils.general_utils import ignore_errors_context, reset_warning_registry
@@ -1256,6 +1256,84 @@ class TestGroup(unittest.TestCase):
 
         for key, val in totals.items():
             assert_near_equal(val['rel error'][0], 0.0, 1e-15)
+
+    def test_set_order_in_config_error(self):
+
+        class SimpleGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
+                self.add_subsystem('comp2', om.ExecComp('b=2*a'))
+
+            def configure(self):
+                self.set_order(['C2', 'C1'])
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('C1', SimpleGroup())
+        model.add_subsystem('C2', SimpleGroup())
+
+        msg = "SimpleGroup (C1): Cannot call set_order in the configure method"
+        with self.assertRaises(RuntimeError) as cm:
+            prob.setup()
+
+        self.assertEqual(str(cm.exception), msg)
+
+    def test_set_order_after_setup(self):
+
+        class SimpleGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
+                self.add_subsystem('comp2', om.ExecComp('b=2*a'))
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('C1', SimpleGroup())
+        model.add_subsystem('C2', SimpleGroup())
+
+        prob.setup()
+        prob.model.set_order(['C2', 'C1'])
+
+        msg = "Problem: Cannot call set_order without calling setup after"
+        with self.assertRaises(RuntimeError) as cm:
+            prob.run_model()
+        self.assertEqual(str(cm.exception), msg)
+
+    def test_set_order_normal(self):
+
+        class SimpleGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
+                self.add_subsystem('comp2', om.ExecComp('b=2*a'))
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('C1', SimpleGroup())
+        model.add_subsystem('C2', SimpleGroup())
+
+        prob.model.set_order(['C2', 'C1'])
+        prob.setup()
+        prob.run_model()
+
+    def test_double_setup_for_set_order(self):
+        class SimpleGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
+                self.add_subsystem('comp2', om.ExecComp('b=2*a'))
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('C1', SimpleGroup())
+        model.add_subsystem('C2', SimpleGroup())
+
+        prob.setup()
+        model.set_order(['C2', 'C1'])
+        prob.setup()
+        prob.run_model()
+
 
 @unittest.skipUnless(MPI, "MPI is required.")
 class TestGroupMPISlice(unittest.TestCase):
@@ -2629,6 +2707,365 @@ class TestGroupAddInput(unittest.TestCase):
         self.assertEqual(cm.exception.args[0], "Group (<model>): The subsystems G1 and par.G4 called set_input_defaults for promoted input 'x' with conflicting values for 'value'. Call <group>.set_input_defaults('x', value=?), where <group> is the model to remove the ambiguity.")
 
 
+class MultComp(om.ExplicitComponent):
+    """
+    This class just performs a list of simple multiplications. It also keeps track of the number
+    of times _setup_var_data is called.
+    """
+    def __init__(self, mults=(), inits=None, **kwargs):
+        super(MultComp, self).__init__(**kwargs)
+        self.mults = list(mults)
+        self.var_setup_count = 0
+        if inits is None:
+            inits = {}
+        self.inits = inits
+
+    def _setup_var_data(self):
+        super(MultComp, self)._setup_var_data()
+        self.var_setup_count += 1
+
+    def add_mult(self, inp, mult, out):
+        self.mults((inp, mult, out))
+
+    def setup(self):
+        all_ins = set([inp for inp, _, _ in self.mults])
+        all_outs = set([out for _, _, out in self.mults])
+        common = sorted(all_ins.intersection(all_outs))
+        if common:
+            raise RuntimeError(f"{common} are both inputs and outputs.")
+
+        out_list = [o for _, _, o in self.mults]
+        if len(all_outs) < len(out_list):
+            raise RuntimeError(f"Some outputs appear more than once.")
+
+        for inp, _, out in self.mults:
+            self.add_input(inp, val=self.inits.get(inp, 1.))
+            self.add_output(out, val=self.inits.get(out, 1.))
+
+    def compute(self, inputs, outputs):
+        for inp, mult, out in self.mults:
+            outputs[out] = mult * inputs[inp]
+
+
+class ConfigGroup(om.Group):
+    """
+    This group can add IO vars and promotes during configure. It also keeps track of how many
+    times _setup_var_data is called.
+    """
+    def __init__(self, parallel=False, *args, **kwargs):
+        super(ConfigGroup, self).__init__(*args, **kwargs)
+        self.cfgproms = []
+        self.cfg_group_ins = []
+        self.cfgio = {}
+        self.cfg_invars = []
+        self.cfg_outvars = []
+        self.io_results = {}
+        self.var_setup_count = 0
+
+        if parallel:
+            self._mpi_proc_allocator.parallel = True
+
+    def _setup_var_data(self):
+        super(ConfigGroup, self)._setup_var_data()
+        self.var_setup_count += 1
+
+    def add_config_prom(self, child, prom):
+        self.cfgproms.append((child, prom))
+
+    def add_input_defaults(self, name, val=None, units=None):
+        self.cfg_group_ins.append((name, val, units))
+
+    def add_var_input(self, name, val=None, units=None):
+        self.cfg_invars.append((name, val, units))
+
+    def add_var_output(self, name, val=None, units=None):
+        self.cfg_outvars.append((name, val, units))
+
+    def add_get_io(self, child, **kwargs):
+        if child in self.cfgio:
+            raise RuntimeError(f"Can't set more than 1 call to get_io_metadata for child {child}.")
+
+        self.cfgio[child] = kwargs
+
+    def configure(self):
+        # retrieve metadata
+        for child, kwargs in self.cfgio.items():
+            kid = self._get_subsystem(child)
+            if kid is not None:
+                self.io_results[child] = kid.get_io_metadata(**kwargs)
+            else:
+                print(f"'{kid}' not found locally.")
+
+        # promotes
+        for child, prom in self.cfgproms:
+            if '.' in child:
+                parent, child = child.rsplit('.', 1)
+                s = self._get_subsystem(parent)
+                if s is None:
+                    print(f"'{parent}' not found locally.")
+                    continue
+            else:
+                s = self
+            s.promotes(child, any=prom)
+
+        # add inputs
+        for vpath, val, units in self.cfg_invars:
+            if '.' in vpath:
+                parent, vname = vpath.rsplit('.', 1)
+                s = self._get_subsystem(parent)
+                if s is None:
+                    print(f"'{parent}' not found locally.")
+                    continue
+                s.add_input(vname, val, units=units)
+            else:
+                raise RuntimeError("tried to add input var to a Group.")
+
+        # add outputs
+        for vpath, val, units in self.cfg_outvars:
+            if '.' in vpath:
+                parent, vname = vpath.rsplit('.', 1)
+                s = self._get_subsystem(parent)
+                if s is None:
+                    print(f"'{parent}' not found locally.")
+                    continue
+                s.add_output(vname, val, units=units)
+            else:
+                raise RuntimeError("tried to add output var to a Group.")
+
+        # set input defaults
+        for name, val, units in self.cfg_group_ins:
+            self.set_input_defaults(name, val=val, units=units)
+
+
+class Test3Deep(unittest.TestCase):
+    """
+    This creates a system tree with two levels of subgroups below model to allow testing of various
+    changes during configure that may change descendant systems that are not direct children.
+    """
+    cfg_par = False
+    sub_par = False
+
+    def build_model(self):
+        p = om.Problem(model=ConfigGroup())
+
+        minprocs = 3 if self.cfg_par else 1
+        cfg = p.model.add_subsystem('cfg', ConfigGroup(parallel=self.cfg_par), min_procs=minprocs)
+        cfg.add_subsystem('C1', MultComp([('x', 2., 'y')]))
+        cfg.add_subsystem('C2', MultComp([('x', 3., 'y')]))
+
+        minprocs = 2 if self.sub_par else 1
+        sub = cfg.add_subsystem('sub', ConfigGroup(parallel=self.sub_par), min_procs=minprocs)
+        sub.add_subsystem('C3', MultComp([('x', 4., 'y')]))
+        sub.add_subsystem('C4', MultComp([('x', 5., 'y')]))
+
+        return p
+
+    def get_matching_var_setup_counts(self, p, count):
+        """
+        Return pathnames of any systems that have a var_setup_count that matches 'count'.
+        """
+        result = set()
+        for s in p.model.system_iter(include_self=True):
+            if hasattr(s, 'var_setup_count') and s.var_setup_count == count:
+                result.add(s.pathname)
+
+        if p.model.comm.size > 1:
+            newres = set()
+            for res in p.model.comm.allgather(result):
+                newres.update(res)
+            result = newres
+
+        return sorted(result)
+
+    def get_io_results(self, p, parent, path):
+        """
+        Retrieve results of get_io_metadata calls that occurred during config.
+        Results are retrieved from all procs.
+        """
+        s = p.model._get_subsystem(parent)
+        if s is None:
+            raise RuntimeError(f"No parent named {parent}.")
+        res = s.io_results[path]
+        if s.comm.size > 1:
+            allres = {}
+            for procres in s.comm.allgather(res):
+                allres.update(procres)
+            res = allres
+        return res
+
+    def check_vs_meta(self, p, parent, meta_dict):
+        """
+        Compare the given metadata dict to the internal metadata dicts of the given parent.
+        """
+        system = p.model._get_subsystem(parent)
+        metas = (system._var_allprocs_abs2meta, system._var_abs2meta)
+        for vname, meta in meta_dict.items():
+            for key, val in meta.items():
+                for mymeta in metas:
+                    if key in mymeta:
+                        if (isinstance(val, np.ndarray) and not np.testing.assert_allclose(val, mymeta[key])) or val != mymeta[key]:
+                            raise RuntimeError(f"{val} != {mymeta[key]}")
+                        break
+
+    def test_io_meta(self):
+        p = self.build_model()
+        p.model.cfg.add_get_io('C1', return_rel_names=False)
+        p.model.cfg.add_get_io('C2')
+        p.model.cfg.add_get_io('sub')
+
+        p.setup()
+
+        res = self.get_io_results(p, 'cfg', 'C1')
+        expected = {'cfg.C1.x', 'cfg.C1.y'}
+        self.assertEqual({n for n in res}, expected)
+        self.check_vs_meta(p, 'cfg', res)
+
+        res = self.get_io_results(p, 'cfg', 'C2')
+        expected = {'x', 'y'}
+        self.assertEqual({n for n in res}, expected)
+        self.check_vs_meta(p, 'cfg', res)
+
+        res = self.get_io_results(p, 'cfg', 'sub')
+        expected = {'C3.x', 'C4.x', 'C3.y', 'C4.y'}
+        self.assertEqual({n for n in res}, expected)
+        self.check_vs_meta(p, 'cfg', res)
+
+        names = self.get_matching_var_setup_counts(p, 1)
+        expected = {'', 'cfg', 'cfg.C1', 'cfg.C2', 'cfg.sub', 'cfg.sub.C3', 'cfg.sub.C4'}
+        self.assertEqual(names, sorted(expected))
+
+    def test_io_meta_local_bad_meta_key(self):
+        p = self.build_model()
+        p.model.cfg.add_get_io('sub', metadata_keys=('value', 'foo'))
+        with self.assertRaises(Exception) as cm:
+            p.setup()
+
+        self.assertEqual(cm.exception.args[0], "ConfigGroup (cfg.sub): ['foo'] are not valid metadata entry names.")
+
+    def test_promote_descendant(self):
+        p = self.build_model()
+        p.model.cfg.add_config_prom('sub.C3', ['x'])
+        p.model.cfg.add_config_prom('sub.C4', ['y'])
+        p.setup()
+
+        names = self.get_matching_var_setup_counts(p, 1)
+        expected = {'', 'cfg', 'cfg.C1', 'cfg.C2', 'cfg.sub.C3', 'cfg.sub.C4'}
+        self.assertEqual(names, sorted(expected))
+
+        names = self.get_matching_var_setup_counts(p, 2)
+        expected = {'cfg.sub'}
+        self.assertEqual(names, sorted(expected))
+
+    def test_promote_child(self):
+        p = self.build_model()
+        p.model.cfg.add_config_prom('C1', ['x'])
+        p.model.cfg.add_config_prom('C2', ['y'])
+        p.model.cfg.sub.add_config_prom('C3', ['x'])
+        p.model.cfg.sub.add_config_prom('C4', ['y'])
+        p.setup()
+
+        names = self.get_matching_var_setup_counts(p, 1)
+        expected = {'', 'cfg', 'cfg.C1', 'cfg.C2', 'cfg.sub', 'cfg.sub.C3', 'cfg.sub.C4'}
+        self.assertEqual(names, sorted(expected))
+
+    def test_add_input_to_child(self):
+        p = self.build_model()
+        p.model.cfg.sub.add_var_input('C3.ivar0', 3.0, units='ft')
+
+        p.setup()
+
+        names = self.get_matching_var_setup_counts(p, 1)
+        expected = {'', 'cfg', 'cfg.C1', 'cfg.C2', 'cfg.sub', 'cfg.sub.C4'}
+        self.assertEqual(names, sorted(expected))
+
+        names = self.get_matching_var_setup_counts(p, 2)
+        expected = {'cfg.sub.C3'}
+        self.assertEqual(names, sorted(expected))
+
+    def test_add_output_to_child(self):
+        p = self.build_model()
+        p.model.cfg.sub.add_var_output('C3.ovar0', 3.0, units='ft')
+        p.setup()
+
+        names = self.get_matching_var_setup_counts(p, 1)
+        expected = {'', 'cfg', 'cfg.C1', 'cfg.C2', 'cfg.sub', 'cfg.sub.C4'}
+        self.assertEqual(names, sorted(expected))
+
+        names = self.get_matching_var_setup_counts(p, 2)
+        expected = {'cfg.sub.C3'}
+        self.assertEqual(names, sorted(expected))
+
+    def test_add_input_to_descendant(self):
+        p = self.build_model()
+        p.model.cfg.add_var_input('sub.C3.ivar0', 3.0, units='ft')
+        p.model.add_var_input('cfg.sub.C3.ivar1', 4.0, units='inch')
+
+        p.setup()
+
+        names = self.get_matching_var_setup_counts(p, 1)
+        expected = {'', 'cfg.C1', 'cfg.C2', 'cfg.sub.C4'}
+        self.assertEqual(names, sorted(expected))
+
+        names = self.get_matching_var_setup_counts(p, 2)
+        expected = {'cfg'}
+        self.assertEqual(names, sorted(expected))
+
+        names = self.get_matching_var_setup_counts(p, 3)
+        expected = {'cfg.sub', 'cfg.sub.C3'}
+        self.assertEqual(names, sorted(expected))
+
+    def test_add_output_to_descendant(self):
+        p = self.build_model()
+        p.model.cfg.add_var_output('sub.C3.ovar0', 3.0, units='ft')
+        p.model.add_var_output('cfg.sub.C3.ovar1', 4.0, units='inch')
+        p.setup()
+
+        names = self.get_matching_var_setup_counts(p, 1)
+        expected = {'', 'cfg.C1', 'cfg.C2', 'cfg.sub.C4'}
+        self.assertEqual(names, sorted(expected))
+
+        names = self.get_matching_var_setup_counts(p, 2)
+        expected = {'cfg'}
+        self.assertEqual(names, sorted(expected))
+
+        names = self.get_matching_var_setup_counts(p, 3)
+        expected = {'cfg.sub', 'cfg.sub.C3'}
+        self.assertEqual(names, sorted(expected))
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestInConfigMPIpar(Test3Deep):
+    N_PROCS = 2
+    sub_par = True
+
+    def test_io_meta_remote(self):
+        p = self.build_model()
+        p.model.add_get_io('cfg', metadata_keys=('value', 'src_indices', 'shape'), get_remote=True)
+        p.model.cfg.add_get_io('sub')
+
+        p.setup()
+
+        res = p.model.io_results['cfg']
+        expected = {'sub.C3.x', 'sub.C3.y', 'sub.C4.x', 'sub.C4.y', 'C1.x', 'C1.y', 'C2.x', 'C2.y'}
+        self.assertEqual(sorted([n for n in res]), sorted(expected))
+        self.check_vs_meta(p, 'cfg', res)
+
+        res = p.model.cfg.io_results['sub']
+        if p.model.comm.rank == 0:
+            expected = {'C3.y', 'C3.x'}
+        else:
+            expected = {'C4.y', 'C4.x'}
+        self.assertEqual(sorted([n for n in res]), sorted(expected))
+        self.check_vs_meta(p, 'cfg.sub', res)
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestInConfigMPIparpar(Test3Deep):
+    N_PROCS = 4
+    cfg_par = True
+    sub_par = True
+
+
 #
 # Feature Tests
 #
@@ -3043,6 +3480,7 @@ class TestFeatureSetOrder(unittest.TestCase):
         # reset the shared order list
         order_list[:] = []
 
+        prob.setup()
         # now swap C2 and C1 in the order
         model.set_order(['C2', 'C1', 'C3'])
 
@@ -3168,8 +3606,74 @@ class TestFeatureConfigure(unittest.TestCase):
                 # In this case, we can only determine the 'vec_size' for totalforcecomp
                 # after flightdatacomp has been setup.
 
-                flight_data = dict(self.flightdatacomp.list_outputs(shape=True, out_stream=None))
-                data_shape = flight_data['thrust']['shape']
+                meta = self.flightdatacomp.get_io_metadata('output', includes='thrust')
+                data_shape = meta['thrust']['shape']
+
+                self.totalforcecomp.add_equation('total_force',
+                                                 input_names=['thrust', 'drag', 'lift', 'weight'],
+                                                 vec_size=data_shape[0], length=data_shape[1],
+                                                 scaling_factors=[1, -1, 1, -1], units='kN')
+
+                self.connect('thrust', 'totalforcecomp.thrust')
+                self.connect('drag', 'totalforcecomp.drag')
+                self.connect('lift', 'totalforcecomp.lift')
+                self.connect('weight', 'totalforcecomp.weight')
+
+
+        p = om.Problem(model=ForceModel())
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p.get_val('totalforcecomp.total_force', units='kN'),
+                         np.array([[100, 200, 300], [0, -1, -2]]).T)
+
+    def test_configure_add_input_output_list_io_group(self):
+        """
+        Like the example above but system we're calling list_outputs on is a Group.
+        """
+        import numpy as np
+        import openmdao.api as om
+
+        class FlightDataComp(om.ExplicitComponent):
+            """
+            Simulate data generated by an external source/code
+            """
+            def setup(self):
+                # number of points may not be known a priori
+                n = 3
+
+                # The vector represents forces at n time points (rows) in 2 dimensional plane (cols)
+                self.add_output(name='thrust', shape=(n, 2), units='kN')
+                self.add_output(name='drag', shape=(n, 2), units='kN')
+                self.add_output(name='lift', shape=(n, 2), units='kN')
+                self.add_output(name='weight', shape=(n, 2), units='kN')
+
+            def compute(self, inputs, outputs):
+                outputs['thrust'][:, 0] = [500, 600, 700]
+                outputs['drag'][:, 0]  = [400, 400, 400]
+                outputs['weight'][:, 1] = [1000, 1001, 1002]
+                outputs['lift'][:, 1]  = [1000, 1000, 1000]
+
+
+        class ForceModel(om.Group):
+            def setup(self):
+                fdgroup = om.Group()
+                fdgroup.add_subsystem('flightdatacomp', FlightDataComp(),
+                                      promotes_outputs=['thrust', 'drag', 'lift', 'weight'])
+                self.add_subsystem('flightdatagroup', fdgroup,
+                                   promotes_outputs=['thrust', 'drag', 'lift', 'weight'])
+
+                self.add_subsystem('totalforcecomp', om.AddSubtractComp())
+
+            def configure(self):
+                # Some models that require self-interrogation need to be able to add
+                # I/O in components from the configure method of their containing groups.
+                # In this case, we can only determine the 'vec_size' for totalforcecomp
+                # after flightdatagroup has been setup.
+
+                flight_data = dict(self.flightdatagroup.list_outputs(shape=True, prom_name=True,
+                                                                     out_stream=None))
+                data_shape = flight_data['flightdatacomp.thrust']['shape']
 
                 self.totalforcecomp.add_equation('total_force',
                                                  input_names=['thrust', 'drag', 'lift', 'weight'],
@@ -3399,6 +3903,9 @@ class TestNaturalNamingMPI(unittest.TestCase):
                 p[name] = 9. + outcount
                 p.model.comm.barrier()
                 self.assertEqual(p.get_val(name, get_remote=True), 9. + outcount)
+
+        self.assertEqual(p.model._gatherable_vars,
+                         {'par.g1.g2.g3.g4.c1.x', 'par.g1a.g2.g3.g4.c1.x', 'par.g1.g2.g3.g4.c1.y', 'par.g1a.g2.g3.g4.c1.y'})
 
 
 if __name__ == "__main__":

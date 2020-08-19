@@ -1,7 +1,5 @@
 // Constants and default valus
 const EMBEDDED = (d3.selectAll("#all_pt_n2_content_div").classed("embedded-n2"));
-const ALLOW_PRECOLLAPSE_COUNT = 200; // Consider precollapsing nodes in models larger than this
-const PRECOLLAPSE_THRESHOLD = 10; // Pre-collapse nodes with more descendants than this
 const _DEFAULT_N2_DIAGRAM_UNIT = 'px';
 const _DEFAULT_N2_DIAGRAM_HEIGHT = window.innerHeight * .95;
 const _DEFAULT_FONT_SIZE = 11;
@@ -42,6 +40,18 @@ let N2TransitionDefaults = {
     'durationSlow': 1500,
     'maxNodes': 150
 }
+
+const Precollapse = {
+    'minimumNodes': 200, // Precollapse nodes in models larger than this
+    'threshold': 0, // Only precollapse nodes with more descendants than this
+    'grpDepthStart': 3, // Only precollapse group nodes at least this deep
+    'cmpDepthStart': 2, // Only precollapse component nodes at least this deep
+    'depthLimit': 6, // Only precollapse nodes with more than this many others at the same depth
+    'children': 6, // Only precollapse nodes with more direct children than this
+                   // (decreases by 1 w/each depth level)
+}
+
+Object.freeze(Precollapse);
 
 let DebugFlags = {
     'timings': false,

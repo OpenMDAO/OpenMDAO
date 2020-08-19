@@ -9,14 +9,14 @@ from collections import OrderedDict
 
 import numpy as np
 
+from openmdao.core.constants import _DEFAULT_OUT_STREAM
 from openmdao.recorders.sqlite_recorder import blob_to_array
 from openmdao.utils.record_util import deserialize, get_source_system
 from openmdao.utils.variable_table import write_var_table
-from openmdao.utils.general_utils import make_set, match_includes_excludes
+from openmdao.utils.general_utils import make_set, match_prom_or_abs
 from openmdao.utils.units import unit_conversion
 from openmdao.recorders.sqlite_recorder import format_version as current_version
 
-_DEFAULT_OUT_STREAM = object()
 _AMBIGOUS_PROM_NAME = object()
 
 
@@ -430,11 +430,11 @@ class Case(object):
             User defined tags that can be used to filter what gets listed. Only inputs with the
             given tags will be listed.
             Default is None, which means there will be no filtering based on tags.
-        includes : None or list_like
-            List of glob patterns for pathnames to include in the check. Default is None, which
-            includes all components in the model.
-        excludes : None or list_like
-            List of glob patterns for pathnames to exclude from the check. Default is None, which
+        includes : iter of str or None
+            Glob patterns for pathnames to include in the check. Default is None, which
+            includes all.
+        excludes : iter of str or None
+            Glob patterns for pathnames to exclude from the check. Default is None, which
             excludes nothing.
         out_stream : file-like object
             Where to send human readable output. Default is sys.stdout.
@@ -456,7 +456,7 @@ class Case(object):
 
                 var_name_prom = self._abs2prom['input'][var_name]
 
-                if not match_includes_excludes(var_name, var_name_prom, includes, excludes):
+                if not match_prom_or_abs(var_name, var_name_prom, includes, excludes):
                     continue
 
                 val = self.inputs[var_name]
@@ -547,11 +547,11 @@ class Case(object):
             User defined tags that can be used to filter what gets listed. Only outputs with the
             given tags will be listed.
             Default is None, which means there will be no filtering based on tags.
-        includes : None or list_like
-            List of glob patterns for pathnames to include in the check. Default is None, which
-            includes all components in the model.
-        excludes : None or list_like
-            List of glob patterns for pathnames to exclude from the check. Default is None, which
+        includes : iter of str or None
+            Glob patterns for pathnames to include in the check. Default is None, which
+            includes all.
+        excludes : iter of str or None
+            Glob patterns for pathnames to exclude from the check. Default is None, which
             excludes nothing.
         list_autoivcs : bool
             If True, include auto_ivc outputs in the listing.  Defaults to False.
@@ -578,11 +578,11 @@ class Case(object):
 
             var_name_prom = self._abs2prom['output'][var_name]
 
-            if not match_includes_excludes(var_name, var_name_prom, includes, excludes):
+            if not match_prom_or_abs(var_name, var_name_prom, includes, excludes):
                 continue
 
             # check if residuals were recorded, skip if within specifed tolerance
-            if self.residuals and var_name in self.residuals.absolute_names():
+            if residuals and self.residuals and var_name in self.residuals.absolute_names():
                 resids = self.residuals[var_name]
                 if residuals_tol and np.linalg.norm(resids) < residuals_tol:
                     continue
@@ -685,8 +685,9 @@ class Case(object):
             # don't have execution order, just sort for determinism
             var_list = sorted(var_dict.keys())
 
+        top_name = pathname if pathname else 'model'
         write_var_table(pathname, var_list, var_type, var_dict,
-                        hierarchical=hierarchical, top_name='model',
+                        hierarchical=hierarchical, top_name=top_name,
                         print_arrays=print_arrays, out_stream=out_stream)
 
     def _get_variables_of_type(self, var_type, scaled=False, use_indices=False):

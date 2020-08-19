@@ -237,8 +237,8 @@ class N2Layout {
         node.numLeaves = 0;
 
         if (! node.varIsHidden) {
-            if (this.model.nodeIds.length > ALLOW_PRECOLLAPSE_COUNT) {
-                node.minimizeIfLarge();
+            if (this.model.nodeIds.length > Precollapse.minimumNodes) {
+                node.minimizeIfLarge(this.model.depthCount[node.depth]);
             }
 
             if (node.hasChildren() && !node.isMinimized) {
