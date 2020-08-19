@@ -838,7 +838,7 @@ class Problem(object):
         self._setup_already_called = False
 
         if hasattr(self, '_metadata') and self._metadata is not None:
-            if self._metadata['setup_status'] == _SetupStatus.POST_FINAL_SETUP: #3
+            if self._metadata['setup_status'] == _SetupStatus.POST_FINAL_SETUP:
                 self._setup_already_called = True
 
         # PETScVector is required for MPI
@@ -891,7 +891,7 @@ class Problem(object):
         self._check = check
         self._logger = logger
 
-        self._metadata['setup_status'] = _SetupStatus.POST_SETUP # 2
+        self._metadata['setup_status'] = _SetupStatus.POST_SETUP
 
         return self
 
