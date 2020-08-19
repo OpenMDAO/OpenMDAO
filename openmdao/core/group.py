@@ -1420,10 +1420,7 @@ class Group(System):
                     if np.prod(src_indices.shape) == 0:
                         continue
 
-                    if is_slice and src_indices.size == np.prod(in_shape):
-                        flat_array_slice_check = True
-                    else:
-                        flat_array_slice_check = False
+                    flat_array_slice_check = is_slice and src_indices.size == np.prod(in_shape)
 
                     if any('flat_src_indices' in subsys._var_abs2meta[name]
                            for name in subsys._var_abs2meta):
@@ -1432,18 +1429,19 @@ class Group(System):
                         simple_warning(msg)
 
                     # initial dimensions of indices shape must be same shape as target
-                    for idx_d, inp_d in zip(src_indices.shape, in_shape):
-                        if idx_d != inp_d and not flat_array_slice_check:
-                            msg = f"{self.msginfo}: The source indices " + \
-                                  f"{src_indices} do not specify a " + \
-                                  f"valid shape for the connection '{abs_out}' to " + \
-                                  f"'{abs_in}'. The target shape is " + \
-                                  f"{in_shape} but indices are {src_indices.shape}."
-                            if self._raise_connection_errors:
-                                raise ValueError(msg)
-                            else:
-                                simple_warning(msg)
-                                continue
+                    if not flat_array_slice_check:
+                        for idx_d, inp_d in zip(src_indices.shape, in_shape):
+                            if idx_d != inp_d:
+                                msg = f"{self.msginfo}: The source indices " + \
+                                    f"{src_indices} do not specify a " + \
+                                    f"valid shape for the connection '{abs_out}' to " + \
+                                    f"'{abs_in}'. The target shape is " + \
+                                    f"{in_shape} but indices are {src_indices.shape}."
+                                if self._raise_connection_errors:
+                                    raise ValueError(msg)
+                                else:
+                                    simple_warning(msg)
+                                    continue
 
                     # any remaining dimension of indices must match shape of source
                     if len(src_indices.shape) > len(in_shape) and not flat_array_slice_check:
