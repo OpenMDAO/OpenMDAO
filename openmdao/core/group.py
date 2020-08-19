@@ -99,8 +99,6 @@ class Group(System):
         Flag indicating whether connection errors are raised as an Exception.
     _order_set : bool
         Flag to check if set_order has been called.
-    _remote_comps : dict
-        Mapping of components that are remote on some proc(s) to their owning rank.
     """
 
     def __init__(self, **kwargs):
@@ -135,7 +133,6 @@ class Group(System):
         self._contains_parallel_group = False
         self._raise_connection_errors = True
         self._order_set = False
-        self._remote_comps = {}
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -616,7 +613,6 @@ class Group(System):
 
         self._resolve_group_input_defaults()
         auto_ivc = self._setup_auto_ivcs(mode)
-        self._compute_owning_ranks()
         self._check_prom_masking()
 
     def _check_prom_masking(self):
@@ -741,11 +737,17 @@ class Group(System):
 
         # If running in parallel, allgather
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
+            loc_sizes = {}
+            for io in ('input', 'output'):
+                loc_sizes[io] = {n: m['size'] for n, m in abs2meta[io].items()}
+
+            myrank = self.comm.rank
             mysub = self._subsystems_myproc[0] if self._subsystems_myproc else False
             if (mysub and mysub.comm.rank == 0 and (mysub._full_comm is None or
                                                     mysub._full_comm.rank == 0)):
                 raw = (allprocs_discrete, allprocs_prom2abs_list, allprocs_abs2meta,
-                       self._has_output_scaling, self._has_resid_scaling, self._group_inputs)
+                       self._has_output_scaling, self._has_resid_scaling, self._group_inputs,
+                       loc_sizes)
             else:
                 raw = (
                     {'input': {}, 'output': {}},
@@ -754,6 +756,7 @@ class Group(System):
                     False,
                     False,
                     {},
+                    loc_sizes,
                 )
 
             gathered = self.comm.allgather(raw)
@@ -764,10 +767,9 @@ class Group(System):
             for io in ['input', 'output']:
                 allprocs_prom2abs_list[io] = OrderedDict()
 
-            myrank = self.comm.rank
             sizedict = defaultdict(lambda: np.zeros((self.comm.size, 1), dtype=INT_DTYPE))
-            for rank, (myproc_discrete, myproc_prom2abs_list, myproc_abs2meta,
-                       oscale, rscale, ginputs) in enumerate(gathered):
+            for rank, (proc_discrete, proc_prom2abs_list, proc_abs2meta,
+                       oscale, rscale, ginputs, proc_sizes) in enumerate(gathered):
                 self._has_output_scaling |= oscale
                 self._has_resid_scaling |= rscale
 
@@ -778,19 +780,20 @@ class Group(System):
                         self._group_inputs[p].extend(mlist)
 
                 for io in ['input', 'output']:
-                    allprocs_abs2meta[io].update(myproc_abs2meta[io])
-
+                    allprocs_abs2meta[io].update(proc_abs2meta[io])
+                    loc_sizes = proc_sizes[io]
                     # collect size info
-                    for n, m in myproc_abs2meta[io].items():
-                        sizedict[n][rank] = m['size']
+                    for n, m in proc_abs2meta[io].items():
+                        if n in loc_sizes:
+                            sizedict[n][rank] = loc_sizes[n]
                         if m['distributed']:
                             self._has_distrib_vars = True
 
                     # Assemble in parallel allprocs_abs_names
-                    allprocs_discrete[io].update(myproc_discrete[io])
+                    allprocs_discrete[io].update(proc_discrete[io])
 
                     # Assemble in parallel allprocs_prom2abs_list
-                    for prom_name, abs_names_list in myproc_prom2abs_list[io].items():
+                    for prom_name, abs_names_list in proc_prom2abs_list[io].items():
                         if prom_name not in allprocs_prom2abs_list[io]:
                             allprocs_prom2abs_list[io][prom_name] = []
                         allprocs_prom2abs_list[io][prom_name].extend(abs_names_list)
@@ -869,11 +872,7 @@ class Group(System):
             self._var_relevant_names['linear'] = nl_relnames
             self._var_allprocs_abs2idx['linear'] = self._var_allprocs_abs2idx['nonlinear']
 
-        self._setup_remote_comp_owners()
-        self._setup_remote_var_owners()
-
-        if self.name:  # don't to this at the top because we'll do it later after auto_ivc init
-            self._compute_owning_ranks()
+        self._compute_owning_ranks()
 
     def _resolve_group_input_defaults(self):
         """
@@ -980,27 +979,43 @@ class Group(System):
         else:
             self._vector_class = self._local_vector_class
 
-    def _compute_owning_ranks(self):
-        if self.comm.size > 1:
+    def _compute_owning_ranks(self, abs2meta_tup=None):
+        if abs2meta_tup is None:
+            self._vars_to_gather = {}
             abs2meta = self._var_allprocs_abs2meta
+            abs2discrete = self._var_allprocs_discrete
+        else:
+            abs2meta, abs2discrete = abs2meta_tup
+
+        if self.comm.size > 1:
             owns = self._owning_rank
             self._owned_sizes = self._var_sizes['nonlinear']['output'].copy()
+            abs2idx = self._var_allprocs_abs2idx['nonlinear']
             for io in ('input', 'output'):
                 sizes = self._var_sizes['nonlinear'][io]
-                for i, (name, meta) in enumerate(self._var_allprocs_abs2meta[io].items()):
+                for name, meta in abs2meta[io].items():
+                    i = abs2idx[name]
                     for rank in range(self.comm.size):
                         if sizes[rank, i] > 0:
                             owns[name] = rank
                             if io == 'output' and not meta['distributed']:
                                 self._owned_sizes[rank + 1:, i] = 0  # zero out all dups
                             break
+                    if not meta['distributed'] and not np.all(sizes[:, i]):
+                        self._vars_to_gather[name] = owns[name]
 
-                if self._var_allprocs_discrete[io]:
-                    local = list(self._var_discrete[io])
-                    for i, names in enumerate(self.comm.allgather(local)):
+                if abs2discrete[io]:
+                    prefix = self.pathname + '.' if self.pathname else ''
+                    all_set = set(abs2discrete[io])
+                    local = set([prefix + n for n in self._var_discrete[io]])
+                    remote = set()
+                    for rank, names in enumerate(self.comm.allgather(local)):
                         for n in names:
                             if n not in owns:
-                                owns[n] = i
+                                owns[n] = rank
+                        remote.update(all_set - names)
+                    for r in remote:
+                        self._vars_to_gather[r] = owns[r]
         else:
             self._owned_sizes = self._var_sizes['nonlinear']['output']
 
@@ -2605,71 +2620,6 @@ class Group(System):
 
         return graph
 
-    def _setup_remote_comp_owners(self):
-        """
-        Compute a mapping of component pathname to owning rank.
-
-        The mapping will contain ONLY components that are remote on at least one proc.
-        """
-        if self.comm.size > 1:
-            if self._mpi_proc_allocator.parallel:
-                loc_comps = self._problem_meta['local_components']
-                # use the allprocs variable dicts to find any remote systems
-                remote_comps = set()
-                for typ in ('input', 'output'):
-                    for abspath in self._var_allprocs_abs2prom[typ]:  # includes real and discrete
-                        comp_name, vname = abspath.rsplit('.', 1)
-                        if comp_name not in loc_comps:
-                            remote_comps.add(comp_name)
-
-                # Find systems that are remote in at least one proc and the owning rank for each.
-                gathered = self.comm.gather(remote_comps, root=0)
-                if self.comm.rank == 0:
-                    remote_comps = {}
-                    remaining_remotes = set()
-                    for remotes in gathered:
-                        remaining_remotes.update(remotes)
-
-                    for rank, remotes in enumerate(gathered):
-                        if not remaining_remotes:
-                            break
-                        diff = remaining_remotes - remotes
-                        for name in diff:
-                            remote_comps[name] = rank
-
-                        remaining_remotes -= diff
-
-                    self.comm.bcast(remote_comps, root=0)
-                else:
-                    remote_comps = self.comm.bcast(None, root=0)
-            else:  # not a parallel group, so just use remote comps from children
-                remote_comps = {}
-                for sub in self._subsystems_myproc:
-                    if isinstance(sub, Group):
-                        remote_comps.update(sub._remote_comps)
-        else:
-            remote_comps = {}
-
-        self._remote_comps = remote_comps
-
-    def _setup_remote_var_owners(self):
-        """
-        Compute a mapping of abs var name to owning rank for variables that are remote somewhere.
-
-        The mapping contains ONLY non-distributed variables that are remote on at least one proc.
-        """
-        owners = {}
-        comp_owning_ranks = self._remote_comps
-        for io in ('input', 'output'):
-            abs2meta = self._var_allprocs_abs2meta[io]
-            for abs_name in self._var_allprocs_abs2prom[io]:
-                comp_name, vname = abs_name.rsplit('.', 1)
-                if comp_name in comp_owning_ranks and not (abs_name in abs2meta and
-                                                           abs2meta[abs_name]['distributed']):
-                    owners[abs_name] = comp_owning_ranks[comp_name]
-
-        self._vars_to_gather = owners
-
     def _get_auto_ivc_out_val(self, tgts, vars_to_gather, all_abs2meta_in, abs2meta_in):
         info = []
         src_idx_found = []
@@ -2692,8 +2642,7 @@ class Group(System):
             elif dist:
                 # OpenMDAO currently can't create an automatic IndepVarComp for inputs on
                 # distributed components.
-                msg = 'Distributed component input "{}" requires an IndepVarComp.'
-                raise RuntimeError(msg.format(tgt))
+                raise RuntimeError(f'Distributed component input "{tgt}" requires an IndepVarComp.')
 
             elif has_src_inds:  # local with non-distrib src_indices
                 src_idx_found.append(tgt)
@@ -2856,6 +2805,8 @@ class Group(System):
         self._var_relevant_names['nonlinear'][io] = list(self._var_abs2meta[io])
         self._setup_var_index_maps(('nonlinear',))
         self._var_allprocs_abs2idx['linear'] = self._var_allprocs_abs2idx['nonlinear']
+        self._compute_owning_ranks((auto_ivc._var_allprocs_abs2meta,
+                                    auto_ivc._var_allprocs_discrete))
 
         return auto_ivc
 
