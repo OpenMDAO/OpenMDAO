@@ -251,24 +251,7 @@ class _AutoIndepVarComp(IndepVarComp):
                 self.options['distributed'] = True
 
             self._remotes = all_remotes
+            for name in all_remotes:
+                self._static_var_rel2meta[name]['distributed'] = True
 
         super(_AutoIndepVarComp, self)._set_vector_class()
-
-    def _setup_var_data(self):
-        """
-        Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
-
-        Parameters
-        ----------
-        recurse : bool (ignored)
-            Whether to call this method in subsystems.
-        """
-        super(_AutoIndepVarComp, self)._setup_var_data()
-        if self.comm.size > 1:
-            all_abs2meta = self._var_allprocs_abs2meta['output']
-            abs2meta = self._var_abs2meta['output']
-
-            for name in self._remotes:
-                if name in abs2meta:
-                    abs2meta[name]['distributed'] = True
-                all_abs2meta[name]['distributed'] = True

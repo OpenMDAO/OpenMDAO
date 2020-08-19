@@ -147,8 +147,7 @@ def name2abs_name(system, name):
         return name
 
     if name in system._var_allprocs_prom2abs_list['output']:
-        abs_name = system._var_allprocs_prom2abs_list['output'][name][0]
-        return abs_name
+        return system._var_allprocs_prom2abs_list['output'][name][0]
 
     # This may raise an exception if name is not unique
     abs_name = prom_name2abs_name(system, name, 'input')

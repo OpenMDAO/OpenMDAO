@@ -634,14 +634,19 @@ class System(object):
 
         self._setup_var_data()
 
+        # promoted names must be know to determine implicit connections so this must be
+        # called after _setup_var_data, and _setup_var_data will have to be partially redone
+        # after auto_ivcs have been added, but auto_ivcs can't be added until after we know all of
+        # the connections.
         self._setup_global_connections()
 
         self._top_level_setup(mode)
 
+        # some linear vec_names have to be mapped to their connected auto_ivc so we can't
+        # specify them until after setup of auto_ivcs (and after connections).
         self._setup_vec_names(mode)
 
         self._setup_relevance(mode, self._relevant)
-        self._setup_var_index_ranges()
         self._setup_var_sizes()
 
         # These are used when the driver assembles the design variables.
@@ -651,6 +656,7 @@ class System(object):
 
         self._top_level_setup2()
 
+        # determine which connections are managed by which group, and check validity of connections
         self._setup_connections()
 
     def _top_level_setup(self, mode):
@@ -1269,12 +1275,6 @@ class System(object):
         self._design_vars.update(self._static_design_vars)
         self._responses.update(self._static_responses)
 
-    def _setup_var_index_ranges(self):
-        """
-        Compute the division of variables by subsystem.
-        """
-        self._setup_var_index_maps()
-
     def _setup_var_data(self):
         """
         Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
@@ -1288,14 +1288,25 @@ class System(object):
         self._owning_rank = defaultdict(int)
         self._var_sizes = {}
         self._owned_sizes = None
+        self._var_allprocs_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
+        self._var_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
 
-    def _setup_var_index_maps(self):
+    def _setup_var_index_maps(self, vec_names=None):
         """
         Compute maps from abs var names to their index among allprocs variables in this system.
-        """
-        self._var_allprocs_abs2idx = abs2idx = {}
 
-        vec_names = self._lin_rel_vec_name_list if self._use_derivatives else self._vec_names
+        Parameters
+        ----------
+        vec_names : iter of str or None
+            Names of vectors to iterate over.  If None, only partial linear vec names will be
+            iterated over, e.g., only those defined for parallel derivatives or vectorized derivs.
+        """
+        abs2idx = self._var_allprocs_abs2idx
+        if vec_names is None:
+            if self._use_derivatives:
+                vec_names = self._lin_rel_vec_name_list[1:]
+            else:
+                vec_names = self._vec_names[2:]
 
         for vec_name in vec_names:
             abs2idx[vec_name] = abs2idx_t = {}
@@ -1303,28 +1314,16 @@ class System(object):
                 for i, abs_name in enumerate(self._var_allprocs_relevant_names[vec_name][io]):
                     abs2idx_t[abs_name] = i
 
-        if self._use_derivatives:
-            abs2idx['nonlinear'] = abs2idx['linear']
-
-        for subsys in self._subsystems_myproc:
-            subsys._setup_var_index_maps()
-
-    def _setup_var_sizes(self):
-        """
-        Compute the arrays of local variable sizes for all variables/procs on this system.
-        """
-        pass
-
     def _setup_global_shapes(self):
         """
         Compute the global size and shape of all variables on this system.
         """
         loc_meta = self._var_abs2meta
 
-        for typ in ('input', 'output'):
+        for io in ('input', 'output'):
             # now set global sizes and shapes into metadata for distributed variables
-            sizes = self._var_sizes['nonlinear'][typ]
-            for idx, (abs_name, mymeta) in enumerate(self._var_allprocs_abs2meta[typ].items()):
+            sizes = self._var_sizes['nonlinear'][io]
+            for idx, (abs_name, mymeta) in enumerate(self._var_allprocs_abs2meta[io].items()):
                 local_shape = mymeta['shape']
                 if mymeta['distributed']:
                     global_size = np.sum(sizes[:, idx])
@@ -1349,9 +1348,9 @@ class System(object):
                     mymeta['global_size'] = mymeta['size']
                     mymeta['global_shape'] = local_shape
 
-                if abs_name in loc_meta[typ]:
-                    loc_meta[typ][abs_name]['global_shape'] = mymeta['global_shape']
-                    loc_meta[typ][abs_name]['global_size'] = mymeta['global_size']
+                if abs_name in loc_meta[io]:
+                    loc_meta[io][abs_name]['global_shape'] = mymeta['global_shape']
+                    loc_meta[io][abs_name]['global_size'] = mymeta['global_size']
 
     def _setup_global_connections(self, conns=None):
         """
@@ -1574,11 +1573,8 @@ class System(object):
         else:
             self._relevant = relevant
 
-        self._var_allprocs_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
-        self._var_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
-
-        self._rel_vec_name_list = []
-        for vec_name in self._vec_names:
+        self._rel_vec_name_list = ['nonlinear', 'linear']
+        for vec_name in self._vec_names[2:]:
             rel, relsys = relevant[vec_name]['@all']
             if self.pathname in relsys:
                 self._rel_vec_name_list.append(vec_name)
@@ -1590,6 +1586,7 @@ class System(object):
 
         self._rel_vec_names = frozenset(self._rel_vec_name_list)
         self._lin_rel_vec_name_list = self._rel_vec_name_list[1:]
+        self._setup_var_index_maps()
 
         for s in self._subsystems_myproc:
             s._setup_relevance(mode, relevant)
@@ -1630,7 +1627,9 @@ class System(object):
 
         vector_class = self._vector_class
 
-        for vec_name in self._rel_vec_name_list:
+        vec_names = self._rel_vec_name_list if self._use_derivatives else self._vec_names
+
+        for vec_name in vec_names:
 
             # Only allocate complex in the vectors we need.
             vec_alloc_complex = root_vectors['output'][vec_name]._alloc_complex

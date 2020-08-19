@@ -220,11 +220,15 @@ class Component(System):
         # Compute the prefix for turning rel/prom names into abs names
         prefix = self.pathname + '.' if self.pathname else ''
 
+        self._var_sizes = {'nonlinear': {}}
         iproc = self.comm.rank
 
         for io in ['input', 'output']:
             abs2meta = self._var_abs2meta[io]
             allprocs_abs2meta = self._var_allprocs_abs2meta[io]
+            sizes = self._var_sizes['nonlinear'][io] = np.zeros((self.comm.size,
+                                                                 len(self._var_rel_names[io])),
+                                                                dtype=INT_DTYPE)
 
             for i, prom_name in enumerate(self._var_rel_names[io]):
                 abs_name = prefix + prom_name
@@ -242,6 +246,18 @@ class Component(System):
                     allprocs_abs2meta[abs_name]['has_src_indices'] = \
                         abs2meta[abs_name]['src_indices'] is not None
 
+                sizes[iproc, i] = metadata['size']
+
+            if self.comm.size > 1:
+                if self.options['distributed']:
+                    for type_ in ['input', 'output']:
+                        sizes_in = sizes[iproc, :].copy()
+                        self.comm.Allgather(sizes_in, sizes)
+                else:
+                    # if component isn't distributed, we don't need to allgather sizes since
+                    # they'll all be the same.
+                    sizes[:] = np.tile(sizes[iproc, :], (self.comm.size, 1))
+
             for prom_name, val in self._var_discrete[io].items():
                 abs_name = prefix + prom_name
 
@@ -253,6 +269,26 @@ class Component(System):
                 self._var_allprocs_discrete[io][abs_name] = v = val.copy()
                 del v['value']
 
+        # all names are relevant for the 'nonlinear' and 'linear' vectors, so
+        # we can set them here, before we've computed the relevance graph.  We
+        # can then use them to compute the size arrays of for all other vectors
+        # based on the nonlinear size array.
+        nl_allprocs_relnames = self._var_allprocs_relevant_names['nonlinear']
+        nl_relnames = self._var_relevant_names['nonlinear']
+        for io in ('input', 'output'):
+            nl_allprocs_relnames[io] = list(self._var_allprocs_abs2meta[io])
+            nl_relnames[io] = list(self._var_abs2meta[io])
+        self._setup_var_index_maps(('nonlinear',))
+
+        if self._use_derivatives:
+            self._var_sizes['linear'] = self._var_sizes['nonlinear']
+            self._var_allprocs_relevant_names['linear'] = nl_allprocs_relnames
+            self._var_relevant_names['linear'] = nl_relnames
+            self._var_allprocs_abs2idx['linear'] = self._var_allprocs_abs2idx['nonlinear']
+
+        self._owned_sizes = self._var_sizes['nonlinear']['output']
+        self._setup_global_shapes()
+
         if self._var_discrete['input'] or self._var_discrete['output']:
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
             self._discrete_outputs = _DictValues(self._var_discrete['output'])
@@ -261,58 +297,31 @@ class Component(System):
 
     def _setup_var_sizes(self):
         """
-        Compute the arrays of local variable sizes for all variables/procs on this system.
+        Compute the arrays of variable sizes for all variables/procs on this system.
         """
-        super(Component, self)._setup_var_sizes()
-
-        iproc = self.comm.rank
-        nproc = self.comm.size
-
-        sizes = self._var_sizes
-        abs2meta = self._var_abs2meta
-
         if self._use_derivatives:
-            vec_names = self._lin_rel_vec_name_list
-        else:
-            vec_names = self._vec_names
 
-        # Initialize empty arrays
-        for vec_name in vec_names:
-            sizes[vec_name] = {}
-            # at component level, _var_allprocs_* is the same as var_* since all vars exist
-            # in all procs for a given component, so we don't have to mess with figuring out
-            # what vars are local.
-            if self._use_derivatives:
+            sizes = self._var_sizes
+            abs2idx = self._var_allprocs_abs2idx['nonlinear']
+            nl_sizes = self._var_sizes['nonlinear']
+
+            # Initialize size arrays for other linear vecs besides 'linear'
+            # (which is the same as 'nonlinear' and was computed in _setup_var_data)
+            for vec_name in self._lin_rel_vec_name_list[1:]:
+                # at component level, _var_allprocs_* is the same as var_* since all vars exist in
+                # all procs for a given component, so we don't have to mess with figuring out what
+                # vars are local.
                 relnames = self._var_allprocs_relevant_names[vec_name]
-            else:
-                relnames = self._var_allprocs_abs2meta
 
-            for io in ('input', 'output'):
-                sizes[vec_name][io] = sz = np.zeros((nproc, len(relnames[io])), int)
+                sizes[vec_name] = {}
+                for io in ('input', 'output'):
+                    sizes[vec_name][io] = sz = np.zeros((self.comm.size, len(relnames[io])),
+                                                        INT_DTYPE)
 
-                # Compute _var_sizes
-                for idx, abs_name in enumerate(relnames[io]):
-                    sz[iproc, idx] = abs2meta[io][abs_name]['size']
-
-        if nproc > 1:
-            for vec_name in vec_names:
-                sizes = self._var_sizes[vec_name]
-                if self.options['distributed']:
-                    for io in ['input', 'output']:
-                        sizes_in = sizes[io][iproc, :].copy()
-                        self.comm.Allgather(sizes_in, sizes[io])
-                else:
-                    # if component isn't distributed, we don't need to allgather sizes since
-                    # they'll all be the same.
-                    for io in ['input', 'output']:
-                        sizes[io] = np.tile(sizes[io][iproc], (nproc, 1))
-
-        if self._use_derivatives:
-            self._var_sizes['nonlinear'] = self._var_sizes['linear']
-
-        self._owned_sizes = self._var_sizes['nonlinear']['output']
-
-        self._setup_global_shapes()
+                    # Variables for this vec_name are a subset of those for nonlinear, so just
+                    # take columns of the nonlinear sizes array
+                    for idx, abs_name in enumerate(relnames[io]):
+                        sz[:, idx] = nl_sizes[io][:, abs2idx[abs_name]]
 
     def _setup_partials(self):
         """
