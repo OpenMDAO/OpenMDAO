@@ -169,6 +169,7 @@ class Problem(object):
         self._initial_condition_cache = {}
 
         self._metadata = None
+        self._run_counter = 0
         self._system_options_recorded = False
         self._rec_mgr = RecordingManager()
 
@@ -597,6 +598,9 @@ class Problem(object):
             self.driver.iter_count = 0
             self.model._reset_iter_counts()
 
+        if self._setup_already_called:
+            self._run_counter += 1
+
         self.final_setup()
         self.model._clear_iprint()
         self.model.run_solve_nonlinear()
@@ -633,7 +637,6 @@ class Problem(object):
             self.driver.iter_count = 0
             self.model._reset_iter_counts()
 
-        self._run_counter = 0
         if self._setup_already_called:
             self._run_counter += 1
 

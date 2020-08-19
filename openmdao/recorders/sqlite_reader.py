@@ -409,7 +409,7 @@ class SqliteCaseReader(BaseCaseReader):
 
         return dct
 
-    def list_model_metadata(self, run_counter=None, out_stream=_DEFAULT_OUT_STREAM):
+    def list_model_options(self, run_counter=None, out_stream=_DEFAULT_OUT_STREAM):
         """
         List of all model options.
 

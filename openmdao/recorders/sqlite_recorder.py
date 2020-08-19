@@ -630,7 +630,7 @@ class SqliteRecorder(CaseRecorder):
         ----------
         recording_requester : System
             The System that would like to record its metadata.
-        run_counter : int
+        run_counter : int or None
             The number of times run_driver has been called.
         """
         if self.connection:
@@ -671,7 +671,7 @@ class SqliteRecorder(CaseRecorder):
             with self.connection as c:
                 c.execute("INSERT OR IGNORE INTO system_metadata"
                           "(id, scaling_factors, component_metadata) "
-                          "VALUES(?,?,?)", (path + '_' + str(run_counter), scaling_factors,
+                          "VALUES(?,?,?)", ("{}_{}".format(path, str(run_counter)), scaling_factors,
                                             pickled_metadata))
 
     def record_metadata_solver(self, recording_requester):

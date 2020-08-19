@@ -315,7 +315,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         stream = StringIO()
 
-        cr.list_model_metadata(out_stream=stream)
+        cr.list_model_options(out_stream=stream)
 
         text = stream.getvalue().split('\n')
 
@@ -334,7 +334,65 @@ class TestSqliteRecorder(unittest.TestCase):
 
         stream = StringIO()
 
-        cr.list_model_metadata(run_counter=1, out_stream=stream)
+        cr.list_model_options(run_counter=1, out_stream=stream)
+
+        text = stream.getvalue().split('\n')
+
+        expected = [
+            "Run Number: 1",
+            "    Subsystem: root",
+            "        assembled_jac_type : dense"
+        ]
+
+        for i, line in enumerate(expected):
+            if line and not line.startswith('-'):
+                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
+
+    def test_double_run_model_option_overwrite(self):
+        prob = ParaboloidProblem()
+
+        driver = prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
+
+        prob.model.add_recorder(self.recorder)
+
+        prob.setup()
+        prob.set_solver_print(0)
+        prob.run_model()
+
+        cr = om.CaseReader(self.filename)
+
+        self.assertTrue(cr._system_options['root_0']['component_options']['assembled_jac_type'], 'csc')
+
+        # New option and re-run of run_driver
+        prob.model.options['assembled_jac_type'] = 'dense'
+        prob.setup()
+        prob.run_model()
+
+        cr = om.CaseReader(self.filename)
+        self.assertTrue(cr._system_options['root_1']['component_options']['assembled_jac_type'], 'dense')
+
+        stream = StringIO()
+
+        cr.list_model_options(out_stream=stream)
+
+        text = stream.getvalue().split('\n')
+
+        expected = [
+            "Run Number: 0",
+            "    Subsystem: root",
+            "        assembled_jac_type : csc",
+            "Run Number: 1",
+            "    Subsystem: root",
+            "        assembled_jac_type : dense"
+        ]
+
+        for i, line in enumerate(expected):
+            if line and not line.startswith('-'):
+                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
+
+        stream = StringIO()
+
+        cr.list_model_options(run_counter=1, out_stream=stream)
 
         text = stream.getvalue().split('\n')
 
