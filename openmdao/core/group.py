@@ -762,6 +762,7 @@ class Group(System):
             gathered = self.comm.allgather(raw)
 
             # start with a fresh OrderedDict to keep order the same in all procs
+            old_abs2meta = allprocs_abs2meta
             allprocs_abs2meta = {'input': OrderedDict(), 'output': OrderedDict()}
 
             for io in ['input', 'output']:
@@ -801,6 +802,10 @@ class Group(System):
             for io in ('input', 'output'):
                 if allprocs_abs2meta[io]:
                     sizes[io] = np.hstack([sizedict[n] for n in allprocs_abs2meta[io]])
+                    # update new allprocs_abs2meta with our local version (now that we have a
+                    # consistent order for our OrderedDict), so that the 'size' metadata will
+                    # accurately reflect this proc's var size instead of one from some other proc.
+                    allprocs_abs2meta[io].update(old_abs2meta[io])
                 else:
                     sizes[io] = np.zeros((self.comm.size, 0), dtype=INT_DTYPE)
 
@@ -836,18 +841,19 @@ class Group(System):
                                    "multiple outputs: {}.".format(self.msginfo, prom_name,
                                                                   sorted(abs_list)))
 
+        for io in ('input', 'output'):
+            a2p = self._var_allprocs_abs2prom[io]
+            for prom, abslist in self._var_allprocs_prom2abs_list[io].items():
+                for abs_name in abslist:
+                    a2p[abs_name] = prom
+
         # all names are relevant for the 'nonlinear' and 'linear' vectors, so
         # we can set them here, before we've computed the relevance graph.  We
         # can then use them to compute the size arrays of for all other vectors
         # based on the nonlinear size array.
         nl_allprocs_relnames = self._var_allprocs_relevant_names['nonlinear']
         nl_relnames = self._var_relevant_names['nonlinear']
-
         for io in ('input', 'output'):
-            a2p = self._var_allprocs_abs2prom[io]
-            for prom, abslist in self._var_allprocs_prom2abs_list[io].items():
-                for abs_name in abslist:
-                    a2p[abs_name] = prom
             nl_allprocs_relnames[io] = list(self._var_allprocs_abs2meta[io])
             nl_relnames[io] = list(self._var_abs2meta[io])
 
