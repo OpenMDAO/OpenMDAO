@@ -231,21 +231,6 @@ class TestConnectionsInSetup(unittest.TestCase):
 
 class TestAddSubcomponentIOInConfigure(unittest.TestCase):
 
-    def test_queue_subcomponent_io_in_configure(self):
-        """
-        This test queues IO to a component in configure, but that subcomponent resolves the
-        queued I/O at setup and therefore this will fail.
-        """
-        p = om.Problem(model=om.Group())
-
-        g = GroupQueuesIOInConfigure()
-
-        g.add_var_to_cube('foo', units='m')
-
-        p.model.add_subsystem('g', subsys=g)
-
-        p.setup()
-
     def test_add_subcomponent_io_in_configure(self):
         """
         This test directly adds IO to a component in configure, and should behave as expected.
