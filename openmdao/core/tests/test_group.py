@@ -26,10 +26,6 @@ try:
 except ImportError:
     PETScVector = None
 
-try:
-    from openmdao.vectors.petsc_vector import PETScVector
-except ImportError:
-    PETScVector = None
 
 arr_order_1x1 = np.array([1, 2, 3, 4])
 arr_2x4 = np.array([[0, 1, 2, 3], [10, 11, 12, 13]])

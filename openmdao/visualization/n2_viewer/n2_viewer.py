@@ -24,7 +24,7 @@ from openmdao.drivers.doe_driver import DOEDriver
 from openmdao.recorders.case_reader import CaseReader
 from openmdao.solvers.nonlinear.newton import NewtonSolver
 from openmdao.utils.class_util import overrides_method
-from openmdao.utils.general_utils import simple_warning, make_serializable
+from openmdao.utils.general_utils import simple_warning, default_noraise
 from openmdao.utils.mpi import MPI
 from openmdao.visualization.html_utils import read_files, write_script, DiagramWriter
 from openmdao.utils.general_utils import warn_deprecation
@@ -416,7 +416,7 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
         warn_deprecation("'use_declare_partial_info' is now the"
                          " default and the option is ignored.")
 
-    raw_data = json.dumps(model_data, default=make_serializable).encode('utf8')
+    raw_data = json.dumps(model_data, default=default_noraise).encode('utf8')
     b64_data = str(base64.b64encode(zlib.compress(raw_data)).decode("ascii"))
     model_data = 'var compressedModel = "%s";' % b64_data
 
