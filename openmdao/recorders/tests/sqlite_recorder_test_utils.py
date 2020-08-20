@@ -473,8 +473,6 @@ def assertViewerDataRecorded(test, expected):
 
         # model tree
         tr = model_viewer_data['tree']
-        test.assertEqual(expected['tree_length'], len(tr))
-
         test.assertEqual({'name', 'type', 'subsystem_type', 'children', 'linear_solver',
                           'nonlinear_solver', 'is_parallel', 'component_type', 'class',
                           'expressions', 'options', 'linear_solver_options',
@@ -490,6 +488,7 @@ def assertViewerDataRecorded(test, expected):
                 for var in expected['abs2prom'][io]:
                     test.assertEqual(abs2prom[io][var], expected['abs2prom'][io][var])
 
+        return model_viewer_data
 
 def assertSystemMetadataIdsRecorded(test, ids):
 
