@@ -244,13 +244,7 @@ class TestAddSubcomponentIOInConfigure(unittest.TestCase):
 
         p.model.add_subsystem('g', subsys=g)
 
-        with self.assertRaises(RuntimeError) as e:
-            p.setup()
-
-        err_msg = str(e.exception)
-        expected = "Cuber (g.cuber): 'promotes_inputs' failed to find any matches for the " \
-                   "following pattern: '*'."
-        self.assertEqual(err_msg, expected)
+        p.setup()
 
     def test_add_subcomponent_io_in_configure(self):
         """
