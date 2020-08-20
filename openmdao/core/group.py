@@ -2939,6 +2939,7 @@ class Group(System):
 
             sval = self.get_val(src, kind='output', get_remote=True, from_src=False)
             errs = set()
+            metadata = set()
 
             prom = abs2prom[tgts[0]]
             if prom not in self._group_inputs:
@@ -2951,29 +2952,37 @@ class Group(System):
 
                 if tgt in all_discrete_ins:
                     if 'value' not in gmeta and sval != tval:
-                        errs.add('value')
+                        errs.add('val')
+                        metadata.add('value')
                 else:
                     tmeta = abs2meta[tgt] if tgt in abs2meta else all_abs2meta[tgt]
                     tunits = tmeta['units'] if 'units' in tmeta else None
                     if 'units' not in gmeta and sunits != tunits:
                         errs.add('units')
+                        metadata.add('units')
                     if 'value' not in gmeta:
                         if tval.shape == sval.shape:
                             if _has_val_mismatch(tunits, tval, sunits, sval):
-                                errs.add('value')
+                                errs.add('val')
+                                metadata.add('value')
                         else:
                             if all_abs2meta[tgt]['has_src_indices'] and tgt in abs2meta:
                                 srcpart = sval[abs2meta[tgt]['src_indices']]
                                 if _has_val_mismatch(tunits, tval, sunits, srcpart):
-                                    errs.add('value')
+                                    errs.add('val')
+                                    metadata.add('value')
 
             if errs:
-                self._show_ambiguity_msg(prom, errs, tgts)
+                self._show_ambiguity_msg(prom, errs, tgts, metadata)
             elif src not in all_discrete_outs:
                 gmeta['units'] = sunits
 
-    def _show_ambiguity_msg(self, prom, metavars, tgts):
+    def _show_ambiguity_msg(self, prom, metavars, tgts, metadata=None):
         errs = sorted(metavars)
+        if metadata is None:
+            meta = errs
+        else:
+            meta = sorted(metadata)
         inputs = sorted(tgts)
         gpath = common_subpath(tgts)
         if gpath == self.pathname:
@@ -3001,6 +3010,6 @@ class Group(System):
         gname = f"Group named '{gpath}'" if gpath else 'model'
         args = ', '.join([f'{n}=?' for n in errs])
         conditional_error(f"{self.msginfo}: The following inputs, {inputs}, promoted "
-                          f"to '{prom}', are connected but their metadata entries {errs}"
+                          f"to '{prom}', are connected but their metadata entries {meta}"
                           f" differ. Call <group>.set_input_defaults('{gprom}', {args}), "
                           f"where <group> is the {gname} to remove the ambiguity.")
