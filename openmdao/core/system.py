@@ -1872,7 +1872,7 @@ class System(object):
                                            (self.msginfo, name, str(src_indices),
                                             str(meta['src_indices'])))
                 if 'flat_src_indices' in meta and meta['flat_src_indices'] is not None:
-                    if not meta['flat_src_indices'] == src_indices:
+                    if not meta['flat_src_indices'] == flat_src_indices:
                         raise RuntimeError("%s: Trying to promote input '%s' with flat_src_indices"
                                            "=%s but flat_src_indices has already been specified as"
                                            " %s." %
