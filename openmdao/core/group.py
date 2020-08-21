@@ -2627,6 +2627,7 @@ class Group(System):
         return graph
 
     def _get_auto_ivc_out_val(self, tgts, vars_to_gather, all_abs2meta_in, abs2meta_in):
+        # all tgts are continuous variables
         info = []
         src_idx_found = []
         for tgt in tgts:
@@ -2635,7 +2636,7 @@ class Group(System):
             has_src_inds = all_meta['has_src_indices']
 
             if tgt in vars_to_gather:  # remote somewhere
-                if self.comm.rank == vars_to_gather[tgt]:
+                if self.comm.rank == vars_to_gather[tgt]:  # this rank owns the variable
                     meta = abs2meta_in[tgt]
                     val = meta['value']
                     if has_src_inds:
@@ -2662,7 +2663,7 @@ class Group(System):
             msg += 'size is undetermined.  Please add an IndepVarComp as the source.'
             raise RuntimeError(msg.format(tgts))
 
-        # return max sized tgt, size, value
+        # return max sized (tgt, size, value, remote)
         return sorted(info, key=lambda x: x[1])[-1]
 
     def _setup_auto_ivcs(self, mode):
@@ -2676,10 +2677,6 @@ class Group(System):
         auto_ivc.name = '_auto_ivc'
         auto_ivc.pathname = auto_ivc.name
 
-        # NOTE: vars_to_gather does NOT include distributed inputs.
-        # NOTE: some distributed inputs do not have src_indices yet
-        vars_to_gather = self._problem_meta['vars_to_gather']
-
         prom2auto = {}
         count = 0
         auto2tgt = defaultdict(list)
@@ -2687,8 +2684,13 @@ class Group(System):
         abs2meta = self._var_abs2meta['input']
         all_abs2meta = self._var_allprocs_abs2meta['input']
         conns = self._problem_meta['connections']
-        auto_tgts = [n for n in all_abs2meta if n not in conns]
-        for tgt in auto_tgts:
+        rems = set()
+        nproc = self.comm.size
+
+        for tgt, meta in all_abs2meta.items():
+            if tgt in conns:
+                continue
+
             prom = abs2prom[tgt]
             if prom in prom2auto:
                 # multiple connected inputs w/o a src. Connect them to the same IVC
@@ -2701,29 +2703,46 @@ class Group(System):
                 conns[tgt] = src
 
             auto2tgt[src].append(tgt)
+            if nproc > 1 and tgt not in abs2meta and not meta['distributed']:
+                rems.add(tgt)
 
-        myrank = self.comm.rank
-        with multi_proc_exception_check(self.comm):
-            for src, tgts in auto2tgt.items():
-                tgt, sz, val, remote = self._get_auto_ivc_out_val(tgts, vars_to_gather,
-                                                                  all_abs2meta, abs2meta)
-                prom = abs2prom[tgt]
-                if prom not in self._group_inputs:
-                    self._group_inputs[prom] = [{'use_tgt': tgt}]
-                else:
-                    self._group_inputs[prom][0]['use_tgt'] = tgt
-                gmeta = self._group_inputs[prom][0]
+        vars2gather = {}
 
-                if 'units' in gmeta:
-                    units = gmeta['units']
-                else:
-                    units = all_abs2meta[tgt]['units']
-                if not remote and 'value' in gmeta:
-                    val = gmeta['value']
-                relsrc = src.rsplit('.', 1)[-1]
-                auto_ivc.add_output(relsrc, val=val, units=units)
-                if remote:
-                    auto_ivc._add_remote(relsrc)
+        if nproc > 1:
+            my_discrete = self._var_discrete['input']
+            for tgt in self._var_allprocs_discrete['input']:
+                if tgt not in conns and tgt not in my_discrete:
+                    rems.add(tgt)
+
+            # find all auto_ivc targets that are remote somewhere in the comm
+
+            procrems = self.comm.allgather(rems)
+            for name in set(chain(*procrems)):
+                for i, rems in enumerate(procrems):
+                    if name not in rems:
+                        vars2gather[name] = i
+                        break
+
+        for src, tgts in auto2tgt.items():
+            tgt, sz, val, remote = self._get_auto_ivc_out_val(tgts, vars2gather,
+                                                              all_abs2meta, abs2meta)
+            prom = abs2prom[tgt]
+            if prom not in self._group_inputs:
+                self._group_inputs[prom] = [{'use_tgt': tgt}]
+            else:
+                self._group_inputs[prom][0]['use_tgt'] = tgt
+            gmeta = self._group_inputs[prom][0]
+
+            if 'units' in gmeta:
+                units = gmeta['units']
+            else:
+                units = all_abs2meta[tgt]['units']
+            if not remote and 'value' in gmeta:
+                val = gmeta['value']
+            relsrc = src.rsplit('.', 1)[-1]
+            auto_ivc.add_output(relsrc, val=val, units=units)
+            if remote:
+                auto_ivc._add_remote(relsrc)
 
         # have to sort to keep vars in sync because we may be doing bcasts
         for abs_in in sorted(self._var_allprocs_discrete['input']):
@@ -2747,11 +2766,11 @@ class Group(System):
                         val = self._var_discrete['input'][abs_in]['value']
                     else:
                         val = None
-                    if abs_in in vars_to_gather:
-                        if vars_to_gather[abs_in] == self.comm.rank:
-                            self.comm.bcast(val, root=vars_to_gather[abs_in])
+                    if abs_in in vars2gather:
+                        if vars2gather[abs_in] == self.comm.rank:
+                            self.comm.bcast(val, root=vars2gather[abs_in])
                         else:
-                            val = self.comm.bcast(None, root=vars_to_gather[abs_in])
+                            val = self.comm.bcast(None, root=vars2gather[abs_in])
                     auto_ivc.add_discrete_output(loc_out_name, val=val)
 
         if not prom2auto:
