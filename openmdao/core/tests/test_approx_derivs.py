@@ -2236,7 +2236,7 @@ class ApproxTotalsFeature(unittest.TestCase):
         assert_near_equal(prob['y2'], 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
-        self.assertLess(prob.model.nonlinear_solver._iter_count, 9)
+        self.assertLess(prob.model.nonlinear_solver._iter_count, 8)
 
 
 class ParallelFDParametricTestCase(unittest.TestCase):

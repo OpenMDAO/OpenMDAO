@@ -453,9 +453,8 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # check that the case keys (iteration coords) come back correctly
         for i, iter_coord in enumerate(solver_cases):
-            iter_num = i + 1
             self.assertEqual(iter_coord,
-                             'rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|%d' % iter_num)
+                             'rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|%d' % i)
 
     def test_reading_solver_metadata(self):
         prob = SellarProblem(linear_solver=om.LinearBlockGS())
@@ -647,6 +646,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(case.parent, parent_coord)
 
         expected_coords = [
+            parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|2|NonlinearBlockGS|0',
             parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|2|NonlinearBlockGS|1',
             parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|2|NonlinearBlockGS|2',
             parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|2|NonlinearBlockGS|3',
@@ -654,7 +654,6 @@ class TestSqliteCaseReader(unittest.TestCase):
             parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|2|NonlinearBlockGS|5',
             parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|2|NonlinearBlockGS|6',
             parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|2|NonlinearBlockGS|7',
-            parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|2|NonlinearBlockGS|8',
             parent_coord + '|NLRunOnce|0',
             parent_coord
         ]
@@ -717,13 +716,13 @@ class TestSqliteCaseReader(unittest.TestCase):
         parent_coord = 'rank0:ScipyOptimize_SLSQP|0|root._solve_nonlinear|0'
 
         expected_coords = [
+            parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|0',
             parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|1',
             parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|2',
             parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|3',
             parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|4',
             parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|5',
             parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|6',
-            parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|7',
             parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|0',
             parent_coord + '|NLRunOnce|0',
             parent_coord
@@ -928,13 +927,13 @@ class TestSqliteCaseReader(unittest.TestCase):
         parent_coord = 'rank0:ScipyOptimize_SLSQP|0|root._solve_nonlinear|0'
 
         expected_coords = [
+            parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|0',
             parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|1',
             parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|2',
             parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|3',
             parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|4',
             parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|5',
             parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|6',
-            parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|7',
             parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|0',
             parent_coord + '|NLRunOnce|0',
             parent_coord
@@ -2987,13 +2986,13 @@ class TestSqliteCaseReader(unittest.TestCase):
         cases_set = set(cr.list_cases(out_stream=None))
 
         expected_set = {'rank0:Driver|0|root._solve_nonlinear|0|d1._solve_nonlinear|0',
-            'rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|1|d1._solve_nonlinear|1',
-            'rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|2|d1._solve_nonlinear|2',
-            'rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|3|d1._solve_nonlinear|3',
-            'rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|4|d1._solve_nonlinear|4',
-            'rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|5|d1._solve_nonlinear|5',
-            'rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|6|d1._solve_nonlinear|6',
-            'rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|7|d1._solve_nonlinear|7',
+            'rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|0|d1._solve_nonlinear|1',
+            'rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|1|d1._solve_nonlinear|2',
+            'rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|2|d1._solve_nonlinear|3',
+            'rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|3|d1._solve_nonlinear|4',
+            'rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|4|d1._solve_nonlinear|5',
+            'rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|5|d1._solve_nonlinear|6',
+            'rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|6|d1._solve_nonlinear|7',
             'rank0:Driver|0',
             'final'}
 
@@ -3017,13 +3016,13 @@ class TestSqliteCaseReader(unittest.TestCase):
         expected_cases = [
             'system',
             '    rank0:Driver|0|root._solve_nonlinear|0|d1._solve_nonlinear|0',
-            '    rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|1|d1._solve_nonlinear|1',
-            '    rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|2|d1._solve_nonlinear|2',
-            '    rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|3|d1._solve_nonlinear|3',
-            '    rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|4|d1._solve_nonlinear|4',
-            '    rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|5|d1._solve_nonlinear|5',
-            '    rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|6|d1._solve_nonlinear|6',
-            '    rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|7|d1._solve_nonlinear|7',
+            '    rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|0|d1._solve_nonlinear|1',
+            '    rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|1|d1._solve_nonlinear|2',
+            '    rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|2|d1._solve_nonlinear|3',
+            '    rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|3|d1._solve_nonlinear|4',
+            '    rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|4|d1._solve_nonlinear|5',
+            '    rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|5|d1._solve_nonlinear|6',
+            '    rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|6|d1._solve_nonlinear|7',
             'driver',
             '    rank0:Driver|0',
             'problem',
