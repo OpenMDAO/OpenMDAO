@@ -1000,11 +1000,7 @@ class TestGroup(unittest.TestCase):
         p = om.Problem()
         g1 = p.model.add_subsystem('G1', om.Group(), promotes=['*'])
 
-        with self.assertRaises(Exception) as context:
-            p.setup()
-        self.assertEqual(str(context.exception),
-                         "Group (G1): 'promotes' failed to find any matches for the following "
-                         "pattern: '*'. Group contains no variables.")
+        p.setup()
 
     def test_missing_promote_var(self):
         p = om.Problem()

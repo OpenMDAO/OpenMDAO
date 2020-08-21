@@ -67,6 +67,17 @@ class TestIndepVarComp(unittest.TestCase):
         assert_near_equal(prob.get_val('indep_var_1'), 1.0)
         assert_near_equal(prob.get_val('indep_var_2'), 2.0)
 
+    def test_promote_glob_no_inputs(self):
+        p = om.Problem()
+        p.model.add_subsystem('indep',
+                              om.IndepVarComp('x', 2.0),
+                              promotes_inputs=['*'],
+                              promotes_outputs=['x'])
+        p.model.add_subsystem('C1', om.ExecComp('y=x'), promotes_inputs=['x'], promotes_outputs=['y'])
+        p.setup()
+        p.run_model()
+        self.assertEqual(p.get_val('x'), p.get_val('y'))
+
     def test_invalid_tags(self):
         with self.assertRaises(TypeError) as cm:
             comp = om.IndepVarComp('indep_var', tags=99)
