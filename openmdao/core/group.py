@@ -1242,58 +1242,92 @@ class Group(System):
     def _setup_deferred_var_size(self):
         """
         add the size infor for inputs and outputs that have been created 
-        with shape_by_conn=True
+        with shape_by_conn=True or copy_shape
         """
-        # global_abs_in2out = self._conn_global_abs_in2out
 
-        abs_in2out = self._conn_abs_in2out = {}
         global_abs_in2out = self._conn_global_abs_in2out
-        pathname = self.pathname
-        allprocs_discrete_in = self._var_allprocs_discrete['input']
-        allprocs_discrete_out = self._var_allprocs_discrete['output']
-
-        allprocs_abs2meta = self._var_allprocs_abs2meta
-
-        nproc = self.comm.size
-
-        # check unit/shape compatibility, but only for connections that are
-        # either owned by (implicit) or declared by (explicit) this Group.
-        # This way, we don't repeat the error checking in multiple groups.
         abs2meta = self._var_abs2meta
 
         def copy_var_shape( var_abs_name, var_meta, new_var_meta):
+            """
+                copy data about size from new_var_meta to var_meta.
+                Speacial care must be taken for distributed components
+            """
 
-            for data in ['size', 'shape']:
-                var_meta[data] = new_var_meta[data]
+            var_meta['size'] = new_var_meta['size']
+            var_meta['shape'] = new_var_meta['shape']
 
             var_meta['value'] = np.ones(var_meta['size'])
 
-            # take care of distributed components
-            if var_meta['distributed'] and var_abs_name in self._var_abs_names['input']:
+            
+            # if going from distributed to distributed:
+            if var_meta['distributed'] and new_var_meta['distributed']:
+                
+                # if var is input
+                if var_abs_name in self._var_abs_names['input']:
 
                     # add src indices if sized from a distributed output
-                    n_list = self.comm.allgather(new_var_meta['size'])
+                    n_list = self.comm.allgather(var_meta['size'])
                     irank  = self.comm.rank
                     n1 = int(np.sum(n_list[:irank]))
                     n2 = int(np.sum(n_list[:irank+1]))
 
                     var_meta['src_indices'] = np.arange(n1,n2,dtype=int)
-                    print(var_abs_name, 'given shape', 'rank', self.comm.rank, 'size', var_meta['size'], 'indices', n1, n2)
+               
+                # if var is output
+                else:
+                    # we don't need to add src_indices and the sizing meta copied 
+                    # was already local to the proc
+                    pass
 
-            # if going from a ditrubuted output to serial input
-            elif not var_meta['distributed'] and new_var_meta['distributed'] and \
-                 var_abs_name in self._var_abs_names['input']:
+            # if going from a ditrubuted to serial 
+            elif not var_meta['distributed'] and new_var_meta['distributed']:
+                # it is the same for both inputs and outputs
+
                 n_list = self.comm.allgather(new_var_meta['size'])
                 total_size = sum(n_list)
                 var_meta['size'] = total_size
-                var_meta['shape'] = total_size
-                var_meta['value'] = np.ones(var_meta['size'])
+                var_meta['shape'] = tuple([total_size])
+                var_meta['value'] = np.ones(total_size)
 
+
+            # if going from a serial to distributed
+            elif  var_meta['distributed'] and not new_var_meta['distributed']:
+                
+                # there is not enough info to determine how the variable is split
+                # over the procs. for now we we split the variable up equally
+                nprocs = self.comm.size
+                rank = self.comm.rank 
+
+                # evenly distribute the variable over the procs
+                ave, res = divmod(new_var_meta['size'], nprocs)
+                count = [ave + 1 if p < res else ave for p in range(nprocs)]
+
+                var_meta['size'] = count[rank]
+                var_meta['shape'] = tuple([count[rank]])
+                var_meta['value'] = np.ones(count[rank])
+
+
+                if var_abs_name in self._var_abs_names['input']:
+
+                    # add src indices if sized from a distributed output
+                    n_list = self.comm.allgather(var_meta['size'])
+                    irank  = self.comm.rank
+                    n1 = int(np.sum(n_list[:irank]))
+                    n2 = int(np.sum(n_list[:irank+1]))
+
+                    var_meta['src_indices'] = np.arange(n1,n2,dtype=int)
+
+                # if var is output
+                else:
+                    # we don't need to add src_indices and the sizing meta copied 
+                    # was already local to the proc
+                    pass
 
         def get_var_size_meta( abs_name, var_visited):
             """
             get the meta data for the variable. This may involve tracing data back through other variables if 
-            variable has a deferred shape
+            variables have a deferred shape
             """
 
             var_meta = abs2meta[abs_name]
@@ -1301,7 +1335,7 @@ class Group(System):
 
             if abs_name in var_visited:
                 var_visited.append(abs_name)
-                raise RuntimeError('deferred shape dependences unresolvables. visited {}'.format(var_visited))
+                raise RuntimeError('deferred shape dependences unresolvable. visited {}'.format(var_visited))
             else: 
                 var_visited.append(abs_name)
 
@@ -1315,6 +1349,8 @@ class Group(System):
                     abs_in = [key for key in global_abs_in2out if global_abs_in2out[key] == abs_name]
                     
                     # now we need to choose which of the inputs we should get size information from 
+                    # it shouldn't matter which input we select since they should all have the same size info
+                    # if they don't have the same size info it well be caught durring setup_connections
                     abs_in = abs_in[0]
                     var_meta = get_var_size_meta(abs_in, var_visited)
 
@@ -1328,15 +1364,13 @@ class Group(System):
                 var_meta = get_var_size_meta(abs_out, var_visited)
 
             return var_meta
-
-            
+   
 
         for subsys in self._subsystems_myproc:
-            print(subsys.pathname)
-            # if isinstance(subsys, Group):
             for var, var_meta in subsys._var_abs2meta.items():
                 if var_meta['shape_by_conn'] or var_meta['copy_shape']:
-                    print('changing shape of ',var)
+                    if self.comm.rank == 0:
+                        print('changing shape of ',var)
                     new_meta = get_var_size_meta(var, [])
                     copy_var_shape(var, var_meta, new_meta)
          
