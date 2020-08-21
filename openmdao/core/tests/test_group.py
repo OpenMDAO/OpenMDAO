@@ -26,10 +26,6 @@ try:
 except ImportError:
     PETScVector = None
 
-try:
-    from openmdao.vectors.petsc_vector import PETScVector
-except ImportError:
-    PETScVector = None
 
 arr_order_1x1 = np.array([1, 2, 3, 4])
 arr_2x4 = np.array([[0, 1, 2, 3], [10, 11, 12, 13]])
@@ -2511,7 +2507,7 @@ class TestGroupAddInput(unittest.TestCase):
            p.setup()
 
         self.assertEqual(cm.exception.args[0],
-                         "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but their metadata entries ['units', 'value'] differ. Call <group>.set_input_defaults('x', units=?, value=?), where <group> is the Group named 'par' to remove the ambiguity.")
+                         "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but their metadata entries ['units', 'value'] differ. Call <group>.set_input_defaults('x', units=?, val=?), where <group> is the Group named 'par' to remove the ambiguity.")
 
     def test_missing_diff_vals(self):
         p = om.Problem()
@@ -2525,7 +2521,7 @@ class TestGroupAddInput(unittest.TestCase):
            p.setup()
 
         self.assertEqual(cm.exception.args[0],
-                         "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but their metadata entries ['value'] differ. Call <group>.set_input_defaults('x', value=?), where <group> is the Group named 'par' to remove the ambiguity.")
+                         "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but their metadata entries ['value'] differ. Call <group>.set_input_defaults('x', val=?), where <group> is the Group named 'par' to remove the ambiguity.")
 
     def test_conflicting_units(self):
         # multiple Group.set_input_defaults calls at same tree level with conflicting units args
