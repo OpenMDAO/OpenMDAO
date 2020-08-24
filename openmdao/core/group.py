@@ -754,6 +754,8 @@ class Group(System):
             self._group_inputs[n] = lst.copy()  # must copy the list manually
 
         for subsys in self._subsystems_myproc:
+            subsys._setup_var_data()
+
             self._has_output_scaling |= subsys._has_output_scaling
             self._has_resid_scaling |= subsys._has_resid_scaling
 
