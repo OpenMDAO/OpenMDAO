@@ -94,7 +94,7 @@ class DynPartialsComp(om.ExplicitComponent):
 
 def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True,
             recorder=None, has_lin_constraint=True, has_diag_partials=True, partial_coloring=False,
-            use_vois=True, **options):
+            use_vois=True, auto_ivc=False, **options):
 
     p = om.Problem(model=CounterGroup())
 
@@ -102,15 +102,25 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True
         p.model.linear_solver = om.DirectSolver(assemble_jac=True)
         p.model.options['assembled_jac_type'] = assemble_type
 
-    indeps = p.model.add_subsystem('indeps', om.IndepVarComp(), promotes_outputs=['*'])
 
     # the following were randomly generated using np.random.random(10)*2-1 to randomly
     # disperse them within a unit circle centered at the origin.
-    indeps.add_output('x', np.array([ 0.55994437, -0.95923447,  0.21798656, -0.02158783,  0.62183717,
-                                      0.04007379,  0.46044942, -0.10129622,  0.27720413, -0.37107886]))
-    indeps.add_output('y', np.array([ 0.52577864,  0.30894559,  0.8420792 ,  0.35039912, -0.67290778,
-                                     -0.86236787, -0.97500023,  0.47739414,  0.51174103,  0.10052582]))
-    indeps.add_output('r', .7)
+    x_init = np.array([ 0.55994437, -0.95923447,  0.21798656, -0.02158783,  0.62183717,
+                        0.04007379,  0.46044942, -0.10129622,  0.27720413, -0.37107886])
+    y_init = np.array([ 0.52577864,  0.30894559,  0.8420792 ,  0.35039912, -0.67290778,
+                        -0.86236787, -0.97500023,  0.47739414,  0.51174103,  0.10052582])
+    r_init = .7
+
+    if auto_ivc:
+        p.model.set_input_defaults('x', x_init)
+        p.model.set_input_defaults('y', y_init)
+        p.model.set_input_defaults('r', r_init)
+
+    else:
+        indeps = p.model.add_subsystem('indeps', om.IndepVarComp(), promotes_outputs=['*'])
+        indeps.add_output('x', x_init)
+        indeps.add_output('y', y_init)
+        indeps.add_output('r', r_init)
 
     if partial_coloring:
         arctan_yox = DynPartialsComp(SIZE)
@@ -139,9 +149,16 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True
     ODD_IND = IND[1::2]  # all odd indices
     EVEN_IND = IND[0::2]  # all even indices
 
-    p.model.connect('r', ('circle.r', 'r_con.r'))
-    p.model.connect('x', ['r_con.x', 'arctan_yox.x', 'l_conx.x'])
-    p.model.connect('y', ['r_con.y', 'arctan_yox.y'])
+    if auto_ivc:
+        p.model.promotes('circle', inputs=['r'])
+        p.model.promotes('r_con', inputs=['r', 'x', 'y'])
+        p.model.promotes('l_conx', inputs=['x'])
+        p.model.promotes('arctan_yox', inputs=['x', 'y'])
+    else:
+        p.model.connect('r', ('circle.r', 'r_con.r'))
+        p.model.connect('x', ['r_con.x', 'arctan_yox.x', 'l_conx.x'])
+        p.model.connect('y', ['r_con.y', 'arctan_yox.y'])
+
     p.model.connect('arctan_yox.g', 'theta_con.x')
     p.model.connect('arctan_yox.g', 'delta_theta_con.even', src_indices=EVEN_IND)
     p.model.connect('arctan_yox.g', 'delta_theta_con.odd', src_indices=ODD_IND)
@@ -202,6 +219,25 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         p = run_opt(pyOptSparseDriver, 'auto', optimizer='SNOPT', print_results=False)
         p_color = run_opt(pyOptSparseDriver, 'auto', optimizer='SNOPT', print_results=False,
                           dynamic_total_coloring=True)
+
+        assert_almost_equal(p['circle.area'], np.pi, decimal=7)
+        assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
+
+        # - coloring saves 16 solves per driver iter  (5 vs 21)
+        # - initial solve for linear constraints takes 21 in both cases (only done once)
+        # - dynamic case does 3 full compute_totals to compute coloring, which adds 21 * 3 solves
+        # - (total_solves - N) / (solves_per_iter) should be equal between the two cases,
+        # - where N is 21 for the uncolored case and 21 * 4 for the dynamic colored case.
+        self.assertEqual((p.model._solve_count - 21) / 21,
+                         (p_color.model._solve_count - 21 * 4) / 5)
+
+    @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
+    def test_dynamic_total_coloring_snopt_auto_autoivc(self):
+        # first, run w/o coloring
+        p = run_opt(pyOptSparseDriver, 'auto', optimizer='SNOPT', print_results=False,
+                    auto_ivc=True)
+        p_color = run_opt(pyOptSparseDriver, 'auto', optimizer='SNOPT', print_results=False,
+                          dynamic_total_coloring=True, auto_ivc=True)
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)

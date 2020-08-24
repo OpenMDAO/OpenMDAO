@@ -1376,8 +1376,8 @@ class TestSqliteCaseReader(unittest.TestCase):
             "",
             "varname     value",
             "----------  -----",
-            "sub.expl.a  [10.]",
-            "sub.expl.x  11   ",
+            "expl.a  [10.]",
+            "expl.x  11   ",
             # sub.impl.x is not recorded (excluded)
         ]
 
@@ -1398,10 +1398,8 @@ class TestSqliteCaseReader(unittest.TestCase):
             "",
             "varname   value",
             "--------  -----",
-            "model",
-            "  sub",
-            "    expl",
-            "      b   [20.]",
+            "expl",
+            "  b   [20.]",
             #      y is not recorded (excluded)
             "",
             "",
@@ -1410,10 +1408,8 @@ class TestSqliteCaseReader(unittest.TestCase):
             "",
             "varname   value",
             "-------   -----",
-            "model",
-            "  sub",
-            "    impl",
-            "      y   2    ",
+            "impl",
+            "  y   2    ",
         ]
 
         stream = StringIO()
@@ -2727,10 +2723,9 @@ class TestSqliteCaseReader(unittest.TestCase):
         text = stream.getvalue()
         self.assertEqual(1, text.count("1 Input(s) in 'model'"))
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(7, num_non_empty_lines)
-        self.assertEqual(1, text.count('\nmodel'))
-        self.assertEqual(1, text.count('\n  mult'))
-        self.assertEqual(1, text.count('\n    x    |10.0|  inch   (100'))
+        self.assertEqual(6, num_non_empty_lines)
+        self.assertEqual(1, text.count('\nmult'))
+        self.assertEqual(1, text.count('\n  x      |10.0|  inch   (100'))
 
         # list outputs
         # out_stream - not hierarchical - extras - no print_arrays
@@ -2759,10 +2754,10 @@ class TestSqliteCaseReader(unittest.TestCase):
                           print_arrays=False,
                           out_stream=stream)
         text = stream.getvalue()
-        self.assertEqual(text.count('    x       |10.0|   x'), 1)
-        self.assertEqual(text.count('    y       |110.0|  y'), 1)
+        self.assertEqual(text.count('  x       |10.0|   x'), 1)
+        self.assertEqual(text.count('  y       |110.0|  y'), 1)
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(num_non_empty_lines, 11)
+        self.assertEqual(num_non_empty_lines, 10)
 
         # Hierarchical - no print arrays
         stream = StringIO()
@@ -2776,13 +2771,12 @@ class TestSqliteCaseReader(unittest.TestCase):
                           print_arrays=False,
                           out_stream=stream)
         text = stream.getvalue()
-        self.assertEqual(text.count('\nmodel'), 1)
-        self.assertEqual(text.count('\n  des_vars'), 1)
-        self.assertEqual(text.count('\n    x'), 1)
-        self.assertEqual(text.count('\n  mult'), 1)
-        self.assertEqual(text.count('\n    y'), 1)
+        self.assertEqual(text.count('\ndes_vars'), 1)
+        self.assertEqual(text.count('\n  x'), 1)
+        self.assertEqual(text.count('\nmult'), 1)
+        self.assertEqual(text.count('\n  y'), 1)
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(num_non_empty_lines, 11)
+        self.assertEqual(num_non_empty_lines, 10)
 
         # Need to explicitly set this to make sure all ways of running this test
         #   result in the same format of the output. When running this test from the
@@ -2842,13 +2836,12 @@ class TestSqliteCaseReader(unittest.TestCase):
             self.assertEqual(text.count('value:'), 2)
             self.assertEqual(text.count('resids:'), 2)
             self.assertEqual(text.count('['), 4)
-            self.assertEqual(text.count('\nmodel'), 1)
-            self.assertEqual(text.count('\n  des_vars'), 1)
-            self.assertEqual(text.count('\n    x'), 1)
-            self.assertEqual(text.count('\n  mult'), 1)
-            self.assertEqual(text.count('\n    y'), 1)
+            self.assertEqual(text.count('\ndes_vars'), 1)
+            self.assertEqual(text.count('\n  x'), 1)
+            self.assertEqual(text.count('\nmult'), 1)
+            self.assertEqual(text.count('\n  y'), 1)
             num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-            self.assertEqual(num_non_empty_lines, 49)
+            self.assertEqual(num_non_empty_lines, 48)
 
     def test_system_metadata_attribute_deprecated(self):
         model = om.Group()
@@ -4182,11 +4175,11 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
             "",
             "varname    value               ",
             "---------  --------------------",
-            "mda.d1.x   [3.43977636e-15]    ",
-            "mda.d1.y2  [3.75527777]        ",
-            "mda.d1.z   |1.9776388835080063|",
-            "mda.d2.y1  [3.16]              ",
-            "mda.d2.z   |1.9776388835080063|",
+            "d1.x   [3.43977636e-15]    ",
+            "d1.y2  [3.75527777]        ",
+            "d1.z   |1.9776388835080063|",
+            "d2.y1  [3.16]              ",
+            "d2.z   |1.9776388835080063|",
          ]
 
         stream = StringIO()
@@ -4204,8 +4197,8 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
             "",
             "varname    value       ",
             "---------  ------------",
-            "mda.d1.y1  [3.16]      ",
-            "mda.d2.y2  [3.75527777]",
+            "d1.y1  [3.16]      ",
+            "d2.y2  [3.75527777]",
             "",
             "",
             "0 Implicit Output(s) in 'mda'",

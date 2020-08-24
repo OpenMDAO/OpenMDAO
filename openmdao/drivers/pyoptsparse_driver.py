@@ -30,14 +30,14 @@ from openmdao.utils.mpi import FakeComm
 
 # names of optimizers that use gradients
 grad_drivers = {'CONMIN', 'FSQP', 'IPOPT', 'NLPQLP',
-                'PSQP', 'SLSQP', 'SNOPT', 'NLPY_AUGLAG'}
+                'PSQP', 'SLSQP', 'SNOPT', 'NLPY_AUGLAG', 'ParOpt'}
 
 # names of optimizers that allow multiple objectives
 multi_obj_drivers = {'NSGA2'}
 
 # All optimizers in pyoptsparse
 optlist = ['ALPSO', 'CONMIN', 'FSQP', 'IPOPT', 'NLPQLP',
-           'NSGA2', 'PSQP', 'SLSQP', 'SNOPT', 'NLPY_AUGLAG', 'NOMAD']
+           'NSGA2', 'PSQP', 'SLSQP', 'SNOPT', 'NLPY_AUGLAG', 'NOMAD', 'ParOpt']
 
 # All optimizers that require an initial run
 run_required = ['NSGA2', 'ALPSO']
@@ -87,7 +87,7 @@ class pyOptSparseDriver(Driver):
     constrained optimization problems, with additional MPI capability.
     pypptsparse has interfaces to the following optimizers:
     ALPSO, CONMIN, FSQP, IPOPT, NLPQLP, NSGA2, PSQP, SLSQP,
-    SNOPT, NLPY_AUGLAG, NOMAD.
+    SNOPT, NLPY_AUGLAG, NOMAD, ParOpt.
     Note that some of these are not open source and therefore not included
     in the pyoptsparse source code.
 
@@ -344,7 +344,7 @@ class pyOptSparseDriver(Driver):
             else:
                 if name in self._res_jacs:
                     resjac = self._res_jacs[name]
-                    jac = {n: resjac[n] for n in wrt}
+                    jac = {n: resjac[input_meta[n]['ivc_source']] for n in wrt}
                 else:
                     jac = None
                 opt_prob.addConGroup(name, size, lower=lower, upper=upper, wrt=wrt, jac=jac)
@@ -373,7 +373,7 @@ class pyOptSparseDriver(Driver):
             else:
                 if name in self._res_jacs:
                     resjac = self._res_jacs[name]
-                    jac = {n: resjac[n] for n in wrt}
+                    jac = {n: resjac[input_meta[n]['ivc_source']] for n in wrt}
                 else:
                     jac = None
                 opt_prob.addConGroup(name, size, upper=upper, lower=lower, wrt=wrt, jac=jac)
@@ -611,10 +611,12 @@ class pyOptSparseDriver(Driver):
                 res_jacs = self._res_jacs
                 for okey in func_dict:
                     new_sens[okey] = newdv = OrderedDict()
+                    okey_src = self._responses[okey]['ivc_source']
                     for ikey in dv_dict:
-                        if okey in res_jacs and ikey in res_jacs[okey]:
+                        ikey_src = self._designvars[ikey]['ivc_source']
+                        if okey_src in res_jacs and ikey_src in res_jacs[okey_src]:
                             arr = sens_dict[okey][ikey]
-                            coo = res_jacs[okey][ikey]
+                            coo = res_jacs[okey_src][ikey_src]
                             row, col, data = coo['coo']
                             coo['coo'][2] = arr[row, col].flatten()
                             newdv[ikey] = coo

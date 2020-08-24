@@ -15,7 +15,6 @@ import numpy as np
 import openmdao.api as om
 from openmdao.test_suite.scripts.circuit_analysis import Circuit
 
-from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.general_utils import run_model
 from openmdao.utils.general_utils import printoptions
 

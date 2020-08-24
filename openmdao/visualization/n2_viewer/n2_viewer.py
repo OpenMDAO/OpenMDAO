@@ -8,6 +8,8 @@ from collections import OrderedDict
 from itertools import chain
 import networkx as nx
 
+import numpy as np
+
 from openmdao.components.exec_comp import ExecComp
 from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
 from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
@@ -22,21 +24,25 @@ from openmdao.drivers.doe_driver import DOEDriver
 from openmdao.recorders.case_reader import CaseReader
 from openmdao.solvers.nonlinear.newton import NewtonSolver
 from openmdao.utils.class_util import overrides_method
-from openmdao.utils.general_utils import simple_warning, make_serializable
-from openmdao.utils.record_util import check_valid_sqlite3_db
+from openmdao.utils.general_utils import simple_warning, default_noraise
 from openmdao.utils.mpi import MPI
 from openmdao.visualization.html_utils import read_files, write_script, DiagramWriter
 from openmdao.utils.general_utils import warn_deprecation
+from openmdao.core.constants import _UNDEFINED
 
 _IND = 4  # HTML indentation (spaces)
+
+_MAX_ARRAY_SIZE_FOR_REPR_VAL = 1000  # If var has more elements than this do not pass to N2
 
 
 def _get_var_dict(system, typ, name):
     if name in system._var_discrete[typ]:
         meta = system._var_discrete[typ][name]
+        is_discrete = True
     else:
         meta = system._var_abs2meta[name]
         name = system._var_abs2prom[typ][name]
+        is_discrete = False
 
     var_dict = OrderedDict()
 
@@ -49,6 +55,32 @@ def _get_var_dict(system, typ, name):
         var_dict['implicit'] = isimplicit
 
     var_dict['dtype'] = type(meta['value']).__name__
+    if 'units' in meta:
+        if meta['units'] is None:
+            var_dict['units'] = 'None'
+        else:
+            var_dict['units'] = meta['units']
+
+    if 'shape' in meta:
+        var_dict['shape'] = str(meta['shape'])
+
+    if 'distributed' in meta:
+        var_dict['distributed'] = meta['distributed']
+
+    var_dict['is_discrete'] = is_discrete
+
+    if is_discrete:
+        if isinstance(meta['value'], (int, str, list, dict, complex, np.ndarray)):
+            val = meta['value']
+            var_dict['value'] = val
+        else:
+            var_dict['value'] = type(meta['value']).__name__
+    else:
+        if meta['value'].size < _MAX_ARRAY_SIZE_FOR_REPR_VAL:
+            var_dict['value'] = meta['value']
+        else:
+            var_dict['value'] = None
+
     return var_dict
 
 
@@ -116,32 +148,60 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
     if isinstance(system, ImplicitComponent):
         if overrides_method('solve_linear', system, ImplicitComponent):
             tree_dict['linear_solver'] = "solve_linear"
+            tree_dict['linear_solver_options'] = None
         elif system.linear_solver:
             tree_dict['linear_solver'] = system.linear_solver.SOLVER
+            options = {k: system.linear_solver.options[k] for k in system.linear_solver.options}
+            tree_dict['linear_solver_options'] = options
         else:
             tree_dict['linear_solver'] = ""
+            tree_dict['linear_solver_options'] = None
 
         if overrides_method('solve_nonlinear', system, ImplicitComponent):
             tree_dict['nonlinear_solver'] = "solve_nonlinear"
+            tree_dict['nonlinear_solver_options'] = None
         elif system.nonlinear_solver:
             tree_dict['nonlinear_solver'] = system.nonlinear_solver.SOLVER
+            options = {k: system.nonlinear_solver.options[k]
+                       for k in system.nonlinear_solver.options}
+            tree_dict['nonlinear_solver_options'] = options
         else:
             tree_dict['nonlinear_solver'] = ""
+            tree_dict['nonlinear_solver_options'] = None
     else:
         if system.linear_solver:
             tree_dict['linear_solver'] = system.linear_solver.SOLVER
+            options = {k: system.linear_solver.options[k] for k in system.linear_solver.options}
+            tree_dict['linear_solver_options'] = options
         else:
             tree_dict['linear_solver'] = ""
+            tree_dict['linear_solver_options'] = None
 
         if system.nonlinear_solver:
             tree_dict['nonlinear_solver'] = system.nonlinear_solver.SOLVER
+            options = {k: system.nonlinear_solver.options[k]
+                       for k in system.nonlinear_solver.options}
+            tree_dict['nonlinear_solver_options'] = options
 
             if system.nonlinear_solver.SOLVER == NewtonSolver.SOLVER:
                 tree_dict['solve_subsystems'] = system._nonlinear_solver.options['solve_subsystems']
         else:
             tree_dict['nonlinear_solver'] = ""
+            tree_dict['nonlinear_solver_options'] = None
 
     tree_dict['children'] = children
+
+    options = {}
+    for k in system.options:
+        # need to handle solvers separate because they are classes or instances
+        if k in ['linear_solver', 'nonlinear_solver']:
+            options[k] = system.options[k].SOLVER
+        else:
+            if system.options._dict[k]['value'] is _UNDEFINED:
+                options[k] = str(system.options._dict[k]['value'])
+            else:
+                options[k] = system.options._dict[k]['value']
+    tree_dict['options'] = options
 
     if not tree_dict['name']:
         tree_dict['name'] = 'root'
@@ -200,18 +260,19 @@ def _get_viewer_data(data_source):
         root_group = data_source.model
 
         if not isinstance(root_group, Group):
-            simple_warning(
-                "The model is not a Group, viewer data is unavailable.")
+            simple_warning("The model is not a Group, viewer data is unavailable.")
             return {}
 
         driver = data_source.driver
         driver_name = driver.__class__.__name__
-        driver_type = 'doe' if isinstance(
-            driver, DOEDriver) else 'optimization'
-        driver_options = {k: driver.options[k] for k in driver.options}
-        driver_opt_settings = None
+        driver_type = 'doe' if isinstance(driver, DOEDriver) else 'optimization'
+
+        driver_options = {key: val for key, val in driver.options.items()}
+
         if driver_type == 'optimization' and 'opt_settings' in dir(driver):
             driver_opt_settings = driver.opt_settings
+        else:
+            driver_opt_settings = None
 
     elif isinstance(data_source, Group):
         if not data_source.pathname:  # root group
@@ -222,6 +283,7 @@ def _get_viewer_data(data_source):
             driver_opt_settings = None
         else:
             # this function only makes sense when it is at the root
+            simple_warning(f"Viewer data is not available for sub-Group '{data_source.pathname}'.")
             return {}
 
     elif isinstance(data_source, str):
@@ -234,8 +296,8 @@ def _get_viewer_data(data_source):
         return data_dict
 
     else:
-        raise TypeError(
-            '_get_viewer_data only accepts Problems, Groups or filenames')
+        raise TypeError(f"Viewer data is not available for '{data_source}'."
+                        "The source must be a Problem, model or the filename of a recording.")
 
     data_dict = {}
     comp_exec_idx = [0]  # list so pass by ref
@@ -295,8 +357,12 @@ def _get_viewer_data(data_source):
     data_dict['connections_list'] = connections_list
     data_dict['abs2prom'] = root_group._var_abs2prom
 
-    data_dict['driver'] = {'name': driver_name, 'type': driver_type,
-                           'options': driver_options, 'opt_settings': driver_opt_settings}
+    data_dict['driver'] = {
+        'name': driver_name,
+        'type': driver_type,
+        'options': driver_options,
+        'opt_settings': driver_opt_settings
+    }
     data_dict['design_vars'] = root_group.get_design_vars(use_prom_ivc=False)
     data_dict['responses'] = root_group.get_responses()
 
@@ -350,7 +416,7 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
         warn_deprecation("'use_declare_partial_info' is now the"
                          " default and the option is ignored.")
 
-    raw_data = json.dumps(model_data, default=make_serializable).encode('utf8')
+    raw_data = json.dumps(model_data, default=default_noraise).encode('utf8')
     b64_data = str(base64.b64encode(zlib.compress(raw_data)).decode("ascii"))
     model_data = 'var compressedModel = "%s";' % b64_data
 

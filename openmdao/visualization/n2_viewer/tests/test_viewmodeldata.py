@@ -11,7 +11,9 @@ import errno
 from shutil import rmtree
 from tempfile import mkdtemp
 
-from openmdao.api import Problem, IndepVarComp, ScipyOptimizeDriver
+import numpy
+
+from openmdao.api import Problem, IndepVarComp, ScipyOptimizeDriver, ExplicitComponent
 from openmdao.test_suite.components.sellar import SellarStateConnection
 from openmdao.visualization.n2_viewer.n2_viewer import _get_viewer_data, n2
 from openmdao.recorders.sqlite_recorder import SqliteRecorder
@@ -43,228 +45,8 @@ class TestViewModelData(unittest.TestCase):
         self.title_html_filename = os.path.join(self.dir, "title_n2.html")
         self.conn_html_filename = os.path.join(self.dir, "conn_n2.html")
 
-        self.expected_tree = json.loads("""
-            {
-               "name":"root",
-               "type":"root",
-               "class":"SellarStateConnection",
-               "expressions":null,
-               "component_type":null,
-               "subsystem_type":"group",
-               "is_parallel":false,
-               "linear_solver":"LN: SCIPY",
-               "nonlinear_solver":"NL: Newton",
-               "solve_subsystems":false,
-               "children":[
-                   {
-                     "name":"sub",
-                     "type":"subsystem",
-                     "class":"Group",
-                     "expressions":null,
-                     "component_type":null,
-                     "subsystem_type":"group",
-                     "is_parallel":false,
-                     "linear_solver":"LN: SCIPY",
-                     "nonlinear_solver":"NL: RUNONCE",
-                     "children":[
-                        {
-                           "name":"state_eq_group",
-                           "type":"subsystem",
-                           "class":"Group",
-                           "expressions":null,
-                           "component_type":null,
-                           "subsystem_type":"group",
-                           "is_parallel":false,
-                           "linear_solver":"LN: SCIPY",
-                           "nonlinear_solver":"NL: RUNONCE",
-                           "children":[
-                              {
-                                 "name":"state_eq",
-                                 "type":"subsystem",
-                                 "class":"StateConnection",
-                                 "expressions":null,
-                                 "subsystem_type":"component",
-                                 "is_parallel":false,
-                                 "component_type":"implicit",
-                                 "linear_solver":"",
-                                 "nonlinear_solver":"",
-                                 "children":[
-                                    {
-                                       "name":"y2_actual",
-                                       "type":"input",
-                                       "dtype":"ndarray"
-                                    },
-                                    {
-                                       "name":"y2_command",
-                                       "type":"output",
-                                       "implicit":true,
-                                       "dtype":"ndarray"
-                                    }
-                                 ]
-                              }
-                           ]
-                        },
-                        {
-                           "name":"d1",
-                           "type":"subsystem",
-                           "class":"SellarDis1withDerivatives",
-                           "expressions":null,
-                           "subsystem_type":"component",
-                           "is_parallel":false,
-                           "component_type":"explicit",
-                           "linear_solver":"",
-                           "nonlinear_solver":"",
-                           "children":[
-                              {
-                                 "name":"z",
-                                 "type":"input",
-                                 "dtype":"ndarray"
-                              },
-                              {
-                                 "name":"x",
-                                 "type":"input",
-                                 "dtype":"ndarray"
-                              },
-                              {
-                                 "name":"y2",
-                                 "type":"input",
-                                 "dtype":"ndarray"
-                              },
-                              {
-                                 "name":"y1",
-                                 "type":"output",
-                                 "implicit":false,
-                                 "dtype":"ndarray"
-                              }
-                           ]
-                        },
-                        {
-                           "name":"d2",
-                           "type":"subsystem",
-                           "class":"SellarDis2withDerivatives",
-                           "expressions":null,
-                           "subsystem_type":"component",
-                           "is_parallel":false,
-                           "component_type":"explicit",
-                           "linear_solver":"",
-                           "nonlinear_solver":"",
-                           "children":[
-                              {
-                                 "name":"z",
-                                 "type":"input",
-                                 "dtype":"ndarray"
-                              },
-                              {
-                                 "name":"y1",
-                                 "type":"input",
-                                 "dtype":"ndarray"
-                              },
-                              {
-                                 "name":"y2",
-                                 "type":"output",
-                                 "implicit":false,
-                                 "dtype":"ndarray"
-                              }
-                           ]
-                        }
-                     ]
-                  },
-                  {
-                     "name":"obj_cmp",
-                     "type":"subsystem",
-                     "class":"ExecComp",
-                     "expressions":[
-                        "obj = x**2 + z[1] + y1 + exp(-y2)"
-                     ],
-                     "subsystem_type":"component",
-                     "is_parallel":false,
-                     "component_type":"exec",
-                     "linear_solver":"",
-                     "nonlinear_solver":"",
-                     "children":[
-                        {
-                           "name":"x",
-                           "type":"input",
-                           "dtype":"ndarray"
-                        },
-                        {
-                           "name":"y1",
-                           "type":"input",
-                           "dtype":"ndarray"
-                        },
-                        {
-                           "name":"y2",
-                           "type":"input",
-                           "dtype":"ndarray"
-                        },
-                        {
-                           "name":"z",
-                           "type":"input",
-                           "dtype":"ndarray"
-                        },
-                        {
-                           "name":"obj",
-                           "type":"output",
-                           "implicit":false,
-                           "dtype":"ndarray"
-                        }
-                     ]
-                  },
-                  {
-                     "name":"con_cmp1",
-                     "type":"subsystem",
-                     "class":"ExecComp",
-                     "expressions":[
-                        "con1 = 3.16 - y1"
-                     ],
-                     "subsystem_type":"component",
-                     "is_parallel":false,
-                     "component_type":"exec",
-                     "linear_solver":"",
-                     "nonlinear_solver":"",
-                     "children":[
-                        {
-                           "name":"y1",
-                           "type":"input",
-                           "dtype":"ndarray"
-                        },
-                        {
-                           "name":"con1",
-                           "type":"output",
-                           "implicit":false,
-                           "dtype":"ndarray"
-                        }
-                     ]
-                  },
-                  {
-                     "name":"con_cmp2",
-                     "type":"subsystem",
-                     "class":"ExecComp",
-                     "expressions":[
-                        "con2 = y2 - 24.0"
-                     ],
-                     "subsystem_type":"component",
-                     "is_parallel":false,
-                     "component_type":"exec",
-                     "linear_solver":"",
-                     "nonlinear_solver":"",
-                     "children":[
-                        {
-                           "name":"y2",
-                           "type":"input",
-                           "dtype":"ndarray"
-                        },
-                        {
-                           "name":"con2",
-                           "type":"output",
-                           "implicit":false,
-                           "dtype":"ndarray"
-                        }
-                     ]
-                  }
-               ]
-            }
-        """)
+        self.parent_dir = os.path.dirname(os.path.realpath(__file__))
+
         self.expected_pathnames = json.loads('["sub.d1", "sub.d2", "sub.state_eq_group.state_eq"]')
         self.expected_conns = json.loads("""
             [
@@ -338,7 +120,8 @@ class TestViewModelData(unittest.TestCase):
                                 expected_design_vars_names,
                                 expected_responses_names
                                 ):
-        self.assertDictEqual(model_viewer_data['tree'], expected_tree)
+
+        numpy.testing.assert_equal(model_viewer_data['tree'], expected_tree, err_msg='', verbose=True)
 
         # check expected system pathnames
         pathnames = model_viewer_data['sys_pathnames_list']
@@ -386,10 +169,13 @@ class TestViewModelData(unittest.TestCase):
 
         model_viewer_data = _get_viewer_data(p)
 
+        with open(os.path.join(self.parent_dir, 'sellar_tree.json')) as json_file:
+            expected_tree = json.load(json_file)
+
         # check expected model tree
         self.check_model_viewer_data(
             model_viewer_data,
-            self.expected_tree,
+            expected_tree,
             self.expected_pathnames,
             self.expected_conns,
             self.expected_abs2prom,
@@ -416,10 +202,13 @@ class TestViewModelData(unittest.TestCase):
 
         model_viewer_data = _get_viewer_data(self.sqlite_db_filename)
 
+        with open(os.path.join(self.parent_dir, 'sellar_tree.json')) as json_file:
+            expected_tree = json.load(json_file)
+
         # check expected model tree
         self.check_model_viewer_data(
             model_viewer_data,
-            self.expected_tree,
+            expected_tree,
             self.expected_pathnames,
             self.expected_conns,
             self.expected_abs2prom,
@@ -458,130 +247,17 @@ class TestViewModelData(unittest.TestCase):
 
         prob.setup()
         prob.final_setup()
-        
+
         model_viewer_data = _get_viewer_data(prob)
 
-        expected_tree_betz = json.loads("""
-            { 
-               "name":"root",
-               "type":"root",
-               "class":"Group",
-               "expressions":null,
-               "component_type":null,
-               "subsystem_type":"group",
-               "is_parallel":false,
-               "linear_solver":"LN: RUNONCE",
-               "nonlinear_solver":"NL: RUNONCE",
-               "children":[ 
-                  { 
-                     "name":"indeps",
-                     "type":"subsystem",
-                     "class":"IndepVarComp",
-                     "expressions":null,
-                     "subsystem_type":"component",
-                     "is_parallel":false,
-                     "component_type":"indep",
-                     "linear_solver":"",
-                     "nonlinear_solver":"",
-                     "children":[ 
-                        { 
-                           "name":"a",
-                           "type":"output",
-                           "implicit":false,
-                           "dtype":"ndarray"
-                        },
-                        { 
-                           "name":"Area",
-                           "type":"output",
-                           "implicit":false,
-                           "dtype":"ndarray"
-                        },
-                        { 
-                           "name":"rho",
-                           "type":"output",
-                           "implicit":false,
-                           "dtype":"ndarray"
-                        },
-                        { 
-                           "name":"Vu",
-                           "type":"output",
-                           "implicit":false,
-                           "dtype":"ndarray"
-                        }
-                     ]
-                  },
-                  { 
-                     "name":"a_disk",
-                     "type":"subsystem",
-                     "class":"ActuatorDisc",
-                     "expressions":null,
-                     "subsystem_type":"component",
-                     "is_parallel":false,
-                     "component_type":"explicit",
-                     "linear_solver":"",
-                     "nonlinear_solver":"",
-                     "children":[ 
-                        { 
-                           "name":"a",
-                           "type":"input",
-                           "dtype":"ndarray"
-                        },
-                        { 
-                           "name":"Area",
-                           "type":"input",
-                           "dtype":"ndarray"
-                        },
-                        { 
-                           "name":"rho",
-                           "type":"input",
-                           "dtype":"ndarray"
-                        },
-                        { 
-                           "name":"Vu",
-                           "type":"input",
-                           "dtype":"ndarray"
-                        },
-                        { 
-                           "name":"Vr",
-                           "type":"output",
-                           "implicit":false,
-                           "dtype":"ndarray"
-                        },
-                        { 
-                           "name":"Vd",
-                           "type":"output",
-                           "implicit":false,
-                           "dtype":"ndarray"
-                        },
-                        { 
-                           "name":"Ct",
-                           "type":"output",
-                           "implicit":false,
-                           "dtype":"ndarray"
-                        },
-                        { 
-                           "name":"thrust",
-                           "type":"output",
-                           "implicit":false,
-                           "dtype":"ndarray"
-                        },
-                        { 
-                           "name":"Cp",
-                           "type":"output",
-                           "implicit":false,
-                           "dtype":"ndarray"
-                        },
-                        { 
-                           "name":"power",
-                           "type":"output",
-                           "implicit":false,
-                           "dtype":"ndarray"
-                        }
-                     ]
-                  }
-               ]
-            }
-        """)
+        # To generate the reference JSON file, use this code
+        # from openmdao.utils.testing_utils import _ModelViewerDataTreeEncoder
+        # with open('betz_tree_new.json', 'w') as outfile:
+        #     json.dump(model_viewer_data['tree'], outfile,cls=_ModelViewerDataTreeEncoder, indent=4)
+
+        with open(os.path.join(self.parent_dir, 'betz_tree.json')) as json_file:
+            expected_tree_betz = json.load(json_file)
+
         expected_pathnames_betz = json.loads('[]')
         expected_conns_betz = json.loads("""
                 [{"src": "indeps.a", "tgt": "a_disk.a"}, {"src": "indeps.Area", "tgt": "a_disk.Area"},
@@ -615,6 +291,52 @@ class TestViewModelData(unittest.TestCase):
             expected_responses_names,
         )
 
+    def test_viewer_data_from_subgroup(self):
+        """
+        Test error message when asking for viewer data for a subgroup.
+        """
+        p = Problem(model=SellarStateConnection())
+        p.setup()
+
+        msg = "Viewer data is not available for sub-Group 'sub'."
+        with assert_warning(UserWarning, msg):
+            _get_viewer_data(p.model.sub)
+
+    def test_viewer_data_from_None(self):
+        """
+        Test error message when asking for viewer data for an invalid source.
+        """
+        p = Problem(model=SellarStateConnection())
+        p.setup()
+
+        msg = "Viewer data is not available for 'None'." + \
+              "The source must be a Problem, model or the filename of a recording."
+
+        with self.assertRaises(TypeError) as cm:
+            _get_viewer_data(None)
+
+        self.assertEquals(str(cm.exception), msg)
+
+    def test_handle_ndarray_system_option(self):
+        class SystemWithNdArrayOption(ExplicitComponent):
+            def initialize(self):
+                self.options.declare('arr', types=(numpy.ndarray,))
+
+            def setup(self):
+                self.add_input('x', val=0.0)
+                self.add_output('f_x', val=0.0)
+
+            def compute(self, inputs, outputs):
+                x = inputs['x']
+                outputs['f_x'] = (x - 3.0) ** 2
+
+        prob = Problem()
+        prob.model.add_subsystem('comp', SystemWithNdArrayOption(arr=numpy.ones(2)))
+        prob.setup()
+        model_viewer_data = _get_viewer_data(prob)
+        numpy.testing.assert_equal(model_viewer_data['tree']['children'][0]['options']['arr'],
+                                   numpy.ones(2))
+
     def test_n2_from_problem(self):
         """
         Test that an n2 html file is generated from a Problem.
@@ -623,6 +345,20 @@ class TestViewModelData(unittest.TestCase):
         p.model = SellarStateConnection()
         p.setup()
         n2(p, outfile=self.problem_html_filename, show_browser=DEBUG_BROWSER)
+
+        # Check that the html file has been created and has something in it.
+        self.assertTrue(os.path.isfile(self.problem_html_filename),
+                        (self.problem_html_filename + " is not a valid file."))
+        self.assertGreater(os.path.getsize(self.problem_html_filename), 100)
+
+    def test_n2_from_model(self):
+        """
+        Test that an n2 html file is generated from a model.
+        """
+        p = Problem()
+        p.model = SellarStateConnection()
+        p.setup()
+        n2(p.model, outfile=self.problem_html_filename, show_browser=DEBUG_BROWSER)
 
         # Check that the html file has been created and has something in it.
         self.assertTrue(os.path.isfile(self.problem_html_filename),
@@ -638,7 +374,7 @@ class TestViewModelData(unittest.TestCase):
             if re.search('var compressedModel', line):
                 b64_data = line.replace('var compressedModel = "', '').replace('";', '')
                 break
-        
+
         file.close()
         compressed_data = base64.b64decode(b64_data)
         model_data = json.loads(zlib.decompress(compressed_data).decode("utf-8"))
@@ -702,7 +438,7 @@ class TestViewModelData(unittest.TestCase):
         """
         Test that an n2 html file is generated from a Problem even if it has connection errors.
         """
-        from openmdao.test_suite.scripts.bad_connection import BadConnectionModel 
+        from openmdao.test_suite.scripts.bad_connection import BadConnectionModel
 
         p = Problem(BadConnectionModel())
 

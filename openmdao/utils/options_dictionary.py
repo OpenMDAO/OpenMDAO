@@ -1,27 +1,7 @@
 """Define the OptionsDictionary class."""
 
 from openmdao.utils.general_utils import warn_deprecation
-
-
-class Undefined(object):
-    """
-    Class for defining an 'undefined' object which appears in the docs as 'undefined'.
-    """
-
-    def __repr__(self):
-        """
-        Return a string representation for an 'undefined' object.
-
-        Returns
-        -------
-        str
-            'undefined'
-        """
-        return 'undefined'
-
-
-# unique object to check if default is given
-_undefined = Undefined()
+from openmdao.core.constants import _UNDEFINED
 
 
 #
@@ -128,7 +108,7 @@ class OptionsDictionary(object):
         outputs = []
         for option_name, option_data in sorted(self._dict.items()):
             name = option_name
-            default = option_data['value'] if option_data['value'] is not _undefined \
+            default = option_data['value'] if option_data['value'] is not _UNDEFINED \
                 else '**Required**'
             values = option_data['values']
             types = option_data['types']
@@ -326,7 +306,7 @@ class OptionsDictionary(object):
         if meta['check_valid'] is not None:
             meta['check_valid'](name, value)
 
-    def declare(self, name, default=_undefined, values=None, types=None, desc='',
+    def declare(self, name, default=_UNDEFINED, values=None, types=None, desc='',
                 upper=None, lower=None, check_valid=None, allow_none=False, recordable=True,
                 deprecation=None):
         r"""
@@ -381,7 +361,7 @@ class OptionsDictionary(object):
         if not recordable:
             self._all_recordable = False
 
-        default_provided = default is not _undefined
+        default_provided = default is not _UNDEFINED
 
         if default_provided and default is None:
             # specifying default=None implies allow_none
@@ -513,3 +493,10 @@ class OptionsDictionary(object):
                 self._raise("Option '{}' is required but has not been set.".format(name))
         except KeyError:
             self._raise("Option '{}' cannot be found".format(name), exc_type=KeyError)
+
+    def items(self):
+        """
+        Yield name and value of options.
+        """
+        for key, val in self._dict.items():
+            yield key, val['value']

@@ -67,7 +67,7 @@ class IndepVarComp(ExplicitComponent):
         opt.declare('res_units', types=str, default=None,
                     desc="Units in which the residuals of this output will be given to "
                          "the user when requested.")
-        opt.declare('desc', types=str,
+        opt.declare('desc', types=str, default=None,
                     desc="Description of the variable")
         opt.declare('lower', types=(int, float, list, tuple, np.ndarray), default=None,
                     desc="Lower bound(s) in user-defined units. It can be (1) a float, "
