@@ -325,7 +325,7 @@ class SrcIndicesTests(unittest.TestCase):
                 self.add_subsystem('comp1', om.ExecComp(['y1=x*2'], y1=np.ones(size), x=np.ones(size)),
                                 promotes_inputs=['*'], promotes_outputs=['*'])
 
-                # Works if you comment out this comp.
+                # test with second absolute path for 'x'
                 self.add_subsystem('comp2', om.ExecComp(['y2=x*2'], y2=np.ones(size), x=np.ones(size)),
                                 promotes_inputs=['*'], promotes_outputs=['*'])
 
