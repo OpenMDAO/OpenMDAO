@@ -355,3 +355,34 @@ class SrcIndicesTests(unittest.TestCase):
         prob.setup()
 
         prob.run_model()
+
+    def test_sub_sub_promotes(self):
+        # this test passes if it doesn't raise an exception.
+        class Burn1(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', om.ExecComp(['y1=x*2'], y1=np.ones(4), x=np.ones(4)),
+                                promotes_outputs=['*'])
+                self.add_subsystem('comp2', om.ExecComp(['y2=x*2'], y2=np.ones(4), x=np.ones(4)),
+                                promotes_outputs=['*'])
+            def configure(self):
+                self.promotes('comp1', inputs=[('x', 'design:x')],
+                            src_indices=[0, 0, 0, 0], flat_src_indices=True)
+                self.set_input_defaults('design:x', 75.3)
+
+        class Phases(om.ParallelGroup):
+            def setup(self):
+                self.add_subsystem('burn1', Burn1(),
+                                promotes_outputs=['*'])
+
+        class Traj(om.Group):
+            def setup(self):
+                self.add_subsystem('phases', Phases(),
+                                promotes_outputs=['*'])
+            def configure(self):
+                # this promotes was leaving a leftover entry in _group_inputs that resulted
+                # from an earlier _setup_var_data call where the input in question had a different
+                # promoted name.
+                self.phases.promotes('burn1', inputs=['design:x'])
+
+        prob = om.Problem(model=Traj())
+        prob.setup()

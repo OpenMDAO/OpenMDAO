@@ -729,6 +729,11 @@ class Group(System):
         """
         Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
         """
+        if self._var_allprocs_prom2abs_list is None:
+            old_prom2abs = {}
+        else:
+            old_prom2abs = self._var_allprocs_prom2abs_list['input']
+
         super(Group, self)._setup_var_data()
 
         abs_names = self._var_abs_names
@@ -900,8 +905,17 @@ class Group(System):
             p2abs_in = self._var_allprocs_prom2abs_list['input']
             extra = [gin for gin in self._group_inputs if gin not in p2abs_in]
             if extra:
-                raise RuntimeError(f"{self.msginfo}: The following group inputs, passed to "
-                                   f"set_input_defaults(), could not be found: {sorted(extra)}.")
+                # make sure that we don't have a leftover group input default entry from a previous
+                # execution of _setup_var_data before promoted names were updated.
+                ex = set()
+                for e in extra:
+                    if e in old_prom2abs:
+                        del self._group_inputs[e]  # clean up old key using old promoted name
+                    else:
+                        ex.add(e)
+                if ex:
+                    raise RuntimeError(f"{self.msginfo}: The following group inputs, passed to "
+                                       f"set_input_defaults(), could not be found: {sorted(ex)}.")
 
         if self._var_discrete['input'] or self._var_discrete['output']:
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
