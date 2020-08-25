@@ -15,7 +15,7 @@ class AnalysisError(Exception):
 
     def __init__(self, error, location=None):
         """
-        Instantiate DemuxComp and populate private members.
+        Initialize AnalysisError.
 
         Parameters
         ----------

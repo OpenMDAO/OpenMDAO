@@ -3,7 +3,6 @@
 import copy
 import sys
 import unittest
-import inspect
 
 from distutils.version import LooseVersion
 
@@ -18,7 +17,6 @@ from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.general_utils import set_pyoptsparse_opt, run_driver
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.mpi import MPI
-from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
 
 # check that pyoptsparse is installed
 # if it is, try to use SNOPT but fall back to SLSQP
@@ -2048,32 +2046,6 @@ class TestPyoptSparse(unittest.TestCase):
 
         assert_near_equal(prob['z'][0], 1.9776, 1e-3)
         assert_near_equal(prob['obj_cmp.obj'][0], 3.183, 1e-3)
-
-    def test_snopt_analysis_error(self):
-
-        x_tr = np.linspace(0, 2*np.pi, 100)
-        y_tr = np.sin(x_tr)
-
-        p = om.Problem(model=om.Group())
-
-        p.driver = om.pyOptSparseDriver(optimizer='SNOPT')
-
-        mm = om.MetaModelStructuredComp(extrapolate=False)
-        mm.add_input('x', val=1.0, training_data=x_tr)
-        mm.add_output('y', val=1.0, training_data=y_tr)
-        p.model.add_subsystem('interp', mm, promotes_inputs=['x'], promotes_outputs=['y'])
-
-        p.model.add_objective('y', scaler=-1)
-        p.model.add_design_var('x', lower=6, upper=10)
-
-        p.set_solver_print(level=0)
-        p.setup()
-
-        p.set_val('x', 0.75)
-
-        msg = "Analysis Error: Line 205 of file {}".format(inspect.getsourcefile(MetaModelStructuredComp))
-        with assert_warning(UserWarning, msg):
-            p.run_driver()
 
 
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
