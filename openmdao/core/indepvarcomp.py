@@ -105,8 +105,9 @@ class IndepVarComp(ExplicitComponent):
 
         super(IndepVarComp, self)._configure_check()
 
-    def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                   lower=None, upper=None, ref=None, ref0=None, res_ref=None, tags=None):
+    def add_output(self, name, val=None, shape=None, units=None, res_units=None, desc='',
+                   lower=None, upper=None, ref=None, ref0=None, res_ref=None, tags=None,
+                   shape_by_conn=False, copy_shape=None):
         """
         Add an independent variable to this component.
 
@@ -139,6 +140,11 @@ class IndepVarComp(ExplicitComponent):
         tags : str or list of strs
             User defined tags that can be used to filter what gets listed when calling
             list_outputs.
+        shape_by_conn : bool
+            If True, shape this output to match its connected input(s).
+        copy_shape : str or None
+            If a str, that str is the name of a variable. Shape this output to match that of
+            the named variable.
         """
         if res_units is not None:
             warn_deprecation(
@@ -168,7 +174,8 @@ class IndepVarComp(ExplicitComponent):
 
         kwargs = {'shape': shape, 'units': units, 'res_units': res_units, 'desc': desc,
                   'lower': lower, 'upper': upper, 'ref': ref, 'ref0': ref0,
-                  'res_ref': res_ref, 'tags': tags
+                  'res_ref': res_ref, 'tags': tags, 'shape_by_conn': shape_by_conn,
+                  'copy_shape': copy_shape,
                   }
         super(IndepVarComp, self).add_output(name, val, **kwargs)
 

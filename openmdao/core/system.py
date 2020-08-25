@@ -73,9 +73,11 @@ _recordable_funcs = frozenset(['_apply_linear', '_apply_nonlinear', '_solve_line
 
 # the following are local metadata that will also be accessible for vars on all procs
 global_meta_names = {
-    'input': ('units', 'shape', 'size', 'distributed', 'tags', 'desc'),
+    'input': ('units', 'shape', 'size', 'distributed', 'tags', 'desc', 'shape_by_conn',
+              'copy_shape'),
     'output': ('units', 'shape', 'size', 'desc',
-               'ref', 'ref0', 'res_ref', 'distributed', 'lower', 'upper', 'tags'),
+               'ref', 'ref0', 'res_ref', 'distributed', 'lower', 'upper', 'tags', 'shape_by_conn',
+               'copy_shape'),
 }
 
 allowed_meta_names = {
@@ -97,6 +99,8 @@ allowed_meta_names = {
     'res_ref',
     'lower',
     'upper',
+    'shape_by_conn',
+    'copy_shape',
 }
 
 
@@ -643,6 +647,7 @@ class System(object):
 
         self._setup_vec_names(mode)
         self._setup_global_connections()
+        self._setup_deferred_var_shape()
 
         if self.pathname == '':
             self._top_level_setup(mode)
@@ -657,14 +662,7 @@ class System(object):
             else:
                 new_names.append(vec_name)
         self._problem_meta['vec_names'] = new_names
-
-        new_names = []
-        for vec_name in self._lin_vec_names:
-            if vec_name in conns:
-                new_names.append(conns[vec_name])
-            else:
-                new_names.append(vec_name)
-        self._problem_meta['lin_vec_names'] = new_names
+        self._problem_meta['lin_vec_names'] = new_names[1:]
 
         self._setup_relevance(mode, self._relevant)
         self._setup_var_index_ranges()
@@ -691,6 +689,9 @@ class System(object):
         """
         Do any error checking on i/o and connections.
         """
+        pass
+
+    def _setup_deferred_var_shape(self):
         pass
 
     def _final_setup(self, comm):

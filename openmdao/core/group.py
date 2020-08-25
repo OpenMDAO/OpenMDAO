@@ -29,6 +29,7 @@ from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismat
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 from openmdao.utils.coloring import Coloring, _STD_COLORING_FNAME
 import openmdao.utils.coloring as coloring_mod
+from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.core.constants import _SetupStatus
 
 # regex to check for valid names.
@@ -1308,6 +1309,158 @@ class Group(System):
 
         for inp in src_ind_inputs:
             allprocs_abs2meta[inp]['has_src_indices'] = True
+
+    def _setup_deferred_var_shape(self):
+        """
+        Add shape/size metadata for variables that were created with shape_by_conn or copy_shape.
+        """
+        def copy_var_meta(from_var, to_var, distrib_sz):
+            all_from_meta = self._var_allprocs_abs2meta[from_var]
+            all_to_meta = self._var_allprocs_abs2meta[to_var]
+            from_meta = self._var_abs2meta[from_var] if from_var in self._var_abs2meta else {}
+            to_meta = self._var_abs2meta[to_var] if to_var in self._var_abs2meta else {}
+
+            nprocs = self.comm.size
+
+            from_dist = nprocs > 1 and all_from_meta['distributed']
+            from_size = all_from_meta['size']
+            from_shape = all_from_meta['shape']
+
+            to_dist = nprocs > 1 and all_to_meta['distributed']
+
+            if (from_dist and to_dist) or not (from_dist or to_dist):
+                all_to_meta['shape'] = from_shape
+                all_to_meta['size'] = from_size
+                if to_meta:
+                    to_meta['shape'] = from_shape
+                    to_meta['size'] = from_size
+                    if from_meta:
+                        to_meta['value'] = from_meta['value'].copy()
+                    else:
+                        to_meta['value'] = np.ones(from_size)
+                if to_dist and from_dist:
+                    distrib_sz[to_var] = distrib_sz[from_var]
+                # src_indices will be computed later for dist inputs that don't specify them
+            elif from_var in self._var_allprocs_abs2prom['output']:
+                # from_var is an output.  assume to_var is an input
+                if from_dist and not to_dist:  # known dist output to serial input
+                    total_size = np.sum(distrib_sz[from_var])
+                    all_to_meta['size'] = total_size
+                    all_to_meta['shape'] = (total_size,)
+                    if to_meta:
+                        to_meta['size'] = total_size
+                        to_meta['shape'] = (total_size,)
+                        to_meta['value'] = np.ones(total_size)
+                else:  # known serial output to dist input
+                    # there is not enough info to determine how the variable is split
+                    # over the procs. for now we split the variable up equally
+                    rank = self.comm.rank
+                    # FIXME: this doesn't handle case where a distrib var is fully remote on
+                    # some procs
+                    sizes, offsets = evenly_distrib_idxs(nprocs, from_size)
+                    size = sizes[rank]
+
+                    all_to_meta['size'] = size
+                    all_to_meta['shape'] = (size,)
+                    distrib_sz[to_var] = np.array(sizes)
+                    if to_meta:
+                        to_meta['size'] = size
+                        to_meta['shape'] = (size,)
+                        to_meta['value'] = np.ones(size)
+                        to_meta['src_indices'] = np.arange(offsets[rank],
+                                                           offsets[rank] + sizes[rank],
+                                                           dtype=INT_DTYPE)
+            else:  # from_var is an input
+                if not from_dist and to_dist:   # known serial input to dist output
+                    # FIXME: this doesn't handle case where a distrib var is fully remote on
+                    # some procs
+                    sizes, offsets = evenly_distrib_idxs(nprocs, from_size)
+                    size = sizes[self.comm.rank]
+
+                    all_to_meta['size'] = size
+                    all_to_meta['shape'] = (size,)
+                    distrib_sz[to_var] = np.array(sizes)
+                    if to_meta:
+                        to_meta['size'] = size
+                        to_meta['shape'] = (size,)
+                        to_meta['value'] = np.ones(size)
+
+                else:  # known dist input to serial output
+                    if all_from_meta['has_src_indices']:
+                        # in this case we have to set the size of the serial output based on
+                        # the largest entry in src_indices across all procs.
+                        mx = np.max(from_meta['src_indices']) if from_var in from_meta else 0
+                        local_max = np.array([mx], dtype=INT_DTYPE)
+                        global_max = np.zeros(1, dtype=INT_DTYPE)
+                        self.comm.Allreduce(local_max, global_max, op=MPI.MAX)
+                        size = global_max[0]
+                    else:  # src_indices are not set, so just sum up the sizes
+                        size = np.sum(distrib_sz[from_var])
+
+                    all_to_meta['size'] = size
+                    all_to_meta['shape'] = (size,)
+                    if to_meta:
+                        to_meta['size'] = size
+                        to_meta['shape'] = (size,)
+                        to_meta['value'] = np.ones(size)
+
+        abs2meta = self._var_allprocs_abs2meta
+        unknown = {n for n, m in abs2meta.items() if m['shape_by_conn'] or m['copy_shape']}
+        if unknown:
+            conn = self._conn_global_abs_in2out
+            rev_conn = defaultdict(list)
+            for tgt, src in conn.items():
+                rev_conn[src].append(tgt)
+            if self.comm.size > 1:
+                my_abs2meta = self._var_abs2meta
+                dist_sz = {}
+                for n, m in abs2meta.items():
+                    if m['distributed']:
+                        if n in my_abs2meta:
+                            sz = my_abs2meta[n]['size']
+                            if sz is not None:
+                                dist_sz[n] = sz
+                        else:
+                            dist_sz[n] = 0
+
+                distrib_sz = defaultdict(lambda: np.zeros(self.comm.size, dtype=INT_DTYPE))
+                for rank, dsz in enumerate(self.comm.allgather(dist_sz)):
+                    for n, sz in dsz.items():
+                        distrib_sz[n][rank] = sz
+            else:
+                distrib_sz = {}
+
+        n_unknowns = len(unknown)
+
+        while(unknown):
+            to_remove = set()
+            for u in unknown:
+                meta = abs2meta[u]
+                if meta['copy_shape']:
+                    abs_new = u.rsplit('.', 1)[0] + '.' + meta['copy_shape']
+                elif meta['shape_by_conn']:
+                    if u in conn:  # it's a connected input
+                        abs_new = conn[u]
+                    elif u in rev_conn:
+                        for inp in rev_conn[u]:
+                            if abs2meta[inp]['shape'] is not None:
+                                abs_new = inp
+                                break
+                        else:
+                            continue
+                    else:
+                        raise RuntimeError(f"{self.msginfo}: 'shape_by_conn' was set for "
+                                           f"unconnected output '{u}'.")
+
+                if abs2meta[abs_new]['shape'] is not None:
+                    copy_var_meta(abs_new, u, distrib_sz)
+                    to_remove.add(u)
+
+            unknown -= to_remove
+            if len(unknown) == n_unknowns:
+                unknown = sorted(unknown)
+                raise RuntimeError(f"{self.msginfo}: Failed to resolve shapes for {unknown}.")
+            n_unknowns = len(unknown)
 
     @check_mpi_exceptions
     def _setup_connections(self):
