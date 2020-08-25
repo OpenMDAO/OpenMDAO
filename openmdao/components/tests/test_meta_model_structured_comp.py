@@ -1087,8 +1087,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
 
         self.run_and_check_derivs(prob)
 
-    def test_snopt_analysis_error(self):
-
+    def test_analysis_error_warning_msg(self):
       x_tr = np.linspace(0, 2*np.pi, 100)
       y_tr = np.sin(x_tr)
 
