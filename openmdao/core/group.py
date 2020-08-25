@@ -1405,8 +1405,9 @@ class Group(System):
                         to_meta['value'] = np.ones(size)
 
         abs2meta = self._var_allprocs_abs2meta
-        unknown = {n for n, m in abs2meta.items() if m['shape_by_conn'] or m['copy_shape']}
-        if unknown:
+        # find all variables that have an unknown shape (across all procs)
+        unknowns = {n for n, m in abs2meta.items() if m['shape_by_conn'] or m['copy_shape']}
+        if unknowns:
             conn = self._conn_global_abs_in2out
             rev_conn = defaultdict(list)
             for tgt, src in conn.items():
@@ -1430,18 +1431,20 @@ class Group(System):
             else:
                 distrib_sz = {}
 
-        n_unknowns = len(unknown)
+        n_unknowns = len(unknowns)
 
-        while(unknown):
+        while(unknowns):
             to_remove = set()
-            for u in unknown:
+            for u in unknowns:
                 meta = abs2meta[u]
                 if meta['copy_shape']:
+                    # variable whose shape is being copied must be on the same component, and
+                    # name stored in 'copy_shape' entry must be the relative name.
                     abs_new = u.rsplit('.', 1)[0] + '.' + meta['copy_shape']
                 elif meta['shape_by_conn']:
                     if u in conn:  # it's a connected input
                         abs_new = conn[u]
-                    elif u in rev_conn:
+                    elif u in rev_conn:  # connected output
                         for inp in rev_conn[u]:
                             if abs2meta[inp]['shape'] is not None:
                                 abs_new = inp
@@ -1450,17 +1453,20 @@ class Group(System):
                             continue
                     else:
                         raise RuntimeError(f"{self.msginfo}: 'shape_by_conn' was set for "
-                                           f"unconnected output '{u}'.")
+                                           f"unconnected variable '{u}'.")
 
+                # if shape info is defined for what we're connected to (or are copying),
+                # update our shape info and remove our name from the unknowns list.
                 if abs2meta[abs_new]['shape'] is not None:
                     copy_var_meta(abs_new, u, distrib_sz)
                     to_remove.add(u)
 
-            unknown -= to_remove
-            if len(unknown) == n_unknowns:
-                unknown = sorted(unknown)
-                raise RuntimeError(f"{self.msginfo}: Failed to resolve shapes for {unknown}.")
-            n_unknowns = len(unknown)
+            unknowns -= to_remove
+            # if the number of unknowns didn't decrease this iteration, we failed
+            if len(unknowns) == n_unknowns:
+                unknowns = sorted(unknowns)
+                raise RuntimeError(f"{self.msginfo}: Failed to resolve shapes for {unknowns}.")
+            n_unknowns = len(unknowns)
 
     @check_mpi_exceptions
     def _setup_connections(self):
