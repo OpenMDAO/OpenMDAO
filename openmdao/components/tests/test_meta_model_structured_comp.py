@@ -9,6 +9,7 @@ from numpy.testing import assert_almost_equal
 
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_partials
+from openmdao.utils.general_utils import set_pyoptsparse_opt
 
 scipy_gte_019 = True
 try:
