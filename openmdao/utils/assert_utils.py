@@ -47,6 +47,34 @@ def assert_warning(category, msg):
 
 
 @contextmanager
+def assert_warnings(expected_warnings):
+    """
+    Context manager asserting that expected warnings are issued.
+
+    Parameters
+    ----------
+    expected_warnings : iterable of (class, str)
+        The category and text of the expected warnings.
+
+    Raises
+    ------
+    AssertionError
+        If all the expected warnings are not raised.
+    """
+    with reset_warning_registry():
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            yield
+
+    for category, msg in expected_warnings:
+        for warn in w:
+            if (issubclass(warn.category, category) and str(warn.message) == msg):
+                break
+        else:
+            raise AssertionError("Did not see expected %s: %s" % (category.__name__, msg))
+
+
+@contextmanager
 def assert_no_warning(category, msg=None):
     """
     Context manager asserting that a warning is not issued.
