@@ -16,6 +16,9 @@ try:
 except ImportError:
     scipy_gte_019 = False
 
+OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
+if OPTIMIZER:
+    from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
 x = np.array([-0.97727788, -0.15135721, -0.10321885,  0.40015721,  0.4105985,
                0.95008842,  0.97873798,  1.76405235,  1.86755799,  2.2408932 ])
@@ -1087,34 +1090,31 @@ class TestMetaModelStructuredPython(unittest.TestCase):
 
         self.run_and_check_derivs(prob)
 
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
+    def test_analysis_error_warning_msg(self):
+      x_tr = np.linspace(0, 2*np.pi, 100)
+      y_tr = np.sin(x_tr)
 
-@unittest.skipIf(OPT is None, "pyoptsparse is not installed")
-class TestMetaModelStructuredCompWithPyoptspare(unittest.TestCase):
+      p = om.Problem(model=om.Group())
 
-  def test_analysis_error_warning_msg(self):
-    x_tr = np.linspace(0, 2*np.pi, 100)
-    y_tr = np.sin(x_tr)
+      p.driver = om.pyOptSparseDriver(optimizer='SNOPT')
 
-    p = om.Problem(model=om.Group())
+      mm = om.MetaModelStructuredComp(extrapolate=False)
+      mm.add_input('x', val=1.0, training_data=x_tr)
+      mm.add_output('y', val=1.0, training_data=y_tr)
+      p.model.add_subsystem('interp', mm, promotes_inputs=['x'], promotes_outputs=['y'])
 
-    p.driver = om.pyOptSparseDriver(optimizer='SNOPT')
+      p.model.add_objective('y', scaler=-1)
+      p.model.add_design_var('x', lower=6, upper=10)
 
-    mm = om.MetaModelStructuredComp(extrapolate=False)
-    mm.add_input('x', val=1.0, training_data=x_tr)
-    mm.add_output('y', val=1.0, training_data=y_tr)
-    p.model.add_subsystem('interp', mm, promotes_inputs=['x'], promotes_outputs=['y'])
+      p.set_solver_print(level=0)
+      p.setup()
 
-    p.model.add_objective('y', scaler=-1)
-    p.model.add_design_var('x', lower=6, upper=10)
+      p.set_val('x', 0.75)
 
-    p.set_solver_print(level=0)
-    p.setup()
-
-    p.set_val('x', 0.75)
-
-    msg = "Analysis Error: Line 205 of file {}".format(inspect.getsourcefile(om.MetaModelStructuredComp))
-    with assert_warning(UserWarning, msg):
-        p.run_driver()
+      msg = "Analysis Error: Line 205 of file {}".format(inspect.getsourcefile(om.MetaModelStructuredComp))
+      with assert_warning(UserWarning, msg):
+          p.run_driver()
 
 
 @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
