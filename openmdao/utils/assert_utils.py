@@ -49,7 +49,7 @@ def assert_warning(category, msg):
 @contextmanager
 def assert_warnings(expected_warnings):
     """
-    Context manager asserting that a warning is issued.
+    Context manager asserting that expected warnings are issued.
 
     Parameters
     ----------
