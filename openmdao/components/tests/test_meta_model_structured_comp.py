@@ -1087,30 +1087,34 @@ class TestMetaModelStructuredPython(unittest.TestCase):
 
         self.run_and_check_derivs(prob)
 
-    def test_analysis_error_warning_msg(self):
-      x_tr = np.linspace(0, 2*np.pi, 100)
-      y_tr = np.sin(x_tr)
 
-      p = om.Problem(model=om.Group())
+@unittest.skipIf(OPT is None, "pyoptsparse is not installed")
+class TestMetaModelStructuredCompWithPyoptspare(unittest.TestCase):
 
-      p.driver = om.pyOptSparseDriver(optimizer='SNOPT')
+  def test_analysis_error_warning_msg(self):
+    x_tr = np.linspace(0, 2*np.pi, 100)
+    y_tr = np.sin(x_tr)
 
-      mm = om.MetaModelStructuredComp(extrapolate=False)
-      mm.add_input('x', val=1.0, training_data=x_tr)
-      mm.add_output('y', val=1.0, training_data=y_tr)
-      p.model.add_subsystem('interp', mm, promotes_inputs=['x'], promotes_outputs=['y'])
+    p = om.Problem(model=om.Group())
 
-      p.model.add_objective('y', scaler=-1)
-      p.model.add_design_var('x', lower=6, upper=10)
+    p.driver = om.pyOptSparseDriver(optimizer='SNOPT')
 
-      p.set_solver_print(level=0)
-      p.setup()
+    mm = om.MetaModelStructuredComp(extrapolate=False)
+    mm.add_input('x', val=1.0, training_data=x_tr)
+    mm.add_output('y', val=1.0, training_data=y_tr)
+    p.model.add_subsystem('interp', mm, promotes_inputs=['x'], promotes_outputs=['y'])
 
-      p.set_val('x', 0.75)
+    p.model.add_objective('y', scaler=-1)
+    p.model.add_design_var('x', lower=6, upper=10)
 
-      msg = "Analysis Error: Line 205 of file {}".format(inspect.getsourcefile(om.MetaModelStructuredComp))
-      with assert_warning(UserWarning, msg):
-          p.run_driver()
+    p.set_solver_print(level=0)
+    p.setup()
+
+    p.set_val('x', 0.75)
+
+    msg = "Analysis Error: Line 205 of file {}".format(inspect.getsourcefile(om.MetaModelStructuredComp))
+    with assert_warning(UserWarning, msg):
+        p.run_driver()
 
 
 @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
