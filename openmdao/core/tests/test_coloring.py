@@ -1028,7 +1028,6 @@ class MatMultMultipointTestCase(unittest.TestCase):
 
         model.add_objective('obj.y')
 
-        #import wingdbstub
         p.setup()
 
         p.run_driver()
