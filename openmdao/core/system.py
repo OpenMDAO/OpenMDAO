@@ -18,10 +18,10 @@ import networkx as nx
 
 import openmdao
 from openmdao.core.configinfo import _ConfigInfo
-from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED
+from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED, INT_DTYPE
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 from openmdao.recorders.recording_manager import RecordingManager
-from openmdao.vectors.vector import INT_DTYPE, _full_slice
+from openmdao.vectors.vector import _full_slice
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
@@ -657,14 +657,7 @@ class System(object):
             else:
                 new_names.append(vec_name)
         self._problem_meta['vec_names'] = new_names
-
-        new_names = []
-        for vec_name in self._lin_vec_names:
-            if vec_name in conns:
-                new_names.append(conns[vec_name])
-            else:
-                new_names.append(vec_name)
-        self._problem_meta['lin_vec_names'] = new_names
+        self._problem_meta['lin_vec_names'] = new_names[1:]
 
         self._setup_relevance(mode, self._relevant)
         self._setup_var_index_ranges()
@@ -1859,13 +1852,14 @@ class System(object):
             if key in self._var_promotes_src_indices:
                 src_indices, flat_src_indices = self._var_promotes_src_indices[key]
 
-                for abs_name in self._var_allprocs_prom2abs_list['input'][name]:
-                    meta = self._var_abs2meta[abs_name]
+                for abs_in in self._var_allprocs_prom2abs_list['input'][name]:
+                    meta = self._var_abs2meta[abs_in]
 
                     _, _, src_indices = ensure_compatible(name, meta['value'], meta['shape'],
                                                           src_indices)
 
-                    if 'src_indices' in meta and meta['src_indices'] is not None:
+                    is_array = isinstance(src_indices, np.ndarray)
+                    if is_array and 'src_indices' in meta and meta['src_indices'] is not None:
                         if not np.array_equal(meta['src_indices'], src_indices):
                             raise RuntimeError(f"{self.msginfo}: Trying to promote input '{name}' "
                                                f"with src_indices {str(src_indices)},"
@@ -1878,11 +1872,7 @@ class System(object):
                                                f"flat_src_indices has already been specified as"
                                                f" {str(meta['flat_src_indices'])}.")
 
-                    if src_indices.dtype == object:
-                        meta['src_indices'] = src_indices
-                    else:
-                        meta['src_indices'] = np.asarray(src_indices, dtype=INT_DTYPE)
-
+                    meta['src_indices'] = src_indices
                     meta['flat_src_indices'] = flat_src_indices
 
         def resolve(to_match, io_types, matches, proms):
@@ -4070,7 +4060,6 @@ class System(object):
         """
         discrete = distrib = False
         val = _UNDEFINED
-        typ = 'output' if abs_name in self._var_allprocs_abs2prom['output'] else 'input'
         if from_root:
             all_meta = self._problem_meta['all_meta']
             my_meta = self._problem_meta['meta']
@@ -4113,6 +4102,7 @@ class System(object):
             else:
                 return _UNDEFINED
 
+        typ = 'output' if abs_name in self._var_allprocs_abs2prom['output'] else 'input'
         if kind is None:
             kind = typ
         if vec_name is None:
@@ -4226,9 +4216,15 @@ class System(object):
 
         conns = self._problem_meta['connections']
         if from_src and abs_names[0] in conns:  # pull input from source
-            return self._get_input_from_src(name, abs_names, conns, units=units, indices=indices,
-                                            get_remote=get_remote, rank=rank, vec_name='nonlinear',
-                                            flat=flat)
+            src = conns[abs_names[0]]
+            if src in self._var_allprocs_abs2prom['output']:
+                caller = self
+            else:
+                # src is outside of this system so get the value from the model
+                caller = self._problem_meta['model_ref']()
+            return caller._get_input_from_src(name, abs_names, conns, units=units, indices=indices,
+                                              get_remote=get_remote, rank=rank,
+                                              vec_name='nonlinear', flat=flat, scope_sys=self)
         else:
             val = self._abs_get_val(abs_names[0], get_remote, rank, vec_name, kind, flat)
 
@@ -4241,7 +4237,8 @@ class System(object):
         return val
 
     def _get_input_from_src(self, name, abs_ins, conns, units=None, indices=None,
-                            get_remote=False, rank=None, vec_name='nonlinear', flat=False):
+                            get_remote=False, rank=None, vec_name='nonlinear', flat=False,
+                            scope_sys=None):
         """
         Given an input name, retrieve the value from its source output.
 
@@ -4270,6 +4267,10 @@ class System(object):
             Name of the vector to use.   Defaults to 'nonlinear'.
         flat : bool
             If True, return the flattened version of the value.
+        scope_sys : <System> or None
+            If not None, the System where the original get_val was called.  This situation
+            happens when get_val is called on an input, and the source connected to that input
+            resides in a different scope.
 
         Returns
         -------
@@ -4287,8 +4288,10 @@ class System(object):
         if units is None and len(abs_ins) > 1:
             if abs_name not in self._var_allprocs_discrete['input']:
                 # can't get here unless self is a Group because len(abs_ins) always == 1 for comp
+                if scope_sys is None:
+                    scope_sys = self
                 try:
-                    units = self._group_inputs[name][0]['units']
+                    units = scope_sys._group_inputs[name][0]['units']
                 except (KeyError, IndexError):
                     unit0 = self._var_allprocs_abs2meta[abs_ins[0]]['units']
                     for n in abs_ins[1:]:
@@ -4296,13 +4299,11 @@ class System(object):
                             self._show_ambiguity_msg(name, ('units',), abs_ins)
                             break
 
-        # get value of the source
-        val = self._abs_get_val(src, get_remote, rank, vec_name, 'output', flat, from_root=True)
-
         if abs_name in self._var_abs2meta:  # input is local
             vmeta = self._var_abs2meta[abs_name]
             src_indices = vmeta['src_indices']
             has_src_indices = src_indices is not None
+            distrib = vmeta['distributed']
         else:
             vmeta = self._var_allprocs_abs2meta[abs_name]
             src_indices = None  # FIXME: remote var could have src_indices
@@ -4314,18 +4315,40 @@ class System(object):
                                    "using `get_val(<name>, get_remote=True)` or from the "
                                    "local process using `get_val(<name>, get_remote=False)`.")
 
+        smeta = self._problem_meta['all_meta'][src]
+        sdistrib = smeta['distributed']
+        slocal = src in self._problem_meta['meta']
+        if sdistrib and not distrib and not get_remote:
+            raise RuntimeError(f"{self.msginfo}: Non-distributed variable '{abs_name}' has "
+                               f"a distributed source, '{src}', so you must retrieve its value "
+                               "using 'get_remote=True'.")
+
+        # get value of the source
+        val = self._abs_get_val(src, get_remote, rank, vec_name, 'output', flat, from_root=True)
+
         if has_src_indices:
-            distrib = vmeta['distributed']
             if src_indices is None:  # input is remote
                 val = np.zeros(0)
             else:
-                if not get_remote and distrib and src.startswith('_auto_ivc.'):
-                    val = val.ravel()[src_indices - src_indices[0]]
-                else:
-                    if _is_slicer_op(src_indices):
-                        val = val[tuple(src_indices)].ravel()
-                    else:
+                if _is_slicer_op(src_indices):
+                    val = val[tuple(src_indices)].ravel()
+                elif distrib and (sdistrib or not slocal) and not get_remote:
+                    var_idx = self._var_allprocs_abs2idx[vec_name][src]
+                    # sizes for src var in each proc
+                    sizes = self._var_sizes[vec_name]['output'][:, var_idx]
+                    start = np.sum(sizes[:self.comm.rank])
+                    end = start + sizes[self.comm.rank]
+                    if np.all(np.logical_and(src_indices >= start, src_indices < end)):
+                        if src_indices.size > 0:
+                            src_indices = src_indices - np.min(src_indices)
                         val = val.ravel()[src_indices]
+                    else:
+                        raise RuntimeError(f"{self.msginfo}: Can't retrieve distributed variable "
+                                           f"'{abs_name}' without setting 'get_remote=True' "
+                                           f"because its src_indices reference entries from other "
+                                           "ranks.")
+                else:
+                    val = val.ravel()[src_indices]
 
             if get_remote:
                 if distrib:
@@ -4356,7 +4379,6 @@ class System(object):
         if indices is not None:
             val = val[indices]
 
-        smeta = self._problem_meta['all_meta'][src]
         if units is not None:
             if smeta['units'] is not None:
                 try:

@@ -4,6 +4,7 @@ import sys
 import pprint
 import os
 import logging
+import weakref
 
 from collections import defaultdict, namedtuple, OrderedDict
 from fnmatch import fnmatchcase
@@ -20,7 +21,7 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group, System
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.total_jac import _TotalJacInfo
-from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED
+from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED, INT_DTYPE
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.solvers.solver import SolverInfo
@@ -39,7 +40,7 @@ from openmdao.utils.units import convert_units
 from openmdao.utils import coloring as coloring_mod
 from openmdao.core.constants import _SetupStatus
 from openmdao.utils.name_maps import abs_key2rel_key
-from openmdao.vectors.vector import _full_slice, INT_DTYPE
+from openmdao.vectors.vector import _full_slice
 from openmdao.vectors.default_vector import DefaultVector
 from openmdao.utils.logger_utils import get_logger, TestLogger
 import openmdao.utils.coloring as coloring_mod
@@ -852,8 +853,8 @@ class Problem(object):
 
         # this metadata will be shared by all Systems/Solvers in the system tree
         self._metadata = {
-            'coloring_dir': self.options['coloring_dir'],
-            'recording_iter': _RecIteration(),
+            'coloring_dir': self.options['coloring_dir'],  # directory for coloring files
+            'recording_iter': _RecIteration(),  # manager of recorder iterations
             'local_vector_class': local_vector_class,
             'distributed_vector_class': distributed_vector_class,
             'solver_info': SolverInfo(),
@@ -871,6 +872,12 @@ class Problem(object):
             'config_info': None,  # used during config to determine if additional updates required
             'parallel_groups': [],  # list of pathnames of parallel groups in this model (all procs)
             'setup_status': _SetupStatus.PRE_SETUP,
+            'vec_names': None,  # names of all nonlinear and linear vectors
+            'line_vec_names': None,  # names of linear vectors
+            'abs2idx': None,  # mapping of var name to index into var sizes array
+            'sizes': None,  # var size arrays
+            'owning_rank': None,  # MPI rank that 'owns' a given non-distributed variable
+            'model_ref': weakref.ref(model)
         }
         model._setup(model_comm, mode, self._metadata)
 

@@ -1354,7 +1354,8 @@ class TestGroupMPISlice(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(p['C1.x'], np.array([3, 3, 3, 3]))
+        val = p.get_val('C1.x', get_remote=False)
+        assert_near_equal(val, np.array([3, 3, 3, 3]))
 
     def test_om_slice_3d_mpi(self):
         class MyComp1(om.ExplicitComponent):

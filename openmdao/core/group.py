@@ -13,9 +13,9 @@ import numpy as np
 import networkx as nx
 
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
-from openmdao.core.system import System, INT_DTYPE
+from openmdao.core.system import System
 from openmdao.core.component import Component, _DictValues, _full_slice
-from openmdao.core.constants import _UNDEFINED
+from openmdao.core.constants import _UNDEFINED, INT_DTYPE
 from openmdao.proc_allocators.default_allocator import DefaultAllocator, ProcAllocationError
 from openmdao.jacobians.jacobian import SUBJAC_META_DEFAULTS
 from openmdao.recorders.recording_iteration_stack import Recording
@@ -1240,7 +1240,7 @@ class Group(System):
                             else:
                                 simple_warning(msg)
                                 continue
-                        meta['src_indices'] = np.atleast_1d(src_indices)
+                        meta['src_indices'] = src_indices
                         meta['flat_src_indices'] = flat_src_indices
 
                     src_ind_inputs.add(abs_in)
@@ -1481,9 +1481,8 @@ class Group(System):
                         global_size = self._var_allprocs_abs2meta[abs_out]['global_size']
                         global_shape = self._var_allprocs_abs2meta[abs_out]['global_shape']
                         src_indices = _slice_indices(src_indices, global_size, global_shape)
+                        abs2meta[abs_in]['src_indices'] = src_indices  # store converted value
                         shape = True
-                    else:
-                        src_indices = np.atleast_1d(src_indices)
 
                     if np.prod(src_indices.shape) == 0:
                         continue
@@ -1930,9 +1929,7 @@ class Group(System):
             src_indices = np.atleast_1d(src_indices)
 
         if isinstance(src_indices, np.ndarray):
-            if not np.issubdtype(src_indices.dtype, np.integer) and not \
-                    any(i == ... for i in src_indices):
-
+            if not np.issubdtype(src_indices.dtype, np.integer):
                 raise TypeError("%s: src_indices must contain integers, but src_indices for "
                                 "connection from '%s' to '%s' is %s." %
                                 (self.msginfo, src_name, tgt_name, src_indices.dtype.type))

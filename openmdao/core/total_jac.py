@@ -10,7 +10,7 @@ import time
 
 import numpy as np
 
-from openmdao.vectors.vector import INT_DTYPE
+from openmdao.core.constants import INT_DTYPE
 from openmdao.utils.general_utils import ContainsAll, simple_warning, prom2ivc_src_dict
 
 from openmdao.utils.mpi import MPI

@@ -15,12 +15,6 @@ _type_map = {
     'residual': 'output'
 }
 
-# This is the dtype we use for index arrays.  Petsc by default uses 32 bit ints
-if os.environ.get('OPENMDAO_USE_BIG_INTS'):
-    INT_DTYPE = np.dtype(np.int64)
-else:
-    INT_DTYPE = np.dtype(np.int32)
-
 
 class Vector(object):
     """
