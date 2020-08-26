@@ -608,10 +608,12 @@ class Group(System):
     def _check_prom_masking(self):
         """
         Raise exception if any promoted variable name masks an absolute variable name.
+
+        Only called on the top level group.
         """
         prom2abs_in = self._var_allprocs_prom2abs_list['input']
         prom2abs_out = self._var_allprocs_prom2abs_list['output']
-        abs2meta = self._problem_meta['model_ref']()._var_allprocs_abs2meta
+        abs2meta = self._var_allprocs_abs2meta
 
         for absname in abs2meta:
             if absname in prom2abs_in:
