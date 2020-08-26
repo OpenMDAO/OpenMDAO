@@ -124,7 +124,7 @@ class _TotalJacInfo(object):
         driver = problem.driver
         prom2abs = problem.model._var_allprocs_prom2abs_list['output']
         prom2abs_in = problem.model._var_allprocs_prom2abs_list['input']
-        conns = problem._metadata['connections']
+        conns = problem.model._conn_global_abs_in2out
 
         self.model = model = problem.model
         self.comm = problem.comm

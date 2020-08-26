@@ -663,19 +663,13 @@ class System(object):
         self._setup_var_index_ranges()
         self._setup_var_sizes()
 
-        # These are used when the driver assembles the design variables.
-        self._problem_meta['abs2idx'] = self._var_allprocs_abs2idx
-        self._problem_meta['sizes'] = self._var_sizes
-        self._problem_meta['owning_rank'] = self._owning_rank
-
         if self.pathname == '':
             self._top_level_setup2()
 
         self._setup_connections()
 
     def _top_level_setup(self, mode):
-        self._problem_meta['all_meta'] = self._var_allprocs_abs2meta
-        self._problem_meta['meta'] = self._var_abs2meta
+        pass
 
     def _top_level_setup2(self):
         pass
@@ -1484,7 +1478,7 @@ class System(object):
         abs2meta = self._var_abs2meta
         pro2abs = self._var_allprocs_prom2abs_list['output']
         pro2abs_in = self._var_allprocs_prom2abs_list['input']
-        conns = self._problem_meta.get('connections', {})
+        conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
 
         dv = self._design_vars
         for name, meta in dv.items():
@@ -2881,8 +2875,9 @@ class System(object):
         """
         pro2abs_out = self._var_allprocs_prom2abs_list['output']
         pro2abs_in = self._var_allprocs_prom2abs_list['input']
-        conns = self._problem_meta.get('connections', {})
-        abs2meta = self._problem_meta['all_meta']
+        model = self._problem_meta['model_ref']()
+        conns = model._conn_global_abs_in2out
+        abs2meta = model._var_allprocs_abs2meta
 
         # Human readable error message during Driver setup.
         out = OrderedDict()
@@ -2918,9 +2913,9 @@ class System(object):
 
         if get_sizes:
             # Size them all
-            sizes = self._problem_meta['sizes']['nonlinear']['output']
-            abs2idx = self._problem_meta['abs2idx']['nonlinear']
-            owning_rank = self._problem_meta['owning_rank']
+            sizes = model._var_sizes['nonlinear']['output']
+            abs2idx = model._var_allprocs_abs2idx['nonlinear']
+            owning_rank = model._owning_rank
 
             for name, meta in out.items():
 
@@ -2990,8 +2985,9 @@ class System(object):
         """
         prom2abs = self._var_allprocs_prom2abs_list['output']
         prom2abs_in = self._var_allprocs_prom2abs_list['input']
-        conns = self._problem_meta['connections']
-        abs2meta = self._problem_meta['all_meta']
+        model = self._problem_meta['model_ref']()
+        conns = model._conn_global_abs_in2out
+        abs2meta = model._var_allprocs_abs2meta
 
         # Human readable error message during Driver setup.
         try:
@@ -3025,9 +3021,9 @@ class System(object):
 
         if get_sizes:
             # Size them all
-            sizes = self._problem_meta['sizes']['nonlinear']['output']
-            abs2idx = self._problem_meta['abs2idx']['nonlinear']
-            owning_rank = self._problem_meta['owning_rank']
+            sizes = model._var_sizes['nonlinear']['output']
+            abs2idx = model._var_allprocs_abs2idx['nonlinear']
+            owning_rank = model._owning_rank
             for prom_name, response in out.items():
                 name = response['ivc_source']
 
@@ -4061,8 +4057,8 @@ class System(object):
         discrete = distrib = False
         val = _UNDEFINED
         if from_root:
-            all_meta = self._problem_meta['all_meta']
-            my_meta = self._problem_meta['meta']
+            all_meta = self._problem_meta['model_ref']()._var_allprocs_abs2meta
+            my_meta = self._problem_meta['model_ref']()._var_abs2meta
         else:
             all_meta = self._var_allprocs_abs2meta
             my_meta = self._var_abs2meta
@@ -4214,7 +4210,7 @@ class System(object):
         if not abs_names:
             raise KeyError('{}: Variable "{}" not found.'.format(self.msginfo, name))
 
-        conns = self._problem_meta['connections']
+        conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
         if from_src and abs_names[0] in conns:  # pull input from source
             src = conns[abs_names[0]]
             if src in self._var_allprocs_abs2prom['output']:
@@ -4315,9 +4311,9 @@ class System(object):
                                    "using `get_val(<name>, get_remote=True)` or from the "
                                    "local process using `get_val(<name>, get_remote=False)`.")
 
-        smeta = self._problem_meta['all_meta'][src]
+        smeta = self._problem_meta['model_ref']()._var_allprocs_abs2meta[src]
         sdistrib = smeta['distributed']
-        slocal = src in self._problem_meta['meta']
+        slocal = src in self._problem_meta['model_ref']()._var_abs2meta
         if sdistrib and not distrib and not get_remote:
             raise RuntimeError(f"{self.msginfo}: Non-distributed variable '{abs_name}' has "
                                f"a distributed source, '{src}', so you must retrieve its value "
@@ -4414,7 +4410,7 @@ class System(object):
             Variable values keyed on absolute name.
         """
         prom2abs_in = self._var_allprocs_prom2abs_list['input']
-        conns = self._problem_meta.get('connections', {})
+        conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
         vdict = {}
         variables = filtered_vars.get(kind)
         if variables:
@@ -4593,9 +4589,9 @@ class System(object):
         object
             The value stored under key in the metadata dictionary for the named variable.
         """
-        if self._problem_meta is not None and 'all_meta' in self._problem_meta:
-            meta_all = self._problem_meta['all_meta']
-            meta_loc = self._problem_meta['meta']
+        if self._problem_meta is not None:
+            meta_all = self._problem_meta['model_ref']()._var_allprocs_abs2meta
+            meta_loc = self._problem_meta['model_ref']()._var_abs2meta
         else:
             meta_all = self._var_allprocs_abs2meta
             meta_loc = self._var_abs2meta

@@ -422,7 +422,7 @@ class Problem(object):
         """
         model = self.model
         if self._metadata is not None:
-            conns = self._metadata['connections']
+            conns = model._conn_global_abs_in2out
         else:
             raise RuntimeError(f"{self.msginfo}: '{name}' Cannot call set_val before setup.")
 
@@ -860,7 +860,6 @@ class Problem(object):
             'solver_info': SolverInfo(),
             'use_derivatives': derivatives,
             'force_alloc_complex': force_alloc_complex,
-            'connections': {},  # all connections in the model (after setup)
             'remote_vars': {},  # vars that are remote somewhere. does not include distrib vars
             'prom2abs': {'input': {}, 'output': {}},  # includes ALL promotes including buried ones
             'static_mode': False,  # used to determine where various 'static'
@@ -873,11 +872,9 @@ class Problem(object):
             'parallel_groups': [],  # list of pathnames of parallel groups in this model (all procs)
             'setup_status': _SetupStatus.PRE_SETUP,
             'vec_names': None,  # names of all nonlinear and linear vectors
-            'line_vec_names': None,  # names of linear vectors
-            'abs2idx': None,  # mapping of var name to index into var sizes array
-            'sizes': None,  # var size arrays
-            'owning_rank': None,  # MPI rank that 'owns' a given non-distributed variable
-            'model_ref': weakref.ref(model)
+            'lin_vec_names': None,  # names of linear vectors
+            'model_ref': weakref.ref(model)  # ref to the model (needed to get out-of-scope
+                                             # src data for inputs)
         }
         model._setup(model_comm, mode, self._metadata)
 

@@ -597,10 +597,6 @@ class Group(System):
         return prom2abs
 
     def _top_level_setup(self, mode):
-        self._problem_meta['connections'] = conns = self._conn_global_abs_in2out
-        self._problem_meta['all_meta'] = self._var_allprocs_abs2meta
-        self._problem_meta['meta'] = self._var_abs2meta
-
         rsystems = self._find_remote_sys_owners()
         self._problem_meta['remote_vars'] = self._find_remote_var_owners(rsystems)
         self._problem_meta['prom2abs'] = self._get_all_promotes(rsystems)
@@ -615,7 +611,7 @@ class Group(System):
         """
         prom2abs_in = self._var_allprocs_prom2abs_list['input']
         prom2abs_out = self._var_allprocs_prom2abs_list['output']
-        abs2meta = self._problem_meta['all_meta']
+        abs2meta = self._problem_meta['model_ref']()._var_allprocs_abs2meta
 
         for absname in abs2meta:
             if absname in prom2abs_in:
@@ -2813,7 +2809,7 @@ class Group(System):
         abs2prom = self._var_allprocs_abs2prom['input']
         abs2meta = self._var_abs2meta
         all_abs2meta = self._var_allprocs_abs2meta
-        conns = self._problem_meta['connections']
+        conns = self._conn_global_abs_in2out
         auto_tgts = [n for n in self._var_allprocs_abs_names['input'] if n not in conns]
         for tgt in auto_tgts:
             prom = abs2prom[tgt]
@@ -2931,7 +2927,7 @@ class Group(System):
         # This should only be called on the top level Group.
 
         srcconns = defaultdict(list)
-        for tgt, src in self._problem_meta['connections'].items():
+        for tgt, src in self._conn_global_abs_in2out.items():
             if src.startswith('_auto_ivc.'):
                 srcconns[src].append(tgt)
 
