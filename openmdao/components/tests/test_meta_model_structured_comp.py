@@ -1100,7 +1100,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
 
       p = om.Problem(model=om.Group())
 
-      p.driver = om.pyOptSparseDriver(optimizer=OPT)
+      p.driver = om.pyOptSparseDriver(optimizer=OPTIMIZER)
 
       mm = om.MetaModelStructuredComp(extrapolate=False)
       mm.add_input('x', val=1.0, training_data=x_tr)
