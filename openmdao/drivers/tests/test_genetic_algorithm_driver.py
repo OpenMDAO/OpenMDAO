@@ -1234,8 +1234,8 @@ class MPITestSimpleGA4Procs(unittest.TestCase):
         prob.driver.options['run_parallel'] = True
         prob.driver.options['procs_per_model'] = 2
         prob.driver.options['bits'] = {'x': 16, 'y': 16}  # use enough bits to get accurate answer
-        prob.driver.options['max_gen'] = 25
-        # prob.driver.options['pop_size'] = 25  # use default pop_size of 4x number of bits
+        prob.driver.options['max_gen'] = 30
+        prob.driver.options['pop_size'] = 150
 
         prob.setup()
         prob.run_driver()
