@@ -17,7 +17,7 @@ try:
 except ImportError:
     scipy_gte_019 = False
 
-OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
+OPT, OPTIMIZER = set_pyoptsparse_opt('SNOPT')
 if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
