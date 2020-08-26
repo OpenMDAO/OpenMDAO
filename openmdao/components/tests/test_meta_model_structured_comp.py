@@ -17,6 +17,8 @@ try:
 except ImportError:
     scipy_gte_019 = False
 
+# check that pyoptsparse is installed
+# if it is, try to use SNOPT but fall back to SLSQP
 OPT, OPTIMIZER = set_pyoptsparse_opt('SNOPT')
 if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
@@ -1091,14 +1093,14 @@ class TestMetaModelStructuredPython(unittest.TestCase):
 
         self.run_and_check_derivs(prob)
 
-    @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
+    @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
     def test_analysis_error_warning_msg(self):
       x_tr = np.linspace(0, 2*np.pi, 100)
       y_tr = np.sin(x_tr)
 
       p = om.Problem(model=om.Group())
 
-      p.driver = om.pyOptSparseDriver(optimizer='SNOPT')
+      p.driver = om.pyOptSparseDriver(optimizer=OPT)
 
       mm = om.MetaModelStructuredComp(extrapolate=False)
       mm.add_input('x', val=1.0, training_data=x_tr)
