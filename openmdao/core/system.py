@@ -4338,11 +4338,15 @@ class System(object):
                         if src_indices.size > 0:
                             src_indices = src_indices - np.min(src_indices)
                         val = val.ravel()[src_indices]
+                        fail = 0
                     else:
+                        fail = 1
+                    if self.comm.allreduce(fail) > 0:
                         raise RuntimeError(f"{self.msginfo}: Can't retrieve distributed variable "
-                                           f"'{abs_name}' without setting 'get_remote=True' "
-                                           f"because its src_indices reference entries from other "
-                                           "ranks.")
+                                           f"'{abs_name}' because its src_indices reference "
+                                           "entries from other processes. You can retrieve values "
+                                           "from all processes using "
+                                           "`get_val(<name>, get_remote=True)`.")
                 else:
                     val = val.ravel()[src_indices]
 
