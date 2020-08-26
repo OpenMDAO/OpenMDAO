@@ -1420,7 +1420,7 @@ class Group(System):
                     if np.prod(src_indices.shape) == 0:
                         continue
 
-                    flat_array_slice_check = is_slice and src_indices.size == np.prod(in_shape)
+                    flat_array_slice_check = not(is_slice and src_indices.size == np.prod(in_shape))
 
                     if any('flat_src_indices' in subsys._var_abs2meta[name]
                            for name in subsys._var_abs2meta):
@@ -1429,7 +1429,7 @@ class Group(System):
                         simple_warning(msg)
 
                     # initial dimensions of indices shape must be same shape as target
-                    if not flat_array_slice_check:
+                    if flat_array_slice_check:
                         for idx_d, inp_d in zip(src_indices.shape, in_shape):
                             if idx_d != inp_d:
                                 msg = f"{self.msginfo}: The source indices " + \
@@ -1444,7 +1444,7 @@ class Group(System):
                                     continue
 
                     # any remaining dimension of indices must match shape of source
-                    if len(src_indices.shape) > len(in_shape) and not flat_array_slice_check:
+                    if len(src_indices.shape) > len(in_shape) and flat_array_slice_check:
                         source_dimensions = src_indices.shape[len(in_shape)]
                         if source_dimensions != len(out_shape):
                             str_indices = str(src_indices).replace('\n', '')
@@ -1490,7 +1490,7 @@ class Group(System):
                         else:
                             abs2meta[abs_in]['src_indices'] = src_indices
 
-                        if src_indices.shape != in_shape and not flat_array_slice_check:
+                        if src_indices.shape != in_shape and flat_array_slice_check:
                             msg = f"{self.msginfo}: src_indices shape " + \
                                   f"{src_indices.shape} does not match {abs_in} shape " + \
                                   f"{in_shape}."
