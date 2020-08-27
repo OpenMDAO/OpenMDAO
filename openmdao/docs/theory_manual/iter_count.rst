@@ -25,7 +25,7 @@ been executed.
 When you have an `ExplicitComponent`, the number stored in iter_count may not match the total
 number of times that the "compute" function has been called.  This is because compute is also
 called whenever '_apply_nonlinear' is called to compute the norm of the current residual. For
-and explicit equation, the residual is defined as the difference in the value of the outputs
+an explicit equation, the residual is defined as the difference in the value of the outputs
 before and after execution, and an additional execution is required to compute this.
 
 The correct execution count for an ExplicitComponent can always be obtained by adding iter_count
