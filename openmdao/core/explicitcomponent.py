@@ -224,25 +224,26 @@ class ExplicitComponent(Component):
         """
         outputs = self._outputs
         residuals = self._residuals
-        with Recording(self.pathname + '._apply_nonlinear', self.iter_count, self):
-            with self._unscaled_context(outputs=[outputs], residuals=[residuals]):
-                residuals.set_vec(outputs)
+        with self._unscaled_context(outputs=[outputs], residuals=[residuals]):
+            residuals.set_vec(outputs)
 
-                # Sign of the residual is minus the sign of the output vector.
-                residuals *= -1.0
+            # Sign of the residual is minus the sign of the output vector.
+            residuals *= -1.0
 
-                self._inputs.read_only = True
-                try:
-                    if self._discrete_inputs or self._discrete_outputs:
-                        self.compute(self._inputs, self._outputs, self._discrete_inputs,
-                                     self._discrete_outputs)
-                    else:
-                        self.compute(self._inputs, self._outputs)
-                finally:
-                    self._inputs.read_only = False
+            self._inputs.read_only = True
+            try:
+                if self._discrete_inputs or self._discrete_outputs:
+                    self.compute(self._inputs, self._outputs, self._discrete_inputs,
+                                 self._discrete_outputs)
+                else:
+                    self.compute(self._inputs, self._outputs)
+            finally:
+                self._inputs.read_only = False
 
-                residuals += outputs
-                outputs -= residuals
+            residuals += outputs
+            outputs -= residuals
+
+        self.iter_count_apply += 1
 
     def _solve_nonlinear(self):
         """
@@ -260,6 +261,8 @@ class ExplicitComponent(Component):
                         self.compute(self._inputs, self._outputs)
                 finally:
                     self._inputs.read_only = False
+
+        # Iteration counter is incremented in the Recording context manager at exit.
 
     def _apply_linear(self, jac, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
         """
