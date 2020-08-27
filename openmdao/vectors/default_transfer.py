@@ -7,7 +7,7 @@ import numpy as np
 
 from openmdao.core.constants import INT_DTYPE
 from openmdao.vectors.transfer import Transfer
-from openmdao.utils.array_utils import convert_neg, _global2local_offsets, _flatten_src_indices
+from openmdao.utils.array_utils import convert_neg, _global2local_offsets
 from openmdao.utils.general_utils import _is_slicer_op
 from openmdao.utils.mpi import MPI
 
@@ -96,10 +96,6 @@ class DefaultTransfer(Transfer):
                     if src_indices is not None:
                         if src_indices.ndim == 1:
                             src_indices = convert_neg(src_indices, meta_out['global_size'])
-                        else:
-                            src_indices = _flatten_src_indices(src_indices, meta_in['shape'],
-                                                               meta_out['global_shape'],
-                                                               meta_out['global_size'])
 
                     # 1. Compute the output indices
                     offset = offsets_out[iproc, idx_out]
