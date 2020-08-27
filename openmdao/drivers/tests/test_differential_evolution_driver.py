@@ -811,7 +811,8 @@ class MPITestDifferentialEvolution4Procs(unittest.TestCase):
         prob.driver = om.DifferentialEvolutionDriver()
         prob.driver.options['run_parallel'] = True
         prob.driver.options['procs_per_model'] = 2
-        prob.driver.options['max_gen'] = 400
+        prob.driver.options['max_gen'] = 250
+        prob.driver.options['pop_size'] = 10
 
         prob.setup()
         prob.run_driver()
