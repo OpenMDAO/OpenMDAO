@@ -596,7 +596,8 @@ class Group(System):
 
         return prom2abs
 
-    def _top_level_setup(self, mode):
+    def _top_level_post_connections(self, mode):
+        # this is called on the top level group after all connections are known
         rsystems = self._find_remote_sys_owners()
         self._problem_meta['remote_vars'] = self._find_remote_var_owners(rsystems)
         self._problem_meta['prom2abs'] = self._get_all_promotes(rsystems)
@@ -632,7 +633,10 @@ class Group(System):
                                        " by promoting '*' at group level or promoting using"
                                        " dotted names.")
 
-    def _top_level_setup2(self):
+    def _top_level_post_sizes(self):
+        # this runs after the variable sizes are known
+        self._setup_global_shapes()
+
         self._resolve_ambiguous_input_meta()
 
         if self.comm.size > 1:
@@ -1094,9 +1098,6 @@ class Group(System):
         if self._use_derivatives:
             self._var_sizes['nonlinear'] = self._var_sizes['linear']
 
-        if self.comm.size > 1:
-            self._setup_global_shapes()
-
     def _setup_global_connections(self, conns=None):
         """
         Compute dict of all connections between this system's inputs and outputs.
@@ -1311,6 +1312,8 @@ class Group(System):
     def _setup_connections(self):
         """
         Compute dict of all connections owned by this Group.
+
+        Also, check shapes of connected variables.
         """
         abs_in2out = self._conn_abs_in2out = {}
         global_abs_in2out = self._conn_global_abs_in2out
@@ -1421,9 +1424,6 @@ class Group(System):
         abs2meta = self._var_abs2meta
 
         for abs_in, abs_out in abs_in2out.items():
-            # if abs_out.startswith('_auto_ivc.'):
-            #     continue  # auto_ivc vars were constructed based on inputs
-
             # check unit compatibility
             out_units = allprocs_abs2meta[abs_out]['units']
             in_units = allprocs_abs2meta[abs_in]['units']

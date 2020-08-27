@@ -45,7 +45,7 @@ def ignore_errors(flag=None):
     """
     global _ignore_errors
     if flag is not None:
-        _ignore_errors = True
+        _ignore_errors = flag
     return _ignore_errors
 
 
@@ -1067,17 +1067,17 @@ def _is_slicer_op(indices):
     return isinstance(indices, slice)
 
 
-def _slice_indices(slicer, out_size, out_shape):
+def _slice_indices(slicer, arr_size, arr_shape):
     """
-    Check if an array of indices contains a slice object.
+    Return an index array based on a slice or slice tuple and the array size and shape.
 
     Parameters
     ----------
-    slicer : slice
+    slicer : slice or tuple containing slices
         Slice object to slice array
-    out_size : int
+    arr_size : int
         Size of output array
-    out_shape : tuple
+    arr_shape : tuple
         Tuple of output array shape
 
     Returns
@@ -1085,7 +1085,7 @@ def _slice_indices(slicer, out_size, out_shape):
     array
         Returns the sliced indices.
     """
-    return np.arange(out_size, dtype=int).reshape(out_shape)[tuple(slicer)]
+    return np.arange(arr_size, dtype=INT_DTYPE).reshape(arr_shape)[tuple(slicer)]
 
 
 def prom2ivc_src_dict(prom_dict):

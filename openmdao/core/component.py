@@ -320,8 +320,6 @@ class Component(System):
 
         self._owned_sizes = self._var_sizes['nonlinear']['output']
 
-        self._setup_global_shapes()
-
     def _setup_partials(self):
         """
         Process all partials and approximations that the user declared.

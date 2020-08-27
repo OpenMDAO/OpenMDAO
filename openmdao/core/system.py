@@ -645,7 +645,7 @@ class System(object):
         self._setup_global_connections()
 
         if self.pathname == '':
-            self._top_level_setup(mode)
+            self._top_level_post_connections(mode)
 
         # Now that connections are setup, we need to convert relevant vector names into their
         # auto_ivc source where applicable.
@@ -664,15 +664,17 @@ class System(object):
         self._setup_var_sizes()
 
         if self.pathname == '':
-            self._top_level_setup2()
+            self._top_level_post_sizes()
 
         self._setup_connections()
 
-    def _top_level_setup(self, mode):
+    def _top_level_post_connections(self, mode):
+        # this runs after all connections are known
         pass
 
-    def _top_level_setup2(self):
-        pass
+    def _top_level_post_sizes(self):
+        # this runs after the variable sizes are known
+        self._setup_global_shapes()
 
     def _configure_check(self):
         """
@@ -1338,10 +1340,10 @@ class System(object):
         meta = self._var_allprocs_abs2meta
         loc_meta = self._var_abs2meta
 
-        for typ in ('input', 'output'):
+        for io in ('input', 'output'):
             # now set global sizes and shapes into metadata for distributed variables
-            sizes = self._var_sizes['nonlinear'][typ]
-            for idx, abs_name in enumerate(self._var_allprocs_abs_names[typ]):
+            sizes = self._var_sizes['nonlinear'][io]
+            for idx, abs_name in enumerate(self._var_allprocs_abs_names[io]):
                 mymeta = meta[abs_name]
                 local_shape = mymeta['shape']
                 if mymeta['distributed']:
