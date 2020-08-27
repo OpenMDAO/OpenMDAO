@@ -442,27 +442,33 @@ class Component(System):
         if tags is not None and not isinstance(tags, (str, list)):
             raise TypeError('The tags argument should be a str or list')
 
+        src_slice = None
+        if src_indices is not None:
+            if _is_slicer_op(src_indices):
+                src_slice = src_indices
+                if flat_src_indices or flat_src_indices is None:
+                    flat_src_indices = True
+                else:
+                    raise RuntimeError(f"{self.msginfo}: when setting src_indices to a slice, "
+                                       "flat_src_indices must not be False.")
+            else:
+                src_indices = np.asarray(src_indices, dtype=INT_DTYPE)
+
         # value, shape: based on args, making sure they are compatible
         value, shape, src_indices = ensure_compatible(name, val, shape, src_indices)
-        distributed = self.options['distributed']
 
         metadata = {
             'value': value,
             'shape': shape,
             'size': np.prod(shape),
-            'src_indices': None,
+            'src_indices': src_indices,
             'flat_src_indices': flat_src_indices,
+            'src_slice': src_slice,
             'units': units,
             'desc': desc,
-            'distributed': distributed,
+            'distributed': self.options['distributed'],
             'tags': make_set(tags),
         }
-
-        if src_indices is not None:
-            if _is_slicer_op(src_indices):
-                metadata['src_indices'] = src_indices
-            else:
-                metadata['src_indices'] = np.asarray(src_indices, dtype=INT_DTYPE)
 
         if self._static_mode:
             var_rel2meta = self._static_var_rel2meta

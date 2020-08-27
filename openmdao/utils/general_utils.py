@@ -1085,7 +1085,7 @@ def _slice_indices(slicer, arr_size, arr_shape):
     array
         Returns the sliced indices.
     """
-    return np.arange(arr_size, dtype=INT_DTYPE).reshape(arr_shape)[tuple(slicer)]
+    return np.arange(arr_size, dtype=INT_DTYPE).reshape(arr_shape)[slicer]
 
 
 def prom2ivc_src_dict(prom_dict):

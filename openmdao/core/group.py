@@ -1113,7 +1113,7 @@ class Group(System):
         conns : dict
             Dictionary of connections passed down from parent group.
         """
-        if self._raise_connection_errors is False:
+        if not self._raise_connection_errors:
             self._set_subsys_connection_errors(False)
 
         global_abs_in2out = self._conn_global_abs_in2out = {}
@@ -1240,6 +1240,13 @@ class Group(System):
                                 simple_warning(msg)
                                 continue
                         meta['src_indices'] = src_indices
+                        if _is_slicer_op(src_indices):
+                            meta['src_slice'] = src_indices
+                            if flat_src_indices or flat_src_indices is None:
+                                flat_src_indices = True
+                            else:
+                                raise RuntimeError(f"{self.msginfo}: when setting src_indices to a "
+                                                   f"slice, flat_src_indices must not be False.")
                         meta['flat_src_indices'] = flat_src_indices
 
                     src_ind_inputs.add(abs_in)
@@ -1340,6 +1347,7 @@ class Group(System):
         for abs_in, abs_out in global_abs_in2out.items():
             if abs_in[:path_len] != path_dot or abs_out[:path_len] != path_dot:
                 continue
+
             # Check that they are in different subsystems of this system.
             out_subsys = abs_out[path_len:].split('.', 1)[0]
             in_subsys = abs_in[path_len:].split('.', 1)[0]
@@ -1424,6 +1432,8 @@ class Group(System):
         abs2meta = self._var_abs2meta
 
         for abs_in, abs_out in abs_in2out.items():
+            all_abs_out = allprocs_abs2meta[abs_out]
+
             # check unit compatibility
             out_units = allprocs_abs2meta[abs_out]['units']
             in_units = allprocs_abs2meta[abs_in]['units']
@@ -1445,20 +1455,25 @@ class Group(System):
                       f"connected to output '{abs_out}' which has no units."
                 simple_warning(msg)
 
+            fail = False
+
             # check shape compatibility
             if abs_in in abs2meta and abs_out in abs2meta:
+                meta_in = abs2meta[abs_in]
+                all_meta_out = allprocs_abs2meta[abs_out]
+
                 # get output shape from allprocs meta dict, since it may
                 # be distributed (we want global shape)
-                out_shape = allprocs_abs2meta[abs_out]['global_shape']
+                out_shape = all_abs_out['global_shape']
                 # get input shape and src_indices from the local meta dict
                 # (input is always local)
-                if abs2meta[abs_in]['distributed']:
+                if meta_in['distributed']:
                     in_full_shape = allprocs_abs2meta[abs_in]['global_shape']
                 else:
-                    in_full_shape = abs2meta[abs_in]['shape']
-                in_shape = abs2meta[abs_in]['shape']
-                src_indices = abs2meta[abs_in]['src_indices']
-                flat = abs2meta[abs_in]['flat_src_indices']
+                    in_full_shape = meta_in['shape']
+                in_shape = meta_in['shape']
+                src_indices = self._get_src_inds_array(abs_in)
+                flat = meta_in['flat_src_indices']
 
                 if src_indices is None and out_shape != in_full_shape:
                     # out_shape != in_shape is allowed if
@@ -1472,15 +1487,9 @@ class Group(System):
                             raise ValueError(msg)
                         else:
                             simple_warning(msg)
+                            fail = True
 
                 elif src_indices is not None:
-                    shape = False
-                    if _is_slicer_op(src_indices):
-                        global_size = self._var_allprocs_abs2meta[abs_out]['global_size']
-                        global_shape = self._var_allprocs_abs2meta[abs_out]['global_shape']
-                        src_indices = _slice_indices(src_indices, global_size, global_shape)
-                        abs2meta[abs_in]['src_indices'] = src_indices  # store converted value
-                        shape = True
 
                     if np.prod(src_indices.shape) == 0:
                         continue
@@ -1497,6 +1506,7 @@ class Group(System):
                                 raise ValueError(msg)
                             else:
                                 simple_warning(msg)
+                                fail = True
                                 continue
 
                     # any remaining dimension of indices must match shape of source
@@ -1513,6 +1523,7 @@ class Group(System):
                                 raise ValueError(msg)
                             else:
                                 simple_warning(msg)
+                                fail = True
                                 continue
                     else:
                         source_dimensions = 1
@@ -1541,10 +1552,11 @@ class Group(System):
                                     raise ValueError(msg)
                                 else:
                                     simple_warning(msg)
+                                    fail = True
                         if src_indices.ndim > 1:
-                            abs2meta[abs_in]['src_indices'] = src_indices.ravel()
+                            meta_in['src_indices'] = src_indices.ravel()
                         else:
-                            abs2meta[abs_in]['src_indices'] = src_indices
+                            meta_in['src_indices'] = src_indices
 
                         if src_indices.shape != in_shape:
                             msg = f"{self.msginfo}: src_indices shape " + \
@@ -1554,9 +1566,10 @@ class Group(System):
                                 raise ValueError(msg)
                             else:
                                 simple_warning(msg)
+                                fail = True
                     else:
                         for d in range(source_dimensions):
-                            if allprocs_abs2meta[abs_out]['distributed'] is True or \
+                            if all_abs_out['distributed'] is True or \
                                allprocs_abs2meta[abs_in]['distributed'] is True:
                                 d_size = out_shape[d] * self.comm.size
                             else:
@@ -1564,10 +1577,7 @@ class Group(System):
                             arr = src_indices[..., d]
                             if np.any(arr >= d_size) or np.any(arr <= -d_size):
                                 for i in arr.flat:
-                                    if shape:
-                                        size_check = abs(i) >= global_size
-                                    else:
-                                        size_check = abs(i) >= d_size
+                                    size_check = abs(i) >= d_size
                                     if size_check:
                                         msg = f"{self.msginfo}: The source indices " + \
                                               f"do not specify a valid index for the " + \
@@ -1578,6 +1588,14 @@ class Group(System):
                                             raise ValueError(msg)
                                         else:
                                             simple_warning(msg)
+                                            fail = True
+
+                        if not fail:
+                            # now convert src_indices into a flat array
+                            meta_in['src_indices'] = \
+                                _flatten_src_indices(src_indices, in_shape,
+                                                     all_abs_out['global_shape'],
+                                                     all_abs_out['global_size'])
 
     def _set_subsys_connection_errors(self, val=True):
         """
@@ -1892,7 +1910,7 @@ class Group(System):
 
         return subsys
 
-    def connect(self, src_name, tgt_name, src_indices=None, flat_src_indices=False):
+    def connect(self, src_name, tgt_name, src_indices=None, flat_src_indices=None):
         """
         Connect source src_name to target tgt_name in this namespace.
 
@@ -1919,11 +1937,13 @@ class Group(System):
             raise TypeError("%s: src_indices must be an index array, did you mean"
                             " connect('%s', %s)?" % (self.msginfo, src_name, tgt_name))
 
-        if isinstance(src_indices, tuple):
-            if not _is_slicer_op(src_indices):
-                src_indices = np.atleast_1d(src_indices)
+        # if multiple targets are given, recursively connect to each
+        if not isinstance(tgt_name, str) and isinstance(tgt_name, Iterable):
+            for name in tgt_name:
+                self.connect(src_name, name, src_indices, flat_src_indices=flat_src_indices)
+            return
 
-        elif isinstance(src_indices, list):
+        if src_indices is not None and not _is_slicer_op(src_indices):
             src_indices = np.atleast_1d(src_indices)
 
         if isinstance(src_indices, np.ndarray):
@@ -1931,12 +1951,6 @@ class Group(System):
                 raise TypeError("%s: src_indices must contain integers, but src_indices for "
                                 "connection from '%s' to '%s' is %s." %
                                 (self.msginfo, src_name, tgt_name, src_indices.dtype.type))
-
-        # if multiple targets are given, recursively connect to each
-        if not isinstance(tgt_name, str) and isinstance(tgt_name, Iterable):
-            for name in tgt_name:
-                self.connect(src_name, name, src_indices, flat_src_indices=flat_src_indices)
-            return
 
         # target should not already be connected
         for manual_connections in [self._manual_connections, self._static_manual_connections]:

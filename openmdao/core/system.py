@@ -34,7 +34,7 @@ from openmdao.utils.coloring import _compute_coloring, Coloring, \
     _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.general_utils import determine_adder_scaler, \
-    format_as_float_or_array, ContainsAll, all_ancestors, \
+    format_as_float_or_array, ContainsAll, all_ancestors, _slice_indices, \
     simple_warning, make_set, ensure_compatible, match_prom_or_abs, _is_slicer_op
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
@@ -73,7 +73,7 @@ _recordable_funcs = frozenset(['_apply_linear', '_apply_nonlinear', '_solve_line
 
 # the following are local metadata that will also be accessible for vars on all procs
 global_meta_names = {
-    'input': ('units', 'shape', 'size', 'distributed', 'tags', 'desc'),
+    'input': ('units', 'shape', 'size', 'distributed', 'tags', 'desc', 'src_slice'),
     'output': ('units', 'shape', 'size', 'desc',
                'ref', 'ref0', 'res_ref', 'distributed', 'lower', 'upper', 'tags'),
 }
@@ -85,6 +85,7 @@ allowed_meta_names = {
     'size',
     'global_size',
     'src_indices',
+    'src_slice',
     'flat_src_indices',
     'units',
     'desc',
@@ -1869,6 +1870,13 @@ class System(object):
                                                f" {str(meta['flat_src_indices'])}.")
 
                     meta['src_indices'] = src_indices
+                    if _is_slicer_op(src_indices):
+                        meta['src_slice'] = src_indices
+                        if flat_src_indices or flat_src_indices is None:
+                            flat_src_indices = True
+                        else:
+                            raise RuntimeError(f"{self.msginfo}: when setting src_indices to a "
+                                               f"slice, flat_src_indices must not be False.")
                     meta['flat_src_indices'] = flat_src_indices
 
         def resolve(to_match, io_types, matches, proms):
@@ -4394,6 +4402,41 @@ class System(object):
             val = self.convert2units(src, val, vmeta['units'])
 
         return val
+
+    def _get_src_inds_array(self, varname):
+        """
+        Return the src_indices, if any, for input 'varname', converting from slice if needed.
+
+        Parameters
+        ----------
+        varname : str
+            Absolute name of the input variable.
+
+        Returns
+        -------
+        ndarray or None
+            The value of src_indices for the given input variable.
+        """
+        meta = self._var_abs2meta[varname]
+        src_indices = meta['src_indices']
+        if src_indices is not None:
+            src_slice = meta['src_slice']
+            # if src_indices is still a slice, update it to an array
+            if src_slice is src_indices:
+                model = self._problem_meta['model_ref']()
+                src = model._conn_global_abs_in2out[varname]
+                try:
+                    global_size = model._var_allprocs_abs2meta[src]['global_size']
+                    global_shape = model._var_allprocs_abs2meta[src]['global_shape']
+                except KeyError:
+                    raise RuntimeError(f"{self.msginfo}: Can't compute src_indices array from "
+                                       f"src_slice for input '{varname}' because we don't know "
+                                       "the global shape of its source yet.")
+                src_indices = _slice_indices(src_slice, global_size, global_shape)
+
+                meta['src_indices'] = src_indices  # store converted value
+
+        return src_indices
 
     def _retrieve_data_of_kind(self, filtered_vars, kind, vec_name, parallel=False):
         """

@@ -124,14 +124,12 @@ class PETScTransfer(DefaultTransfer):
                         # is defined.
                         if meta_in['size'] > sizes_out[owner, idx_out]:
                             src_indices = np.arange(meta_in['size'], dtype=INT_DTYPE)
-                    elif not _is_slicer_op(src_indices):
-                        if src_indices.ndim == 1:
-                            src_indices = convert_neg(src_indices, meta_out['global_size'])
-                        else:
-                            src_indices = _flatten_src_indices(src_indices, meta_in['shape'],
-                                                               meta_out['global_shape'],
-                                                               meta_out['global_size'])
-                        meta_in['src_indices'] = src_indices
+                    elif src_indices.ndim == 1:
+                        src_indices = convert_neg(src_indices, meta_out['global_size'])
+                    else:
+                        src_indices = _flatten_src_indices(src_indices, meta_in['shape'],
+                                                           meta_out['global_shape'],
+                                                           meta_out['global_size'])
 
                     # 1. Compute the output indices
                     # NOTE: src_indices are relative to a single, possibly distributed variable,

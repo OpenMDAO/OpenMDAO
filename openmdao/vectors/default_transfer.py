@@ -93,14 +93,13 @@ class DefaultTransfer(Transfer):
 
                     # Read in and process src_indices
                     src_indices = meta_in['src_indices']
-                    if not (src_indices is None or _is_slicer_op(src_indices)):
+                    if src_indices is not None:
                         if src_indices.ndim == 1:
                             src_indices = convert_neg(src_indices, meta_out['global_size'])
                         else:
                             src_indices = _flatten_src_indices(src_indices, meta_in['shape'],
                                                                meta_out['global_shape'],
                                                                meta_out['global_size'])
-                        meta_in['src_indices'] = src_indices
 
                     # 1. Compute the output indices
                     offset = offsets_out[iproc, idx_out]
