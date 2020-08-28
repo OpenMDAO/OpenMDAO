@@ -1872,11 +1872,10 @@ class System(object):
                     meta['src_indices'] = src_indices
                     if _is_slicer_op(src_indices):
                         meta['src_slice'] = src_indices
-                        if flat_src_indices or flat_src_indices is None:
-                            flat_src_indices = True
-                        else:
-                            raise RuntimeError(f"{self.msginfo}: when setting src_indices to a "
-                                               f"slice, flat_src_indices must not be False.")
+                        if flat_src_indices is not None:
+                            simple_warning(f"{self.msginfo}: Input '{name}' was promoted with "
+                                           "slice src_indices, so flat_src_indices is ignored.")
+                        flat_src_indices = True
                     meta['flat_src_indices'] = flat_src_indices
 
         def resolve(to_match, io_types, matches, proms):

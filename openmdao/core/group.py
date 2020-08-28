@@ -1242,11 +1242,6 @@ class Group(System):
                         meta['src_indices'] = src_indices
                         if _is_slicer_op(src_indices):
                             meta['src_slice'] = src_indices
-                            if flat_src_indices or flat_src_indices is None:
-                                flat_src_indices = True
-                            else:
-                                raise RuntimeError(f"{self.msginfo}: when setting src_indices to a "
-                                                   f"slice, flat_src_indices must not be False.")
                         meta['flat_src_indices'] = flat_src_indices
 
                     src_ind_inputs.add(abs_in)
@@ -1458,7 +1453,7 @@ class Group(System):
             fail = False
 
             # check shape compatibility
-            if abs_in in abs2meta and abs_out in abs2meta:
+            if abs_in in abs2meta and abs_out in allprocs_abs2meta:
                 meta_in = abs2meta[abs_in]
                 all_meta_out = allprocs_abs2meta[abs_out]
 
@@ -1473,7 +1468,6 @@ class Group(System):
                     in_full_shape = meta_in['shape']
                 in_shape = meta_in['shape']
                 src_indices = self._get_src_inds_array(abs_in)
-                flat = meta_in['flat_src_indices']
                 has_slice = meta_in['src_slice'] is not None
 
                 if src_indices is None and out_shape != in_full_shape:
@@ -1498,9 +1492,14 @@ class Group(System):
                     flat_array_slice_check = not (has_slice and
                                                   src_indices.size == np.prod(in_shape))
 
-                    if has_slice and meta_in['flat_src_indices'] is not None:
-                        simple_warning(f"{self.msginfo}: flat_src_indices has no effect when "
-                                       "using om_slicer to slice array.")
+                    if has_slice:
+                        if meta_in['flat_src_indices'] is not None:
+                            simple_warning(f"{self.msginfo}: Connection from '{abs_out}' to "
+                                           f"'{abs_in}' was added with slice src_indices, so "
+                                           "flat_src_indices is ignored.")
+                        meta_in['flat_src_indices'] = True
+
+                    flat = meta_in['flat_src_indices']
 
                     if flat_array_slice_check:
                         # initial dimensions of indices shape must be same shape as target

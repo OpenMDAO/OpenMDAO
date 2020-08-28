@@ -451,11 +451,10 @@ class Component(System):
         if src_indices is not None:
             if _is_slicer_op(src_indices):
                 src_slice = src_indices
-                if flat_src_indices or flat_src_indices is None:
-                    flat_src_indices = True
-                else:
-                    raise RuntimeError(f"{self.msginfo}: when setting src_indices to a slice, "
-                                       "flat_src_indices must not be False.")
+                if flat_src_indices is not None:
+                    simple_warning(f"{self.msginfo}: Input '{name}' was added with slice "
+                                   "src_indices, so flat_src_indices is ignored.")
+                flat_src_indices = True
             else:
                 src_indices = np.asarray(src_indices, dtype=INT_DTYPE)
 
@@ -466,9 +465,9 @@ class Component(System):
             'value': value,
             'shape': shape,
             'size': np.prod(shape),
-            'src_indices': src_indices,
+            'src_indices': src_indices,  # these will ultimately be converted to a flat index array
             'flat_src_indices': flat_src_indices,
-            'src_slice': src_slice,
+            'src_slice': src_slice,  # store slice def here, if any.  This is never overwritten
             'units': units,
             'desc': desc,
             'distributed': self.options['distributed'],

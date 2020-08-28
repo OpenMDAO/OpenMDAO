@@ -598,7 +598,7 @@ class TestGroup(unittest.TestCase):
         p.model.connect('indep.x', 'row123_comp.x', src_indices=om.slicer[idxs, ...],
                         flat_src_indices=True)
 
-        msg = "Group (<model>): flat_src_indices has no effect when using om_slicer to slice array."
+        msg = "Group (<model>): Connection from 'indep.x' to 'row123_comp.x' was added with slice src_indices, so flat_src_indices is ignored."
         with assert_warning(UserWarning, msg):
             p.setup()
         p.run_model()
