@@ -111,7 +111,8 @@ class TestGroupFiniteDifference(unittest.TestCase):
         # 1. run_model; 2. step x; 3. step y
         self.assertEqual(model.parab.count, 3)
         self.assertEqual(model.parab.iter_count_without_approx, 1)
-        self.assertEqual(model.parab.iter_count, 3)
+        self.assertEqual(model.parab.iter_count, 1)
+        self.assertEqual(model.parab.iter_count_apply, 2)
 
     def test_fd_count_driver(self):
         # Make sure we aren't doing FD wrt any var that isn't in the driver desvar set.
