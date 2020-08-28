@@ -1474,6 +1474,7 @@ class Group(System):
                 in_shape = meta_in['shape']
                 src_indices = self._get_src_inds_array(abs_in)
                 flat = meta_in['flat_src_indices']
+                has_slice = meta_in['src_slice'] is not None
 
                 if src_indices is None and out_shape != in_full_shape:
                     # out_shape != in_shape is allowed if
@@ -1494,8 +1495,12 @@ class Group(System):
                     if np.prod(src_indices.shape) == 0:
                         continue
 
-                    flat_array_slice_check = not (meta_in['src_slice'] is not None and
+                    flat_array_slice_check = not (has_slice and
                                                   src_indices.size == np.prod(in_shape))
+
+                    if has_slice and meta_in['flat_src_indices'] is not None:
+                        simple_warning(f"{self.msginfo}: flat_src_indices has no effect when "
+                                       "using om_slicer to slice array.")
 
                     if flat_array_slice_check:
                         # initial dimensions of indices shape must be same shape as target
