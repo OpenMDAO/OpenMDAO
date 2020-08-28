@@ -262,7 +262,8 @@ class Component(System):
             allprocs_abs2meta[abs_name]['has_src_indices'] = metadata['src_indices'] is not None
 
             # ensure that if src_indices is a slice we reset it to that instead of
-            # the converted array value (in case this is a re-setup)
+            # the converted array value (in case this is a re-setup), so that we can
+            # re-convert using potentially different sizing information.
             if metadata['src_slice'] is not None:
                 metadata['src_indices'] = metadata['src_slice']
 
