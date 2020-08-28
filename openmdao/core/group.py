@@ -1494,23 +1494,27 @@ class Group(System):
                     if np.prod(src_indices.shape) == 0:
                         continue
 
-                    # initial dimensions of indices shape must be same shape as target
-                    for idx_d, inp_d in zip(src_indices.shape, in_shape):
-                        if idx_d != inp_d:
-                            msg = f"{self.msginfo}: The source indices " + \
-                                  f"{src_indices} do not specify a " + \
-                                  f"valid shape for the connection '{abs_out}' to " + \
-                                  f"'{abs_in}'. The target shape is " + \
-                                  f"{in_shape} but indices are {src_indices.shape}."
-                            if self._raise_connection_errors:
-                                raise ValueError(msg)
-                            else:
-                                simple_warning(msg)
-                                fail = True
-                                continue
+                    flat_array_slice_check = not (meta_in['src_slice'] is not None and
+                                                  src_indices.size == np.prod(in_shape))
+
+                    if flat_array_slice_check:
+                        # initial dimensions of indices shape must be same shape as target
+                        for idx_d, inp_d in zip(src_indices.shape, in_shape):
+                            if idx_d != inp_d:
+                                msg = f"{self.msginfo}: The source indices " + \
+                                      f"{src_indices} do not specify a " + \
+                                      f"valid shape for the connection '{abs_out}' to " + \
+                                      f"'{abs_in}'. The target shape is " + \
+                                      f"{in_shape} but indices are {src_indices.shape}."
+                                if self._raise_connection_errors:
+                                    raise ValueError(msg)
+                                else:
+                                    simple_warning(msg)
+                                    fail = True
+                                    continue
 
                     # any remaining dimension of indices must match shape of source
-                    if len(src_indices.shape) > len(in_shape):
+                    if len(src_indices.shape) > len(in_shape) and flat_array_slice_check:
                         source_dimensions = src_indices.shape[len(in_shape)]
                         if source_dimensions != len(out_shape):
                             str_indices = str(src_indices).replace('\n', '')
@@ -1558,7 +1562,7 @@ class Group(System):
                         else:
                             meta_in['src_indices'] = src_indices
 
-                        if src_indices.shape != in_shape:
+                        if src_indices.shape != in_shape and flat_array_slice_check:
                             msg = f"{self.msginfo}: src_indices shape " + \
                                   f"{src_indices.shape} does not match {abs_in} shape " + \
                                   f"{in_shape}."

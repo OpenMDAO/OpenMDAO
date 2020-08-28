@@ -258,8 +258,13 @@ class Component(System):
                 del v['value']
 
         for abs_name in abs_names['input']:
-            allprocs_abs2meta[abs_name]['has_src_indices'] = \
-                abs2meta[abs_name]['src_indices'] is not None
+            metadata = abs2meta[abs_name]
+            allprocs_abs2meta[abs_name]['has_src_indices'] = metadata['src_indices'] is not None
+
+            # ensure that if src_indices is a slice we reset it to that instead of
+            # the converted array value (in case this is a re-setup)
+            if metadata['src_slice'] is not None:
+                metadata['src_indices'] = metadata['src_slice']
 
         if self._var_discrete['input'] or self._var_discrete['output']:
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
