@@ -19,7 +19,7 @@ from openmdao.recorders.case_recorder import CaseRecorder
 from openmdao.utils.mpi import MPI
 from openmdao.utils.record_util import dict_to_structured_array
 from openmdao.utils.options_dictionary import OptionsDictionary
-from openmdao.utils.general_utils import simple_warning, make_serializable
+from openmdao.utils.general_utils import simple_warning, make_serializable, default_noraise
 from openmdao.core.driver import Driver
 from openmdao.core.system import System
 from openmdao.core.problem import Problem
@@ -612,7 +612,7 @@ class SqliteRecorder(CaseRecorder):
             The unique ID to use for this data in the table.
         """
         if self.connection:
-            json_data = json.dumps(model_viewer_data, default=make_serializable)
+            json_data = json.dumps(model_viewer_data, default=default_noraise)
 
             # Note: recorded to 'driver_metadata' table for legacy/compatibility reasons.
             try:

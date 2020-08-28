@@ -26,10 +26,6 @@ try:
 except ImportError:
     PETScVector = None
 
-try:
-    from openmdao.vectors.petsc_vector import PETScVector
-except ImportError:
-    PETScVector = None
 
 arr_order_1x1 = np.array([1, 2, 3, 4])
 arr_2x4 = np.array([[0, 1, 2, 3], [10, 11, 12, 13]])
@@ -559,6 +555,81 @@ class TestGroup(unittest.TestCase):
         with assert_warning(UserWarning, msg):
             p.setup()
 
+    def test_connect_to_flat_array_with_slice(self):
+        class SlicerComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones((12,)))
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x']) ** 2.0
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr_large_4x4))
+        p.model.add_subsystem('row123_comp', SlicerComp())
+
+        idxs = np.array([0, 2, 3], dtype=int)
+
+        p.model.connect('indep.x', 'row123_comp.x', src_indices=om.slicer[idxs, ...])
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['row123_comp.x'], arr_large_4x4[(0, 2, 3), ...].ravel())
+        assert_near_equal(p['row123_comp.y'], np.sum(arr_large_4x4[(0, 2, 3), ...]) ** 2.0)
+
+    def test_connect_to_flat_src_indices_with_slice_user_warning(self):
+        class SlicerComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones((12,)))
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x']) ** 2.0
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr_large_4x4))
+        p.model.add_subsystem('row123_comp', SlicerComp())
+
+        idxs = np.array([0, 2, 3], dtype=int)
+
+        p.model.connect('indep.x', 'row123_comp.x', src_indices=om.slicer[idxs, ...],
+                        flat_src_indices=True)
+
+        msg = "Group (<model>): flat_src_indices has no effect when using om_slicer to slice array."
+        with assert_warning(UserWarning, msg):
+            p.setup()
+        p.run_model()
+
+        assert_near_equal(p['row123_comp.x'], arr_large_4x4[(0, 2, 3), ...].ravel())
+        assert_near_equal(p['row123_comp.y'], np.sum(arr_large_4x4[(0, 2, 3), ...]) ** 2.0)
+
+    def test_connect_to_flat_array(self):
+        class SlicerComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones((4,)))
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', val=arr_large_4x4))
+        p.model.add_subsystem('trace_comp', SlicerComp())
+
+        idxs = np.array([0, 5, 10, 15], dtype=int)
+
+        p.model.connect('indep.x', 'trace_comp.x', src_indices=idxs, flat_src_indices=True)
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['trace_comp.x'], np.diag(arr_large_4x4))
+        assert_near_equal(p['trace_comp.y'], np.sum(np.diag(arr_large_4x4)))
+
     def test_om_slice_in_connect(self):
 
         p = om.Problem()
@@ -1004,11 +1075,7 @@ class TestGroup(unittest.TestCase):
         p = om.Problem()
         g1 = p.model.add_subsystem('G1', om.Group(), promotes=['*'])
 
-        with self.assertRaises(Exception) as context:
-            p.setup()
-        self.assertEqual(str(context.exception),
-                         "Group (G1): 'promotes' failed to find any matches for the following "
-                         "pattern: '*'. Group contains no variables.")
+        p.setup()
 
     def test_missing_promote_var(self):
         p = om.Problem()

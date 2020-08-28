@@ -729,6 +729,11 @@ class Group(System):
         """
         Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
         """
+        if self._var_allprocs_prom2abs_list is None:
+            old_prom2abs = {}
+        else:
+            old_prom2abs = self._var_allprocs_prom2abs_list['input']
+
         super(Group, self)._setup_var_data()
 
         abs_names = self._var_abs_names
@@ -900,8 +905,17 @@ class Group(System):
             p2abs_in = self._var_allprocs_prom2abs_list['input']
             extra = [gin for gin in self._group_inputs if gin not in p2abs_in]
             if extra:
-                raise RuntimeError(f"{self.msginfo}: The following group inputs, passed to "
-                                   f"set_input_defaults(), could not be found: {sorted(extra)}.")
+                # make sure that we don't have a leftover group input default entry from a previous
+                # execution of _setup_var_data before promoted names were updated.
+                ex = set()
+                for e in extra:
+                    if e in old_prom2abs:
+                        del self._group_inputs[e]  # clean up old key using old promoted name
+                    else:
+                        ex.add(e)
+                if ex:
+                    raise RuntimeError(f"{self.msginfo}: The following group inputs, passed to "
+                                       f"set_input_defaults(), could not be found: {sorted(ex)}.")
 
         if self._var_discrete['input'] or self._var_discrete['output']:
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
@@ -1463,7 +1477,8 @@ class Group(System):
 
                 elif src_indices is not None:
                     shape = False
-                    if _is_slicer_op(src_indices):
+                    is_slice = _is_slicer_op(src_indices)
+                    if is_slice:
                         global_size = self._var_allprocs_abs2meta[abs_out]['global_size']
                         global_shape = self._var_allprocs_abs2meta[abs_out]['global_shape']
                         src_indices = _slice_indices(src_indices, global_size, global_shape)
@@ -1474,22 +1489,31 @@ class Group(System):
                     if np.prod(src_indices.shape) == 0:
                         continue
 
+                    flat_array_slice_check = not(is_slice and src_indices.size == np.prod(in_shape))
+
+                    if any('flat_src_indices' in subsys._var_abs2meta[name]
+                           for name in subsys._var_abs2meta):
+                        msg = ("%s: flat_src_indices has no effect when using om_slicer to "
+                               "slice array." % (self.msginfo))
+                        simple_warning(msg)
+
                     # initial dimensions of indices shape must be same shape as target
-                    for idx_d, inp_d in zip(src_indices.shape, in_shape):
-                        if idx_d != inp_d:
-                            msg = f"{self.msginfo}: The source indices " + \
-                                  f"{src_indices} do not specify a " + \
-                                  f"valid shape for the connection '{abs_out}' to " + \
-                                  f"'{abs_in}'. The target shape is " + \
-                                  f"{in_shape} but indices are {src_indices.shape}."
-                            if self._raise_connection_errors:
-                                raise ValueError(msg)
-                            else:
-                                simple_warning(msg)
-                                continue
+                    if flat_array_slice_check:
+                        for idx_d, inp_d in zip(src_indices.shape, in_shape):
+                            if idx_d != inp_d:
+                                msg = f"{self.msginfo}: The source indices " + \
+                                    f"{src_indices} do not specify a " + \
+                                    f"valid shape for the connection '{abs_out}' to " + \
+                                    f"'{abs_in}'. The target shape is " + \
+                                    f"{in_shape} but indices are {src_indices.shape}."
+                                if self._raise_connection_errors:
+                                    raise ValueError(msg)
+                                else:
+                                    simple_warning(msg)
+                                    continue
 
                     # any remaining dimension of indices must match shape of source
-                    if len(src_indices.shape) > len(in_shape):
+                    if len(src_indices.shape) > len(in_shape) and flat_array_slice_check:
                         source_dimensions = src_indices.shape[len(in_shape)]
                         if source_dimensions != len(out_shape):
                             str_indices = str(src_indices).replace('\n', '')
@@ -1535,7 +1559,7 @@ class Group(System):
                         else:
                             abs2meta[abs_in]['src_indices'] = src_indices
 
-                        if src_indices.shape != in_shape:
+                        if src_indices.shape != in_shape and flat_array_slice_check:
                             msg = f"{self.msginfo}: src_indices shape " + \
                                   f"{src_indices.shape} does not match {abs_in} shape " + \
                                   f"{in_shape}."

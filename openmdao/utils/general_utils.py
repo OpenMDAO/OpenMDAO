@@ -830,6 +830,8 @@ def make_serializable(o):
     """
     Recursively convert numpy types to native types for JSON serialization.
 
+    This function should NOT be passed into json.dump or json.dumps as the 'default' arg.
+
     Parameters
     ----------
     o : object
@@ -850,6 +852,36 @@ def make_serializable(o):
         return o.__class__.__name__
     else:
         return o
+
+
+def default_noraise(o):
+    """
+    Try to convert some extra types during JSON serialization.
+
+    This is intended to be passed to json.dump or json.dumps as the 'default' arg.  It will
+    attempt to convert values if possible, but if no conversion works, will return
+    'unserializable object (<type>)' instead of raising a TypeError.
+
+    Parameters
+    ----------
+    o : object
+        the object to be converted
+
+    Returns
+    -------
+    object
+        The converted object.
+    """
+    if isinstance(o, _container_classes):
+        return [make_serializable(item) for item in o]
+    elif isinstance(o, np.ndarray):
+        return o.tolist()
+    elif isinstance(o, np.number):
+        return o.item()
+    elif hasattr(o, '__dict__'):
+        return o.__class__.__name__
+    else:
+        return f"unserializable object ({type(o).__name__})"
 
 
 def make_set(str_data, name=None):

@@ -98,10 +98,9 @@ class IndepVarComp(ExplicitComponent):
         Do any error checking on i/o configuration.
         """
         if len(self._static_var_rel2meta) + len(self._var_rel2meta) == 0:
-            raise RuntimeError("{}: No outputs (independent variables) have been declared. "
-                               "They must either be declared during "
-                               "instantiation or by calling add_output or add_discrete_output "
-                               "afterwards.".format(self.msginfo))
+            raise RuntimeError(f"{self.msginfo}: No outputs (independent variables) have been "
+                               "declared. They must either be declared during instantiation or "
+                               "by calling add_output or add_discrete_output afterwards.")
 
         super(IndepVarComp, self)._configure_check()
 
@@ -141,19 +140,29 @@ class IndepVarComp(ExplicitComponent):
             list_outputs.
         """
         if res_units is not None:
-            warn_deprecation(
-                "'res_units' has been deprecated and will be removed in a future version")
-        elif lower is not None:
-            warn_deprecation("'lower' has been deprecated and will be removed in a future version")
-        elif upper is not None:
-            warn_deprecation("'upper' has been deprecated and will be removed in a future version")
-        elif ref0 is not None:
-            warn_deprecation("'ref0' has been deprecated and will be removed in a future version")
-        elif res_ref is not None:
-            warn_deprecation(
-                "'res_ref' has been deprecated and will be removed in a future version")
-        elif ref is not None:
-            warn_deprecation("'ref' has been deprecated and will be removed in a future version")
+            warn_deprecation(f"{self.msginfo}: The 'res_units' argument was used when adding "
+                             f"output '{name}'. This argument has been deprecated and will be "
+                             "removed in a future version.")
+        if lower is not None:
+            warn_deprecation(f"{self.msginfo}: The 'lower' argument was used when adding "
+                             f"output '{name}'. This argument has been deprecated and will be "
+                             "removed in a future version.")
+        if upper is not None:
+            warn_deprecation(f"{self.msginfo}: The 'upper' argument was used when adding "
+                             f"output '{name}'. This argument has been deprecated and will be "
+                             "removed in a future version.")
+        if ref0 is not None:
+            warn_deprecation(f"{self.msginfo}: The 'ref0' argument was used when adding "
+                             f"output '{name}'. This argument has been deprecated and will be "
+                             "removed in a future version.")
+        if res_ref is not None:
+            warn_deprecation(f"{self.msginfo}: The 'res_ref' argument was used when adding "
+                             f"output '{name}'. This argument has been deprecated and will be "
+                             "removed in a future version.")
+        if ref is not None:
+            warn_deprecation(f"{self.msginfo}: The 'ref' argument was used when adding "
+                             f"output '{name}'. This argument has been deprecated and will be "
+                             "removed in a future version.")
 
         ref = 1.0
         ref0 = 0.0
