@@ -2940,7 +2940,10 @@ class System(object):
 
                 if 'size' not in meta:
                     if src_name in abs2idx:
-                        meta['size'] = sizes[owning_rank[src_name], abs2idx[src_name]]
+                        if out[abs_name]['distributed']:
+                            meta['size'] = sizes[self.comm.rank, abs2idx[src_name]]
+                        else:
+                            meta['size'] = sizes[owning_rank[src_name], abs2idx[src_name]]
                     else:
                         meta['size'] = 0  # discrete var, don't know size
 
@@ -2967,10 +2970,12 @@ class System(object):
                     out.update(dvs)
 
             if self.comm.size > 1 and self._subsystems_allprocs:
-                allouts = self.comm.allgather(out)
-                out = OrderedDict()
-                for all_out in allouts:
-                    out.update(all_out)
+                for name in out:
+                    if out[abs_name]['distributed']:
+                        allouts = self.comm.allgather(out)
+                        out = OrderedDict()
+                        for all_out in allouts:
+                            out.update(all_out)
 
         return out
 
