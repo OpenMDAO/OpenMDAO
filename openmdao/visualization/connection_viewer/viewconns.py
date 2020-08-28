@@ -63,7 +63,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
     else:
         system = root
 
-    connections = system._problem_meta['connections']
+    connections = system._problem_meta['model_ref']()._conn_global_abs_in2out
 
     src2tgts = defaultdict(list)
     units = defaultdict(lambda: '')
