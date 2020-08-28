@@ -6,12 +6,14 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.test_suite.components.double_sellar import SubSellar
-from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimple, \
-    TestExplCompSimpleDense
 from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.general_utils import printoptions, remove_whitespace
 from openmdao.utils.mpi import MPI
+from openmdao.test_suite.components.double_sellar import SubSellar
+from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimple, \
+    TestExplCompSimpleDense
+from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
+     SellarDis2withDerivatives
 
 # Note: The following class definitions are used in feature docs
 
@@ -956,6 +958,37 @@ class ExplCompTestCase(unittest.TestCase):
 
         # verify read_only status is reset after AnalysisError
         prob['length'] = 111.
+
+    def test_iter_count(self):
+        # Make sure we correctly count iters in both _apply_nonlinear and _solve_nonlinear
+        class SellarMDF(om.Group):
+            def setup(self):
+                self.set_input_defaults('x', 1.0)
+                self.set_input_defaults('z', np.array([5.0, 2.0]))
+
+                cycle = self.add_subsystem('cycle', om.Group(), promotes=['*'])
+                cycle.add_subsystem('d1', SellarDis1withDerivatives(), promotes_inputs=['x', 'z', 'y2'],
+                                    promotes_outputs=['y1'])
+                cycle.add_subsystem('d2', SellarDis2withDerivatives(), promotes_inputs=['z', 'y1'],
+                                    promotes_outputs=['y2'])
+
+                cycle.linear_solver = om.ScipyKrylov()
+
+                cycle.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+
+
+        prob = om.Problem()
+        prob.model = SellarMDF()
+
+        prob.setup()
+        prob.set_solver_print(level=0)
+
+        prob.run_model()
+        self.assertEqual(prob.model.cycle.d1.iter_count, 0)
+        self.assertEqual(prob.model.cycle.d2.iter_count, 0)
+        self.assertEqual(prob.model.cycle.d1.iter_count_apply, 10)
+        self.assertEqual(prob.model.cycle.d2.iter_count_apply, 10)
+
 
 @unittest.skipUnless(MPI, "MPI is required.")
 class TestMPIExplComp(unittest.TestCase):

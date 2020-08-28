@@ -2059,9 +2059,10 @@ class Group(System):
 
         self._transfer('nonlinear', 'fwd')
         # Apply recursion
-        with Recording(name + '._apply_nonlinear', self.iter_count, self):
-            for subsys in self._subsystems_myproc:
-                subsys._apply_nonlinear()
+        for subsys in self._subsystems_myproc:
+            subsys._apply_nonlinear()
+
+        self.iter_count_apply += 1
 
     def _solve_nonlinear(self):
         """
@@ -2071,6 +2072,8 @@ class Group(System):
 
         with Recording(name + '._solve_nonlinear', self.iter_count, self):
             self._nonlinear_solver.solve()
+
+        # Iteration counter is incremented in the Recording context manager at exit.
 
     def _guess_nonlinear(self):
         """
