@@ -76,15 +76,17 @@ def take_nth(rank, size, seq):
                     return
 
 
-def convert_neg(arr, dim):
+def convert_neg(arr, size):
     """
     Convert any negative indices into their positive equivalent.
+
+    This only works for a 1D array.
 
     Parameters
     ----------
     arr : ndarray
         Array having negative indices converted.
-    dim : int
+    size : int
         Dimension of the array.
 
     Returns
@@ -92,7 +94,7 @@ def convert_neg(arr, dim):
     ndarray
         The converted array.
     """
-    arr[arr < 0] += dim
+    arr[arr < 0] += size
     return arr
 
 

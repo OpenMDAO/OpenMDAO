@@ -382,7 +382,7 @@ class SqliteRecorder(CaseRecorder):
             abs2prom = json.dumps(self._abs2prom)
             prom2abs = json.dumps(self._prom2abs)
             abs2meta = json.dumps(self._abs2meta)
-            conns = json.dumps(system._problem_meta.get('connections', {}))
+            conns = json.dumps(system._problem_meta['model_ref']()._conn_global_abs_in2out)
 
             var_settings = {}
             var_settings.update(desvars)
