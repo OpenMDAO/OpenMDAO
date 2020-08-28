@@ -348,5 +348,79 @@ class TestPassSizeDistributed(unittest.TestCase):
         self.assertEqual(np.sum(prob.get_val('E.out')), (n**2 + n)/2 * size_down)
 
 
+class DynComp(om.ExplicitComponent):
+    def __init__(self, n_inputs=2):
+        super(DynComp, self).__init__()
+        self.n_inputs = n_inputs
+
+    def setup(self):
+        for i in range(self.n_inputs):
+            self.add_input(f"x{i+1}", shape_by_conn=True, copy_shape=f"y{i+1}")
+            self.add_output(f"y{i+1}", shape_by_conn=True, copy_shape=f"x{i+1}")
+
+    def compute(self, inputs, outputs):
+        for i in range(self.n_inputs):
+            outputs[f"y{i+1}"] = 2*inputs[f"x{i+1}"]
+
+
+class DynGroup(om.Group):
+    def __init__(self, n_comps, n_inputs):
+        super(DynGroup, self).__init__()
+        self.n_comps = n_comps
+        self.n_inputs = n_inputs
+
+    def setup(self):
+        for icmp in range(1, self.n_comps + 1):
+            self.add_subsystem(f"C{icmp}", DynComp(n_inputs=self.n_inputs))
+
+        for icmp in range(1, self.n_comps):
+            for i in range(1, self.n_inputs + 1):
+                self.connect(f"C{icmp}.y{i}", f"C{icmp+1}.x{i}")
+
+
+class TestCycles(unittest.TestCase):
+    def test_baseline(self):
+        # this is just a sized source and sink, and we put a DynGroup in between them
+        p = om.Problem()
+        indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
+        indep.add_output('x2', val=np.ones((4,2)))
+        p.model.add_subsystem('Gdyn', DynGroup(3, 2))
+        p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
+                                                  x1=np.ones((2,3)),
+                                                  x2=np.ones((4,2)),
+                                                  y1=np.ones((2,3)),
+                                                  y2=np.ones((4,2))))
+        p.model.connect('Gdyn.C3.y1', 'sink.x1')
+        p.model.connect('Gdyn.C3.y2', 'sink.x2')
+        p.model.connect('indep.x1', 'Gdyn.C1.x1')
+        p.model.connect('indep.x2', 'Gdyn.C1.x2')
+        p.setup()
+        p.run_model()
+        np.testing.assert_allclose(p['sink.y1'], np.ones((2,3))*16)
+        np.testing.assert_allclose(p['sink.y2'], np.ones((4,2))*16)
+
+    def test_cycle(self):
+        # now put the DynGroup in a cycle (sink.y2 feeds back into Gdyn.C1.x2)
+        p = om.Problem()
+        indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
+        p.model.add_subsystem('Gdyn', DynGroup(3,2))
+        p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
+                                                  x1=np.ones((2,3)),
+                                                  x2=np.ones((4,2)),
+                                                  y1=np.ones((2,3)),
+                                                  y2=np.ones((4,2))))
+        p.model.connect('Gdyn.C3.y1', 'sink.x1')
+        p.model.connect('Gdyn.C3.y2', 'sink.x2')
+        p.model.connect('sink.y2', 'Gdyn.C1.x2')
+        p.model.connect('indep.x1', 'Gdyn.C1.x1')
+        p.setup()
+        p.run_model()
+        np.testing.assert_allclose(p['sink.y1'], np.ones((2,3))*16)
+        np.testing.assert_allclose(p['sink.y2'], np.ones((4,2))*16)
+        p.run_model()
+        np.testing.assert_allclose(p['sink.y1'], np.ones((2,3))*16)
+        np.testing.assert_allclose(p['sink.y2'], np.ones((4,2))*256)
+
+
 if __name__ == "__main__":
     unittest.main()

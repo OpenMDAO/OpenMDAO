@@ -1442,7 +1442,15 @@ class Group(System):
                     # variable whose shape is being copied must be on the same component, and
                     # name stored in 'copy_shape' entry must be the relative name.
                     abs_new = u.rsplit('.', 1)[0] + '.' + meta['copy_shape']
-                elif meta['shape_by_conn']:
+
+                    # if shape info is defined for what we're copying,
+                    # update our shape info and remove our name from the unknowns list.
+                    if abs2meta[abs_new]['shape'] is not None:
+                        copy_var_meta(abs_new, u, distrib_sz)
+                        to_remove.add(u)
+                        continue
+
+                if meta['shape_by_conn']:
                     if u in conn:  # it's a connected input
                         abs_new = conn[u]
                     elif u in rev_conn:  # connected output
@@ -1456,11 +1464,11 @@ class Group(System):
                         raise RuntimeError(f"{self.msginfo}: 'shape_by_conn' was set for "
                                            f"unconnected variable '{u}'.")
 
-                # if shape info is defined for what we're connected to (or are copying),
-                # update our shape info and remove our name from the unknowns list.
-                if abs2meta[abs_new]['shape'] is not None:
-                    copy_var_meta(abs_new, u, distrib_sz)
-                    to_remove.add(u)
+                    # if shape info is defined for what we're connected to,
+                    # update our shape info and remove our name from the unknowns list.
+                    if abs2meta[abs_new]['shape'] is not None:
+                        copy_var_meta(abs_new, u, distrib_sz)
+                        to_remove.add(u)
 
             unknowns -= to_remove
             # if the number of unknowns didn't decrease this iteration, we failed

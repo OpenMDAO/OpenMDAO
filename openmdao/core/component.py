@@ -460,9 +460,6 @@ class Component(System):
                              "'copy_shape', 'shape' and 'val' should be None, "
                              "but shape of '%s' and val of '%s' was given for variable '%s'."
                              % (self.msginfo, shape, val, name))
-        if copy_shape and shape_by_conn:
-            raise ValueError("%s: Cannot use both 'shape_by_conn' and' copy_shape' for "
-                             "variable '%s'." % (self.msginfo, name))
 
         src_slice = None
         if not (shape_by_conn or copy_shape):
@@ -631,9 +628,6 @@ class Component(System):
                              "'copy_shape', 'shape' and 'val' should be None, "
                              "but shape of '%s' and val of '%s' was given for variable '%s'."
                              % (self.msginfo, shape, val, name))
-        if copy_shape and shape_by_conn:
-            raise ValueError("%s: Cannot use both 'shape_by_conn' and' copy_shape' for "
-                             "variable '%s'." % (self.msginfo, name))
 
         if not isinstance(name, str):
             raise TypeError('%s: The name argument should be a string.' % self.msginfo)
