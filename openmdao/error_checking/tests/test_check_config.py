@@ -385,7 +385,7 @@ class TestCheckConfig(unittest.TestCase):
         testlogger.find_in('info', expected_info)
         testlogger.find_in('warning', expected_warning_1)
 
-    def test_unconnected_ivc(self):
+    def test_unconnected_auto_ivc(self):
         class SellarMDAConnect(om.Group):
 
             def setup(self):
