@@ -193,7 +193,6 @@ class TestPassSize(unittest.TestCase):
 
     def test_err(self):
 
-
         prob = om.Problem()
         prob.model = om.Group()
 
@@ -380,16 +379,16 @@ class DynGroup(om.Group):
 
 class TestCycles(unittest.TestCase):
     def test_baseline(self):
-        # this is just a sized source and sink, and we put a DynGroup in between them
+        # this is just a sized source and unsized sink, and we put a DynGroup in between them
         p = om.Problem()
         indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
         indep.add_output('x2', val=np.ones((4,2)))
         p.model.add_subsystem('Gdyn', DynGroup(3, 2))
         p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
-                                                  x1=np.ones((2,3)),
-                                                  x2=np.ones((4,2)),
-                                                  y1=np.ones((2,3)),
-                                                  y2=np.ones((4,2))))
+                                                  x1={'shape_by_conn': True, 'copy_shape': 'y1'},
+                                                  x2={'shape_by_conn': True, 'copy_shape': 'y2'},
+                                                  y1={'shape_by_conn': True, 'copy_shape': 'x1'},
+                                                  y2={'shape_by_conn': True, 'copy_shape': 'x2'}))
         p.model.connect('Gdyn.C3.y1', 'sink.x1')
         p.model.connect('Gdyn.C3.y2', 'sink.x2')
         p.model.connect('indep.x1', 'Gdyn.C1.x1')
@@ -399,8 +398,9 @@ class TestCycles(unittest.TestCase):
         np.testing.assert_allclose(p['sink.y1'], np.ones((2,3))*16)
         np.testing.assert_allclose(p['sink.y2'], np.ones((4,2))*16)
 
-    def test_cycle(self):
-        # now put the DynGroup in a cycle (sink.y2 feeds back into Gdyn.C1.x2)
+    def test_cycle_fwd_rev(self):
+        # now put the DynGroup in a cycle (sink.y2 feeds back into Gdyn.C1.x2). Sizes are known
+        # at the IVC and at the sink
         p = om.Problem()
         indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
         p.model.add_subsystem('Gdyn', DynGroup(3,2))
@@ -419,7 +419,53 @@ class TestCycles(unittest.TestCase):
         np.testing.assert_allclose(p['sink.y2'], np.ones((4,2))*16)
         p.run_model()
         np.testing.assert_allclose(p['sink.y1'], np.ones((2,3))*16)
+        # each time we run_model, the value of sink.y2 will be multiplied by 16
+        # because of the feedback
         np.testing.assert_allclose(p['sink.y2'], np.ones((4,2))*256)
+
+    def test_cycle_rev(self):
+        # now put the DynGroup in a cycle (sink.y2 feeds back into Gdyn.C1.x2), but here,
+        # only the sink outputs are known
+        p = om.Problem()
+        p.model.add_subsystem('Gdyn', DynGroup(3,2))
+        p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
+                                                  x1=np.ones((2,3)),
+                                                  x2=np.ones((4,2)),
+                                                  y1=np.ones((2,3)),
+                                                  y2=np.ones((4,2))))
+        p.model.connect('Gdyn.C3.y1', 'sink.x1')
+        p.model.connect('Gdyn.C3.y2', 'sink.x2')
+        p.model.connect('sink.y2', 'Gdyn.C1.x2')
+        p.setup()
+        p.run_model()
+        np.testing.assert_allclose(p['sink.y1'], np.ones((2,3))*16)
+        np.testing.assert_allclose(p['sink.y2'], np.ones((4,2))*16)
+        p.run_model()
+        np.testing.assert_allclose(p['sink.y1'], np.ones((2,3))*16)
+        # each time we run_model, the value of sink.y2 will be multiplied by 16
+        # because of the feedback
+        np.testing.assert_allclose(p['sink.y2'], np.ones((4,2))*256)
+
+    def test_cycle_unresolved(self):
+        # now put the DynGroup in a cycle (sink.y2 feeds back into Gdyn.C1.x2), but here,
+        # sink.y2 is unsized, so no var in the '2' loop can get resolved.
+        p = om.Problem()
+        indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
+        p.model.add_subsystem('Gdyn', DynGroup(3,2))
+        p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
+                                                  x1={'shape_by_conn': True, 'copy_shape': 'y1'},
+                                                  x2={'shape_by_conn': True, 'copy_shape': 'y2'},
+                                                  y1={'shape_by_conn': True, 'copy_shape': 'x1'},
+                                                  y2={'shape_by_conn': True, 'copy_shape': 'x2'}))
+        p.model.connect('Gdyn.C3.y1', 'sink.x1')
+        p.model.connect('Gdyn.C3.y2', 'sink.x2')
+        p.model.connect('sink.y2', 'Gdyn.C1.x2')
+        p.model.connect('indep.x1', 'Gdyn.C1.x1')
+        with self.assertRaises(RuntimeError) as cm:
+            p.setup()
+
+        msg = "Group (<model>): Failed to resolve shapes for ['Gdyn.C1.x2', 'Gdyn.C1.y2', 'Gdyn.C2.x2', 'Gdyn.C2.y2', 'Gdyn.C3.x2', 'Gdyn.C3.y2', 'sink.x2', 'sink.y2']."
+        self.assertEqual(str(cm.exception), msg)
 
 
 if __name__ == "__main__":

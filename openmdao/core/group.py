@@ -1315,7 +1315,8 @@ class Group(System):
         """
         Add shape/size metadata for variables that were created with shape_by_conn or copy_shape.
         """
-        def copy_var_meta(from_var, to_var, distrib_sz):
+        def copy_var_meta(from_var, to_var, distrib_sizes):
+            # transfer shape/size info from from_var to to_var
             all_from_meta = self._var_allprocs_abs2meta[from_var]
             all_to_meta = self._var_allprocs_abs2meta[to_var]
             from_meta = self._var_abs2meta[from_var] if from_var in self._var_abs2meta else {}
@@ -1340,12 +1341,12 @@ class Group(System):
                     else:
                         to_meta['value'] = np.ones(from_size)
                 if to_dist and from_dist:
-                    distrib_sz[to_var] = distrib_sz[from_var]
+                    distrib_sizes[to_var] = distrib_sizes[from_var]
                 # src_indices will be computed later for dist inputs that don't specify them
             elif from_var in self._var_allprocs_abs2prom['output']:
                 # from_var is an output.  assume to_var is an input
                 if from_dist and not to_dist:  # known dist output to serial input
-                    total_size = np.sum(distrib_sz[from_var])
+                    total_size = np.sum(distrib_sizes[from_var])
                     all_to_meta['size'] = total_size
                     all_to_meta['shape'] = (total_size,)
                     if to_meta:
@@ -1363,7 +1364,7 @@ class Group(System):
 
                     all_to_meta['size'] = size
                     all_to_meta['shape'] = (size,)
-                    distrib_sz[to_var] = np.array(sizes)
+                    distrib_sizes[to_var] = np.array(sizes)
                     if to_meta:
                         to_meta['size'] = size
                         to_meta['shape'] = (size,)
@@ -1380,7 +1381,7 @@ class Group(System):
 
                     all_to_meta['size'] = size
                     all_to_meta['shape'] = (size,)
-                    distrib_sz[to_var] = np.array(sizes)
+                    distrib_sizes[to_var] = np.array(sizes)
                     if to_meta:
                         to_meta['size'] = size
                         to_meta['shape'] = (size,)
@@ -1396,7 +1397,7 @@ class Group(System):
                         self.comm.Allreduce(local_max, global_max, op=MPI.MAX)
                         size = global_max[0]
                     else:  # src_indices are not set, so just sum up the sizes
-                        size = np.sum(distrib_sz[from_var])
+                        size = np.sum(distrib_sizes[from_var])
 
                     all_to_meta['size'] = size
                     all_to_meta['shape'] = (size,)
@@ -1405,77 +1406,99 @@ class Group(System):
                         to_meta['shape'] = (size,)
                         to_meta['value'] = np.ones(size)
 
-        abs2meta = self._var_allprocs_abs2meta
-        # find all variables that have an unknown shape (across all procs)
-        unknowns = {n for n, m in abs2meta.items() if m['shape_by_conn'] or m['copy_shape']}
-        if unknowns:
-            conn = self._conn_global_abs_in2out
-            rev_conn = defaultdict(list)
+        all_abs2meta = self._var_allprocs_abs2meta
+        my_abs2meta = self._var_abs2meta
+        nprocs = self.comm.size
+        conn = self._conn_global_abs_in2out
+        rev_conn = None
+
+        def get_rev_conn():
+            rev = defaultdict(list)
             for tgt, src in conn.items():
-                rev_conn[src].append(tgt)
-            if self.comm.size > 1:
-                my_abs2meta = self._var_abs2meta
-                dist_sz = {}
-                for n, m in abs2meta.items():
-                    if m['distributed']:
-                        if n in my_abs2meta:
-                            sz = my_abs2meta[n]['size']
-                            if sz is not None:
-                                dist_sz[n] = sz
-                        else:
-                            dist_sz[n] = 0
+                rev[src].append(tgt)
+            return rev
 
-                distrib_sz = defaultdict(lambda: np.zeros(self.comm.size, dtype=INT_DTYPE))
-                for rank, dsz in enumerate(self.comm.allgather(dist_sz)):
-                    for n, sz in dsz.items():
-                        distrib_sz[n][rank] = sz
-            else:
-                distrib_sz = {}
+        graph = nx.Graph()
+        dist_sz = {}  # local distrib sizes
+        knowns = set()
 
-        n_unknowns = len(unknowns)
-
-        while(unknowns):
-            to_remove = set()
-            for u in unknowns:
-                meta = abs2meta[u]
-                if meta['copy_shape']:
-                    # variable whose shape is being copied must be on the same component, and
-                    # name stored in 'copy_shape' entry must be the relative name.
-                    abs_new = u.rsplit('.', 1)[0] + '.' + meta['copy_shape']
-
-                    # if shape info is defined for what we're copying,
-                    # update our shape info and remove our name from the unknowns list.
-                    if abs2meta[abs_new]['shape'] is not None:
-                        copy_var_meta(abs_new, u, distrib_sz)
-                        to_remove.add(u)
-                        continue
-
-                if meta['shape_by_conn']:
-                    if u in conn:  # it's a connected input
-                        abs_new = conn[u]
-                    elif u in rev_conn:  # connected output
-                        for inp in rev_conn[u]:
-                            if abs2meta[inp]['shape'] is not None:
-                                abs_new = inp
-                                break
-                        else:
-                            continue
-                    else:
+        # find all variables that have an unknown shape (across all procs)
+        for name, meta in all_abs2meta.items():
+            if meta['shape_by_conn']:
+                if name in conn:  # it's a connected input
+                    abs_from = conn[name]
+                    graph.add_edge(name, abs_from)
+                    if all_abs2meta[abs_from]['shape'] is not None:
+                        knowns.add(abs_from)
+                else:
+                    if rev_conn is None:
+                        rev_conn = get_rev_conn()
+                    if name in rev_conn:  # connected output
+                        for inp in rev_conn[name]:
+                            graph.add_edge(name, inp)
+                            if all_abs2meta[inp]['shape'] is not None:
+                                knowns.add(inp)
+                    elif not meta['copy_shape']:
                         raise RuntimeError(f"{self.msginfo}: 'shape_by_conn' was set for "
                                            f"unconnected variable '{u}'.")
 
-                    # if shape info is defined for what we're connected to,
-                    # update our shape info and remove our name from the unknowns list.
-                    if abs2meta[abs_new]['shape'] is not None:
-                        copy_var_meta(abs_new, u, distrib_sz)
-                        to_remove.add(u)
+            if meta['copy_shape']:
+                # variable whose shape is being copied must be on the same component, and
+                # name stored in 'copy_shape' entry must be the relative name.
+                abs_from = name.rsplit('.', 1)[0] + '.' + meta['copy_shape']
+                graph.add_edge(name, abs_from)
+                # this is unlikely, but a user *could* do it, so we'll check
+                if all_abs2meta[abs_from]['shape'] is not None:
+                    knowns.add(abs_from)
 
-            unknowns -= to_remove
-            # if the number of unknowns didn't decrease this iteration, we failed
-            if len(unknowns) == n_unknowns:
-                unknowns = sorted(unknowns)
-                raise RuntimeError(f"{self.msginfo}: Failed to resolve shapes for {unknowns}.")
-            n_unknowns = len(unknowns)
+            # store known distributed size info needed for computing shapes
+            if nprocs > 1 and meta['distributed']:
+                if name in my_abs2meta:
+                    sz = my_abs2meta[name]['size']
+                    if sz is not None:
+                        dist_sz[name] = sz
+                else:
+                    dist_sz[name] = 0
+
+        if graph.order() == 0:
+            # we don't have any shape_by_conn or copy_shape variables, so we're done
+            return
+
+        if nprocs > 1:
+            distrib_sizes = defaultdict(lambda: np.zeros(nprocs, dtype=INT_DTYPE))
+            for rank, dsz in enumerate(self.comm.allgather(dist_sz)):
+                for n, sz in dsz.items():
+                    distrib_sizes[n][rank] = sz
+        else:
+            distrib_sizes = {}
+
+        unresolved = set()
+
+        for comps in nx.connected_components(graph):
+            comp_knowns = knowns.intersection(comps)
+            if not comp_knowns:
+                # we need at least 1 known node to resolve this component, so we fail.
+                # store the list of unresolved nodes so we have the total list at the end.
+                unresolved.update(comps)
+                continue
+
+            # because comps is a connected component, we only need 1 known node to resolve
+            # the rest
+            stack = set([comp_knowns.pop()])
+            while stack:
+                known = stack.pop()
+                for node in graph.neighbors(known):
+                    if node not in knowns:
+                        # transfer the known shape info to the unshaped variable
+                        copy_var_meta(known, node, distrib_sizes)
+                        # adding to knowns here won't affect the intersection above since this
+                        # node can't exist in a different connected component anyway
+                        knowns.add(node)
+                        stack.add(node)
+
+        if unresolved:
+            unresolved = sorted(unresolved)
+            raise RuntimeError(f"{self.msginfo}: Failed to resolve shapes for {unresolved}.")
 
     @check_mpi_exceptions
     def _setup_connections(self):
