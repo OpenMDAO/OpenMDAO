@@ -328,7 +328,7 @@ def _check_hanging_inputs(problem, logger):
             prom_tgt = abs2prom[abs_tgt]
 
             # Ignore inputs that are declared as design vars.
-            if prom_tgt in desvar:
+            if desvar and prom_tgt in desvar:
                 continue
 
             unconns.append((prom_tgt, abs_tgt))
