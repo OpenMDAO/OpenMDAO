@@ -425,7 +425,7 @@ class TestCycles(unittest.TestCase):
 
     def test_cycle_rev(self):
         # now put the DynGroup in a cycle (sink.y2 feeds back into Gdyn.C1.x2), but here,
-        # only the sink outputs are known
+        # only the sink outputs are known and inputs are coming from auto_ivcs.
         p = om.Problem()
         p.model.add_subsystem('Gdyn', DynGroup(3,2))
         p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
