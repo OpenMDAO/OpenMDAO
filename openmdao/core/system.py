@@ -654,7 +654,7 @@ class System(object):
 
         self._setup_vec_names(mode)
         self._setup_global_connections()
-        self._setup_deferred_var_shape()
+        self._setup_dynamic_shapes()
 
         if self.pathname == '':
             self._top_level_post_connections(mode)
@@ -694,7 +694,7 @@ class System(object):
         """
         pass
 
-    def _setup_deferred_var_shape(self):
+    def _setup_dynamic_shapes(self):
         pass
 
     def _final_setup(self, comm):

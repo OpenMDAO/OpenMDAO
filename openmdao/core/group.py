@@ -1311,7 +1311,7 @@ class Group(System):
         for inp in src_ind_inputs:
             allprocs_abs2meta[inp]['has_src_indices'] = True
 
-    def _setup_deferred_var_shape(self):
+    def _setup_dynamic_shapes(self):
         """
         Add shape/size metadata for variables that were created with shape_by_conn or copy_shape.
         """
