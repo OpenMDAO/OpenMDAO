@@ -634,8 +634,8 @@ class SqliteRecorder(CaseRecorder):
             The number of times run_driver or run_model has been called.
         """
         if self.connection:
-            if run_counter is None:
-                run_counter = self._counter
+            # if run_counter is None:
+            #     run_counter = self._counter
 
             scaling_vecs, user_options = self._get_metadata_system(recording_requester)
 
@@ -668,10 +668,14 @@ class SqliteRecorder(CaseRecorder):
             #   the current OpenMDAO code will call this function each time and there will be
             #   SQL errors for "UNIQUE constraint failed: system_metadata.id"
             # Future versions of OpenMDAO will handle this better.
+            if run_counter is None:
+                name = path
+            else:
+                name = "{}_{}".format(path, str(run_counter))
             with self.connection as c:
                 c.execute("INSERT OR IGNORE INTO system_metadata"
                           "(id, scaling_factors, component_metadata) "
-                          "VALUES(?,?,?)", ("{}_{}".format(path, str(run_counter)), scaling_factors,
+                          "VALUES(?,?,?)", (name, scaling_factors,
                                             pickled_metadata))
 
     def record_metadata_solver(self, recording_requester):

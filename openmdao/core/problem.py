@@ -171,7 +171,7 @@ class Problem(object):
         self._initial_condition_cache = {}
 
         self._metadata = None
-        self._run_counter = 0
+        self._run_counter = -1
         self._system_options_recorded = False
         self._rec_mgr = RecordingManager()
 
@@ -600,8 +600,7 @@ class Problem(object):
             self.driver.iter_count = 0
             self.model._reset_iter_counts()
 
-        if self._setup_already_called:
-            self._run_counter += 1
+        self._run_counter += 1
 
         self.final_setup()
         self.model._clear_iprint()
@@ -639,8 +638,7 @@ class Problem(object):
             self.driver.iter_count = 0
             self.model._reset_iter_counts()
 
-        if self._setup_already_called:
-            self._run_counter += 1
+        self._run_counter += 1
 
         self.final_setup()
         self.model._clear_iprint()
@@ -839,12 +837,6 @@ class Problem(object):
         """
         model = self.model
         comm = self.comm
-
-        self._setup_already_called = False
-
-        if hasattr(self, '_metadata') and self._metadata is not None:
-            if self._metadata['setup_status'] == _SetupStatus.POST_FINAL_SETUP:
-                self._setup_already_called = True
 
         # PETScVector is required for MPI
         if comm.size > 1:

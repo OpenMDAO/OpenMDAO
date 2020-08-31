@@ -38,6 +38,20 @@ class BaseCaseReader(object):
         self._system_options = {}
 
     @property
+    def system_options(self):
+        """
+        Provide 'system_options' property for backwards compatibility.
+
+        Returns
+        -------
+        dict
+            reference to the '_system_options' attribute.
+        """
+        warn_deprecation("The system_options attribute is deprecated. "
+                         "Use `list_model_options` instead.")
+        return self._system_options
+
+    @property
     def system_metadata(self):
         """
         Provide 'system_metadata' property for backwards compatibility.

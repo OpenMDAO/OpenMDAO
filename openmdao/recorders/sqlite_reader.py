@@ -433,7 +433,11 @@ class SqliteCaseReader(BaseCaseReader):
             dct = {}
 
             for i in self._system_options:
-                subsys, num = i.rsplit('_', 1)
+                if '_' in i:
+                    subsys, num = i.rsplit('_', 1)
+                else:
+                    subsys = i
+                    num = 0
 
                 if (run_counter is not None and run_counter == int(num) and subsys == 'root') or \
                         (subsys == 'root' and run_counter is None):
