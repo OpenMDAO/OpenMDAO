@@ -139,11 +139,16 @@ class System(object):
     under_approx : bool
         When True, this system is undergoing approximation.
     iter_count : int
-        Int that holds the number of times this system has iterated
-        in a recording run.
+        Counts the number of times this system has called _solve_nonlinear. This also
+        corresponds to the number of times that the system's outputs are recorded if a recorder
+        is present.
+    iter_count_apply : int
+        Counts the number of times the system has called _apply_nonlinear. For ExplicitComponent,
+        calls to apply_nonlinear also call compute, so number of executions can be found by adding
+        this and iter_count together. Recorders do no record calls to apply_nonlinear.
     iter_count_without_approx : int
-        Int that holds the number of times this system has iterated
-        in a recording run excluding any calls due to approximation schemes.
+        Counts the number of times the system has iterated but excludes any that occur during
+        approximation of derivatives.
     cite : str
         Listing of relevant citations that should be referenced when
         publishing work that uses this class.
@@ -371,8 +376,9 @@ class System(object):
 
         self._problem_meta = None
 
-        # Case recording related
+        # Counting iterations.
         self.iter_count = 0
+        self.iter_count_apply = 0
         self.iter_count_without_approx = 0
 
         self.cite = ""
@@ -3874,6 +3880,7 @@ class System(object):
 
             self._rec_mgr.record_iteration(self, data, metadata)
 
+        # All calls to _solve_nonlinear are recorded, The counter is incremented after recording.
         self.iter_count += 1
         if not self.under_approx:
             self.iter_count_without_approx += 1
@@ -3903,6 +3910,9 @@ class System(object):
         """
         for s in self.system_iter(include_self=True, recurse=True):
             s.iter_count = 0
+            s.iter_count_apply = 0
+            s.iter_count_without_approx = 0
+
             if s._linear_solver:
                 s._linear_solver._iter_count = 0
             if s._nonlinear_solver:
