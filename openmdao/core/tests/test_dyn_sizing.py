@@ -22,8 +22,8 @@ class L2(om.ExplicitComponent):
     def compute(self, inputs, outputs):
         outputs['val'] = np.linalg.norm(inputs['vec'])
 
-class TestAdder(unittest.TestCase):
 
+class TestAdder(unittest.TestCase):
     def test_adder(self):
         import openmdao.api as om
         from openmdao.test_suite.components.sellar_feature import SellarMDA
@@ -31,17 +31,17 @@ class TestAdder(unittest.TestCase):
         prob = om.Problem()
         prob.model = om.Group()
 
-        indeps = prob.model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
-        indeps.add_output('in', np.ones(10), tags="advanced")
+        indeps = prob.model.add_subsystem('indeps', om.IndepVarComp('in', np.ones(10)), promotes=['*'])
 
         prob.model.add_subsystem('L2norm', L2())
         prob.model.connect('in', ['L2norm.vec'])
         prob.setup()
         prob.run_model()
+        np.testing.assert_allclose(prob['L2norm.vec'], np.ones(10))
 
 
 # This is based on passing size information through the system shown below
-# in all test C starts with the size information
+# in all tests C starts with the shape information
 
 # +-----+
 # |     |
@@ -158,11 +158,8 @@ class D_dis(om.ExplicitComponent):
         outputs['out'] = inputs['in']
 
 
-
-
 class TestPassSize(unittest.TestCase):
     def test_serial(self):
-
         prob = om.Problem()
         prob.model = om.Group()
 
@@ -191,8 +188,7 @@ class TestPassSize(unittest.TestCase):
         self.assertEqual(prob.get_val('D.out').size ,9)
         self.assertEqual(prob.get_val('E.in').size ,9)
 
-    def test_err(self):
-
+    def test_unresolved_err(self):
         prob = om.Problem()
         prob.model = om.Group()
 
@@ -256,32 +252,20 @@ class TestPassSizeDistributed(unittest.TestCase):
         # evenly distribute the variable over the procs
         ave, res = divmod(4, nprocs)
         sizes_up = [ave + 1 if p < res else ave for p in range(nprocs)]
+        size_up = sizes_up[rank]
 
         ave, res = divmod(9, nprocs)
         sizes_down = [ave + 1 if p < res else ave for p in range(nprocs)]
-
-
-        if rank == 0:
-            size_up = 2
-        elif rank == 1:
-            size_up = 1
-        else:
-            size_up = 0
-
-        size_down = 3
-
-        #  get_val for inputs with distributed  components isn't working as expected
-        # it could be a bug
+        size_down = sizes_down[rank]
 
         self.assertEqual(prob.get_val('A.out').size, 4)
-        # self.assertEqual(prob.get_val('B.in').size, size_up)
+        self.assertEqual(prob.get_val('B.in').size, size_up)
         self.assertEqual(prob.get_val('B.out').size, sizes_up[rank])
 
-        # self.assertEqual(prob.get_val('D.in').size, size_down)
+        self.assertEqual(prob.get_val('D.in').size, size_down)
         self.assertEqual(prob.get_val('D.out').size, sizes_down[rank])
-        # self.assertEqual(prob.get_val('E.in').size, 3*self.N_PROCS)
+        self.assertEqual(prob.get_val('E.in', get_remote=True).size, 3*self.N_PROCS)
         self.assertEqual(prob.get_val('E.out').size, 9)
-
 
         # test the output from running model
         self.assertEqual(np.sum(prob.get_val('E.out')), np.sum(np.arange(9)))
@@ -330,16 +314,13 @@ class TestPassSizeDistributed(unittest.TestCase):
 
         size_down = 3
 
-        #  get_val for inputs with distributed  components isn't working as expected
-        # it could be a bug
-
         self.assertEqual(prob.get_val('A.out').size, 3)
-        # self.assertEqual(prob.get_val('B.in').size, size_up)
+        self.assertEqual(prob.get_val('B.in').size, size_up)
         self.assertEqual(prob.get_val('B.out').size, size_up)
 
-        # self.assertEqual(prob.get_val('D.in').size, size_down)
+        self.assertEqual(prob.get_val('D.in').size, size_down)
         self.assertEqual(prob.get_val('D.out').size, size_down)
-        # self.assertEqual(prob.get_val('E.in').size, 3*self.N_PROCS)
+        self.assertEqual(prob.get_val('E.in', get_remote=True).size, 3*self.N_PROCS)
         self.assertEqual(prob.get_val('E.out').size, 3*self.N_PROCS)
 
         # test the output from running model
@@ -347,9 +328,9 @@ class TestPassSizeDistributed(unittest.TestCase):
         self.assertEqual(np.sum(prob.get_val('E.out')), (n**2 + n)/2 * size_down)
 
 
-class DynComp(om.ExplicitComponent):
+class DynShapeComp(om.ExplicitComponent):
     def __init__(self, n_inputs=2):
-        super(DynComp, self).__init__()
+        super(DynShapeComp, self).__init__()
         self.n_inputs = n_inputs
 
     def setup(self):
@@ -362,15 +343,15 @@ class DynComp(om.ExplicitComponent):
             outputs[f"y{i+1}"] = 2*inputs[f"x{i+1}"]
 
 
-class DynGroup(om.Group):
+class DynShapeGroup(om.Group):
     def __init__(self, n_comps, n_inputs):
-        super(DynGroup, self).__init__()
+        super(DynShapeGroup, self).__init__()
         self.n_comps = n_comps
         self.n_inputs = n_inputs
 
     def setup(self):
         for icmp in range(1, self.n_comps + 1):
-            self.add_subsystem(f"C{icmp}", DynComp(n_inputs=self.n_inputs))
+            self.add_subsystem(f"C{icmp}", DynShapeComp(n_inputs=self.n_inputs))
 
         for icmp in range(1, self.n_comps):
             for i in range(1, self.n_inputs + 1):
@@ -379,11 +360,11 @@ class DynGroup(om.Group):
 
 class TestCycles(unittest.TestCase):
     def test_baseline(self):
-        # this is just a sized source and unsized sink, and we put a DynGroup in between them
+        # this is just a sized source and unsized sink, and we put a DynShapeGroup in between them
         p = om.Problem()
         indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
         indep.add_output('x2', val=np.ones((4,2)))
-        p.model.add_subsystem('Gdyn', DynGroup(3, 2))
+        p.model.add_subsystem('Gdyn', DynShapeGroup(3, 2))
         p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
                                                   x1={'shape_by_conn': True, 'copy_shape': 'y1'},
                                                   x2={'shape_by_conn': True, 'copy_shape': 'y2'},
@@ -399,11 +380,11 @@ class TestCycles(unittest.TestCase):
         np.testing.assert_allclose(p['sink.y2'], np.ones((4,2))*16)
 
     def test_cycle_fwd_rev(self):
-        # now put the DynGroup in a cycle (sink.y2 feeds back into Gdyn.C1.x2). Sizes are known
+        # now put the DynShapeGroup in a cycle (sink.y2 feeds back into Gdyn.C1.x2). Sizes are known
         # at the IVC and at the sink
         p = om.Problem()
         indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
-        p.model.add_subsystem('Gdyn', DynGroup(3,2))
+        p.model.add_subsystem('Gdyn', DynShapeGroup(3,2))
         p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
                                                   x1=np.ones((2,3)),
                                                   x2=np.ones((4,2)),
@@ -424,10 +405,10 @@ class TestCycles(unittest.TestCase):
         np.testing.assert_allclose(p['sink.y2'], np.ones((4,2))*256)
 
     def test_cycle_rev(self):
-        # now put the DynGroup in a cycle (sink.y2 feeds back into Gdyn.C1.x2), but here,
+        # now put the DynShapeGroup in a cycle (sink.y2 feeds back into Gdyn.C1.x2), but here,
         # only the sink outputs are known and inputs are coming from auto_ivcs.
         p = om.Problem()
-        p.model.add_subsystem('Gdyn', DynGroup(3,2))
+        p.model.add_subsystem('Gdyn', DynShapeGroup(3,2))
         p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
                                                   x1=np.ones((2,3)),
                                                   x2=np.ones((4,2)),
@@ -447,11 +428,11 @@ class TestCycles(unittest.TestCase):
         np.testing.assert_allclose(p['sink.y2'], np.ones((4,2))*256)
 
     def test_cycle_unresolved(self):
-        # now put the DynGroup in a cycle (sink.y2 feeds back into Gdyn.C1.x2), but here,
+        # now put the DynShapeGroup in a cycle (sink.y2 feeds back into Gdyn.C1.x2), but here,
         # sink.y2 is unsized, so no var in the '2' loop can get resolved.
         p = om.Problem()
         indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
-        p.model.add_subsystem('Gdyn', DynGroup(3,2))
+        p.model.add_subsystem('Gdyn', DynShapeGroup(3,2))
         p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
                                                   x1={'shape_by_conn': True, 'copy_shape': 'y1'},
                                                   x2={'shape_by_conn': True, 'copy_shape': 'y2'},
