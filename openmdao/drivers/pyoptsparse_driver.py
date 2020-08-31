@@ -439,7 +439,12 @@ class pyOptSparseDriver(Driver):
             self.set_design_var(name, dv_dict[name])
 
         with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
-            model.run_solve_nonlinear()
+            try:
+                model.run_solve_nonlinear()
+            except AnalysisError:
+                model._clear_iprint()
+                fail = 1
+
             rec.abs = 0.0
             rec.rel = 0.0
         self.iter_count += 1
