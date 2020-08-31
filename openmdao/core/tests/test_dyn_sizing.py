@@ -350,7 +350,6 @@ class DynShapeComp(om.ExplicitComponent):
         super(DynShapeComp, self).__init__()
         self.n_inputs = n_inputs
 
-    def setup(self):
         for i in range(self.n_inputs):
             self.add_input(f"x{i+1}", shape_by_conn=True, copy_shape=f"y{i+1}")
             self.add_output(f"y{i+1}", shape_by_conn=True, copy_shape=f"x{i+1}")
@@ -397,12 +396,12 @@ class DistribComp(om.ExplicitComponent):
 
 
 class DynShapeGroup(om.Group):
+    # strings together some number of DynShapeComps in series
     def __init__(self, n_comps, n_inputs):
         super(DynShapeGroup, self).__init__()
         self.n_comps = n_comps
         self.n_inputs = n_inputs
 
-    def setup(self):
         for icmp in range(1, self.n_comps + 1):
             self.add_subsystem(f"C{icmp}", DynShapeComp(n_inputs=self.n_inputs))
 
@@ -451,7 +450,7 @@ class TestCycles(unittest.TestCase):
 
     def test_cycle_fwd_rev(self):
         # now put the DynShapeGroup in a cycle (sink.y2 feeds back into Gdyn.C1.x2). Sizes are known
-        # at the IVC and at the sink
+        # at both ends of the model (the IVC and at the sink)
         p = om.Problem()
         indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
         p.model.add_subsystem('Gdyn', DynShapeGroup(3,2))

@@ -156,9 +156,15 @@ class Component(System):
         self._var_rel_names = {'input': [], 'output': []}
         self._var_rel2meta = {}
 
+        # reset shape if any dynamic shape parameters are set in case this is a resetup
+        # NOTE: this is necessary because we allow variables to be added in __init__.
+        for meta in self._static_var_rel2meta.values():
+            if 'shape_by_conn' in meta and (meta['shape_by_conn'] or meta['copy_shape'] is not None):
+                meta['shape'] = None
+
         self._var_rel2meta.update(self._static_var_rel2meta)
-        for type_ in ['input', 'output']:
-            self._var_rel_names[type_].extend(self._static_var_rel_names[type_])
+        for io in ['input', 'output']:
+            self._var_rel_names[io].extend(self._static_var_rel_names[io])
         self.setup()
 
         # check to make sure that if num_par_fd > 1 that this system is actually doing FD.
