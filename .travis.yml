@@ -105,23 +105,27 @@ install:
     cd build_pyoptsparse;
     chmod 755 ./build_pyoptsparse.sh;
 
+    if [ "$PETSc" ]; then
+      PAROPT=-a;
+    fi
+
     if [ "$SNOPT" == "7.7" ] && [ "$SNOPT_LOCATION_77" ]; then
       echo "  > Secure copying SNOPT 7.7 over SSH";
       mkdir SNOPT;
       scp -qr "$SNOPT_LOCATION_77" SNOPT;
-      ./build_pyoptsparse.sh -b "$PYOPTSPARSE" -s SNOPT/src -a;
+      ./build_pyoptsparse.sh -b "$PYOPTSPARSE" -s SNOPT/src $PAROPT;
 
     elif [ "$SNOPT" == "7.2" ] && [ "$SNOPT_LOCATION_72" ]; then
       echo "  > Secure copying SNOPT 7.2 over SSH";
       mkdir SNOPT;
       scp -qr "$SNOPT_LOCATION_72" SNOPT;
-      ./build_pyoptsparse.sh -b "$PYOPTSPARSE" -s SNOPT/source -a;
+      ./build_pyoptsparse.sh -b "$PYOPTSPARSE" -s SNOPT/source $PAROPT;
 
     else
       if [ "$SNOPT" ]; then
         echo "SNOPT version $SNOPT was requested but source is not available";
       fi
-      ./build_pyoptsparse.sh -b "$PYOPTSPARSE" -a;
+      ./build_pyoptsparse.sh -b "$PYOPTSPARSE" $PAROPT;
     fi
 
     cd ..;

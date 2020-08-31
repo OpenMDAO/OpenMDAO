@@ -10,8 +10,9 @@ from scipy.sparse import issparse
 
 from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_META, \
     global_meta_names
+from openmdao.core.constants import INT_DTYPE
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
-from openmdao.vectors.vector import INT_DTYPE, _full_slice
+from openmdao.vectors.vector import _full_slice
 from openmdao.utils.units import valid_units
 from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key, rel_name2abs_name
 from openmdao.utils.mpi import MPI
@@ -257,8 +258,14 @@ class Component(System):
                 del v['value']
 
         for abs_name in abs_names['input']:
-            allprocs_abs2meta[abs_name]['has_src_indices'] = \
-                abs2meta[abs_name]['src_indices'] is not None
+            metadata = abs2meta[abs_name]
+            allprocs_abs2meta[abs_name]['has_src_indices'] = metadata['src_indices'] is not None
+
+            # ensure that if src_indices is a slice we reset it to that instead of
+            # the converted array value (in case this is a re-setup), so that we can
+            # re-convert using potentially different sizing information.
+            if metadata['src_slice'] is not None:
+                metadata['src_indices'] = metadata['src_slice']
 
         if self._var_discrete['input'] or self._var_discrete['output']:
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
@@ -318,8 +325,6 @@ class Component(System):
             self._var_sizes['nonlinear'] = self._var_sizes['linear']
 
         self._owned_sizes = self._var_sizes['nonlinear']['output']
-
-        self._setup_global_shapes()
 
     def _setup_partials(self):
         """
@@ -443,27 +448,32 @@ class Component(System):
         if tags is not None and not isinstance(tags, (str, list)):
             raise TypeError('The tags argument should be a str or list')
 
+        src_slice = None
+        if src_indices is not None:
+            if _is_slicer_op(src_indices):
+                src_slice = src_indices
+                if flat_src_indices is not None:
+                    simple_warning(f"{self.msginfo}: Input '{name}' was added with slice "
+                                   "src_indices, so flat_src_indices is ignored.")
+                flat_src_indices = True
+            else:
+                src_indices = np.asarray(src_indices, dtype=INT_DTYPE)
+
         # value, shape: based on args, making sure they are compatible
         value, shape, src_indices = ensure_compatible(name, val, shape, src_indices)
-        distributed = self.options['distributed']
 
         metadata = {
             'value': value,
             'shape': shape,
             'size': np.prod(shape),
-            'src_indices': None,
+            'src_indices': src_indices,  # these will ultimately be converted to a flat index array
             'flat_src_indices': flat_src_indices,
+            'src_slice': src_slice,  # store slice def here, if any.  This is never overwritten
             'units': units,
             'desc': desc,
-            'distributed': distributed,
+            'distributed': self.options['distributed'],
             'tags': make_set(tags),
         }
-
-        if src_indices is not None:
-            if _is_slicer_op(src_indices):
-                metadata['src_indices'] = src_indices
-            else:
-                metadata['src_indices'] = np.asarray(src_indices, dtype=INT_DTYPE)
 
         if self._static_mode:
             var_rel2meta = self._static_var_rel2meta
