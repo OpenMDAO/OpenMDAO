@@ -328,8 +328,25 @@ class TestPassSizeDistributed(unittest.TestCase):
         self.assertEqual(np.sum(prob.get_val('E.out')), (n**2 + n)/2 * size_down)
 
 
+class ResizableComp(om.ExplicitComponent):
+    def __init__(self, n_inputs=1, size=5, mult=2.):
+        super(ResizableComp, self).__init__()
+        self.n_inputs = n_inputs
+        self.size = size
+        self.mult = mult
+
+    def setup(self):
+        for i in range(self.n_inputs):
+            self.add_input(f"x{i+1}", val=np.ones(self.size))
+            self.add_output(f"y{i+1}", val=np.ones(self.size))
+
+    def compute(self, inputs, outputs):
+        for i in range(self.n_inputs):
+            outputs[f"y{i+1}"] = self.mult*inputs[f"x{i+1}"]
+
+
 class DynShapeComp(om.ExplicitComponent):
-    def __init__(self, n_inputs=2):
+    def __init__(self, n_inputs=1):
         super(DynShapeComp, self).__init__()
         self.n_inputs = n_inputs
 
@@ -341,6 +358,42 @@ class DynShapeComp(om.ExplicitComponent):
     def compute(self, inputs, outputs):
         for i in range(self.n_inputs):
             outputs[f"y{i+1}"] = 2*inputs[f"x{i+1}"]
+
+
+class DistribDynShapeComp(DynShapeComp):
+    def __init__(self, n_inputs=1):
+        super(DistribDynShapeComp, self).__init__(n_inputs)
+        self.options['distributed'] = True
+
+    def setup(self):
+        for i in range(self.n_inputs):
+            self.add_input(f"x{i+1}", shape_by_conn=True, copy_shape=f"y{i+1}")
+            self.add_output(f"y{i+1}", shape_by_conn=True, copy_shape=f"x{i+1}")
+
+    def compute(self, inputs, outputs):
+        for i in range(self.n_inputs):
+            outputs[f"y{i+1}"] = 2*inputs[f"x{i+1}"]
+
+
+class DistribComp(om.ExplicitComponent):
+    def __init__(self, global_size, n_inputs=2):
+        super(DistribComp, self).__init__()
+        self.n_inputs = n_inputs
+        self.global_size = global_size
+        self.options['distributed'] = True
+
+    def setup(self):
+        # evenly distribute the variable over the procs
+        ave, res = divmod(self.global_size, self.comm.size)
+        sizes = [ave + 1 if p < res else ave for p in range(self.comm.size)]
+
+        for i in range(self.n_inputs):
+            self.add_input(f"x{i+1}", val=np.ones(sizes[rank]))
+            self.add_output(f"y{i+1}", val=np.ones(sizes[rank]))
+
+    def compute(self, inputs, outputs):
+        for i in range(self.n_inputs):
+            outputs[f"y{i+1}"] = (self.comm.rank + 1)*inputs[f"x{i+1}"]
 
 
 class DynShapeGroup(om.Group):
@@ -378,6 +431,23 @@ class TestCycles(unittest.TestCase):
         p.run_model()
         np.testing.assert_allclose(p['sink.y1'], np.ones((2,3))*16)
         np.testing.assert_allclose(p['sink.y2'], np.ones((4,2))*16)
+
+    def test_resetup(self):
+        # test that the dynamic sizing reflects any changes that occur prior to 2nd call to setup.
+        p = om.Problem()
+        ninputs = 1
+        p.model.add_subsystem('Gdyn', DynShapeGroup(2, ninputs))
+        comp = p.model.add_subsystem('sink', ResizableComp(ninputs, 10, 3.))
+        p.model.connect('Gdyn.C2.y1', 'sink.x1')
+        p.setup()
+        p.run_model()
+        np.testing.assert_allclose(p['sink.y1'], np.ones(10)*12)
+
+        # now change the size and setup again
+        comp.size = 5
+        p.setup()
+        p.run_model()
+        np.testing.assert_allclose(p['sink.y1'], np.ones(5)*12)
 
     def test_cycle_fwd_rev(self):
         # now put the DynShapeGroup in a cycle (sink.y2 feeds back into Gdyn.C1.x2). Sizes are known
