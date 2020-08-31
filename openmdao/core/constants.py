@@ -2,7 +2,15 @@
 Various objects to be used as constants.
 """
 
+import os
 from enum import IntEnum
+import numpy as np
+
+# This is the dtype we use for index arrays.  Petsc by default uses 32 bit ints
+if os.environ.get('OPENMDAO_USE_BIG_INTS'):
+    INT_DTYPE = np.dtype(np.int64)
+else:
+    INT_DTYPE = np.dtype(np.int32)
 
 
 class _SetupStatus(IntEnum):

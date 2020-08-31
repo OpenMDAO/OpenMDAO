@@ -6,10 +6,10 @@ from collections import defaultdict
 
 from openmdao.vectors.transfer import Transfer
 from openmdao.vectors.default_transfer import DefaultTransfer, _merge
-from openmdao.vectors.vector import INT_DTYPE
+from openmdao.core.constants import INT_DTYPE
 from openmdao.utils.mpi import MPI
-from openmdao.utils.array_utils import convert_neg, _flatten_src_indices
-from openmdao.utils.general_utils import _is_slicer_op, _slice_indices
+from openmdao.utils.array_utils import convert_neg
+from openmdao.utils.general_utils import _is_slicer_op
 
 _empty_idx_array = np.array([], dtype=INT_DTYPE)
 
@@ -125,14 +125,7 @@ class PETScTransfer(DefaultTransfer):
                         if meta_in['size'] > sizes_out[owner, idx_out]:
                             src_indices = np.arange(meta_in['size'], dtype=INT_DTYPE)
                     elif src_indices.ndim == 1:
-                        if _is_slicer_op(src_indices):
-                            indices = _slice_indices(src_indices, meta_out['global_size'],
-                                                     meta_out['global_shape'])
-                            src_indices = convert_neg(indices, meta_out['global_size'])
-                    else:
-                        src_indices = _flatten_src_indices(src_indices, meta_in['shape'],
-                                                           meta_out['global_shape'],
-                                                           meta_out['global_size'])
+                        src_indices = convert_neg(src_indices, meta_out['global_size'])
 
                     # 1. Compute the output indices
                     # NOTE: src_indices are relative to a single, possibly distributed variable,

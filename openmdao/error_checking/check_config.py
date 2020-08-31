@@ -303,9 +303,10 @@ def _list_has_val_mismatch(discretes, names, units, vals):
 
 def _check_hanging_inputs(problem, logger):
     """
-    Issue a logger warning if any inputs are not connected.
+    Issue a logger warning if any model inputs are not connected.
 
-    Promoted inputs are shown alongside their corresponding absolute names.
+    If an input is declared as a design variable, it is considered to be connected. Promoted
+    inputs are shown alongside their corresponding absolute names.
 
     Parameters
     ----------
@@ -314,55 +315,28 @@ def _check_hanging_inputs(problem, logger):
     logger : object
         The object that manages logging output.
     """
-    if isinstance(problem.model, Component):
-        input_srcs = {}
-    else:
-        input_srcs = problem.model._conn_global_abs_in2out
+    model = problem.model
+    if isinstance(model, Component):
+        return
 
-    prom_ins = problem.model._var_allprocs_prom2abs_list['input']
-    abs2meta = problem.model._var_allprocs_abs2meta
+    conns = model._conn_global_abs_in2out
+    abs2prom = model._var_allprocs_abs2prom['input']
+    desvar = problem.driver._designvars
     unconns = []
-    nwid = uwid = 0
+    for abs_tgt, src in conns.items():
+        if src.startswith('_auto_ivc.'):
+            prom_tgt = abs2prom[abs_tgt]
 
-    for prom, abslist in prom_ins.items():
-        unconn = [a for a in abslist if a not in input_srcs or len(input_srcs[a]) == 0]
-        if unconn:
-            w = max([len(u) for u in unconn])
-            if w > nwid:
-                nwid = w
-            units = [abs2meta[a]['units'] if a in abs2meta else '' for a in unconn]
-            units = [u if u is not None else '' for u in units]
-            lens = [len(u) for u in units]
-            if lens:
-                u = max(lens)
-                if u > uwid:
-                    uwid = u
-            unconns.append((prom, unconn, units))
+            # Ignore inputs that are declared as design vars.
+            if desvar and prom_tgt in desvar:
+                continue
+
+            unconns.append((prom_tgt, abs_tgt))
 
     if unconns:
-        template_abs = "   {:<{nwid}} {:<{uwid}} {}\n"
-        template_prom = "      {:<{nwid}} {:<{uwid}} {}\n"
         msg = ["The following inputs are not connected:\n"]
-        for prom, absnames, units in sorted(unconns, key=lambda x: x[0]):
-            if len(absnames) == 1 and prom == absnames[0]:  # not really promoted
-                a = absnames[0]
-                valstr = _trim_str(problem.get_val(a, get_remote=True), 25)
-                msg.append(template_abs.format(a, units[0], valstr, nwid=nwid + 3, uwid=uwid))
-            else:  # promoted
-                vals = [problem.get_val(a, get_remote=True) for a in absnames]
-                mismatch = _list_has_val_mismatch(problem.model._var_allprocs_discrete['input'],
-                                                  absnames, units, vals)
-                if mismatch:
-                    msg.append("\n   ----- WARNING: connected input values don't match when "
-                               "converted to consistent units. -----\n")
-                msg.append("   {}  (p):\n".format(prom))
-                for a, u, v in zip(absnames, units, vals):
-                    valstr = _trim_str(problem.get_val(a, get_remote=True), 25)
-                    msg.append(template_prom.format(a, u, valstr, nwid=nwid, uwid=uwid))
-                if mismatch:
-                    msg.append("   --------------------------------------------------------------"
-                               "-----------------------------\n\n")
-
+        for prom_tgt, abs_tgt in sorted(unconns):
+            msg.append(f'  {prom_tgt} ({abs_tgt})\n')
         logger.warning(''.join(msg))
 
 

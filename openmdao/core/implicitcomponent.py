@@ -66,16 +66,17 @@ class ImplicitComponent(Component):
         Compute residuals. The model is assumed to be in a scaled state.
         """
         with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
-            with Recording(self.pathname + '._apply_nonlinear', self.iter_count, self):
-                self._inputs.read_only = self._outputs.read_only = True
-                try:
-                    if self._discrete_inputs or self._discrete_outputs:
-                        self.apply_nonlinear(self._inputs, self._outputs, self._residuals,
-                                             self._discrete_inputs, self._discrete_outputs)
-                    else:
-                        self.apply_nonlinear(self._inputs, self._outputs, self._residuals)
-                finally:
-                    self._inputs.read_only = self._outputs.read_only = False
+            self._inputs.read_only = self._outputs.read_only = True
+            try:
+                if self._discrete_inputs or self._discrete_outputs:
+                    self.apply_nonlinear(self._inputs, self._outputs, self._residuals,
+                                         self._discrete_inputs, self._discrete_outputs)
+                else:
+                    self.apply_nonlinear(self._inputs, self._outputs, self._residuals)
+            finally:
+                self._inputs.read_only = self._outputs.read_only = False
+
+        self.iter_count_apply += 1
 
     def _solve_nonlinear(self):
         """
@@ -97,6 +98,8 @@ class ImplicitComponent(Component):
                             self.solve_nonlinear(self._inputs, self._outputs)
         finally:
             self._inputs.read_only = False
+
+        # Iteration counter is incremented in the Recording context manager at exit.
 
     def _guess_nonlinear(self):
         """

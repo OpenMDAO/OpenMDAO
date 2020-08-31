@@ -80,9 +80,10 @@ class TestBalanceComp(unittest.TestCase):
         prob.setup()
 
         prob.run_model()
-        self.assertEqual(prob._metadata['meta']['balance.x']['units'], 'm')
-        self.assertEqual(prob._metadata['meta']['balance.rhs:x']['units'], 'm')
-        self.assertEqual(prob._metadata['meta']['balance.lhs:x']['units'], 'm')
+        meta = prob.model._var_abs2meta
+        self.assertEqual(meta['balance.x']['units'], 'm')
+        self.assertEqual(meta['balance.rhs:x']['units'], 'm')
+        self.assertEqual(meta['balance.lhs:x']['units'], 'm')
 
     def test_create_on_init(self):
 
