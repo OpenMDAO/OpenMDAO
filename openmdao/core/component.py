@@ -159,7 +159,8 @@ class Component(System):
         # reset shape if any dynamic shape parameters are set in case this is a resetup
         # NOTE: this is necessary because we allow variables to be added in __init__.
         for meta in self._static_var_rel2meta.values():
-            if 'shape_by_conn' in meta and (meta['shape_by_conn'] or meta['copy_shape'] is not None):
+            if 'shape_by_conn' in meta and (meta['shape_by_conn'] or
+                                            meta['copy_shape'] is not None):
                 meta['shape'] = None
 
         self._var_rel2meta.update(self._static_var_rel2meta)
