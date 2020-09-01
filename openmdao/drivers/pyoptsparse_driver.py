@@ -443,7 +443,6 @@ class pyOptSparseDriver(Driver):
                 model.run_solve_nonlinear()
             except AnalysisError:
                 model._clear_iprint()
-                fail = 1
 
             rec.abs = 0.0
             rec.rel = 0.0
