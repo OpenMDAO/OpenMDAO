@@ -113,7 +113,7 @@ class E(om.ExplicitComponent):
         outputs['out'] = inputs['in']
 
 
-class B_dis(om.ExplicitComponent):
+class B_distrib(om.ExplicitComponent):
     def initialize(self):
         self.options['distributed'] = True
 
@@ -126,7 +126,7 @@ class B_dis(om.ExplicitComponent):
         outputs['out'] = inputs['in']
 
 
-class C_dis(om.ExplicitComponent):
+class C_distrib(om.ExplicitComponent):
     def initialize(self):
         self.options['distributed'] = True
 
@@ -145,7 +145,7 @@ class C_dis(om.ExplicitComponent):
         outputs['out'] *= self.comm.rank
 
 
-class D_dis(om.ExplicitComponent):
+class D_distrib(om.ExplicitComponent):
     def initialize(self):
         self.options['distributed'] = True
 
@@ -221,13 +221,13 @@ class TestPassSizeDistributed(unittest.TestCase):
         indeps = prob.model.add_subsystem('A', om.IndepVarComp())
         indeps.add_output('out', shape_by_conn=True)
 
-        prob.model.add_subsystem('B', B_dis())
+        prob.model.add_subsystem('B', B_distrib())
         prob.model.connect('A.out', ['B.in'])
 
         prob.model.add_subsystem('C', C())
         prob.model.connect('B.out', ['C.in'])
 
-        prob.model.add_subsystem('D', D_dis())
+        prob.model.add_subsystem('D', D_distrib())
         prob.model.connect('C.out', ['D.in'])
 
         prob.model.add_subsystem('E', E())
@@ -279,13 +279,13 @@ class TestPassSizeDistributed(unittest.TestCase):
         indeps = prob.model.add_subsystem('A', om.IndepVarComp())
         indeps.add_output('out', shape_by_conn=True)
 
-        prob.model.add_subsystem('B', B_dis())
+        prob.model.add_subsystem('B', B_distrib())
         prob.model.connect('A.out', ['B.in'])
 
-        prob.model.add_subsystem('C', C_dis())
+        prob.model.add_subsystem('C', C_distrib())
         prob.model.connect('B.out', ['C.in'])
 
-        prob.model.add_subsystem('D', D_dis())
+        prob.model.add_subsystem('D', D_distrib())
         prob.model.connect('C.out', ['D.in'])
 
         prob.model.add_subsystem('E', E())
@@ -329,6 +329,7 @@ class TestPassSizeDistributed(unittest.TestCase):
 
 
 class ResizableComp(om.ExplicitComponent):
+    # this is just a component that allows us to resize between setups
     def __init__(self, n_inputs=1, size=5, mult=2.):
         super(ResizableComp, self).__init__()
         self.n_inputs = n_inputs
@@ -346,6 +347,7 @@ class ResizableComp(om.ExplicitComponent):
 
 
 class DynShapeComp(om.ExplicitComponent):
+    # component whose inputs and outputs are dynamically shaped
     def __init__(self, n_inputs=1):
         super(DynShapeComp, self).__init__()
         self.n_inputs = n_inputs
@@ -359,9 +361,11 @@ class DynShapeComp(om.ExplicitComponent):
             outputs[f"y{i+1}"] = 2*inputs[f"x{i+1}"]
 
 
-class DistribDynShapeComp(DynShapeComp):
+class DistribDynShapeComp(om.ExplicitComponent):
+    # a distributed component whose inputs and outputs are dynamically shaped
     def __init__(self, n_inputs=1):
-        super(DistribDynShapeComp, self).__init__(n_inputs)
+        super(DistribDynShapeComp, self).__init__()
+        self.n_inputs = n_inputs
         self.options['distributed'] = True
 
     def setup(self):
@@ -375,6 +379,7 @@ class DistribDynShapeComp(DynShapeComp):
 
 
 class DistribComp(om.ExplicitComponent):
+    # a distributed component with inputs and outputs that are not dynamically shaped
     def __init__(self, global_size, n_inputs=2):
         super(DistribComp, self).__init__()
         self.n_inputs = n_inputs
@@ -395,28 +400,44 @@ class DistribComp(om.ExplicitComponent):
             outputs[f"y{i+1}"] = (self.comm.rank + 1)*inputs[f"x{i+1}"]
 
 
-class DynShapeGroup(om.Group):
-    # strings together some number of DynShapeComps in series
-    def __init__(self, n_comps, n_inputs):
-        super(DynShapeGroup, self).__init__()
+class DynShapeGroupSeries(om.Group):
+    # strings together some number of components in series.
+    # component type is determined by comp_class
+    def __init__(self, n_comps, n_inputs, comp_class):
+        super(DynShapeGroupSeries, self).__init__()
         self.n_comps = n_comps
         self.n_inputs = n_inputs
+        self.comp_class = comp_class
 
         for icmp in range(1, self.n_comps + 1):
-            self.add_subsystem(f"C{icmp}", DynShapeComp(n_inputs=self.n_inputs))
+            self.add_subsystem(f"C{icmp}", self.comp_class(n_inputs=self.n_inputs))
 
         for icmp in range(1, self.n_comps):
             for i in range(1, self.n_inputs + 1):
                 self.connect(f"C{icmp}.y{i}", f"C{icmp+1}.x{i}")
 
 
-class TestCycles(unittest.TestCase):
-    def test_baseline(self):
-        # this is just a sized source and unsized sink, and we put a DynShapeGroup in between them
+class DynShapeGroupConnectedInputs(om.Group):
+    # contains some number of components with all of their matching inputs connected.
+    # component type is determined by comp_class
+    def __init__(self, n_comps, n_inputs, comp_class):
+        super(DynShapeGroupConnectedInputs, self).__init__()
+        self.n_comps = n_comps
+        self.n_inputs = n_inputs
+        self.comp_class = comp_class
+
+        for icmp in range(1, self.n_comps + 1):
+            self.add_subsystem(f"C{icmp}", self.comp_class(n_inputs=self.n_inputs),
+                               promotes_inputs=['*'])
+
+
+class TestDynShapes(unittest.TestCase):
+    def test_baseline_series(self):
+        # this is just a sized source and unsized sink, and we put a DynShapeGroupSeries in between them
         p = om.Problem()
         indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
         indep.add_output('x2', val=np.ones((4,2)))
-        p.model.add_subsystem('Gdyn', DynShapeGroup(3, 2))
+        p.model.add_subsystem('Gdyn', DynShapeGroupSeries(3, 2, DynShapeComp))
         p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
                                                   x1={'shape_by_conn': True, 'copy_shape': 'y1'},
                                                   x2={'shape_by_conn': True, 'copy_shape': 'y2'},
@@ -431,11 +452,34 @@ class TestCycles(unittest.TestCase):
         np.testing.assert_allclose(p['sink.y1'], np.ones((2,3))*16)
         np.testing.assert_allclose(p['sink.y2'], np.ones((4,2))*16)
 
+    def test_baseline_conn_inputs(self):
+        # this is a sized source and unsized sink, with a DynShapeGroupConnectedInputs between them
+        # indep.x? connects to Gdyn.C?.x?
+        p = om.Problem()
+        indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))),
+                                      promotes_outputs=['*'])
+        indep.add_output('x2', val=np.ones((4,2)))
+        p.model.add_subsystem('Gdyn', DynShapeGroupConnectedInputs(2, 2, DynShapeComp),
+                              promotes_inputs=['*'])
+        p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
+                                                  x1={'shape_by_conn': True, 'copy_shape': 'y1'},
+                                                  x2={'shape_by_conn': True, 'copy_shape': 'y2'},
+                                                  y1={'shape_by_conn': True, 'copy_shape': 'x1'},
+                                                  y2={'shape_by_conn': True, 'copy_shape': 'x2'}))
+        p.model.connect('Gdyn.C1.y1', 'sink.x1')
+        p.model.connect('Gdyn.C2.y2', 'sink.x2')
+        p.setup()
+        p.run_model()
+        np.testing.assert_allclose(p['sink.y1'], np.ones((2,3))*4)
+        np.testing.assert_allclose(p['sink.y2'], np.ones((4,2))*4)
+        np.testing.assert_allclose(p['Gdyn.C1.y2'], np.ones((4,2))*2)  # unconnected dyn shaped output
+        np.testing.assert_allclose(p['Gdyn.C2.y1'], np.ones((2,3))*2)  # unconnected dyn shaped output
+
     def test_resetup(self):
         # test that the dynamic sizing reflects any changes that occur prior to 2nd call to setup.
         p = om.Problem()
         ninputs = 1
-        p.model.add_subsystem('Gdyn', DynShapeGroup(2, ninputs))
+        p.model.add_subsystem('Gdyn', DynShapeGroupSeries(2, ninputs, DynShapeComp))
         comp = p.model.add_subsystem('sink', ResizableComp(ninputs, 10, 3.))
         p.model.connect('Gdyn.C2.y1', 'sink.x1')
         p.setup()
@@ -449,11 +493,11 @@ class TestCycles(unittest.TestCase):
         np.testing.assert_allclose(p['sink.y1'], np.ones(5)*12)
 
     def test_cycle_fwd_rev(self):
-        # now put the DynShapeGroup in a cycle (sink.y2 feeds back into Gdyn.C1.x2). Sizes are known
+        # now put the DynShapeGroupSeries in a cycle (sink.y2 feeds back into Gdyn.C1.x2). Sizes are known
         # at both ends of the model (the IVC and at the sink)
         p = om.Problem()
         indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
-        p.model.add_subsystem('Gdyn', DynShapeGroup(3,2))
+        p.model.add_subsystem('Gdyn', DynShapeGroupSeries(3,2, DynShapeComp))
         p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
                                                   x1=np.ones((2,3)),
                                                   x2=np.ones((4,2)),
@@ -474,10 +518,10 @@ class TestCycles(unittest.TestCase):
         np.testing.assert_allclose(p['sink.y2'], np.ones((4,2))*256)
 
     def test_cycle_rev(self):
-        # now put the DynShapeGroup in a cycle (sink.y2 feeds back into Gdyn.C1.x2), but here,
+        # now put the DynShapeGroupSeries in a cycle (sink.y2 feeds back into Gdyn.C1.x2), but here,
         # only the sink outputs are known and inputs are coming from auto_ivcs.
         p = om.Problem()
-        p.model.add_subsystem('Gdyn', DynShapeGroup(3,2))
+        p.model.add_subsystem('Gdyn', DynShapeGroupSeries(3,2, DynShapeComp))
         p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
                                                   x1=np.ones((2,3)),
                                                   x2=np.ones((4,2)),
@@ -497,11 +541,11 @@ class TestCycles(unittest.TestCase):
         np.testing.assert_allclose(p['sink.y2'], np.ones((4,2))*256)
 
     def test_cycle_unresolved(self):
-        # now put the DynShapeGroup in a cycle (sink.y2 feeds back into Gdyn.C1.x2), but here,
+        # now put the DynShapeGroupSeries in a cycle (sink.y2 feeds back into Gdyn.C1.x2), but here,
         # sink.y2 is unsized, so no var in the '2' loop can get resolved.
         p = om.Problem()
         indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
-        p.model.add_subsystem('Gdyn', DynShapeGroup(3,2))
+        p.model.add_subsystem('Gdyn', DynShapeGroupSeries(3,2, DynShapeComp))
         p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
                                                   x1={'shape_by_conn': True, 'copy_shape': 'y1'},
                                                   x2={'shape_by_conn': True, 'copy_shape': 'y2'},
@@ -518,5 +562,24 @@ class TestCycles(unittest.TestCase):
         self.assertEqual(str(cm.exception), msg)
 
 
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestDistribDynShapes(unittest.TestCase):
+    N_PROCS = 4
+
+    def test_remote_distrib(self):
+        p = om.Problem()
+        par = p.model.add_subsystem('par', om.ParallelGroup(), promotes_inputs=['*'])
+        G1 = par.add_subsystem('G1', DynShapeGroupSeries(2,1, DistribDynShapeComp))
+        G2 = par.add_subsystem('G2', DynShapeGroupSeries(2,1, DistribDynShapeComp))
+        
+        p.model.add_subsystem('sink', om.ExecComp(['y1=x1', 'y2=x2'], shape=(5,)))
+        par.connect('G1.C2.y1', 'sink.x1')
+        par.connect('G1.C1.y1', 'sink.x2')
+        
+        import wingdbstub
+        p.setup()
+        p.run_model()
+        
+        
 if __name__ == "__main__":
     unittest.main()
