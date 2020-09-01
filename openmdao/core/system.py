@@ -2940,7 +2940,7 @@ class System(object):
 
                 if 'size' not in meta:
                     if src_name in abs2idx:
-                        if out[abs_name]['distributed']:
+                        if meta['distributed']:
                             meta['size'] = sizes[self.comm.rank, abs2idx[src_name]]
                         else:
                             meta['size'] = sizes[owning_rank[src_name], abs2idx[src_name]]
@@ -2971,7 +2971,7 @@ class System(object):
 
             if self.comm.size > 1 and self._subsystems_allprocs:
                 for name in out:
-                    if out[abs_name]['distributed']:
+                    if not out[name]['distributed']:
                         allouts = self.comm.allgather(out)
                         out = OrderedDict()
                         for all_out in allouts:
