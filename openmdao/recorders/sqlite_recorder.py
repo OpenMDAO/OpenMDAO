@@ -634,8 +634,6 @@ class SqliteRecorder(CaseRecorder):
             The number of times run_driver or run_model has been called.
         """
         if self.connection:
-            # if run_counter is None:
-            #     run_counter = self._counter
 
             scaling_vecs, user_options = self._get_metadata_system(recording_requester)
 
