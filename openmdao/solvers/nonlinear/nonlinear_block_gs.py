@@ -67,6 +67,8 @@ class NonlinearBlockGS(NonlinearSolver):
                              desc='lower limit for Aitken relaxation factor')
         self.options.declare('aitken_max_factor', default=1.5,
                              desc='upper limit for Aitken relaxation factor')
+        self.options.declare('aitken_initial_factor', default=1.0,
+                             desc='initial value for Aitken relaxation factor')
         self.options.declare('cs_reconverge', types=bool, default=True,
                              desc='When True, when this driver solves under a complex step, nudge '
                              'the Solution vector by a small amount so that it reconverges.')
@@ -123,6 +125,7 @@ class NonlinearBlockGS(NonlinearSolver):
             # some variables that are used for Aitken's relaxation
             delta_outputs_n_1 = self._delta_outputs_n_1
             theta_n_1 = self._theta_n_1
+            theta_n = self.options['aitken_initial_factor']
 
             # store a copy of the outputs, used to compute the change in outputs later
             delta_outputs_n = outputs.asarray(copy=True)
@@ -176,13 +179,14 @@ class NonlinearBlockGS(NonlinearSolver):
 
                 theta_n = theta_n_1 * (1 - tddo / temp_norm ** 2)
 
-                # limit relaxation factor to the specified range
-                theta_n = max(aitken_min_factor, min(aitken_max_factor, theta_n))
-
-                # save relaxation factor for the next iteration
-                theta_n_1 = theta_n
             else:
-                theta_n = 1.
+                # keep the initial the relaxation factor
+                pass
+
+            # limit relaxation factor to the specified range
+            theta_n = max(aitken_min_factor, min(aitken_max_factor, theta_n))
+            # save relaxation factor for the next iteration
+            self._theta_n_1 = theta_n
 
             if not self.options['use_apply_nonlinear']:
                 with system._unscaled_context(outputs=[outputs]):
@@ -223,7 +227,7 @@ class NonlinearBlockGS(NonlinearSolver):
         elif itercount < 1:
             # Run instead of calling apply, so that we don't "waste" the extra run. This also
             # further increments the iteration counter.
-            itercount += 1
+            self._iter_count += 1
             outputs = system._outputs
             residuals = system._residuals
 

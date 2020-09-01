@@ -22,6 +22,7 @@ import importlib
 import numpy as np
 import openmdao
 
+from openmdao.core.constants import INT_DTYPE
 
 # Certain command line tools can make use of this to allow visualization of models when errors
 # are present that would normally cause setup to abort.
@@ -44,7 +45,7 @@ def ignore_errors(flag=None):
     """
     global _ignore_errors
     if flag is not None:
-        _ignore_errors = True
+        _ignore_errors = flag
     return _ignore_errors
 
 
@@ -245,11 +246,12 @@ def ensure_compatible(name, value, shape=None, indices=None):
         value = np.asarray(value)
 
     if indices is not None:
-        indices = np.atleast_1d(indices)
         contains_slicer = _is_slicer_op(indices)
-        ind_shape = indices.shape
+        if not contains_slicer:
+            indices = np.atleast_1d(np.asarray(indices, dtype=INT_DTYPE))
+            ind_shape = indices.shape
     else:
-        contains_slicer = None
+        contains_slicer = False
 
     # if shape is not given, infer from value (if not scalar) or indices
     if shape is not None:
@@ -284,7 +286,7 @@ def ensure_compatible(name, value, shape=None, indices=None):
                                  "Expected %s but got %s." %
                                  (name, shape, value.shape))
 
-    if indices is not None and shape != ind_shape[:len(shape)] and not contains_slicer:
+    if indices is not None and not contains_slicer and shape != ind_shape[:len(shape)]:
         raise ValueError("Shape of indices does not match shape for '%s': "
                          "Expected %s but got %s." %
                          (name, shape, ind_shape[:len(shape)]))
@@ -1059,26 +1061,23 @@ def _is_slicer_op(indices):
     bool
         Returns True if indices contains a colon or ellipsis operator.
     """
-    if isinstance(indices, Iterable):
-        if isinstance(indices, (tuple, list, range, str)):
-            return any(isinstance(i, slice) or i is ... for i in indices)
-        else:
-            return any(isinstance(i, slice) or i is ... for i in indices.flatten())
-    else:
-        return isinstance(indices, slice)
+    if isinstance(indices, tuple):
+        return any(isinstance(i, slice) or i is ... for i in indices)
+
+    return isinstance(indices, slice)
 
 
-def _slice_indices(slicer, out_size, out_shape):
+def _slice_indices(slicer, arr_size, arr_shape):
     """
-    Check if an array of indices contains a slice object.
+    Return an index array based on a slice or slice tuple and the array size and shape.
 
     Parameters
     ----------
-    slicer : slice
+    slicer : slice or tuple containing slices
         Slice object to slice array
-    out_size : int
+    arr_size : int
         Size of output array
-    out_shape : tuple
+    arr_shape : tuple
         Tuple of output array shape
 
     Returns
@@ -1086,7 +1085,7 @@ def _slice_indices(slicer, out_size, out_shape):
     array
         Returns the sliced indices.
     """
-    return np.arange(out_size, dtype=int).reshape(out_shape)[tuple(slicer)]
+    return np.arange(arr_size, dtype=INT_DTYPE).reshape(arr_shape)[slicer]
 
 
 def prom2ivc_src_dict(prom_dict):

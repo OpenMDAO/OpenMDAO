@@ -4,7 +4,8 @@ import numbers
 
 import numpy as np
 
-from openmdao.vectors.vector import Vector, INT_DTYPE, _full_slice
+from openmdao.core.constants import INT_DTYPE
+from openmdao.vectors.vector import Vector, _full_slice
 from openmdao.vectors.default_transfer import DefaultTransfer
 from openmdao.utils.mpi import MPI, multi_proc_exception_check
 
