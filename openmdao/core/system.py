@@ -2970,12 +2970,10 @@ class System(object):
                     out.update(dvs)
 
             if self.comm.size > 1 and self._subsystems_allprocs:
-                for name in out:
-                    if not out[name]['distributed']:
-                        allouts = self.comm.allgather(out)
-                        out = OrderedDict()
-                        for all_out in allouts:
-                            out.update(all_out)
+                allouts = self.comm.allgather(out)
+                out = OrderedDict()
+                for all_out in allouts:
+                    out.update(all_out)
 
         return out
 
