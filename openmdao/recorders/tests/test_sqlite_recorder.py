@@ -2605,14 +2605,10 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         prob.setup()
 
-        # declare two options
-        d1 = prob.model.d1
-        d1.options.declare('options value 1', 1)
-
-        # create recorder and attach to driver and d1
+        # create recorder and attach to driver and model
         recorder = om.SqliteRecorder("cases.sql")
         prob.driver.add_recorder(recorder)
-        d1.add_recorder(recorder)
+        prob.model.add_recorder(recorder)
 
         prob.run_model()
         prob.cleanup()
@@ -2620,15 +2616,13 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         cr = om.CaseReader("cases.sql")
 
         # metadata for all the systems in the model
-        metadata = cr._system_options
+        metadata = cr.list_model_options()
 
         self.assertEqual(sorted(metadata.keys()),
-                         sorted(['root', '_auto_ivc', 'd1', 'd2', 'obj_cmp', 'con_cmp1',
-                                 'con_cmp2']))
+                         sorted(['root']))
 
-        # options for system 'd1', with second option excluded
-        self.assertEqual(metadata['d1']['component_options']['distributed'], False)
-        self.assertEqual(metadata['d1']['component_options']['options value 1'], 1)
+        # options for system 'root'
+        self.assertEqual(metadata['root']['ln_maxiter'], None)
 
     def test_feature_system_recording_options(self):
         import openmdao.api as om
