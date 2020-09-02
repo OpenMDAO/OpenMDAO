@@ -1290,7 +1290,6 @@ class TestParallelDOE(unittest.TestCase):
         self.assertEqual(sum(num_cases), len(expected))
 
     def test_fan_in_grouped(self):
-        #import wingdbstub
         # run 2 cases at a time, each using 2 of our 4 procs
         doe_parallel = 2
 
