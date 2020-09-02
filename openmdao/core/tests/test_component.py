@@ -20,13 +20,13 @@ class TestExplicitComponent(unittest.TestCase):
 
         # check optional metadata (desc)
         self.assertEqual(
-            comp._var_abs2meta['length']['desc'],
+            comp._var_abs2meta['input']['length']['desc'],
             'length of rectangle')
         self.assertEqual(
-            comp._var_abs2meta['width']['desc'],
+            comp._var_abs2meta['input']['width']['desc'],
             'width of rectangle')
         self.assertEqual(
-            comp._var_abs2meta['area']['desc'],
+            comp._var_abs2meta['output']['area']['desc'],
             'area of rectangle')
 
         prob['length'] = 3.
@@ -205,13 +205,13 @@ class TestExplicitComponent(unittest.TestCase):
         comp = model.add_subsystem('comp', MyComp())
 
         prob.setup()
-        self.assertEqual(comp._var_abs_names['input'], ['comp.x'])
-        self.assertEqual(comp._var_abs_names['output'], ['comp.y'])
+        self.assertEqual(list(comp._var_abs2meta['input']), ['comp.x'])
+        self.assertEqual(list(comp._var_abs2meta['output']), ['comp.y'])
 
         prob.run_model()
         prob.setup()
-        self.assertEqual(comp._var_abs_names['input'], ['comp.x'])
-        self.assertEqual(comp._var_abs_names['output'], ['comp.y'])
+        self.assertEqual(list(comp._var_abs2meta['input']), ['comp.x'])
+        self.assertEqual(list(comp._var_abs2meta['output']), ['comp.y'])
 
     def test_add_input_output_dupes(self):
 

@@ -514,7 +514,7 @@ class MPITests(unittest.TestCase):
         test = self
 
         def verify(inputs, outputs, in_vals=1., out_vals=1., pathnames=False, comm=None, final=True, rank=None):
-            global_shape = (size, ) if final else 'Unavailable'
+            global_shape = (size, )
 
             inputs = sorted(inputs)
             outputs = sorted(outputs)
@@ -768,7 +768,7 @@ class MPITests(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             prob.setup()
 
-        msg = ' Distributed component input "C.invec" requires an IndepVarComp.'
+        msg = 'Distributed component input "C.invec" requires an IndepVarComp.'
 
         err_msg = str(context.exception).split(':')[-1]
         self.assertEqual(err_msg, msg)

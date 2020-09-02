@@ -94,11 +94,10 @@ class ExplicitComponent(Component):
         """
         if wrt_matches is None:
             wrt_matches = ContainsAll()
-        abs2meta = self._var_allprocs_abs2meta
         offset = end = 0
-        for wrt in self._var_allprocs_abs_names['input']:
+        for wrt, meta in self._var_allprocs_abs2meta['input'].items():
             if wrt in wrt_matches:
-                end += abs2meta[wrt]['size']
+                end += meta['size']
                 yield wrt, offset, end, _full_slice
                 offset = end
 
@@ -108,13 +107,11 @@ class ExplicitComponent(Component):
         """
         super(ExplicitComponent, self)._setup_partials()
 
-        abs2meta = self._var_abs2meta
         abs2prom_out = self._var_abs2prom['output']
 
         # Note: These declare calls are outside of setup_partials so that users do not have to
         # call the super version of setup_partials. This is still in the final setup.
-        for out_abs in self._var_abs_names['output']:
-            meta = abs2meta[out_abs]
+        for out_abs, meta in self._var_abs2meta['output'].items():
             out_name = abs2prom_out[out_abs]
             arange = np.arange(meta['size'])
 

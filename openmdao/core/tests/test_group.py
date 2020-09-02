@@ -1213,7 +1213,7 @@ class TestGroup(unittest.TestCase):
         prob.set_solver_print(level=0)
 
         self.assertEqual(['C1', 'C2', 'C3'],
-                         [s.name for s in model._static_subsystems_allprocs])
+                         [s.name for s, _ in model._static_subsystems_allprocs.values()])
 
         prob.setup()
         prob.set_val('x', 1.)
@@ -2966,7 +2966,8 @@ class Test3Deep(unittest.TestCase):
         Compare the given metadata dict to the internal metadata dicts of the given parent.
         """
         system = p.model._get_subsystem(parent)
-        metas = (system._var_allprocs_abs2meta, system._var_abs2meta)
+        metas = (system._var_allprocs_abs2meta['input'], system._var_allprocs_abs2meta['output'],
+                 system._var_abs2meta['input'], system._var_abs2meta['output'])
         for vname, meta in meta_dict.items():
             for key, val in meta.items():
                 for mymeta in metas:
@@ -3115,7 +3116,7 @@ class TestInConfigMPIpar(Test3Deep):
 
         res = p.model.io_results['cfg']
         expected = {'sub.C3.x', 'sub.C3.y', 'sub.C4.x', 'sub.C4.y', 'C1.x', 'C1.y', 'C2.x', 'C2.y'}
-        self.assertEqual(sorted([n for n in res]), sorted(expected))
+        self.assertEqual(sorted(res), sorted(expected))
         self.check_vs_meta(p, 'cfg', res)
 
         res = p.model.cfg.io_results['sub']
@@ -3123,7 +3124,7 @@ class TestInConfigMPIpar(Test3Deep):
             expected = {'C3.y', 'C3.x'}
         else:
             expected = {'C4.y', 'C4.x'}
-        self.assertEqual(sorted([n for n in res]), sorted(expected))
+        self.assertEqual(sorted(res), sorted(expected))
         self.check_vs_meta(p, 'cfg.sub', res)
 
 
@@ -3972,7 +3973,7 @@ class TestNaturalNamingMPI(unittest.TestCase):
                 p.model.comm.barrier()
                 self.assertEqual(p.get_val(name, get_remote=True), 9. + outcount)
 
-        self.assertEqual(p.model._gatherable_vars,
+        self.assertEqual(set(p.model._vars_to_gather),
                          {'par.g1.g2.g3.g4.c1.x', 'par.g1a.g2.g3.g4.c1.x', 'par.g1.g2.g3.g4.c1.y', 'par.g1a.g2.g3.g4.c1.y'})
 
 

@@ -89,10 +89,10 @@ class Component(System):
         super(Component, self).__init__(**kwargs)
 
         self._var_rel_names = {'input': [], 'output': []}
-        self._var_rel2meta = {}
+        self._var_rel2meta = OrderedDict()
 
         self._static_var_rel_names = {'input': [], 'output': []}
-        self._static_var_rel2meta = {}
+        self._static_var_rel2meta = OrderedDict()
 
         self._declared_partials = defaultdict(dict)
         self._declared_partial_checks = []
@@ -154,7 +154,7 @@ class Component(System):
 
         # Clear out old variable information so that we can call setup on the component.
         self._var_rel_names = {'input': [], 'output': []}
-        self._var_rel2meta = {}
+        self._var_rel2meta = OrderedDict()
 
         # reset shape if any dynamic shape parameters are set in case this is a resetup
         # NOTE: this is necessary because we allow variables to be added in __init__.
@@ -220,59 +220,88 @@ class Component(System):
         global global_meta_names
         super(Component, self)._setup_var_data()
 
-        abs_names = self._var_abs_names = self._var_allprocs_abs_names
-        abs_names_discrete = self._var_abs_names_discrete = self._var_allprocs_abs_names_discrete
-
         allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
-
         abs2prom = self._var_allprocs_abs2prom = self._var_abs2prom
-
-        allprocs_abs2meta = self._var_allprocs_abs2meta
-        abs2meta = self._var_abs2meta
 
         # Compute the prefix for turning rel/prom names into abs names
         prefix = self.pathname + '.' if self.pathname else ''
 
-        for type_ in ['input', 'output']:
-            for prom_name in self._var_rel_names[type_]:
+        self._var_sizes = {'nonlinear': {}}
+        iproc = self.comm.rank
+
+        for io in ['input', 'output']:
+            abs2meta = self._var_abs2meta[io]
+            allprocs_abs2meta = self._var_allprocs_abs2meta[io]
+            sizes = self._var_sizes['nonlinear'][io] = np.zeros((self.comm.size,
+                                                                 len(self._var_rel_names[io])),
+                                                                dtype=INT_DTYPE)
+
+            is_input = io == 'input'
+            for i, prom_name in enumerate(self._var_rel_names[io]):
                 abs_name = prefix + prom_name
                 abs2meta[abs_name] = metadata = self._var_rel2meta[prom_name]
 
-                abs_names[type_].append(abs_name)
-
                 # Compute allprocs_prom2abs_list, abs2prom
-                allprocs_prom2abs_list[type_][prom_name] = [abs_name]
-                abs2prom[type_][abs_name] = prom_name
+                allprocs_prom2abs_list[io][prom_name] = [abs_name]
+                abs2prom[io][abs_name] = prom_name
 
-                # Compute allprocs_abs2meta
                 allprocs_abs2meta[abs_name] = {
                     meta_name: metadata[meta_name]
-                    for meta_name in global_meta_names[type_]
+                    for meta_name in global_meta_names[io]
                 }
+                if is_input and 'src_indices' in metadata:
+                    allprocs_abs2meta[abs_name]['has_src_indices'] = \
+                        metadata['src_indices'] is not None
 
-            for prom_name, val in self._var_discrete[type_].items():
+                    # ensure that if src_indices is a slice we reset it to that instead of
+                    # the converted array value (in case this is a re-setup), so that we can
+                    # re-convert using potentially different sizing information.
+                    if metadata['src_slice'] is not None:
+                        metadata['src_indices'] = metadata['src_slice']
+
+                sz = metadata['size']
+                sizes[iproc, i] = sz if sz is not None else -1
+
+            if self.comm.size > 1:
+                if self.options['distributed']:
+                    for type_ in ['input', 'output']:
+                        sizes_in = sizes[iproc, :].copy()
+                        self.comm.Allgather(sizes_in, sizes)
+                else:
+                    # if component isn't distributed, we don't need to allgather sizes since
+                    # they'll all be the same.
+                    sizes[:] = np.tile(sizes[iproc, :], (self.comm.size, 1))
+
+            for prom_name, val in self._var_discrete[io].items():
                 abs_name = prefix + prom_name
 
-                # Compute allprocs_abs_names_discrete
-                abs_names_discrete[type_].append(abs_name)
-
                 # Compute allprocs_prom2abs_list, abs2prom
-                allprocs_prom2abs_list[type_][prom_name] = [abs_name]
-                abs2prom[type_][abs_name] = prom_name
+                allprocs_prom2abs_list[io][prom_name] = [abs_name]
+                abs2prom[io][abs_name] = prom_name
 
                 # Compute allprocs_discrete (metadata for discrete vars)
-                self._var_allprocs_discrete[type_][abs_name] = v = val.copy()
+                self._var_allprocs_discrete[io][abs_name] = v = val.copy()
                 del v['value']
 
-        for abs_name in abs_names['input']:
-            metadata = abs2meta[abs_name]
-            allprocs_abs2meta[abs_name]['has_src_indices'] = metadata['src_indices'] is not None
+        # all names are relevant for the 'nonlinear' and 'linear' vectors, so
+        # we can set them here, before we've computed the relevance graph.  We
+        # can then use them to compute the size arrays of for all other vectors
+        # based on the nonlinear size array.
+        nl_allprocs_relnames = self._var_allprocs_relevant_names['nonlinear']
+        nl_relnames = self._var_relevant_names['nonlinear']
+        for io in ('input', 'output'):
+            nl_allprocs_relnames[io] = list(self._var_allprocs_abs2meta[io])
+            nl_relnames[io] = list(self._var_abs2meta[io])
+        self._setup_var_index_maps(('nonlinear',))
 
-            # ensure that if src_indices is a slice we reset it to that instead of
-            # the converted array value (in case this is a re-setup), so that we can
-            # re-convert using potentially different sizing information.
-            if metadata['src_slice'] is not None:
-                metadata['src_indices'] = metadata['src_slice']
+        if self._use_derivatives:
+            self._var_sizes['linear'] = self._var_sizes['nonlinear']
+            self._var_allprocs_relevant_names['linear'] = nl_allprocs_relnames
+            self._var_relevant_names['linear'] = nl_relnames
+            self._var_allprocs_abs2idx['linear'] = self._var_allprocs_abs2idx['nonlinear']
+
+        self._owned_sizes = self._var_sizes['nonlinear']['output']
+        self._setup_global_shapes()
 
         if self._var_discrete['input'] or self._var_discrete['output']:
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
@@ -282,56 +311,30 @@ class Component(System):
 
     def _setup_var_sizes(self):
         """
-        Compute the arrays of local variable sizes for all variables/procs on this system.
+        Compute the arrays of variable sizes for all variables/procs on this system.
         """
-        super(Component, self)._setup_var_sizes()
-
-        iproc = self.comm.rank
-        nproc = self.comm.size
-
-        sizes = self._var_sizes
-        abs2meta = self._var_abs2meta
-
         if self._use_derivatives:
-            vec_names = self._lin_rel_vec_name_list
-        else:
-            vec_names = self._vec_names
 
-        # Initialize empty arrays
-        for vec_name in vec_names:
-            # at component level, _var_allprocs_* is the same as var_* since all vars exist in all
-            # procs for a given component, so we don't have to mess with figuring out what vars are
-            # local.
-            if self._use_derivatives:
+            sizes = self._var_sizes
+            abs2idx = self._var_allprocs_abs2idx['nonlinear']
+            nl_sizes = self._var_sizes['nonlinear']
+
+            # Initialize size arrays for other linear vecs besides 'linear'
+            # (which is the same as 'nonlinear' and was computed in _setup_var_data)
+            for vec_name in self._lin_rel_vec_name_list[1:]:
+                # at component level, _var_allprocs_* is the same as var_* since all vars exist in
+                # all procs for a given component, so we don't have to mess with figuring out what
+                # vars are local.
                 relnames = self._var_allprocs_relevant_names[vec_name]
-            else:
-                relnames = self._var_allprocs_abs_names
 
-            sizes[vec_name] = {}
-            for type_ in ('input', 'output'):
-                sizes[vec_name][type_] = sz = np.zeros((nproc, len(relnames[type_])), int)
-
-                # Compute _var_sizes
-                for idx, abs_name in enumerate(relnames[type_]):
-                    sz[iproc, idx] = abs2meta[abs_name]['size']
-
-        if nproc > 1:
-            for vec_name in vec_names:
-                sizes = self._var_sizes[vec_name]
-                if self.options['distributed']:
-                    for type_ in ['input', 'output']:
-                        sizes_in = sizes[type_][iproc, :].copy()
-                        self.comm.Allgather(sizes_in, sizes[type_])
-                else:
-                    # if component isn't distributed, we don't need to allgather sizes since
-                    # they'll all be the same.
-                    for type_ in ['input', 'output']:
-                        sizes[type_] = np.tile(sizes[type_][iproc], (nproc, 1))
-
-        if self._use_derivatives:
-            self._var_sizes['nonlinear'] = self._var_sizes['linear']
-
-        self._owned_sizes = self._var_sizes['nonlinear']['output']
+                sizes[vec_name] = {}
+                for io in ('input', 'output'):
+                    sizes[vec_name][io] = sz = np.zeros((self.comm.size, len(relnames[io])),
+                                                        INT_DTYPE)
+                    # Variables for this vec_name are a subset of those for nonlinear, so just
+                    # take columns of the nonlinear sizes array
+                    for idx, abs_name in enumerate(relnames[io]):
+                        sz[:, idx] = nl_sizes[io][:, abs2idx[abs_name]]
 
     def _setup_partials(self):
         """
@@ -499,6 +502,7 @@ class Component(System):
             'tags': make_set(tags),
             'shape_by_conn': shape_by_conn,
             'copy_shape': copy_shape,
+            'iotype': 'input',
         }
 
         if self._static_mode:
@@ -553,6 +557,7 @@ class Component(System):
             'type': type(val),
             'desc': desc,
             'tags': make_set(tags),
+            'iotype': 'input',
         }
 
         if metadata['type'] == np.ndarray:
@@ -724,7 +729,8 @@ class Component(System):
             'lower': lower,
             'upper': upper,
             'shape_by_conn': shape_by_conn,
-            'copy_shape': copy_shape
+            'copy_shape': copy_shape,
+            'iotype': 'output',
         }
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
@@ -778,7 +784,8 @@ class Component(System):
             'value': val,
             'type': type(val),
             'desc': desc,
-            'tags': make_set(tags)
+            'tags': make_set(tags),
+            'iotype': 'output',
         }
 
         if metadata['type'] == np.ndarray:
@@ -835,18 +842,18 @@ class Component(System):
             return set()
 
         iproc = self.comm.rank
-        abs2meta = self._var_abs2meta
+        abs2meta = self._var_abs2meta['input']
 
         sizes_in = self._var_sizes['nonlinear']['input']
         sizes_out = all_sizes['nonlinear']['output']
         added_src_inds = set()
-        for i, iname in enumerate(self._var_allprocs_abs_names['input']):
+        for i, iname in enumerate(self._var_allprocs_abs2meta['input']):
             if iname in abs2meta and abs2meta[iname]['src_indices'] is None:
                 src = abs_in2out[iname]
                 out_i = all_abs2idx[src]
                 nzs = np.nonzero(sizes_out[:, out_i])[0]
-                if (all_abs2meta[src]['global_size'] == all_abs2meta[iname]['global_size'] or
-                        nzs.size == self.comm.size):
+                if (all_abs2meta['output'][src]['global_size'] ==
+                        all_abs2meta['input'][iname]['global_size'] or nzs.size == self.comm.size):
                     # This offset assumes a 'full' distributed output
                     offset = np.sum(sizes_in[:iproc, i])
                     end = offset + sizes_in[iproc, i]
@@ -863,7 +870,7 @@ class Component(System):
                                "added without src_indices. Setting src_indices to "
                                f"range({offset}, {end}).")
                 abs2meta[iname]['src_indices'] = np.arange(offset, end, dtype=INT_DTYPE)
-                all_abs2meta[iname]['has_src_indices'] = True
+                all_abs2meta['input'][iname]['has_src_indices'] = True
                 added_src_inds.add(iname)
 
         return added_src_inds
@@ -1283,7 +1290,8 @@ class Component(System):
                 cols = None
 
         pattern_matches = self._find_partial_matches(of, wrt)
-        abs2meta = self._var_abs2meta
+        abs2meta_in = self._var_abs2meta['input']
+        abs2meta_out = self._var_abs2meta['output']
 
         is_array = isinstance(val, ndarray)
         patmeta = dict(dct)
@@ -1312,23 +1320,29 @@ class Component(System):
                 else:
                     meta = patmeta.copy()
 
+                of, wrt = abs_key
                 meta['rows'] = rows
                 meta['cols'] = cols
-                meta['shape'] = shape = (abs2meta[abs_key[0]]['size'], abs2meta[abs_key[1]]['size'])
+                csz = abs2meta_in[wrt]['size'] if wrt in abs2meta_in else abs2meta_out[wrt]['size']
+                meta['shape'] = shape = (abs2meta_out[of]['size'], csz)
 
                 if shape[0] == 0 or shape[1] == 0:
                     msg = "{}: '{}' is an array of size 0"
                     if shape[0] == 0:
-                        if not abs2meta[abs_key[0]]['distributed']:
+                        if not abs2meta_out[of]['distributed']:
                             # non-distributed components are not allowed to have zero size inputs
-                            raise ValueError(msg.format(self.msginfo, abs_key[0]))
+                            raise ValueError(msg.format(self.msginfo, of))
                         else:
                             # distributed comp are allowed to have zero size inputs on some procs
                             rows_max = -1
                     if shape[1] == 0:
-                        if not abs2meta[abs_key[1]]['distributed']:
+                        if wrt in abs2meta_in:
+                            distrib = abs2meta_in[wrt]['distributed']
+                        else:
+                            distrib = abs2meta_out[wrt]['distributed']
+                        if not distrib:
                             # non-distributed components are not allowed to have zero size outputs
-                            raise ValueError(msg.format(self.msginfo, abs_key[1]))
+                            raise ValueError(msg.format(self.msginfo, wrt))
                         else:
                             # distributed comp are allowed to have zero size outputs on some procs
                             cols_max = -1

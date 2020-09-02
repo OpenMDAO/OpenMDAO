@@ -280,7 +280,8 @@ class Problem(object):
             return sub is not None and sub._is_local
 
         # variable exists, but may be remote
-        return abs_name in self.model._var_abs2meta
+        return abs_name in self.model._var_abs2meta['input'] or \
+            abs_name in self.model._var_abs2meta['output']
 
     def _get_cached_val(self, name, get_remote=False):
         # We have set and cached already
@@ -301,16 +302,17 @@ class Problem(object):
                 raise KeyError('{}: Variable "{}" not found.'.format(self.model.msginfo, name))
 
             abs_name = abs_names[0]
-            remote_vars = self._metadata['remote_vars']
+            vars_to_gather = self._metadata['vars_to_gather']
 
-            if abs_name in meta:
+            io = 'output' if abs_name in meta['output'] else 'input'
+            if abs_name in meta[io]:
                 if abs_name in conns:
-                    val = meta[conns[abs_name]]['value']
+                    val = meta['output'][conns[abs_name]]['value']
                 else:
-                    val = meta[abs_name]['value']
+                    val = meta[io][abs_name]['value']
 
-            if get_remote and abs_name in remote_vars:
-                owner = remote_vars[abs_name]
+            if get_remote and abs_name in vars_to_gather:
+                owner = vars_to_gather[abs_name]
                 if self.model.comm.rank == owner:
                     self.model.comm.bcast(val, root=owner)
                 else:
@@ -427,6 +429,7 @@ class Problem(object):
             raise RuntimeError(f"{self.msginfo}: '{name}' Cannot call set_val before setup.")
 
         all_meta = model._var_allprocs_abs2meta
+        loc_meta = model._var_abs2meta
         n_proms = 0  # if nonzero, name given was promoted input name w/o a matching prom output
 
         try:
@@ -448,18 +451,18 @@ class Problem(object):
             src = conns[abs_name]
             if abs_name not in model._var_allprocs_discrete['input']:
                 value = np.asarray(value)
-                tmeta = all_meta[abs_name]
+                tmeta = all_meta['input'][abs_name]
                 tunits = tmeta['units']
-                sunits = all_meta[src]['units']
-                if abs_name in model._var_abs2meta:
-                    tlocmeta = model._var_abs2meta[abs_name]
+                sunits = all_meta['output'][src]['units']
+                if abs_name in loc_meta['input']:
+                    tlocmeta = loc_meta['input'][abs_name]
                 else:
                     tlocmeta = None
 
                 gunits = ginputs[name][0].get('units') if name in ginputs else None
                 if n_proms > 1:  # promoted input name was used
                     if gunits is None:
-                        tunit_list = [all_meta[n]['units'] for n in abs_names]
+                        tunit_list = [all_meta['input'][n]['units'] for n in abs_names]
                         tu0 = tunit_list[0]
                         for tu in tunit_list:
                             if tu != tu0:
@@ -514,7 +517,8 @@ class Problem(object):
             elif abs_name in conns:  # input name given. Set value into output
                 if model._outputs._contains_abs(src):  # src is local
                     if (model._outputs._abs_get_val(src).size == 0 and
-                            src.rsplit('.', 1)[0] == '_auto_ivc' and all_meta[src]['distributed']):
+                            src.rsplit('.', 1)[0] == '_auto_ivc' and
+                            all_meta['output'][src]['distributed']):
                         pass  # special case, auto_ivc dist var with 0 local size
                     elif tmeta['has_src_indices'] and n_proms < 2:
                         if tlocmeta:  # target is local
@@ -860,7 +864,7 @@ class Problem(object):
             'solver_info': SolverInfo(),
             'use_derivatives': derivatives,
             'force_alloc_complex': force_alloc_complex,
-            'remote_vars': {},  # vars that are remote somewhere. does not include distrib vars
+            'vars_to_gather': {},  # vars that are remote somewhere. does not include distrib vars
             'prom2abs': {'input': {}, 'output': {}},  # includes ALL promotes including buried ones
             'static_mode': False,  # used to determine where various 'static'
                                    # and 'dynamic' data structures are stored.
@@ -1237,19 +1241,24 @@ class Problem(object):
                             except KeyError:
                                 indep_key[c_name].add(rel_key)
 
+                            if wrt in comp._var_abs2meta['input']:
+                                wrt_meta = comp._var_abs2meta['input'][wrt]
+                            else:
+                                wrt_meta = comp._var_abs2meta['output'][wrt]
+
                             if deriv_value is None:
                                 # Missing derivatives are assumed 0.
-                                in_size = comp._var_abs2meta[wrt]['size']
-                                out_size = comp._var_abs2meta[of]['size']
+                                in_size = wrt_meta['size']
+                                out_size = comp._var_abs2meta['output'][of]['size']
                                 deriv_value = np.zeros((out_size, in_size))
 
                             if force_dense:
                                 if rows is not None:
                                     try:
-                                        in_size = comp._var_abs2meta[wrt]['size']
+                                        in_size = wrt_meta['size']
                                     except KeyError:
-                                        in_size = comp._var_abs2meta[wrt]['size']
-                                    out_size = comp._var_abs2meta[of]['size']
+                                        in_size = wrt_meta['size']
+                                    out_size = comp._var_abs2meta['output'][of]['size']
                                     tmp_value = np.zeros((out_size, in_size))
                                     # if a scalar value is provided (in declare_partials),
                                     # expand to the correct size array value for zipping
