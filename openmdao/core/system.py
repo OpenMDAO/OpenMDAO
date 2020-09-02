@@ -2941,7 +2941,7 @@ class System(object):
                 if 'size' not in meta:
                     if src_name in abs2idx:
                         if meta['distributed']:
-                            meta['size'] = sizes[self.comm.rank, abs2idx[src_name]]
+                            meta['size'] = abs2meta[src_name]['global_size']
                         else:
                             meta['size'] = sizes[owning_rank[src_name], abs2idx[src_name]]
                     else:
