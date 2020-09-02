@@ -347,6 +347,47 @@ class MPITests(unittest.TestCase):
 
     N_PROCS = 2
 
+    def test_dist_to_nondist_err(self):
+        size = 5
+        p = om.Problem()
+        model = p.model
+        model.add_subsystem('indep', om.IndepVarComp('x', np.ones(size)))
+        model.add_subsystem("Cdist", DistribInputDistribOutputComp(arr_size=size))
+        model.add_subsystem("Cserial", InOutArrayComp(arr_size=size))
+        model.connect('indep.x', 'Cdist.invec')
+        model.connect('Cdist.outvec', 'Cserial.invec')
+        p.setup()
+        p.run_model()
+        msg = "Group (<model>): Non-distributed variable 'Cserial.invec' has a distributed source, 'Cdist.outvec', so you must retrieve its value using 'get_remote=True'."
+        with self.assertRaises(Exception) as cm:
+            p['Cserial.invec']
+        self.assertEqual(str(cm.exception), msg)
+
+        with self.assertRaises(Exception) as cm:
+            p.get_val('Cserial.invec')
+        self.assertEqual(str(cm.exception), msg)
+
+        with self.assertRaises(Exception) as cm:
+            p.get_val('Cserial.invec', get_remote=False)
+        self.assertEqual(str(cm.exception), msg)
+
+    def test_dist_to_dist_get_remote_False_err(self):
+        size = 5
+        p = om.Problem()
+        model = p.model
+        model.add_subsystem('indep', om.IndepVarComp('x', np.ones(size*2)))
+        model.add_subsystem("Cdist", DistribInputDistribOutputComp(arr_size=size*2))
+        model.add_subsystem("Cdist2", DistribInputDistribOutputComp(arr_size=size))
+        model.connect('indep.x', 'Cdist.invec')
+        model.connect('Cdist.outvec', 'Cdist2.invec')
+        #import wingdbstub
+        p.setup()
+        p.run_model()
+        msg = "Group (<model>): Can't retrieve distributed variable 'Cdist2.invec' because its src_indices reference entries from other processes. You can retrieve values from all processes using `get_val(<name>, get_remote=True)`."
+        with self.assertRaises(Exception) as cm:
+            p.get_val('Cdist2.invec', get_remote=False)
+        self.assertEqual(str(cm.exception), msg)
+
     def test_distrib_full_in_out(self):
         size = 11
 

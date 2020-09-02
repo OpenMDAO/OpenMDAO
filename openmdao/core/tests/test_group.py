@@ -26,10 +26,6 @@ try:
 except ImportError:
     PETScVector = None
 
-try:
-    from openmdao.vectors.petsc_vector import PETScVector
-except ImportError:
-    PETScVector = None
 
 arr_order_1x1 = np.array([1, 2, 3, 4])
 arr_2x4 = np.array([[0, 1, 2, 3], [10, 11, 12, 13]])
@@ -559,6 +555,81 @@ class TestGroup(unittest.TestCase):
         with assert_warning(UserWarning, msg):
             p.setup()
 
+    def test_connect_to_flat_array_with_slice(self):
+        class SlicerComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones((12,)))
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x']) ** 2.0
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr_large_4x4))
+        p.model.add_subsystem('row123_comp', SlicerComp())
+
+        idxs = np.array([0, 2, 3], dtype=int)
+
+        p.model.connect('indep.x', 'row123_comp.x', src_indices=om.slicer[idxs, ...])
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['row123_comp.x'], arr_large_4x4[(0, 2, 3), ...].ravel())
+        assert_near_equal(p['row123_comp.y'], np.sum(arr_large_4x4[(0, 2, 3), ...]) ** 2.0)
+
+    def test_connect_to_flat_src_indices_with_slice_user_warning(self):
+        class SlicerComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones((12,)))
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x']) ** 2.0
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr_large_4x4))
+        p.model.add_subsystem('row123_comp', SlicerComp())
+
+        idxs = np.array([0, 2, 3], dtype=int)
+
+        p.model.connect('indep.x', 'row123_comp.x', src_indices=om.slicer[idxs, ...],
+                        flat_src_indices=True)
+
+        msg = "Group (<model>): Connection from 'indep.x' to 'row123_comp.x' was added with slice src_indices, so flat_src_indices is ignored."
+        with assert_warning(UserWarning, msg):
+            p.setup()
+        p.run_model()
+
+        assert_near_equal(p['row123_comp.x'], arr_large_4x4[(0, 2, 3), ...].ravel())
+        assert_near_equal(p['row123_comp.y'], np.sum(arr_large_4x4[(0, 2, 3), ...]) ** 2.0)
+
+    def test_connect_to_flat_array(self):
+        class SlicerComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones((4,)))
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', val=arr_large_4x4))
+        p.model.add_subsystem('trace_comp', SlicerComp())
+
+        idxs = np.array([0, 5, 10, 15], dtype=int)
+
+        p.model.connect('indep.x', 'trace_comp.x', src_indices=idxs, flat_src_indices=True)
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['trace_comp.x'], np.diag(arr_large_4x4))
+        assert_near_equal(p['trace_comp.y'], np.sum(np.diag(arr_large_4x4)))
+
     def test_om_slice_in_connect(self):
 
         p = om.Problem()
@@ -1004,11 +1075,7 @@ class TestGroup(unittest.TestCase):
         p = om.Problem()
         g1 = p.model.add_subsystem('G1', om.Group(), promotes=['*'])
 
-        with self.assertRaises(Exception) as context:
-            p.setup()
-        self.assertEqual(str(context.exception),
-                         "Group (G1): 'promotes' failed to find any matches for the following "
-                         "pattern: '*'. Group contains no variables.")
+        p.setup()
 
     def test_missing_promote_var(self):
         p = om.Problem()
@@ -1362,7 +1429,8 @@ class TestGroupMPISlice(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(p['C1.x'], np.array([3, 3, 3, 3]))
+        val = p.get_val('C1.x', get_remote=False)
+        assert_near_equal(val, np.array([3, 3, 3, 3]))
 
     def test_om_slice_3d_mpi(self):
         class MyComp1(om.ExplicitComponent):
@@ -2511,7 +2579,7 @@ class TestGroupAddInput(unittest.TestCase):
            p.setup()
 
         self.assertEqual(cm.exception.args[0],
-                         "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but their metadata entries ['units', 'value'] differ. Call <group>.set_input_defaults('x', units=?, value=?), where <group> is the Group named 'par' to remove the ambiguity.")
+                         "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but their metadata entries ['units', 'value'] differ. Call <group>.set_input_defaults('x', units=?, val=?), where <group> is the Group named 'par' to remove the ambiguity.")
 
     def test_missing_diff_vals(self):
         p = om.Problem()
@@ -2525,7 +2593,7 @@ class TestGroupAddInput(unittest.TestCase):
            p.setup()
 
         self.assertEqual(cm.exception.args[0],
-                         "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but their metadata entries ['value'] differ. Call <group>.set_input_defaults('x', value=?), where <group> is the Group named 'par' to remove the ambiguity.")
+                         "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but their metadata entries ['value'] differ. Call <group>.set_input_defaults('x', val=?), where <group> is the Group named 'par' to remove the ambiguity.")
 
     def test_conflicting_units(self):
         # multiple Group.set_input_defaults calls at same tree level with conflicting units args

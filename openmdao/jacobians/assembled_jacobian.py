@@ -10,7 +10,6 @@ from openmdao.matrices.coo_matrix import COOMatrix
 from openmdao.matrices.csr_matrix import CSRMatrix
 from openmdao.matrices.csc_matrix import CSCMatrix
 from openmdao.utils.units import unit_conversion
-from openmdao.utils.array_utils import _flatten_src_indices
 
 _empty_dict = {}
 
@@ -160,12 +159,7 @@ class AssembledJacobian(Jacobian):
                         # instead of d(output)/d(input).  int_mtx is a square matrix whose
                         # rows and columns map to output/resid vars only.
                         abs_key2 = (res_abs_name, out_abs_name)
-
                         shape = abs_key2shape(abs_key2)
-                        if len(src_indices.shape) > 1:
-                            src_indices = _flatten_src_indices(src_indices, meta_in['shape'],
-                                                               all_out_meta['global_shape'],
-                                                               all_out_meta['global_size'])
 
                     int_mtx._add_submat(abs_key, info, res_offset, out_offset,
                                         src_indices, shape, factor)
