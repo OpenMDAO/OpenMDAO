@@ -2854,7 +2854,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = om.CaseReader(self.filename)
         msg = "The BaseCaseReader.system_metadata attribute is deprecated. " \
-        "Use the BaseCaseReader.system_option attribute instead."
+        "Use `list_model_options` instead."
         with assert_warning(DeprecationWarning, msg):
             options = cr.system_metadata
 

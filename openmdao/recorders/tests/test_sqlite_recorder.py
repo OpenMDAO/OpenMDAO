@@ -2622,7 +2622,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
                          sorted(['root']))
 
         # options for system 'root'
-        self.assertEqual(metadata['root']['ln_maxiter'], None)
+        self.assertEqual(options['root']['ln_maxiter'], None)
 
     def test_feature_system_recording_options(self):
         import openmdao.api as om
