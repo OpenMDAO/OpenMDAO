@@ -4,7 +4,7 @@
 September 04, 2020
 
 OpenMDAO 3.3.0 features some changes to the setup/configure stack that
-are indented to make it easier to implement complex models in OpenMDAO.
+are intended to make it easier to implement complex models in OpenMDAO.
 
 The new group method `get_io_metadata` is available from the `configure`
 method of Groups.  During setup, a Group's configure method is run
@@ -30,12 +30,12 @@ None
 
 - Added more information to the node info window in the n2. #1610
 - Removed warning when recording deprecated options in viewer data. #1613
-- Implementation of POEM029 - Adds get_io_metadata method to retrieve metadata of underlying inputs and outputs. #1618
+- <POEM 029> Adds get_io_metadata method to retrieve metadata of underlying inputs and outputs. #1618
 - Internal definition of undefined inputs is now managed with an _UNDEFINED constant in openmdao.core.constants. #1622
 - N2 code getting tree dict updated to use _UNDEFINED constant. #1623
 - When encountering an AnalysisError, drivers will now indicate which component raised the error. #1650
 - Differential Evolution driver added. #1662
-- Added Aitken Relaxation to the Linear Block Gauss-Seidel solver. #1663
+- <POEM 031> Added Aitken Relaxation to the Linear Block Gauss-Seidel solver. #1663
 - Tagging capability added to AddSubtractComp #1664
 
 ## Bug Fixes:
