@@ -9,7 +9,11 @@
     "linear_solver": "LN: RUNONCE",
     "linear_solver_options": {
         "iprint": 1,
-        "assemble_jac": false
+        "assemble_jac": false,
+        "use_aitken": false,
+        "aitken_min_factor": 0.1,
+        "aitken_max_factor": 1.5,
+        "aitken_initial_factor": 1.0
     },
     "nonlinear_solver": "NL: RUNONCE",
     "nonlinear_solver_options": {
