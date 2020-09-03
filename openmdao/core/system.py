@@ -213,6 +213,10 @@ class System(object):
         in the given system.  This is only defined in a Group that owns one or more interprocess
         connections or a top level Group or System that is used to compute total derivatives
         across multiple processes.
+    _vars_to_gather : dict
+        Contains names of non-distributed variables that are remote on at least one proc in the comm
+    _dist_var_locality : dict
+        Contains names of distrib vars mapped to the ranks in the comm where they are local.
     _conn_global_abs_in2out : {'abs_in': 'abs_out'}
         Dictionary containing all explicit & implicit connections owned by this system
         or any descendant system. The data is the same across all processors.
@@ -388,6 +392,8 @@ class System(object):
         self._subsystems_allprocs = []
         self._subsystems_myproc = []
         self._subsystems_inds = {}
+        self._vars_to_gather = {}
+        self._dist_var_locality = {}
 
         self._var_promotes = {'input': [], 'output': [], 'any': []}
         self._var_promotes_src_indices = {}
@@ -653,21 +659,20 @@ class System(object):
         self._setup_var_data()
 
         self._setup_vec_names(mode)
+
+        # promoted names must be known to determine implicit connections so this must be
+        # called after _setup_var_data, and _setup_var_data will have to be partially redone
+        # after auto_ivcs have been added, but auto_ivcs can't be added until after we know all of
+        # the connections.
         self._setup_global_connections()
         self._setup_dynamic_shapes()
 
-        if self.pathname == '':
-            self._top_level_post_connections(mode)
+        self._top_level_post_connections(mode)
 
         # Now that connections are setup, we need to convert relevant vector names into their
         # auto_ivc source where applicable.
-        new_names = []
         conns = self._conn_global_abs_in2out
-        for vec_name in self._vec_names:
-            if vec_name in conns:
-                new_names.append(conns[vec_name])
-            else:
-                new_names.append(vec_name)
+        new_names = [conns[v] if v in conns else v for v in self._vec_names]
         self._problem_meta['vec_names'] = new_names
         self._problem_meta['lin_vec_names'] = new_names[1:]
 
@@ -675,9 +680,9 @@ class System(object):
         self._setup_var_index_ranges()
         self._setup_var_sizes()
 
-        if self.pathname == '':
-            self._top_level_post_sizes()
+        self._top_level_post_sizes()
 
+        # determine which connections are managed by which group, and check validity of connections
         self._setup_connections()
 
     def _top_level_post_connections(self, mode):
@@ -1318,7 +1323,6 @@ class System(object):
         self._var_allprocs_abs2meta = {}
         self._var_abs2meta = {}
         self._var_allprocs_abs2idx = {}
-        self._gatherable_vars = set()
         self._owning_rank = defaultdict(int)
 
     def _setup_var_index_maps(self):
@@ -2956,6 +2960,8 @@ class System(object):
                     meta = abs2meta[src_name]
                     out[name]['distributed'] = meta['distributed']
                     out[name]['global_size'] = meta['global_size']
+                else:
+                    out[name]['global_size'] = 0  # discrete var
 
         if recurse:
             abs2prom_in = self._var_allprocs_abs2prom['input']
@@ -3052,7 +3058,7 @@ class System(object):
 
                 # Discrete vars
                 if name not in abs2idx:
-                    response['size'] = 0  # discrete var, we don't know the size
+                    response['size'] = response['global_size'] = 0  # discrete var, don't know size
                     continue
 
                 meta = abs2meta[name]
@@ -3261,7 +3267,7 @@ class System(object):
                                 ret_meta[key] = 'Unavailable'
 
                 if need_gather:
-                    if distrib or abs_name in self._gatherable_vars:
+                    if distrib or abs_name in self._vars_to_gather:
                         if rank is None:
                             allproc_metas = self.comm.allgather(ret_meta)
                         else:
@@ -3288,7 +3294,7 @@ class System(object):
                                     else:
                                         ret_meta['src_indices'] = np.zeros(0, dtype=INT_DTYPE)
 
-                            elif abs_name in self._gatherable_vars:
+                            elif abs_name in self._vars_to_gather:
                                 for m in allproc_metas:
                                     if m is not None:
                                         ret_meta = m
@@ -4096,8 +4102,8 @@ class System(object):
                 meta = all_meta[abs_name]
                 distrib = meta['distributed']
             else:
-                remote_vars = self._problem_meta['remote_vars']
-                if abs_name in remote_vars and remote_vars[abs_name] != self.comm.rank:
+                vars_to_gather = self._problem_meta['vars_to_gather']
+                if abs_name in vars_to_gather and vars_to_gather[abs_name] != self.comm.rank:
                     raise RuntimeError(f"{self.msginfo}: Variable '{abs_name}' is not local to "
                                        f"rank {self.comm.rank}. You can retrieve values from "
                                        "other processes using `get_val(<name>, get_remote=True)`.")
