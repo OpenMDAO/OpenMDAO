@@ -19,6 +19,7 @@ from openmdao.test_suite.groups.parallel_groups import FanInGrouped
 
 from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.general_utils import run_driver, printoptions
+from openmdao.utils.testing_utils import use_tempdirs
 
 from openmdao.utils.mpi import MPI
 
@@ -105,13 +106,10 @@ class TestErrors(unittest.TestCase):
                          "'cm', 'correlation', 'corr', None].")
 
 
+@use_tempdirs
 class TestDOEDriver(unittest.TestCase):
 
     def setUp(self):
-        self.startdir = os.getcwd()
-        self.tempdir = tempfile.mkdtemp(prefix='TestDOEDriver-')
-        os.chdir(self.tempdir)
-
         self.expected_fullfact3 = [
             {'x': np.array([0.]), 'y': np.array([0.]), 'f_xy': np.array([22.00])},
             {'x': np.array([.5]), 'y': np.array([0.]), 'f_xy': np.array([19.25])},
@@ -125,13 +123,6 @@ class TestDOEDriver(unittest.TestCase):
             {'x': np.array([.5]), 'y': np.array([1.]), 'f_xy': np.array([28.75])},
             {'x': np.array([1.]), 'y': np.array([1.]), 'f_xy': np.array([27.00])},
         ]
-
-    def tearDown(self):
-        os.chdir(self.startdir)
-        try:
-            shutil.rmtree(self.tempdir)
-        except OSError:
-            pass
 
     def test_no_generator(self):
         prob = om.Problem()
@@ -153,7 +144,7 @@ class TestDOEDriver(unittest.TestCase):
         prob.cleanup()
 
         cr = om.CaseReader("cases.sql")
-        cases = cr.list_cases('driver')
+        cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), 0)
 
@@ -185,7 +176,7 @@ class TestDOEDriver(unittest.TestCase):
         expected = self.expected_fullfact3
 
         cr = om.CaseReader("cases.sql")
-        cases = cr.list_cases('driver')
+        cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), 9)
 
@@ -302,7 +293,7 @@ class TestDOEDriver(unittest.TestCase):
         expected = self.expected_fullfact3
 
         cr = om.CaseReader("cases.sql")
-        cases = cr.list_cases('driver')
+        cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), 9)
 
@@ -370,7 +361,7 @@ class TestDOEDriver(unittest.TestCase):
         ]
 
         cr = om.CaseReader("cases.sql")
-        cases = cr.list_cases('driver')
+        cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), 16)
 
@@ -490,7 +481,7 @@ class TestDOEDriver(unittest.TestCase):
         ]
 
         cr = om.CaseReader("cases.sql")
-        cases = cr.list_cases('driver')
+        cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), 5)
 
@@ -520,7 +511,7 @@ class TestDOEDriver(unittest.TestCase):
         expected = self.expected_fullfact3
 
         cr = om.CaseReader("cases.sql")
-        cases = cr.list_cases('driver')
+        cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), 9)
 
@@ -566,7 +557,7 @@ class TestDOEDriver(unittest.TestCase):
         prob.cleanup()
 
         cr = om.CaseReader("cases.sql")
-        cases = cr.list_cases('driver')
+        cases = cr.list_cases('driver', out_stream=None)
 
         objs = [int(cr.get_case(case).outputs['f']) for case in cases]
 
@@ -607,7 +598,7 @@ class TestDOEDriver(unittest.TestCase):
         ]
 
         cr = om.CaseReader("cases.sql")
-        cases = cr.list_cases('driver')
+        cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), 9)
 
@@ -643,7 +634,7 @@ class TestDOEDriver(unittest.TestCase):
         ]
 
         cr = om.CaseReader("cases.sql")
-        cases = cr.list_cases('driver')
+        cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), 4)
 
@@ -680,7 +671,7 @@ class TestDOEDriver(unittest.TestCase):
         prob.cleanup()
 
         cr = om.CaseReader("cases.sql")
-        cases = cr.list_cases('driver')
+        cases = cr.list_cases('driver', out_stream=None)
 
         # The Box-Behnken design for 3 factors involves three blocks, in each of
         # which 2 factors are varied thru the 4 possible combinations of high & low.
@@ -763,7 +754,7 @@ class TestDOEDriver(unittest.TestCase):
         ]
 
         cr = om.CaseReader("cases.sql")
-        cases = cr.list_cases('driver')
+        cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), 4)
 
@@ -831,7 +822,7 @@ class TestDOEDriver(unittest.TestCase):
         ]
 
         cr = om.CaseReader("cases.sql")
-        cases = cr.list_cases('driver')
+        cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), 4)
 
@@ -881,7 +872,7 @@ class TestDOEDriver(unittest.TestCase):
         prob.cleanup()
 
         cr = om.CaseReader("cases.sql")
-        cases = cr.list_cases('driver')
+        cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), samples)
 
@@ -936,7 +927,7 @@ class TestDOEDriver(unittest.TestCase):
         prob.run_driver()
 
         cr = om.CaseReader("cases.sql")
-        final_case = cr.list_cases('driver')[-1]
+        final_case = cr.list_cases('driver', out_stream=None)[-1]
         outputs = cr.get_case(final_case).outputs
 
         assert_near_equal(outputs['x'], 10.0, 1e-7)
@@ -974,7 +965,7 @@ class TestDOEDriver(unittest.TestCase):
         prob.cleanup()
 
         cr = om.CaseReader("cases.sql")
-        cases = cr.list_cases('driver')
+        cases = cr.list_cases('driver', out_stream=None)
 
         expected = [{'x': 5, 'y': 1, 'f_xy': 31},
                     {'x': 3, 'y': 6, 'f_xy': 115},
@@ -1025,7 +1016,7 @@ class TestDOEDriver(unittest.TestCase):
         prob.cleanup()
 
         cr = om.CaseReader("cases.sql")
-        cases = cr.list_cases('driver')
+        cases = cr.list_cases('driver', out_stream=None)
 
         expected = ['abc', None]
 
@@ -1064,7 +1055,7 @@ class TestDOEDriver(unittest.TestCase):
         prob.cleanup()
 
         cr = om.CaseReader("cases.sql")
-        cases = cr.list_cases('problem')
+        cases = cr.list_cases('problem', out_stream=None)
 
         case = cr.get_case('end')
         inputs = case.inputs
@@ -1105,7 +1096,7 @@ class TestDOEDriver(unittest.TestCase):
         prob.cleanup()
 
         cr = om.CaseReader("cases.sql")
-        cases = cr.list_cases('driver')
+        cases = cr.list_cases('driver', out_stream=None)
 
         expected = [{'x': np.array([5, 1]), 'y': np.array([1, 4]), 'f_xy': np.array([31, 69])},
                     {'x': np.array([3, 2]), 'y': np.array([6, -3]), 'f_xy': np.array([115, -7])},
@@ -1118,7 +1109,6 @@ class TestDOEDriver(unittest.TestCase):
             for name in ('x', 'y', 'f_xy'):
                 self.assertEqual(outputs[name][0], expected_case[name][0])
                 self.assertEqual(outputs[name][1], expected_case[name][1])
-
 
     def test_discrete_desvar_csv(self):
         prob = om.Problem()
@@ -1156,7 +1146,7 @@ class TestDOEDriver(unittest.TestCase):
         prob.cleanup()
 
         cr = om.CaseReader("cases.sql")
-        cases = cr.list_cases('driver')
+        cases = cr.list_cases('driver', out_stream=None)
 
         expected = [{'x': 5, 'y': 1, 'f_xy': 31},
                     {'x': 3, 'y': 6, 'f_xy': 115},
@@ -1172,15 +1162,12 @@ class TestDOEDriver(unittest.TestCase):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@use_tempdirs
 class TestParallelDOE(unittest.TestCase):
 
     N_PROCS = 4
 
     def setUp(self):
-        self.startdir = os.getcwd()
-        self.tempdir = tempfile.mkdtemp(prefix='TestDOEDriver-')
-        os.chdir(self.tempdir)
-
         self.expected_fullfact3 = [
             {'x': np.array([0.]), 'y': np.array([0.]), 'f_xy': np.array([22.00])},
             {'x': np.array([.5]), 'y': np.array([0.]), 'f_xy': np.array([19.25])},
@@ -1194,13 +1181,6 @@ class TestParallelDOE(unittest.TestCase):
             {'x': np.array([.5]), 'y': np.array([1.]), 'f_xy': np.array([28.75])},
             {'x': np.array([1.]), 'y': np.array([1.]), 'f_xy': np.array([27.00])},
         ]
-
-    def tearDown(self):
-        os.chdir(self.startdir)
-        try:
-            shutil.rmtree(self.tempdir)
-        except OSError:
-            pass
 
     def test_indivisible_error(self):
         prob = om.Problem()
@@ -1271,7 +1251,7 @@ class TestParallelDOE(unittest.TestCase):
         self.assertTrue(expect_msg in output)
 
         cr = om.CaseReader(filename)
-        cases = cr.list_cases('driver')
+        cases = cr.list_cases('driver', out_stream=None)
 
         # cases recorded on this proc
         num_cases = len(cases)
@@ -1340,7 +1320,7 @@ class TestParallelDOE(unittest.TestCase):
             self.assertTrue(expect_msg in output)
 
             cr = om.CaseReader(filename)
-            cases = cr.list_cases('driver')
+            cases = cr.list_cases('driver', out_stream=None)
 
             # cases recorded on this proc
             num_cases = len(cases)
@@ -1413,7 +1393,7 @@ class TestParallelDOE(unittest.TestCase):
         self.assertTrue(expect_msg in output)
 
         cr = om.CaseReader(filename)
-        cases = cr.list_cases('driver')
+        cases = cr.list_cases('driver', out_stream=None)
 
         # cases recorded on this proc
         num_cases = len(cases)
@@ -1433,17 +1413,12 @@ class TestParallelDOE(unittest.TestCase):
         self.assertEqual(sum(num_cases), len(expected))
 
 
+@use_tempdirs
 class TestDOEDriverFeature(unittest.TestCase):
 
     def setUp(self):
         import json
-        import os
-        import tempfile
         import numpy as np
-
-        self.startdir = os.getcwd()
-        self.tempdir = tempfile.mkdtemp(prefix='TestDOEDriverFeature-')
-        os.chdir(self.tempdir)
 
         self.expected_csv = '\n'.join([
             " x ,   y",
@@ -1490,16 +1465,6 @@ class TestDOEDriverFeature(unittest.TestCase):
         self.expected_json = json.dumps(cases).replace(']]],', ']]],\n')
         with open('cases.json', 'w') as f:
             f.write(self.expected_json)
-
-    def tearDown(self):
-        import os
-        import shutil
-
-        os.chdir(self.startdir)
-        try:
-            shutil.rmtree(self.tempdir)
-        except OSError:
-            pass
 
     def test_uniform(self):
         import openmdao.api as om
@@ -1605,8 +1570,6 @@ class TestDOEDriverFeature(unittest.TestCase):
 
         case_list = json.loads(json_data)
 
-        self.assertEqual(case_list, json.loads(json_data))
-
         # create DOEDriver using provided list of cases
         prob.driver = om.DOEDriver(case_list)
 
@@ -1631,13 +1594,12 @@ class TestDOEDriverFeature(unittest.TestCase):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@use_tempdirs
 class TestParallelDOEFeature(unittest.TestCase):
 
     N_PROCS = 2
 
     def setUp(self):
-        import os
-        import tempfile
         import numpy as np
 
         from mpi4py import MPI
@@ -1666,18 +1628,6 @@ class TestParallelDOEFeature(unittest.TestCase):
         self.expect_text = "\n"+"\n".join([
             "x: %5.2f, y: %5.2f, f_xy: %6.2f" % xyf for xyf in values
         ])
-
-        # run in temp dir
-        self.startdir = os.getcwd()
-        self.tempdir = tempfile.mkdtemp(prefix='TestParallelDOEFeature-')
-        os.chdir(self.tempdir)
-
-    def tearDown(self):
-        os.chdir(self.startdir)
-        try:
-            shutil.rmtree(self.tempdir)
-        except OSError:
-            pass
 
     def test_full_factorial(self):
         import openmdao.api as om
@@ -1725,15 +1675,12 @@ class TestParallelDOEFeature(unittest.TestCase):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@use_tempdirs
 class TestParallelDOEFeature2(unittest.TestCase):
 
     N_PROCS = 4
 
     def setUp(self):
-        import os
-        import shutil
-        import tempfile
-
         from mpi4py import MPI
         rank = MPI.COMM_WORLD.rank
 
@@ -1760,18 +1707,6 @@ class TestParallelDOEFeature2(unittest.TestCase):
         self.expect_text = "\n"+"\n".join([
             "x1: %5.2f, x2: %5.2f, c3.y: %6.2f" % vals_i for vals_i in values
         ])
-
-        # run in temp dir
-        self.startdir = os.getcwd()
-        self.tempdir = tempfile.mkdtemp(prefix='TestParallelDOEFeature2-')
-        os.chdir(self.tempdir)
-
-    def tearDown(self):
-        os.chdir(self.startdir)
-        try:
-            shutil.rmtree(self.tempdir)
-        except OSError:
-            pass
 
     def test_fan_in_grouped(self):
         import openmdao.api as om
@@ -1812,29 +1747,18 @@ class TestParallelDOEFeature2(unittest.TestCase):
                 outputs = cr.get_case(case).outputs
 
                 # TODO - Restore this when issue 1498 is fixed.
-                #values.append((outputs['x1'], outputs['x2'], outputs['c3.y']))
+                values.append((outputs['x1'], outputs['x2'], outputs['c3.y']))
 
             # TODO - Restore this when issue 1498 is fixed.
-            #self.assertEqual("\n"+"\n".join(["x1: %5.2f, x2: %5.2f, c3.y: %6.2f" % (x1, x2, y) for x1, x2, y in values]),
-            #    self.expect_text)
+            self.assertEqual("\n"+"\n".join(["x1: %5.2f, x2: %5.2f, c3.y: %6.2f" % (x1, x2, y) for x1, x2, y in values]),
+               self.expect_text)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@use_tempdirs
 class TestParallelDistribDOE(unittest.TestCase):
 
     N_PROCS = 4
-
-    def setUp(self):
-        self.startdir = os.getcwd()
-        self.tempdir = tempfile.mkdtemp(prefix='TestDOEDriver-')
-        os.chdir(self.tempdir)
-
-    def tearDown(self):
-        os.chdir(self.startdir)
-        try:
-            shutil.rmtree(self.tempdir)
-        except OSError:
-            pass
 
     def test_doe_distributed_var(self):
         size = 3
