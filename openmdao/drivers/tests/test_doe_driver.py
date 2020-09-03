@@ -1306,60 +1306,67 @@ class TestParallelDOE(unittest.TestCase):
         prob.driver.options['run_parallel'] = True
         prob.driver.options['procs_per_model'] = doe_parallel
 
+        #import wingdbstub
+        #from openmdao.devtools.debug import trace_mpi
+        #trace_mpi()
         prob.setup()
 
         failed, output = run_driver(prob)
-        self.assertFalse(failed)
 
-        prob.cleanup()
-
-        expected = [
-            {'x1': np.array([0.]), 'x2': np.array([0.]), 'c3.y': np.array([0.0])},
-            {'x1': np.array([.5]), 'x2': np.array([0.]), 'c3.y': np.array([-3.0])},
-            {'x1': np.array([1.]), 'x2': np.array([0.]), 'c3.y': np.array([-6.0])},
-
-            {'x1': np.array([0.]), 'x2': np.array([.5]), 'c3.y': np.array([17.5])},
-            {'x1': np.array([.5]), 'x2': np.array([.5]), 'c3.y': np.array([14.5])},
-            {'x1': np.array([1.]), 'x2': np.array([.5]), 'c3.y': np.array([11.5])},
-
-            {'x1': np.array([0.]), 'x2': np.array([1.]), 'c3.y': np.array([35.0])},
-            {'x1': np.array([.5]), 'x2': np.array([1.]), 'c3.y': np.array([32.0])},
-            {'x1': np.array([1.]), 'x2': np.array([1.]), 'c3.y': np.array([29.0])},
-        ]
-
-        rank = prob.comm.rank
-        size = prob.comm.size // doe_parallel
-
-        num_cases = 0
-
-        # cases will be split across files for each proc up to the number requested
-        if rank < doe_parallel:
-            filename = "cases.sql_%d" % rank
-
-            expect_msg = "Cases from rank %d are being written to %s." % (rank, filename)
-            self.assertTrue(expect_msg in output)
-
-            cr = om.CaseReader(filename)
-            cases = cr.list_cases('driver')
-
-            # cases recorded on this proc
-            num_cases = len(cases)
-            self.assertEqual(num_cases, len(expected) // size+(rank < len(expected) % size))
-
-            for n, case in enumerate(cases):
-                idx = n * size + rank  # index of expected case
-
-                outputs = cr.get_case(case).outputs
-
-                for name in ('x1', 'x2', 'c3.y'):
-
-                    # TODO - Remove this when issue 1498 is fixed.
-                    if name in ['x1', 'x2']:
-                        continue
-
-                    self.assertEqual(outputs[name], expected[idx][name])
-        else:
-            self.assertFalse("Cases from rank %d are being written" % rank in output)
+        from openmdao.utils.mpi import multi_proc_exception_check
+        
+        with multi_proc_exception_check(prob.comm):
+            self.assertFalse(failed)
+    
+            prob.cleanup()
+    
+            expected = [
+                {'x1': np.array([0.]), 'x2': np.array([0.]), 'c3.y': np.array([0.0])},
+                {'x1': np.array([.5]), 'x2': np.array([0.]), 'c3.y': np.array([-3.0])},
+                {'x1': np.array([1.]), 'x2': np.array([0.]), 'c3.y': np.array([-6.0])},
+    
+                {'x1': np.array([0.]), 'x2': np.array([.5]), 'c3.y': np.array([17.5])},
+                {'x1': np.array([.5]), 'x2': np.array([.5]), 'c3.y': np.array([14.5])},
+                {'x1': np.array([1.]), 'x2': np.array([.5]), 'c3.y': np.array([11.5])},
+    
+                {'x1': np.array([0.]), 'x2': np.array([1.]), 'c3.y': np.array([35.0])},
+                {'x1': np.array([.5]), 'x2': np.array([1.]), 'c3.y': np.array([32.0])},
+                {'x1': np.array([1.]), 'x2': np.array([1.]), 'c3.y': np.array([29.0])},
+            ]
+    
+            rank = prob.comm.rank
+            size = prob.comm.size // doe_parallel
+    
+            num_cases = 0
+    
+            # cases will be split across files for each proc up to the number requested
+            if rank < doe_parallel:
+                filename = "cases.sql_%d" % rank
+    
+                expect_msg = "Cases from rank %d are being written to %s." % (rank, filename)
+                self.assertTrue(expect_msg in output)
+    
+                cr = om.CaseReader(filename)
+                cases = cr.list_cases('driver')
+    
+                # cases recorded on this proc
+                num_cases = len(cases)
+                self.assertEqual(num_cases, len(expected) // size+(rank < len(expected) % size))
+    
+                for n, case in enumerate(cases):
+                    idx = n * size + rank  # index of expected case
+    
+                    outputs = cr.get_case(case).outputs
+    
+                    for name in ('x1', 'x2', 'c3.y'):
+    
+                        # TODO - Remove this when issue 1498 is fixed.
+                        if name in ['x1', 'x2']:
+                            continue
+    
+                        self.assertEqual(outputs[name], expected[idx][name])
+            else:
+                self.assertFalse("Cases from rank %d are being written" % rank in output)
 
         # total number of cases recorded across all requested procs
         num_cases = prob.comm.allgather(num_cases)

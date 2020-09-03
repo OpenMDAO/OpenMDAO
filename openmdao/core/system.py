@@ -2970,10 +2970,16 @@ class System(object):
                     out.update(dvs)
 
             if self.comm.size > 1 and self._subsystems_allprocs:
+                my_out = out
                 allouts = self.comm.allgather(out)
                 out = OrderedDict()
-                for all_out in allouts:
-                    out.update(all_out)
+                for rank, all_out in enumerate(allouts):
+                    for name, meta in all_out.items():
+                        if name not in out:
+                            if name in my_out:
+                                out[name] = my_out[name]
+                            else:
+                                out[name] = meta
 
         return out
 
