@@ -98,6 +98,7 @@ class LinearBlockGS(BlockLinearSolver):
                 d_out_vec = system._vectors['output']
             else:
                 d_out_vec = system._vectors['residual']
+
             for vec_name in vec_names:
                 d_n[vec_name] = d_out_vec[vec_name].asarray(copy=True)
                 delta_d_n[vec_name] = d_out_vec[vec_name].asarray(copy=True)
