@@ -104,7 +104,6 @@ class LinearBlockGS(BlockLinearSolver):
                 delta_d_n[vec_name] = d_out_vec[vec_name].asarray(copy=True)
 
         if mode == 'fwd':
-
             for isub, subsys in enumerate(system._subsystems_allprocs):
                 if self._rel_systems is not None and subsys.pathname not in self._rel_systems:
                     continue
