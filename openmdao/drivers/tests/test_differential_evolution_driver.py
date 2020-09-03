@@ -25,15 +25,15 @@ extra_prints = False  # enable printing results
 
 class TestDifferentialEvolution(unittest.TestCase):
     def setUp(self):
-        import openmdao.api as om
-        import numpy as np
-        import os
+        import os  # import needed in setup for tests in documentation
         os.environ['DifferentialEvolutionDriver_seed'] = '11'  # make RNG repeatable
 
     def test_rastrigin(self):
+        import openmdao.api as om
+        import numpy as np
+
         ORDER = 6  # dimension of problem
         span = 5   # upper and lower limits
-        extra_prints = False
 
         class RastriginComp(om.ExplicitComponent):
             def setup(self):
@@ -69,12 +69,6 @@ class TestDifferentialEvolution(unittest.TestCase):
 
         prob.setup()
         prob.run_driver()
-
-        # show results
-        if extra_prints:
-            print('rastrigin.y', prob['rastrigin.y'])
-            print('x', prob['x'])
-            print('objective function calls', prob.driver.iter_count, '\n')
 
         assert_near_equal(prob['rastrigin.y'], 0.0, 1e-6)
         assert_near_equal(prob['x'], np.zeros(ORDER), 1e-6)
@@ -271,7 +265,6 @@ class TestDifferentialEvolution(unittest.TestCase):
 
 class TestDriverOptionsDifferentialEvolution(unittest.TestCase):
     def setUp(self):
-        import os
         os.environ['DifferentialEvolutionDriver_seed'] = '11'
 
     def test_driver_options(self):
@@ -300,7 +293,6 @@ class TestDriverOptionsDifferentialEvolution(unittest.TestCase):
 
 class TestMultiObjectiveDifferentialEvolution(unittest.TestCase):
     def setUp(self):
-        import os
         os.environ['DifferentialEvolutionDriver_seed'] = '11'
 
     def test_multi_obj(self):
@@ -409,7 +401,6 @@ class TestMultiObjectiveDifferentialEvolution(unittest.TestCase):
 
 class TestConstrainedDifferentialEvolution(unittest.TestCase):
     def setUp(self):
-        import os
         os.environ['DifferentialEvolutionDriver_seed'] = '11'
 
     def test_constrained_with_penalty(self):
@@ -586,7 +577,6 @@ class MPITestDifferentialEvolution(unittest.TestCase):
     N_PROCS = 2
 
     def setUp(self):
-        import os
         os.environ['DifferentialEvolutionDriver_seed'] = '11'
 
     def test_mpi_bug_solver(self):
@@ -706,7 +696,6 @@ class MPITestDifferentialEvolution4Procs(unittest.TestCase):
     N_PROCS = 4
 
     def setUp(self):
-        import os
         os.environ['DifferentialEvolutionDriver_seed'] = '11'
 
     def test_indivisible_error(self):
@@ -829,14 +818,10 @@ class MPITestDifferentialEvolution4Procs(unittest.TestCase):
 
 class TestFeatureDifferentialEvolution(unittest.TestCase):
     def setUp(self):
-        import numpy as np
-        import os
+        import os  # import needed in setup for tests in documentation
         os.environ['DifferentialEvolutionDriver_seed'] = '11'
 
     def test_basic(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.branin import Branin
-
         prob = om.Problem()
         model = prob.model
 
@@ -852,9 +837,6 @@ class TestFeatureDifferentialEvolution(unittest.TestCase):
         prob.run_driver()
 
     def test_basic_with_assert(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.branin import Branin
-
         prob = om.Problem()
         model = prob.model
 
@@ -911,8 +893,6 @@ class TestFeatureDifferentialEvolution(unittest.TestCase):
         prob.run_driver()
 
     def test_constrained_with_penalty(self):
-        import openmdao.api as om
-
         class Cylinder(om.ExplicitComponent):
             """Main class"""
 
@@ -960,14 +940,9 @@ class MPIFeatureTests(unittest.TestCase):
     N_PROCS = 2
 
     def setUp(self):
-        import numpy as np
-        import os
         os.environ['DifferentialEvolutionDriver_seed'] = '11'
 
     def test_option_parallel(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.branin import Branin
-
         prob = om.Problem()
         model = prob.model
 
@@ -1001,14 +976,9 @@ class MPIFeatureTests4(unittest.TestCase):
     N_PROCS = 4
 
     def setUp(self):
-        import numpy as np
-        import os
         os.environ['DifferentialEvolutionDriver_seed'] = '11'
 
     def test_option_procs_per_model(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.branin import Branin
-
         prob = om.Problem()
         model = prob.model
 
