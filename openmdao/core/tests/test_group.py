@@ -555,6 +555,81 @@ class TestGroup(unittest.TestCase):
         with assert_warning(UserWarning, msg):
             p.setup()
 
+    def test_connect_to_flat_array_with_slice(self):
+        class SlicerComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones((12,)))
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x']) ** 2.0
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr_large_4x4))
+        p.model.add_subsystem('row123_comp', SlicerComp())
+
+        idxs = np.array([0, 2, 3], dtype=int)
+
+        p.model.connect('indep.x', 'row123_comp.x', src_indices=om.slicer[idxs, ...])
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['row123_comp.x'], arr_large_4x4[(0, 2, 3), ...].ravel())
+        assert_near_equal(p['row123_comp.y'], np.sum(arr_large_4x4[(0, 2, 3), ...]) ** 2.0)
+
+    def test_connect_to_flat_src_indices_with_slice_user_warning(self):
+        class SlicerComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones((12,)))
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x']) ** 2.0
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr_large_4x4))
+        p.model.add_subsystem('row123_comp', SlicerComp())
+
+        idxs = np.array([0, 2, 3], dtype=int)
+
+        p.model.connect('indep.x', 'row123_comp.x', src_indices=om.slicer[idxs, ...],
+                        flat_src_indices=True)
+
+        msg = "Group (<model>): Connection from 'indep.x' to 'row123_comp.x' was added with slice src_indices, so flat_src_indices is ignored."
+        with assert_warning(UserWarning, msg):
+            p.setup()
+        p.run_model()
+
+        assert_near_equal(p['row123_comp.x'], arr_large_4x4[(0, 2, 3), ...].ravel())
+        assert_near_equal(p['row123_comp.y'], np.sum(arr_large_4x4[(0, 2, 3), ...]) ** 2.0)
+
+    def test_connect_to_flat_array(self):
+        class SlicerComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones((4,)))
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', val=arr_large_4x4))
+        p.model.add_subsystem('trace_comp', SlicerComp())
+
+        idxs = np.array([0, 5, 10, 15], dtype=int)
+
+        p.model.connect('indep.x', 'trace_comp.x', src_indices=idxs, flat_src_indices=True)
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['trace_comp.x'], np.diag(arr_large_4x4))
+        assert_near_equal(p['trace_comp.y'], np.sum(np.diag(arr_large_4x4)))
+
     def test_om_slice_in_connect(self):
 
         p = om.Problem()
@@ -1354,7 +1429,8 @@ class TestGroupMPISlice(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(p['C1.x'], np.array([3, 3, 3, 3]))
+        val = p.get_val('C1.x', get_remote=False)
+        assert_near_equal(val, np.array([3, 3, 3, 3]))
 
     def test_om_slice_3d_mpi(self):
         class MyComp1(om.ExplicitComponent):

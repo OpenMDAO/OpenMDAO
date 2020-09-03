@@ -382,7 +382,7 @@ class SqliteRecorder(CaseRecorder):
             abs2prom = json.dumps(self._abs2prom)
             prom2abs = json.dumps(self._prom2abs)
             abs2meta = json.dumps(self._abs2meta)
-            conns = json.dumps(system._problem_meta.get('connections', {}))
+            conns = json.dumps(system._problem_meta['model_ref']()._conn_global_abs_in2out)
 
             var_settings = {}
             var_settings.update(desvars)
@@ -622,7 +622,7 @@ class SqliteRecorder(CaseRecorder):
             except sqlite3.IntegrityError:
                 print("Model viewer data has already has already been recorded for %s." % key)
 
-    def record_metadata_system(self, recording_requester):
+    def record_metadata_system(self, recording_requester, run_counter=None):
         """
         Record system metadata.
 
@@ -630,8 +630,11 @@ class SqliteRecorder(CaseRecorder):
         ----------
         recording_requester : System
             The System that would like to record its metadata.
+        run_counter : int or None
+            The number of times run_driver or run_model has been called.
         """
         if self.connection:
+
             scaling_vecs, user_options = self._get_metadata_system(recording_requester)
 
             if scaling_vecs is None:
@@ -663,10 +666,15 @@ class SqliteRecorder(CaseRecorder):
             #   the current OpenMDAO code will call this function each time and there will be
             #   SQL errors for "UNIQUE constraint failed: system_metadata.id"
             # Future versions of OpenMDAO will handle this better.
+            if run_counter is None:
+                name = path
+            else:
+                name = "{}_{}".format(path, str(run_counter))
             with self.connection as c:
                 c.execute("INSERT OR IGNORE INTO system_metadata"
                           "(id, scaling_factors, component_metadata) "
-                          "VALUES(?,?,?)", (path, scaling_factors, pickled_metadata))
+                          "VALUES(?,?,?)", (name, scaling_factors,
+                                            pickled_metadata))
 
     def record_metadata_solver(self, recording_requester):
         """

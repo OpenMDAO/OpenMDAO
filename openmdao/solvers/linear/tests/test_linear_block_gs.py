@@ -139,6 +139,49 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
 
         assert_near_equal(derivs[('sub.z', 'sub.z')], [[0., 1.]])
 
+    def test_aitken(self):
+        prob = om.Problem()
+        model = prob.model
+
+        aitken = om.LinearBlockGS()
+        aitken.options['use_aitken'] = True
+        aitken.options['err_on_non_converge'] = True
+
+        # It takes 6 iterations without Aitken.
+        aitken.options['maxiter'] = 4
+
+        sub = model.add_subsystem('sub', SellarDerivatives(nonlinear_solver=om.NonlinearRunOnce(),
+                                                           linear_solver=aitken))
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=True)
+
+        prob.setup(mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_near_equal(prob.get_val('sub.y1'), 25.58830273, .00001)
+        assert_near_equal(prob.get_val('sub.y2'), 12.05848819, .00001)
+
+        prob = om.Problem()
+        model = prob.model
+
+        aitken = om.LinearBlockGS()
+        aitken.options['use_aitken'] = True
+        aitken.options['err_on_non_converge'] = True
+
+        # It takes 6 iterations without Aitken.
+        aitken.options['maxiter'] = 4
+
+        sub = model.add_subsystem('sub', SellarDerivatives(nonlinear_solver=om.NonlinearRunOnce(),
+                                                           linear_solver=aitken))
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=True)
+
+        prob.setup(mode='rev')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_near_equal(prob.get_val('sub.y1'), 25.58830273, .00001)
+        assert_near_equal(prob.get_val('sub.y2'), 12.05848819, .00001)
+
 
 class TestBGSSolverFeature(unittest.TestCase):
 

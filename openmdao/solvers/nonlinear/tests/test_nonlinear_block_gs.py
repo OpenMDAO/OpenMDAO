@@ -134,19 +134,29 @@ class TestNLBGaussSeidel(unittest.TestCase):
         model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        nlbgs = model.nonlinear_solver = om.NonlinearBlockGS()
-        nlbgs.options['maxiter'] = 2
-
         prob.setup()
+        nlbgs = model.nonlinear_solver = om.NonlinearBlockGS()
 
+        #basic test of number of iterations
+        nlbgs.options['maxiter'] = 1
+        prob.run_model()
+        self.assertEqual(model.nonlinear_solver._iter_count, 1)
+
+        nlbgs.options['maxiter'] = 5
+        prob.run_model()
+        self.assertEqual(model.nonlinear_solver._iter_count, 5)
+
+        #test of number of iterations AND solution after exit at maxiter
         prob.set_val('x', 1.)
         prob.set_val('z', np.array([5.0, 2.0]))
 
+        nlbgs.options['maxiter'] = 3
         prob.set_solver_print()
         prob.run_model()
 
         assert_near_equal(prob.get_val('y1'), 25.58914915, .00001)
         assert_near_equal(prob.get_val('y2'), 12.05857185, .00001)
+        self.assertEqual(model.nonlinear_solver._iter_count, 3)
 
     def test_feature_rtol(self):
         import numpy as np
@@ -242,7 +252,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         assert_near_equal(prob.get_val('y2'), 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
-        self.assertEqual(model.nonlinear_solver._iter_count, 7)
+        self.assertEqual(model.nonlinear_solver._iter_count, 8)
 
         # Only one extra execution
         self.assertEqual(model.d1.execution_count, 8)
@@ -364,7 +374,66 @@ class TestNLBGaussSeidel(unittest.TestCase):
 
         assert_near_equal(prob.get_val('y1'), 25.58830273, .00001)
         assert_near_equal(prob.get_val('y2'), 12.05848819, .00001)
-        self.assertTrue(model.nonlinear_solver._iter_count == 5)
+        self.assertTrue(model.nonlinear_solver._iter_count == 6)
+
+        #check that the relaxation factor is updated correctly
+        assert_near_equal(model.nonlinear_solver._theta_n_1, 1.00, 0.001)
+
+    def test_NLBGS_Aitken_initial_factor(self):
+
+        prob = om.Problem(model=SellarDerivatives())
+        model = prob.model
+        model.nonlinear_solver = om.NonlinearBlockGS()
+
+        prob.setup()
+
+        y1_0 = prob.get_val('y1')
+        y2_0 = prob.get_val('y2')
+        model.nonlinear_solver.options['use_aitken'] = True
+        model.nonlinear_solver.options['aitken_initial_factor'] = 0.33
+        model.nonlinear_solver.options['maxiter'] = 1
+        prob.run_model()
+        self.assertTrue(model.nonlinear_solver._theta_n_1 == 0.33)
+
+
+        model.nonlinear_solver.options['maxiter'] = 10
+        prob.run_model()
+
+        # should converge to the same solution
+        assert_near_equal(prob.get_val('y1'), 25.58830273, .00001)
+        assert_near_equal(prob.get_val('y2'), 12.05848819, .00001)
+
+        # in more iterations
+        self.assertTrue(model.nonlinear_solver._iter_count == 7)
+
+        #check that the relaxation factor is updated correctly (should tend towards 1)
+        assert_near_equal(model.nonlinear_solver._theta_n_1, 1.00, 0.001)
+
+
+    def test_NLBGS_Aitken_min_max_factor(self):
+
+        prob = om.Problem(model=SellarDerivatives())
+        model = prob.model
+        model.nonlinear_solver = om.NonlinearBlockGS()
+
+        prob.setup()
+
+        y1_0 = prob.get_val('y1')
+        y2_0 = prob.get_val('y2')
+        model.nonlinear_solver.options['use_aitken'] = True
+        model.nonlinear_solver.options['aitken_min_factor'] = 1.2
+        model.nonlinear_solver.options['maxiter'] = 1
+        prob.run_model()
+        self.assertTrue(model.nonlinear_solver._theta_n_1 == 1.2)
+
+        model.nonlinear_solver.options['aitken_max_factor'] = 0.7
+        model.nonlinear_solver.options['aitken_min_factor'] = 0.1
+
+        model.nonlinear_solver.options['maxiter'] = 1
+        prob.run_model()
+        self.assertTrue(model.nonlinear_solver._theta_n_1 == 0.7)
+
+
 
     def test_NLBGS_Aitken_cs(self):
 
@@ -436,7 +505,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        self.assertEqual(nlbgs._iter_count, 9, 'res_ref should make this take more iters.')
+        self.assertEqual(nlbgs._iter_count, 10, 'res_ref should make this take more iters.')
 
     def test_guess_nonlinear(self):
         class SmartGroup(om.Group):
@@ -520,7 +589,7 @@ class ProcTestCase1(unittest.TestCase):
         assert_near_equal(prob.get_val('d2b.y2', get_remote=True), 12.05848819, .00001)
 
         # Test that Aitken accelerated the convergence, normally takes 7.
-        self.assertTrue(model.nonlinear_solver._iter_count == 5)
+        self.assertTrue(model.nonlinear_solver._iter_count == 6)
 
 
 if __name__ == "__main__":

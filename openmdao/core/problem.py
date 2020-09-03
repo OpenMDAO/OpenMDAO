@@ -4,6 +4,7 @@ import sys
 import pprint
 import os
 import logging
+import weakref
 
 from collections import defaultdict, namedtuple, OrderedDict
 from fnmatch import fnmatchcase
@@ -20,7 +21,7 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group, System
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.total_jac import _TotalJacInfo
-from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED
+from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED, INT_DTYPE
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.solvers.solver import SolverInfo
@@ -39,7 +40,7 @@ from openmdao.utils.units import convert_units
 from openmdao.utils import coloring as coloring_mod
 from openmdao.core.constants import _SetupStatus
 from openmdao.utils.name_maps import abs_key2rel_key
-from openmdao.vectors.vector import _full_slice, INT_DTYPE
+from openmdao.vectors.vector import _full_slice
 from openmdao.vectors.default_vector import DefaultVector
 from openmdao.utils.logger_utils import get_logger, TestLogger
 import openmdao.utils.coloring as coloring_mod
@@ -116,6 +117,8 @@ class Problem(object):
         A flag to indicate whether the system options for all the systems have been recorded
     _metadata : dict
         Problem level metadata.
+    _run_counter : int
+        The number of times run_driver or run_model has been called.
     """
 
     def __init__(self, model=None, driver=None, comm=None, name=None, **options):
@@ -169,6 +172,7 @@ class Problem(object):
         self._initial_condition_cache = {}
 
         self._metadata = None
+        self._run_counter = -1
         self._system_options_recorded = False
         self._rec_mgr = RecordingManager()
 
@@ -421,7 +425,7 @@ class Problem(object):
         """
         model = self.model
         if self._metadata is not None:
-            conns = self._metadata['connections']
+            conns = model._conn_global_abs_in2out
         else:
             raise RuntimeError(f"{self.msginfo}: '{name}' Cannot call set_val before setup.")
 
@@ -597,6 +601,8 @@ class Problem(object):
             self.driver.iter_count = 0
             self.model._reset_iter_counts()
 
+        self._run_counter += 1
+
         self.final_setup()
         self.model._clear_iprint()
         self.model.run_solve_nonlinear()
@@ -632,6 +638,8 @@ class Problem(object):
         if self.model.iter_count > 0 and reset_iter_counts:
             self.driver.iter_count = 0
             self.model._reset_iter_counts()
+
+        self._run_counter += 1
 
         self.final_setup()
         self.model._clear_iprint()
@@ -852,14 +860,13 @@ class Problem(object):
 
         # this metadata will be shared by all Systems/Solvers in the system tree
         self._metadata = {
-            'coloring_dir': self.options['coloring_dir'],
-            'recording_iter': _RecIteration(),
+            'coloring_dir': self.options['coloring_dir'],  # directory for coloring files
+            'recording_iter': _RecIteration(),  # manager of recorder iterations
             'local_vector_class': local_vector_class,
             'distributed_vector_class': distributed_vector_class,
             'solver_info': SolverInfo(),
             'use_derivatives': derivatives,
             'force_alloc_complex': force_alloc_complex,
-            'connections': {},  # all connections in the model (after setup)
             'remote_vars': {},  # vars that are remote somewhere. does not include distrib vars
             'prom2abs': {'input': {}, 'output': {}},  # includes ALL promotes including buried ones
             'static_mode': False,  # used to determine where various 'static'
@@ -871,6 +878,10 @@ class Problem(object):
             'config_info': None,  # used during config to determine if additional updates required
             'parallel_groups': [],  # list of pathnames of parallel groups in this model (all procs)
             'setup_status': _SetupStatus.PRE_SETUP,
+            'vec_names': None,  # names of all nonlinear and linear vectors
+            'lin_vec_names': None,  # names of linear vectors
+            'model_ref': weakref.ref(model)  # ref to the model (needed to get out-of-scope
+                                             # src data for inputs)
         }
         model._setup(model_comm, mode, self._metadata)
 

@@ -1037,11 +1037,10 @@ class MatMultMultipointTestCase(unittest.TestCase):
         for i in range(num_pts):
             cname = 'par2.comp%d' % i
             vname = cname + '.A'
-            if vname in model._var_abs_names['input']:
-                A1 = p.get_val('par1.comp%d.A'%i)
-                A2 = p.get_val('par2.comp%d.A'%i)
-                norm = np.linalg.norm(J['par2.comp%d.y'%i,'indep%d.x'%i] - A2.dot(A1))
-                self.assertLess(norm, 1.e-7)
+            A1 = p.get_val('par1.comp%d.A'%i, get_remote=True)
+            A2 = p.get_val('par2.comp%d.A'%i, get_remote=True)
+            norm = np.linalg.norm(J['par2.comp%d.y'%i,'indep%d.x'%i] - A2.dot(A1))
+            self.assertLess(norm, 1.e-7)
 
         print("final obj:", p['obj.y'])
 
