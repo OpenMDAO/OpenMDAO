@@ -583,6 +583,7 @@ class TestDistribDynShapes(unittest.TestCase):
 
         p.setup()
         p.run_model()
+        np.testing.assert_allclose(p['sink.y1'], np.ones(5)*8.)
 
 
 if __name__ == "__main__":
