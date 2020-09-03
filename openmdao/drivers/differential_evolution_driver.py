@@ -578,16 +578,17 @@ class DifferentialEvolution(object):
                 while c == ii or c == a or c == b:
                     c = rng.integers(0, self.npop)
 
-                # randomly select chromosome index for crossover
+                # randomly select chromosome index for forced crossover
                 r = rng.integers(0, self.lchrom)
 
                 # crossover and mutation
                 population[ii] = parentPop[ii]  # start the same as parent
                 # clip mutant so that it cannot be outside the bounds
                 mutant = np.clip(parentPop[a] + F * (parentPop[b] - parentPop[c]), vlb, vub)
-                for j in range(self.lchrom):
-                    # sometimes replace parent's feature with mutant's
-                    if rng.random() < Pc or j == r:
-                        population[ii][j] = mutant[j]
+                # sometimes replace parent's feature with mutant's
+                rr = rng.random(self.lchrom)
+                idx = np.where(rr < Pc)
+                population[ii][idx] = mutant[idx]
+                population[ii][r] = mutant[r]  # always replace at least one with mutant's
 
         return xopt, fopt, nfit
