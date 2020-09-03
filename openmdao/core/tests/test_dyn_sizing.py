@@ -562,24 +562,23 @@ class TestDynShapes(unittest.TestCase):
         self.assertEqual(str(cm.exception), msg)
 
 
-@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-class TestDistribDynShapes(unittest.TestCase):
-    N_PROCS = 4
+# @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+# class TestDistribDynShapes(unittest.TestCase):
+#     N_PROCS = 4
 
-    def test_remote_distrib(self):
-        p = om.Problem()
-        par = p.model.add_subsystem('par', om.ParallelGroup(), promotes_inputs=['*'])
-        G1 = par.add_subsystem('G1', DynShapeGroupSeries(2,1, DistribDynShapeComp))
-        G2 = par.add_subsystem('G2', DynShapeGroupSeries(2,1, DistribDynShapeComp))
-        
-        p.model.add_subsystem('sink', om.ExecComp(['y1=x1', 'y2=x2'], shape=(5,)))
-        par.connect('G1.C2.y1', 'sink.x1')
-        par.connect('G1.C1.y1', 'sink.x2')
-        
-        import wingdbstub
-        p.setup()
-        p.run_model()
-        
-        
+#     def test_remote_distrib(self):
+#         p = om.Problem()
+#         par = p.model.add_subsystem('par', om.ParallelGroup(), promotes_inputs=['*'])
+#         G1 = par.add_subsystem('G1', DynShapeGroupSeries(2,1, DistribDynShapeComp))
+#         G2 = par.add_subsystem('G2', DynShapeGroupSeries(2,1, DistribDynShapeComp))
+
+#         p.model.add_subsystem('sink', om.ExecComp(['y1=x1', 'y2=x2'], shape=(5,)))
+#         par.connect('G1.C2.y1', 'sink.x1')
+#         par.connect('G1.C1.y1', 'sink.x2')
+
+#         p.setup()
+#         p.run_model()
+
+
 if __name__ == "__main__":
     unittest.main()
