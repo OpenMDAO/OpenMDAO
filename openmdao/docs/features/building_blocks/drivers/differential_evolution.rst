@@ -16,7 +16,7 @@ The DifferentialEvolutionDriver has advantages and disadvantages when compared t
 
   * DifferentialEvolutionDriver is typically about 3 times faster than SimpleGADriver
 
-  * DifferentialEvolutionDriver is usually more accurate SimpleGADriver because it does not limit the number of bits available to represent inputs
+  * DifferentialEvolutionDriver is usually more accurate than SimpleGADriver because it does not limit the number of bits available to represent inputs
 
   * DifferentialEvolutionDriver does not require the user to manually specify a number of representation bits
 
