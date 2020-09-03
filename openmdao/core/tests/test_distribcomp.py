@@ -409,7 +409,7 @@ class DistributedIO(unittest.TestCase):
         # Check the local size of the design variables on each proc
         dvs = p.model.get_design_vars()
         for name, meta in dvs.items():
-            model_size = dvs[name]['size']
+            model_size = meta['size']
             self.assertEqual(model_size, ndvs)
 
 
