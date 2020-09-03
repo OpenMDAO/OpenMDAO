@@ -45,7 +45,7 @@ class BaseCaseReader(object):
         Returns
         -------
         dict
-            reference to the _system_options method.
+            reference to the _system_options attribute.
         """
         warn_deprecation("The system_options attribute is deprecated. "
                          "Use `list_model_options` instead.")
