@@ -3109,6 +3109,7 @@ class TestInConfigMPIpar(Test3Deep):
 
     def test_io_meta_remote(self):
         p = self.build_model()
+
         p.model.add_get_io('cfg', metadata_keys=('value', 'src_indices', 'shape'), get_remote=True)
         p.model.cfg.add_get_io('sub')
 

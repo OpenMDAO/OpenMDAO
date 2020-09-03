@@ -62,8 +62,6 @@ class Group(System):
         Information used to determine MPI process allocation to subsystems.
     _subgroups_myproc : list
         List of local subgroups.
-    _subsystems_proc_range : (int, int)
-        List of ranges of each myproc subsystem's processors relative to those of this system.
     _manual_connections : dict
         Dictionary of input_name: (output_name, src_indices) connections.
     _group_inputs : dict
@@ -118,7 +116,6 @@ class Group(System):
         super(Group, self).__init__(**kwargs)
 
         self._subgroups_myproc = None
-        self._subsystems_proc_range = []
         self._manual_connections = {}
         self._group_inputs = {}
         self._pre_config_group_inputs = {}
@@ -472,9 +469,6 @@ class Group(System):
             self._subsystems_myproc = [s for s, _ in self._subsystems_allprocs.values()]
             sub_proc_range = (0, 1)
 
-        # Compute _subsystems_proc_range
-        self._subsystems_proc_range = [sub_proc_range] * len(self._subsystems_myproc)
-
         # need to set pathname correctly even for non-local subsystems
         for s, _ in self._subsystems_allprocs.values():
             s.pathname = '.'.join((self.pathname, s.name)) if self.pathname else s.name
@@ -702,7 +696,6 @@ class Group(System):
             lst[0]['path'] = self.pathname  # used for error reporting
             self._group_inputs[n] = lst.copy()  # must copy the list manually
 
-        self._var_sizes['nonlinear'] = sizes = {}
         self._has_distrib_vars = False
 
         for subsys in self._subsystems_myproc:
@@ -746,17 +739,11 @@ class Group(System):
 
         # If running in parallel, allgather
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
-            loc_sizes = {}
-            for io in ('input', 'output'):
-                loc_sizes[io] = {n: m['size'] for n, m in abs2meta[io].items()}
-
-            myrank = self.comm.rank
             mysub = self._subsystems_myproc[0] if self._subsystems_myproc else False
             if (mysub and mysub.comm.rank == 0 and (mysub._full_comm is None or
                                                     mysub._full_comm.rank == 0)):
                 raw = (allprocs_discrete, allprocs_prom2abs_list, allprocs_abs2meta,
-                       self._has_output_scaling, self._has_resid_scaling, self._group_inputs,
-                       loc_sizes)
+                       self._has_output_scaling, self._has_resid_scaling, self._group_inputs)
             else:
                 raw = (
                     {'input': {}, 'output': {}},
@@ -765,7 +752,6 @@ class Group(System):
                     False,
                     False,
                     {},
-                    loc_sizes,
                 )
 
             gathered = self.comm.allgather(raw)
@@ -777,9 +763,9 @@ class Group(System):
             for io in ['input', 'output']:
                 allprocs_prom2abs_list[io] = OrderedDict()
 
-            sizedict = defaultdict(lambda: np.zeros((self.comm.size, 1), dtype=INT_DTYPE))
+            myrank = self.comm.rank
             for rank, (proc_discrete, proc_prom2abs_list, proc_abs2meta,
-                       oscale, rscale, ginputs, proc_sizes) in enumerate(gathered):
+                       oscale, rscale, ginputs) in enumerate(gathered):
                 self._has_output_scaling |= oscale
                 self._has_resid_scaling |= rscale
 
@@ -791,11 +777,8 @@ class Group(System):
 
                 for io in ['input', 'output']:
                     allprocs_abs2meta[io].update(proc_abs2meta[io])
-                    loc_sizes = proc_sizes[io]
                     # collect size info
                     for n, m in proc_abs2meta[io].items():
-                        if n in loc_sizes:
-                            sizedict[n][rank] = loc_sizes[n]
                         if m['distributed']:
                             self._has_distrib_vars = True
 
@@ -810,37 +793,10 @@ class Group(System):
 
             for io in ('input', 'output'):
                 if allprocs_abs2meta[io]:
-                    sizes[io] = np.hstack([sizedict[n] for n in allprocs_abs2meta[io]])
                     # update new allprocs_abs2meta with our local version (now that we have a
                     # consistent order for our OrderedDict), so that the 'size' metadata will
                     # accurately reflect this proc's var size instead of one from some other proc.
                     allprocs_abs2meta[io].update(old_abs2meta[io])
-                else:
-                    sizes[io] = np.zeros((self.comm.size, 0), dtype=INT_DTYPE)
-
-        else:  # serial or non-parallel group under MPI
-            # even if a group has comm.size > 1, as long as it's not a parallel group, we know
-            # that its child comms are the same size as its comm, and that all subsystems in
-            # _subsystems_allprocs are local, so we can simply iterate over them and fill in
-            # our sizes array without having to perform any MPI operations.
-            for io in ('input', 'output'):
-                sizes[io] = sz = np.zeros((self.comm.size, len(allprocs_abs2meta[io])),
-                                          dtype=INT_DTYPE)
-                # the order of our allprocs variables (and correspondingly the order of columns
-                # in our sizes array) is determined by the order of our subsystems in
-                # _subsystems_myproc, so just keep a running allprocs column id as we iterate
-                # over our subsystems.
-                allprocs_col = 0
-                for sub in self._subsystems_myproc:
-                    subsizes = sub._var_sizes['nonlinear'][io]
-                    par_fd = sub._full_comm is not None
-                    for col in range(subsizes.shape[1]):
-                        arr = subsizes[:, col]
-                        if arr.size > 0:
-                            if par_fd:
-                                arr = np.tile(arr, self.comm.size // sub.comm.size)
-                            sz[:, allprocs_col] = arr
-                            allprocs_col += 1
 
         self._var_allprocs_abs2meta = allprocs_abs2meta
 
@@ -855,18 +811,6 @@ class Group(System):
             for prom, abslist in self._var_allprocs_prom2abs_list[io].items():
                 for abs_name in abslist:
                     a2p[abs_name] = prom
-
-        # all names are relevant for the 'nonlinear' and 'linear' vectors, so
-        # we can set them here, before we've computed the relevance graph.  We
-        # can then use them to compute the size arrays of for all other vectors
-        # based on the nonlinear size array.
-        nl_allprocs_relnames = self._var_allprocs_relevant_names['nonlinear']
-        nl_relnames = self._var_relevant_names['nonlinear']
-        for io in ('input', 'output'):
-            nl_allprocs_relnames[io] = list(self._var_allprocs_abs2meta[io])
-            nl_relnames[io] = list(self._var_abs2meta[io])
-
-        self._setup_var_index_maps(('nonlinear',))
 
         if self._group_inputs:
             p2abs_in = self._var_allprocs_prom2abs_list['input']
@@ -890,13 +834,7 @@ class Group(System):
         else:
             self._discrete_inputs = self._discrete_outputs = ()
 
-        if self._use_derivatives:
-            self._var_sizes['linear'] = self._var_sizes['nonlinear']
-            self._var_allprocs_relevant_names['linear'] = nl_allprocs_relnames
-            self._var_relevant_names['linear'] = nl_relnames
-            self._var_allprocs_abs2idx['linear'] = self._var_allprocs_abs2idx['nonlinear']
-
-        self._compute_owning_ranks()
+        self._vars_to_gather, self._dist_var_locality = self._find_remote_var_owners()
 
     def _resolve_group_input_defaults(self):
         """
@@ -963,22 +901,91 @@ class Group(System):
             for meta in metalist:
                 meta.update(fullmeta)
 
+    def _find_remote_var_owners(self):
+        """
+        Return a mapping of var pathname to owning rank and distrib var name locality.
+
+        The first mapping will contain ONLY systems that are remote on at least one proc.
+        Distributed systems are not included.
+
+        The second will contain only distrib vars keyed to an array of local ranks.
+
+        Returns
+        -------
+        dict
+            The mapping of variable pathname to owning rank.
+        dict
+            The mapping of distrib var name to local ranks.
+        """
+        remote_vars = {}
+        dists = {}
+
+        if self.comm.size > 1:
+            locality = {}
+            snames = {}
+            for io in ('input', 'output'):
+                snames[io] = sorted(self._var_allprocs_abs2prom[io])
+                nvars = len(snames[io])
+                locality[io] = locs = np.zeros(nvars, dtype=bool)
+                abs2prom = self._var_abs2prom[io]
+                for i, name in enumerate(snames[io]):
+                    if name in abs2prom:
+                        locs[i] = True
+
+            proc_locs = self.comm.allgather(locality)
+            for io in ('input', 'output'):
+                if proc_locs[0][io].size > 0:
+                    abs2meta = self._var_allprocs_abs2meta[io]
+                    locs = np.vstack([loc[io] for loc in proc_locs])
+                    for i, name in enumerate(snames[io]):
+                        nzs = np.nonzero(locs[:, i])[0]
+                        if name in abs2meta and abs2meta[name]['distributed']:
+                            dists[name] = nzs
+                        elif (nzs.size > 0 and nzs.size < locs.shape[0] and name in abs2meta):
+                            remote_vars[name] = nzs[0]
+
+        return remote_vars, dists
+
     def _setup_var_sizes(self):
         """
         Compute the arrays of variable sizes for all variables/procs on this system.
         """
+        self._var_offsets = None
+
         for subsys in self._subsystems_myproc:
             subsys._setup_var_sizes()
 
-        sizes = self._var_sizes
+        nl_allprocs_relnames = self._var_allprocs_relevant_names['nonlinear']
+        nl_relnames = self._var_relevant_names['nonlinear']
+
+        all_abs2meta = self._var_allprocs_abs2meta
+        iproc = self.comm.rank
+        self._var_sizes = {'nonlinear': {}}
+        for io in ('input', 'output'):
+            nl_allprocs_relnames[io] = list(self._var_allprocs_abs2meta[io])
+            nl_relnames[io] = list(self._var_abs2meta[io])
+
+            sizes = self._var_sizes['nonlinear'][io] = np.zeros((self.comm.size,
+                                                                len(all_abs2meta[io])),
+                                                                dtype=INT_DTYPE)
+            abs2meta = self._var_abs2meta[io]
+            for i, name in enumerate(self._var_allprocs_abs2meta[io]):
+                if name in abs2meta:
+                    sizes[iproc, i] = abs2meta[name]['size']
+
+            if self.comm.size > 1:
+                my_sizes = sizes[iproc, :].copy()
+                self.comm.Allgather(my_sizes, sizes)
+
+        self._setup_var_index_maps('nonlinear')
+        self._var_allprocs_abs2meta['linear'] = self._var_allprocs_abs2idx['nonlinear']
+
         relnames = self._var_allprocs_relevant_names
-
         vec_names = self._lin_rel_vec_name_list[1:] if self._use_derivatives else []
-
         abs2idx = self._var_allprocs_abs2idx['nonlinear']
-        nl_sizes = sizes['nonlinear']
 
-        # Compute _var_sizes
+        sizes = self._var_sizes
+        nl_sizes = sizes['nonlinear']
         for vec_name in vec_names:
             sizes[vec_name] = {}
 
@@ -989,6 +996,8 @@ class Group(System):
                 # Compute _var_sizes based on 'nonlinear' var sizes
                 for idx, abs_name in enumerate(relnames[vec_name][io]):
                     sz[:, idx] = nl_sizes[io][:, abs2idx[abs_name]]
+
+            self._setup_var_index_maps(vec_name)
 
         if self.comm.size > 1:
             if (self._has_distrib_vars or self._contains_parallel_group or
@@ -1003,13 +1012,18 @@ class Group(System):
         else:
             self._vector_class = self._local_vector_class
 
-    def _compute_owning_ranks(self, abs2meta_tup=None):
-        if abs2meta_tup is None:
-            self._vars_to_gather = {}
-            abs2meta = self._var_allprocs_abs2meta
-            abs2discrete = self._var_allprocs_discrete
-        else:
-            abs2meta, abs2discrete = abs2meta_tup
+        if self._use_derivatives:
+            self._var_sizes['linear'] = self._var_sizes['nonlinear']
+            self._var_allprocs_relevant_names['linear'] = \
+                self._var_allprocs_relevant_names['nonlinear']
+            self._var_relevant_names['linear'] = self._var_relevant_names['nonlinear']
+            self._var_allprocs_abs2idx['linear'] = self._var_allprocs_abs2idx['nonlinear']
+
+        self._compute_owning_ranks()
+
+    def _compute_owning_ranks(self):
+        abs2meta = self._var_allprocs_abs2meta
+        abs2discrete = self._var_allprocs_discrete
 
         if self.comm.size > 1:
             owns = self._owning_rank
@@ -1025,8 +1039,6 @@ class Group(System):
                             if io == 'output' and not meta['distributed']:
                                 self._owned_sizes[rank + 1:, i] = 0  # zero out all dups
                             break
-                    if not meta['distributed'] and not np.all(sizes[:, i]):
-                        self._vars_to_gather[name] = owns[name]
 
                 if abs2discrete[io]:
                     prefix = self.pathname + '.' if self.pathname else ''
@@ -1038,8 +1050,6 @@ class Group(System):
                             if n not in owns:
                                 owns[n] = rank
                         remote.update(all_set - names)
-                    for r in remote:
-                        self._vars_to_gather[r] = owns[r]
         else:
             self._owned_sizes = self._var_sizes['nonlinear']['output']
 
@@ -1255,11 +1265,42 @@ class Group(System):
         for inp in src_ind_inputs:
             allprocs_abs2meta[inp]['has_src_indices'] = True
 
+    def _evenly_distribute_sizes_to_locals(self, var, arr_size):
+        """
+        Evenly distribute entries for the given array size, but only where the given var is local.
+
+        Parameters
+        ----------
+        var : str
+            Absolute name of the variable.
+        arr_size : int
+            Size to be distributed among procs where var is local.
+
+        Returns
+        -------
+        ndarray
+            Array of sizes, one entry for each proc in this group's comm.
+        ndarray
+            Array of offsets.
+        """
+        sizes = np.zeros(self.comm.size, dtype=INT_DTYPE)
+        locality = self._dist_var_locality[var]
+        dsizes, offsets = evenly_distrib_idxs(locality.size, arr_size)
+        for loc_idx, sz in zip(locality, dsizes):
+            sizes[loc_idx] = sz
+
+        offsets = np.zeros(self.comm.size, dtype=int)
+        offsets[1:] = np.cumsum(sizes)[:-1]
+
+        return sizes, offsets
+
     def _setup_dynamic_shapes(self):
         """
         Add shape/size metadata for variables that were created with shape_by_conn or copy_shape.
         """
         def copy_var_meta(from_var, to_var, distrib_sizes):
+            # copy size/shape info from from_var's metadata to to_var's metadata
+
             from_io = 'output' if from_var in self._var_allprocs_abs2meta['output'] else 'input'
             to_io = 'output' if to_var in self._var_allprocs_abs2meta['output'] else 'input'
 
@@ -1277,6 +1318,7 @@ class Group(System):
 
             to_dist = nprocs > 1 and all_to_meta['distributed']
 
+            # distrib to distrib or serial to serial
             if (from_dist and to_dist) or not (from_dist or to_dist):
                 all_to_meta['shape'] = from_shape
                 all_to_meta['size'] = from_size
@@ -1290,23 +1332,21 @@ class Group(System):
                 if to_dist and from_dist:
                     distrib_sizes[to_var] = distrib_sizes[from_var]
                 # src_indices will be computed later for dist inputs that don't specify them
-            elif from_var in self._var_allprocs_abs2prom['output']:
+            elif from_io == 'output':
                 # from_var is an output.  assume to_var is an input
                 if from_dist and not to_dist:  # known dist output to serial input
-                    total_size = np.sum(distrib_sizes[from_var])
-                    all_to_meta['size'] = total_size
-                    all_to_meta['shape'] = (total_size,)
+                    size = np.sum(distrib_sizes[from_var])
+                    all_to_meta['size'] = size
+                    all_to_meta['shape'] = (size,)
                     if to_meta:
-                        to_meta['size'] = total_size
-                        to_meta['shape'] = (total_size,)
-                        to_meta['value'] = np.ones(total_size)
+                        to_meta['size'] = size
+                        to_meta['shape'] = (size,)
+                        to_meta['value'] = np.ones(size)
                 else:  # known serial output to dist input
                     # there is not enough info to determine how the variable is split
                     # over the procs. for now we split the variable up equally
                     rank = self.comm.rank
-                    # FIXME: this doesn't handle case where a distrib var is fully remote on
-                    # some procs
-                    sizes, offsets = evenly_distrib_idxs(nprocs, from_size)
+                    sizes, offsets = self._evenly_distribute_sizes_to_locals(to_var, from_size)
                     size = sizes[rank]
 
                     all_to_meta['size'] = size
@@ -1321,9 +1361,7 @@ class Group(System):
                                                            dtype=INT_DTYPE)
             else:  # from_var is an input
                 if not from_dist and to_dist:   # known serial input to dist output
-                    # FIXME: this doesn't handle case where a distrib var is fully remote on
-                    # some procs
-                    sizes, offsets = evenly_distrib_idxs(nprocs, from_size)
+                    sizes, _ = self._evenly_distribute_sizes_to_locals(to_var, from_size)
                     size = sizes[self.comm.rank]
 
                     all_to_meta['size'] = size
@@ -1363,16 +1401,17 @@ class Group(System):
                 rev[src].append(tgt)
             return rev
 
-        graph = nx.Graph()
+        graph = nx.OrderedGraph()
         dist_sz = {}  # local distrib sizes
         knowns = set()
         all_abs2meta_out = self._var_allprocs_abs2meta['output']
+        all_abs2meta_in = self._var_allprocs_abs2meta['input']
+        my_abs2meta_out = self._var_abs2meta['output']
+        my_abs2meta_in = self._var_abs2meta['input']
 
         # find all variables that have an unknown shape (across all procs)
         for io in ('input', 'output'):
-            all_abs2meta = self._var_allprocs_abs2meta[io]
-            my_abs2meta = self._var_abs2meta[io]
-            for name, meta in all_abs2meta.items():
+            for name, meta in self._var_allprocs_abs2meta[io].items():
                 if meta['shape_by_conn']:
                     if name in conn:  # it's a connected input
                         abs_from = conn[name]
@@ -1385,7 +1424,7 @@ class Group(System):
                         if name in rev_conn:  # connected output
                             for inp in rev_conn[name]:
                                 graph.add_edge(name, inp)
-                                if all_abs2meta[inp]['shape'] is not None:
+                                if all_abs2meta_in[inp]['shape'] is not None:
                                     knowns.add(inp)
                         elif not meta['copy_shape']:
                             raise RuntimeError(f"{self.msginfo}: 'shape_by_conn' was set for "
@@ -1397,11 +1436,13 @@ class Group(System):
                     abs_from = name.rsplit('.', 1)[0] + '.' + meta['copy_shape']
                     graph.add_edge(name, abs_from)
                     # this is unlikely, but a user *could* do it, so we'll check
-                    if all_abs2meta[abs_from]['shape'] is not None:
+                    a2m = all_abs2meta_in if abs_from in all_abs2meta_in else all_abs2meta_out
+                    if a2m[abs_from]['shape'] is not None:
                         knowns.add(abs_from)
 
                 # store known distributed size info needed for computing shapes
                 if nprocs > 1 and meta['distributed']:
+                    my_abs2meta = my_abs2meta_in if name in my_abs2meta_in else my_abs2meta_out
                     if name in my_abs2meta:
                         sz = my_abs2meta[name]['size']
                         if sz is not None:
@@ -1433,7 +1474,7 @@ class Group(System):
 
             # because comps is a connected component, we only need 1 known node to resolve
             # the rest
-            stack = set([comp_knowns.pop()])
+            stack = [comp_knowns.pop()]
             while stack:
                 known = stack.pop()
                 for node in graph.neighbors(known):
@@ -1443,7 +1484,7 @@ class Group(System):
                         # adding to knowns here won't affect the intersection above since this
                         # node can't exist in a different connected component anyway
                         knowns.add(node)
-                        stack.add(node)
+                        stack.append(node)
 
         if unresolved:
             unresolved = sorted(unresolved)
@@ -3032,7 +3073,6 @@ class Group(System):
             s.index = i + 1
 
         self._subsystems_myproc = [auto_ivc] + self._subsystems_myproc
-        self._subsystems_proc_range = [(0, self.comm.size)] + self._subsystems_proc_range
 
         io = 'output'  # auto_ivc has only output vars
         old = self._var_allprocs_prom2abs_list[io]
@@ -3063,17 +3103,6 @@ class Group(System):
 
         self._approx_subjac_keys = None  # this will force re-initialization
         self._setup_procs_finished = True
-
-        # fix nonlinear sizes
-        self._var_sizes['nonlinear'][io] = np.hstack((auto_ivc._var_sizes['nonlinear'][io],
-                                                      self._var_sizes['nonlinear'][io]))
-        self._var_allprocs_relevant_names['nonlinear'][io] = \
-            list(self._var_allprocs_abs2meta[io])
-        self._var_relevant_names['nonlinear'][io] = list(self._var_abs2meta[io])
-        self._setup_var_index_maps(('nonlinear',))
-        self._var_allprocs_abs2idx['linear'] = self._var_allprocs_abs2idx['nonlinear']
-        self._compute_owning_ranks((auto_ivc._var_allprocs_abs2meta,
-                                    auto_ivc._var_allprocs_discrete))
 
         return auto_ivc
 

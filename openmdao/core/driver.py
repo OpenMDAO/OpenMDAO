@@ -742,11 +742,11 @@ class Driver(object):
             else:
                 objs[name] = data
 
-        response_size = sum(resps[n]['size'] for n in self._get_ordered_nl_responses())
+        response_size = sum(resps[n]['global_size'] for n in self._get_ordered_nl_responses())
 
         # Gather up the information for design vars.
         self._designvars = designvars = model.get_design_vars(recurse=True, use_prom_ivc=True)
-        desvar_size = sum(data['size'] for data in designvars.values())
+        desvar_size = sum(data['global_size'] for data in designvars.values())
 
         return response_size, desvar_size
 

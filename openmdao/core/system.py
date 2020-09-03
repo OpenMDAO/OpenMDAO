@@ -180,8 +180,6 @@ class System(object):
         Dictionary of discrete var metadata and values local to this process.
     _var_allprocs_discrete : dict
         Dictionary of discrete var metadata and values for all processes.
-    _vars_to_gather : dict
-        Mapping of variables that are remote in some proc(s) to their owning rank.
     _discrete_inputs : dict-like or None
         Storage for discrete input values.
     _discrete_outputs : dict-like or None
@@ -202,6 +200,10 @@ class System(object):
         in the given system.  This is only defined in a Group that owns one or more interprocess
         connections or a top level Group or System that is used to compute total derivatives
         across multiple processes.
+    _vars_to_gather : dict
+        Contains names of non-distributed variables that are remote on at least one proc in the comm
+    _dist_var_locality : dict
+        Contains names of distrib vars mapped to the ranks in the comm where they are local.
     _conn_global_abs_in2out : {'abs_in': 'abs_out'}
         Dictionary containing all explicit & implicit connections owned by this system
         or any descendant system. The data is the same across all processors.
@@ -377,6 +379,7 @@ class System(object):
         self._subsystems_allprocs = OrderedDict()
         self._subsystems_myproc = []
         self._vars_to_gather = {}
+        self._dist_var_locality = {}
 
         self._var_promotes = {'input': [], 'output': [], 'any': []}
         self._var_promotes_src_indices = {}
@@ -1314,28 +1317,19 @@ class System(object):
         self._var_allprocs_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
         self._var_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
 
-    def _setup_var_index_maps(self, vec_names=None):
+    def _setup_var_index_maps(self, vec_name):
         """
         Compute maps from abs var names to their index among allprocs variables in this system.
 
         Parameters
         ----------
-        vec_names : iter of str or None
-            Names of vectors to iterate over.  If None, only partial linear vec names will be
-            iterated over, e.g., only those defined for parallel derivatives or vectorized derivs.
+        vec_name : str
+            Name of vector.
         """
-        abs2idx = self._var_allprocs_abs2idx
-        if vec_names is None:
-            if self._use_derivatives:
-                vec_names = self._lin_rel_vec_name_list[1:]
-            else:
-                vec_names = self._vec_names[2:]
-
-        for vec_name in vec_names:
-            abs2idx[vec_name] = abs2idx_t = {}
-            for io in ['input', 'output']:
-                for i, abs_name in enumerate(self._var_allprocs_relevant_names[vec_name][io]):
-                    abs2idx_t[abs_name] = i
+        abs2idx = self._var_allprocs_abs2idx[vec_name] = {}
+        for io in ['input', 'output']:
+            for i, abs_name in enumerate(self._var_allprocs_relevant_names[vec_name][io]):
+                abs2idx[abs_name] = i
 
     def _setup_global_shapes(self):
         """
@@ -1612,7 +1606,6 @@ class System(object):
 
         self._rel_vec_names = frozenset(self._rel_vec_name_list)
         self._lin_rel_vec_name_list = self._rel_vec_name_list[1:]
-        self._setup_var_index_maps()
 
         for s in self._subsystems_myproc:
             s._setup_relevance(mode, relevant)
@@ -2944,6 +2937,8 @@ class System(object):
                     meta = abs2meta_out[src_name]
                     out[name]['distributed'] = meta['distributed']
                     out[name]['global_size'] = meta['global_size']
+                else:
+                    out[name]['global_size'] = 0  # discrete var
 
         if recurse:
             abs2prom_in = self._var_allprocs_abs2prom['input']
@@ -3040,7 +3035,7 @@ class System(object):
 
                 # Discrete vars
                 if name not in abs2idx:
-                    response['size'] = 0  # discrete var, we don't know the size
+                    response['size'] = response['global_size'] = 0  # discrete var, don't know size
                     continue
 
                 meta = abs2meta_out[name]

@@ -380,7 +380,6 @@ class MPITests(unittest.TestCase):
         model.add_subsystem("Cdist2", DistribInputDistribOutputComp(arr_size=size))
         model.connect('indep.x', 'Cdist.invec')
         model.connect('Cdist.outvec', 'Cdist2.invec')
-        #import wingdbstub
         p.setup()
         p.run_model()
         msg = "Group (<model>): Can't retrieve distributed variable 'Cdist2.invec' because its src_indices reference entries from other processes. You can retrieve values from all processes using `get_val(<name>, get_remote=True)`."
@@ -514,7 +513,7 @@ class MPITests(unittest.TestCase):
         test = self
 
         def verify(inputs, outputs, in_vals=1., out_vals=1., pathnames=False, comm=None, final=True, rank=None):
-            global_shape = (size, )
+            global_shape = (size, ) if final else 'Unavailable'
 
             inputs = sorted(inputs)
             outputs = sorted(outputs)

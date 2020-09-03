@@ -567,19 +567,23 @@ class TestDistribDynShapes(unittest.TestCase):
     N_PROCS = 4
 
     def test_remote_distrib(self):
+        # this test has remote distributed components (distributed comps under parallel groups)
         p = om.Problem()
-        par = p.model.add_subsystem('par', om.ParallelGroup(), promotes_inputs=['*'])
+        indep = p.model.add_subsystem('indep', om.IndepVarComp())
+        indep.add_output('x1', shape_by_conn=True)
+
+        par = p.model.add_subsystem('par', om.ParallelGroup())
         G1 = par.add_subsystem('G1', DynShapeGroupSeries(2,1, DistribDynShapeComp))
         G2 = par.add_subsystem('G2', DynShapeGroupSeries(2,1, DistribDynShapeComp))
-        
-        p.model.add_subsystem('sink', om.ExecComp(['y1=x1', 'y2=x2'], shape=(5,)))
-        par.connect('G1.C2.y1', 'sink.x1')
-        par.connect('G1.C1.y1', 'sink.x2')
-        
-        import wingdbstub
+
+        p.model.add_subsystem('sink', om.ExecComp(['y1=x1+x2'], shape=(5,)))
+        p.model.connect('indep.x1', ['par.G1.C1.x1', 'par.G2.C1.x1'])
+        p.model.connect('par.G1.C2.y1', 'sink.x1')
+        p.model.connect('par.G2.C2.y1', 'sink.x2')
+
         p.setup()
         p.run_model()
-        
-        
+
+
 if __name__ == "__main__":
     unittest.main()
