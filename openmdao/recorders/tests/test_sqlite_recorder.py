@@ -2615,10 +2615,10 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         cr = om.CaseReader("cases.sql")
 
-        # metadata for all the systems in the model
-        metadata = cr.list_model_options()
+        # options for all the systems in the model
+        options = cr.list_model_options()
 
-        self.assertEqual(sorted(metadata.keys()),
+        self.assertEqual(sorted(options.keys()),
                          sorted(['root']))
 
         # options for system 'root'
