@@ -62,7 +62,7 @@ class BaseCaseReader(object):
             reference to the '_system_options' attribute.
         """
         warn_deprecation("The BaseCaseReader.system_metadata attribute is deprecated. "
-                         "Use the BaseCaseReader.system_option attribute instead.")
+                         "Use `list_model_options` instead.")
         return self._system_options
 
     def get_cases(self, source, recurse=True, flat=False):

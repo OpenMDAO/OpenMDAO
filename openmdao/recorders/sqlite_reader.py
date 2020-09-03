@@ -33,7 +33,7 @@ class SqliteCaseReader(BaseCaseReader):
         Metadata about the problem, including the system hierachy and connections.
     solver_metadata : dict
         The solver options for each solver in the recorded model.
-    system_options : dict
+    _system_options : dict
         Metadata about each system in the recorded model, including options and scaling factors.
     _format_version : int
         The version of the format assumed when loading the file.
@@ -107,7 +107,7 @@ class SqliteCaseReader(BaseCaseReader):
 
             # collect data from the system_metadata table. this includes:
             #   component metadata and scaling factors for each system,
-            #   which is added to system_options
+            #   which is added to _system_options
             self._collect_system_metadata(cur)
 
             # collect data from the solver_metadata table. this includes:
