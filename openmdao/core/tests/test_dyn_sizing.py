@@ -607,9 +607,32 @@ class TestDistribDynShapes(unittest.TestCase):
         np.testing.assert_allclose(p['sink.y1'], np.ones(5)*8.)
 
 
+class PartialsComp(om.ExplicitComponent):
+    def setup(self):
+        self.add_input('x', shape_by_conn=True, copy_shape='y')
+        self.add_output('y', shape_by_conn=True, copy_shape='x')
+
+    def setup_partials(self):
+        size = self._var_rel2meta['x']['size']
+        self.mat = np.eye(size) * 3.
+        rng = np.arange(size)
+        self.declare_partials('y', 'x', rows=rng, cols=rng, val=3.0)
+
+    def compute(self, inputs, outputs):
+        outputs['y'] = self.mat.dot(inputs['x'])
+
+
+
 class TestDynWithSetupPartials(unittest.TestCase):
     def test_setup_partials(sefl):
-        pass
+        p = om.Problem()
+        p.model.add_subsystem('comp', PartialsComp())
+        p.model.add_subsystem('sink', om.ExecComp('y=x', shape=10))
+        p.model.connect('comp.y', 'sink.x')
+        p.setup()
+        p.run_model()
+        J = p.compute_totals(of=['sink.y'], wrt=['comp.x'])
+        np.testing.assert_allclose(J['sink.y', 'comp.x'], np.eye(10)*3.)
 
 if __name__ == "__main__":
     unittest.main()
