@@ -35,6 +35,8 @@ None
 - N2 code getting tree dict updated to use _UNDEFINED constant. #1623
 - When encountering an AnalysisError, drivers will now indicate which component raised the error. #1650
 - Differential Evolution driver added. #1662
+- Added Aitken Relaxation to the Linear Block Gauss-Seidel solver. #1663
+- Tagging capability added to AddSubtractComp #1664
 
 ## Bug Fixes:
 
