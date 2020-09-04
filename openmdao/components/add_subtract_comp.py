@@ -159,7 +159,7 @@ class AddSubtractComp(ExplicitComponent):
             Scaling parameter. The value in the user-defined res_units of this output's residual
             when the scaled value is 1. Default is 1.
         tags : str or list of strs
-            User defined tags that can be used to filter what gets listed when calling 
+            User defined tags that can be used to filter what gets listed when calling
             list_inputs and list_outputs and also when listing results from case recorders.
         """
         kwargs = {'units': units, 'res_units': res_units, 'desc': desc,
