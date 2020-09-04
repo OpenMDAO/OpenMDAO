@@ -39,6 +39,13 @@ The call signature for the `LinearBlockGS` constructor is:
 .. automethod:: openmdao.solvers.linear.linear_block_gs.LinearBlockGS.__init__
     :noindex:
 
+Aitken relaxation
+-------------------
+This solver implements Aitken relaxation, as described in Algorithm 1 of this paper on aerostructual design optimization_.
+The relaxation is turned off by default, but it may help convergence for more tightly coupled models.
+
+.. _optimization: http://mdolab.engin.umich.edu/content/scalable-parallel-approach-aeroelastic-analysis-and-derivative
+
 
 LinearBlockGS Option Examples
 -----------------------------
