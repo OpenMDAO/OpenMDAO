@@ -1450,42 +1450,44 @@ class Group(System):
 
         # find all variables that have an unknown shape (across all procs) and connect them
         # to other unknow and known shape variables to form a graph.
-        for name, meta in all_abs2meta.items():
-            if meta['shape_by_conn']:
-                if name in conn:  # it's a connected input
-                    abs_from = conn[name]
+        for io in ('input', 'output'):
+            for name in self._var_allprocs_abs_names[io]:
+                meta = all_abs2meta[name]
+                if meta['shape_by_conn']:
+                    if name in conn:  # it's a connected input
+                        abs_from = conn[name]
+                        graph.add_edge(name, abs_from)
+                        if all_abs2meta[abs_from]['shape'] is not None:
+                            knowns.add(abs_from)
+                    else:
+                        if rev_conn is None:
+                            rev_conn = get_rev_conn()
+                        if name in rev_conn:  # connected output
+                            for inp in rev_conn[name]:
+                                graph.add_edge(name, inp)
+                                if all_abs2meta[inp]['shape'] is not None:
+                                    knowns.add(inp)
+                        elif not meta['copy_shape']:
+                            raise RuntimeError(f"{self.msginfo}: 'shape_by_conn' was set for "
+                                               f"unconnected variable '{u}'.")
+
+                if meta['copy_shape']:
+                    # variable whose shape is being copied must be on the same component, and
+                    # name stored in 'copy_shape' entry must be the relative name.
+                    abs_from = name.rsplit('.', 1)[0] + '.' + meta['copy_shape']
                     graph.add_edge(name, abs_from)
+                    # this is unlikely, but a user *could* do it, so we'll check
                     if all_abs2meta[abs_from]['shape'] is not None:
                         knowns.add(abs_from)
-                else:
-                    if rev_conn is None:
-                        rev_conn = get_rev_conn()
-                    if name in rev_conn:  # connected output
-                        for inp in rev_conn[name]:
-                            graph.add_edge(name, inp)
-                            if all_abs2meta[inp]['shape'] is not None:
-                                knowns.add(inp)
-                    elif not meta['copy_shape']:
-                        raise RuntimeError(f"{self.msginfo}: 'shape_by_conn' was set for "
-                                           f"unconnected variable '{u}'.")
 
-            if meta['copy_shape']:
-                # variable whose shape is being copied must be on the same component, and
-                # name stored in 'copy_shape' entry must be the relative name.
-                abs_from = name.rsplit('.', 1)[0] + '.' + meta['copy_shape']
-                graph.add_edge(name, abs_from)
-                # this is unlikely, but a user *could* do it, so we'll check
-                if all_abs2meta[abs_from]['shape'] is not None:
-                    knowns.add(abs_from)
-
-            # store known distributed size info needed for computing shapes
-            if nprocs > 1 and meta['distributed']:
-                if name in my_abs2meta:
-                    sz = my_abs2meta[name]['size']
-                    if sz is not None:
-                        dist_sz[name] = sz
-                else:
-                    dist_sz[name] = 0
+                # store known distributed size info needed for computing shapes
+                if nprocs > 1 and meta['distributed']:
+                    if name in my_abs2meta:
+                        sz = my_abs2meta[name]['size']
+                        if sz is not None:
+                            dist_sz[name] = sz
+                    else:
+                        dist_sz[name] = 0
 
         if graph.order() == 0:
             # we don't have any shape_by_conn or copy_shape variables, so we're done
@@ -1511,11 +1513,24 @@ class Group(System):
 
             # because comps is a connected component, we only need 1 known node to resolve
             # the rest
-            stack = [comp_knowns.pop()]
+            stack = [sorted(comp_knowns)[0]]  # sort to keep error messages consistent
             while stack:
                 known = stack.pop()
+                known_shape = all_abs2meta[known]['shape']
                 for node in graph.neighbors(known):
-                    if node not in knowns:
+                    if node in knowns:
+                        # check to see if shapes agree
+                        if all_abs2meta[node]['shape'] != known_shape:
+                            known_dist = all_abs2meta[known]['distributed']
+                            dist = all_abs2meta[node]['distributed']
+                            # can't compare shapes if one is dist and other is not. The mismatch
+                            # will be caught later in setup_connections in that case.
+                            if not (dist ^ known_dist):
+                                raise RuntimeError(f"{self.msginfo}: Shape mismatch,  "
+                                                   f"{all_abs2meta[node]['shape']} vs. "
+                                                   f"{known_shape} for variable '{node}' during "
+                                                   "dynamic shape determination.")
+                    else:
                         # transfer the known shape info to the unshaped variable
                         copy_var_meta(known, node, distrib_sizes)
                         # adding to knowns here won't affect the intersection above since this

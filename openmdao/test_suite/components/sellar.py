@@ -427,6 +427,7 @@ class StateConnection(om.ImplicitComponent):
         # States
         self.add_output('y2_command', val=1.0)
 
+    def setup_partials(self):
         # Declare derivatives
         self.declare_partials(of='*', wrt='*')
 
@@ -555,6 +556,7 @@ class SellarImplicitDis1(om.ImplicitComponent):
         # Coupling output
         self.add_output('y1', val=1.0, lower=-0.1, upper=1000, units=units, ref=ref)
 
+    def setup_partials(self):
         # Derivatives
         self.declare_partials('*', '*')
 
@@ -614,6 +616,7 @@ class SellarImplicitDis2(om.ImplicitComponent):
         # Coupling output
         self.add_output('y2', val=1.0, lower=0.1, upper=1000., units=units, ref=ref)
 
+    def setup_partials(self):
         # Derivatives
         self.declare_partials('*', '*')
 

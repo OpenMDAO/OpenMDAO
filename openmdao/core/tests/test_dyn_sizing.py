@@ -470,7 +470,7 @@ class TestDynShapes(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             p.setup()
 
-        msg = "Group (<model>): The source and target shapes do not match or are ambiguous for the connection 'indep.x2' to 'Gdyn.C1.x2'. The source shape is (4, 2) but the target shape is (3, 2)."
+        msg = "Group (<model>): Shape mismatch,  (3, 2) vs. (4, 2) for variable 'sink.x2' during dynamic shape determination."
         self.assertEqual(str(cm.exception), msg)
 
     def test_baseline_conn_inputs(self):
@@ -606,6 +606,10 @@ class TestDistribDynShapes(unittest.TestCase):
         p.run_model()
         np.testing.assert_allclose(p['sink.y1'], np.ones(5)*8.)
 
+
+class TestDynWithSetupPartials(unittest.TestCase):
+    def test_setup_partials(sefl):
+        pass
 
 if __name__ == "__main__":
     unittest.main()
