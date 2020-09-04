@@ -377,6 +377,45 @@ class TestForExceptions(unittest.TestCase):
         self.assertEqual(str(err.exception), expected_msg)
 
 
+class TestAddSubtractCompTags(unittest.TestCase):
+
+    def setUp(self):
+        self.nn = 1
+        self.p = om.Problem()
+        ivc = om.IndepVarComp()
+        ivc.add_output(name='a', shape=(self.nn,))
+        ivc.add_output(name='b', shape=(self.nn,))
+
+        self.p.model.add_subsystem(name='ivc',
+                                   subsys=ivc,
+                                   promotes_outputs=['a', 'b'])
+
+        adder=self.p.model.add_subsystem(name='add_subtract_comp', subsys=om.AddSubtractComp())
+        adder.add_equation('adder_output', ['input_a','input_b'], tags={'foo'})
+        adder.add_equation('adder_output2', ['input_a','input_a'], tags={'bar'})
+
+        self.p.model.connect('a', 'add_subtract_comp.input_a')
+        self.p.model.connect('b', 'add_subtract_comp.input_b')
+
+        self.p.setup()
+
+        self.p['a'] = np.random.rand(self.nn,)
+        self.p['b'] = np.random.rand(self.nn,)
+
+        self.p.run_model()
+
+    def test_results(self):
+        a = self.p['a']
+        b = self.p['b']
+
+        foo_outputs = self.p.model.list_outputs(tags={'foo'}, out_stream=None)
+        bar_outputs = self.p.model.list_outputs(tags={'bar'}, out_stream=None)
+
+        self.assertEqual(len(foo_outputs), 1)
+        self.assertEqual(len(bar_outputs), 1)
+
+        assert_near_equal(foo_outputs[0][1]['value'], a + b)
+        assert_near_equal(bar_outputs[0][1]['value'], a + a)
 
 
 class TestFeature(unittest.TestCase):
