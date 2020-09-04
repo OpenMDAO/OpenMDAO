@@ -75,6 +75,7 @@ from openmdao.visualization.connection_viewer.viewconns import view_connections
 from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 from openmdao.drivers.scipy_optimizer import ScipyOptimizeDriver
 from openmdao.drivers.genetic_algorithm_driver import SimpleGADriver
+from openmdao.drivers.differential_evolution_driver import DifferentialEvolutionDriver
 from openmdao.drivers.doe_driver import DOEDriver
 from openmdao.drivers.doe_generators import ListGenerator, CSVGenerator, UniformGenerator, \
     FullFactorialGenerator, PlackettBurmanGenerator, BoxBehnkenGenerator, LatinHypercubeGenerator
