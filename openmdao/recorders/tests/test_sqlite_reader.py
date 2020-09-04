@@ -2006,7 +2006,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         prob.cleanup()
         cr = om.CaseReader(self.filename)
-        subs_options = cr.system_options['subs']['component_options']
+        subs_options = cr._system_options['subs']['component_options']
 
         # no options should have been recorded for d1
         self.assertEqual(len(subs_options._dict), 0)
@@ -2854,9 +2854,22 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = om.CaseReader(self.filename)
         msg = "The BaseCaseReader.system_metadata attribute is deprecated. " \
-        "Use the BaseCaseReader.system_option attribute instead."
+        "Use `list_model_options` instead."
         with assert_warning(DeprecationWarning, msg):
             options = cr.system_metadata
+
+    def test_system_options_attribute_deprecated(self):
+        model = om.Group()
+        model.add_recorder(self.recorder)
+        prob = om.Problem(model)
+        prob.setup()
+        prob.run_model()
+        prob.cleanup()
+
+        cr = om.CaseReader(self.filename)
+        msg = "The system_options attribute is deprecated. Use `list_model_options` instead."
+        with assert_warning(DeprecationWarning, msg):
+            options = cr.system_options
 
     def test_sqlite_reader_problem_derivatives(self):
 

@@ -117,6 +117,8 @@ class Problem(object):
         A flag to indicate whether the system options for all the systems have been recorded
     _metadata : dict
         Problem level metadata.
+    _run_counter : int
+        The number of times run_driver or run_model has been called.
     """
 
     def __init__(self, model=None, driver=None, comm=None, name=None, **options):
@@ -170,6 +172,7 @@ class Problem(object):
         self._initial_condition_cache = {}
 
         self._metadata = None
+        self._run_counter = -1
         self._system_options_recorded = False
         self._rec_mgr = RecordingManager()
 
@@ -602,6 +605,8 @@ class Problem(object):
             self.driver.iter_count = 0
             self.model._reset_iter_counts()
 
+        self._run_counter += 1
+
         self.final_setup()
         self.model._clear_iprint()
         self.model.run_solve_nonlinear()
@@ -637,6 +642,8 @@ class Problem(object):
         if self.model.iter_count > 0 and reset_iter_counts:
             self.driver.iter_count = 0
             self.model._reset_iter_counts()
+
+        self._run_counter += 1
 
         self.final_setup()
         self.model._clear_iprint()
