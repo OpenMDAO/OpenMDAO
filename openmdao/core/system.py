@@ -713,6 +713,10 @@ class System(object):
         comm : MPI.Comm or <FakeComm> or None
             The global communicator.
         """
+        if self._use_derivatives:
+            # must call this before vector setup because it determines if we need to alloc commplex
+            self._setup_partials()
+
         self._setup_vectors(self._get_root_vectors())
 
         # Transfers do not require recursion, but they have to be set up after the vector setup.
@@ -723,7 +727,6 @@ class System(object):
         self._setup_solvers()
         self._setup_solver_print()
         if self._use_derivatives:
-            self._setup_partials()
             self._setup_jacobians()
 
         self._setup_recording()

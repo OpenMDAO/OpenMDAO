@@ -27,6 +27,7 @@ class QuadraticComp(om.ImplicitComponent):
         self.add_input('c', val=1.)
         self.add_output('x', val=0., tags=['tag_x'])
 
+    def setup_partials(self):
         self.declare_partials(of='*', wrt='*')
 
     def apply_nonlinear(self, inputs, outputs, residuals):
@@ -1300,6 +1301,7 @@ class ListFeatureTestCase(unittest.TestCase):
                                 ref=1.1, ref0=2.1,
                                 units='inch')
 
+            def setup_partials(self):
                 self.declare_partials(of='*', wrt='*')
 
             def apply_nonlinear(self, inputs, outputs, residuals):
