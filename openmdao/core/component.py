@@ -340,9 +340,21 @@ class Component(System):
         self._subjacs_info = {}
         self._jacobian = DictionaryJacobian(system=self)
 
+        self.setup_partials()  # hook for component writers to specify sparsity patterns
+
         for key, dct in self._declared_partials.items():
             of, wrt = key
             self._declare_partials(of, wrt, dct)
+
+    def setup_partials(self):
+        """
+        Declare partials.
+
+        This is meant to be overridden by component classes.  All partials should be
+        declared here since this is called after all size/shape information is known for
+        all variables.
+        """
+        pass
 
     def _update_wrt_matches(self, info):
         """

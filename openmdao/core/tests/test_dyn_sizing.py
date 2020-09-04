@@ -452,6 +452,27 @@ class TestDynShapes(unittest.TestCase):
         np.testing.assert_allclose(p['sink.y1'], np.ones((2,3))*16)
         np.testing.assert_allclose(p['sink.y2'], np.ones((4,2))*16)
 
+    def test_mismatched_dyn_shapes(self):
+        # this is a sized source and sink, but their sizes are incompatible
+        p = om.Problem()
+        indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
+        indep.add_output('x2', val=np.ones((4,2)))
+        p.model.add_subsystem('Gdyn', DynShapeGroupSeries(3, 2, DynShapeComp))
+        p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
+                                                  x1=np.ones((2,3)),
+                                                  x2=np.ones((3,2)),
+                                                  y1=np.ones((2,3)),
+                                                  y2=np.ones((3,2))))
+        p.model.connect('Gdyn.C3.y1', 'sink.x1')
+        p.model.connect('Gdyn.C3.y2', 'sink.x2')
+        p.model.connect('indep.x1', 'Gdyn.C1.x1')
+        p.model.connect('indep.x2', 'Gdyn.C1.x2')
+        with self.assertRaises(Exception) as cm:
+            p.setup()
+
+        msg = "Group (<model>): The source and target shapes do not match or are ambiguous for the connection 'indep.x2' to 'Gdyn.C1.x2'. The source shape is (4, 2) but the target shape is (3, 2)."
+        self.assertEqual(str(cm.exception), msg)
+
     def test_baseline_conn_inputs(self):
         # this is a sized source and unsized sink, with a DynShapeGroupConnectedInputs between them
         # indep.x? connects to Gdyn.C?.x?
