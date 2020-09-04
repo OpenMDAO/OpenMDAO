@@ -3972,7 +3972,7 @@ class TestNaturalNamingMPI(unittest.TestCase):
                 p.model.comm.barrier()
                 self.assertEqual(p.get_val(name, get_remote=True), 9. + outcount)
 
-        self.assertEqual(p.model._vars_to_gather,
+        self.assertEqual(set(p.model._vars_to_gather),
                          {'par.g1.g2.g3.g4.c1.x', 'par.g1a.g2.g3.g4.c1.x', 'par.g1.g2.g3.g4.c1.y', 'par.g1a.g2.g3.g4.c1.y'})
 
 

@@ -1358,6 +1358,7 @@ class System(object):
         """
         meta = self._var_allprocs_abs2meta
         loc_meta = self._var_abs2meta
+        myrank = self.comm.rank
 
         for io in ('input', 'output'):
             # now set global sizes and shapes into metadata for distributed variables
@@ -4166,6 +4167,8 @@ class System(object):
                     loc_val = val if val is not _UNDEFINED else np.zeros(sizes[myrank])
                     val = np.zeros(np.sum(sizes))
                     self.comm.Allgatherv(loc_val, [val, sizes, offsets, MPI.DOUBLE])
+                    if not flat:
+                        val.shape = meta['global_shape'] if get_remote else meta['shape']
                 else:
                     if owner != self.comm.rank:
                         val = None
@@ -4182,6 +4185,8 @@ class System(object):
                     loc_val = val if val is not _UNDEFINED else np.zeros(sizes[idx])
                     val = np.zeros(np.sum(sizes))
                     self.comm.Gatherv(loc_val, [val, sizes, offsets, MPI.DOUBLE], root=rank)
+                    if not flat:
+                        val.shape = meta['global_shape'] if get_remote else meta['shape']
                 else:
                     if rank != owner:
                         tag = self._var_allprocs_abs2idx[vec_name][abs_name]
@@ -4194,9 +4199,6 @@ class System(object):
                             self.comm.send(val, dest=rank, tag=tag)
                         elif self.comm.rank == rank:
                             val = self.comm.recv(source=owner, tag=tag)
-
-        if not flat and val is not _UNDEFINED and not discrete and not np.isscalar(val):
-            val.shape = meta['global_shape'] if get_remote and distrib else meta['shape']
 
         return val
 

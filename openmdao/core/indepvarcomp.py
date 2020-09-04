@@ -285,7 +285,8 @@ class _AutoIndepVarComp(IndepVarComp):
             abs2meta = self._var_abs2meta
 
             for name in self._remotes:
-                if name in all_abs2meta:
-                    if name in abs2meta:
-                        abs2meta[name]['distributed'] = True
-                    all_abs2meta[name]['distributed'] = True
+                absname = f"_auto_ivc.{name}"
+                if absname in all_abs2meta:
+                    if absname in abs2meta:
+                        abs2meta[absname]['distributed'] = True
+                    all_abs2meta[absname]['distributed'] = True

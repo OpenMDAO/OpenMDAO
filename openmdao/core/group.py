@@ -2986,8 +2986,8 @@ class Group(System):
         rems = set()
         nproc = self.comm.size
 
-        for tgt, meta in all_abs2meta.items():
-            if tgt in conns or tgt not in abs2prom:
+        for tgt in self._var_allprocs_abs_names['input']:
+            if tgt in conns:
                 continue
 
             prom = abs2prom[tgt]
@@ -3002,7 +3002,7 @@ class Group(System):
                 conns[tgt] = src
 
             auto2tgt[src].append(tgt)
-            if nproc > 1 and tgt not in abs2meta and not meta['distributed']:
+            if nproc > 1 and tgt not in abs2meta and not all_abs2meta[tgt]['distributed']:
                 rems.add(tgt)
 
         vars2gather = {}
@@ -3094,7 +3094,8 @@ class Group(System):
         old = self._var_allprocs_prom2abs_list[io]
         p2abs = OrderedDict()
         for name in auto_ivc._var_allprocs_prom2abs_list[io]:
-            p2abs[name] = [name]
+            n = f"_auto_ivc.{name}"
+            p2abs[n] = [n]
         p2abs.update(old)
         self._var_allprocs_prom2abs_list[io] = p2abs
 
@@ -3104,8 +3105,8 @@ class Group(System):
                                                 auto_ivc._var_allprocs_abs2prom[io]})
 
         self._var_allprocs_abs_names_discrete[io] = (
-                auto_ivc._var_allprocs_abs_names_discrete[io] +
-                self._var_allprocs_abs_names_discrete[io])
+            auto_ivc._var_allprocs_abs_names_discrete[io] +
+            self._var_allprocs_abs_names_discrete[io])
         self._var_abs_names_discrete[io] = (auto_ivc._var_abs_names_discrete[io] +
                                             self._var_abs_names_discrete[io])
         self._var_discrete[io].update({'_auto_ivc.' + k: v for k, v in

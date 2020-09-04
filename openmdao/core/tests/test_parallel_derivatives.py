@@ -129,7 +129,7 @@ class ParDerivTestCase(unittest.TestCase):
         prob.model.add_design_var('x2', parallel_deriv_color='par_dv')
         prob.model.add_design_var('x3')
         prob.model.add_objective('c3.y')
-
+        #import wingdbstub
         prob.setup(check=False, mode='fwd')
         prob.run_driver()
 
