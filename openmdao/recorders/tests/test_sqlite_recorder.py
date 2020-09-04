@@ -2,6 +2,7 @@
 import errno
 import os
 import unittest
+from io import StringIO
 import numpy as np
 
 import sqlite3
@@ -27,7 +28,7 @@ from openmdao.recorders.tests.sqlite_recorder_test_utils import assertMetadataRe
 
 from openmdao.recorders.tests.recorder_test_utils import run_driver
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_equal_arrays
-from openmdao.utils.general_utils import determine_adder_scaler
+from openmdao.utils.general_utils import determine_adder_scaler, remove_whitespace
 from openmdao.utils.testing_utils import use_tempdirs
 
 # check that pyoptsparse is installed. if it is, try to use SLSQP.
@@ -289,6 +290,122 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_data = ((coordinate, (t0, t1), expected_derivs),)
         assertDriverDerivDataRecorded(self, expected_data, self.eps)
 
+    def test_double_run_driver_option_overwrite(self):
+        prob = ParaboloidProblem()
+
+        driver = prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
+
+        prob.model.add_recorder(self.recorder)
+
+        prob.setup()
+        prob.set_solver_print(0)
+        prob.run_driver()
+
+        cr = om.CaseReader(self.filename)
+
+        self.assertTrue(cr._system_options['root']['component_options']['assembled_jac_type'], 'csc')
+
+        # New option and re-run of run_driver
+        prob.model.options['assembled_jac_type'] = 'dense'
+        prob.setup()
+        prob.run_driver()
+
+        cr = om.CaseReader(self.filename)
+        self.assertTrue(cr._system_options['root_1']['component_options']['assembled_jac_type'], 'dense')
+
+        stream = StringIO()
+
+        cr.list_model_options(out_stream=stream)
+
+        text = stream.getvalue().split('\n')
+
+        expected = [
+            "Run Number: 0",
+            "    Subsystem: root",
+            "        assembled_jac_type : csc",
+            "Run Number: 1",
+            "    Subsystem: root",
+            "        assembled_jac_type : dense"
+        ]
+
+        for i, line in enumerate(expected):
+            if line and not line.startswith('-'):
+                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
+
+        stream = StringIO()
+
+        cr.list_model_options(run_counter=1, out_stream=stream)
+
+        text = stream.getvalue().split('\n')
+
+        expected = [
+            "Run Number: 1",
+            "    Subsystem: root",
+            "        assembled_jac_type : dense"
+        ]
+
+        for i, line in enumerate(expected):
+            if line and not line.startswith('-'):
+                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
+
+    def test_double_run_model_option_overwrite(self):
+        prob = ParaboloidProblem()
+
+        driver = prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
+
+        prob.model.add_recorder(self.recorder)
+
+        prob.setup()
+        prob.set_solver_print(0)
+        prob.run_model()
+
+        cr = om.CaseReader(self.filename)
+
+        self.assertTrue(cr._system_options['root']['component_options']['assembled_jac_type'], 'csc')
+
+        # New option and re-run of run_driver
+        prob.model.options['assembled_jac_type'] = 'dense'
+        prob.setup()
+        prob.run_model()
+
+        cr = om.CaseReader(self.filename)
+        self.assertTrue(cr._system_options['root_1']['component_options']['assembled_jac_type'], 'dense')
+
+        stream = StringIO()
+
+        cr.list_model_options(out_stream=stream)
+
+        text = stream.getvalue().split('\n')
+
+        expected = [
+            "Run Number: 0",
+            "    Subsystem: root",
+            "        assembled_jac_type : csc",
+            "Run Number: 1",
+            "    Subsystem: root",
+            "        assembled_jac_type : dense"
+        ]
+
+        for i, line in enumerate(expected):
+            if line and not line.startswith('-'):
+                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
+
+        stream = StringIO()
+
+        cr.list_model_options(run_counter=1, out_stream=stream)
+
+        text = stream.getvalue().split('\n')
+
+        expected = [
+            "Run Number: 1",
+            "    Subsystem: root",
+            "        assembled_jac_type : dense"
+        ]
+
+        for i, line in enumerate(expected):
+            if line and not line.startswith('-'):
+                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
+
     def test_simple_driver_recording_with_prefix(self):
         prob = ParaboloidProblem()
 
@@ -299,6 +416,7 @@ class TestSqliteRecorder(unittest.TestCase):
         driver.recording_options['record_derivatives'] = True
         driver.recording_options['includes'] = ['*']
         driver.add_recorder(self.recorder)
+        prob.model.add_recorder(self.recorder)
 
         prob.setup()
         prob.set_solver_print(0)
@@ -483,9 +601,9 @@ class TestSqliteRecorder(unittest.TestCase):
         cr = om.CaseReader("cases.sql")
         # Quick check to see that keys and values were recorded
         for key in ['root', '_auto_ivc', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']:
-            self.assertTrue(key in cr.system_options.keys())
+            self.assertTrue(key in cr._system_options.keys())
 
-        value = cr.system_options['root']['component_options']['assembled_jac_type']
+        value = cr._system_options['root']['component_options']['assembled_jac_type']
         self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
 
     def test_record_system_options(self):
@@ -506,8 +624,8 @@ class TestSqliteRecorder(unittest.TestCase):
         cr = om.CaseReader("cases_driver.sql")
         # Quick check to see that keys and values were recorded
         for key in expected_system_options_keys:
-            self.assertTrue(key in cr.system_options.keys())
-        value = cr.system_options['root']['component_options']['assembled_jac_type']
+            self.assertTrue(key in cr._system_options.keys())
+        value = cr._system_options['root']['component_options']['assembled_jac_type']
         self.assertEqual('csc', value)  # quick check only. Too much to check exhaustively
 
         # Recorder on Problem
@@ -521,8 +639,8 @@ class TestSqliteRecorder(unittest.TestCase):
         cr = om.CaseReader("cases_problem.sql")
         # Quick check to see that keys and values were recorded
         for key in expected_system_options_keys:
-            self.assertTrue(key in cr.system_options.keys())
-        value = cr.system_options['root']['component_options']['assembled_jac_type']
+            self.assertTrue(key in cr._system_options.keys())
+        value = cr._system_options['root']['component_options']['assembled_jac_type']
         self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
 
         # Recorder on a subsystem
@@ -536,8 +654,8 @@ class TestSqliteRecorder(unittest.TestCase):
         cr = om.CaseReader("cases_subsystem.sql")
         # Quick check to see that keys and values were recorded
         for key in expected_system_options_keys:
-            self.assertTrue(key in cr.system_options.keys())
-        value = cr.system_options['root']['component_options']['assembled_jac_type']
+            self.assertTrue(key in cr._system_options.keys())
+        value = cr._system_options['root']['component_options']['assembled_jac_type']
         self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
 
         # Recorder on a solver
@@ -551,11 +669,11 @@ class TestSqliteRecorder(unittest.TestCase):
         cr = om.CaseReader("cases_solver.sql")
         # Quick check to see that keys and values were recorded
         for key in expected_system_options_keys:
-            self.assertTrue(key in cr.system_options.keys())
-        value = cr.system_options['root']['component_options']['assembled_jac_type']
+            self.assertTrue(key in cr._system_options.keys())
+        value = cr._system_options['root']['component_options']['assembled_jac_type']
         self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
 
-    def test_warning_system_options_overwriting(self):
+    def test_warning__system_options_overwriting(self):
 
         prob = ParaboloidProblem()
         prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
@@ -2487,29 +2605,24 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         prob.setup()
 
-        # declare two options
-        d1 = prob.model.d1
-        d1.options.declare('options value 1', 1)
-
-        # create recorder and attach to driver and d1
+        # create recorder and attach to driver and model
         recorder = om.SqliteRecorder("cases.sql")
         prob.driver.add_recorder(recorder)
-        d1.add_recorder(recorder)
+        prob.model.add_recorder(recorder)
 
         prob.run_model()
         prob.cleanup()
 
         cr = om.CaseReader("cases.sql")
 
-        # metadata for all the systems in the model
-        metadata = cr.system_options
+        # options for all the systems in the model
+        options = cr.list_model_options()
 
-        self.assertEqual(sorted(metadata.keys()),
-                         sorted(['root', '_auto_ivc', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']))
+        self.assertEqual(sorted(options.keys()),
+                         sorted(['root']))
 
-        # options for system 'd1', with second option excluded
-        self.assertEqual(metadata['d1']['component_options']['distributed'], False)
-        self.assertEqual(metadata['d1']['component_options']['options value 1'], 1)
+        # options for system 'root'
+        self.assertEqual(options['root']['ln_maxiter'], None)
 
     def test_feature_system_recording_options(self):
         import openmdao.api as om

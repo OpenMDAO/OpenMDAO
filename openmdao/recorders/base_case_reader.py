@@ -17,7 +17,7 @@ class BaseCaseReader(object):
         Metadata about the problem, including the system hierachy and connections.
     solver_metadata : dict
         The solver options for each solver in the recorded model.
-    system_options : dict
+    _system_options : dict
         Metadata about each system in the recorded model, including options and scaling factors.
     """
 
@@ -35,7 +35,21 @@ class BaseCaseReader(object):
         self._format_version = None
         self.problem_metadata = {}
         self.solver_metadata = {}
-        self.system_options = {}
+        self._system_options = {}
+
+    @property
+    def system_options(self):
+        """
+        Provide '_system_options' property for backwards compatibility.
+
+        Returns
+        -------
+        dict
+            reference to the _system_options attribute.
+        """
+        warn_deprecation("The system_options attribute is deprecated. "
+                         "Use `list_model_options` instead.")
+        return self._system_options
 
     @property
     def system_metadata(self):
@@ -45,11 +59,11 @@ class BaseCaseReader(object):
         Returns
         -------
         dict
-            reference to the 'system_options' attribute.
+            reference to the '_system_options' attribute.
         """
         warn_deprecation("The BaseCaseReader.system_metadata attribute is deprecated. "
-                         "Use the BaseCaseReader.system_option attribute instead.")
-        return self.system_options
+                         "Use `list_model_options` instead.")
+        return self._system_options
 
     def get_cases(self, source, recurse=True, flat=False):
         """
