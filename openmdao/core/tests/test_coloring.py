@@ -1027,7 +1027,7 @@ class MatMultMultipointTestCase(unittest.TestCase):
             model.connect('normcomp%d.y' % i, 'obj.x%d' % i)
 
         model.add_objective('obj.y')
-        #import wingdbstub
+
         p.setup()
 
         p.run_driver()

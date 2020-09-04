@@ -1389,41 +1389,28 @@ class Group(System):
                 # from_var is an output.  assume to_var is an input
                 if from_dist and not to_dist:  # known dist output to serial input
                     size = np.sum(distrib_sizes[from_var])
-                    all_to_meta['size'] = size
-                    all_to_meta['shape'] = (size,)
-                    if to_meta:
-                        to_meta['size'] = size
-                        to_meta['shape'] = (size,)
-                        to_meta['value'] = np.ones(size)
                 else:  # known serial output to dist input
                     # there is not enough info to determine how the variable is split
                     # over the procs. for now we split the variable up equally
                     rank = self.comm.rank
                     sizes, offsets = self._evenly_distribute_sizes_to_locals(to_var, from_size)
                     size = sizes[rank]
-
-                    all_to_meta['size'] = size
-                    all_to_meta['shape'] = (size,)
                     distrib_sizes[to_var] = np.array(sizes)
                     if to_meta:
-                        to_meta['size'] = size
-                        to_meta['shape'] = (size,)
-                        to_meta['value'] = np.ones(size)
                         to_meta['src_indices'] = np.arange(offsets[rank],
                                                            offsets[rank] + sizes[rank],
                                                            dtype=INT_DTYPE)
+                all_to_meta['size'] = size
+                all_to_meta['shape'] = (size,)
+                if to_meta:
+                    to_meta['size'] = size
+                    to_meta['shape'] = (size,)
+                    to_meta['value'] = np.ones(size)
             else:  # from_var is an input
                 if not from_dist and to_dist:   # known serial input to dist output
                     sizes, _ = self._evenly_distribute_sizes_to_locals(to_var, from_size)
                     size = sizes[self.comm.rank]
-
-                    all_to_meta['size'] = size
-                    all_to_meta['shape'] = (size,)
                     distrib_sizes[to_var] = np.array(sizes)
-                    if to_meta:
-                        to_meta['size'] = size
-                        to_meta['shape'] = (size,)
-                        to_meta['value'] = np.ones(size)
 
                 else:  # known dist input to serial output
                     if all_from_meta['has_src_indices']:
@@ -1437,12 +1424,12 @@ class Group(System):
                     else:  # src_indices are not set, so just sum up the sizes
                         size = np.sum(distrib_sizes[from_var])
 
-                    all_to_meta['size'] = size
-                    all_to_meta['shape'] = (size,)
-                    if to_meta:
-                        to_meta['size'] = size
-                        to_meta['shape'] = (size,)
-                        to_meta['value'] = np.ones(size)
+                all_to_meta['size'] = size
+                all_to_meta['shape'] = (size,)
+                if to_meta:
+                    to_meta['size'] = size
+                    to_meta['shape'] = (size,)
+                    to_meta['value'] = np.ones(size)
 
         all_abs2meta = self._var_allprocs_abs2meta
         my_abs2meta = self._var_abs2meta
@@ -1451,16 +1438,18 @@ class Group(System):
         rev_conn = None
 
         def get_rev_conn():
+            # build reverse connection dict (src: tgts)
             rev = defaultdict(list)
             for tgt, src in conn.items():
                 rev[src].append(tgt)
             return rev
 
-        graph = nx.OrderedGraph()
+        graph = nx.OrderedGraph()  # ordered graph for consistency across procs
         dist_sz = {}  # local distrib sizes
-        knowns = set()
+        knowns = set()  # variable nodes in the graph with known shapes
 
-        # find all variables that have an unknown shape (across all procs)
+        # find all variables that have an unknown shape (across all procs) and connect them
+        # to other unknow and known shape variables to form a graph.
         for name, meta in all_abs2meta.items():
             if meta['shape_by_conn']:
                 if name in conn:  # it's a connected input
