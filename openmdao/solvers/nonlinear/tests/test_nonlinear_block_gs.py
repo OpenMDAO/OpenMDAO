@@ -376,7 +376,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         assert_near_equal(prob.get_val('y2'), 12.05848819, .00001)
         self.assertTrue(model.nonlinear_solver._iter_count == 6)
 
-        #check that the relaxation factor is updated correctly 
+        #check that the relaxation factor is updated correctly
         assert_near_equal(model.nonlinear_solver._theta_n_1, 1.00, 0.001)
 
     def test_NLBGS_Aitken_initial_factor(self):

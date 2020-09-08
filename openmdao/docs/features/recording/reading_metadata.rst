@@ -24,13 +24,10 @@ System Options
 All case recorders record the component options and scaling factors for all systems in the model.
 These values are accessible using code such as this, where :code:`cr` is a case reader object.
 
-    - :code:`cr.system_options['root']['component_options']`
-    - :code:`cr.system_options['root']['scaling_factors']`
+    - :code:`cr.list_model_options()`
 
-The component options include user-defined options that were defined
-through the :code:`system.options.declare` method. By default, everything in options is
-pickled and recorded. If there are options that cannot be pickled or you simply do not wish
-to record, they can be excluded using the 'options_excludes' recording option on the system.
+This function creates a dictionary of the latest model options available that were set in the model.
+
 
 .. embed-code::
     openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_recording_system_options

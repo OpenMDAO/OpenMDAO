@@ -2,12 +2,14 @@
 Unit tests for the structured metamodel component.
 """
 import unittest
+import inspect
 
 import numpy as np
 from numpy.testing import assert_almost_equal
 
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_partials
+from openmdao.utils.general_utils import set_pyoptsparse_opt
 
 scipy_gte_019 = True
 try:
@@ -15,6 +17,11 @@ try:
 except ImportError:
     scipy_gte_019 = False
 
+# check that pyoptsparse is installed
+# if it is, try to use SNOPT but fall back to SLSQP
+OPT, OPTIMIZER = set_pyoptsparse_opt('SNOPT')
+if OPTIMIZER:
+    from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
 x = np.array([-0.97727788, -0.15135721, -0.10321885,  0.40015721,  0.4105985,
                0.95008842,  0.97873798,  1.76405235,  1.86755799,  2.2408932 ])
@@ -1085,6 +1092,32 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         prob.run_model()
 
         self.run_and_check_derivs(prob)
+
+    @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
+    def test_analysis_error_warning_msg(self):
+      x_tr = np.linspace(0, 2*np.pi, 100)
+      y_tr = np.sin(x_tr)
+
+      p = om.Problem(model=om.Group())
+
+      p.driver = om.pyOptSparseDriver(optimizer=OPTIMIZER)
+
+      mm = om.MetaModelStructuredComp(extrapolate=False)
+      mm.add_input('x', val=1.0, training_data=x_tr)
+      mm.add_output('y', val=1.0, training_data=y_tr)
+      p.model.add_subsystem('interp', mm, promotes_inputs=['x'], promotes_outputs=['y'])
+
+      p.model.add_objective('y', scaler=-1)
+      p.model.add_design_var('x', lower=6, upper=10)
+
+      p.set_solver_print(level=0)
+      p.setup()
+
+      p.set_val('x', 0.75)
+
+      msg = "Analysis Error: Line 205 of file {}".format(inspect.getsourcefile(om.MetaModelStructuredComp))
+      with assert_warning(UserWarning, msg):
+          p.run_driver()
 
 
 @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
