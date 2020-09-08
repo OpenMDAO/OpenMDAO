@@ -6,6 +6,7 @@ from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.general_utils import _warn_simple_format, reset_warning_registry
 import warnings
 
+
 class AnalysisError(Exception):
     """
     Analysis Error.
@@ -14,7 +15,7 @@ class AnalysisError(Exception):
     code or a subsolver.
     """
 
-    def __init__(self, error, location=None):
+    def __init__(self, error, location=None, msginfo=None):
         """
         Initialize AnalysisError.
 
@@ -29,6 +30,6 @@ class AnalysisError(Exception):
         if location is not None:
             with reset_warning_registry():
                 warnings.formatwarning = _warn_simple_format
-                msg = (f"Analysis Error: Line {location.lineno} of file "
+                msg = (f"Analysis Error: {msginfo} Line {location.lineno} of file "
                        f"{location.filename}")
                 warnings.warn(msg, UserWarning, 2)

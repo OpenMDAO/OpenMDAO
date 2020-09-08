@@ -1101,7 +1101,6 @@ class TestMetaModelStructuredPython(unittest.TestCase):
       p = om.Problem(model=om.Group())
 
       p.driver = om.pyOptSparseDriver(optimizer=OPTIMIZER)
-      # p.driver.opt_settings['iSumm'] = 6
 
       mm = om.MetaModelStructuredComp(extrapolate=False)
       mm.add_input('x', val=1.0, training_data=x_tr)
@@ -1116,7 +1115,8 @@ class TestMetaModelStructuredPython(unittest.TestCase):
 
       p.set_val('x', 0.75)
 
-      msg = "Analysis Error: Line 205 of file {}".format(inspect.getsourcefile(om.MetaModelStructuredComp))
+      msg = "Analysis Error: MetaModelStructuredComp " \
+            "(interp) Line 205 of file {}".format(inspect.getsourcefile(om.MetaModelStructuredComp))
       with assert_warning(UserWarning, msg):
         p.run_driver()
 
