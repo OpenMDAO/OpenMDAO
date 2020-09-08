@@ -213,14 +213,9 @@ class AddSubtractComp(ExplicitComponent):
                                                     f'equation but had different units '
                                                     f'({prev_units} vs. {units}.')
 
-    def add_output(self, **kwargs):
+    def add_output(self):
         """
         Use add_equation instead of add_output to define equation systems.
-
-        Parameters
-        ----------
-        **kwargs : dict
-            Keyword args
         """
         raise NotImplementedError(self.msginfo + ': Use add_equation method, not add_output '
                                   'method to create an addition/subtraction relation')
