@@ -25,6 +25,8 @@ class AnalysisError(Exception):
             Error message.
         location : None or inspect.currentframe()
             inspect.currentframe of error being raised.
+        msginfo : str
+            Name of component that raise the AnalysisError.
         """
         super(AnalysisError, self).__init__(error)
         if location is not None:
