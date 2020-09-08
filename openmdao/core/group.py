@@ -982,6 +982,7 @@ class Group(System):
             locality = {}
             snames = {}
             for io in ('input', 'output'):
+                # var order must be same on all procs
                 snames[io] = sorted(self._var_allprocs_abs2prom[io])
                 nvars = len(snames[io])
                 locality[io] = locs = np.zeros(nvars, dtype=bool)
@@ -993,13 +994,14 @@ class Group(System):
             abs2meta = self._var_allprocs_abs2meta
             proc_locs = self.comm.allgather(locality)
             for io in ('input', 'output'):
+                all_abs2prom = self._var_allprocs_abs2prom[io]
                 if proc_locs[0][io].size > 0:
                     locs = np.vstack([loc[io] for loc in proc_locs])
                     for i, name in enumerate(snames[io]):
                         nzs = np.nonzero(locs[:, i])[0]
                         if name in abs2meta and abs2meta[name]['distributed']:
                             dists[name] = nzs
-                        elif (nzs.size > 0 and nzs.size < locs.shape[0] and name in abs2meta):
+                        elif (nzs.size > 0 and nzs.size < locs.shape[0] and name in all_abs2prom):
                             remote_vars[name] = nzs[0]
 
         return remote_vars, dists
@@ -2938,7 +2940,11 @@ class Group(System):
             dist = all_meta['distributed']
             has_src_inds = all_meta['has_src_indices']
 
-            if tgt in vars_to_gather:  # remote somewhere
+            if dist:
+                # OpenMDAO currently can't create an automatic IndepVarComp for inputs on
+                # distributed components.
+                raise RuntimeError(f'Distributed component input "{tgt}" requires an IndepVarComp.')
+            elif tgt in vars_to_gather:  # remote somewhere
                 if self.comm.rank == vars_to_gather[tgt]:  # this rank owns the variable
                     meta = abs2meta[tgt]
                     val = meta['value']
@@ -2948,11 +2954,6 @@ class Group(System):
                         info.append((tgt, meta['size'], val, False))
                 else:
                     info.append((tgt, 0, np.zeros(0), True))
-
-            elif dist:  # distributed and local everywhere
-                # OpenMDAO currently can't create an automatic IndepVarComp for inputs on
-                # distributed components.
-                raise RuntimeError(f'Distributed component input "{tgt}" requires an IndepVarComp.')
 
             elif has_src_inds:  # local with non-distrib src_indices
                 src_idx_found.append(tgt)
@@ -2987,7 +2988,6 @@ class Group(System):
         abs2meta = self._var_abs2meta
         all_abs2meta = self._var_allprocs_abs2meta
         conns = self._conn_global_abs_in2out
-        rems = set()
         nproc = self.comm.size
 
         for tgt in self._var_allprocs_abs_names['input']:
@@ -3006,25 +3006,8 @@ class Group(System):
                 conns[tgt] = src
 
             auto2tgt[src].append(tgt)
-            if nproc > 1 and tgt not in abs2meta and not all_abs2meta[tgt]['distributed']:
-                rems.add(tgt)
 
-        vars2gather = {}
-
-        if nproc > 1:
-            my_discrete = self._var_discrete['input']
-            for tgt in self._var_allprocs_discrete['input']:
-                if tgt not in conns and tgt not in my_discrete:
-                    rems.add(tgt)
-
-            # find all auto_ivc targets that are remote somewhere in the comm
-
-            procrems = self.comm.allgather(rems)
-            for name in set(chain(*procrems)):
-                for i, rems in enumerate(procrems):
-                    if name not in rems:
-                        vars2gather[name] = i
-                        break
+        vars2gather = self._vars_to_gather
 
         for src, tgts in auto2tgt.items():
             tgt, sz, val, remote = self._get_auto_ivc_out_val(tgts, vars2gather,
