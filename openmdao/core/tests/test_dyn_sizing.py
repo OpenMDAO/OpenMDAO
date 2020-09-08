@@ -1,4 +1,3 @@
-from mpi4py import MPI
 import unittest
 import numpy as np
 import openmdao.api as om
