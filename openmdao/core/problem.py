@@ -854,6 +854,8 @@ class Problem(object):
             msg = "%s: Unsupported mode: '%s'. Use either 'fwd' or 'rev'." % (self.msginfo, mode)
             raise ValueError(msg)
 
+
+
         self._mode = self._orig_mode = mode
 
         model_comm = self.driver._setup_comm(comm)

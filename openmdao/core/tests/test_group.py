@@ -2640,6 +2640,19 @@ class TestGroupAddInput(unittest.TestCase):
 
         self.assertEqual(cm.exception.args[0], "Group (<model>): The subsystems G1 and par.G4 called set_input_defaults for promoted input 'x' with conflicting values for 'units'. Call <group>.set_input_defaults('x', units=?), where <group> is the model to remove the ambiguity.")
 
+    def test_auto_ivc_warning(self):
+        p = self._make_tree_model()
+        model = p.model
+        g2 = model._get_subsystem('G1.G2')
+        g2.set_input_defaults('x', units='km')
+
+        g1 = model._get_subsystem('G1')
+        g1.set_input_defaults('x', units='inch', val=2.)
+
+        msg = "Groups 'G1' and 'G1.G2' called set_input_defaults for the input 'x' with conflicting 'units'. The value (inch) from 'G1' will be used."
+        with assert_warning(UserWarning, msg):
+            p.setup()
+
     def test_override_units(self):
         # multiple Group.set_input_defaults calls at different tree levels with conflicting units args
         p = self._make_tree_model()
