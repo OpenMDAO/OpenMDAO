@@ -661,6 +661,19 @@ class TestDynShapes(unittest.TestCase):
         msg = "Group (<model>): Failed to resolve shapes for ['Gdyn.C1.x2', 'Gdyn.C1.y2', 'Gdyn.C2.x2', 'Gdyn.C2.y2', 'Gdyn.C3.x2', 'Gdyn.C3.y2', 'sink.x2', 'sink.y2']."
         self.assertEqual(str(cm.exception), msg)
 
+    def test_bad_copy_shape_name(self):
+        p = om.Problem()
+        indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
+        p.model.add_subsystem('sink', om.ExecComp('y1 = x1*2',
+                                                  x1={'shape_by_conn': True, 'copy_shape': 'y1'},
+                                                  y1={'shape_by_conn': True, 'copy_shape': 'x11'}))
+        p.model.connect('indep.x1', 'sink.x1')
+        with self.assertRaises(RuntimeError) as cm:
+            p.setup()
+
+        msg = "Group (<model>): Can't copy shape of variable 'sink.x11'. Variable doesn't exist."
+        self.assertEqual(str(cm.exception), msg)
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestDistribDynShapes(unittest.TestCase):

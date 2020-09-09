@@ -1434,6 +1434,8 @@ class Group(System):
                     to_meta['value'] = np.ones(size)
 
         all_abs2meta = self._var_allprocs_abs2meta
+        all_abs2prom_in = self._var_allprocs_abs2prom['input']
+        all_abs2prom_out = self._var_allprocs_abs2prom['output']
         my_abs2meta = self._var_abs2meta
         nprocs = self.comm.size
         conn = self._conn_global_abs_in2out
@@ -1477,10 +1479,14 @@ class Group(System):
                     # variable whose shape is being copied must be on the same component, and
                     # name stored in 'copy_shape' entry must be the relative name.
                     abs_from = name.rsplit('.', 1)[0] + '.' + meta['copy_shape']
-                    graph.add_edge(name, abs_from)
-                    # this is unlikely, but a user *could* do it, so we'll check
-                    if all_abs2meta[abs_from]['shape'] is not None:
-                        knowns.add(abs_from)
+                    if abs_from in all_abs2prom_in or abs_from in all_abs2prom_out:
+                        graph.add_edge(name, abs_from)
+                        # this is unlikely, but a user *could* do it, so we'll check
+                        if all_abs2meta[abs_from]['shape'] is not None:
+                            knowns.add(abs_from)
+                    else:
+                        raise RuntimeError(f"{self.msginfo}: Can't copy shape of variable "
+                                           f"'{abs_from}'. Variable doesn't exist.")
 
                 # store known distributed size info needed for computing shapes
                 if nprocs > 1 and meta['distributed']:
