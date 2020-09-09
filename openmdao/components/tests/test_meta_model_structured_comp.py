@@ -1118,7 +1118,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
       msg = "Analysis Error: MetaModelStructuredComp " \
             "(interp) Line 205 of file {}".format(inspect.getsourcefile(om.MetaModelStructuredComp))
       with assert_warning(UserWarning, msg):
-        p.run_driver()
+          p.run_driver()
 
 
 @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
