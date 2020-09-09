@@ -22,7 +22,7 @@ Here is an example, based on the :ref:`Betz Limit Example <betz_limit_tutorial>`
 
 
 The calls to :code:`declare_partials` tell OpenMDAO which partial derivatives to expect.
-This is always done inside the :code:`setup` method.
+This should always be done inside the :code:`setup_partials` method.
 In this example, not all the outputs depend on all the inputs, and you'll see that if you look at the derivative declarations.
 Any partial that is not declared is assumed to be zero.
 You may declare all the partials in just one line as follows (see the documentation on :ref:`specifying partials <feature_specify_partials>` for more details):

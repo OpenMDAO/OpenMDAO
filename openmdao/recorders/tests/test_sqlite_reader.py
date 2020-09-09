@@ -3505,6 +3505,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
                 self.add_input('width', val=1., tags=["tag2"])
                 self.add_output('area', val=1., tags="tag1")
 
+            def setup_partials(self):
                 self.declare_partials('*', '*')
 
             def compute(self, inputs, outputs):

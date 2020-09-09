@@ -1,4 +1,3 @@
-from mpi4py import MPI
 import unittest
 import numpy as np
 import openmdao.api as om
@@ -452,6 +451,107 @@ class TestDynShapes(unittest.TestCase):
         np.testing.assert_allclose(p['sink.y1'], np.ones((2,3))*16)
         np.testing.assert_allclose(p['sink.y2'], np.ones((4,2))*16)
 
+    def test_copy_shape_out_out(self):
+        # test copy_shape from output to output
+        p = om.Problem()
+        indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
+        indep.add_output('x2', val=np.ones((2,3)))
+        p.model.add_subsystem('Gdyn', DynShapeGroupSeries(3, 2, DynShapeComp))
+        p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
+                                                  x1={'shape_by_conn': True, 'copy_shape': 'y1'},
+                                                  x2={'shape_by_conn': True, 'copy_shape': 'y2'},
+                                                  y1={'copy_shape': 'y2'},
+                                                  y2={'copy_shape': 'y1'}))
+        p.model.connect('Gdyn.C3.y1', 'sink.x1')
+        p.model.connect('Gdyn.C3.y2', 'sink.x2')
+        p.model.connect('indep.x1', 'Gdyn.C1.x1')
+        p.model.connect('indep.x2', 'Gdyn.C1.x2')
+        p.setup()
+        p.run_model()
+        np.testing.assert_allclose(p['sink.y1'], np.ones((2,3))*16)
+        np.testing.assert_allclose(p['sink.y2'], np.ones((2,3))*16)
+
+    def test_copy_shape_in_in(self):
+        # test copy_shape from input to input
+        # The fact that this case works is a bit of a surprise since comp.x1 and comp.x2 do not set
+        # shape_by_conn, so you would expect them to be unresolvable, but they connect to dynamic
+        # shaped vars that DO have shape_by_conn set.  Basically, if shape_by_conn is set on either
+        # end of a connection when both vars are dynamically shaped, it's the same effect as if
+        # both had set shape_by_conn since the shapes of any two connected vars must match.
+        p = om.Problem()
+        indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
+        indep.add_output('x2', val=np.ones((2,3)))
+        p.model.add_subsystem('Gdyn', DynShapeGroupSeries(3, 2, DynShapeComp))
+        p.model.add_subsystem('comp', om.ExecComp('y1, y2 = x1*2, x2*2',
+                                                  x1={'copy_shape': 'x2'},
+                                                  x2={'copy_shape': 'x1'},
+                                                  y1={'shape_by_conn': True},
+                                                  y2={'shape_by_conn': True}))
+        p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
+                                                  x1=np.ones((2,3)),
+                                                  x2=np.ones((2,3)),
+                                                  y1=np.ones((2,3)),
+                                                  y2=np.ones((2,3))))
+        p.model.connect('indep.x1', 'Gdyn.C1.x1')
+        p.model.connect('indep.x2', 'Gdyn.C1.x2')
+        p.model.connect('Gdyn.C3.y1', 'comp.x1')
+        p.model.connect('Gdyn.C3.y2', 'comp.x2')
+        p.model.connect('comp.y1', 'sink.x1')
+        p.model.connect('comp.y2', 'sink.x2')
+        p.setup()
+        p.run_model()
+        np.testing.assert_allclose(p['sink.y1'], np.ones((2,3))*32)
+        np.testing.assert_allclose(p['sink.y2'], np.ones((2,3))*32)
+
+    def test_copy_shape_in_in_unresolvable(self):
+        # test copy_shape from input to input
+        # In this case, our dynamicaly shaped inputs that do copy_shape from other inputs are connected to
+        # non-dynamically shaped outputs, and because they don't set shape_by_conn, they are unresolvable,
+        # unlike the test above where they connected to dynamically shaped outputs.
+        p = om.Problem()
+        indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
+        indep.add_output('x2', val=np.ones((2,3)))
+        p.model.add_subsystem('comp', om.ExecComp('y1, y2 = x1*2, x2*2',
+                                                  x1={'copy_shape': 'x2'},
+                                                  x2={'copy_shape': 'x1'},
+                                                  y1={'shape_by_conn': True},
+                                                  y2={'shape_by_conn': True}))
+        p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
+                                                  x1=np.ones((2,3)),
+                                                  x2=np.ones((2,3)),
+                                                  y1=np.ones((2,3)),
+                                                  y2=np.ones((2,3))))
+        p.model.connect('indep.x1', 'comp.x1')
+        p.model.connect('indep.x2', 'comp.x2')
+        p.model.connect('comp.y1', 'sink.x1')
+        p.model.connect('comp.y2', 'sink.x2')
+        with self.assertRaises(RuntimeError) as cm:
+            p.setup()
+
+        msg = "Group (<model>): Failed to resolve shapes for ['comp.x1', 'comp.x2']."
+        self.assertEqual(cm.exception.args[0], msg)
+
+    def test_mismatched_dyn_shapes(self):
+        # this is a sized source and sink, but their sizes are incompatible
+        p = om.Problem()
+        indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
+        indep.add_output('x2', val=np.ones((4,2)))
+        p.model.add_subsystem('Gdyn', DynShapeGroupSeries(3, 2, DynShapeComp))
+        p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
+                                                  x1=np.ones((2,3)),
+                                                  x2=np.ones((3,2)),
+                                                  y1=np.ones((2,3)),
+                                                  y2=np.ones((3,2))))
+        p.model.connect('Gdyn.C3.y1', 'sink.x1')
+        p.model.connect('Gdyn.C3.y2', 'sink.x2')
+        p.model.connect('indep.x1', 'Gdyn.C1.x1')
+        p.model.connect('indep.x2', 'Gdyn.C1.x2')
+        with self.assertRaises(Exception) as cm:
+            p.setup()
+
+        msg = "Group (<model>): Shape mismatch,  (3, 2) vs. (4, 2) for variable 'sink.x2' during dynamic shape determination."
+        self.assertEqual(str(cm.exception), msg)
+
     def test_baseline_conn_inputs(self):
         # this is a sized source and unsized sink, with a DynShapeGroupConnectedInputs between them
         # indep.x? connects to Gdyn.C?.x?
@@ -561,6 +661,19 @@ class TestDynShapes(unittest.TestCase):
         msg = "Group (<model>): Failed to resolve shapes for ['Gdyn.C1.x2', 'Gdyn.C1.y2', 'Gdyn.C2.x2', 'Gdyn.C2.y2', 'Gdyn.C3.x2', 'Gdyn.C3.y2', 'sink.x2', 'sink.y2']."
         self.assertEqual(str(cm.exception), msg)
 
+    def test_bad_copy_shape_name(self):
+        p = om.Problem()
+        indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
+        p.model.add_subsystem('sink', om.ExecComp('y1 = x1*2',
+                                                  x1={'shape_by_conn': True, 'copy_shape': 'y1'},
+                                                  y1={'shape_by_conn': True, 'copy_shape': 'x11'}))
+        p.model.connect('indep.x1', 'sink.x1')
+        with self.assertRaises(RuntimeError) as cm:
+            p.setup()
+
+        msg = "Group (<model>): Can't copy shape of variable 'sink.x11'. Variable doesn't exist."
+        self.assertEqual(str(cm.exception), msg)
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestDistribDynShapes(unittest.TestCase):
@@ -585,6 +698,33 @@ class TestDistribDynShapes(unittest.TestCase):
         p.run_model()
         np.testing.assert_allclose(p['sink.y1'], np.ones(5)*8.)
 
+
+class PartialsComp(om.ExplicitComponent):
+    def setup(self):
+        self.add_input('x', shape_by_conn=True, copy_shape='y')
+        self.add_output('y', shape_by_conn=True, copy_shape='x')
+
+    def setup_partials(self):
+        size = self._var_rel2meta['x']['size']
+        self.mat = np.eye(size) * 3.
+        rng = np.arange(size)
+        self.declare_partials('y', 'x', rows=rng, cols=rng, val=3.0)
+
+    def compute(self, inputs, outputs):
+        outputs['y'] = self.mat.dot(inputs['x'])
+
+
+
+class TestDynWithSetupPartials(unittest.TestCase):
+    def test_setup_partials(sefl):
+        p = om.Problem()
+        p.model.add_subsystem('comp', PartialsComp())
+        p.model.add_subsystem('sink', om.ExecComp('y=x', shape=10))
+        p.model.connect('comp.y', 'sink.x')
+        p.setup()
+        p.run_model()
+        J = p.compute_totals(of=['sink.y'], wrt=['comp.x'])
+        np.testing.assert_allclose(J['sink.y', 'comp.x'], np.eye(10)*3.)
 
 if __name__ == "__main__":
     unittest.main()

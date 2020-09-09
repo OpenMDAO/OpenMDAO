@@ -380,6 +380,7 @@ class MPITests(unittest.TestCase):
         model.add_subsystem("Cdist2", DistribInputDistribOutputComp(arr_size=size))
         model.connect('indep.x', 'Cdist.invec')
         model.connect('Cdist.outvec', 'Cdist2.invec')
+
         p.setup()
         p.run_model()
         msg = "Group (<model>): Can't retrieve distributed variable 'Cdist2.invec' because its src_indices reference entries from other processes. You can retrieve values from all processes using `get_val(<name>, get_remote=True)`."

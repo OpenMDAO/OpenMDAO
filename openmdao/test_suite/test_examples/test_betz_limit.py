@@ -29,6 +29,7 @@ class ActuatorDisc(om.ExplicitComponent):
         self.add_output('Cp', 0.0, desc="Power Coefficient")
         self.add_output('power', 0.0, units="W", desc="Power produced by the rotor")
 
+    def setup_partials(self):
         self.declare_partials('Vr', ['a', 'Vu'])
         self.declare_partials('Vd', 'a')
         self.declare_partials('Ct', 'a')
@@ -118,6 +119,7 @@ class TestBetzLimit(unittest.TestCase):
                 self.add_output('Cp', 0.0, desc="Power Coefficient")
                 self.add_output('power', 0.0, units="W", desc="Power produced by the rotor")
 
+            def setup_partials(self):
                 self.declare_partials('Vr', ['a', 'Vu'])
                 self.declare_partials('Vd', 'a')
                 self.declare_partials('Ct', 'a')
@@ -239,6 +241,7 @@ class TestBetzLimit(unittest.TestCase):
                 self.add_output('Cp', 0.0, desc="Power Coefficient")
                 self.add_output('power', 0.0, units="W", desc="Power produced by the rotor")
 
+            def setup_partials(self):
                 self.declare_partials('Vr', ['a', 'Vu'])
                 self.declare_partials('Vd', 'a')
                 self.declare_partials('Ct', 'a')

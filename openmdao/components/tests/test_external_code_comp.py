@@ -315,6 +315,7 @@ class ParaboloidExternalCodeCompFD(om.ExternalCodeComp):
             sys.executable, 'extcode_paraboloid.py', self.input_file, self.output_file
         ]
 
+    def setup_partials(self):
         # this external code does not provide derivatives, use finite difference
         self.declare_partials(of='*', wrt='*', method='fd')
 
@@ -357,6 +358,7 @@ class ParaboloidExternalCodeCompDerivs(om.ExternalCodeComp):
             self.input_file, self.output_file, self.derivs_file
         ]
 
+    def setup_partials(self):
         # this external code does provide derivatives
         self.declare_partials(of='*', wrt='*')
 
@@ -549,7 +551,6 @@ class TestExternalCodeImplicitCompFeature(unittest.TestCase):
             def setup(self):
                 self.add_input('area_ratio', val=1.0, units=None)
                 self.add_output('mach', val=1., units=None)
-                self.declare_partials(of='mach', wrt='area_ratio', method='fd')
 
                 self.input_file = 'mach_input.dat'
                 self.output_file = 'mach_output.dat'
@@ -569,6 +570,9 @@ class TestExternalCodeImplicitCompFeature(unittest.TestCase):
 
                 # If you want to write your own string command, the code below will also work.
                 # self.options['command_apply'] = ('python extcode_mach.py {} {}').format(self.input_file, self.output_file)
+
+            def setup_partials(self):
+                self.declare_partials(of='mach', wrt='area_ratio', method='fd')
 
             def apply_nonlinear(self, inputs, outputs, residuals):
                 with open(self.input_file, 'w') as input_file:

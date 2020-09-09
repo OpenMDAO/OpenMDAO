@@ -88,15 +88,7 @@ allowed_meta_names = {
     'src_slice',
     'flat_src_indices',
     'type',
-    'iotype',
     'res_units',
-    'ref',
-    'ref0',
-    'res_ref',
-    'lower',
-    'upper',
-    'shape_by_conn',
-    'copy_shape',
 }
 allowed_meta_names.update(global_meta_names['input'])
 allowed_meta_names.update(global_meta_names['output'])
@@ -657,7 +649,7 @@ class System(object):
 
         self._setup_vec_names(mode)
 
-        # promoted names must be know to determine implicit connections so this must be
+        # promoted names must be known to determine implicit connections so this must be
         # called after _setup_var_data, and _setup_var_data will have to be partially redone
         # after auto_ivcs have been added, but auto_ivcs can't be added until after we know all of
         # the connections.
@@ -709,6 +701,10 @@ class System(object):
         comm : MPI.Comm or <FakeComm> or None
             The global communicator.
         """
+        if self._use_derivatives:
+            # must call this before vector setup because it determines if we need to alloc commplex
+            self._setup_partials()
+
         self._setup_vectors(self._get_root_vectors())
 
         # Transfers do not require recursion, but they have to be set up after the vector setup.
@@ -719,7 +715,6 @@ class System(object):
         self._setup_solvers()
         self._setup_solver_print()
         if self._use_derivatives:
-            self._setup_partials()
             self._setup_jacobians()
 
         self._setup_recording()
@@ -3186,6 +3181,7 @@ class System(object):
         loc2meta = self._var_abs2meta
         all2meta = self._var_allprocs_abs2meta
 
+        dynset = set(('shape', 'size', 'value'))
         gather_keys = {'value', 'src_indices'}
         need_gather = get_remote and self.comm.size > 1
         if metadata_keys is not None:
@@ -3195,6 +3191,7 @@ class System(object):
                 raise RuntimeError(f"{self.msginfo}: {sorted(diff)} are not valid metadata entry "
                                    "names.")
         need_local_meta = metadata_keys is not None and len(gather_keys.intersection(keyset)) > 0
+        nodyn = metadata_keys is None or keyset.intersection(dynset)
 
         if need_local_meta:
             metadict = loc2meta
@@ -3224,6 +3221,12 @@ class System(object):
                 if abs_name in all2meta[iotype]:  # continuous
                     meta = cont2meta[abs_name] if abs_name in cont2meta else None
                     distrib = all2meta[iotype][abs_name]['distributed']
+                    if nodyn:
+                        a2m = all2meta[iotype][abs_name]
+                        if a2m['shape'] is None and (a2m['shape_by_conn'] or a2m['copy_shape']):
+                            raise RuntimeError(f"{self.msginfo}: Can't retrieve shape, size, or "
+                                               f"value for dynamically sized variable '{prom}' "
+                                               "because they aren't known yet.")
                 else:  # discrete
                     if need_local_meta:  # use relative name for discretes
                         meta = disc2meta[rel_name] if rel_name in disc2meta else None
@@ -4148,6 +4151,8 @@ class System(object):
                     loc_val = val if val is not _UNDEFINED else np.zeros(sizes[myrank])
                     val = np.zeros(np.sum(sizes))
                     self.comm.Allgatherv(loc_val, [val, sizes, offsets, MPI.DOUBLE])
+                    if not flat:
+                        val.shape = meta['global_shape'] if get_remote else meta['shape']
                 else:
                     if owner != self.comm.rank:
                         val = None
@@ -4164,6 +4169,8 @@ class System(object):
                     loc_val = val if val is not _UNDEFINED else np.zeros(sizes[idx])
                     val = np.zeros(np.sum(sizes))
                     self.comm.Gatherv(loc_val, [val, sizes, offsets, MPI.DOUBLE], root=rank)
+                    if not flat:
+                        val.shape = meta['global_shape'] if get_remote else meta['shape']
                 else:
                     if rank != owner:
                         tag = self._var_allprocs_abs2idx[vec_name][abs_name]
@@ -4176,9 +4183,6 @@ class System(object):
                             self.comm.send(val, dest=rank, tag=tag)
                         elif self.comm.rank == rank:
                             val = self.comm.recv(source=owner, tag=tag)
-
-        if not flat and val is not _UNDEFINED and not discrete and not np.isscalar(val):
-            val.shape = meta['global_shape'] if get_remote and distrib else meta['shape']
 
         return val
 
@@ -4394,7 +4398,6 @@ class System(object):
         if indices is not None:
             val = val[indices]
 
-        smeta = self._problem_meta['model_ref']()._var_allprocs_abs2meta['output'][src]
         if units is not None:
             if smeta['units'] is not None:
                 try:

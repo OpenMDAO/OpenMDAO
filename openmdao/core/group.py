@@ -924,6 +924,7 @@ class Group(System):
             locality = {}
             snames = {}
             for io in ('input', 'output'):
+                # var order must be same on all procs
                 snames[io] = sorted(self._var_allprocs_abs2prom[io])
                 nvars = len(snames[io])
                 locality[io] = locs = np.zeros(nvars, dtype=bool)
@@ -934,6 +935,7 @@ class Group(System):
 
             proc_locs = self.comm.allgather(locality)
             for io in ('input', 'output'):
+                all_abs2prom = self._var_allprocs_abs2prom[io]
                 if proc_locs[0][io].size > 0:
                     abs2meta = self._var_allprocs_abs2meta[io]
                     locs = np.vstack([loc[io] for loc in proc_locs])
@@ -941,7 +943,7 @@ class Group(System):
                         nzs = np.nonzero(locs[:, i])[0]
                         if name in abs2meta and abs2meta[name]['distributed']:
                             dists[name] = nzs
-                        elif (nzs.size > 0 and nzs.size < locs.shape[0] and name in abs2meta):
+                        elif (nzs.size > 0 and nzs.size < locs.shape[0] and name in all_abs2prom):
                             remote_vars[name] = nzs[0]
 
         return remote_vars, dists
@@ -1336,41 +1338,28 @@ class Group(System):
                 # from_var is an output.  assume to_var is an input
                 if from_dist and not to_dist:  # known dist output to serial input
                     size = np.sum(distrib_sizes[from_var])
-                    all_to_meta['size'] = size
-                    all_to_meta['shape'] = (size,)
-                    if to_meta:
-                        to_meta['size'] = size
-                        to_meta['shape'] = (size,)
-                        to_meta['value'] = np.ones(size)
                 else:  # known serial output to dist input
                     # there is not enough info to determine how the variable is split
                     # over the procs. for now we split the variable up equally
                     rank = self.comm.rank
                     sizes, offsets = self._evenly_distribute_sizes_to_locals(to_var, from_size)
                     size = sizes[rank]
-
-                    all_to_meta['size'] = size
-                    all_to_meta['shape'] = (size,)
                     distrib_sizes[to_var] = np.array(sizes)
                     if to_meta:
-                        to_meta['size'] = size
-                        to_meta['shape'] = (size,)
-                        to_meta['value'] = np.ones(size)
                         to_meta['src_indices'] = np.arange(offsets[rank],
                                                            offsets[rank] + sizes[rank],
                                                            dtype=INT_DTYPE)
+                all_to_meta['size'] = size
+                all_to_meta['shape'] = (size,)
+                if to_meta:
+                    to_meta['size'] = size
+                    to_meta['shape'] = (size,)
+                    to_meta['value'] = np.ones(size)
             else:  # from_var is an input
                 if not from_dist and to_dist:   # known serial input to dist output
                     sizes, _ = self._evenly_distribute_sizes_to_locals(to_var, from_size)
                     size = sizes[self.comm.rank]
-
-                    all_to_meta['size'] = size
-                    all_to_meta['shape'] = (size,)
                     distrib_sizes[to_var] = np.array(sizes)
-                    if to_meta:
-                        to_meta['size'] = size
-                        to_meta['shape'] = (size,)
-                        to_meta['value'] = np.ones(size)
 
                 else:  # known dist input to serial output
                     if all_from_meta['has_src_indices']:
@@ -1384,13 +1373,15 @@ class Group(System):
                     else:  # src_indices are not set, so just sum up the sizes
                         size = np.sum(distrib_sizes[from_var])
 
-                    all_to_meta['size'] = size
-                    all_to_meta['shape'] = (size,)
-                    if to_meta:
-                        to_meta['size'] = size
-                        to_meta['shape'] = (size,)
-                        to_meta['value'] = np.ones(size)
+                all_to_meta['size'] = size
+                all_to_meta['shape'] = (size,)
+                if to_meta:
+                    to_meta['size'] = size
+                    to_meta['shape'] = (size,)
+                    to_meta['value'] = np.ones(size)
 
+        all_abs2prom_in = self._var_allprocs_abs2prom['input']
+        all_abs2prom_out = self._var_allprocs_abs2prom['output']
         nprocs = self.comm.size
         conn = self._conn_global_abs_in2out
         rev_conn = None
@@ -1401,15 +1392,16 @@ class Group(System):
                 rev[src].append(tgt)
             return rev
 
-        graph = nx.OrderedGraph()
+        graph = nx.OrderedGraph()  # ordered graph for consistency across procs
         dist_sz = {}  # local distrib sizes
-        knowns = set()
+        knowns = set()  # variable nodes in the graph with known shapes
         all_abs2meta_out = self._var_allprocs_abs2meta['output']
         all_abs2meta_in = self._var_allprocs_abs2meta['input']
         my_abs2meta_out = self._var_abs2meta['output']
         my_abs2meta_in = self._var_abs2meta['input']
 
-        # find all variables that have an unknown shape (across all procs)
+        # find all variables that have an unknown shape (across all procs) and connect them
+        # to other unknow and known shape variables to form a graph.
         for io in ('input', 'output'):
             for name, meta in self._var_allprocs_abs2meta[io].items():
                 if meta['shape_by_conn']:
@@ -1434,11 +1426,15 @@ class Group(System):
                     # variable whose shape is being copied must be on the same component, and
                     # name stored in 'copy_shape' entry must be the relative name.
                     abs_from = name.rsplit('.', 1)[0] + '.' + meta['copy_shape']
-                    graph.add_edge(name, abs_from)
-                    # this is unlikely, but a user *could* do it, so we'll check
-                    a2m = all_abs2meta_in if abs_from in all_abs2meta_in else all_abs2meta_out
-                    if a2m[abs_from]['shape'] is not None:
-                        knowns.add(abs_from)
+                    if abs_from in all_abs2prom_in or abs_from in all_abs2prom_out:
+                        graph.add_edge(name, abs_from)
+                        # this is unlikely, but a user *could* do it, so we'll check
+                        a2m = all_abs2meta_in if abs_from in all_abs2meta_in else all_abs2meta_out
+                        if a2m[abs_from]['shape'] is not None:
+                            knowns.add(abs_from)
+                    else:
+                        raise RuntimeError(f"{self.msginfo}: Can't copy shape of variable "
+                                           f"'{abs_from}'. Variable doesn't exist.")
 
                 # store known distributed size info needed for computing shapes
                 if nprocs > 1 and meta['distributed']:
@@ -1474,11 +1470,26 @@ class Group(System):
 
             # because comps is a connected component, we only need 1 known node to resolve
             # the rest
-            stack = [comp_knowns.pop()]
+            stack = [sorted(comp_knowns)[0]]  # sort to keep error messages consistent
             while stack:
                 known = stack.pop()
+                known_a2m = all_abs2meta_in if known in all_abs2meta_in else all_abs2meta_out
+                known_shape = known_a2m[known]['shape']
+                known_dist = known_a2m[known]['distributed']
                 for node in graph.neighbors(known):
-                    if node not in knowns:
+                    if node in knowns:
+                        a2m = all_abs2meta_in if node in all_abs2meta_in else all_abs2meta_out
+                        # check to see if shapes agree
+                        if a2m[node]['shape'] != known_shape:
+                            dist = a2m[node]['distributed']
+                            # can't compare shapes if one is dist and other is not. The mismatch
+                            # will be caught later in setup_connections in that case.
+                            if not (dist ^ known_dist):
+                                raise RuntimeError(f"{self.msginfo}: Shape mismatch,  "
+                                                   f"{a2m[node]['shape']} vs. "
+                                                   f"{known_shape} for variable '{node}' during "
+                                                   "dynamic shape determination.")
+                    else:
                         # transfer the known shape info to the unshaped variable
                         copy_var_meta(known, node, distrib_sizes)
                         # adding to knowns here won't affect the intersection above since this
@@ -1668,14 +1679,6 @@ class Group(System):
                             fail = True
 
                 elif src_indices is not None:
-                    shape = False
-                    if _is_slicer_op(src_indices):
-                        global_size = allprocs_abs2meta_out[abs_out]['global_size']
-                        global_shape = allprocs_abs2meta_out[abs_out]['global_shape']
-                        src_indices = _slice_indices(src_indices, global_size, global_shape)
-                        shape = True
-                    else:
-                        src_indices = np.atleast_1d(src_indices)
 
                     if np.prod(src_indices.shape) == 0:
                         continue
@@ -2918,7 +2921,11 @@ class Group(System):
             dist = all_meta['distributed']
             has_src_inds = all_meta['has_src_indices']
 
-            if tgt in vars_to_gather:  # remote somewhere
+            if dist:
+                # OpenMDAO currently can't create an automatic IndepVarComp for inputs on
+                # distributed components.
+                raise RuntimeError(f'Distributed component input "{tgt}" requires an IndepVarComp.')
+            elif tgt in vars_to_gather:  # remote somewhere
                 if self.comm.rank == vars_to_gather[tgt]:  # this rank owns the variable
                     meta = abs2meta_in[tgt]
                     val = meta['value']
@@ -2928,11 +2935,6 @@ class Group(System):
                         info.append((tgt, meta['size'], val, False))
                 else:
                     info.append((tgt, 0, np.zeros(0), True))
-
-            elif dist:
-                # OpenMDAO currently can't create an automatic IndepVarComp for inputs on
-                # distributed components.
-                raise RuntimeError(f'Distributed component input "{tgt}" requires an IndepVarComp.')
 
             elif has_src_inds:  # local with non-distrib src_indices
                 src_idx_found.append(tgt)
@@ -2964,13 +2966,12 @@ class Group(System):
         count = 0
         auto2tgt = defaultdict(list)
         abs2prom = self._var_allprocs_abs2prom['input']
-        conns = self._conn_global_abs_in2out
         abs2meta = self._var_abs2meta['input']
         all_abs2meta = self._var_allprocs_abs2meta['input']
-        rems = set()
+        conns = self._conn_global_abs_in2out
         nproc = self.comm.size
 
-        for tgt, meta in all_abs2meta.items():
+        for tgt in all_abs2meta:
             if tgt in conns:
                 continue
 
@@ -2986,25 +2987,8 @@ class Group(System):
                 conns[tgt] = src
 
             auto2tgt[src].append(tgt)
-            if nproc > 1 and tgt not in abs2meta and not meta['distributed']:
-                rems.add(tgt)
 
-        vars2gather = {}
-
-        if nproc > 1:
-            my_discrete = self._var_discrete['input']
-            for tgt in self._var_allprocs_discrete['input']:
-                if tgt not in conns and tgt not in my_discrete:
-                    rems.add(tgt)
-
-            # find all auto_ivc targets that are remote somewhere in the comm
-
-            procrems = self.comm.allgather(rems)
-            for name in set(chain(*procrems)):
-                for i, rems in enumerate(procrems):
-                    if name not in rems:
-                        vars2gather[name] = i
-                        break
+        vars2gather = self._vars_to_gather
 
         for src, tgts in auto2tgt.items():
             tgt, sz, val, remote = self._get_auto_ivc_out_val(tgts, vars2gather,

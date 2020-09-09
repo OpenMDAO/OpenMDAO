@@ -17,6 +17,7 @@ class EggCrate(om.ExplicitComponent):
         self.add_input('y', val=0.0)
         self.add_output('f_xy', val=0.0)
 
+    def setup_partials(self):
         self.declare_partials('*', '*')
 
     def compute(self, inputs, outputs):

@@ -168,15 +168,6 @@ class Component(System):
             self._var_rel_names[io].extend(self._static_var_rel_names[io])
         self.setup()
 
-        # check to make sure that if num_par_fd > 1 that this system is actually doing FD.
-        # Unfortunately we have to do this check after system setup has been called because that's
-        # when declare_partials generally happens, so we raise an exception here instead of just
-        # resetting the value of num_par_fd (because the comm has already been split and possibly
-        # used by the system setup).
-        if self._num_par_fd > 1 and orig_comm.size > 1 and not (self._owns_approx_jac or
-                                                                self._approx_schemes):
-            raise RuntimeError("%s: num_par_fd is > 1 but no FD is active." % self.msginfo)
-
         self._set_vector_class()
 
     def _set_vector_class(self):
@@ -339,9 +330,31 @@ class Component(System):
         self._subjacs_info = {}
         self._jacobian = DictionaryJacobian(system=self)
 
+        self.setup_partials()  # hook for component writers to specify sparsity patterns
+
+        # check to make sure that if num_par_fd > 1 that this system is actually doing FD.
+        # Unfortunately we have to do this check after system setup has been called because that's
+        # when declare_partials generally happens, so we raise an exception here instead of just
+        # resetting the value of num_par_fd (because the comm has already been split and possibly
+        # used by the system setup).
+        orig_comm = self._full_comm if self._full_comm is not None else self.comm
+        if self._num_par_fd > 1 and orig_comm.size > 1 and not (self._owns_approx_jac or
+                                                                self._approx_schemes):
+            raise RuntimeError("%s: num_par_fd is > 1 but no FD is active." % self.msginfo)
+
         for key, dct in self._declared_partials.items():
             of, wrt = key
             self._declare_partials(of, wrt, dct)
+
+    def setup_partials(self):
+        """
+        Declare partials.
+
+        This is meant to be overridden by component classes.  All partials should be
+        declared here since this is called after all size/shape information is known for
+        all variables.
+        """
+        pass
 
     def _update_wrt_matches(self, info):
         """
