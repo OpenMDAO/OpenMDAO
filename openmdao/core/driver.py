@@ -176,6 +176,7 @@ class Driver(object):
         self.supports.declare('active_set', types=bool, default=False)
         self.supports.declare('simultaneous_derivatives', types=bool, default=False)
         self.supports.declare('total_jac_sparsity', types=bool, default=False)
+        self.supports.declare('distributed_design_vars', types=bool, default=False)
 
         self.iter_count = 0
         self.cite = ""
