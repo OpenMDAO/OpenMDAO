@@ -35,7 +35,37 @@ class InfoPropYesNo extends InfoPropDefault {
 }
 
 // Used to format that floats displayed
-let val_formatter = d3.format("g");
+let val_float_formatter = d3.format("g");
+
+/** Stringify in the JSON sense except when val is 'nan'.
+ * @param {val} string, int,... The item to convert.
+ * @returns {str} the string of the Stringify item.
+ */
+function stringify_with_support_for_nan(val){
+    if (val === 'nan'){
+       return val;
+    } else {
+       return JSON.stringify(val);
+    }
+}
+
+/** Convert an element to a string that is human readable.
+ * @param {element} string, int,... The item to convert. Not an array!
+ * @returns {str} the string of the converted element.
+ */
+function element_to_string(element){
+    let val_string;
+    if (typeof element === 'number'){
+       if (Number.isInteger(element)) {
+          val_string = element.toString();
+       } else { /* float */
+          val_string = val_float_formatter(element);
+       }
+    } else {
+       val_string = stringify_with_support_for_nan(element);
+    }
+    return val_string;
+}
 
 /** Convert an item to a string that is human readable.
  * @param {val} arr,string, int,... The item to convert.
@@ -44,7 +74,7 @@ let val_formatter = d3.format("g");
  */
 function val_to_string(val, level=0){
     if (!Array.isArray(val)){
-        return JSON.stringify(val);
+        return element_to_string(val);
     }
     let indent = ' '.repeat(level);
     let s = indent + '[';
@@ -53,17 +83,7 @@ function val_to_string(val, level=0){
         if (Array.isArray(element)) {
             s += val_to_string(element,level+1);
         } else {
-            let val_string;
-            if (typeof element === 'number'){
-                if (Number.isInteger(element)) {
-                    val_string = element.toString();
-                } else { /* float */
-                    val_string = val_formatter(element);
-                }
-            } else {
-                val_string = JSON.stringify(element);
-            }
-            s += val_string ;
+            s += element_to_string(element) ;
         }
         s += ' ';
     }
@@ -80,24 +100,14 @@ function val_to_string(val, level=0){
  */
 function val_to_copy_string(val){
     if (!Array.isArray(val)){
-        return JSON.stringify(val);
+        return element_to_string(val);
     }
     let s = 'array([';
     for (const element of val) {
         if (Array.isArray(element)) {
             s += val_to_copy_string(element);
         } else {
-            let val_string;
-            if (typeof element === 'number'){
-                if (Number.isInteger(element)) {
-                    val_string = element.toString();
-                } else { /* float */
-                    val_string = val_formatter(element);
-                }
-            } else {
-                val_string = JSON.stringify(element);
-            }
-            s += val_string ;
+            s += element_to_string(element) ;
         }
         s += ', ';
     }
@@ -219,7 +229,7 @@ class ValueInfo {
         .enter()
         .append('td')
         .text(function (d) {
-            return val_formatter(d);
+            return val_float_formatter(d);
         })
 
         // Save the width and height of the table when it is fully

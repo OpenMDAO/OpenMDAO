@@ -34,6 +34,20 @@ _IND = 4  # HTML indentation (spaces)
 
 _MAX_ARRAY_SIZE_FOR_REPR_VAL = 1000  # If var has more elements than this do not pass to N2
 
+def _convert_nans_in_nested_list(l):
+    for i, val in enumerate(l):
+        if isinstance(val, list):
+            _convert_nans_in_nested_list(val)
+        else:
+            if np.isnan(val):
+                l[i] = "nan"
+            else:
+                l[i] = val
+
+def _handle_nans(a):
+    l = a.tolist()
+    converted = _convert_nans_in_nested_list(l)
+    return(l)
 
 def _get_var_dict(system, typ, name):
     if name in system._var_discrete[typ]:
@@ -77,7 +91,7 @@ def _get_var_dict(system, typ, name):
             var_dict['value'] = type(meta['value']).__name__
     else:
         if meta['value'].size < _MAX_ARRAY_SIZE_FOR_REPR_VAL:
-            var_dict['value'] = meta['value']
+            var_dict['value'] = _handle_nans(meta['value'])
         else:
             var_dict['value'] = None
 
@@ -416,7 +430,7 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
         warn_deprecation("'use_declare_partial_info' is now the"
                          " default and the option is ignored.")
 
-    raw_data = json.dumps(model_data, default=default_noraise).encode('utf8')
+    raw_data = json.dumps(model_data, default=default_noraise, allow_nan=False).encode('utf8')
     b64_data = str(base64.b64encode(zlib.compress(raw_data)).decode("ascii"))
     model_data = 'var compressedModel = "%s";' % b64_data
 
