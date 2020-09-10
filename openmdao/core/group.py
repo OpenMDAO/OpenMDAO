@@ -1566,7 +1566,7 @@ class Group(System):
         if unresolved:
             unresolved = sorted(unresolved)
             conditional_error(f"{self.msginfo}: Failed to resolve shapes for {unresolved}. "
-                              "to see the dynamic shape dependency graph, "
+                              "To see the dynamic shape dependency graph, "
                               "do 'openmdao view_dyn_shapes <your_py_file>'.")
 
     @check_mpi_exceptions
