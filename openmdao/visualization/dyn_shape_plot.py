@@ -106,6 +106,10 @@ def view_dyn_shapes(root, outfile='shape_dep_graph.png', show=True, title=None):
         raise RuntimeError("Can't plot dynamic shape dependency graph because it hasn't been "
                            "computed yet.  view_dyn_shapes must be called after problem setup().")
 
+    if graph.order() == 0:
+        print("The model has no dynamically shaped variables.")
+        return
+
     if title is None:
         # keep the names from being super long by removing any common subpath
         common = common_subpath(graph.nodes())
