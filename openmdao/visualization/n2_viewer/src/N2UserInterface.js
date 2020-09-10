@@ -37,17 +37,6 @@ class InfoPropYesNo extends InfoPropDefault {
 // Used to format that floats displayed
 let val_float_formatter = d3.format("g");
 
-/** Stringify in the JSON sense except when val is 'nan'.
- * @param {val} string, int,... The item to convert.
- * @returns {str} the string of the Stringify item.
- */
-function stringify_with_support_for_nan(val){
-    if (val === 'nan'){
-       return val;
-    } else {
-       return JSON.stringify(val);
-    }
-}
 
 /** Convert an element to a string that is human readable.
  * @param {element} string, int,... The item to convert. Not an array!
@@ -62,7 +51,11 @@ function element_to_string(element){
           val_string = val_float_formatter(element);
        }
     } else {
-       val_string = stringify_with_support_for_nan(element);
+       if (element === 'nan'){
+          return element;
+       } else {
+          return JSON.stringify(element);
+       }
     }
     return val_string;
 }
