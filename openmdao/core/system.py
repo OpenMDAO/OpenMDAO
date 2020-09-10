@@ -504,6 +504,9 @@ class System(object):
             return '{} ({})'.format(type(self).__name__, self.name)
         return type(self).__name__
 
+    def _get_inst_id(self):
+        return self.pathname
+
     def _declare_options(self):
         """
         Declare options before kwargs are processed in the init method.

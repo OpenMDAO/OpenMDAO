@@ -89,6 +89,10 @@ class Group(System):
         Flag indicating whether connection errors are raised as an Exception.
     _order_set : bool
         Flag to check if set_order has been called.
+    _shapes_graph : nx.OrderedGraph
+        Dynamic shape dependency graph, or None.
+    _shape_knowns : set
+        Set of shape dependency graph nodes with known (non-dynamic) shapes.
     """
 
     def __init__(self, **kwargs):
@@ -123,6 +127,8 @@ class Group(System):
         self._contains_parallel_group = False
         self._raise_connection_errors = True
         self._order_set = False
+        self._shapes_graph = None
+        self._shape_knowns = None
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -1244,6 +1250,12 @@ class Group(System):
                         continue
 
                 if src_indices is not None:
+                    a2m = allprocs_abs2meta[abs_in]
+                    if (a2m['shape_by_conn'] or a2m['copy_shape']):
+                        raise ValueError(f"{self.msginfo}: Setting of 'src_indices' along with "
+                                         f"'shape_by_conn' or 'copy_shape' for variable '{abs_in}' "
+                                         "is currently unsupported.")
+
                     if abs_in in abs2meta:
                         meta = abs2meta[abs_in]
                         if meta['src_indices'] is not None:
@@ -1359,6 +1371,9 @@ class Group(System):
         """
         Add shape/size metadata for variables that were created with shape_by_conn or copy_shape.
         """
+        self._shapes_graph = graph = nx.OrderedGraph()  # ordered graph for consistency across procs
+        self._shape_knowns = knowns = set()
+
         def copy_var_meta(from_var, to_var, distrib_sizes):
             # transfer shape/size info from from_var to to_var
             all_from_meta = self._var_allprocs_abs2meta[from_var]
@@ -1448,12 +1463,11 @@ class Group(System):
                 rev[src].append(tgt)
             return rev
 
-        graph = nx.OrderedGraph()  # ordered graph for consistency across procs
         dist_sz = {}  # local distrib sizes
         knowns = set()  # variable nodes in the graph with known shapes
 
         # find all variables that have an unknown shape (across all procs) and connect them
-        # to other unknow and known shape variables to form a graph.
+        # to other unknow and known shape variables to form an undirected graph.
         for io in ('input', 'output'):
             for name in self._var_allprocs_abs_names[io]:
                 meta = all_abs2meta[name]
@@ -1510,6 +1524,7 @@ class Group(System):
             distrib_sizes = {}
 
         unresolved = set()
+        seen = knowns.copy()
 
         for comps in nx.connected_components(graph):
             comp_knowns = knowns.intersection(comps)
@@ -1526,7 +1541,7 @@ class Group(System):
                 known = stack.pop()
                 known_shape = all_abs2meta[known]['shape']
                 for node in graph.neighbors(known):
-                    if node in knowns:
+                    if node in seen:
                         # check to see if shapes agree
                         if all_abs2meta[node]['shape'] != known_shape:
                             known_dist = all_abs2meta[known]['distributed']
@@ -1534,21 +1549,25 @@ class Group(System):
                             # can't compare shapes if one is dist and other is not. The mismatch
                             # will be caught later in setup_connections in that case.
                             if not (dist ^ known_dist):
-                                raise RuntimeError(f"{self.msginfo}: Shape mismatch,  "
-                                                   f"{all_abs2meta[node]['shape']} vs. "
-                                                   f"{known_shape} for variable '{node}' during "
-                                                   "dynamic shape determination.")
+                                conditional_error(f"{self.msginfo}: Shape mismatch,  "
+                                                  f"{all_abs2meta[node]['shape']} vs. "
+                                                  f"{known_shape} for variable '{node}' during "
+                                                  "dynamic shape determination.")
                     else:
                         # transfer the known shape info to the unshaped variable
                         copy_var_meta(known, node, distrib_sizes)
-                        # adding to knowns here won't affect the intersection above since this
-                        # node can't exist in a different connected component anyway
-                        knowns.add(node)
+                        seen.add(node)
                         stack.append(node)
+
+        # save graph info for possible later plotting
+        self._shapes_graph = graph
+        self._shape_knowns = knowns
 
         if unresolved:
             unresolved = sorted(unresolved)
-            raise RuntimeError(f"{self.msginfo}: Failed to resolve shapes for {unresolved}.")
+            conditional_error(f"{self.msginfo}: Failed to resolve shapes for {unresolved}. "
+                              "to see the dynamic shape dependency graph, "
+                              "do 'openmdao view_dyn_shapes <your_py_file>'.")
 
     @check_mpi_exceptions
     def _setup_connections(self):
