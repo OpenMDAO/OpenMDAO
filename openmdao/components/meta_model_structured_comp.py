@@ -202,7 +202,8 @@ class MetaModelStructuredComp(ExplicitComponent):
                     "was out of bounds ('{}', '{}') with " \
                     "value '{}'".format(self.msginfo, out_name, varname_causing_error,
                                         err.lower, err.upper, err.value)
-                raise AnalysisError(errmsg, inspect.getframeinfo(inspect.currentframe()))
+                raise AnalysisError(errmsg, inspect.getframeinfo(inspect.currentframe()),
+                                    self.msginfo)
 
             except ValueError as err:
                 raise ValueError("{}: Error interpolating output '{}':\n{}".format(self.msginfo,
