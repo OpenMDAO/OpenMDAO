@@ -9,12 +9,20 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_partials
+from openmdao.core.driver import Driver
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.general_utils import printoptions
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp, NonSquareArrayComp
+
+from openmdao.utils.mpi import MPI
+
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
 
 @use_tempdirs
@@ -797,6 +805,41 @@ class TestDriverFeature(unittest.TestCase):
 
         con = prob.driver.get_constraint_values(driver_scaling=True)
         assert_near_equal(con['comp1.y1'][0], 38.0 * 5 / 9, 1e-8)
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestDriverMPI(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def test_unsupported_distributed(self):
+
+        class MyDriver(Driver):
+
+            def __init__(self, generator=None, **kwargs):
+                super(MyDriver, self).__init__(**kwargs)
+                self.supports['distributed_design_vars'] = False
+                self.supports._read_only = True
+
+        doe_parallel = 2
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp(distributed=True)
+        ivc.add_output('invec')
+        model.add_subsystem('p', ivc)
+        model.add_design_var('p.invec', lower=0.0, upper=1.0)
+
+        prob.driver = MyDriver()
+
+        prob.setup()
+
+        with self.assertRaises(RuntimeError) as context:
+            prob.final_setup()
+
+        msg = "Distributed design variables are not supported by this driver, but the following variables are distributed: [p.invec]"
+        self.assertEqual(str(context.exception), msg)
 
 
 if __name__ == "__main__":

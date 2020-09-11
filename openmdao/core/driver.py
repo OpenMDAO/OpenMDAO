@@ -176,7 +176,7 @@ class Driver(object):
         self.supports.declare('active_set', types=bool, default=False)
         self.supports.declare('simultaneous_derivatives', types=bool, default=False)
         self.supports.declare('total_jac_sparsity', types=bool, default=False)
-        self.supports.declare('distributed_design_vars', types=bool, default=False)
+        self.supports.declare('distributed_design_vars', types=bool, default=True)
 
         self.iter_count = 0
         self.cite = ""
@@ -749,6 +749,31 @@ class Driver(object):
         # Gather up the information for design vars.
         self._designvars = designvars = model.get_design_vars(recurse=True, use_prom_ivc=True)
         desvar_size = sum(data['size'] for data in designvars.values())
+
+        # Only allow distributed design variables on drivers that support it.
+        if True or self.supports['distributed_design_vars'] is False:
+            dist_vars = []
+            for dv, meta in designvars.items():
+
+                # For Auto-ivcs, we need to check the distributed metadata on the target instead.
+                if meta['ivc_source'].startswith('_auto_ivc.'):
+                    abs_name = model._var_allprocs_prom2abs_list['input'][dv][0]
+                    if abs_name in model._var_allprocs_abs_names_discrete['input']:
+                        # Discrete vars aren't distributed.
+                        dist = False
+                    else:
+                        dist = model._var_allprocs_abs2meta[abs_name]['distributed']
+                else:
+                    dist = meta['distributed']
+
+                if dist:
+                    dist_vars.append(dv)
+
+            if dist_vars:
+                dstr = ', '.join(dist_vars)
+                msg = "Distributed design variables are not supported by this driver, but the "
+                msg += f"following variables are distributed: [{dstr}]"
+                raise RuntimeError(msg)
 
         return response_size, desvar_size
 
