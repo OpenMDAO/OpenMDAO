@@ -31,7 +31,7 @@ from openmdao.recorders.recording_manager import RecordingManager, record_viewer
     record_system_options
 from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.general_utils import ContainsAll, pad_name, simple_warning, warn_deprecation, \
-    _is_slicer_op
+    _is_slicer_op, common_subpath, conditional_error
 from openmdao.utils.mpi import FakeComm
 from openmdao.utils.mpi import MPI
 from openmdao.utils.name_maps import prom_name2abs_name, name2abs_names
@@ -853,8 +853,6 @@ class Problem(object):
         if mode not in ['fwd', 'rev', 'auto']:
             msg = "%s: Unsupported mode: '%s'. Use either 'fwd' or 'rev'." % (self.msginfo, mode)
             raise ValueError(msg)
-
-
 
         self._mode = self._orig_mode = mode
 
