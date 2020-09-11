@@ -924,6 +924,74 @@ class Group(System):
         else:
             self._discrete_inputs = self._discrete_outputs = ()
 
+    def _resolve_group_input_defaults(self):
+        """
+        Resolve any ambiguities in group input defaults throughout the model.
+        """
+        skip = set(('path', 'use_tgt', 'prom'))
+        prom2abs_in = self._var_allprocs_prom2abs_list['input']
+
+        for prom, metalist in self._group_inputs.items():
+            try:
+                top_origin = metalist[0]['path']
+                top_prom = metalist[0]['prom']
+            except KeyError:
+                simple_warning("No auto IVCs found")
+            allmeta = set()
+            for meta in metalist:
+                allmeta.update(meta)
+            fullmeta = {n: _UNDEFINED for n in allmeta - skip}
+
+            for key in sorted(fullmeta):
+                for i, submeta in enumerate(metalist):
+                    if key in submeta:
+                        if fullmeta[key] is _UNDEFINED:
+                            origin = submeta['path']
+                            origin_prom = submeta['prom']
+                            val = fullmeta[key] = submeta[key]
+                            if origin != top_origin:
+                                simple_warning(f"Group '{top_origin}' did not set a default "
+                                               f"'{key}' for input '{top_prom}', so the value of "
+                                               f"({val}) from group '{origin}' will be used.")
+                        else:
+                            eq = submeta[key] == val
+                            if isinstance(eq, np.ndarray):
+                                eq = np.all(eq)
+                            if not eq:
+                                # first, see if origin is an ancestor
+                                if not origin or submeta['path'].startswith(origin + '.'):
+                                    simple_warning(f"Groups '{origin}' and '{submeta['path']}' "
+                                                   f"called set_input_defaults for the input "
+                                                   f"'{origin_prom}' with conflicting '{key}'. "
+                                                   f"The value ({val}) from '{origin}' will be "
+                                                   "used.")
+                                else:  # origin is not an ancestor, so we have an ambiguity
+                                    if origin_prom != submeta['prom']:
+                                        prm = f"('{origin_prom}' / '{submeta['prom']}')"
+                                    else:
+                                        prm = f"'{origin_prom}'"
+                                    common = common_subpath((origin, submeta['path']))
+                                    if common:
+                                        sub = self._get_subsystem(common)
+                                        if sub is not None:
+                                            for a in prom2abs_in[prom]:
+                                                if a in sub._var_abs2prom['input']:
+                                                    prom = sub._var_abs2prom['input'][a]
+                                                    break
+
+                                    gname = f"Group named '{common}'" if common else 'model'
+                                    conditional_error(f"{self.msginfo}: The subsystems {origin} "
+                                                      f"and {submeta['path']} called "
+                                                      f"set_input_defaults for promoted input "
+                                                      f"{prm} with conflicting values for "
+                                                      f"'{key}'. Call <group>.set_input_defaults("
+                                                      f"'{prom}', {key}=?), where <group> is the "
+                                                      f"{gname} to remove the ambiguity.")
+
+            # update all metadata dicts with any missing metadata that was filled in elsewhere
+            for meta in metalist:
+                meta.update(fullmeta)
+
     def _setup_var_sizes(self):
         """
         Compute the arrays of local variable sizes for all variables/procs on this system.
