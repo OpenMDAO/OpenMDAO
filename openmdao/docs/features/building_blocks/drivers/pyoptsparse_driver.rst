@@ -27,6 +27,17 @@ pyOptSparseDriver Options
     pyOptSparseDriver
     options
 
+pyOptSparseDriver Constructor
+-----------------------------
+
+The call signature for the `pyOptSparseDriver` constructor is:
+
+.. automethod:: openmdao.drivers.pyoptsparse_driver.pyOptSparseDriver.__init__
+    :noindex:
+
+Using pyOptSparseDriver
+-----------------------
+
 pyOptSparseDriver has a small number of unified options that can be specified as keyword arguments when
 it is instantiated or by using the "options" dictionary. We have already shown how to set the
 `optimizer` option. Next we see how the `print_results` option can be used to turn on or off the echoing
@@ -91,7 +102,7 @@ you are on a supercomputing cluster. Here is a simple example for unix and mpi.
     ktmoore1$ kill -SIGUSR1 17955
 
 If SIGUSR1 is already used for something else, or its behavior is not supported on your operating system, mpi implementation,
-or queuing system, then you can choose a different signal by setting the "user_teriminate_signal" option and giving it a
+or queuing system, then you can choose a different signal by setting the "user_terminate_signal" option and giving it a
 different signal, or None to disable the feature.  Here, we change the signal to SIGUSR2:
 
 .. embed-code::

@@ -12,8 +12,8 @@ class TestCodeUtils(unittest.TestCase):
         devnull = open(os.devnull, "w")
 
         graph = get_nested_calls(Group, '_final_setup', stream=devnull)
-        self.assertIn(('Group._setup_global', 'System._setup_global'),
-                      graph.edges(), "System._setup_global not called by Group._setup_global")
+        self.assertIn(('Group._compute_root_scale_factors', 'System._compute_root_scale_factors'),
+                      graph.edges(), "System._compute_root_scale_factors not called by Group._compute_root_scale_factors")
 
 
 if __name__ == '__main__':

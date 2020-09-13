@@ -14,8 +14,8 @@ from openmdao.utils.logger_utils import get_logger
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.mpi import MPI
 from openmdao.utils.hooks import _register_hook
-from openmdao.utils.general_utils import printoptions
-from openmdao.utils.units import convert_units
+from openmdao.utils.general_utils import printoptions, simple_warning, ignore_errors
+from openmdao.utils.units import convert_units, _has_val_mismatch
 from openmdao.utils.file_utils import _load_and_exec
 
 
@@ -155,7 +155,14 @@ def _get_used_before_calc_subs(group, input_srcs):
         A dict mapping names of target Systems to a set of names of their
         source Systems that execute after them.
     """
-    sub2i = {sub.name: i for i, sub in enumerate(group._subsystems_allprocs)}
+    sub2i = {}
+    parallel_solver = {}
+    for i, sub in enumerate(group._subsystems_allprocs):
+        if hasattr(sub, '_mpi_proc_allocator') and sub._mpi_proc_allocator.parallel:
+            parallel_solver[sub.name] = sub.nonlinear_solver.SOLVER
+
+        sub2i[sub.name] = i
+
     glen = len(group.pathname.split('.')) if group.pathname else 0
 
     ubcs = defaultdict(set)
@@ -165,6 +172,16 @@ def _get_used_before_calc_subs(group, input_srcs):
             oparts = src_abs.split('.')
             src_sys = oparts[glen]
             tgt_sys = iparts[glen]
+            hierarchy_check = True if oparts[glen + 1] == iparts[glen + 1] else False
+
+            if (src_sys in parallel_solver and tgt_sys in parallel_solver and
+                    (parallel_solver[src_sys] not in ["NL: NLBJ", "NL: Newton", "BROYDEN"]) and
+                    src_sys == tgt_sys and
+                    not hierarchy_check):
+                simple_warning("Need to attach NonlinearBlockJac, NewtonSolver, or BroydenSolver "
+                               "to '%s' when connecting components inside parallel "
+                               "groups" % (src_sys))
+                ubcs[tgt_abs.rsplit('.', 1)[0]].add(src_abs.rsplit('.', 1)[0])
             if (src_sys in sub2i and tgt_sys in sub2i and
                     (sub2i[src_sys] > sub2i[tgt_sys])):
                 ubcs[tgt_sys].add(src_sys)
@@ -243,7 +260,7 @@ def _trim_str(obj, size):
     return s
 
 
-def _has_val_mismatch(discretes, names, units, vals):
+def _list_has_val_mismatch(discretes, names, units, vals):
     """
     Return True if any of the given values don't match, subject to unit conversion.
 
@@ -278,13 +295,8 @@ def _has_val_mismatch(discretes, names, units, vals):
         if u0 is _UNSET:
             u0 = u
             v0 = v
-        else:
-            if u != u0:
-                # convert units
-                v = convert_units(v, u, new_units=u0)
-
-            if np.linalg.norm(v - v0) > 1e-10:
-                return True
+        elif _has_val_mismatch(u0, v0, u, v):
+            return True
 
     return False
 
@@ -338,8 +350,8 @@ def _check_hanging_inputs(problem, logger):
                 msg.append(template_abs.format(a, units[0], valstr, nwid=nwid + 3, uwid=uwid))
             else:  # promoted
                 vals = [problem.get_val(a, get_remote=True) for a in absnames]
-                mismatch = _has_val_mismatch(problem.model._var_allprocs_discrete['input'],
-                                             absnames, units, vals)
+                mismatch = _list_has_val_mismatch(problem.model._var_allprocs_discrete['input'],
+                                                  absnames, units, vals)
                 if mismatch:
                     msg.append("\n   ----- WARNING: connected input values don't match when "
                                "converted to consistent units. -----\n")
@@ -648,6 +660,7 @@ def _check_config_cmd(options, user_args):
     # register the hook
     _register_hook('final_setup', class_name='Problem', inst_id=options.problem, post=_check_config)
 
+    ignore_errors(True)
     _load_and_exec(options.file[0], user_args)
 
 

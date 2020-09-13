@@ -37,19 +37,19 @@ class ParDerivTestCase(unittest.TestCase):
         prob.model.linear_solver = om.LinearBlockGS()
         prob.model.sub.linear_solver = om.LinearBlockGS()
 
-        prob.model.add_design_var('iv.x1')
-        prob.model.add_design_var('iv.x2')
+        prob.model.add_design_var('x1')
+        prob.model.add_design_var('x2')
         prob.model.add_objective('c3.y')
 
         prob.setup(check=False, mode='rev')
         prob.run_driver()
 
-        indep_list = ['iv.x1', 'iv.x2']
+        indep_list = ['x1', 'x2']
         unknown_list = ['c3.y']
 
         J = prob.compute_totals(unknown_list, indep_list, return_format='dict')
-        assert_near_equal(J['c3.y']['iv.x1'][0][0], -6.0, 1e-6)
-        assert_near_equal(J['c3.y']['iv.x2'][0][0], 35.0, 1e-6)
+        assert_near_equal(J['c3.y']['x1'][0][0], -6.0, 1e-6)
+        assert_near_equal(J['c3.y']['x2'][0][0], 35.0, 1e-6)
 
     def test_fan_in_serial_sets_fwd(self):
 
@@ -58,19 +58,19 @@ class ParDerivTestCase(unittest.TestCase):
         prob.model.linear_solver = om.LinearBlockGS()
         prob.model.sub.linear_solver = om.LinearBlockGS()
 
-        prob.model.add_design_var('iv.x1')
-        prob.model.add_design_var('iv.x2')
+        prob.model.add_design_var('x1')
+        prob.model.add_design_var('x2')
         prob.model.add_objective('c3.y')
 
         prob.setup(check=False, mode='fwd')
         prob.run_driver()
 
-        indep_list = ['iv.x1', 'iv.x2']
+        indep_list = ['x1', 'x2']
         unknown_list = ['c3.y']
 
         J = prob.compute_totals(unknown_list, indep_list, return_format='flat_dict')
-        assert_near_equal(J['c3.y', 'iv.x1'][0][0], -6.0, 1e-6)
-        assert_near_equal(J['c3.y', 'iv.x2'][0][0], 35.0, 1e-6)
+        assert_near_equal(J['c3.y', 'x1'][0][0], -6.0, 1e-6)
+        assert_near_equal(J['c3.y', 'x2'][0][0], 35.0, 1e-6)
 
     def test_fan_out_serial_sets_fwd(self):
 
@@ -118,34 +118,42 @@ class ParDerivTestCase(unittest.TestCase):
 
         prob = om.Problem()
         prob.model = FanInGrouped()
+
+        # An extra unconnected desvar was in the original test.
+        prob.model.add_subsystem('p', om.IndepVarComp('x3', 0.0), promotes=['x3'])
+
         prob.model.linear_solver = om.LinearBlockGS()
         prob.model.sub.linear_solver = om.LinearBlockGS()
 
-        prob.model.add_design_var('iv.x1', parallel_deriv_color='par_dv')
-        prob.model.add_design_var('iv.x2', parallel_deriv_color='par_dv')
-        prob.model.add_design_var('iv.x3')
+        prob.model.add_design_var('x1', parallel_deriv_color='par_dv')
+        prob.model.add_design_var('x2', parallel_deriv_color='par_dv')
+        prob.model.add_design_var('x3')
         prob.model.add_objective('c3.y')
 
         prob.setup(check=False, mode='fwd')
         prob.run_driver()
 
-        indep_list = ['iv.x1', 'iv.x2']
+        indep_list = ['x1', 'x2']
         unknown_list = ['c3.y']
 
         J = prob.compute_totals(unknown_list, indep_list, return_format='flat_dict')
-        assert_near_equal(J['c3.y', 'iv.x1'][0][0], -6.0, 1e-6)
-        assert_near_equal(J['c3.y', 'iv.x2'][0][0], 35.0, 1e-6)
+        assert_near_equal(J['c3.y', 'x1'][0][0], -6.0, 1e-6)
+        assert_near_equal(J['c3.y', 'x2'][0][0], 35.0, 1e-6)
 
     def test_debug_print_option_totals_color(self):
 
         prob = om.Problem()
         prob.model = FanInGrouped()
+
+        # An extra unconnected desvar was in the original test.
+        prob.model.add_subsystem('p', om.IndepVarComp('x3', 0.0), promotes=['x3'])
+
         prob.model.linear_solver = om.LinearBlockGS()
         prob.model.sub.linear_solver = om.LinearBlockGS()
 
-        prob.model.add_design_var('iv.x1', parallel_deriv_color='par_dv')
-        prob.model.add_design_var('iv.x2', parallel_deriv_color='par_dv')
-        prob.model.add_design_var('iv.x3')
+        prob.model.add_design_var('x1', parallel_deriv_color='par_dv')
+        prob.model.add_design_var('x2', parallel_deriv_color='par_dv')
+        prob.model.add_design_var('x3')
         prob.model.add_objective('c3.y')
 
         prob.driver.options['debug_print'] = ['totals']
@@ -154,7 +162,7 @@ class ParDerivTestCase(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_driver()
 
-        indep_list = ['iv.x1', 'iv.x2', 'iv.x3']
+        indep_list = ['x1', 'x2', 'x3']
         unknown_list = ['c3.y']
 
         stdout = sys.stdout
@@ -169,9 +177,9 @@ class ParDerivTestCase(unittest.TestCase):
         output = strout.getvalue()
 
         if not prob.comm.rank:
-            self.assertTrue('Solving color: par_dv (iv.x1, iv.x2)' in output)
+            self.assertTrue('Solving color: par_dv (x1, x2)' in output)
             self.assertTrue('In mode: fwd, Solving variable(s) using simul coloring:' in output)
-            self.assertTrue("('iv.x3', [2])" in output)
+            self.assertTrue("('p.x3', [2])" in output)
 
     def test_fan_out_parallel_sets_rev(self):
 
@@ -624,9 +632,10 @@ class PartialDependGroup(om.Group):
     def setup(self):
         size = 4
 
-        Indep1 = self.add_subsystem('Indep1', om.IndepVarComp('x', np.arange(size, dtype=float)+1.0))
         Comp1 = self.add_subsystem('Comp1', SumComp(size))
         pargroup = self.add_subsystem('ParallelGroup1', om.ParallelGroup())
+
+        self.set_input_defaults('Comp1.x', val=np.arange(size, dtype=float)+1.0)
 
         self.linear_solver = om.LinearBlockGS()
         self.linear_solver.options['iprint'] = -1
@@ -637,12 +646,11 @@ class PartialDependGroup(om.Group):
         Con1 = pargroup.add_subsystem('Con1', SlowComp(delay=delay, size=2, mult=2.0))
         Con2 = pargroup.add_subsystem('Con2', SlowComp(delay=delay, size=2, mult=-3.0))
 
-        self.connect('Indep1.x', 'Comp1.x')
         self.connect('Comp1.y', 'ParallelGroup1.Con1.x')
         self.connect('Comp1.y', 'ParallelGroup1.Con2.x')
 
         color = 'parcon'
-        self.add_design_var('Indep1.x')
+        self.add_design_var('Comp1.x')
         self.add_constraint('ParallelGroup1.Con1.y', lower=0.0, parallel_deriv_color=color)
         self.add_constraint('ParallelGroup1.Con2.y', upper=0.0, parallel_deriv_color=color)
 
@@ -665,7 +673,7 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
         size = 4
 
         of = ['ParallelGroup1.Con1.y', 'ParallelGroup1.Con2.y']
-        wrt = ['Indep1.x']
+        wrt = ['Comp1.x']
 
         # run first in fwd mode
         p = om.Problem(model=PartialDependGroup())
@@ -674,8 +682,8 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
 
         J = p.compute_totals(of, wrt, return_format='dict')
 
-        assert_near_equal(J['ParallelGroup1.Con1.y']['Indep1.x'][0], np.ones(size)*2., 1e-6)
-        assert_near_equal(J['ParallelGroup1.Con2.y']['Indep1.x'][0], np.ones(size)*-3., 1e-6)
+        assert_near_equal(J['ParallelGroup1.Con1.y']['Comp1.x'][0], np.ones(size)*2., 1e-6)
+        assert_near_equal(J['ParallelGroup1.Con2.y']['Comp1.x'][0], np.ones(size)*-3., 1e-6)
 
     def test_fwd_vs_rev(self):
         import time
@@ -688,7 +696,7 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
         size = 4
 
         of = ['ParallelGroup1.Con1.y', 'ParallelGroup1.Con2.y']
-        wrt = ['Indep1.x']
+        wrt = ['Comp1.x']
 
         # run first in fwd mode
         p = om.Problem(model=PartialDependGroup())
@@ -699,8 +707,8 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
         J = p.compute_totals(of, wrt, return_format='dict')
         elapsed_fwd = time.time() - elapsed_fwd
 
-        assert_near_equal(J['ParallelGroup1.Con1.y']['Indep1.x'][0], np.ones(size)*2., 1e-6)
-        assert_near_equal(J['ParallelGroup1.Con2.y']['Indep1.x'][0], np.ones(size)*-3., 1e-6)
+        assert_near_equal(J['ParallelGroup1.Con1.y']['Comp1.x'][0], np.ones(size)*2., 1e-6)
+        assert_near_equal(J['ParallelGroup1.Con2.y']['Comp1.x'][0], np.ones(size)*-3., 1e-6)
 
         # now run in rev mode and compare times for deriv calculation
         p = om.Problem(model=PartialDependGroup())
@@ -712,8 +720,8 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
         J = p.compute_totals(of, wrt, return_format='dict')
         elapsed_rev = time.time() - elapsed_rev
 
-        assert_near_equal(J['ParallelGroup1.Con1.y']['Indep1.x'][0], np.ones(size)*2., 1e-6)
-        assert_near_equal(J['ParallelGroup1.Con2.y']['Indep1.x'][0], np.ones(size)*-3., 1e-6)
+        assert_near_equal(J['ParallelGroup1.Con1.y']['Comp1.x'][0], np.ones(size)*2., 1e-6)
+        assert_near_equal(J['ParallelGroup1.Con2.y']['Comp1.x'][0], np.ones(size)*-3., 1e-6)
 
         # make sure that rev mode is faster than fwd mode
         self.assertGreater(elapsed_fwd / elapsed_rev, 1.0)
@@ -781,7 +789,7 @@ class CheckParallelDerivColoringEfficiency(unittest.TestCase):
     # these tests check that redudant calls to compute_jacvec_product
     # are not performed when running parallel derivatives
     # ref issue 1405
-    
+
     N_PROCS = 3
 
     def setup_model(self, size):

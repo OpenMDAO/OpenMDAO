@@ -143,7 +143,7 @@ class N2Toolbar {
 
         this.toolbarContainer = d3.select('#toolbarLoc');
         this.toolbar = d3.select('#true-toolbar');
-        this.hideToolbarButton = d3.select('#hide-toolbar');
+        this.hideToolbarButton = d3.select('.toolbar-hide-container');
         this.hideToolbarIcon = this.hideToolbarButton.select('i');
         this.searchBar = d3.select('#awesompleteId');
         this.searchCount = d3.select('#searchCountId');
@@ -155,12 +155,10 @@ class N2Toolbar {
         if (!EMBEDDED || (EMBEDDED && window.location.href.includes('#toolbar')))
             this.show();
 
-        this._setupExpandableButtons();
         this._setupButtonFunctions(n2ui);
 
         // Expand the search bar and set focus when search button clicked
         d3.select('#searchbar-container').on('click', function () {
-            self.toolbarContainer.style('z-index', 10);
             self.searchCount.html('0 matches');
             
             self.searchBar.node().value = '';
@@ -175,17 +173,16 @@ class N2Toolbar {
 
         // Retract search bar when focus is lost
         this.searchBar.on('focusout', function () {
-            self.toolbarContainer.style('z-index', 1);
             d3.select('#searchbar-and-label').attr('class', 'searchbar-hidden')
         });
     }
 
     /** Slide everything to the left offscreen 75px, rotate the button */
     hide() {
-        this.toolbarContainer.style('left', '-75px');
-        this.hideToolbarButton.style('left', '-30px');
+        this.toolbarContainer.style('left', '-65px');
+        this.hideToolbarButton.style('left', '-20px');
         this.hideToolbarIcon.style('transform', 'rotate(-180deg)');
-        d3.select('#d3_content_div').style('margin-left', '-75px');
+        d3.select('#d3_content_div').style('margin-left', '-65px');
         this.hidden = true;
     }
 
@@ -201,21 +198,6 @@ class N2Toolbar {
     toggle() {
         if (this.hidden) this.show();
         else this.hide();
-    }
-
-    _setupExpandableButtons() {
-        const self = this;
-
-        // Open expandable buttons when hovered over
-        d3.selectAll('.expandable > div')
-            .on('mouseover', function () {
-                self.toolbarContainer.style('z-index', '5');
-                d3.select(this).style('max-width', '200px');
-            })
-            .on('mouseout', function () {
-                d3.select(this).style('max-width', '0');
-                self.toolbarContainer.style('z-index', '1')
-            })
     }
 
     /** When an expanded button is clicked, update the 'root' button to the same icon/function. */
@@ -249,59 +231,52 @@ class N2Toolbar {
 
         new N2ToolbarButtonClick('#collapse-element', tooltipBox,
             "Control variable collapsing",
-            e => { n2ui.collapseOutputsButtonClick(n2ui.n2Diag.zoomedElement) });
+            e => { n2ui.collapseAll(n2ui.n2Diag.zoomedElement) });
 
         new N2ToolbarButtonClick('#collapse-element-2', tooltipBox,
             "Collapse only variables in current view",
             function (target) {
-                n2ui.collapseOutputsButtonClick(n2ui.n2Diag.zoomedElement);
+                n2ui.collapseAll(n2ui.n2Diag.zoomedElement);
                 self._setRootButton(target);
             });
 
         new N2ToolbarButtonClick('#collapse-all', tooltipBox,
             "Collapse all variables in entire model",
             function (target) {
-                n2ui.collapseOutputsButtonClick(n2ui.n2Diag.model.root);
+                n2ui.collapseAll(n2ui.n2Diag.model.root);
                 self._setRootButton(target);
             });
 
         new N2ToolbarButtonClick('#expand-element', tooltipBox,
             "Expand only variables in current view",
             function (target) {
-                n2ui.uncollapseButtonClick(n2ui.n2Diag.zoomedElement);
+                n2ui.expandAll(n2ui.n2Diag.zoomedElement);
                 self._setRootButton(target);
             });
 
         new N2ToolbarButtonClick('#expand-all', tooltipBox,
             "Expand all variables in entire model",
             function (target) {
-                n2ui.uncollapseButtonClick(n2ui.n2Diag.model.root);
-                self._setRootButton(target);
-            });
-
-        new N2ToolbarButtonClick('#show-connections', tooltipBox,
-            "Set connections visibility",
-            function (target) {
-                n2ui.n2Diag.showArrows();
+                n2ui.expandAll(n2ui.n2Diag.model.root);
                 self._setRootButton(target);
             });
 
         new N2ToolbarButtonClick('#hide-connections', tooltipBox,
-            "Hide all connection arrows",
+            "Remove all connection arrows",
             function (target) {
                 n2ui.n2Diag.clearArrows();
                 self._setRootButton(target);
             });
 
-        new N2ToolbarButtonClick('#show-connections-2', tooltipBox,
-            "Show pinned connection arrows",
+        new N2ToolbarButtonClick('#hide-connections-2', tooltipBox,
+            "Remove all connection arrows",
             function (target) {
-                n2ui.n2Diag.showArrows();
+                n2ui.n2Diag.clearArrows();
                 self._setRootButton(target);
             });
 
         new N2ToolbarButtonClick('#show-all-connections', tooltipBox,
-            "Show all connections in model",
+            "Show all connections in view",
             function (target) {
                 n2ui.n2Diag.showAllArrows();
                 self._setRootButton(target);
@@ -329,7 +304,11 @@ class N2Toolbar {
         new N2ToolbarButtonToggle('#info-button', tooltipBox,
             ["Show detailed node information", "Hide detailed node information"],
             pred => { return n2ui.nodeInfoBox.hidden; },
-            e => { n2ui.nodeInfoBox.toggle(); }
+            e => {
+                n2ui.nodeInfoBox.unpin();
+                n2ui.nodeInfoBox.clear();
+                n2ui.nodeInfoBox.toggle();
+            }
         );
 
         new N2ToolbarButtonToggle('#question-button', tooltipBox,

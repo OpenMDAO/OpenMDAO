@@ -6,8 +6,10 @@
  * @property {Object} prevDims The previous value of dims.
  * @property {Object} solverDims The size and location of the node within the solver tree.
  * @property {Object} prevSolverDims The previous value of solverDims.
- * @property {Object} isMinimized Whether this node or a parent has been collapsed.
- * @property {number} depth
+ * @property {Boolean} isMinimized Whether this node or a parent has been collapsed.
+ * @property {Number} nameWidthPx The width of the name in pixels as computed by N2Layout.
+ * @property {Boolean} manuallyExpanded If this node was right-clicked.
+ * @property {Number} depth The index of the column this node appears in.
  */
 class N2TreeNode {
 
@@ -19,9 +21,18 @@ class N2TreeNode {
         // Merge all of the props from the original JSON tree node to us.
         Object.assign(this, origNode);
 
-        // From old ClearConnections():
         this.sourceParentSet = new Set();
         this.targetParentSet = new Set();
+        this.nameWidthPx = 1; // Set by N2Layout
+        this.numLeaves = 0; // Set by N2Layout
+        this.isMinimized = false;
+        this.manuallyExpanded = false;
+        this.childNames = new Set(); // Set by ModelData
+        this.depth = -1; // Set by ModelData
+        this.parent = null; // Set by ModelData
+        this.id = -1; // Set by ModelData
+        this.absPathName = ''; // Set by ModelData
+        this.numDescendants = 0; // Set by ModelData
 
         // Solver names may be empty, so set them to "None" instead.
         if (this.linear_solver == "") this.linear_solver = "None";
@@ -29,12 +40,10 @@ class N2TreeNode {
 
         this.rootIndex = -1;
         this.dims = {
-            'x': 0,
-            'y': 0,
+            'x': 1e-6,
+            'y': 1e-6,
             'width': 1,
-            'height': 1,
-            'rx': 12,
-            'ry': 12
+            'height': 1
         };
         this.prevDims = {
             'x': 1e-6,
@@ -43,8 +52,8 @@ class N2TreeNode {
             'height': 1e-6
         };
         this.solverDims = {
-            'x': 0,
-            'y': 0,
+            'x': 1e-6,
+            'y': 1e-6,
             'width': 1,
             'height': 1
         };
@@ -54,13 +63,17 @@ class N2TreeNode {
             'width': 1e-6,
             'height': 1e-6
         };
-        this.isMinimized = false;
+
     }
 
-    /** Run when a node is collapsed/restored. */
-    toggleMinimize() {
-        this.isMinimized = !this.isMinimized;
-        return this.isMinimized;
+    /** Run when a node is collapsed. */
+    minimize() {
+        this.isMinimized = true;
+    }
+
+    /** Run when a node is restored. */
+    expand() {
+        this.isMinimized = false;
     }
 
     /**
@@ -88,32 +101,34 @@ class N2TreeNode {
         return (Array.isPopulatedArray(this[childrenPropName]));
     }
 
-    /** True if this.type is 'param' or 'unconnected_param'. */
-    isParam() {
-        return this.type.match(paramRegex);
+    /** True if this.type is 'input' or 'unconnected_input'. */
+    isInput() {
+        return this.type.match(inputRegex);
     }
 
-    /** True if this is a parameter and connected. */
-    isConnectedParam() {
-        return (this.type == 'param');
-    }
+    /** True if this is an input and connected. */
+    isConnectedInput() { return (this.type == 'input'); }
 
-    /** True if this a paramater and unconnected. */
-    isUnconnectedParam() {
-        return (this.type == 'unconnected_param');
-    }
+    /** True if this an input and unconnected. */
+    isUnconnectedInput() { return (this.type == 'unconnected_input'); }
 
-    /** True if this.type is 'unknown'. */
-    isUnknown() { return (this.type == 'unknown'); }
+    /** True if this is an input whose source is an auto-ivc'd output */
+    isAutoIvcInput() { return (this.type == 'autoivc_input');}
 
-    /** True if this is an unknown and it's not implicit */
-    isExplicitOutput() { return (this.isUnknown() && !this.implicit); }
+    /** True if this.type is 'output'. */
+    isOutput() { return (this.type == 'output'); }
 
-    /** True if this is an unknown and it is implicit */
-    isImplicitOutput() { return (this.isUnknown() && this.implicit); }
+    /** True if this is the root node in the model */
+    isRoot() { return (this.type == 'root'); }
 
-    /** True if this.type is 'param', 'unconnected_param', or 'unknown'. */
-    isParamOrUnknown() { return this.type.match(paramOrUnknownRegex); }
+    /** True if this is an output and it's not implicit */
+    isExplicitOutput() { return (this.isOutput() && !this.implicit); }
+
+    /** True if this is an output and it is implicit */
+    isImplicitOutput() { return (this.isOutput() && this.implicit); }
+
+    /** True if this.type is 'input', 'unconnected_input', or 'output'. */
+    isInputOrOutput() { return this.type.match(inputOrOutputRegex); }
 
     /** True is this.type is 'subsystem' */
     isSubsystem() { return (this.type == 'subsystem'); }
@@ -124,9 +139,9 @@ class N2TreeNode {
     /** True if it's a subsystem and this.subsystem_type is 'component' */
     isComponent() { return ( this.isSubsystem() && this.subsystem_type == 'component'); }
 
-    /** Not connectable if this is a param group or parents are minimized. */
+    /** Not connectable if this is a input group or parents are minimized. */
     isConnectable() {
-        if (this.isParamOrUnknown() && !(this.hasChildren() ||
+        if (this.isInputOrOutput() && !(this.hasChildren() ||
                 this.parent.isMinimized || this.parentComponent.isMinimized)) return true;
 
         return this.isMinimized;
@@ -138,22 +153,25 @@ class N2TreeNode {
     }
 
     /**
-     * Compare the supplied node, and recurse through children if it doesn't match.
-     * @returns {Boolean} True if a match is found.
+     * Look for the supplied node in the set of child names.
+     * @returns {Boolean} True if a match is found, otherwise false.
      */
-    _hasNodeInChildren(compareNode) {
-        if (this === compareNode) {
-            return true;
-        }
+    hasNodeInChildren(compareNode) {
+        return this.childNames.has(compareNode.absPathName);
+    }
 
-        if (this.hasChildren()) {
-            for (let child of this.children) {
-                if (child._hasNodeInChildren(compareNode)) {
-                    return true;
-                }
+    /** Look for the supplied node in the parentage of this one.
+     * @param {N2TreeNode} compareNode The node to look for.
+     * @param {N2TreeNode} [parentLimit = null] Stop searching at this common parent.
+     * @returns {Boolean} True if the node is found, otherwise false.
+     */
+    hasParent(compareNode, parentLimit = null) {
+        for (let obj = this.parent; obj != null && obj !== parentLimit; obj = obj.parent) {
+            if (obj === compareNode) {
+                return true;
             }
         }
-
+        
         return false;
     }
 
@@ -164,15 +182,14 @@ class N2TreeNode {
      * @returns {Boolean} True if the node is found, otherwise false.
      */
     hasNode(compareNode, parentLimit = null) {
-        // Check parents first.
-        for (let obj = this; obj != null && obj !== parentLimit; obj = obj.parent) {
-            if (obj === compareNode) {
-                return true;
-            }
-        }
+        if (this.type == 'root') return true;
 
-        // Check children if not found in parents.
-        return this._hasNodeInChildren(compareNode);
+        if ( this === compareNode) return true;
+
+        // Check parents first.
+        if (this.hasParent(compareNode, parentLimit)) return true;
+
+        return this.hasNodeInChildren(compareNode);
     }
 
     /**
@@ -224,5 +241,22 @@ class N2TreeNode {
         // Should never get here because root is parent of all
         debugInfo("No common parent found between two nodes: ", this, other);
         return null;
+    }
+
+    /**
+     * If the node has a lot of descendants and it wasn't manually expanded,
+     * minimize it.
+     * @returns {Boolean} True if minimized here, false otherwise.
+     */
+    minimizeIfLarge() {
+        if ( ! (this.isRoot() || this.manuallyExpanded) &&
+            (this.numDescendants > PRECOLLAPSE_THRESHOLD &&
+                this.children.length > 1 ) ) {
+            debugInfo(`Precollapsing node ${this.absPathName}`)
+            this.minimize();
+            return true;
+        }
+
+        return false;
     }
 }

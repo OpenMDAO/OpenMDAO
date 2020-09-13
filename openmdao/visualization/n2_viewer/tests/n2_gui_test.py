@@ -93,7 +93,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Hover on N2 matrix element and check arrow count",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_23_23.vMid",
+            "selector": "g#n2elements rect#cellShape_node_22.vMid",
             "arrowCount": 4
         },
         {
@@ -105,7 +105,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Hover on N2 matrix element and check arrow count",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_23_23.vMid",
+            "selector": "g#n2elements rect#cellShape_node_22.vMid",
             "arrowCount": 4
         },
         {
@@ -120,7 +120,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Hover over collapsed N2 matrix element and check arrow count",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_7_7.gMid",
+            "selector": "g#n2elements rect#cellShape_node_6.gMid",
             "arrowCount": 5
         },
         {
@@ -138,7 +138,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Hover over zoomed N2 cell and check arrow count",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_11_11.vMid",
+            "selector": "g#n2elements rect#cellShape_node_10.vMid",
             "arrowCount": 5
         },
         {
@@ -153,7 +153,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Hover over collapsed N2 cell and check arrow count",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_7_7.gMid",
+            "selector": "g#n2elements rect#cellShape_node_6.gMid",
             "arrowCount": 5
         },
         {
@@ -161,13 +161,43 @@ n2_gui_test_scripts = {
             "test": "click",
             "selector": "g#solver_tree rect#circuit_n1",
             "button": "right"
-        }
+        },
+        {
+            "test": "root"
+        },
+        {
+            "desc": "Check the number of cells in the N2 Matrix",
+            "test": "count",
+            "selector": "g#n2elements > g.n2cell",
+            "count": 40
+        },
+        {
+            "desc": "Perform a search on V_out",
+            "test": "search",
+            "searchString": "V_out",
+            "n2ElementCount": 11
+        },
+        {
+            "test": "root"
+        },
+        {
+            "desc": "Check that home button works after search",
+            "test": "count",
+            "selector": "g#n2elements > g.n2cell",
+            "count": 40
+        },
     ],
     "bug_arrow": [
         {
+            "desc": "Check the number of cells in the N2 Matrix",
+            "test": "count",
+            "selector": "g#n2elements > g.n2cell",
+            "count": 11
+        },
+        {
             "desc": "Hover on N2 matrix element and check arrow count",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_11_11.vMid",
+            "selector": "g#n2elements rect#cellShape_node_10.vMid",
             "arrowCount": 2
         },
         {
@@ -179,7 +209,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Hover on N2 matrix element and check arrow count",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_11_11.vMid",
+            "selector": "g#n2elements rect#cellShape_node_10.vMid",
             "arrowCount": 2
         },
         {
@@ -194,7 +224,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Hover over collapsed N2 matrix element and check arrow count",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_10_10.gMid",
+            "selector": "g#n2elements rect#cellShape_node_9.gMid",
             "arrowCount": 1
         },
         {
@@ -206,14 +236,14 @@ n2_gui_test_scripts = {
         {
             "desc": "Left-click to zoom on solver element",
             "test": "click",
-            "selector": "g#solver_tree rect#design_fan_map_d1",
+            "selector": "g#solver_tree rect#design_fan_map_scalars",
             "button": "left"
         },
         {
             "desc": "Hover over zoomed N2 cell and check arrow count",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_9_9.vMid",
-            "arrowCount": 1
+            "selector": "g#n2elements rect#cellShape_node_10.vMid",
+            "arrowCount": 2
         },
         {
             "test": "root"
@@ -227,7 +257,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Hover over collapsed N2 cell and check arrow count",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_10_10.gMid",
+            "selector": "g#n2elements rect#cellShape_node_9.gMid",
             "arrowCount": 1
         },
         {
@@ -241,7 +271,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Hover on N2 matrix element and check arrow count",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_11_11.vMid",
+            "selector": "g#n2elements rect#cellShape_node_10.vMid",
             "arrowCount": 4
         },
         {
@@ -253,7 +283,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Hover on N2 matrix element and check arrow count",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_11_11.vMid",
+            "selector": "g#n2elements rect#cellShape_node_10.vMid",
             "arrowCount": 4
         },
         {
@@ -268,7 +298,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Hover over collapsed N2 matrix element and check arrow count",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_13_13.gMid",
+            "selector": "g#n2elements rect#cellShape_node_12.gMid",
             "arrowCount": 3
         },
         {
@@ -286,7 +316,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Hover over zoomed N2 cell and check arrow count",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_21_21.vMid",
+            "selector": "g#n2elements rect#cellShape_node_20.vMid",
             "arrowCount": 4
         },
         {
@@ -301,7 +331,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Hover over collapsed N2 cell and check arrow count",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_3_3.gMid",
+            "selector": "g#n2elements rect#cellShape_node_2.gMid",
             "arrowCount": 3
         },
         {
@@ -319,17 +349,9 @@ n2_gui_test_scripts = {
         {
             "desc": "Hover over N2 cell and check arrow count with collapsed group",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_15_15.vMid",
+            "selector": "g#n2elements rect#cellShape_node_14.vMid",
             "arrowCount": 2
         },
-    ],
-    "udpi_circuit": [
-        {
-        "desc": "Check the number of cells in the N2 Matrix",
-        "test": "count",
-        "selector": "g#n2elements > g.n2cell",
-        "count": 29
-        }
     ],
     "parabaloid": [
         {
@@ -372,6 +394,7 @@ n2_gui_test_scripts = {
 }
 
 n2_gui_test_models = n2_gui_test_scripts.keys()
+
 
 class n2_gui_test_case(unittest.TestCase):
 
@@ -426,15 +449,9 @@ class n2_gui_test_case(unittest.TestCase):
         self.n2files[self.current_model] = n2file
         print("Creating " + n2file)
 
-        if (self.current_model[:5] == 'udpi_'):
-            subprocess.run(
-                ['openmdao', 'n2', '-o', n2file,  '--no_browser',
-                    '--use_declare_partial_info', pyfile],
-                stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-        else:
-            subprocess.run(
-                ['openmdao', 'n2', '-o', n2file,  '--no_browser', pyfile],
-                stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        subprocess.run(
+            ['openmdao', 'n2', '-o', n2file,  '--no_browser', pyfile],
+            stderr=subprocess.PIPE, stdout=subprocess.PIPE)
 
     async def load_test_page(self):
         """ Load the specified HTML file from the local filesystem. """
@@ -482,7 +499,7 @@ class n2_gui_test_case(unittest.TestCase):
         Count the number of path elements in the n2arrows < div > and make
         sure it matches the specified value.
         """
-        await self.assert_element_count('g#n2arrows > path', expected_arrows)
+        await self.assert_element_count('g#n2arrows > g', expected_arrows)
 
     async def get_handle(self, selector):
         """ Get handle for a specific element and assert that it exists. """
@@ -535,7 +552,7 @@ class n2_gui_test_case(unittest.TestCase):
         self.log_test("Return to root")
         hndl = await self.get_handle("#reset-graph")
         await hndl.click()
-        await self.page.waitFor(self.transition_wait)
+        await self.page.waitFor(self.transition_wait * 2)
 
     async def search_and_check_result(self, options):
         """
@@ -548,17 +565,17 @@ class n2_gui_test_case(unittest.TestCase):
                       "' and checking for " +
                       str(options['n2ElementCount']) + " N2 elements after.")
 
-        await self.page.hover(".searchbar-container")
-        await self.page.click(".searchbar")
+        # await self.page.hover(".searchbar-container")
+        await self.page.click("#searchbar-container")
         await self.page.waitFor(500)
 
         searchbar = await self.page.querySelector('#awesompleteId')
-        await self.page.evaluate('(element, searchString, page) => element.value = searchString + " "', searchbar, searchString, page)
+        await searchbar.type(searchString + "\n")
 
-        await self.page.waitFor(500)
+        # await self.page.waitFor(500)
 
-        await self.page.keyboard.press('Backspace')
-        await self.page.keyboard.press("Enter")
+        # await self.page.keyboard.press('Backspace')
+        # await self.page.keyboard.press("Enter")
         await self.page.waitFor(self.transition_wait + 500)
         await self.assert_element_count("g#n2elements > g.n2cell",
                                         options['n2ElementCount'])

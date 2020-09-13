@@ -288,8 +288,8 @@ class TestUserDefinedSolver(unittest.TestCase):
         prob = om.Problem()
 
 
-        prob.model.add_subsystem('des_vars', om.IndepVarComp('a', val=10., units='m'), promotes=['*'])
         prob.model.add_subsystem('icomp', CustomSolveImplicit(), promotes=['*'])
+        prob.model.set_input_defaults('a', 10., units='m')
 
         model = prob.model
 

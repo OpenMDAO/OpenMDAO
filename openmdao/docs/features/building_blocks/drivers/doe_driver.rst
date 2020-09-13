@@ -34,6 +34,15 @@ DOEDriver Options
     DOEDriver
     options
 
+DOEDriver Constructor
+----------------------
+
+The call signature for the `DOEDriver` constructor is:
+
+.. automethod:: openmdao.drivers.doe_driver.DOEDriver.__init__
+    :noindex:
+
+
 Simple Example
 --------------
 `UniformGenerator` implements the simplest method and will generate a requested number of

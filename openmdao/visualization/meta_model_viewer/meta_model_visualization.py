@@ -275,10 +275,10 @@ class MetaModelVisualization(object):
                 # Check for no training data
                 try:
                     # Append the input data/titles to a dictionary
-                    self.training_inputs[name] = metamodel.params[idx]
+                    self.training_inputs[name] = metamodel.inputs[idx]
                     # Also, append the data as an 'add_input' to the model reference
                     self.meta_model.add_input(name, 0.,
-                                              training_data=metamodel.params[idx])
+                                              training_data=metamodel.inputs[idx])
                 except TypeError:
                     msg = "No training data present for one or more parameters"
                     raise TypeError(msg)
@@ -769,7 +769,7 @@ class MetaModelVisualization(object):
             The array of training points and their alpha opacity with respect to the surrogate line
         """
         # Create tuple of the input parameters
-        input_dimensions = tuple(self.meta_model.params)
+        input_dimensions = tuple(self.meta_model.inputs)
 
         # Input training data and output training data
         x_training = np.array([z for z in product(*input_dimensions)])

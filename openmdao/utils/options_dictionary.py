@@ -2,8 +2,48 @@
 
 from openmdao.utils.general_utils import warn_deprecation
 
+
+class Undefined(object):
+    """
+    Class for defining an 'undefined' object which appears in the docs as 'undefined'.
+    """
+
+    def __repr__(self):
+        """
+        Return a string representation for an 'undefined' object.
+
+        Returns
+        -------
+        str
+            'undefined'
+        """
+        return 'undefined'
+
+
 # unique object to check if default is given
-_undefined = object()
+_undefined = Undefined()
+
+
+#
+# Template for `check_valid` function
+#
+def check_valid(name, value):
+    """
+    Check the validity of value for the option with name.
+
+    Parameters
+    ----------
+    name : str
+        name of the option
+    value : any
+        value for the option
+
+    Raises
+    ------
+    ValueError
+        if value is not valid for option
+    """
+    raise ValueError(f"Option '{name}' with value {value} is not valid.")
 
 
 class OptionsDictionary(object):
@@ -314,7 +354,8 @@ class OptionsDictionary(object):
         lower : float or None
             Minimum allowable value.
         check_valid : function or None
-            General check function that raises an exception if value is not valid.
+            User-supplied function with arguments (name, value) that raises an exception
+            if the value is not valid.
         allow_none : bool
             If True, allow None as a value regardless of values or types.
         recordable : bool
@@ -341,6 +382,10 @@ class OptionsDictionary(object):
             self._all_recordable = False
 
         default_provided = default is not _undefined
+
+        if default_provided and default is None:
+            # specifying default=None implies allow_none
+            allow_none = True
 
         self._dict[name] = {
             'value': default,

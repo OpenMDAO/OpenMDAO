@@ -24,6 +24,15 @@ MultiFiMetaModelUnStructuredComp Options
     MultiFiMetaModelUnStructuredComp
     options
 
+MultiFiMetaModelUnStructuredComp Constructor
+--------------------------------------------
+
+The call signature for the `MultiFiMetaModelUnStructuredComp` constructor is:
+
+.. automethod:: openmdao.components.multifi_meta_model_unstructured_comp.MultiFiMetaModelUnStructuredComp.__init__
+    :noindex:
+
+
 Simple Example
 --------------
 

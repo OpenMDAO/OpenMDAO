@@ -1,8 +1,9 @@
 """IndepVarComp tests used in the IndepVarComp feature doc."""
 import unittest
+import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 
 
 class TestIndepVarComp(unittest.TestCase):
@@ -14,10 +15,10 @@ class TestIndepVarComp(unittest.TestCase):
         comp = om.IndepVarComp('indep_var')
         prob = om.Problem(comp).setup()
 
-        assert_near_equal(prob['indep_var'], 1.0)
+        assert_near_equal(prob.get_val('indep_var'), 1.0)
 
-        prob['indep_var'] = 2.0
-        assert_near_equal(prob['indep_var'], 2.0)
+        prob.set_val('indep_var', 2.0)
+        assert_near_equal(prob.get_val('indep_var'), 2.0)
 
     def test_simple_default(self):
         """Define one independent variable with a default value."""
@@ -26,7 +27,7 @@ class TestIndepVarComp(unittest.TestCase):
         comp = om.IndepVarComp('indep_var', val=2.0)
         prob = om.Problem(comp).setup()
 
-        assert_near_equal(prob['indep_var'], 2.0)
+        assert_near_equal(prob.get_val('indep_var'), 2.0)
 
     def test_simple_kwargs(self):
         """Define one independent variable with a default value and additional options."""
@@ -35,7 +36,7 @@ class TestIndepVarComp(unittest.TestCase):
         comp = om.IndepVarComp('indep_var', val=2.0, units='m', lower=0, upper=10)
         prob = om.Problem(comp).setup()
 
-        assert_near_equal(prob['indep_var'], 2.0)
+        assert_near_equal(prob.get_val('indep_var'), 2.0)
 
     def test_simple_array(self):
         """Define one independent array variable."""
@@ -51,27 +52,28 @@ class TestIndepVarComp(unittest.TestCase):
         comp = om.IndepVarComp('indep_var', val=array)
         prob = om.Problem(comp).setup()
 
-        assert_near_equal(prob['indep_var'], array)
+        assert_near_equal(prob.get_val('indep_var'), array)
 
     def test_add_output(self):
         """Define two independent variables using the add_output method."""
         import openmdao.api as om
 
         comp = om.IndepVarComp()
-        comp.add_output('indep_var_1', val=1.0, lower=0, upper=10)
-        comp.add_output('indep_var_2', val=2.0, lower=1, upper=20)
+        comp.add_output('indep_var_1', val=1.0)
+        comp.add_output('indep_var_2', val=2.0)
 
         prob = om.Problem(comp).setup()
 
-        assert_near_equal(prob['indep_var_1'], 1.0)
-        assert_near_equal(prob['indep_var_2'], 2.0)
+        assert_near_equal(prob.get_val('indep_var_1'), 1.0)
+        assert_near_equal(prob.get_val('indep_var_2'), 2.0)
 
     def test_invalid_tags(self):
         with self.assertRaises(TypeError) as cm:
             comp = om.IndepVarComp('indep_var', tags=99)
 
         self.assertEqual(str(cm.exception),
-            "The tags argument should be str, set, or list: 99")
+            "IndepVarComp: Value (99) of option 'tags' has type 'int', "
+            "but one of types ('str', 'list') was expected.")
 
     def test_simple_with_tags(self):
         """Define one independent variable and set its value. Try filtering with tag"""
@@ -109,8 +111,8 @@ class TestIndepVarComp(unittest.TestCase):
         from openmdao.api import Problem, IndepVarComp
 
         comp = IndepVarComp()
-        comp.add_output('indep_var_1', val=1.0, lower=0, upper=10, tags="tag1")
-        comp.add_output('indep_var_2', val=2.0, lower=1, upper=20, tags="tag2")
+        comp.add_output('indep_var_1', val=1.0, tags="tag1")
+        comp.add_output('indep_var_2', val=2.0, tags="tag2")
 
         prob = Problem(comp).setup(check=False)
         prob.run_model()
@@ -173,7 +175,7 @@ class TestIndepVarComp(unittest.TestCase):
         model = prob.model
 
         ivc = om.IndepVarComp()
-        ivc.add_output('x1', val=[1, 2, 3], lower=0, upper=10)
+        ivc.add_output('x1', val=[1, 2, 3])
 
         model.add_subsystem('p', ivc)
 
@@ -182,7 +184,80 @@ class TestIndepVarComp(unittest.TestCase):
         prob['p.x1'][0] = 0.5
         prob.run_model()
 
-        assert_near_equal(prob['p.x1'][0], 0.5)
+        assert_near_equal(prob.get_val('p.x1')[0], 0.5)
+
+    def test_options(self):
+        class Parameters(om.IndepVarComp):
+            def initialize(self):
+                self.options.declare('num_x', default=0)
+                self.options.declare('val_y', default=0.)
+
+            def setup(self):
+                self.add_discrete_output('num_x', val = np.zeros(self.options['num_x']))
+                self.add_output('val_y',val = self.options['val_y'])
+
+        prob = om.Problem(model=Parameters(num_x=4, val_y=2.5))
+        prob.setup()
+        prob.run_model()
+
+        self.assertEqual(len(prob.get_val('num_x')), 4)
+        self.assertEqual(prob.get_val('val_y'), 2.5)
+
+    def test_ivc_deprecations(self):
+        # ref0
+        prob = om.Problem()
+
+        indep = prob.model.add_subsystem('p1', om.IndepVarComp())
+
+        msg = "'ref0' has been deprecated and will be removed in a future version"
+        with assert_warning(DeprecationWarning, msg):
+            indep.add_output('x', 12., ref=0.0, ref0=1.)
+
+        # res_units
+        prob = om.Problem()
+
+        indep = prob.model.add_subsystem('p1', om.IndepVarComp())
+
+        msg = "'res_units' has been deprecated and will be removed in a future " + \
+              "version"
+        with assert_warning(DeprecationWarning, msg):
+            indep.add_output('x', 12., res_units='m')
+
+        # upper
+        prob = om.Problem()
+
+        indep = prob.model.add_subsystem('p1', om.IndepVarComp())
+
+        msg = "'upper' has been deprecated and will be removed in a future version"
+        with assert_warning(DeprecationWarning, msg):
+            indep.add_output('x', 12., upper=1.)
+
+        # lower
+        prob = om.Problem()
+
+        indep = prob.model.add_subsystem('p1', om.IndepVarComp())
+
+        msg = "'lower' has been deprecated and will be removed in a future version"
+        with assert_warning(DeprecationWarning, msg):
+            indep.add_output('x', 12., lower=1.)
+
+        # res_ref
+        prob = om.Problem()
+
+        indep = prob.model.add_subsystem('p1', om.IndepVarComp())
+
+        msg = "'res_ref' has been deprecated and will be removed in a future version"
+        with assert_warning(DeprecationWarning, msg):
+            indep.add_output('x', 12., res_ref=1.)
+
+        # res_ref
+        prob = om.Problem()
+
+        indep = prob.model.add_subsystem('p1', om.IndepVarComp())
+
+        msg = "'ref' has been deprecated and will be removed in a future version"
+        with assert_warning(DeprecationWarning, msg):
+            indep.add_output('x', 12., ref=2.)
 
 
 if __name__ == '__main__':

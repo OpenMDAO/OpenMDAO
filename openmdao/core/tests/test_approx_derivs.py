@@ -21,7 +21,7 @@ from openmdao.test_suite.parametric_suite import parametric_suite
 from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.mpi import MPI
-import time 
+import time
 
 try:
     from openmdao.parallel_api import PETScVector
@@ -110,6 +110,8 @@ class TestGroupFiniteDifference(unittest.TestCase):
 
         # 1. run_model; 2. step x; 3. step y
         self.assertEqual(model.parab.count, 3)
+        self.assertEqual(model.parab.iter_count_without_approx, 1)
+        self.assertEqual(model.parab.iter_count, 3)
 
     def test_fd_count_driver(self):
         # Make sure we aren't doing FD wrt any var that isn't in the driver desvar set.
@@ -1880,58 +1882,6 @@ class TestComponentComplexStep(unittest.TestCase):
         assert_near_equal(Jfd['sub.comp.x', 'sub.comp.rhs'], -np.eye(2), 1e-6)
         assert_near_equal(Jfd['sub.comp.x', 'sub.comp.x'], comp.mtx, 1e-6)
 
-    def test_reconfigure(self):
-        # In this test, we switch to 'cs' when we reconfigure.
-
-        class TestImplCompArrayDense(TestImplCompArray):
-
-            def initialize(self):
-                self.mtx = np.array([
-                    [0.99, 0.01],
-                    [0.01, 0.99],
-                ])
-                self.count = 0
-
-            def setup(self):
-                super(TestImplCompArrayDense, self).setup()
-                if self.count > 0:
-                    self.declare_partials('*', '*', method='cs')
-                else:
-                    self.declare_partials('*', '*', method='fd')
-                self.count += 1
-
-        prob = self.prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('p_rhs', om.IndepVarComp('rhs', val=np.ones(2)))
-        sub = model.add_subsystem('sub', om.Group())
-        comp = sub.add_subsystem('comp', TestImplCompArrayDense())
-        model.connect('p_rhs.rhs', 'sub.comp.rhs')
-
-        model.linear_solver = om.ScipyKrylov()
-
-        prob.setup()
-        prob.run_model()
-
-        with self.assertRaises(RuntimeError) as context:
-            model.resetup(setup_mode='reconf')
-
-        msg = "TestImplCompArrayDense (sub.comp): In order to activate complex step during reconfiguration, " \
-              "you need to set 'force_alloc_complex' to True during setup. " \
-              "e.g. 'problem.setup(force_alloc_complex=True)'"
-        self.assertEqual(str(context.exception), msg)
-
-        # This time, allocate complex in setup.
-        prob.setup(check=False, force_alloc_complex=True)
-        prob.run_model()
-        model.resetup(setup_mode='reconf')
-        prob.run_model()
-
-        model.run_linearize()
-        Jfd = comp._jacobian
-        assert_near_equal(Jfd['sub.comp.x', 'sub.comp.rhs'], -np.eye(2), 1e-6)
-        assert_near_equal(Jfd['sub.comp.x', 'sub.comp.x'], comp.mtx, 1e-6)
-
     def test_vector_methods(self):
 
         class KenComp(om.ExplicitComponent):
@@ -2113,18 +2063,16 @@ class TestComponentComplexStep(unittest.TestCase):
                     print("y", outputs['y'])
 
         prob = om.Problem()
-        prob.model.add_subsystem('px', om.IndepVarComp('x', val=1.0))
         prob.model.add_subsystem('comp', SimpleComp())
-        prob.model.connect('px.x', 'comp.x')
 
-        prob.model.add_design_var('px.x', lower=-100, upper=100)
+        prob.model.add_design_var('comp.x', lower=-100, upper=100)
         prob.model.add_objective('comp.y')
 
         prob.setup(force_alloc_complex=True)
 
         prob.run_model()
 
-        prob.compute_totals(of=['comp.y'], wrt=['px.x'])
+        prob.compute_totals(of=['comp.y'], wrt=['comp.x'])
 
 
 class ApproxTotalsFeature(unittest.TestCase):
@@ -2160,7 +2108,9 @@ class ApproxTotalsFeature(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
-        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
+
+        model.set_input_defaults('x', 0.0)
+
         model.add_subsystem('comp1', CompOne(), promotes=['x', 'y'])
         comp2 = model.add_subsystem('comp2', CompTwo(), promotes=['y', 'z'])
 
@@ -2208,7 +2158,8 @@ class ApproxTotalsFeature(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
-        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
+        model.set_input_defaults('x', 0.0)
+
         model.add_subsystem('comp1', CompOne(), promotes=['x', 'y'])
         model.add_subsystem('comp2', CompTwo(), promotes=['y', 'z'])
 
@@ -2232,7 +2183,7 @@ class ApproxTotalsFeature(unittest.TestCase):
         class CompOne(om.ExplicitComponent):
 
             def setup(self):
-                self.add_input('x', val=0.0)
+                self.add_input('x', val=1.0)
                 self.add_output('y', val=np.zeros(25))
                 self._exec_count = 0
 
@@ -2255,7 +2206,6 @@ class ApproxTotalsFeature(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
-        model.add_subsystem('p1', om.IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('comp1', CompOne(), promotes=['x', 'y'])
         model.add_subsystem('comp2', CompTwo(), promotes=['y', 'z'])
 

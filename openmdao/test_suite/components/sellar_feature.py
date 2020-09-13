@@ -12,7 +12,6 @@ import numpy as np
 import openmdao.api as om
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
                          SellarDis2withDerivatives
-from openmdao.test_suite.components.double_sellar import SubSellar
 
 
 class SellarDis1(om.ExplicitComponent):
@@ -93,15 +92,14 @@ class SellarMDA(om.Group):
     """
 
     def setup(self):
-        indeps = self.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
-        indeps.add_output('x', 1.0)
-        indeps.add_output('z', np.array([5.0, 2.0]))
-
         cycle = self.add_subsystem('cycle', om.Group(), promotes=['*'])
         cycle.add_subsystem('d1', SellarDis1(), promotes_inputs=['x', 'z', 'y2'],
                             promotes_outputs=['y1'])
         cycle.add_subsystem('d2', SellarDis2(), promotes_inputs=['z', 'y1'],
                             promotes_outputs=['y2'])
+
+        cycle.set_input_defaults('x', 1.0)
+        cycle.set_input_defaults('z', np.array([5.0, 2.0]))
 
         # Nonlinear Block Gauss Seidel is a gradient free solver
         cycle.nonlinear_solver = om.NonlinearBlockGS()
@@ -112,6 +110,7 @@ class SellarMDA(om.Group):
 
         self.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         self.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
 
 class SellarMDAWithUnits(om.Group):
     """
@@ -190,15 +189,15 @@ class SellarMDAWithUnits(om.Group):
             outputs['y2'] = y1**.5 + z1 + z2
 
     def setup(self):
-        indeps = self.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
-        indeps.add_output('x', 1.0, units='degC')
-        indeps.add_output('z', np.array([5.0, 2.0]), units='degC')
 
         cycle = self.add_subsystem('cycle', om.Group(), promotes=['*'])
         cycle.add_subsystem('d1', self.SellarDis1Units(), promotes_inputs=['x', 'z', 'y2'],
                             promotes_outputs=['y1'])
         cycle.add_subsystem('d2', self.SellarDis2Units(), promotes_inputs=['z', 'y1'],
                             promotes_outputs=['y2'])
+
+        cycle.set_input_defaults('x', 1.0, units='degC')
+        cycle.set_input_defaults('z', np.array([5.0, 2.0]), units='degC')
 
         # Nonlinear Block Gauss Seidel is a gradient free solver
         cycle.nonlinear_solver = om.NonlinearBlockGS()
@@ -224,15 +223,15 @@ class SellarMDALinearSolver(om.Group):
     """
 
     def setup(self):
-        indeps = self.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
-        indeps.add_output('x', 1.0)
-        indeps.add_output('z', np.array([5.0, 2.0]))
 
         cycle = self.add_subsystem('cycle', om.Group(), promotes=['*'])
         d1 = cycle.add_subsystem('d1', SellarDis1(), promotes_inputs=['x', 'z', 'y2'],
                                  promotes_outputs=['y1'])
         d2 = cycle.add_subsystem('d2', SellarDis2(), promotes_inputs=['z', 'y1'],
                                  promotes_outputs=['y2'])
+
+        self.set_input_defaults('x', 1.0)
+        self.set_input_defaults('z', np.array([5.0, 2.0]))
 
         cycle.nonlinear_solver = om.NonlinearBlockGS()
         cycle.linear_solver = om.DirectSolver()
@@ -349,50 +348,40 @@ class SellarIDF(om.Group):
     """
     def setup(self):
         # construct the Sellar model with `y1` and `y2` as independent variables
-        dv = om.IndepVarComp()
-        dv.add_output('x', 5.)
-        dv.add_output('y1', 5.)
-        dv.add_output('y2', 5.)
-        dv.add_output('z', np.array([2., 0.]))
 
-        self.add_subsystem('dv', dv)
-        self.add_subsystem('d1', SellarDis1withDerivatives())
-        self.add_subsystem('d2', SellarDis2withDerivatives())
+        self.set_input_defaults('x', 5.)
+        self.set_input_defaults('y1', 5.)
+        self.set_input_defaults('y2', 5.)
+        self.set_input_defaults('z', np.array([2., 0.]))
+
+        self.add_subsystem('d1', SellarDis1withDerivatives(), promotes_inputs=['x', 'z', 'y2'])
+        self.add_subsystem('d2', SellarDis2withDerivatives(), promotes_inputs=['y1', 'z'])
 
         self.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                           x=0., z=np.array([0., 0.])))
+                           x=0., z=np.array([0., 0.])), promotes_inputs=['x', 'z', 'y1', 'y2'])
 
-        self.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'))
-        self.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'))
-
-        self.connect('dv.x', ['d1.x', 'obj_cmp.x'])
-        self.connect('dv.y1', ['d2.y1', 'obj_cmp.y1', 'con_cmp1.y1'])
-        self.connect('dv.y2', ['d1.y2', 'obj_cmp.y2', 'con_cmp2.y2'])
-        self.connect('dv.z', ['d1.z', 'd2.z', 'obj_cmp.z'])
+        self.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes_inputs=['y1'])
+        self.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes_inputs=['y2'])
 
         # rather than create a cycle by connecting d1.y1 to d2.y1 and d2.y2 to d1.y2
         # we will constrain y1 and y2 to be equal for the two disciplines
 
         equal = om.EQConstraintComp()
-        self.add_subsystem('equal', equal)
+        self.add_subsystem('equal', equal, promotes_inputs=[('lhs:y1', 'y1'), ('lhs:y2', 'y2')])
 
         equal.add_eq_output('y1', add_constraint=True)
         equal.add_eq_output('y2', add_constraint=True)
 
-        self.connect('dv.y1', 'equal.lhs:y1')
         self.connect('d1.y1', 'equal.rhs:y1')
-
-        self.connect('dv.y2', 'equal.lhs:y2')
         self.connect('d2.y2', 'equal.rhs:y2')
 
         # the driver will effectively solve the cycle
         # by satisfying the equality constraints
 
-        self.add_design_var('dv.x', lower=0., upper=5.)
-        self.add_design_var('dv.y1', lower=0., upper=5.)
-        self.add_design_var('dv.y2', lower=0., upper=5.)
-        self.add_design_var('dv.z', lower=np.array([-5., 0.]), upper=np.array([5., 5.]))
+        self.add_design_var('x', lower=0., upper=5.)
+        self.add_design_var('y1', lower=0., upper=5.)
+        self.add_design_var('y2', lower=0., upper=5.)
+        self.add_design_var('z', lower=np.array([-5., 0.]), upper=np.array([5., 5.]))
         self.add_objective('obj_cmp.obj')
         self.add_constraint('con_cmp1.con1', upper=0.)
         self.add_constraint('con_cmp2.con2', upper=0.)
-

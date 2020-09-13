@@ -11,9 +11,10 @@ from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimple, 
     TestExplCompSimpleDense
 from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.general_utils import printoptions, remove_whitespace
-
+from openmdao.utils.mpi import MPI
 
 # Note: The following class definitions are used in feature docs
+
 
 class RectangleComp(om.ExplicitComponent):
     """
@@ -74,17 +75,8 @@ class RectangleJacVec(RectangleComp):
 class RectangleGroup(om.Group):
 
     def setup(self):
-        comp1 = self.add_subsystem('comp1', om.IndepVarComp())
-        comp1.add_output('length', 1.0)
-        comp1.add_output('width', 1.0)
-
-        self.add_subsystem('comp2', RectanglePartial())
-        self.add_subsystem('comp3', RectangleJacVec())
-
-        self.connect('comp1.length', 'comp2.length')
-        self.connect('comp1.length', 'comp3.length')
-        self.connect('comp1.width', 'comp2.width')
-        self.connect('comp1.width', 'comp3.width')
+        self.add_subsystem('comp1', RectanglePartial(), promotes_inputs=['width', 'length'])
+        self.add_subsystem('comp2', RectangleJacVec(), promotes_inputs=['width', 'length'])
 
 
 class ExplCompTestCase(unittest.TestCase):
@@ -122,38 +114,36 @@ class ExplCompTestCase(unittest.TestCase):
         else:
             self.fail("Exception expected")
 
-        prob['comp1.length'] = 3.
-        prob['comp1.width'] = 2.
+        prob.set_val('length', 3.)
+        prob.set_val('width', 2.)
         prob.run_model()
+        assert_near_equal(prob['comp1.area'], 6.)
         assert_near_equal(prob['comp2.area'], 6.)
-        assert_near_equal(prob['comp3.area'], 6.)
 
         # total derivs
         total_derivs = prob.compute_totals(
-            wrt=['comp1.length', 'comp1.width'],
-            of=['comp2.area', 'comp3.area']
+            wrt=['length', 'width'],
+            of=['comp1.area', 'comp2.area']
         )
-        assert_near_equal(total_derivs['comp2.area', 'comp1.length'], [[2.]])
-        assert_near_equal(total_derivs['comp3.area', 'comp1.length'], [[2.]])
-        assert_near_equal(total_derivs['comp2.area', 'comp1.width'], [[3.]])
-        assert_near_equal(total_derivs['comp3.area', 'comp1.width'], [[3.]])
+        assert_near_equal(total_derivs['comp1.area', 'length'], [[2.]])
+        assert_near_equal(total_derivs['comp2.area', 'length'], [[2.]])
+        assert_near_equal(total_derivs['comp1.area', 'width'], [[3.]])
+        assert_near_equal(total_derivs['comp2.area', 'width'], [[3.]])
 
         # list inputs
         inputs = prob.model.list_inputs(out_stream=None)
         self.assertEqual(sorted(inputs), [
+            ('comp1.length', {'value': [3.]}),
+            ('comp1.width',  {'value': [2.]}),
             ('comp2.length', {'value': [3.]}),
             ('comp2.width',  {'value': [2.]}),
-            ('comp3.length', {'value': [3.]}),
-            ('comp3.width',  {'value': [2.]}),
         ])
 
         # list explicit outputs
         outputs = prob.model.list_outputs(implicit=False, out_stream=None)
         self.assertEqual(sorted(outputs), [
-            ('comp1.length', {'value': [3.]}),
-            ('comp1.width',  {'value': [2.]}),
+            ('comp1.area',   {'value': [6.]}),
             ('comp2.area',   {'value': [6.]}),
-            ('comp3.area',   {'value': [6.]}),
         ])
 
         # list states
@@ -897,8 +887,7 @@ class ExplCompTestCase(unittest.TestCase):
             prob.run_model()
 
         self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'length' in input vector "
-                         "when it is read only.")
+                         "BadComp (<model>): Attempt to set value of 'length' in input vector when it is read only.")
 
     def test_compute_inputs_read_only_reset(self):
         class BadComp(TestExplCompSimple):
@@ -928,7 +917,7 @@ class ExplCompTestCase(unittest.TestCase):
             prob.check_partials()
 
         self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'length' in input vector "
+                         "BadComp (<model>): Attempt to set value of 'length' in input vector "
                          "when it is read only.")
 
     def test_compute_partials_inputs_read_only_reset(self):
@@ -961,7 +950,7 @@ class ExplCompTestCase(unittest.TestCase):
             prob.check_partials()
 
         self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'length' in input vector "
+                         "BadComp (<model>): Attempt to set value of 'length' in input vector "
                          "when it is read only.")
 
     def test_compute_jacvec_product_inputs_read_only_reset(self):
@@ -980,6 +969,107 @@ class ExplCompTestCase(unittest.TestCase):
         # verify read_only status is reset after AnalysisError
         prob['length'] = 111.
 
+@unittest.skipUnless(MPI, "MPI is required.")
+class TestMPIExplComp(unittest.TestCase):
+    N_PROCS = 3
+
+    def test_list_inputs_outputs_with_parallel_comps(self):
+        class TestComp(om.ExplicitComponent):
+
+            def initialize(self):
+                self.options['distributed'] = False
+
+            def setup(self):
+                self.add_input('x', shape=1)
+                self.add_output('y', shape=1)
+                self.declare_partials('y', 'x')
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = inputs['x'] ** 2
+
+            def compute_partials(self, inputs, J):
+                J['y', 'x'] = 2 * inputs['x']
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 1.0))
+        model.add_subsystem('p2', om.IndepVarComp('x', 1.0))
+
+        parallel = model.add_subsystem('parallel', om.ParallelGroup())
+        parallel.add_subsystem('c1', TestComp())
+        parallel.add_subsystem('c2', TestComp())
+
+        model.add_subsystem('c3', om.ExecComp(['y=3.0*x1+7.0*x2']))
+
+        model.connect("parallel.c1.y", "c3.x1")
+        model.connect("parallel.c2.y", "c3.x2")
+
+        model.connect("p1.x", "parallel.c1.x")
+        model.connect("p2.x", "parallel.c2.x")
+
+        prob.setup()
+        prob.run_model()
+
+        stream = StringIO()
+        prob.model.list_outputs(all_procs=True, out_stream=stream)
+
+        if self.comm.rank == 0:
+
+            text = stream.getvalue().split('\n')
+            expected_text = [
+                "5 Explicit Output(s) in 'model'",
+                "-------------------------------",
+                "",
+                "varname     value",
+                "----------  -----",
+                "model",
+                "p1",
+                "    x       [1.]",
+                "p2",
+                "    x       [1.]",
+                "parallel",
+                "    c1",
+                "   y     [1.]",
+                "    c2",
+                "    y     [1.]",
+                "c3",
+                "    y       [10.]",
+                "",
+                "",
+                "0 Implicit Output(s) in 'model'",
+                "-------------------------------",
+            ]
+            for i, line in enumerate(expected_text):
+                if line and not line.startswith('-'):
+                    self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
+
+        stream = StringIO()
+        prob.model.list_inputs(all_procs=True, out_stream=stream)
+
+        if self.comm.rank == 0:
+
+            text = stream.getvalue().split('\n')
+            expected_text = [
+                "4 Input(s) in 'model'",
+                "---------------------",
+                "",
+                "varname     value",
+                "----------  -----",
+                "model",
+                "parallel",
+                "    c1",
+                "    x     [1.]",
+                "    c2",
+                "    x     [1.]",
+                "c3",
+                "    x1      [1.]",
+                "    x2      [1.]",
+            ]
+
+            for i, line in enumerate(expected_text):
+                if line and not line.startswith('-'):
+                    self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
 
 if __name__ == '__main__':
     unittest.main()

@@ -166,7 +166,8 @@ class BroydenSolver(NonlinearSolver):
             self.linesearch._setup_solvers(system, self._depth + 1)
             self.linesearch._do_subsolve = True
 
-        self._disallow_distrib_solve()
+        # this check is incorrect (for broyden) and needs to be done differently.
+        # self._disallow_distrib_solve()
 
         states = self.options['state_vars']
         prom2abs = system._var_allprocs_prom2abs_list['output']
@@ -299,7 +300,7 @@ class BroydenSolver(NonlinearSolver):
             self.Gm = self.Gm.astype(np.complex)
             self.xm = self.xm.astype(np.complex)
             self.fxm = self.fxm.astype(np.complex)
-        elif np.iscomplex(self.xm[0]):
+        elif np.iscomplexobj(self.xm):
             self.Gm = self.Gm.real
             self.xm = self.xm.real
             self.fxm = self.fxm.real
@@ -489,7 +490,7 @@ class BroydenSolver(NonlinearSolver):
             Array containing values of vector at desired states.
         """
         if self._full_inverse:
-            xm = vec._data.copy()
+            xm = vec.asarray(copy=True)
         else:
             states = self.options['state_vars']
             xm = self.xm.copy()
@@ -511,7 +512,7 @@ class BroydenSolver(NonlinearSolver):
         outputs = self._system()._outputs
 
         if self._full_inverse:
-            outputs._data[:] = new_val
+            outputs.set_val(new_val)
         else:
             states = self.options['state_vars']
             for name in states:
@@ -530,9 +531,9 @@ class BroydenSolver(NonlinearSolver):
         linear = self._system()._vectors['output']['linear']
 
         if self._full_inverse:
-            linear._data[:] = dx
+            linear.set_val(dx)
         else:
-            linear.set_const(0.0)
+            linear.set_val(0.0)
             for name in self.options['state_vars']:
                 i, j = self._idx[name]
                 linear[name] = dx[i:j]
@@ -555,7 +556,7 @@ class BroydenSolver(NonlinearSolver):
         d_out = system._vectors['output']['linear']
 
         inv_jac = self.Gm
-        d_res.set_const(0.0)
+        d_res.set_val(0.0)
 
         # Disable local fd
         approx_status = system._owns_approx_jac

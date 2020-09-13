@@ -98,7 +98,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.cleanup()
 
         coordinate = [0, 'Driver', (0, )]
-        expected_outputs = {"px.x": [1.0, ], "pz.z": [5.0, 2.0]}
+        expected_outputs = {"x": [1.0, ], "z": [5.0, 2.0]}
 
         expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
         assertDriverIterDataRecorded(self, expected_data, self.eps)
@@ -119,7 +119,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.cleanup()
 
         coordinate = [0, 'Driver', (0, )]
-        expected_outputs = {"px.x": [1.0, ], "pz.z": [5.0, 2.0]}
+        expected_outputs = {"x": [1.0, ], "z": [5.0, 2.0]}
 
         expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
         assertDriverIterDataRecorded(self, expected_data, self.eps)
@@ -399,8 +399,8 @@ class TestSqliteRecorder(unittest.TestCase):
                 'y1': ['d2.y1', 'obj_cmp.y1', 'con_cmp1.y1']
             },
             'output': {
-                'x': ['px.x'],
-                'z': ['pz.z'],
+                '_auto_ivc.v0': ['_auto_ivc.v0'],
+                '_auto_ivc.v1': ['_auto_ivc.v1'],
                 'y1': ['d1.y1'],
                 'y2': ['d2.y2'],
                 'obj': ['obj_cmp.obj'],
@@ -424,8 +424,8 @@ class TestSqliteRecorder(unittest.TestCase):
                 'con_cmp2.y2': 'y2'
             },
             'output': {
-                'px.x': 'x',
-                'pz.z': 'z',
+                '_auto_ivc.v0': '_auto_ivc.v0',
+                '_auto_ivc.v1': '_auto_ivc.v1',
                 'd1.y1': 'y1',
                 'd2.y2': 'y2',
                 'obj_cmp.obj': 'obj',
@@ -438,7 +438,7 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_problem_metadata = {
             'connections_list_length': 11,
             'tree_length': 10,
-            'tree_children_length': 7,
+            'tree_children_length': 5,
             'abs2prom': abs2prom,
         }
         assertViewerDataRecorded(self, expected_problem_metadata)
@@ -457,49 +457,95 @@ class TestSqliteRecorder(unittest.TestCase):
 
         cr = om.CaseReader("cases.sql")
         # Quick check to see that keys and values were recorded
-        for key in ['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']:
+        for key in ['root', '_auto_ivc', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']:
             self.assertTrue(key in cr.system_options.keys())
 
         value = cr.system_options['root']['component_options']['assembled_jac_type']
         self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
 
-    def test_driver_record_model_metadata(self):
+    def test_record_system_options(self):
+        # Regardless what object the case recorder is attached to, system options
+        #  should be recorded for all systems in the model
+
+        expected_system_options_keys = ['root', '_auto_ivc', 'd1', 'd2', 'obj_cmp', 'con_cmp1',
+                                        'con_cmp2']
+
+        # Recorder on Driver
         prob = om.Problem(model=SellarDerivatives())
         prob.setup()
-
-        recorder = om.SqliteRecorder("cases.sql")
+        recorder = om.SqliteRecorder("cases_driver.sql")
         prob.driver.add_recorder(recorder)
-
         prob.set_solver_print(level=0)
         prob.run_model()
         prob.cleanup()
-
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader("cases_driver.sql")
         # Quick check to see that keys and values were recorded
-        for key in ['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']:
+        for key in expected_system_options_keys:
             self.assertTrue(key in cr.system_options.keys())
-
         value = cr.system_options['root']['component_options']['assembled_jac_type']
-        self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
+        self.assertEqual('csc', value)  # quick check only. Too much to check exhaustively
 
-    def test_driver_record_metadata(self):
+        # Recorder on Problem
         prob = om.Problem(model=SellarDerivatives())
         prob.setup()
-
-        recorder = om.SqliteRecorder("cases.sql")
-        prob.driver.add_recorder(recorder)
-
+        recorder = om.SqliteRecorder("cases_problem.sql")
+        prob.add_recorder(recorder)
         prob.set_solver_print(level=0)
         prob.run_model()
         prob.cleanup()
-
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader("cases_problem.sql")
         # Quick check to see that keys and values were recorded
-        for key in ['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']:
+        for key in expected_system_options_keys:
             self.assertTrue(key in cr.system_options.keys())
-
         value = cr.system_options['root']['component_options']['assembled_jac_type']
         self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
+
+        # Recorder on a subsystem
+        prob = om.Problem(model=SellarDerivatives())
+        prob.setup()
+        recorder = om.SqliteRecorder("cases_subsystem.sql")
+        prob.model.d1.add_recorder(recorder)
+        prob.set_solver_print(level=0)
+        prob.run_model()
+        prob.cleanup()
+        cr = om.CaseReader("cases_subsystem.sql")
+        # Quick check to see that keys and values were recorded
+        for key in expected_system_options_keys:
+            self.assertTrue(key in cr.system_options.keys())
+        value = cr.system_options['root']['component_options']['assembled_jac_type']
+        self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
+
+        # Recorder on a solver
+        prob = om.Problem(model=SellarDerivatives())
+        prob.setup()
+        recorder = om.SqliteRecorder("cases_solver.sql")
+        prob.model.nonlinear_solver.add_recorder(recorder)
+        prob.set_solver_print(level=0)
+        prob.run_model()
+        prob.cleanup()
+        cr = om.CaseReader("cases_solver.sql")
+        # Quick check to see that keys and values were recorded
+        for key in expected_system_options_keys:
+            self.assertTrue(key in cr.system_options.keys())
+        value = cr.system_options['root']['component_options']['assembled_jac_type']
+        self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
+
+    def test_warning_system_options_overwriting(self):
+
+        prob = ParaboloidProblem()
+        prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
+        prob.add_recorder(self.recorder)
+        prob.setup()
+        prob.set_solver_print(0)
+        prob.run_driver()
+        prob.record('final')
+
+        prob.setup()
+        msg = "The model is being run again, if the options or scaling of any components " \
+              "has changed then only their new values will be recorded."
+
+        with assert_warning(UserWarning, msg):
+            prob.run_driver()
 
     def test_without_n2_data(self):
         prob = SellarProblem()
@@ -682,17 +728,17 @@ class TestSqliteRecorder(unittest.TestCase):
 
         model.mda.nonlinear_solver.options['use_apply_nonlinear'] = True
 
-        pz = model.pz  # IndepVarComp which is an ExplicitComponent
-        pz.recording_options['record_inputs'] = True
-        pz.recording_options['record_outputs'] = True
-        pz.recording_options['record_residuals'] = True
-        pz.add_recorder(self.recorder)
-
         d1 = model.mda.d1
         d1.recording_options['record_inputs'] = True
         d1.recording_options['record_outputs'] = True
         d1.recording_options['record_residuals'] = True
         d1.add_recorder(self.recorder)
+
+        d2 = model.mda.d2
+        d2.recording_options['record_inputs'] = True
+        d2.recording_options['record_outputs'] = True
+        d2.recording_options['record_residuals'] = True
+        d2.add_recorder(self.recorder)
 
         prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
 
@@ -726,14 +772,27 @@ class TestSqliteRecorder(unittest.TestCase):
         assertSystemIterDataRecorded(self, expected_data, self.eps)
 
         #
-        # check data for 'pz'
+        # check data for 'd2'
         #
-        coordinate = [0, 'ScipyOptimize_SLSQP', (2, ), 'root._solve_nonlinear', (2, ), 'NLRunOnce', (0, ),
-                      'pz._solve_nonlinear', (2, )]
+        coordinate = [
+            0,
+            'ScipyOptimize_SLSQP', (1, ),
+            'root._solve_nonlinear', (1, ),
+            'NLRunOnce', (0, ),
+            'mda._solve_nonlinear', (1, ),
+            'NonlinearBlockGS', (0,),
+            'mda.d2._solve_nonlinear', (7, )
+        ]
 
         expected_inputs = None
         expected_outputs = {"pz.z": [2.8640616, 0.825643, ], }
         expected_residuals = {"pz.z": [0.0, 0.0], }
+        expected_inputs = {
+            "mda.d2.z": [5.0, 2.0],
+            "mda.d2.y1": [25.5883027, ],
+        }
+        expected_outputs = {"mda.d2.y2": [12.0584865, ], }
+        expected_residuals = {"mda.d2.y2": [0.0, ], }
 
         expected_data = (
             (coordinate, (t0, t1), expected_inputs, expected_outputs, expected_residuals),
@@ -762,20 +821,20 @@ class TestSqliteRecorder(unittest.TestCase):
             "con_cmp1.con1": [-22.42830237],
             "d1.y1": [25.58830237],
             "con_cmp2.con2": [-11.941511849],
-            "pz.z": [5.0, 2.0],
+            "_auto_ivc.v0": [5.0, 2.0],
             "obj_cmp.obj": [28.588308165],
             "d2.y2": [12.058488150],
-            "px.x": [1.0]
+            "_auto_ivc.v1": [1.0]
         }
 
         expected_solver_residuals = {
             "con_cmp1.con1": [0.0],
             "d1.y1": [-1.318802844707534e-10],
             "con_cmp2.con2": [0.0],
-            "pz.z": [0.0, 0.0],
+            "_auto_ivc.v0": [0.0, 0.0],
             "obj_cmp.obj": [0.0],
             "d2.y2": [0.0],
-            "px.x": [0.0]
+            "_auto_ivc.v1": [0.0]
         }
 
         expected_data = ((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
@@ -797,10 +856,10 @@ class TestSqliteRecorder(unittest.TestCase):
             "con_cmp1.con1": [0.0],
             "d1.y1": [2.60769184e-12],
             "con_cmp2.con2": [0.0],
-            "pz.z": [0.0, 0.0],
+            "_auto_ivc.v0": [0.0, 0.0],
             "obj_cmp.obj": [0.0],
             "d2.y2": [0.0],
-            "px.x": [0.0]
+            "_auto_ivc.v1": [0.0]
         }
 
         expected_data = ((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
@@ -894,7 +953,6 @@ class TestSqliteRecorder(unittest.TestCase):
                          ['d1.x', 'd1.y2', 'd1.z', 'd2.y1', 'd2.z'])
         self.assertEqual(sorted(last_case.outputs.keys()), ['d1.y1', 'd2.y2'])
 
-
     def test_record_line_search_armijo_goldstein(self):
         prob = om.Problem()
         prob.model.add_subsystem('px', om.IndepVarComp('x', 1.0))
@@ -975,10 +1033,10 @@ class TestSqliteRecorder(unittest.TestCase):
             "con_cmp1.con1": [-22.42830237],
             "d1.y1": [25.58830237],
             "con_cmp2.con2": [-11.941511849],
-            "pz.z": [5.0, 2.0],
+            "_auto_ivc.v0": [5.0, 2.0],
             "obj_cmp.obj": [28.588308165],
             "d2.y2": [12.058488150],
-            "px.x": [1.0]
+            "_auto_ivc.v1": [1.0]
         }
 
         expected_solver_residuals = None
@@ -1029,8 +1087,8 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_rel_error = 3.6299074030587596e-12
 
         expected_solver_output = {
-            'px.x': [1.],
-            'pz.z': [5., 2.],
+            '_auto_ivc.v1': [1.],
+            '_auto_ivc.v0': [5., 2.],
             'd1.y1': [25.58830237],
             'd2.y2': [12.05848815],
             'obj_cmp.obj': [28.58830817],
@@ -1039,8 +1097,8 @@ class TestSqliteRecorder(unittest.TestCase):
         }
 
         expected_solver_residuals = {
-            'px.x': [0.],
-            'pz.z': [0., 0.],
+            '_auto_ivc.v1': [0.],
+            '_auto_ivc.v0': [0., 0.],
             'd1.y1': [-1.31880284e-10],
             'd2.y2': [0.],
             'obj_cmp.obj': [0.],
@@ -1068,8 +1126,8 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_rel_error = 1.991112651729199e-08
 
         expected_solver_output = {
-            'px.x': [1.],
-            'pz.z': [5., 2.],
+            '_auto_ivc.v1': [1.],
+            '_auto_ivc.v0': [5., 2.],
             'd1.y1': [25.58830237],
             'd2.y2': [12.05848815],
             'obj_cmp.obj': [28.58830817],
@@ -1100,8 +1158,8 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_rel_error = 5.966657077752565e-12
 
         expected_solver_output = {
-            'px.x': [1.],
-            'pz.z': [5., 2.],
+            '_auto_ivc.v1': [1.],
+            '_auto_ivc.v0': [5., 2.],
             'd1.y1': [25.58830237],
             'd2.y2': [12.05848815],
             'obj_cmp.obj': [28.58830817],
@@ -1132,8 +1190,8 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_rel_error = None
 
         expected_solver_output = {
-            'px.x': [1.],
-            'pz.z': [5., 2.],
+            '_auto_ivc.v1': [1.],
+            '_auto_ivc.v0': [5., 2.],
             'd1.y1': [27.8],
             'd2.y2': [12.27257053],
             'obj_cmp.obj': [30.80000468],
@@ -1192,11 +1250,11 @@ class TestSqliteRecorder(unittest.TestCase):
         driver.add_recorder(self.recorder)
 
         # System
-        pz = prob.model.pz  # IndepVarComp which is an ExplicitComponent
-        pz.recording_options['record_inputs'] = True
-        pz.recording_options['record_outputs'] = True
-        pz.recording_options['record_residuals'] = True
-        pz.add_recorder(self.recorder)
+        cc = prob.model.con_cmp1
+        cc.recording_options['record_inputs'] = True
+        cc.recording_options['record_outputs'] = True
+        cc.recording_options['record_residuals'] = True
+        cc.add_recorder(self.recorder)
 
         # Solver
         nl = prob.model.mda.nonlinear_solver = om.NonlinearBlockGS()
@@ -1215,8 +1273,8 @@ class TestSqliteRecorder(unittest.TestCase):
         coordinate = [0, 'ScipyOptimize_SLSQP', (6, )]
 
         expected_desvars = {
-            "pz.z": prob['pz.z'],
-            "px.x": prob['px.x']
+            "z": prob['z'],
+            "x": prob['x']
         }
         expected_objectives = {
             "obj_cmp.obj": prob['obj_cmp.obj']
@@ -1237,11 +1295,11 @@ class TestSqliteRecorder(unittest.TestCase):
         # System recording test
         #
         coordinate = [0, 'ScipyOptimize_SLSQP', (2, ), 'root._solve_nonlinear', (2, ), 'NLRunOnce', (0, ),
-                      'pz._solve_nonlinear', (2, )]
+                      'con_cmp1._solve_nonlinear', (2, )]
 
-        expected_inputs = None
-        expected_outputs = {"pz.z": [2.8640616, 0.825643, ], }
-        expected_residuals = {"pz.z": [0.0, 0.0], }
+        expected_inputs = {"con_cmp1.y1": [7.73433739], }
+        expected_outputs = {"con_cmp1.con1": [-4.57433739], }
+        expected_residuals = {"con_cmp1.con1": [0.0], }
 
         expected_system_data = (
             (coordinate, (t0, t1), expected_inputs, expected_outputs, expected_residuals),
@@ -1416,8 +1474,7 @@ class TestSqliteRecorder(unittest.TestCase):
         # Just make sure all Systems had some metadata recorded
         assertSystemMetadataIdsRecorded(self, [
             'root',
-            'px',
-            'pz',
+            '_auto_ivc',
             'mda',
             'mda.d1',
             'mda.d2',
@@ -1435,8 +1492,7 @@ class TestSqliteRecorder(unittest.TestCase):
             'rank0:root._solve_nonlinear|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|0|mda.d1._solve_nonlinear|0',
             'rank0:root._solve_nonlinear|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|0|mda.d2._solve_nonlinear|0',
             'rank0:root._solve_nonlinear|0|NLRunOnce|0|obj_cmp._solve_nonlinear|0',
-            'rank0:root._solve_nonlinear|0|NLRunOnce|0|px._solve_nonlinear|0',
-            'rank0:root._solve_nonlinear|0|NLRunOnce|0|pz._solve_nonlinear|0',
+            'rank0:root._solve_nonlinear|0|NLRunOnce|0|_auto_ivc._solve_nonlinear|0',
         ])
 
     def test_record_system_with_prefix(self):
@@ -1454,8 +1510,7 @@ class TestSqliteRecorder(unittest.TestCase):
         # Just make sure all Systems had some metadata recorded
         assertSystemMetadataIdsRecorded(self, [
             'root',
-            'px',
-            'pz',
+            '_auto_ivc',
             'mda',
             'mda.d1',
             'mda.d2',
@@ -1473,8 +1528,7 @@ class TestSqliteRecorder(unittest.TestCase):
             'Run1_rank0:root._solve_nonlinear|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|0|mda.d1._solve_nonlinear|0',
             'Run1_rank0:root._solve_nonlinear|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|0|mda.d2._solve_nonlinear|0',
             'Run1_rank0:root._solve_nonlinear|0|NLRunOnce|0|obj_cmp._solve_nonlinear|0',
-            'Run1_rank0:root._solve_nonlinear|0|NLRunOnce|0|px._solve_nonlinear|0',
-            'Run1_rank0:root._solve_nonlinear|0|NLRunOnce|0|pz._solve_nonlinear|0',
+            'Run1_rank0:root._solve_nonlinear|0|NLRunOnce|0|_auto_ivc._solve_nonlinear|0',
 
             'Run2_rank0:root._solve_nonlinear|0',
             'Run2_rank0:root._solve_nonlinear|0|NLRunOnce|0|con_cmp1._solve_nonlinear|0',
@@ -1483,8 +1537,7 @@ class TestSqliteRecorder(unittest.TestCase):
             'Run2_rank0:root._solve_nonlinear|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|0|mda.d1._solve_nonlinear|0',
             'Run2_rank0:root._solve_nonlinear|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|0|mda.d2._solve_nonlinear|0',
             'Run2_rank0:root._solve_nonlinear|0|NLRunOnce|0|obj_cmp._solve_nonlinear|0',
-            'Run2_rank0:root._solve_nonlinear|0|NLRunOnce|0|px._solve_nonlinear|0',
-            'Run2_rank0:root._solve_nonlinear|0|NLRunOnce|0|pz._solve_nonlinear|0',
+            'Run2_rank0:root._solve_nonlinear|0|NLRunOnce|0|_auto_ivc._solve_nonlinear|0',
         ])
 
     def test_driver_recording_with_system_vars(self):
@@ -1508,8 +1561,8 @@ class TestSqliteRecorder(unittest.TestCase):
         coordinate = [0, 'ScipyOptimize_SLSQP', (6, )]
 
         expected_desvars = {
-            "pz.z": prob['pz.z'],
-            "px.x": prob['px.x']
+            "z": prob['z'],
+            "x": prob['x']
         }
         expected_objectives = {
             "obj_cmp.obj": prob['obj_cmp.obj']
@@ -1563,7 +1616,7 @@ class TestSqliteRecorder(unittest.TestCase):
         # Do a simple test to see if recording second time was OK
         coordinate = [0, 'Driver', (0, )]
 
-        expected_outputs = {"px.x": [1.0, ], "pz.z": [5.0, 2.0]}
+        expected_outputs = {"x": [1.0, ], "z": [5.0, 2.0]}
 
         expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
         assertDriverIterDataRecorded(self, expected_data, self.eps)
@@ -1581,7 +1634,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.setup()
 
         driver = prob.driver
-        system = prob.model.pz
+        system = prob.model.sub
         solver = prob.model.nonlinear_solver.linesearch = om.BoundsEnforceLS()
 
         # create 3 different recorders
@@ -1676,8 +1729,6 @@ class TestSqliteRecorder(unittest.TestCase):
         # by default we should get all outputs
         self.assertEqual(set(final_case.outputs.keys()),
                          {'con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z'})
-
-
 
     def test_problem_record_with_options(self):
         prob = om.Problem(model=SellarDerivatives())
@@ -2063,7 +2114,6 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_data = ((coordinate, (t0, t1), None, None, None),)
         assertDriverIterDataRecorded(self, expected_data, self.eps)
 
-
     def test_problem_record_options_includes(self):
         prob = om.Problem(model=SellarDerivatives())
 
@@ -2127,7 +2177,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_data = ((case_name, (t0, t1), expected_derivs),)
         assertProblemDerivDataRecorded(self, expected_data, self.eps)
-
 
     def test_problem_recording_derivatives_option_false(self):
         prob = ParaboloidProblem()
@@ -2224,6 +2273,21 @@ class TestSqliteRecorder(unittest.TestCase):
         self.assertAlmostEqual((unscaled_x + adder) * scaler, scaled_x, places=12)
         self.assertAlmostEqual((unscaled_y + adder) * scaler, scaled_y, places=12)
 
+    def test_problem_record_before_final_setup(self):
+        prob = om.Problem()
+        prob.add_recorder(self.recorder)
+        prob.setup()
+
+        with self.assertRaises(RuntimeError) as cm:
+            prob.record('initial')
+
+        self.assertEqual(str(cm.exception),
+                         "Problem: Problem.record() cannot be called before "
+                         "`Problem.run_model()`, `Problem.run_driver()`, or "
+                         "`Problem.final_setup()`.")
+
+        prob.cleanup()
+
 
 @use_tempdirs
 class TestFeatureSqliteRecorder(unittest.TestCase):
@@ -2289,15 +2353,15 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         self.assertEqual('\n'.join([conn['src']+'\t'+conn['tgt'] for conn in connections]),
                          '\n'.join(["d1.y1\tcon_cmp1.y1",
                                     "d2.y2\tcon_cmp2.y2",
-                                    "px.x\td1.x",
+                                    "_auto_ivc.v1\td1.x",
                                     "d2.y2\td1.y2",
-                                    "pz.z\td1.z",
+                                    "_auto_ivc.v0\td1.z",
                                     "d1.y1\td2.y1",
-                                    "pz.z\td2.z",
-                                    "px.x\tobj_cmp.x",
+                                    "_auto_ivc.v0\td2.z",
+                                    "_auto_ivc.v1\tobj_cmp.x",
                                     "d1.y1\tobj_cmp.y1",
                                     "d2.y2\tobj_cmp.y2",
-                                    "pz.z\tobj_cmp.z"]))
+                                    "_auto_ivc.v0\tobj_cmp.z"]))
 
         # access the model tree stored in metadata
         self.assertEqual(set(cr.problem_metadata['tree'].keys()),
@@ -2306,7 +2370,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
                           'expressions'})
         self.assertEqual(cr.problem_metadata['tree']['name'], 'root')
         self.assertEqual(sorted([child["name"] for child in cr.problem_metadata['tree']["children"]]),
-                         ['con_cmp1', 'con_cmp2', 'd1', 'd2', 'obj_cmp', 'px', 'pz'])
+                         ['con_cmp1', 'con_cmp2', 'd1', 'd2', 'obj_cmp'])
 
     def test_feature_problem_metadata_with_driver_information(self):
         import openmdao.api as om
@@ -2415,7 +2479,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         metadata = cr.system_options
 
         self.assertEqual(sorted(metadata.keys()),
-                         sorted(['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']))
+                         sorted(['root', '_auto_ivc', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']))
 
         # options for system 'd1', with second option excluded
         self.assertEqual(metadata['d1']['component_options']['distributed'], False)
@@ -2798,7 +2862,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         self.assertEqual(problem_cases, ['final'])
 
         # get list of output variables recorded on problem
-        problem_vars = cr.list_source_vars('problem')
+        problem_vars = cr.list_source_vars('problem', out_stream=None)
         self.assertEqual(sorted(problem_vars['outputs']), ['con1', 'con2', 'obj', 'x', 'z'])
 
         # get the recorded case and check values
@@ -2852,7 +2916,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         self.assertEqual(problem_cases, ['final'])
 
         # get list of output variables recorded on problem
-        problem_vars = cr.list_source_vars('problem')
+        problem_vars = cr.list_source_vars('problem', out_stream=None)
         self.assertEqual(sorted(problem_vars['outputs']), ['con1', 'con2', 'obj', 'x', 'z'])
 
         # get the recorded case and check values
@@ -2931,6 +2995,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         y_recorded = case.get_val('test_sys.y')
 
         assert_near_equal(y_recorded, y1)
+
 
 class TestFeatureAdvancedExample(unittest.TestCase):
 
@@ -3044,7 +3109,7 @@ class TestFeatureAdvancedExample(unittest.TestCase):
         self.assertEqual(problem_cases, ['final_state'])
 
         # get list of output variables recorded on problem
-        problem_vars = cr.list_source_vars('problem')
+        problem_vars = cr.list_source_vars('problem', out_stream=None)
         self.assertEqual(sorted(problem_vars['outputs']),
                          ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z'])
 
@@ -3090,6 +3155,7 @@ class TestFeatureAdvancedExample(unittest.TestCase):
         ax2.grid()
         # There are two lines in the right plot because "Z" contains two variables that are being
         # optimized
+
 
 @use_tempdirs
 class TestFeatureBasicRecording(unittest.TestCase):

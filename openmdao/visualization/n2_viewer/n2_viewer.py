@@ -3,6 +3,7 @@ import base64
 import inspect
 import json
 import os
+import zlib
 from collections import OrderedDict
 from itertools import chain
 import networkx as nx
@@ -25,11 +26,7 @@ from openmdao.utils.general_utils import simple_warning, make_serializable
 from openmdao.utils.record_util import check_valid_sqlite3_db
 from openmdao.utils.mpi import MPI
 from openmdao.visualization.html_utils import read_files, write_script, DiagramWriter
-
-# Toolbar settings
-_FONT_SIZES = [8, 9, 10, 11, 12, 13, 14]
-_MODEL_HEIGHTS = [600, 650, 700, 750, 800,
-                  850, 900, 950, 1000, 2000, 3000, 4000]
+from openmdao.utils.general_utils import warn_deprecation
 
 _IND = 4  # HTML indentation (spaces)
 
@@ -45,10 +42,10 @@ def _get_var_dict(system, typ, name):
 
     var_dict['name'] = name
     if typ == 'input':
-        var_dict['type'] = 'param'
+        var_dict['type'] = 'input'
     elif typ == 'output':
         isimplicit = isinstance(system, ImplicitComponent)
-        var_dict['type'] = 'unknown'
+        var_dict['type'] = 'output'
         var_dict['implicit'] = isimplicit
 
     var_dict['dtype'] = type(meta['value']).__name__
@@ -98,9 +95,13 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
         tree_dict['component_type'] = None
         tree_dict['subsystem_type'] = 'group'
         tree_dict['is_parallel'] = is_parallel
-        children = [_get_tree_dict(s, component_execution_orders, component_execution_index,
-                                   is_parallel)
-                    for s in system._subsystems_myproc]
+
+        children = []
+        for s in system._subsystems_myproc:
+            if (s.name != '_auto_ivc'):
+                children.append(_get_tree_dict(s, component_execution_orders,
+                                component_execution_index, is_parallel))
+
         if system.comm.size > 1:
             if system._subsystems_myproc:
                 sub_comm = system._subsystems_myproc[0].comm
@@ -170,7 +171,8 @@ def _get_declare_partials(system):
         if isinstance(system, Component):
             subjacs = system._subjacs_info
             for abs_key, meta in subjacs.items():
-                dpl.append("{} > {}".format(abs_key[0], abs_key[1]))
+                if abs_key[0] != abs_key[1]:
+                    dpl.append("{} > {}".format(abs_key[0], abs_key[1]))
         elif isinstance(system, Group):
             for s in system._subsystems_myproc:
                 recurse_get_partials(s, dpl)
@@ -295,7 +297,7 @@ def _get_viewer_data(data_source):
 
     data_dict['driver'] = {'name': driver_name, 'type': driver_type,
                            'options': driver_options, 'opt_settings': driver_opt_settings}
-    data_dict['design_vars'] = root_group.get_design_vars()
+    data_dict['design_vars'] = root_group.get_design_vars(use_prom_ivc=False)
     data_dict['responses'] = root_group.get_responses()
 
     data_dict['declare_partials_list'] = _get_declare_partials(root_group)
@@ -329,10 +331,9 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     title : str, optional
         The title for the diagram. Used in the HTML title.
 
-    use_declare_partial_info : bool, optional
-        If True, in the N2 matrix, component internal connectivity computed using derivative
-        declarations, otherwise, derivative declarations ignored, so dense component connectivity
-        is assumed.
+    use_declare_partial_info : ignored
+        This option is no longer used because it is now always true.
+        Still present for backwards compatibility.
 
     """
     # grab the model viewer data
@@ -342,11 +343,16 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     if MPI and MPI.COMM_WORLD.rank != 0:
         return
 
-    options = {'use_declare_partial_info': use_declare_partial_info}
+    options = {}
     model_data['options'] = options
 
-    model_data = 'var modelData = %s' % json.dumps(
-        model_data, default=make_serializable)
+    if use_declare_partial_info:
+        warn_deprecation("'use_declare_partial_info' is now the"
+                         " default and the option is ignored.")
+
+    raw_data = json.dumps(model_data, default=make_serializable).encode('utf8')
+    b64_data = str(base64.b64encode(zlib.compress(raw_data)).decode("ascii"))
+    model_data = 'var compressedModel = "%s";' % b64_data
 
     import openmdao
     openmdao_dir = os.path.dirname(inspect.getfile(openmdao))
@@ -357,8 +363,12 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     assets_dir = os.path.join(vis_dir, "assets")
 
     # grab the libraries, src and style
-    lib_dct = {'d3': 'd3.v5.min', 'awesomplete': 'awesomplete',
-               'vk_beautify': 'vkBeautify'}
+    lib_dct = {
+        'd3': 'd3.v5.min',
+        'awesomplete': 'awesomplete',
+        'vk_beautify': 'vkBeautify',
+        'pako_inflate': 'pako_inflate.min'
+    }
     libs = read_files(lib_dct.values(), libs_dir, 'js')
     src_names = \
         'modal', \
@@ -397,6 +407,9 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     with open(os.path.join(style_dir, "logo_png.b64"), "r") as f:
         logo_png = str(f.read())
 
+    with open(os.path.join(assets_dir, "spinner.png"), "rb") as f:
+        waiting_icon = str(base64.b64encode(f.read()).decode("ascii"))
+
     if title:
         title = "OpenMDAO Model Hierarchy and N2 diagram: %s" % title
     else:
@@ -411,8 +424,8 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
 
     # put all style and JS into index
     h.insert('{{fontello}}', encoded_font)
-
     h.insert('{{logo_png}}', logo_png)
+    h.insert('{{waiting_icon}}', waiting_icon)
 
     for k, v in lib_dct.items():
         h.insert('{{{}_lib}}'.format(k), write_script(libs[v], indent=_IND))

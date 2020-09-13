@@ -14,6 +14,15 @@ LinearSystemComp Options
     LinearSystemComp
     options
 
+LinearSystemComp Constructor
+----------------------------
+
+The call signature for the `LinearSystemComp` constructor is:
+
+.. automethod:: openmdao.components.linear_system_comp.LinearSystemComp.__init__
+    :noindex:
+
+
 LinearSystemComp Example
 ------------------------
 

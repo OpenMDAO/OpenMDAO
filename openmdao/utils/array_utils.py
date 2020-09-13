@@ -340,15 +340,15 @@ def get_input_idx_split(full_idxs, inputs, outputs, use_full_cols, is_total):
     assert len(full_idxs) > 0, "Empty index array passed to get_input_idx_split."
     full_idxs = np.asarray(full_idxs)
     if use_full_cols:
-        out_size = outputs._data.size
+        out_size = len(outputs)
         out_idxs = full_idxs[full_idxs < out_size]
-        in_idxs = full_idxs[full_idxs >= out_size]
-        if out_idxs.size > 0 and in_idxs.size > 0:
-            return [(inputs, in_idxs - out_size), (outputs, out_idxs)]
-        elif in_idxs.size > 0:
-            return [(inputs, in_idxs - out_size)]
-        else:
-            return [(outputs, out_idxs)]
+        in_idxs = full_idxs[full_idxs >= out_size] - out_size
+        if in_idxs.size > 0:
+            if out_idxs.size > 0:
+                return [(inputs, in_idxs), (outputs, out_idxs)]
+            else:
+                return [(inputs, in_idxs)]
+        return [(outputs, out_idxs)]
     elif is_total:
         return [(outputs, full_idxs)]
     else:
@@ -376,7 +376,7 @@ def _flatten_src_indices(src_indices, shape_in, shape_out, size_out):
         The flattened src_indices.
     """
     if len(shape_out) == 1 or shape_in == src_indices.shape:
-        return convert_neg(src_indices.flatten(), size_out)
+        return convert_neg(src_indices.ravel(), size_out)
 
     entries = [list(range(x)) for x in shape_in]
     cols = np.vstack([src_indices[i] for i in product(*entries)])
