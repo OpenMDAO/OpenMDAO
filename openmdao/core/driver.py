@@ -290,7 +290,7 @@ class Driver(object):
         responses = prom2ivc_src_dict(self._responses)
 
         # Only allow distributed design variables on drivers that support it.
-        if True or self.supports['distributed_design_vars'] is False:
+        if self.supports['distributed_design_vars'] is False:
             dist_vars = []
             for dv, meta in self._designvars.items():
 
