@@ -296,12 +296,14 @@ class Driver(object):
 
                 # For Auto-ivcs, we need to check the distributed metadata on the target instead.
                 if meta['ivc_source'].startswith('_auto_ivc.'):
-                    abs_name = model._var_allprocs_prom2abs_list['input'][dv][0]
-                    if abs_name in model._var_allprocs_abs_names_discrete['input']:
-                        # Discrete vars aren't distributed.
-                        dist = False
-                    else:
-                        dist = model._var_allprocs_abs2meta[abs_name]['distributed']
+                    abs_names = model._var_allprocs_prom2abs_list['input'][dv]
+                    dist = False
+                    for abs_name in abs_names:
+                        if abs_name in model._var_allprocs_abs_names_discrete['input']:
+                            # Discrete vars aren't distributed.
+                            break
+
+                        dist = dist or model._var_allprocs_abs2meta[abs_name]['distributed']
                 else:
                     dist = meta['distributed']
 
