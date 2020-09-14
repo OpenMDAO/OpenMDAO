@@ -2891,10 +2891,8 @@ class Group(System):
                     'upper': None,
                 }
 
-                var_rel2meta = auto_ivc._static_var_rel2meta
-                var_rel_names = auto_ivc._static_var_rel_names
-                var_rel2meta[name] = metadata
-                var_rel_names['output'].append(name)
+                auto_ivc._static_var_rel2meta[name] = metadata
+                auto_ivc._static_var_rel_names['output'].append(name)
                 auto_ivc._var_added(name)
 
                 if remote:
