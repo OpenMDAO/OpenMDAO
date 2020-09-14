@@ -35,6 +35,51 @@ _IND = 4  # HTML indentation (spaces)
 _MAX_ARRAY_SIZE_FOR_REPR_VAL = 1000  # If var has more elements than this do not pass to N2
 
 
+def _convert_nans_in_nested_list(val_as_list):
+    """
+    Given a list, possibly nested, replace any numpy.nan values with the string "nan".
+
+    This is done since JSON does not handle nan. This code is used to pass variable values
+    to the N2 diagram.
+
+    The modifications to the list values are done in-place to avoid excessive copying of lists.
+
+    Parameters
+    ----------
+    val_as_list : list, possibly nested
+        the list whose nan elements need to be converted
+    """
+    for i, val in enumerate(val_as_list):
+        if isinstance(val, list):
+            _convert_nans_in_nested_list(val)
+        else:
+            if np.isnan(val):
+                val_as_list[i] = "nan"
+            else:
+                val_as_list[i] = val
+
+
+def _convert_ndarray_to_support_nans_in_json(val):
+    """
+    Given numpy array of arbitrary dimensions, return the equivalent nested list with nan replaced.
+
+    numpy.nan values are replaced with the string "nan".
+
+    Parameters
+    ----------
+    val : ndarray
+        the numpy array to be converted
+
+    Returns
+    -------
+    object : list, possibly nested
+        The equivalent list with any nan values replaced with the string "nan".
+    """
+    val_as_list = val.tolist()
+    _convert_nans_in_nested_list(val_as_list)
+    return(val_as_list)
+
+
 def _get_var_dict(system, typ, name):
     if name in system._var_discrete[typ]:
         meta = system._var_discrete[typ][name]
@@ -77,7 +122,7 @@ def _get_var_dict(system, typ, name):
             var_dict['value'] = type(meta['value']).__name__
     else:
         if meta['value'].size < _MAX_ARRAY_SIZE_FOR_REPR_VAL:
-            var_dict['value'] = meta['value']
+            var_dict['value'] = _convert_ndarray_to_support_nans_in_json(meta['value'])
         else:
             var_dict['value'] = None
 
@@ -197,10 +242,13 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
         if k in ['linear_solver', 'nonlinear_solver']:
             options[k] = system.options[k].SOLVER
         else:
-            if system.options._dict[k]['value'] is _UNDEFINED:
-                options[k] = str(system.options._dict[k]['value'])
+            val = system.options._dict[k]['value']
+            if not system.options._dict[k]['recordable']:
+                options[k] = default_noraise(val)
+            elif val is _UNDEFINED:
+                options[k] = str(val)
             else:
-                options[k] = system.options._dict[k]['value']
+                options[k] = val
     tree_dict['options'] = options
 
     if not tree_dict['name']:
