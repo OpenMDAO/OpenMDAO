@@ -1364,7 +1364,6 @@ class System(object):
         """
         meta = self._var_allprocs_abs2meta
         loc_meta = self._var_abs2meta
-        myrank = self.comm.rank
 
         for io in ('input', 'output'):
             # now set global sizes and shapes into metadata for distributed variables
