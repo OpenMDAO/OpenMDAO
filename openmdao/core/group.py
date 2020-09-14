@@ -2870,7 +2870,33 @@ class Group(System):
                     units = all_abs2meta[tgt]['units']
                 if not remote and 'value' in gmeta:
                     val = gmeta['value']
-                auto_ivc.add_output(src.rsplit('.', 1)[-1], val=val, units=units)
+
+                # Add the output quickly.
+                # We don't need to ensure compatability or check for errors because we get the
+                # value straight from a source, and ivc metadata is minimal.
+                name = src.rsplit('.', 1)[-1]
+                metadata = {
+                    'value': val,
+                    'shape': (sz, ),
+                    'size': sz,
+                    'units': units,
+                    'res_units': None,
+                    'desc': '',
+                    'distributed': False,
+                    'tags': None,
+                    'ref': 1.0,
+                    'ref0': 0.0,
+                    'res_ref': 1.0,
+                    'lower': None,
+                    'upper': None,
+                }
+
+                var_rel2meta = auto_ivc._static_var_rel2meta
+                var_rel_names = auto_ivc._static_var_rel_names
+                var_rel2meta[name] = metadata
+                var_rel_names['output'].append(name)
+                auto_ivc._var_added(name)
+
                 if remote:
                     auto_ivc._add_remote(src)
 
