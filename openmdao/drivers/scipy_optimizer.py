@@ -132,6 +132,7 @@ class ScipyOptimizeDriver(Driver):
         self.supports['multiple_objectives'] = False
         self.supports['active_set'] = False
         self.supports['integer_design_vars'] = False
+        self.supports['distributed_design_vars'] = False
         self.supports._read_only = True
 
         # The user places optimizer-specific settings in here.
