@@ -1164,7 +1164,7 @@ class Component(System):
 
         return opts
 
-    def _declare_partials(self, of, wrt, dct):
+    def _declare_partials(self, of, wrt, dct, no_wildcard=False):
         """
         Store subjacobian metadata for later use.
 
@@ -1179,6 +1179,8 @@ class Component(System):
             May also contain glob patterns.
         dct : dict
             Metadata dict specifying shape, and/or approx properties.
+        no_wildcard : bool
+            When True, skip pattern matching, which isn't needed in certain cases.
         """
         val = dct['value'] if 'value' in dct else None
         is_scalar = isscalar(val)
@@ -1234,7 +1236,11 @@ class Component(System):
                 rows = None
                 cols = None
 
-        pattern_matches = self._find_partial_matches(of, wrt)
+        if no_wildcard:
+            pattern_matches = ([(of, [of])], [(wrt, [wrt])])
+        else:
+            pattern_matches = self._find_partial_matches(of, wrt)
+
         abs2meta = self._var_abs2meta
 
         is_array = isinstance(val, ndarray)
