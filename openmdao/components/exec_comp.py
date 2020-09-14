@@ -313,8 +313,6 @@ class ExecComp(ExplicitComponent):
             # if user supplied an initial value, use it, otherwise set to 1.0
             if var in init_vals:
                 val = init_vals[var]
-            elif 'shape_by_conn' or 'copy_shape' in meta:
-                init_vals[var] = val = None
             else:
                 init_vals[var] = val = 1.0
 

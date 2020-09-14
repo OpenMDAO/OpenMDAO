@@ -4450,25 +4450,6 @@ class System(object):
 
         return src_indices
 
-    def get_srcname(self, name):
-        """
-        If named variable is an input, return the name of its source variable, else its own name.
-
-        Parameters
-        ----------
-        name : str
-            The variable name.
-
-        Returns
-        -------
-        str
-            The name of the variable's source (if an input), else the variable's name.
-        """
-        conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
-        if name in conns:
-            return conns[name]
-        return name
-
     def _retrieve_data_of_kind(self, filtered_vars, kind, vec_name, parallel=False):
         """
         Retrieve variables, either local or remote, in the filtered_vars list.

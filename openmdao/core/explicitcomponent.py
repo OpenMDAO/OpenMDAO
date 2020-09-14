@@ -144,7 +144,7 @@ class ExplicitComponent(Component):
         if self._has_approx and self._use_derivatives:
             self._set_approx_partials_meta()
 
-    def add_output(self, name, val=None, shape=None, units=None, res_units=None, desc='',
+    def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, tags=None,
                    shape_by_conn=False, copy_shape=None):
         """

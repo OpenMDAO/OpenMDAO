@@ -1336,15 +1336,13 @@ class Group(System):
 
             # distrib to distrib or serial to serial
             if (from_dist and to_dist) or not (from_dist or to_dist):
+                # all copy_shapes (and some shape_by_conn) handled here
                 all_to_meta['shape'] = from_shape
                 all_to_meta['size'] = from_size
                 if to_meta:
                     to_meta['shape'] = from_shape
                     to_meta['size'] = from_size
-                    if from_meta:
-                        to_meta['value'] = from_meta['value'].copy()
-                    else:
-                        to_meta['value'] = np.ones(from_size)
+                    to_meta['value'] = np.full(from_shape, to_meta['value'])
                 if to_dist and from_dist:
                     distrib_sizes[to_var] = distrib_sizes[from_var]
                 # src_indices will be computed later for dist inputs that don't specify them
@@ -1368,7 +1366,7 @@ class Group(System):
                 if to_meta:
                     to_meta['size'] = size
                     to_meta['shape'] = (size,)
-                    to_meta['value'] = np.ones(size)
+                    to_meta['value'] = np.full(size, to_meta['value'])
             else:  # from_var is an input
                 if not from_dist and to_dist:   # known serial input to dist output
                     sizes, _ = self._evenly_distribute_sizes_to_locals(to_var, from_size)
@@ -1392,7 +1390,7 @@ class Group(System):
                 if to_meta:
                     to_meta['size'] = size
                     to_meta['shape'] = (size,)
-                    to_meta['value'] = np.ones(size)
+                    to_meta['value'] = np.full(size, to_meta['value'])
 
         all_abs2prom_in = self._var_allprocs_abs2prom['input']
         all_abs2prom_out = self._var_allprocs_abs2prom['output']

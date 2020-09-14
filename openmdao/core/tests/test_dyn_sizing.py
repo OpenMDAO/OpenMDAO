@@ -70,7 +70,6 @@ class TestAdder(unittest.TestCase):
 class B(om.ExplicitComponent):
 
     def setup(self):
-        # Inputs
         self.add_input('in', copy_shape='out')
         self.add_output('out', shape_by_conn=True)
 
@@ -81,7 +80,6 @@ class B(om.ExplicitComponent):
 class C(om.ExplicitComponent):
 
     def setup(self):
-        # Inputs
         self.add_input('in', shape=4)
         self.add_output('out', shape=9)
 
@@ -92,7 +90,6 @@ class C(om.ExplicitComponent):
 class D(om.ExplicitComponent):
 
     def setup(self):
-        # Inputs
         self.add_input('in', shape_by_conn=True)
         self.add_output('out', copy_shape='in')
 
@@ -103,12 +100,10 @@ class D(om.ExplicitComponent):
 class E(om.ExplicitComponent):
 
     def setup(self):
-        # Inputs
         self.add_input('in', shape_by_conn=True)
         self.add_output('out', copy_shape='in')
 
     def compute(self, inputs, outputs):
-        print(inputs['in'])
         outputs['out'] = inputs['in']
 
 
@@ -117,7 +112,6 @@ class B_distrib(om.ExplicitComponent):
         self.options['distributed'] = True
 
     def setup(self):
-        # Inputs
         self.add_input('in', copy_shape='out')
         self.add_output('out', shape_by_conn=True)
 
@@ -130,7 +124,6 @@ class C_distrib(om.ExplicitComponent):
         self.options['distributed'] = True
 
     def setup(self):
-        # Inputs
         if self.comm.rank == 0:
             self.add_input('in', shape=1, src_indices=np.arange(0,1, dtype=int))
         elif self.comm.rank == 1:
@@ -141,7 +134,7 @@ class C_distrib(om.ExplicitComponent):
         self.add_output('out', shape=3)
 
     def compute(self, inputs, outputs):
-        outputs['out'] *= self.comm.rank
+        outputs['out'] = np.sum(inputs['in']) * (self.comm.rank + 1)
 
 
 class D_distrib(om.ExplicitComponent):
@@ -149,7 +142,6 @@ class D_distrib(om.ExplicitComponent):
         self.options['distributed'] = True
 
     def setup(self):
-        # Inputs
         self.add_input('in', shape_by_conn=True)
         self.add_output('out', copy_shape='in')
 
@@ -324,7 +316,7 @@ class TestPassSizeDistributed(unittest.TestCase):
 
         # test the output from running model
         n = self.N_PROCS - 1
-        self.assertEqual(np.sum(prob.get_val('E.out')), (n**2 + n)/2 * size_down)
+        np.testing.assert_allclose(prob.get_val('E.out'), np.array([1., 1., 1., 4., 4., 4., 0., 0., 0.]))
 
 
 class ResizableComp(om.ExplicitComponent):

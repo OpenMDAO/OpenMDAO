@@ -162,6 +162,11 @@ class Component(System):
             if 'shape_by_conn' in meta and (meta['shape_by_conn'] or
                                             meta['copy_shape'] is not None):
                 meta['shape'] = None
+                if not np.isscalar(meta['value']):
+                    if meta['value'].size > 0:
+                        meta['value'] = meta['value'].flatten()[0]
+                    else:
+                        meta['value'] = 1.0
 
         self._var_rel2meta.update(self._static_var_rel2meta)
         for io in ['input', 'output']:
@@ -404,7 +409,7 @@ class Component(System):
                     # add sparsity info to existing partial info
                     self._subjacs_info[abs_key]['sparsity'] = tup
 
-    def add_input(self, name, val=None, shape=None, src_indices=None, flat_src_indices=None,
+    def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
                   units=None, desc='', tags=None, shape_by_conn=False, copy_shape=None):
         """
         Add an input variable to the component.
@@ -413,7 +418,7 @@ class Component(System):
         ----------
         name : str
             name of the variable in this component's namespace.
-        val : float or list or tuple or ndarray or Iterable or None
+        val : float or list or tuple or ndarray or Iterable
             The initial value of the variable being added in user-defined units.
             Default is 1.0.
         shape : int or tuple or list or None
@@ -453,8 +458,7 @@ class Component(System):
         if not _valid_var_name(name):
             raise NameError("%s: '%s' is not a valid input name." % (self.msginfo, name))
 
-        if val is not None and not isscalar(val) and not isinstance(val, (list, tuple,
-                                                                          ndarray, Iterable)):
+        if not isscalar(val) and not isinstance(val, (list, tuple, ndarray, Iterable)):
             raise TypeError('%s: The val argument should be a float, list, tuple, ndarray or '
                             'Iterable' % self.msginfo)
         if shape is not None and not isinstance(shape, (int, tuple, list, np.integer)):
@@ -475,9 +479,9 @@ class Component(System):
             raise TypeError('The tags argument should be a str or list')
 
         if (shape_by_conn or copy_shape):
-            if shape is not None or val is not None:
+            if shape is not None or not isscalar(val):
                 raise ValueError("%s: If shape is to be set dynamically using 'shape_by_conn' or "
-                                 "'copy_shape', 'shape' and 'val' should be None, "
+                                 "'copy_shape', 'shape' and 'val' should be a scalar, "
                                  "but shape of '%s' and val of '%s' was given for variable '%s'."
                                  % (self.msginfo, shape, val, name))
             if src_indices is not None:
@@ -487,9 +491,6 @@ class Component(System):
 
         src_slice = None
         if not (shape_by_conn or copy_shape):
-            if val is None:
-                val = 1.0
-
             if src_indices is not None:
                 if _is_slicer_op(src_indices):
                     src_slice = src_indices
@@ -592,7 +593,7 @@ class Component(System):
 
         return metadata
 
-    def add_output(self, name, val=None, shape=None, units=None, res_units=None, desc='',
+    def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, tags=None,
                    shape_by_conn=False, copy_shape=None):
         """
@@ -649,9 +650,9 @@ class Component(System):
             metadata for added variable
         """
         # First, type check all arguments
-        if (shape_by_conn or copy_shape) and (shape is not None or val is not None):
+        if (shape_by_conn or copy_shape) and (shape is not None or not isscalar(val)):
             raise ValueError("%s: If shape is to be set dynamically using 'shape_by_conn' or "
-                             "'copy_shape', 'shape' and 'val' should be None, "
+                             "'copy_shape', 'shape' and 'val' should be scalar, "
                              "but shape of '%s' and val of '%s' was given for variable '%s'."
                              % (self.msginfo, shape, val, name))
 
@@ -661,9 +662,6 @@ class Component(System):
             raise NameError("%s: '%s' is not a valid output name." % (self.msginfo, name))
 
         if not (copy_shape or shape_by_conn):
-            if val is None:
-                val = 1.0
-
             if not isscalar(val) and not isinstance(val, (list, tuple, ndarray, Iterable)):
                 msg = '%s: The val argument should be a float, list, tuple, ndarray or Iterable'
                 raise TypeError(msg % self.msginfo)
