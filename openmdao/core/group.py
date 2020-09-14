@@ -756,7 +756,7 @@ class Group(System):
                 raw = (
                     {'input': {}, 'output': {}},
                     {'input': {}, 'output': {}},
-                    allprocs_abs2meta,
+                    {'input': {}, 'output': {}},
                     False,
                     False,
                     {},
