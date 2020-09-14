@@ -89,10 +89,10 @@ class Component(System):
         super(Component, self).__init__(**kwargs)
 
         self._var_rel_names = {'input': [], 'output': []}
-        self._var_rel2meta = OrderedDict()
+        self._var_rel2meta = {}
 
         self._static_var_rel_names = {'input': [], 'output': []}
-        self._static_var_rel2meta = OrderedDict()
+        self._static_var_rel2meta = {}
 
         self._declared_partials = defaultdict(dict)
         self._declared_partial_checks = []
@@ -154,7 +154,7 @@ class Component(System):
 
         # Clear out old variable information so that we can call setup on the component.
         self._var_rel_names = {'input': [], 'output': []}
-        self._var_rel2meta = OrderedDict()
+        self._var_rel2meta = {}
 
         # reset shape if any dynamic shape parameters are set in case this is a resetup
         # NOTE: this is necessary because we allow variables to be added in __init__.
@@ -474,11 +474,16 @@ class Component(System):
         if tags is not None and not isinstance(tags, (str, list)):
             raise TypeError('The tags argument should be a str or list')
 
-        if (shape_by_conn or copy_shape) and (shape is not None or val is not None):
-            raise ValueError("%s: If shape is to be set dynamically using 'shape_by_conn' or "
-                             "'copy_shape', 'shape' and 'val' should be None, "
-                             "but shape of '%s' and val of '%s' was given for variable '%s'."
-                             % (self.msginfo, shape, val, name))
+        if (shape_by_conn or copy_shape):
+            if shape is not None or val is not None:
+                raise ValueError("%s: If shape is to be set dynamically using 'shape_by_conn' or "
+                                 "'copy_shape', 'shape' and 'val' should be None, "
+                                 "but shape of '%s' and val of '%s' was given for variable '%s'."
+                                 % (self.msginfo, shape, val, name))
+            if src_indices is not None:
+                raise ValueError("%s: Setting of 'src_indices' along with 'shape_by_conn' or "
+                                 "'copy_shape' for variable '%s' is currently unsupported." %
+                                 (self.msginfo, name))
 
         src_slice = None
         if not (shape_by_conn or copy_shape):

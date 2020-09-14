@@ -37,6 +37,8 @@ import re
 namecheck_rgx = re.compile('[a-zA-Z][_a-zA-Z0-9]*')
 
 
+# use a class with slots instead of a namedtuple so that we can
+# change index after creation if needed.
 class _SysInfo(object):
 
     __slots__ = ['system', 'index']
@@ -98,6 +100,10 @@ class Group(System):
         Flag indicating whether connection errors are raised as an Exception.
     _order_set : bool
         Flag to check if set_order has been called.
+    _shapes_graph : nx.OrderedGraph
+        Dynamic shape dependency graph, or None.
+    _shape_knowns : set
+        Set of shape dependency graph nodes with known (non-dynamic) shapes.
     """
 
     def __init__(self, **kwargs):
@@ -131,6 +137,8 @@ class Group(System):
         self._contains_parallel_group = False
         self._raise_connection_errors = True
         self._order_set = False
+        self._shapes_graph = None
+        self._shape_knowns = None
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -688,7 +696,7 @@ class Group(System):
         abs2meta = self._var_abs2meta
         abs2prom = self._var_abs2prom
 
-        allprocs_abs2meta = {'input': OrderedDict(), 'output': OrderedDict()}
+        allprocs_abs2meta = {'input': {}, 'output': {}}
 
         allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
 
@@ -1119,6 +1127,7 @@ class Group(System):
 
         src_ind_inputs = set()
         abs2meta = self._var_abs2meta['input']
+        allprocs_abs2meta = self._var_allprocs_abs2meta['input']
 
         # Add explicit connections (only ones declared by this group)
         for prom_in, (prom_out, src_indices, flat_src_indices) in \
@@ -1184,6 +1193,12 @@ class Group(System):
                         continue
 
                 if src_indices is not None:
+                    a2m = allprocs_abs2meta[abs_in]
+                    if (a2m['shape_by_conn'] or a2m['copy_shape']):
+                        raise ValueError(f"{self.msginfo}: Setting of 'src_indices' along with "
+                                         f"'shape_by_conn' or 'copy_shape' for variable '{abs_in}' "
+                                         "is currently unsupported.")
+
                     if abs_in in abs2meta:
                         meta = abs2meta[abs_in]
                         if meta['src_indices'] is not None:
@@ -1263,7 +1278,6 @@ class Group(System):
                 all_src_ind_ins.update(src_ind_ins)
             src_ind_inputs = all_src_ind_ins
 
-        allprocs_abs2meta = self._var_allprocs_abs2meta['input']
         for inp in src_ind_inputs:
             allprocs_abs2meta[inp]['has_src_indices'] = True
 
@@ -1401,7 +1415,7 @@ class Group(System):
         my_abs2meta_in = self._var_abs2meta['input']
 
         # find all variables that have an unknown shape (across all procs) and connect them
-        # to other unknow and known shape variables to form a graph.
+        # to other unknown and known shape variables to form an undirected graph.
         for io in ('input', 'output'):
             for name, meta in self._var_allprocs_abs2meta[io].items():
                 if meta['shape_by_conn']:
@@ -1459,6 +1473,7 @@ class Group(System):
             distrib_sizes = {}
 
         unresolved = set()
+        seen = knowns.copy()
 
         for comps in nx.connected_components(graph):
             comp_knowns = knowns.intersection(comps)
@@ -1477,7 +1492,7 @@ class Group(System):
                 known_shape = known_a2m[known]['shape']
                 known_dist = known_a2m[known]['distributed']
                 for node in graph.neighbors(known):
-                    if node in knowns:
+                    if node in seen:
                         a2m = all_abs2meta_in if node in all_abs2meta_in else all_abs2meta_out
                         # check to see if shapes agree
                         if a2m[node]['shape'] != known_shape:
@@ -1492,14 +1507,18 @@ class Group(System):
                     else:
                         # transfer the known shape info to the unshaped variable
                         copy_var_meta(known, node, distrib_sizes)
-                        # adding to knowns here won't affect the intersection above since this
-                        # node can't exist in a different connected component anyway
-                        knowns.add(node)
+                        seen.add(node)
                         stack.append(node)
+
+        # save graph info for possible later plotting
+        self._shapes_graph = graph
+        self._shape_knowns = knowns
 
         if unresolved:
             unresolved = sorted(unresolved)
-            raise RuntimeError(f"{self.msginfo}: Failed to resolve shapes for {unresolved}.")
+            conditional_error(f"{self.msginfo}: Failed to resolve shapes for {unresolved}. "
+                              "To see the dynamic shape dependency graph, "
+                              "do 'openmdao view_dyn_shapes <your_py_file>'.")
 
     @check_mpi_exceptions
     def _setup_connections(self):
@@ -2224,7 +2243,7 @@ class Group(System):
             raise ValueError("%s: Duplicate name(s) found in subsystem order list: %s" %
                              (self.msginfo, sorted(dupes)))
 
-        subsystems = OrderedDict()  # need a fresh one to keep the right order
+        subsystems = {}  # need a fresh one to keep the right order
         if self._static_mode:
             self._static_subsystems_allprocs = subsystems
         else:
@@ -3076,12 +3095,12 @@ class Group(System):
         self._var_allprocs_discrete[io].update(auto_ivc._var_allprocs_discrete[io])
 
         old = self._var_abs2meta[io]
-        self._var_abs2meta[io] = OrderedDict()
+        self._var_abs2meta[io] = {}
         self._var_abs2meta[io].update(auto_ivc._var_abs2meta[io])
         self._var_abs2meta[io].update(old)
 
         old = self._var_allprocs_abs2meta[io]
-        self._var_allprocs_abs2meta[io] = OrderedDict()
+        self._var_allprocs_abs2meta[io] = {}
         self._var_allprocs_abs2meta[io].update(auto_ivc._var_allprocs_abs2meta[io])
         self._var_allprocs_abs2meta[io].update(old)
 

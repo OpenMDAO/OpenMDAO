@@ -368,7 +368,7 @@ class System(object):
 
         self._solver_print_cache = []
 
-        self._subsystems_allprocs = OrderedDict()
+        self._subsystems_allprocs = {}
         self._subsystems_myproc = []
         self._vars_to_gather = {}
         self._dist_var_locality = {}
@@ -379,10 +379,10 @@ class System(object):
         self._var_allprocs_prom2abs_list = None
         self._var_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2prom = {'input': {}, 'output': {}}
-        self._var_allprocs_abs2meta = {'input': OrderedDict(), 'output': OrderedDict()}
-        self._var_abs2meta = {'input': OrderedDict(), 'output': OrderedDict()}
-        self._var_discrete = {'input': OrderedDict(), 'output': OrderedDict()}
-        self._var_allprocs_discrete = {'input': OrderedDict(), 'output': OrderedDict()}
+        self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
+        self._var_abs2meta = {'input': {}, 'output': {}}
+        self._var_discrete = {'input': {}, 'output': {}}
+        self._var_allprocs_discrete = {'input': {}, 'output': {}}
 
         self._var_allprocs_abs2idx = {}
 
@@ -424,7 +424,7 @@ class System(object):
 
         self._conn_global_abs_in2out = {}
 
-        self._static_subsystems_allprocs = OrderedDict()
+        self._static_subsystems_allprocs = {}
         self._static_design_vars = OrderedDict()
         self._static_responses = OrderedDict()
 
@@ -477,6 +477,9 @@ class System(object):
         if self.name:
             return '{} ({})'.format(type(self).__name__, self.name)
         return type(self).__name__
+
+    def _get_inst_id(self):
+        return self.pathname
 
     def _abs_name_iter(self, iotype, local=True, cont=True, discrete=False):
         if cont:
@@ -1303,8 +1306,8 @@ class System(object):
         self._var_allprocs_prom2abs_list = {'input': OrderedDict(), 'output': OrderedDict()}
         self._var_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2prom = {'input': {}, 'output': {}}
-        self._var_allprocs_abs2meta = {'input': OrderedDict(), 'output': OrderedDict()}
-        self._var_abs2meta = {'input': OrderedDict(), 'output': OrderedDict()}
+        self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
+        self._var_abs2meta = {'input': {}, 'output': {}}
         self._var_allprocs_abs2idx = {}
         self._owning_rank = defaultdict(int)
         self._var_sizes = {}
@@ -4697,7 +4700,7 @@ class System(object):
                 # key is either bogus or a key into the local metadata dict
                 # (like 'value' or 'src_indices'). If MPI is active, this val may be remote
                 # on some procs
-                if self.comm.size > 1 and abs_name in self._vars_to_gathers:
+                if self.comm.size > 1 and abs_name in self._vars_to_gather:
                     # TODO: fix this
                     # cause a failure in all procs to avoid a hang
                     raise RuntimeError(f"{self.msgifo}: No support yet for retrieving local "
