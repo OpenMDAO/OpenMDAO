@@ -41,8 +41,8 @@ def _view_dyn_shapes_cmd(options, user_args):
     user_args : list of str
         Args to be passed to the user script.
     """
-    def _view_shape_graph(prob):
-        view_dyn_shapes(prob, outfile=options.outfile, show=not options.no_display,
+    def _view_shape_graph(model):
+        view_dyn_shapes(model, outfile=options.outfile, show=not options.no_display,
                         title=options.title)
         exit()
 
@@ -126,7 +126,12 @@ def view_dyn_shapes(root, outfile='shape_dep_graph.png', show=True, title=None):
     # label variables with known shape at the start of the algorithm in green, unknowns in red.
     node_colors = ['green' if n in knowns else 'red' for n in graph]
     # prepend the shape onto the variable name
-    node_labels = {n: f"{abs2meta[n]['shape']}: {n[common_idx:]}" for n in graph}
+    node_labels = {}
+    for n in graph:
+        shape = abs2meta[n]['shape']
+        if shape is None:
+            shape = '?'
+        node_labels[n] = f"{shape}: {n[common_idx:]}"
 
     nx.draw_networkx(graph, with_labels=True, node_color=node_colors, labels=node_labels)
     plt.axis('off')  # turn of axis
