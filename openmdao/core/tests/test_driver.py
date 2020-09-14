@@ -821,8 +821,6 @@ class TestDriverMPI(unittest.TestCase):
                 self.supports['distributed_design_vars'] = False
                 self.supports._read_only = True
 
-        doe_parallel = 2
-
         prob = om.Problem()
         model = prob.model
 
