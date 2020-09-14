@@ -188,7 +188,8 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
                     self._input_sizes[fi] += input_size
 
     def add_output(self, name, val=1.0, surrogate=None, shape=None, units=None, res_units=None,
-                   desc='', lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0):
+                   desc='', lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, tags=None,
+                   shape_by_conn=False, copy_shape=None):
         """
         Add an output variable to the component.
 
@@ -230,13 +231,23 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
         res_ref : float
             Scaling parameter. The value in the user-defined res_units of this output's residual
             when the scaled value is 1. Default is 1.
+        tags : str or list of strs or set of strs
+            User defined tags that can be used to filter what gets listed when calling
+            list_inputs and list_outputs.
+        shape_by_conn : bool
+            If True, shape this output to match its connected input(s).
+        copy_shape : str or None
+            If a str, that str is the name of a variable. Shape this output to match that of
+            the named variable.
         """
         super(MultiFiMetaModelUnStructuredComp, self).add_output(name, val, shape=shape,
                                                                  units=units, res_units=res_units,
                                                                  desc=desc, lower=lower,
                                                                  upper=upper, ref=ref,
                                                                  ref0=ref0, res_ref=res_ref,
-                                                                 surrogate=surrogate)
+                                                                 surrogate=surrogate, tags=tags,
+                                                                 shape_by_conn=shape_by_conn,
+                                                                 copy_shape=copy_shape)
         self._training_output[name] = self._nfi * [np.empty(0)]
 
         # Add train:<outvar>_fi<n>

@@ -890,6 +890,8 @@ class MetaModelTestCase(unittest.TestCase):
                 surrogate = SinSurrogate()
                 self.add_input('x', 0.)
                 self.add_output('sin_x', 0., surrogate=surrogate)
+
+            def setup_partials(self):
                 self.declare_partials('sin_x', 'x', method='fd',
                                       form='backward', step=1e-7, step_calc='rel')
 

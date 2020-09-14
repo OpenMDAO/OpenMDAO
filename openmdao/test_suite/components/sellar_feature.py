@@ -33,6 +33,7 @@ class SellarDis1(om.ExplicitComponent):
         # Coupling output
         self.add_output('y1', val=1.0)
 
+    def setup_partials(self):
         # Finite difference all partials.
         self.declare_partials('*', '*', method='fd')
 
@@ -64,6 +65,7 @@ class SellarDis2(om.ExplicitComponent):
         # Coupling output
         self.add_output('y2', val=1.0)
 
+    def setup_partials(self):
         # Finite difference all partials.
         self.declare_partials('*', '*', method='fd')
 
@@ -136,6 +138,7 @@ class SellarMDAWithUnits(om.Group):
             # Coupling output
             self.add_output('y1', val=1.0, units='degC')
 
+        def setup_partials(self):
             # Finite difference all partials.
             self.declare_partials('*', '*', method='fd')
 
@@ -167,6 +170,7 @@ class SellarMDAWithUnits(om.Group):
             # Coupling output
             self.add_output('y2', val=1.0, units='degC')
 
+        def setup_partials(self):
             # Finite difference all partials.
             self.declare_partials('*', '*', method='fd')
 
@@ -264,6 +268,7 @@ class SellarDis1CS(om.ExplicitComponent):
         # Coupling output
         self.add_output('y1', val=1.0)
 
+    def setup_partials(self):
         # Finite difference all partials.
         self.declare_partials('*', '*', method='cs')
 
@@ -296,6 +301,7 @@ class SellarDis2CS(om.ExplicitComponent):
         # Coupling output
         self.add_output('y2', val=1.0)
 
+    def setup_partials(self):
         # Finite difference all partials.
         self.declare_partials('*', '*', method='cs')
 

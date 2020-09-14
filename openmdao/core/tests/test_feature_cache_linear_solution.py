@@ -41,6 +41,7 @@ class CacheLinearTestCase(unittest.TestCase):
                 self.add_input('c', val=1.)
                 self.add_output('states', val=[0,0])
 
+            def setup_partials(self):
                 self.declare_partials(of='*', wrt='*')
 
             def apply_nonlinear(self, inputs, outputs, residuals):

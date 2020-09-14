@@ -49,8 +49,6 @@ class LinearSystemComp(ImplicitComponent):
         vec_size = self.options['vec_size']
         vec_size_A = self.vec_size_A = vec_size if self.options['vectorize_A'] else 1
         size = self.options['size']
-        mat_size = size * size
-        full_size = size * vec_size
 
         self._lup = []
         shape = (vec_size, size) if vec_size > 1 else (size, )
@@ -64,7 +62,16 @@ class LinearSystemComp(ImplicitComponent):
         self.add_input("b", val=np.ones(shape))
         self.add_output("x", shape=shape, val=.1)
 
-        # Set up the derivatives.
+    def setup_partials(self):
+        """
+        Set up the derivatives.
+        """
+        vec_size = self.options['vec_size']
+        vec_size_A = self.vec_size_A = vec_size if self.options['vectorize_A'] else 1
+        size = self.options['size']
+        mat_size = size * size
+        full_size = size * vec_size
+
         row_col = np.arange(full_size, dtype="int")
 
         self.declare_partials('x', 'b', val=np.full(full_size, -1.0), rows=row_col, cols=row_col)

@@ -175,11 +175,11 @@ class LGLFit(om.ExplicitComponent):
         self.add_output('y_mid', val=np.zeros(n-1), desc='interpolated values at midpoint nodes')
         self.add_output('yp_lgl', val=np.zeros(n), desc='approximated derivative at LGL nodes')
 
+    def setup_partials(self):
         self.declare_partials(of='y_mid', wrt='y_lgl', val=self.L_mid)
         self.declare_partials(of='yp_lgl', wrt='y_lgl', val=self.D_lgl/np.pi)
 
     def compute(self, inputs, outputs):
-
         outputs['y_mid'] = np.dot(self.L_mid, inputs['y_lgl'])
         outputs['yp_lgl'] = np.dot(self.D_lgl, inputs['y_lgl'])/np.pi
 
@@ -196,7 +196,8 @@ class DefectComp(om.ExplicitComponent):
         self.add_input('y_approx', val=np.zeros(n-1), desc='interpolated values at midpoint nodes')
         self.add_output('defect', val=np.zeros(n-1), desc='error values at midpoint nodes')
 
-        arange = np.arange(n-1)
+    def setup_partials(self):
+        arange = np.arange(self.options['num_nodes'] - 1)
         self.declare_partials(of='defect', wrt='y_truth', rows=arange, cols=arange, val=1.0)
         self.declare_partials(of='defect', wrt='y_approx', rows=arange, cols=arange, val=-1.0)
 
@@ -215,7 +216,8 @@ class ArcLengthFunction(om.ExplicitComponent):
         self.add_input('yp_lgl', val=np.zeros(n), desc='approximated derivative at LGL nodes')
         self.add_output('f_arclength', val=np.zeros(n), desc='The integrand of the arclength function')
 
-        arange = np.arange(n)
+    def setup_partials(self):
+        arange = np.arange(self.options['num_nodes'])
         self.declare_partials(of='f_arclength', wrt='yp_lgl', rows=arange, cols=arange, val=1.0)
 
     def compute(self, inputs, outputs):
@@ -246,6 +248,7 @@ class ArcLengthQuadrature(om.ExplicitComponent):
         self._mask[-1] = 2 # / (n * (n - 1))
         #self._mask = self._mask * np.pi
 
+    def setup_partials(self):
         da_df = np.atleast_2d(self.w_lgl*np.pi*self._mask)
 
         self.declare_partials(of='arclength', wrt='f_arclength', dependent=True, val=da_df)

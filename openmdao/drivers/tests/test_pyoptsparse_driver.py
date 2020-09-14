@@ -1248,6 +1248,7 @@ class TestPyoptSparse(unittest.TestCase):
                 self.add_input('y2', val=0.0)
                 self.add_output('y1', val=0.0)
 
+            def setup_partials(self):
                 self.declare_partials(of='*', wrt='*')
 
             def compute(self, inputs, outputs):
@@ -1271,6 +1272,7 @@ class TestPyoptSparse(unittest.TestCase):
                 self.add_input('y1', val=0.0)
                 self.add_output('y2', val=0.0)
 
+            def setup_partials(self):
                 self.declare_partials(of='*', wrt='*')
 
             def compute(self, inputs, outputs):
@@ -2315,12 +2317,12 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
                 self.add_input('x', val=0.)
                 self.add_input('y2', val=1.0)
                 self.add_output('y1', val=1.0)
-
-                self.declare_partials('*', '*')
-
                 self.fail_deriv = [2, 4]
                 self.count_iter = 0
                 self.failed = 0
+
+            def setup_partials(self):
+                self.declare_partials('*', '*')
 
             def compute(self, inputs, outputs):
 
@@ -2348,6 +2350,7 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
                 self.add_input('y1', val=1.0)
                 self.add_output('y2', val=1.0)
 
+            def setup_partials(self):
                 self.declare_partials('*', '*')
 
             def compute(self, inputs, outputs):

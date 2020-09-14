@@ -26,6 +26,7 @@ class Comp4LinearCacheTest(om.ImplicitComponent):
         self.add_input('x', val=1.0)
         self.add_output('y', val=np.sqrt(3))
 
+    def setup_partials(self):
         self.declare_partials(of='*', wrt='*')
 
     def apply_nonlinear(self, inputs, outputs, residuals):
