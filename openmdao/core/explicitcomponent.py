@@ -115,8 +115,9 @@ class ExplicitComponent(Component):
         # call the super version of setup_partials. This is still in the final setup.
         for out_abs in self._var_abs_names['output']:
             meta = abs2meta[out_abs]
+            size = meta['size']
             out_name = abs2prom_out[out_abs]
-            arange = np.arange(meta['size'])
+            arange = np.arange(size)
 
             # No need to FD outputs wrt other outputs
             abs_key = (out_abs, out_abs)
@@ -124,16 +125,17 @@ class ExplicitComponent(Component):
                 if 'method' in self._subjacs_info[abs_key]:
                     del self._subjacs_info[abs_key]['method']
 
-            dct = {
-                'rows': arange,
-                'cols': arange,
-                'value': np.full(meta['size'], -1.),
-                'dependent': True,
-            }
-
             # ExplicitComponent jacobians have -1 on the diagonal.
-            if arange.size > 0:
-                self._declare_partials(out_name, out_name, dct, no_wildcard=True)
+            if size > 0:
+
+                dct = {
+                    'rows': arange,
+                    'cols': arange,
+                    'value': np.full(size, -1.),
+                    'dependent': True,
+                }
+
+                self._declare_partials(out_name, out_name, dct, quick_declare=True)
 
     def _setup_jacobians(self, recurse=True):
         """

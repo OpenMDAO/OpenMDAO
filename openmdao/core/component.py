@@ -1164,7 +1164,7 @@ class Component(System):
 
         return opts
 
-    def _declare_partials(self, of, wrt, dct, no_wildcard=False):
+    def _declare_partials(self, of, wrt, dct, quick_declare=False):
         """
         Store subjacobian metadata for later use.
 
@@ -1179,9 +1179,23 @@ class Component(System):
             May also contain glob patterns.
         dct : dict
             Metadata dict specifying shape, and/or approx properties.
-        no_wildcard : bool
-            When True, skip pattern matching, which isn't needed in certain cases.
+        quick_declare : bool
+            This is set to True when declaring the jacobian diagonal terms for explicit
+            components. The checks and conversions are all skipped to improve performance for
+            cases with large numbers of explicit components or indepvarcomps.
         """
+        if quick_declare:
+            abs_key = rel_key2abs_key(self, (of, wrt))
+
+            meta = {}
+            meta['rows'] = np.array(dct['rows'], dtype=INT_DTYPE, copy=False)
+            meta['cols'] = np.array(dct['cols'], dtype=INT_DTYPE, copy=False)
+            meta['shape'] = (len(dct['rows']), len(dct['cols']))
+            meta['value'] = dct['value']
+
+            self._subjacs_info[abs_key] = meta
+            return
+
         val = dct['value'] if 'value' in dct else None
         is_scalar = isscalar(val)
         dependent = dct['dependent']
@@ -1236,10 +1250,7 @@ class Component(System):
                 rows = None
                 cols = None
 
-        if no_wildcard:
-            pattern_matches = ([(of, [of])], [(wrt, [wrt])])
-        else:
-            pattern_matches = self._find_partial_matches(of, wrt)
+        pattern_matches = self._find_partial_matches(of, wrt)
 
         abs2meta = self._var_abs2meta
 
