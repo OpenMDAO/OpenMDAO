@@ -785,15 +785,12 @@ class Group(System):
 
                 for io in ['input', 'output']:
                     allprocs_abs2meta[io].update(proc_abs2meta[io])
-                    # collect size info
                     for n, m in proc_abs2meta[io].items():
                         if m['distributed']:
                             self._has_distrib_vars = True
 
-                    # Assemble in parallel allprocs_abs_names
                     allprocs_discrete[io].update(proc_discrete[io])
 
-                    # Assemble in parallel allprocs_prom2abs_list
                     for prom_name, abs_names_list in proc_prom2abs_list[io].items():
                         if prom_name not in allprocs_prom2abs_list[io]:
                             allprocs_prom2abs_list[io][prom_name] = []
@@ -1314,6 +1311,9 @@ class Group(System):
         """
         Add shape/size metadata for variables that were created with shape_by_conn or copy_shape.
         """
+        self._shapes_graph = graph = nx.OrderedGraph()  # ordered graph for consistency across procs
+        self._shape_knowns = knowns = set()
+
         def copy_var_meta(from_var, to_var, distrib_sizes):
             # copy size/shape info from from_var's metadata to to_var's metadata
 
@@ -1399,6 +1399,7 @@ class Group(System):
         rev_conn = None
 
         def get_rev_conn():
+            # build reverse connection dict (src: tgts)
             rev = defaultdict(list)
             for tgt, src in conn.items():
                 rev[src].append(tgt)

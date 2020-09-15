@@ -4,6 +4,7 @@ import unittest
 import os
 import json
 import re
+import types
 import base64
 import zlib
 
@@ -459,6 +460,37 @@ class TestViewModelData(unittest.TestCase):
                         (self.conn_html_filename + " is not a valid file."))
         self.assertTrue('OpenMDAO Model Hierarchy and N2 diagram: Bad Connection'
                         in open(self.conn_html_filename).read())
+
+
+class TestN2UnderMPI(unittest.TestCase):
+    N_PROCS = 2
+
+    def test_non_recordable(self):
+        dummyModule = types.ModuleType('dummyModule', 'The dummyModule module')
+
+        class myComp(ExplicitComponent):
+            def initialize(self):
+                self.options['distributed'] = True
+                self.options.declare('foo', recordable=False)
+
+            def setup(self):
+                self.add_input('x2')
+                self.add_output('x3')
+
+            def compute(self, inputs, outputs):
+                outputs['x3'] = inputs['x2'] + 1
+
+        p = Problem()
+        ivc = p.model.add_subsystem('ivc', IndepVarComp())
+        ivc.add_output('x1')
+        p.model.add_subsystem('myComp', myComp(foo=dummyModule))
+
+        p.model.connect('ivc.x1', 'myComp.x2')
+        p.setup()
+
+        # Test for bug where assembling the options metadata under MPI caused a lockup when
+        # they were gathered.
+        n2(p, show_browser=False)
 
 
 if __name__ == "__main__":

@@ -176,6 +176,7 @@ class Driver(object):
         self.supports.declare('active_set', types=bool, default=False)
         self.supports.declare('simultaneous_derivatives', types=bool, default=False)
         self.supports.declare('total_jac_sparsity', types=bool, default=False)
+        self.supports.declare('distributed_design_vars', types=bool, default=False)
 
         self.iter_count = 0
         self.cite = ""
@@ -287,6 +288,32 @@ class Driver(object):
         src_cons = prom2ivc_src_dict(self._cons)
         src_objs = prom2ivc_src_dict(self._objs)
         responses = prom2ivc_src_dict(self._responses)
+
+        # Only allow distributed design variables on drivers that support it.
+        if self.supports['distributed_design_vars'] is False:
+            dist_vars = []
+            abs2meta_in = model._var_allprocs_abs2meta['input']
+            discrete_in = model._var_allprocs_discrete['input']
+            for dv, meta in self._designvars.items():
+
+                # For Auto-ivcs, we need to check the distributed metadata on the target instead.
+                if meta['ivc_source'].startswith('_auto_ivc.'):
+                    for abs_name in model._var_allprocs_prom2abs_list['input'][dv]:
+                        if abs_name in discrete_in:
+                            # Discrete vars aren't distributed.
+                            break
+
+                        if abs2meta_in[abs_name]['distributed']:
+                            dist_vars.append(dv)
+                            break
+                elif meta['distributed']:
+                    dist_vars.append(dv)
+
+            if dist_vars:
+                dstr = ', '.join(dist_vars)
+                msg = "Distributed design variables are not supported by this driver, but the "
+                msg += f"following variables are distributed: [{dstr}]"
+                raise RuntimeError(msg)
 
         # Now determine if later we'll need to allgather cons, objs, or desvars.
         if model.comm.size > 1 and model._subsystems_allprocs:
