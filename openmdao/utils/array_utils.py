@@ -29,8 +29,7 @@ def evenly_distrib_idxs(num_divisions, arr_size):
         a tuple of (sizes, offsets), where sizes and offsets contain values for all
         divisions.
     """
-    base = arr_size // num_divisions
-    leftover = arr_size % num_divisions
+    base, leftover = divmod(arr_size, num_divisions)
     sizes = np.full(num_divisions, base, dtype=int)
 
     # evenly distribute the remainder across size-leftover procs,

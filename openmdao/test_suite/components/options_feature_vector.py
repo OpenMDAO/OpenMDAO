@@ -17,6 +17,9 @@ class VectorDoublingComp(om.ExplicitComponent):
 
         self.add_input('x', shape=size)
         self.add_output('y', shape=size)
+
+    def setup_partials(self):
+        size = self.options['size']
         self.declare_partials('y', 'x', val=2.,
                               rows=np.arange(size),
                               cols=np.arange(size))

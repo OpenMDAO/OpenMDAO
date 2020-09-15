@@ -451,7 +451,7 @@ class MPITests(unittest.TestCase):
         model.add_subsystem("Cdist2", DistribInputDistribOutputComp(arr_size=size))
         model.connect('indep.x', 'Cdist.invec')
         model.connect('Cdist.outvec', 'Cdist2.invec')
-        #import wingdbstub
+
         p.setup()
         p.run_model()
         msg = "Group (<model>): Can't retrieve distributed variable 'Cdist2.invec' because its src_indices reference entries from other processes. You can retrieve values from all processes using `get_val(<name>, get_remote=True)`."
@@ -839,7 +839,7 @@ class MPITests(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             prob.setup()
 
-        msg = ' Distributed component input "C.invec" requires an IndepVarComp.'
+        msg = 'Distributed component input "C.invec" requires an IndepVarComp.'
 
         err_msg = str(context.exception).split(':')[-1]
         self.assertEqual(err_msg, msg)

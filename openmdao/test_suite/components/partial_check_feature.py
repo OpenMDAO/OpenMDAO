@@ -10,6 +10,7 @@ class BrokenDerivComp(om.ExplicitComponent):
 
         self.add_output('y', 5.5)
 
+    def setup_partials(self):
         self.declare_partials(of='*', wrt='*')
 
     def compute(self, inputs, outputs):

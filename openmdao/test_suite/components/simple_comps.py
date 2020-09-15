@@ -18,8 +18,6 @@ class DoubleArrayComp(om.ExplicitComponent):
                             [-1.0, 0.0, 8.0, 1.0],
                             [1.0, 4.0, -5.0, 6.0]])
 
-        self.declare_partials('*', '*')
-
     def setup(self):
         # Params
         self.add_input('x1', np.zeros([2]))
@@ -29,6 +27,7 @@ class DoubleArrayComp(om.ExplicitComponent):
         self.add_output('y1', np.zeros([2]))
         self.add_output('y2', np.zeros([2]))
 
+    def setup_partials(self):
         # Derivs
         self.declare_partials(of='*', wrt='*')
 
@@ -64,8 +63,6 @@ class NonSquareArrayComp(om.ExplicitComponent):
                             [-1.0, 0.0, 8.0, 1.0],
                             [1.0, 4.0, -5.0, 6.0]])
 
-        self.declare_partials('*', '*')
-
     def setup(self):
         # Params
         self.add_input('x1', np.zeros([2]))
@@ -75,6 +72,7 @@ class NonSquareArrayComp(om.ExplicitComponent):
         self.add_output('y1', np.zeros([3]))
         self.add_output('y2', np.zeros([1]))
 
+    def setup_partials(self):
         # Derivs
         self.declare_partials(of='*', wrt='*')
 

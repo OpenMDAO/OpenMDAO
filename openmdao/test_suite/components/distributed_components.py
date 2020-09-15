@@ -84,10 +84,11 @@ class DistribCompDerivs(om.ExplicitComponent):
         self.add_input('invec', np.ones(mysize, float))
         self.add_output('outvec', np.ones(mysize, float))
 
+    def setup_partials(self):
         # declare partial derivatives (diagonal of mysize)
-        self.declare_partials('outvec', 'invec', 
-                              rows=np.arange(0, mysize),
-                              cols=np.arange(0, mysize))
+        self.declare_partials('outvec', 'invec',
+                              rows=np.arange(0, self.mysize),
+                              cols=np.arange(0, self.mysize))
 
     def compute(self, inputs, outputs):
         if self.comm.rank == 0:
@@ -117,6 +118,7 @@ class SummerDerivs(om.ExplicitComponent):
 
         self.add_output('sum', 0.0, shape=1)
 
+    def setup_partials(self):
         # the derivative is constant
         self.declare_partials('sum', 'invec', val=1.)
 

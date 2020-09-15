@@ -79,6 +79,7 @@ class TestAssertUtils(unittest.TestCase):
         prob.model = SellarNoDerivativesCS()
 
         prob.setup()
+        prob.final_setup()
 
         try:
             assert_no_approx_partials(prob.model, include_self=True, recurse=True)

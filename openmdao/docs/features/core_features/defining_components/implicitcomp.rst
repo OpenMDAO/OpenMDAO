@@ -36,6 +36,14 @@ The implementation of each method will be illustrated using a simple implicit co
   .. embed-code::
       openmdao.core.tests.test_impl_comp.QuadraticComp.setup
 
+- :code:`setup_partials()`:
+
+  Declare partial derivatives that this component provides. Here we use the wild card to say that
+  this component provides derivatives of all implicit residuals with respect to all inputs and outputs.
+
+  .. embed-code::
+      openmdao.core.tests.test_impl_comp.QuadraticComp.setup_partials
+
 - :code:`apply_nonlinear(inputs, outputs, residuals)` :
 
   Compute the :code:`residuals`, given the :code:`inputs` and :code:`outputs`.

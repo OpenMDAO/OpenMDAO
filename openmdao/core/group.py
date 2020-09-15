@@ -29,6 +29,7 @@ from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismat
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 from openmdao.utils.coloring import Coloring, _STD_COLORING_FNAME
 import openmdao.utils.coloring as coloring_mod
+from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.core.constants import _SetupStatus
 
 # regex to check for valid names.
@@ -88,6 +89,10 @@ class Group(System):
         Flag indicating whether connection errors are raised as an Exception.
     _order_set : bool
         Flag to check if set_order has been called.
+    _shapes_graph : nx.OrderedGraph
+        Dynamic shape dependency graph, or None.
+    _shape_knowns : set
+        Set of shape dependency graph nodes with known (non-dynamic) shapes.
     """
 
     def __init__(self, **kwargs):
@@ -122,6 +127,8 @@ class Group(System):
         self._contains_parallel_group = False
         self._raise_connection_errors = True
         self._order_set = False
+        self._shapes_graph = None
+        self._shape_knowns = None
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -536,55 +543,52 @@ class Group(System):
         else:
             return self._list_states()
 
-    def _get_all_promotes(self, remote_systems):
+    def _get_all_promotes(self):
         """
-        Create the top level mapping of all promoted names to absolute names.
+        Create the top level mapping of all promoted names to absolute names for all local systems.
 
         This includes all buried promoted names.
-
-        Parameters
-        ----------
-        remote_systems : dict
-            Mapping of system pathname to owning rank.  Includes only systems that are
-            remote in at least one MPI process.
 
         Returns
         -------
         dict
             Mapping of all promoted names to absolute names.
         """
-        myrank = self.comm.rank
-        mysys = set(n for n, rank in remote_systems.items() if rank == myrank)
         iotypes = ('input', 'output')
         if self.comm.size > 1:
             prom2abs = {'input': defaultdict(set), 'output': defaultdict(set)}
+            rem_prom2abs = {'input': defaultdict(set), 'output': defaultdict(set)}
+            myrank = self.comm.rank
+            vars_to_gather = self._vars_to_gather
 
             for s in self.system_iter(recurse=True):
-                if s.pathname in mysys:  # we 'own' this system
-                    prefix = s.pathname + '.' if s.pathname else ''
-                    for typ in iotypes:
-                        # use abs2prom to determine locality since prom2abs is for allprocs
-                        sys_abs2prom = s._var_abs2prom[typ]
-                        t_prom2abs = prom2abs[typ]
-                        for prom, alist in s._var_allprocs_prom2abs_list[typ].items():
-                            t_prom2abs[prefix + prom].update(n for n in alist if n in sys_abs2prom)
+                prefix = s.pathname + '.' if s.pathname else ''
+                for typ in iotypes:
+                    # use abs2prom to determine locality since prom2abs is for allprocs
+                    sys_abs2prom = s._var_abs2prom[typ]
+                    t_remprom2abs = rem_prom2abs[typ]
+                    t_prom2abs = prom2abs[typ]
+                    for prom, alist in s._var_allprocs_prom2abs_list[typ].items():
+                        abs_names = [n for n in alist if n in sys_abs2prom]
+                        t_prom2abs[prefix + prom].update(abs_names)
+                        t_remprom2abs[prefix + prom].update(n for n in abs_names
+                                                            if n in vars_to_gather
+                                                            and vars_to_gather[n] == myrank)
 
-            all_proms = self.comm.gather(prom2abs, root=0)
+            all_proms = self.comm.gather(rem_prom2abs, root=0)
             if myrank == 0:
-                prom2abs = {'input': defaultdict(list), 'output': defaultdict(list)}
                 for typ in iotypes:
                     t_prom2abs = prom2abs[typ]
                     for rankproms in all_proms:
                         for prom, absnames in rankproms[typ].items():
-                            t_prom2abs[prom].extend(absnames)
+                            t_prom2abs[prom].update(absnames)
 
-                t_prom2abs = prom2abs['input']
-                for prom, absnames in t_prom2abs.items():
-                    t_prom2abs[prom] = sorted(absnames)  # sort to keep order the same on all procs
+                    for prom, absnames in t_prom2abs.items():
+                        t_prom2abs[prom] = sorted(absnames)  # sort to keep order same on all procs
 
                 self.comm.bcast(prom2abs, root=0)
             else:
-                prom2abs = self.comm.bcast(prom2abs, root=0)
+                prom2abs = self.comm.bcast(None, root=0)
         else:  # serial
             prom2abs = {'input': defaultdict(list), 'output': defaultdict(list)}
             for s in self.system_iter(recurse=True):
@@ -598,9 +602,8 @@ class Group(System):
 
     def _top_level_post_connections(self, mode):
         # this is called on the top level group after all connections are known
-        rsystems = self._find_remote_sys_owners()
-        self._problem_meta['remote_vars'] = self._find_remote_var_owners(rsystems)
-        self._problem_meta['prom2abs'] = self._get_all_promotes(rsystems)
+        self._problem_meta['vars_to_gather'] = self._vars_to_gather
+        self._problem_meta['prom2abs'] = self._get_all_promotes()
 
         self._resolve_group_input_defaults()
         auto_ivc = self._setup_auto_ivcs(mode)
@@ -754,7 +757,6 @@ class Group(System):
         allprocs_abs2prom = self._var_allprocs_abs2prom
 
         allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
-        gatherable = self._gatherable_vars
 
         for n, lst in self._group_inputs.items():
             lst[0]['path'] = self.pathname  # used for error reporting
@@ -769,8 +771,6 @@ class Group(System):
             # Assemble allprocs_abs2meta and abs2meta
             allprocs_abs2meta.update(subsys._var_allprocs_abs2meta)
             abs2meta.update(subsys._var_abs2meta)
-
-            gatherable.update(subsys._gatherable_vars)
 
             sub_prefix = subsys.name + '.'
 
@@ -870,33 +870,6 @@ class Group(System):
                             allprocs_prom2abs_list[type_][prom_name] = []
                         allprocs_prom2abs_list[type_][prom_name].extend(abs_names_list)
 
-            # determine 'gatherable' vars, i.e., vars that are remote somewhere in the comm
-            locs = {}
-            locs_disc = {}
-            for type_ in ('input', 'output'):
-                locs[type_] = np.array([n in abs2meta and abs2meta[n]['size'] > 0
-                                        for n in allprocs_abs_names[type_]], dtype=bool)
-                locs_disc[type_] = np.array([
-                    n in abs2prom[type_] for n in allprocs_abs_names_discrete[type_]
-                ], dtype=bool)
-
-            raw_locs = (locs, locs_disc)
-            allprocs_raw_locs = self.comm.allgather(raw_locs)
-            for type_ in ('input', 'output'):
-                all_locs = np.ones(len(allprocs_abs_names[type_]), dtype=bool)
-                all_locs_disc = np.ones(len(allprocs_abs_names_discrete[type_]), dtype=bool)
-                for rank, (loc, loc_disc) in enumerate(allprocs_raw_locs):
-                    all_locs &= loc[type_]
-                    all_locs_disc &= loc_disc[type_]
-
-                for i, n in enumerate(allprocs_abs_names[type_]):
-                    if not all_locs[i]:
-                        gatherable.add(n)
-
-                for i, n in enumerate(allprocs_abs_names_discrete[type_]):
-                    if not all_locs_disc[i]:
-                        gatherable.add(n)
-
         for prom_name, abs_list in allprocs_prom2abs_list['output'].items():
             if len(abs_list) > 1:
                 raise RuntimeError("{}: Output name '{}' refers to "
@@ -924,6 +897,8 @@ class Group(System):
             self._discrete_outputs = _DictValues(self._var_discrete['output'])
         else:
             self._discrete_inputs = self._discrete_outputs = ()
+
+        self._vars_to_gather, self._dist_var_locality = self._find_remote_var_owners()
 
     def _resolve_group_input_defaults(self):
         """
@@ -989,6 +964,53 @@ class Group(System):
             # update all metadata dicts with any missing metadata that was filled in elsewhere
             for meta in metalist:
                 meta.update(fullmeta)
+
+    def _find_remote_var_owners(self):
+        """
+        Return a mapping of var pathname to owning rank and distrib var name locality.
+
+        The first mapping will contain ONLY systems that are remote on at least one proc.
+        Distributed systems are not included.
+
+        The second will contain only distrib vars keyed to an array of local ranks.
+
+        Returns
+        -------
+        dict
+            The mapping of variable pathname to owning rank.
+        dict
+            The mapping of distrib var name to local ranks.
+        """
+        remote_vars = {}
+        dists = {}
+
+        if self.comm.size > 1:
+            locality = {}
+            snames = {}
+            for io in ('input', 'output'):
+                # var order must be same on all procs
+                snames[io] = sorted(self._var_allprocs_abs2prom[io])
+                nvars = len(snames[io])
+                locality[io] = locs = np.zeros(nvars, dtype=bool)
+                abs2prom = self._var_abs2prom[io]
+                for i, name in enumerate(snames[io]):
+                    if name in abs2prom:
+                        locs[i] = True
+
+            abs2meta = self._var_allprocs_abs2meta
+            proc_locs = self.comm.allgather(locality)
+            for io in ('input', 'output'):
+                all_abs2prom = self._var_allprocs_abs2prom[io]
+                if proc_locs[0][io].size > 0:
+                    locs = np.vstack([loc[io] for loc in proc_locs])
+                    for i, name in enumerate(snames[io]):
+                        nzs = np.nonzero(locs[:, i])[0]
+                        if name in abs2meta and abs2meta[name]['distributed']:
+                            dists[name] = nzs
+                        elif (nzs.size > 0 and nzs.size < locs.shape[0] and name in all_abs2prom):
+                            remote_vars[name] = nzs[0]
+
+        return remote_vars, dists
 
     def _setup_var_sizes(self):
         """
@@ -1228,6 +1250,12 @@ class Group(System):
                         continue
 
                 if src_indices is not None:
+                    a2m = allprocs_abs2meta[abs_in]
+                    if (a2m['shape_by_conn'] or a2m['copy_shape']):
+                        raise ValueError(f"{self.msginfo}: Setting of 'src_indices' along with "
+                                         f"'shape_by_conn' or 'copy_shape' for variable '{abs_in}' "
+                                         "is currently unsupported.")
+
                     if abs_in in abs2meta:
                         meta = abs2meta[abs_in]
                         if meta['src_indices'] is not None:
@@ -1309,6 +1337,237 @@ class Group(System):
 
         for inp in src_ind_inputs:
             allprocs_abs2meta[inp]['has_src_indices'] = True
+
+    def _evenly_distribute_sizes_to_locals(self, var, arr_size):
+        """
+        Evenly distribute entries for the given array size, but only where the given var is local.
+
+        Parameters
+        ----------
+        var : str
+            Absolute name of the variable.
+        arr_size : int
+            Size to be distributed among procs where var is local.
+
+        Returns
+        -------
+        ndarray
+            Array of sizes, one entry for each proc in this group's comm.
+        ndarray
+            Array of offsets.
+        """
+        sizes = np.zeros(self.comm.size, dtype=INT_DTYPE)
+        locality = self._dist_var_locality[var]
+        dsizes, offsets = evenly_distrib_idxs(locality.size, arr_size)
+        for loc_idx, sz in zip(locality, dsizes):
+            sizes[loc_idx] = sz
+
+        offsets = np.zeros(self.comm.size, dtype=int)
+        offsets[1:] = np.cumsum(sizes)[:-1]
+
+        return sizes, offsets
+
+    def _setup_dynamic_shapes(self):
+        """
+        Add shape/size metadata for variables that were created with shape_by_conn or copy_shape.
+        """
+        self._shapes_graph = graph = nx.OrderedGraph()  # ordered graph for consistency across procs
+        self._shape_knowns = knowns = set()
+
+        def copy_var_meta(from_var, to_var, distrib_sizes):
+            # transfer shape/size info from from_var to to_var
+            all_from_meta = self._var_allprocs_abs2meta[from_var]
+            all_to_meta = self._var_allprocs_abs2meta[to_var]
+            from_meta = self._var_abs2meta[from_var] if from_var in self._var_abs2meta else {}
+            to_meta = self._var_abs2meta[to_var] if to_var in self._var_abs2meta else {}
+            from_in = from_var in self._var_allprocs_abs2prom['input']
+            to_in = to_var in self._var_allprocs_abs2prom['input']
+
+            nprocs = self.comm.size
+
+            from_dist = nprocs > 1 and all_from_meta['distributed']
+            from_size = all_from_meta['size']
+            from_shape = all_from_meta['shape']
+
+            to_dist = nprocs > 1 and all_to_meta['distributed']
+
+            if (from_dist and to_dist) or not (from_dist or to_dist):
+                # all copy_shapes (and some shape_by_conn) handled here
+                all_to_meta['shape'] = from_shape
+                all_to_meta['size'] = from_size
+                if to_meta:
+                    to_meta['shape'] = from_shape
+                    to_meta['size'] = from_size
+                    to_meta['value'] = np.full(from_shape, to_meta['value'])
+                if to_dist and from_dist:
+                    distrib_sizes[to_var] = distrib_sizes[from_var]
+                # src_indices will be computed later for dist inputs that don't specify them
+            elif from_var in self._var_allprocs_abs2prom['output']:
+                # from_var is an output.  assume to_var is an input
+                if from_dist and not to_dist:  # known dist output to serial input
+                    size = np.sum(distrib_sizes[from_var])
+                else:  # known serial output to dist input
+                    # there is not enough info to determine how the variable is split
+                    # over the procs. for now we split the variable up equally
+                    rank = self.comm.rank
+                    sizes, offsets = self._evenly_distribute_sizes_to_locals(to_var, from_size)
+                    size = sizes[rank]
+                    distrib_sizes[to_var] = np.array(sizes)
+                    if to_meta:
+                        to_meta['src_indices'] = np.arange(offsets[rank],
+                                                           offsets[rank] + sizes[rank],
+                                                           dtype=INT_DTYPE)
+                all_to_meta['size'] = size
+                all_to_meta['shape'] = (size,)
+                if to_meta:
+                    to_meta['size'] = size
+                    to_meta['shape'] = (size,)
+                    to_meta['value'] = np.full(size, to_meta['value'])
+            else:  # from_var is an input
+                if not from_dist and to_dist:   # known serial input to dist output
+                    sizes, _ = self._evenly_distribute_sizes_to_locals(to_var, from_size)
+                    size = sizes[self.comm.rank]
+                    distrib_sizes[to_var] = np.array(sizes)
+
+                else:  # known dist input to serial output
+                    if all_from_meta['has_src_indices']:
+                        # in this case we have to set the size of the serial output based on
+                        # the largest entry in src_indices across all procs.
+                        mx = np.max(from_meta['src_indices']) if from_var in from_meta else 0
+                        local_max = np.array([mx], dtype=INT_DTYPE)
+                        global_max = np.zeros(1, dtype=INT_DTYPE)
+                        self.comm.Allreduce(local_max, global_max, op=MPI.MAX)
+                        size = global_max[0]
+                    else:  # src_indices are not set, so just sum up the sizes
+                        size = np.sum(distrib_sizes[from_var])
+
+                all_to_meta['size'] = size
+                all_to_meta['shape'] = (size,)
+                if to_meta:
+                    to_meta['size'] = size
+                    to_meta['shape'] = (size,)
+                    to_meta['value'] = np.full(size, to_meta['value'])
+
+        all_abs2meta = self._var_allprocs_abs2meta
+        all_abs2prom_in = self._var_allprocs_abs2prom['input']
+        all_abs2prom_out = self._var_allprocs_abs2prom['output']
+        my_abs2meta = self._var_abs2meta
+        nprocs = self.comm.size
+        conn = self._conn_global_abs_in2out
+        rev_conn = None
+
+        def get_rev_conn():
+            # build reverse connection dict (src: tgts)
+            rev = defaultdict(list)
+            for tgt, src in conn.items():
+                rev[src].append(tgt)
+            return rev
+
+        dist_sz = {}  # local distrib sizes
+        knowns = set()  # variable nodes in the graph with known shapes
+
+        # find all variables that have an unknown shape (across all procs) and connect them
+        # to other unknow and known shape variables to form an undirected graph.
+        for io in ('input', 'output'):
+            for name in self._var_allprocs_abs_names[io]:
+                meta = all_abs2meta[name]
+                if meta['shape_by_conn']:
+                    if name in conn:  # it's a connected input
+                        abs_from = conn[name]
+                        graph.add_edge(name, abs_from)
+                        if all_abs2meta[abs_from]['shape'] is not None:
+                            knowns.add(abs_from)
+                    else:
+                        if rev_conn is None:
+                            rev_conn = get_rev_conn()
+                        if name in rev_conn:  # connected output
+                            for inp in rev_conn[name]:
+                                graph.add_edge(name, inp)
+                                if all_abs2meta[inp]['shape'] is not None:
+                                    knowns.add(inp)
+                        elif not meta['copy_shape']:
+                            raise RuntimeError(f"{self.msginfo}: 'shape_by_conn' was set for "
+                                               f"unconnected variable '{u}'.")
+
+                if meta['copy_shape']:
+                    # variable whose shape is being copied must be on the same component, and
+                    # name stored in 'copy_shape' entry must be the relative name.
+                    abs_from = name.rsplit('.', 1)[0] + '.' + meta['copy_shape']
+                    if abs_from in all_abs2prom_in or abs_from in all_abs2prom_out:
+                        graph.add_edge(name, abs_from)
+                        # this is unlikely, but a user *could* do it, so we'll check
+                        if all_abs2meta[abs_from]['shape'] is not None:
+                            knowns.add(abs_from)
+                    else:
+                        raise RuntimeError(f"{self.msginfo}: Can't copy shape of variable "
+                                           f"'{abs_from}'. Variable doesn't exist.")
+
+                # store known distributed size info needed for computing shapes
+                if nprocs > 1 and meta['distributed']:
+                    if name in my_abs2meta:
+                        sz = my_abs2meta[name]['size']
+                        if sz is not None:
+                            dist_sz[name] = sz
+                    else:
+                        dist_sz[name] = 0
+
+        if graph.order() == 0:
+            # we don't have any shape_by_conn or copy_shape variables, so we're done
+            return
+
+        if nprocs > 1:
+            distrib_sizes = defaultdict(lambda: np.zeros(nprocs, dtype=INT_DTYPE))
+            for rank, dsz in enumerate(self.comm.allgather(dist_sz)):
+                for n, sz in dsz.items():
+                    distrib_sizes[n][rank] = sz
+        else:
+            distrib_sizes = {}
+
+        unresolved = set()
+        seen = knowns.copy()
+
+        for comps in nx.connected_components(graph):
+            comp_knowns = knowns.intersection(comps)
+            if not comp_knowns:
+                # we need at least 1 known node to resolve this component, so we fail.
+                # store the list of unresolved nodes so we have the total list at the end.
+                unresolved.update(comps)
+                continue
+
+            # because comps is a connected component, we only need 1 known node to resolve
+            # the rest
+            stack = [sorted(comp_knowns)[0]]  # sort to keep error messages consistent
+            while stack:
+                known = stack.pop()
+                known_shape = all_abs2meta[known]['shape']
+                for node in graph.neighbors(known):
+                    if node in seen:
+                        # check to see if shapes agree
+                        if all_abs2meta[node]['shape'] != known_shape:
+                            known_dist = all_abs2meta[known]['distributed']
+                            dist = all_abs2meta[node]['distributed']
+                            # can't compare shapes if one is dist and other is not. The mismatch
+                            # will be caught later in setup_connections in that case.
+                            if not (dist ^ known_dist):
+                                conditional_error(f"{self.msginfo}: Shape mismatch,  "
+                                                  f"{all_abs2meta[node]['shape']} vs. "
+                                                  f"{known_shape} for variable '{node}' during "
+                                                  "dynamic shape determination.")
+                    else:
+                        # transfer the known shape info to the unshaped variable
+                        copy_var_meta(known, node, distrib_sizes)
+                        seen.add(node)
+                        stack.append(node)
+
+        # save graph info for possible later plotting
+        self._shapes_graph = graph
+        self._shape_knowns = knowns
+
+        if unresolved:
+            unresolved = sorted(unresolved)
+            conditional_error(f"{self.msginfo}: Failed to resolve shapes for {unresolved}. "
+                              "To see the dynamic shape dependency graph, "
+                              "do 'openmdao view_dyn_shapes <your_py_file>'.")
 
     @check_mpi_exceptions
     def _setup_connections(self):
@@ -2697,85 +2956,8 @@ class Group(System):
 
         return graph
 
-    def _find_remote_sys_owners(self):
-        """
-        Return a mapping of system pathname to owning rank.
-
-        The mapping will contain ONLY systems that are remote on at least one proc.
-        Distributed systems are not included.
-
-        Returns
-        -------
-        dict
-            The mapping of system pathname to owning rank.
-        """
-        if self.comm.size > 1:
-            loc_sys = set(s.pathname for s in self.system_iter(recurse=True))
-            # use the allprocs variable dicts to find any remote systems
-            remote_sys = set()
-            seen = set()
-            for typ in ('input', 'output'):
-                for abspath in self._var_allprocs_abs2prom[typ]:  # includes real and discrete vars
-                    sname, vname = abspath.rsplit('.', 1)
-                    if sname not in seen:
-                        seen.add(sname)
-                        for path in all_ancestors(sname):
-                            if path not in loc_sys:
-                                remote_sys.add(path)
-
-            # Find systems that are remote in at least one proc and the owning rank for each.
-            gathered = self.comm.gather(remote_sys, root=0)
-            if self.comm.rank == 0:
-                remote_systems = {}
-                remaining_remotes = set()
-                for remotes in gathered:
-                    remaining_remotes.update(remotes)
-
-                for rank, remotes in enumerate(gathered):
-                    if not remaining_remotes:
-                        break
-                    diff = remaining_remotes - remotes
-                    for name in diff:
-                        remote_systems[name] = rank
-
-                    remaining_remotes -= diff
-
-                self.comm.bcast(remote_systems, root=0)
-            else:
-                remote_systems = self.comm.bcast(None, root=0)
-        else:
-            remote_systems = {}
-
-        return remote_systems
-
-    def _find_remote_var_owners(self, sys_owners):
-        """
-        Return a mapping of abs var name to owning rank.
-
-        The mapping contains only non-distributed variables that are
-        remote on at least one proc.
-
-        Parameters
-        ----------
-        sys_owners : dict
-            Mapping of system pathname to owning rank. Contains remote systems only.
-
-        Returns
-        -------
-        dict
-            The mapping of variable pathname to owning rank.
-        """
-        owners = {}
-        all_abs2meta = self._var_allprocs_abs2meta
-        for typ in ('input', 'output'):
-            for abs_name in self._var_allprocs_abs2prom[typ]:
-                sname, vname = abs_name.rsplit('.', 1)
-                dist = abs_name in all_abs2meta and all_abs2meta[abs_name]['distributed']
-                if not dist and sname in sys_owners:
-                    owners[abs_name] = sys_owners[sname]
-        return owners
-
-    def _get_auto_ivc_out_val(self, tgts, remote_vars, all_abs2meta, abs2meta):
+    def _get_auto_ivc_out_val(self, tgts, vars_to_gather, all_abs2meta, abs2meta):
+        # all tgts are continuous variables
         info = []
         src_idx_found = []
         for tgt in tgts:
@@ -2783,8 +2965,12 @@ class Group(System):
             dist = all_meta['distributed']
             has_src_inds = all_meta['has_src_indices']
 
-            if tgt in remote_vars:  # remote somewhere
-                if self.comm.rank == remote_vars[tgt]:
+            if dist:
+                # OpenMDAO currently can't create an automatic IndepVarComp for inputs on
+                # distributed components.
+                raise RuntimeError(f'Distributed component input "{tgt}" requires an IndepVarComp.')
+            elif tgt in vars_to_gather:  # remote somewhere
+                if self.comm.rank == vars_to_gather[tgt]:  # this rank owns the variable
                     meta = abs2meta[tgt]
                     val = meta['value']
                     if has_src_inds:
@@ -2793,12 +2979,6 @@ class Group(System):
                         info.append((tgt, meta['size'], val, False))
                 else:
                     info.append((tgt, 0, np.zeros(0), True))
-
-            elif dist:  # distributed and local everywhere
-                # OpenMDAO currently can't create an automatic IndepVarComp for inputs on
-                # distributed components.
-                msg = 'Distributed component input "{}" requires an IndepVarComp.'
-                raise RuntimeError(msg.format(tgt))
 
             elif has_src_inds:  # local with non-distrib src_indices
                 src_idx_found.append(tgt)
@@ -2826,10 +3006,6 @@ class Group(System):
         auto_ivc.name = '_auto_ivc'
         auto_ivc.pathname = auto_ivc.name
 
-        # NOTE: remote_vars does NOT include distributed inputs.
-        # NOTE: some distributed inputs do not have src_indices yet
-        remote_vars = self._problem_meta['remote_vars']
-
         prom2auto = {}
         count = 0
         auto2tgt = defaultdict(list)
@@ -2837,8 +3013,12 @@ class Group(System):
         abs2meta = self._var_abs2meta
         all_abs2meta = self._var_allprocs_abs2meta
         conns = self._conn_global_abs_in2out
-        auto_tgts = [n for n in self._var_allprocs_abs_names['input'] if n not in conns]
-        for tgt in auto_tgts:
+        nproc = self.comm.size
+
+        for tgt in self._var_allprocs_abs_names['input']:
+            if tgt in conns:
+                continue
+
             prom = abs2prom[tgt]
             if prom in prom2auto:
                 # multiple connected inputs w/o a src. Connect them to the same IVC
@@ -2852,27 +3032,28 @@ class Group(System):
 
             auto2tgt[src].append(tgt)
 
-        myrank = self.comm.rank
-        with multi_proc_exception_check(self.comm):
-            for src, tgts in auto2tgt.items():
-                tgt, sz, val, remote = self._get_auto_ivc_out_val(tgts, remote_vars, all_abs2meta,
-                                                                  abs2meta)
-                prom = abs2prom[tgt]
-                if prom not in self._group_inputs:
-                    self._group_inputs[prom] = [{'use_tgt': tgt}]
-                else:
-                    self._group_inputs[prom][0]['use_tgt'] = tgt
-                gmeta = self._group_inputs[prom][0]
+        vars2gather = self._vars_to_gather
 
-                if 'units' in gmeta:
-                    units = gmeta['units']
-                else:
-                    units = all_abs2meta[tgt]['units']
-                if not remote and 'value' in gmeta:
-                    val = gmeta['value']
-                auto_ivc.add_output(src.rsplit('.', 1)[-1], val=val, units=units)
-                if remote:
-                    auto_ivc._add_remote(src)
+        for src, tgts in auto2tgt.items():
+            tgt, sz, val, remote = self._get_auto_ivc_out_val(tgts, vars2gather,
+                                                              all_abs2meta, abs2meta)
+            prom = abs2prom[tgt]
+            if prom not in self._group_inputs:
+                self._group_inputs[prom] = [{'use_tgt': tgt}]
+            else:
+                self._group_inputs[prom][0]['use_tgt'] = tgt
+            gmeta = self._group_inputs[prom][0]
+
+            if 'units' in gmeta:
+                units = gmeta['units']
+            else:
+                units = all_abs2meta[tgt]['units']
+            if not remote and 'value' in gmeta:
+                val = gmeta['value']
+            relsrc = src.rsplit('.', 1)[-1]
+            auto_ivc.add_output(relsrc, val=val, units=units)
+            if remote:
+                auto_ivc._add_remote(relsrc)
 
         # have to sort to keep vars in sync because we may be doing bcasts
         for abs_in in sorted(self._var_allprocs_discrete['input']):
@@ -2896,11 +3077,11 @@ class Group(System):
                         val = self._var_discrete['input'][abs_in]['value']
                     else:
                         val = None
-                    if abs_in in remote_vars:
-                        if remote_vars[abs_in] == self.comm.rank:
-                            self.comm.bcast(val, root=remote_vars[abs_in])
+                    if abs_in in vars2gather:
+                        if vars2gather[abs_in] == self.comm.rank:
+                            self.comm.bcast(val, root=vars2gather[abs_in])
                         else:
-                            val = self.comm.bcast(None, root=remote_vars[abs_in])
+                            val = self.comm.bcast(None, root=vars2gather[abs_in])
                     auto_ivc.add_discrete_output(loc_out_name, val=val)
 
         if not prom2auto:
@@ -2917,30 +3098,32 @@ class Group(System):
         self._subsystems_myproc = [auto_ivc] + self._subsystems_myproc
         self._subsystems_proc_range = [(0, self.comm.size)] + self._subsystems_proc_range
         self._subsystems_inds = {s.name: i for i, s in enumerate(self._subsystems_allprocs)}
-        for typ in ('input', 'output'):
-            self._var_abs_names[typ] = auto_ivc._var_abs_names[typ] + self._var_abs_names[typ]
-            self._var_allprocs_abs_names[typ] = (auto_ivc._var_allprocs_abs_names[typ] +
-                                                 self._var_allprocs_abs_names[typ])
-            old = self._var_allprocs_prom2abs_list[typ]
-            p2abs = OrderedDict()
-            for name in auto_ivc._var_allprocs_abs_names[typ]:
-                p2abs[name] = [name]
-            p2abs.update(old)
-            self._var_allprocs_prom2abs_list[typ] = p2abs
 
-            # auto_ivc never promotes anything
-            self._var_abs2prom[typ].update({n: n for n in auto_ivc._var_abs2prom[typ]})
-            self._var_allprocs_abs2prom[typ].update({n: n for n in
-                                                     auto_ivc._var_allprocs_abs2prom[typ]})
+        io = 'output'  # auto_ivc has only output vars
+        self._var_abs_names[io] = auto_ivc._var_abs_names[io] + self._var_abs_names[io]
+        self._var_allprocs_abs_names[io] = (auto_ivc._var_allprocs_abs_names[io] +
+                                            self._var_allprocs_abs_names[io])
+        old = self._var_allprocs_prom2abs_list[io]
+        p2abs = OrderedDict()
+        for name in auto_ivc._var_allprocs_prom2abs_list[io]:
+            n = f"_auto_ivc.{name}"
+            p2abs[n] = [n]
+        p2abs.update(old)
+        self._var_allprocs_prom2abs_list[io] = p2abs
 
-            self._var_allprocs_abs_names_discrete[typ] = (
-                auto_ivc._var_allprocs_abs_names_discrete[typ] +
-                self._var_allprocs_abs_names_discrete[typ])
-            self._var_abs_names_discrete[typ] = (auto_ivc._var_abs_names_discrete[typ] +
-                                                 self._var_abs_names_discrete[typ])
-            self._var_discrete[typ].update({'_auto_ivc.' + k: v for k, v in
-                                            auto_ivc._var_discrete[typ].items()})
-            self._var_allprocs_discrete[typ].update(auto_ivc._var_allprocs_discrete[typ])
+        # auto_ivc never promotes anything
+        self._var_abs2prom[io].update({n: n for n in auto_ivc._var_abs2prom[io]})
+        self._var_allprocs_abs2prom[io].update({n: n for n in
+                                                auto_ivc._var_allprocs_abs2prom[io]})
+
+        self._var_allprocs_abs_names_discrete[io] = (
+            auto_ivc._var_allprocs_abs_names_discrete[io] +
+            self._var_allprocs_abs_names_discrete[io])
+        self._var_abs_names_discrete[io] = (auto_ivc._var_abs_names_discrete[io] +
+                                            self._var_abs_names_discrete[io])
+        self._var_discrete[io].update({'_auto_ivc.' + k: v for k, v in
+                                       auto_ivc._var_discrete[io].items()})
+        self._var_allprocs_discrete[io].update(auto_ivc._var_allprocs_discrete[io])
 
         self._var_abs2meta.update(auto_ivc._var_abs2meta)
         self._var_allprocs_abs2meta.update(auto_ivc._var_allprocs_abs2meta)
