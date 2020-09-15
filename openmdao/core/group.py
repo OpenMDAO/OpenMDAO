@@ -88,6 +88,8 @@ class Group(System):
         Flag indicating whether connection errors are raised as an Exception.
     _order_set : bool
         Flag to check if set_order has been called.
+    _auto_ivc_warnings : list
+        List of Auto IVC warnings to be raised later with simple_warnings.
     """
 
     def __init__(self, **kwargs):
@@ -928,12 +930,16 @@ class Group(System):
     def _resolve_group_input_defaults(self, show_warnings=False):
         """
         Resolve any ambiguities in group input defaults throughout the model.
+
+        Parameters
+        ----------
+        show_warnings : bool
+            Bool to show or hide the auto_ivc warnings.
         """
         skip = set(('path', 'use_tgt', 'prom'))
         prom2abs_in = self._var_allprocs_prom2abs_list['input']
 
-        self._set_default_arg_warnings = []
-        self._conflict_warnings = []
+        self._auto_ivc_warnings = []
 
         for prom, metalist in self._group_inputs.items():
             try:
@@ -960,7 +966,7 @@ class Group(System):
                                 if show_warnings:
                                     simple_warning(msg)
                                 else:
-                                    self._set_default_arg_warnings.append(msg)
+                                    self._auto_ivc_warnings.append(msg)
 
                         else:
                             eq = submeta[key] == val
@@ -970,14 +976,14 @@ class Group(System):
                                 # first, see if origin is an ancestor
                                 if not origin or submeta['path'].startswith(origin + '.'):
                                     msg = (f"Groups '{origin}' and '{submeta['path']}' "
-                                          f"called set_input_defaults for the input "
-                                          f"'{origin_prom}' with conflicting '{key}'. "
-                                          f"The value ({val}) from '{origin}' will be "
-                                          "used.")
+                                           f"called set_input_defaults for the input "
+                                           f"'{origin_prom}' with conflicting '{key}'. "
+                                           f"The value ({val}) from '{origin}' will be "
+                                           "used.")
                                     if show_warnings:
                                         simple_warning(msg)
                                     else:
-                                        self._conflict_warnings.append(msg)
+                                        self._auto_ivc_warnings.append(msg)
                                 else:  # origin is not an ancestor, so we have an ambiguity
                                     if origin_prom != submeta['prom']:
                                         prm = f"('{origin_prom}' / '{submeta['prom']}')"

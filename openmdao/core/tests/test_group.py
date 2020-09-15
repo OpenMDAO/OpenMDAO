@@ -2651,8 +2651,9 @@ class TestGroupAddInput(unittest.TestCase):
         g1.set_input_defaults('x', units='inch', val=2.)
 
         msg = "Groups 'G1' and 'G1.G2' called set_input_defaults for the input 'x' with conflicting 'units'. The value (inch) from 'G1' will be used."
+        p.setup(check=True)
         with assert_warning(UserWarning, msg):
-            p.setup()
+            p.final_setup()
 
     def test_sub_sub_override(self):
         p = om.Problem()
@@ -2665,8 +2666,9 @@ class TestGroupAddInput(unittest.TestCase):
         G3.add_subsystem('C2', om.ExecComp('y = 4.*x', x={'units': 'cm'}), promotes=['x'])
         G3.set_input_defaults('x', units='cm')
         msg = "Groups 'G1' and 'G1.G2.G3' called set_input_defaults for the input 'x' with conflicting 'units'. The value (mm) from 'G1' will be used."
+        p.setup(check=True)
         with assert_warning(UserWarning, msg):
-            p.setup()
+            p.final_setup()
 
     def test_sub_sets_parent_meta(self):
         p = om.Problem()
@@ -2677,8 +2679,9 @@ class TestGroupAddInput(unittest.TestCase):
         G2.add_subsystem('C1', om.ExecComp('y = 3.*x', x={'units': 'm'}), promotes=['x'])
         G2.set_input_defaults('x', units='cm')
         msg = "Group 'G1' did not set a default 'units' for input 'x', so the value of (cm) from group 'G1.G2' will be used."
+        p.setup(check=True)
         with assert_warning(UserWarning, msg):
-            p.setup()
+            p.final_setup()
 
     def test_sub_sub_override2(self):
         p = om.Problem()
@@ -2691,6 +2694,7 @@ class TestGroupAddInput(unittest.TestCase):
         G3.add_subsystem('C1', om.ExecComp('y = 3.*x', x={'units': 'm'}), promotes=['x'])
         G3.add_subsystem('C2', om.ExecComp('y = 4.*x', x={'units': 'cm'}), promotes=['x'])
         G3.set_input_defaults('x', units='cm')
+        p.setup(check=True)
         msgs = [
             "Groups 'G1' and 'G1.G2' called set_input_defaults for the input 'x' with conflicting 'units'. The value (mm) from 'G1' will be used.",
             "Groups 'G1' and 'G1.G2.G3' called set_input_defaults for the input 'x' with conflicting 'units'. The value (mm) from 'G1' will be used."
@@ -2698,7 +2702,7 @@ class TestGroupAddInput(unittest.TestCase):
         with reset_warning_registry():
             with warnings.catch_warnings(record=True) as w:
                 warnings.simplefilter("always")
-                p.setup()
+                p.final_setup()
 
         for msg in msgs:
             for warn in w:

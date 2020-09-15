@@ -372,14 +372,9 @@ def _check_auto_ivc_warnings(problem, logger):
     logger : object
         The object that manages logging output.
     """
-    if hasattr(problem.model, "_set_default_arg_warnings"):
-        for i in problem.model._set_default_arg_warnings:
+    if hasattr(problem.model, "_auto_ivc_warnings"):
+        for i in problem.model._auto_ivc_warnings:
             simple_warning(i)
-        # logger.warning(problem.model._set_default_arg_warnings)
-    if hasattr(problem.model, "_conflict_warnings"):
-        for i in problem.model._conflict_warnings:
-            simple_warning(i)
-        # logger.warning(problem.model._conflict_warnings)
 
 
 def _check_system_configs(problem, logger):

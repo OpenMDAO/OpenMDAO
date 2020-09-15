@@ -1812,6 +1812,7 @@ class Problem(object):
             logger.info('checking %s' % c)
             _all_checks[c](self, logger)
 
+
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
                               compact_print, system_list, global_options, totals=False,
                               indep_key=None, print_reverse=False,
