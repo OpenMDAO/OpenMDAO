@@ -1161,15 +1161,15 @@ def record_iteration(requester, prob, case_name):
     discrete_inputs = model._discrete_inputs
     discrete_outputs = model._discrete_outputs
 
+    opts = requester.recording_options
     data = {'input': {}, 'output': {}, 'residual': {}}
-    if requester.recording_options['record_inputs'] and (inputs._names or len(discrete_inputs) > 0):
+    if opts['record_inputs'] and (inputs._names or len(discrete_inputs) > 0):
         data['input'] = model._retrieve_data_of_kind(filt, 'input', 'nonlinear', parallel)
 
-    if requester.recording_options['record_outputs'] and \
-            (outputs._names or len(discrete_outputs) > 0):
+    if opts['record_outputs'] and (outputs._names or len(discrete_outputs) > 0):
         data['output'] = model._retrieve_data_of_kind(filt, 'output', 'nonlinear', parallel)
 
-    if requester.recording_options['record_residuals'] and residuals._names:
+    if opts['record_residuals'] and residuals._names:
         data['residual'] = model._retrieve_data_of_kind(filt, 'residual', 'nonlinear', parallel)
 
     from openmdao.core.problem import Problem
