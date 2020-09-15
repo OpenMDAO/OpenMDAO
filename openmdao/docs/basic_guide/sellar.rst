@@ -27,7 +27,8 @@ You can see the coupling between the two disciplines show up through the :math:`
 Building the Disciplinary Components
 ************************************
 
-In the following component definitions, there is a call to :ref:`declare_partials <feature_declare_partials_approx>` in the :code:`setup` method that looks like this:
+In the following component definitions, there is a call to :ref:`declare_partials <feature_declare_partials_approx>`
+in the :code:`setup_partials` method that looks like this:
 
 .. code::
 

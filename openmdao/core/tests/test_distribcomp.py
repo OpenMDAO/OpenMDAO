@@ -342,6 +342,77 @@ class NOMPITests(unittest.TestCase):
         self.assertTrue(all(C2._outputs['outvec'] == np.array(range(size, 0, -1), float)*4))
 
 
+class DistribParaboloid(om.ExplicitComponent):
+
+    def setup(self):
+        self.options['distributed'] = True
+
+        if self.comm.rank == 0:
+            ndvs = 3
+        else:
+            ndvs = 2
+
+        self.add_input('w', val=1.) # this will connect to a non-distributed IVC
+        self.add_input('x', shape=ndvs) # this will connect to a distributed IVC
+
+        self.add_output('y', shape=1) # all-gathered output, duplicated on all procs
+        self.add_output('z', shape=ndvs) # distributed output
+        self.declare_partials('y', 'x')
+        self.declare_partials('y', 'w')
+        self.declare_partials('z', 'x')
+
+    def compute(self, inputs, outputs):
+        x = inputs['x']
+        local_y = np.sum((x-5)**2)
+        y_g = np.zeros(self.comm.size)
+        self.comm.Allgather(local_y, y_g)
+        outputs['y'] = np.sum(y_g) + (inputs['w']-10)**2
+        outputs['z'] = x**2
+
+    def compute_partials(self, inputs, J):
+        x = inputs['x']
+        J['y', 'x'] = 2*(x-5)
+        J['y', 'w'] = 2*(inputs['w']-10)
+        J['z', 'x'] = np.diag(2*x)
+
+
+@unittest.skipUnless(MPI, "MPI is required.")
+class DistributedIO(unittest.TestCase):
+
+    def test_driver_metadata(self):
+        self.comm = MPI.COMM_WORLD
+
+        p = om.Problem()
+        d_ivc = p.model.add_subsystem('distrib_ivc',
+                                    om.IndepVarComp(distributed=True),
+                                    promotes=['*'])
+
+        # Sending different values to different ranks
+        if self.comm.rank == 0:
+            ndvs = 3
+        else:
+            ndvs = 2
+        d_ivc.add_output('x', 2*np.ones(ndvs))
+
+        ivc = p.model.add_subsystem('ivc',
+                                    om.IndepVarComp(distributed=False),
+                                    promotes=['*'])
+        ivc.add_output('w', 2.0)
+        p.model.add_subsystem('dp', DistribParaboloid(), promotes=['*'])
+
+        p.model.add_design_var('x', lower=-100, upper=100)
+        p.model.add_objective('y')
+        p.setup()
+        p.run_model()
+
+
+        # Check the local size of the design variables on each proc
+        dvs = p.model.get_design_vars()
+        for name, meta in dvs.items():
+            model_size = meta['size']
+            self.assertEqual(model_size, ndvs)
+
+
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class MPITests(unittest.TestCase):
 
@@ -380,7 +451,7 @@ class MPITests(unittest.TestCase):
         model.add_subsystem("Cdist2", DistribInputDistribOutputComp(arr_size=size))
         model.connect('indep.x', 'Cdist.invec')
         model.connect('Cdist.outvec', 'Cdist2.invec')
-        #import wingdbstub
+
         p.setup()
         p.run_model()
         msg = "Group (<model>): Can't retrieve distributed variable 'Cdist2.invec' because its src_indices reference entries from other processes. You can retrieve values from all processes using `get_val(<name>, get_remote=True)`."
@@ -768,7 +839,7 @@ class MPITests(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             prob.setup()
 
-        msg = ' Distributed component input "C.invec" requires an IndepVarComp.'
+        msg = 'Distributed component input "C.invec" requires an IndepVarComp.'
 
         err_msg = str(context.exception).split(':')[-1]
         self.assertEqual(err_msg, msg)

@@ -17,6 +17,7 @@ class Resistor(om.ExplicitComponent):
         self.add_input('V_out', units='V')
         self.add_output('I', units='A')
 
+    def setup_partials(self):
         self.declare_partials('I', 'V_in', method='fd')
         self.declare_partials('I', 'V_out', method='fd')
 
@@ -37,6 +38,7 @@ class Diode(om.ExplicitComponent):
         self.add_input('V_out', units='V')
         self.add_output('I', units='A')
 
+    def setup_partials(self):
         self.declare_partials('I', 'V_in', method='fd')
         self.declare_partials('I', 'V_out', method='fd')
 
@@ -65,6 +67,7 @@ class Node(om.ImplicitComponent):
             i_name = 'I_out:{}'.format(i)
             self.add_input(i_name, units='A')
 
+    def setup_partials(self):
         #note: we don't declare any partials wrt `V` here,
         #      because the residual doesn't directly depend on it
         self.declare_partials('V', 'I*', method='fd')

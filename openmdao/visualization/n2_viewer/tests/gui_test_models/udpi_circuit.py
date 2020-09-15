@@ -13,6 +13,7 @@ class Resistor(om.ExplicitComponent):
         self.add_input('V_out', units='V')
         self.add_output('I', units='A')
 
+    def setup_partials(self):
         # partial derivs are constant, so we can assign their values in setup
         R = self.options['R']
         self.declare_partials('I', 'V_in', val=1 / R)
@@ -34,6 +35,7 @@ class Diode(om.ExplicitComponent):
         self.add_input('V_out', units='V')
         self.add_output('I', units='A')
 
+    def setup_partials(self):
         # non-linear component, so we'll declare the partials here but compute them in compute_partials
         self.declare_partials('I', 'V_in')
         self.declare_partials('I', 'V_out')

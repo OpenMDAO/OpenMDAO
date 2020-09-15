@@ -16,6 +16,8 @@ class LinearCombinationComp(om.ExplicitComponent):
     def setup(self):
         self.add_input('x')
         self.add_output('y')
+
+    def setup_partials(self):
         self.declare_partials('y', 'x', val=self.options['a'])
 
     def compute(self, inputs, outputs):

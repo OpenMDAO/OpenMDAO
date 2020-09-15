@@ -54,13 +54,15 @@ The component is the basic building block of a model.
 You will always define components as a subclass of either :ref:`ExplicitComponent <openmdao.core.explicitcomponent.py>`
 or :ref:`ImplicitComponent <openmdao.core.implicitcomponent.py>`.
 Since our simple paraboloid function is explicit, we'll use the :ref:`ExplicitComponent <openmdao.core.explicitcomponent.py>`.
-You see two methods defined:
+You see three methods defined:
 
-    - `setup`: define all your inputs and outputs here, and declare derivatives
+    - `setup`: define all your inputs and outputs here
+    - `setup_partials`: declare partial derivatives
     - `compute`: calculation of all output values for the given inputs
 
-In the `setup` method you define the inputs and outputs of the component,
-and in this case you also ask OpenMDAO to approximate all the partial derivatives (derivatives of outputs with respect to inputs)
+In the `setup` method you define the inputs and outputs of the component.
+In the `setup_partials` method in this case you also ask OpenMDAO to approximate all the partial
+derivatives (derivatives of outputs with respect to inputs)
 using the `finite difference method <https://en.wikipedia.org/wiki/Finite_difference_method>`_.
 
 .. note::

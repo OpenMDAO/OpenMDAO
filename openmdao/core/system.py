@@ -73,9 +73,11 @@ _recordable_funcs = frozenset(['_apply_linear', '_apply_nonlinear', '_solve_line
 
 # the following are local metadata that will also be accessible for vars on all procs
 global_meta_names = {
-    'input': ('units', 'shape', 'size', 'distributed', 'tags', 'desc'),
+    'input': ('units', 'shape', 'size', 'distributed', 'tags', 'desc', 'shape_by_conn',
+              'copy_shape'),
     'output': ('units', 'shape', 'size', 'desc',
-               'ref', 'ref0', 'res_ref', 'distributed', 'lower', 'upper', 'tags'),
+               'ref', 'ref0', 'res_ref', 'distributed', 'lower', 'upper', 'tags', 'shape_by_conn',
+               'copy_shape'),
 }
 
 allowed_meta_names = {
@@ -98,6 +100,8 @@ allowed_meta_names = {
     'res_ref',
     'lower',
     'upper',
+    'shape_by_conn',
+    'copy_shape',
 }
 
 
@@ -209,6 +213,10 @@ class System(object):
         in the given system.  This is only defined in a Group that owns one or more interprocess
         connections or a top level Group or System that is used to compute total derivatives
         across multiple processes.
+    _vars_to_gather : dict
+        Contains names of non-distributed variables that are remote on at least one proc in the comm
+    _dist_var_locality : dict
+        Contains names of distrib vars mapped to the ranks in the comm where they are local.
     _conn_global_abs_in2out : {'abs_in': 'abs_out'}
         Dictionary containing all explicit & implicit connections owned by this system
         or any descendant system. The data is the same across all processors.
@@ -384,6 +392,8 @@ class System(object):
         self._subsystems_allprocs = []
         self._subsystems_myproc = []
         self._subsystems_inds = {}
+        self._vars_to_gather = {}
+        self._dist_var_locality = {}
 
         self._var_promotes = {'input': [], 'output': [], 'any': []}
         self._var_promotes_src_indices = {}
@@ -493,6 +503,9 @@ class System(object):
         if self.name:
             return '{} ({})'.format(type(self).__name__, self.name)
         return type(self).__name__
+
+    def _get_inst_id(self):
+        return self.pathname
 
     def _declare_options(self):
         """
@@ -649,20 +662,20 @@ class System(object):
         self._setup_var_data()
 
         self._setup_vec_names(mode)
-        self._setup_global_connections()
 
-        if self.pathname == '':
-            self._top_level_post_connections(mode)
+        # promoted names must be known to determine implicit connections so this must be
+        # called after _setup_var_data, and _setup_var_data will have to be partially redone
+        # after auto_ivcs have been added, but auto_ivcs can't be added until after we know all of
+        # the connections.
+        self._setup_global_connections()
+        self._setup_dynamic_shapes()
+
+        self._top_level_post_connections(mode)
 
         # Now that connections are setup, we need to convert relevant vector names into their
         # auto_ivc source where applicable.
-        new_names = []
         conns = self._conn_global_abs_in2out
-        for vec_name in self._vec_names:
-            if vec_name in conns:
-                new_names.append(conns[vec_name])
-            else:
-                new_names.append(vec_name)
+        new_names = [conns[v] if v in conns else v for v in self._vec_names]
         self._problem_meta['vec_names'] = new_names
         self._problem_meta['lin_vec_names'] = new_names[1:]
 
@@ -670,9 +683,9 @@ class System(object):
         self._setup_var_index_ranges()
         self._setup_var_sizes()
 
-        if self.pathname == '':
-            self._top_level_post_sizes()
+        self._top_level_post_sizes()
 
+        # determine which connections are managed by which group, and check validity of connections
         self._setup_connections()
 
     def _top_level_post_connections(self, mode):
@@ -689,6 +702,9 @@ class System(object):
         """
         pass
 
+    def _setup_dynamic_shapes(self):
+        pass
+
     def _final_setup(self, comm):
         """
         Perform final setup for this system and its descendant systems.
@@ -700,6 +716,10 @@ class System(object):
         comm : MPI.Comm or <FakeComm> or None
             The global communicator.
         """
+        if self._use_derivatives:
+            # must call this before vector setup because it determines if we need to alloc commplex
+            self._setup_partials()
+
         self._setup_vectors(self._get_root_vectors())
 
         # Transfers do not require recursion, but they have to be set up after the vector setup.
@@ -710,7 +730,6 @@ class System(object):
         self._setup_solvers()
         self._setup_solver_print()
         if self._use_derivatives:
-            self._setup_partials()
             self._setup_jacobians()
 
         self._setup_recording()
@@ -1310,7 +1329,6 @@ class System(object):
         self._var_allprocs_abs2meta = {}
         self._var_abs2meta = {}
         self._var_allprocs_abs2idx = {}
-        self._gatherable_vars = set()
         self._owning_rank = defaultdict(int)
 
     def _setup_var_index_maps(self):
@@ -2940,7 +2958,10 @@ class System(object):
 
                 if 'size' not in meta:
                     if src_name in abs2idx:
-                        meta['size'] = sizes[owning_rank[src_name], abs2idx[src_name]]
+                        if meta['distributed']:
+                            meta['size'] = sizes[model.comm.rank, abs2idx[src_name]]
+                        else:
+                            meta['size'] = sizes[owning_rank[src_name], abs2idx[src_name]]
                     else:
                         meta['size'] = 0  # discrete var, don't know size
 
@@ -2948,6 +2969,8 @@ class System(object):
                     meta = abs2meta[src_name]
                     out[name]['distributed'] = meta['distributed']
                     out[name]['global_size'] = meta['global_size']
+                else:
+                    out[name]['global_size'] = 0  # discrete var
 
         if recurse:
             abs2prom_in = self._var_allprocs_abs2prom['input']
@@ -2967,10 +2990,16 @@ class System(object):
                     out.update(dvs)
 
             if self.comm.size > 1 and self._subsystems_allprocs:
+                my_out = out
                 allouts = self.comm.allgather(out)
                 out = OrderedDict()
-                for all_out in allouts:
-                    out.update(all_out)
+                for rank, all_out in enumerate(allouts):
+                    for name, meta in all_out.items():
+                        if name not in out:
+                            if name in my_out:
+                                out[name] = my_out[name]
+                            else:
+                                out[name] = meta
 
         return out
 
@@ -3044,7 +3073,7 @@ class System(object):
 
                 # Discrete vars
                 if name not in abs2idx:
-                    response['size'] = 0  # discrete var, we don't know the size
+                    response['size'] = response['global_size'] = 0  # discrete var, don't know size
                     continue
 
                 meta = abs2meta[name]
@@ -3195,6 +3224,7 @@ class System(object):
         loc2meta = self._var_abs2meta
         all2meta = self._var_allprocs_abs2meta
 
+        dynset = set(('shape', 'size', 'value'))
         gather_keys = {'value', 'src_indices'}
         need_gather = get_remote and self.comm.size > 1
         if metadata_keys is not None:
@@ -3204,6 +3234,7 @@ class System(object):
                 raise RuntimeError(f"{self.msginfo}: {sorted(diff)} are not valid metadata entry "
                                    "names.")
         need_local_meta = metadata_keys is not None and len(gather_keys.intersection(keyset)) > 0
+        nodyn = metadata_keys is None or keyset.intersection(dynset)
 
         if need_local_meta:
             metadict = loc2meta
@@ -3232,6 +3263,12 @@ class System(object):
                 if abs_name in all2meta:  # continuous
                     meta = metadict[abs_name] if abs_name in metadict else None
                     distrib = all2meta[abs_name]['distributed']
+                    if nodyn:
+                        a2m = all2meta[abs_name]
+                        if a2m['shape'] is None and (a2m['shape_by_conn'] or a2m['copy_shape']):
+                            raise RuntimeError(f"{self.msginfo}: Can't retrieve shape, size, or "
+                                               f"value for dynamically sized variable '{prom}' "
+                                               "because they aren't known yet.")
                 else:  # discrete
                     if need_local_meta:  # use relative name for discretes
                         meta = disc2meta[rel_name] if rel_name in disc2meta else None
@@ -3253,7 +3290,7 @@ class System(object):
                                 ret_meta[key] = 'Unavailable'
 
                 if need_gather:
-                    if distrib or abs_name in self._gatherable_vars:
+                    if distrib or abs_name in self._vars_to_gather:
                         if rank is None:
                             allproc_metas = self.comm.allgather(ret_meta)
                         else:
@@ -3280,7 +3317,7 @@ class System(object):
                                     else:
                                         ret_meta['src_indices'] = np.zeros(0, dtype=INT_DTYPE)
 
-                            elif abs_name in self._gatherable_vars:
+                            elif abs_name in self._vars_to_gather:
                                 for m in allproc_metas:
                                     if m is not None:
                                         ret_meta = m
@@ -4088,8 +4125,8 @@ class System(object):
                 meta = all_meta[abs_name]
                 distrib = meta['distributed']
             else:
-                remote_vars = self._problem_meta['remote_vars']
-                if abs_name in remote_vars and remote_vars[abs_name] != self.comm.rank:
+                vars_to_gather = self._problem_meta['vars_to_gather']
+                if abs_name in vars_to_gather and vars_to_gather[abs_name] != self.comm.rank:
                     raise RuntimeError(f"{self.msginfo}: Variable '{abs_name}' is not local to "
                                        f"rank {self.comm.rank}. You can retrieve values from "
                                        "other processes using `get_val(<name>, get_remote=True)`.")
@@ -4152,6 +4189,8 @@ class System(object):
                     loc_val = val if val is not _UNDEFINED else np.zeros(sizes[myrank])
                     val = np.zeros(np.sum(sizes))
                     self.comm.Allgatherv(loc_val, [val, sizes, offsets, MPI.DOUBLE])
+                    if not flat:
+                        val.shape = meta['global_shape'] if get_remote else meta['shape']
                 else:
                     if owner != self.comm.rank:
                         val = None
@@ -4168,6 +4207,8 @@ class System(object):
                     loc_val = val if val is not _UNDEFINED else np.zeros(sizes[idx])
                     val = np.zeros(np.sum(sizes))
                     self.comm.Gatherv(loc_val, [val, sizes, offsets, MPI.DOUBLE], root=rank)
+                    if not flat:
+                        val.shape = meta['global_shape'] if get_remote else meta['shape']
                 else:
                     if rank != owner:
                         tag = self._var_allprocs_abs2idx[vec_name][abs_name]
@@ -4180,9 +4221,6 @@ class System(object):
                             self.comm.send(val, dest=rank, tag=tag)
                         elif self.comm.rank == rank:
                             val = self.comm.recv(source=owner, tag=tag)
-
-        if not flat and val is not _UNDEFINED and not discrete and not np.isscalar(val):
-            val.shape = meta['global_shape'] if get_remote and distrib else meta['shape']
 
         return val
 
