@@ -139,8 +139,6 @@ class Component(System):
         """
         super(Component, self)._setup_procs(pathname, comm, mode, prob_meta)
 
-        self._vectors = {}
-
         orig_comm = comm
         if self._num_par_fd > 1:
             if comm.size > 1:
@@ -272,7 +270,6 @@ class Component(System):
         """
         Compute the arrays of variable sizes for all variables/procs on this system.
         """
-        self._var_sizes = {'nonlinear': {}}
         iproc = self.comm.rank
 
         for io in ('input', 'output'):

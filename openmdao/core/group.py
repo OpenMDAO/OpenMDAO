@@ -397,7 +397,6 @@ class Group(System):
         super(Group, self)._setup_procs(pathname, comm, mode, prob_meta)
         self._setup_procs_finished = False
 
-        self._vectors = {}
         nproc = comm.size
 
         if self._num_par_fd > 1:
@@ -475,7 +474,6 @@ class Group(System):
         else:
             sub_comm = comm
             self._subsystems_myproc = [s for s, _ in self._subsystems_allprocs.values()]
-            sub_proc_range = (0, 1)
 
         # need to set pathname correctly even for non-local subsystems
         for s, _ in self._subsystems_allprocs.values():
@@ -967,7 +965,6 @@ class Group(System):
 
         all_abs2meta = self._var_allprocs_abs2meta
         iproc = self.comm.rank
-        self._var_sizes = {'nonlinear': {}}
         for io in ('input', 'output'):
             nl_allprocs_relnames[io] = list(self._var_allprocs_abs2meta[io])
             nl_relnames[io] = list(self._var_abs2meta[io])

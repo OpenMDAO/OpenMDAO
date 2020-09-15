@@ -1273,6 +1273,7 @@ class System(object):
         Execute first phase of the setup process.
 
         Distribute processors, assign pathnames, and call setup on the component.
+        Also reset internal data structures.
 
         Parameters
         ----------
@@ -1290,6 +1291,8 @@ class System(object):
         self._problem_meta = prob_meta
         self._first_call_to_linearize = True
         self._is_local = True
+        self._vectors = {}
+        self._full_comm = None
 
         self.options._parent_name = self.msginfo
         self.recording_options._parent_name = self.msginfo
@@ -1308,9 +1311,10 @@ class System(object):
         self._var_allprocs_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
         self._var_abs2meta = {'input': {}, 'output': {}}
+        self._var_allprocs_discrete = {'input': {}, 'output': {}}
         self._var_allprocs_abs2idx = {}
         self._owning_rank = defaultdict(int)
-        self._var_sizes = {}
+        self._var_sizes = {'nonlinear': {}}
         self._owned_sizes = None
         self._var_allprocs_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
         self._var_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
