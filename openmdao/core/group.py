@@ -900,13 +900,9 @@ class Group(System):
         else:
             self._discrete_inputs = self._discrete_outputs = ()
 
-<<<<<<< HEAD
-    def _resolve_group_input_defaults(self, show_warnings=False):
-=======
         self._vars_to_gather, self._dist_var_locality = self._find_remote_var_owners()
 
-    def _resolve_group_input_defaults(self):
->>>>>>> c03985f36dfb5d2a508b4a4cc4593952994d351c
+    def _resolve_group_input_defaults(self, show_warnings=False):
         """
         Resolve any ambiguities in group input defaults throughout the model.
 
