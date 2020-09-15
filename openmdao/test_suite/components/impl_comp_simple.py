@@ -25,8 +25,7 @@ class TestImplCompSimple(om.ImplicitComponent):
 
 class TestImplCompSimpleDense(TestImplCompSimple):
 
-    def setup(self):
-        super(TestImplCompSimpleDense, self).setup()
+    def setup_partials(self):
         self.declare_partials(of='*', wrt='*')
 
     def linearize(self, inputs, outputs, jacobian):
@@ -37,8 +36,7 @@ class TestImplCompSimpleDense(TestImplCompSimple):
 
 class TestImplCompSimpleSpmtx(TestImplCompSimple):
 
-    def setup(self):
-        super(TestImplCompSimpleSpmtx, self).setup()
+    def setup_partials(self):
         self.declare_partials(of='*', wrt='*')
 
     def linearize(self, inputs, outputs, jacobian):
@@ -54,8 +52,7 @@ class TestImplCompSimpleSpmtx(TestImplCompSimple):
 
 class TestImplCompSimpleSparse(TestImplCompSimple):
 
-    def setup(self):
-        super(TestImplCompSimpleSparse, self).setup()
+    def setup_partials(self):
         self.declare_partials(of='*', wrt='*')
 
     def linearize(self, inputs, outputs, jacobian):

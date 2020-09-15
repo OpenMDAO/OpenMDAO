@@ -594,7 +594,7 @@ class SellarDis1withDerivativesMod(SellarDis1):
     # Version of Sellar discipline 1 with a slightly incorrect x derivative.
     # This will still solve, but will require some backtracking at times.
 
-    def _do_declares(self):
+    def setup_partials(self):
         self.declare_partials(of='*', wrt='*')
 
     def compute_partials(self, inputs, partials):
