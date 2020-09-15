@@ -602,6 +602,7 @@ class Group(System):
         self._problem_meta['remote_vars'] = self._find_remote_var_owners(rsystems)
         self._problem_meta['prom2abs'] = self._get_all_promotes(rsystems)
 
+        self._resolve_group_input_defaults()
         auto_ivc = self._setup_auto_ivcs(mode)
         self._check_prom_masking()
 
@@ -924,12 +925,15 @@ class Group(System):
         else:
             self._discrete_inputs = self._discrete_outputs = ()
 
-    def _resolve_group_input_defaults(self):
+    def _resolve_group_input_defaults(self, show_warnings=False):
         """
         Resolve any ambiguities in group input defaults throughout the model.
         """
         skip = set(('path', 'use_tgt', 'prom'))
         prom2abs_in = self._var_allprocs_prom2abs_list['input']
+
+        self._set_default_arg_warnings = []
+        self._conflict_warnings = []
 
         for prom, metalist in self._group_inputs.items():
             try:
@@ -950,9 +954,14 @@ class Group(System):
                             origin_prom = submeta['prom']
                             val = fullmeta[key] = submeta[key]
                             if origin != top_origin:
-                                simple_warning(f"Group '{top_origin}' did not set a default "
-                                               f"'{key}' for input '{top_prom}', so the value of "
-                                               f"({val}) from group '{origin}' will be used.")
+                                msg = (f"Group '{top_origin}' did not set a default "
+                                       f"'{key}' for input '{top_prom}', so the value of "
+                                       f"({val}) from group '{origin}' will be used.")
+                                if show_warnings:
+                                    simple_warning(msg)
+                                else:
+                                    self._set_default_arg_warnings.append(msg)
+
                         else:
                             eq = submeta[key] == val
                             if isinstance(eq, np.ndarray):
@@ -960,11 +969,15 @@ class Group(System):
                             if not eq:
                                 # first, see if origin is an ancestor
                                 if not origin or submeta['path'].startswith(origin + '.'):
-                                    simple_warning(f"Groups '{origin}' and '{submeta['path']}' "
-                                                   f"called set_input_defaults for the input "
-                                                   f"'{origin_prom}' with conflicting '{key}'. "
-                                                   f"The value ({val}) from '{origin}' will be "
-                                                   "used.")
+                                    msg = (f"Groups '{origin}' and '{submeta['path']}' "
+                                          f"called set_input_defaults for the input "
+                                          f"'{origin_prom}' with conflicting '{key}'. "
+                                          f"The value ({val}) from '{origin}' will be "
+                                          "used.")
+                                    if show_warnings:
+                                        simple_warning(msg)
+                                    else:
+                                        self._conflict_warnings.append(msg)
                                 else:  # origin is not an ancestor, so we have an ambiguity
                                     if origin_prom != submeta['prom']:
                                         prm = f"('{origin_prom}' / '{submeta['prom']}')"
