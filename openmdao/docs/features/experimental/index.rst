@@ -12,4 +12,5 @@ Anything documented here is functional but not fully tested.
    discrete_vars.rst
    simul_coloring_fd_cs.rst
    plugins.rst
+   dynamic_shapes.rst
 

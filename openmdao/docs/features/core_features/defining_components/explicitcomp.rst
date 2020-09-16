@@ -25,11 +25,18 @@ The implementation of each method will be illustrated using a simple explicit co
 - :code:`setup()` :
 
   Declare input and output variables via :code:`add_input` and :code:`add_output`.
-  Information such as variable names, sizes, units, and bounds are declared here. Also in :code:`setup`, we declare partial derivatives that this component provides,
-  using wild cards to say that this component provides derivatives of all outputs with respect to all inputs.
+  Information such as variable names, sizes, units, and bounds are declared here.
 
   .. embed-code::
       openmdao.core.tests.test_expl_comp.RectangleComp.setup
+
+- :code:`setup_partials()` :
+
+  Declare partial derivatives that this component provides,
+  using wild cards to say that this component provides derivatives of all outputs with respect to all inputs.
+
+  .. embed-code::
+      openmdao.core.tests.test_expl_comp.RectangleComp.setup_partials
 
 - :code:`compute(inputs, outputs)` :
 

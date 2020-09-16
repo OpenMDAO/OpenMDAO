@@ -10,7 +10,7 @@ from scipy.sparse import issparse
 
 from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_META, \
     global_meta_names
-from openmdao.core.constants import INT_DTYPE
+from openmdao.core.constants import _UNDEFINED, INT_DTYPE
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.vectors.vector import _full_slice
 from openmdao.utils.array_utils import shape_to_len
@@ -157,19 +157,22 @@ class Component(System):
         self._var_rel_names = {'input': [], 'output': []}
         self._var_rel2meta = {}
 
-        self._var_rel2meta.update(self._static_var_rel2meta)
-        for type_ in ['input', 'output']:
-            self._var_rel_names[type_].extend(self._static_var_rel_names[type_])
-        self.setup()
+        # reset shape if any dynamic shape parameters are set in case this is a resetup
+        # NOTE: this is necessary because we allow variables to be added in __init__.
+        for meta in self._static_var_rel2meta.values():
+            if 'shape_by_conn' in meta and (meta['shape_by_conn'] or
+                                            meta['copy_shape'] is not None):
+                meta['shape'] = None
+                if not np.isscalar(meta['value']):
+                    if meta['value'].size > 0:
+                        meta['value'] = meta['value'].flatten()[0]
+                    else:
+                        meta['value'] = 1.0
 
-        # check to make sure that if num_par_fd > 1 that this system is actually doing FD.
-        # Unfortunately we have to do this check after system setup has been called because that's
-        # when declare_partials generally happens, so we raise an exception here instead of just
-        # resetting the value of num_par_fd (because the comm has already been split and possibly
-        # used by the system setup).
-        if self._num_par_fd > 1 and orig_comm.size > 1 and not (self._owns_approx_jac or
-                                                                self._approx_schemes):
-            raise RuntimeError("%s: num_par_fd is > 1 but no FD is active." % self.msginfo)
+        self._var_rel2meta.update(self._static_var_rel2meta)
+        for io in ['input', 'output']:
+            self._var_rel_names[io].extend(self._static_var_rel_names[io])
+        self.setup()
 
         self._set_vector_class()
 
@@ -334,9 +337,31 @@ class Component(System):
         self._subjacs_info = {}
         self._jacobian = DictionaryJacobian(system=self)
 
+        self.setup_partials()  # hook for component writers to specify sparsity patterns
+
+        # check to make sure that if num_par_fd > 1 that this system is actually doing FD.
+        # Unfortunately we have to do this check after system setup has been called because that's
+        # when declare_partials generally happens, so we raise an exception here instead of just
+        # resetting the value of num_par_fd (because the comm has already been split and possibly
+        # used by the system setup).
+        orig_comm = self._full_comm if self._full_comm is not None else self.comm
+        if self._num_par_fd > 1 and orig_comm.size > 1 and not (self._owns_approx_jac or
+                                                                self._approx_schemes):
+            raise RuntimeError("%s: num_par_fd is > 1 but no FD is active." % self.msginfo)
+
         for key, dct in self._declared_partials.items():
             of, wrt = key
             self._declare_partials(of, wrt, dct)
+
+    def setup_partials(self):
+        """
+        Declare partials.
+
+        This is meant to be overridden by component classes.  All partials should be
+        declared here since this is called after all size/shape information is known for
+        all variables.
+        """
+        pass
 
     def _update_wrt_matches(self, info):
         """
@@ -387,7 +412,7 @@ class Component(System):
                     self._subjacs_info[abs_key]['sparsity'] = tup
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
-                  units=None, desc='', tags=None):
+                  units=None, desc='', tags=None, shape_by_conn=False, copy_shape=None):
         """
         Add an input variable to the component.
 
@@ -418,6 +443,11 @@ class Component(System):
         tags : str or list of strs
             User defined tags that can be used to filter what gets listed when calling
             list_inputs and list_outputs.
+        shape_by_conn : bool
+            If True, shape this input to match its connected output.
+        copy_shape : str or None
+            If a str, that str is the name of a variable. Shape this input to match that of
+            the named variable.
 
         Returns
         -------
@@ -429,6 +459,7 @@ class Component(System):
             raise TypeError('%s: The name argument should be a string.' % self.msginfo)
         if not _valid_var_name(name):
             raise NameError("%s: '%s' is not a valid input name." % (self.msginfo, name))
+
         if not isscalar(val) and not isinstance(val, (list, tuple, ndarray, Iterable)):
             raise TypeError('%s: The val argument should be a float, list, tuple, ndarray or '
                             'Iterable' % self.msginfo)
@@ -449,22 +480,34 @@ class Component(System):
         if tags is not None and not isinstance(tags, (str, list)):
             raise TypeError('The tags argument should be a str or list')
 
-        src_slice = None
-        if src_indices is not None:
-            if _is_slicer_op(src_indices):
-                src_slice = src_indices
-                if flat_src_indices is not None:
-                    simple_warning(f"{self.msginfo}: Input '{name}' was added with slice "
-                                   "src_indices, so flat_src_indices is ignored.")
-                flat_src_indices = True
-            else:
-                src_indices = np.asarray(src_indices, dtype=INT_DTYPE)
+        if (shape_by_conn or copy_shape):
+            if shape is not None or not isscalar(val):
+                raise ValueError("%s: If shape is to be set dynamically using 'shape_by_conn' or "
+                                 "'copy_shape', 'shape' and 'val' should be a scalar, "
+                                 "but shape of '%s' and val of '%s' was given for variable '%s'."
+                                 % (self.msginfo, shape, val, name))
+            if src_indices is not None:
+                raise ValueError("%s: Setting of 'src_indices' along with 'shape_by_conn' or "
+                                 "'copy_shape' for variable '%s' is currently unsupported." %
+                                 (self.msginfo, name))
 
-        # value, shape: based on args, making sure they are compatible
-        value, shape, src_indices = ensure_compatible(name, val, shape, src_indices)
+        src_slice = None
+        if not (shape_by_conn or copy_shape):
+            if src_indices is not None:
+                if _is_slicer_op(src_indices):
+                    src_slice = src_indices
+                    if flat_src_indices is not None:
+                        simple_warning(f"{self.msginfo}: Input '{name}' was added with slice "
+                                       "src_indices, so flat_src_indices is ignored.")
+                    flat_src_indices = True
+                else:
+                    src_indices = np.asarray(src_indices, dtype=INT_DTYPE)
+
+            # value, shape: based on args, making sure they are compatible
+            val, shape, src_indices = ensure_compatible(name, val, shape, src_indices)
 
         metadata = {
-            'value': value,
+            'value': val,
             'shape': shape,
             'size': shape_to_len(shape),
             'src_indices': src_indices,  # these will ultimately be converted to a flat index array
@@ -474,6 +517,8 @@ class Component(System):
             'desc': desc,
             'distributed': self.options['distributed'],
             'tags': make_set(tags),
+            'shape_by_conn': shape_by_conn,
+            'copy_shape': copy_shape,
         }
 
         if self._static_mode:
@@ -549,7 +594,8 @@ class Component(System):
         return metadata
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, tags=None):
+                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, tags=None,
+                   shape_by_conn=False, copy_shape=None):
         """
         Add an output variable to the component.
 
@@ -592,28 +638,43 @@ class Component(System):
         tags : str or list of strs or set of strs
             User defined tags that can be used to filter what gets listed when calling
             list_inputs and list_outputs.
+        shape_by_conn : bool
+            If True, shape this output to match its connected input(s).
+        copy_shape : str or None
+            If a str, that str is the name of a variable. Shape this output to match that of
+            the named variable.
 
         Returns
         -------
         dict
             metadata for added variable
         """
+        # First, type check all arguments
+        if (shape_by_conn or copy_shape) and (shape is not None or not isscalar(val)):
+            raise ValueError("%s: If shape is to be set dynamically using 'shape_by_conn' or "
+                             "'copy_shape', 'shape' and 'val' should be scalar, "
+                             "but shape of '%s' and val of '%s' was given for variable '%s'."
+                             % (self.msginfo, shape, val, name))
+
         if not isinstance(name, str):
             raise TypeError('%s: The name argument should be a string.' % self.msginfo)
         if not _valid_var_name(name):
             raise NameError("%s: '%s' is not a valid output name." % (self.msginfo, name))
-        if not isscalar(val) and not isinstance(val, (list, tuple, ndarray, Iterable)):
-            msg = '%s: The val argument should be a float, list, tuple, ndarray or Iterable'
-            raise TypeError(msg % self.msginfo)
-        if not isscalar(ref) and not isinstance(val, (list, tuple, ndarray, Iterable)):
-            msg = '%s: The ref argument should be a float, list, tuple, ndarray or Iterable'
-            raise TypeError(msg % self.msginfo)
-        if not isscalar(ref0) and not isinstance(val, (list, tuple, ndarray, Iterable)):
-            msg = '%s: The ref0 argument should be a float, list, tuple, ndarray or Iterable'
-            raise TypeError(msg % self.msginfo)
-        if not isscalar(res_ref) and not isinstance(val, (list, tuple, ndarray, Iterable)):
-            msg = '%s: The res_ref argument should be a float, list, tuple, ndarray or Iterable'
-            raise TypeError(msg % self.msginfo)
+
+        if not (copy_shape or shape_by_conn):
+            if not isscalar(val) and not isinstance(val, (list, tuple, ndarray, Iterable)):
+                msg = '%s: The val argument should be a float, list, tuple, ndarray or Iterable'
+                raise TypeError(msg % self.msginfo)
+            if not isscalar(ref) and not isinstance(val, (list, tuple, ndarray, Iterable)):
+                msg = '%s: The ref argument should be a float, list, tuple, ndarray or Iterable'
+                raise TypeError(msg % self.msginfo)
+            if not isscalar(ref0) and not isinstance(val, (list, tuple, ndarray, Iterable)):
+                msg = '%s: The ref0 argument should be a float, list, tuple, ndarray or Iterable'
+                raise TypeError(msg % self.msginfo)
+            if not isscalar(res_ref) and not isinstance(val, (list, tuple, ndarray, Iterable)):
+                msg = '%s: The res_ref argument should be a float, list, tuple, ndarray or Iterable'
+                raise TypeError(msg % self.msginfo)
+
         if shape is not None and not isinstance(shape, (int, tuple, list, np.integer)):
             raise TypeError("%s: The shape argument should be an int, tuple, or list but "
                             "a '%s' was given" % (self.msginfo, type(shape)))
@@ -629,25 +690,26 @@ class Component(System):
         if tags is not None and not isinstance(tags, (str, set, list)):
             raise TypeError('The tags argument should be a str, set, or list')
 
-        # value, shape: based on args, making sure they are compatible
-        value, shape, _ = ensure_compatible(name, val, shape)
+        if not (copy_shape or shape_by_conn):
+            # value, shape: based on args, making sure they are compatible
+            val, shape, _ = ensure_compatible(name, val, shape)
 
-        if lower is not None:
-            lower = ensure_compatible(name, lower, shape)[0]
-            self._has_bounds = True
-        if upper is not None:
-            upper = ensure_compatible(name, upper, shape)[0]
-            self._has_bounds = True
+            if lower is not None:
+                lower = ensure_compatible(name, lower, shape)[0]
+                self._has_bounds = True
+            if upper is not None:
+                upper = ensure_compatible(name, upper, shape)[0]
+                self._has_bounds = True
 
-        # All refs: check the shape if necessary
-        for item, item_name in zip([ref, ref0, res_ref], ['ref', 'ref0', 'res_ref']):
-            if not isscalar(item):
-                it = atleast_1d(item)
-                if it.shape != shape:
-                    raise ValueError("{}: When adding output '{}', expected shape {} but got "
-                                     "shape {} for argument '{}'.".format(self.msginfo, name,
-                                                                          shape,
-                                                                          it.shape, item_name))
+            # All refs: check the shape if necessary
+            for item, item_name in zip([ref, ref0, res_ref], ['ref', 'ref0', 'res_ref']):
+                if not isscalar(item):
+                    it = atleast_1d(item)
+                    if it.shape != shape:
+                        raise ValueError("{}: When adding output '{}', expected shape {} but got "
+                                         "shape {} for argument '{}'.".format(self.msginfo, name,
+                                                                              shape, it.shape,
+                                                                              item_name))
 
         if isscalar(ref):
             self._has_output_scaling |= ref != 1.0
@@ -665,7 +727,7 @@ class Component(System):
             self._has_resid_scaling |= np.any(res_ref != 1.0)
 
         metadata = {
-            'value': value,
+            'value': val,
             'shape': shape,
             'size': shape_to_len(shape),
             'units': units,
@@ -678,6 +740,8 @@ class Component(System):
             'res_ref': format_as_float_or_array('res_ref', res_ref, flatten=True),
             'lower': lower,
             'upper': upper,
+            'shape_by_conn': shape_by_conn,
+            'copy_shape': copy_shape
         }
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.

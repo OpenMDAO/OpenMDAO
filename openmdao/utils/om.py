@@ -17,6 +17,8 @@ from itertools import chain
 import openmdao.utils.hooks as hooks
 from openmdao.visualization.n2_viewer.n2_viewer import n2
 from openmdao.visualization.connection_viewer.viewconns import view_connections
+from openmdao.visualization.dyn_shape_plot import _view_dyn_shapes_setup_parser, \
+    _view_dyn_shapes_cmd
 try:
     import bokeh
     from openmdao.visualization.meta_model_viewer.meta_model_visualization import view_metamodel
@@ -470,6 +472,8 @@ _command_map = {
     'view_coloring': (_view_coloring_setup_parser, _view_coloring_exec, 'View a colored jacobian.'),
     'view_connections': (_view_connections_setup_parser, _view_connections_cmd,
                          'View connections showing values and source/target units.'),
+    'view_dyn_shapes': (_view_dyn_shapes_setup_parser, _view_dyn_shapes_cmd,
+                        'View the dynamic shape dependency graph.'),
     'view_mm': (_meta_model_parser, _meta_model_cmd, "View a metamodel.")
 }
 

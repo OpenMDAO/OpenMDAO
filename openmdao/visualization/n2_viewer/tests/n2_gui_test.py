@@ -390,7 +390,8 @@ n2_gui_test_scripts = {
             "selector": "rect#indeps",
             "n2ElementCount": 2
         }
-    ]
+    ],
+    "nan_value": []
 }
 
 n2_gui_test_models = n2_gui_test_scripts.keys()
@@ -401,14 +402,23 @@ class n2_gui_test_case(unittest.TestCase):
     async def handle_console_err(self, msg):
         """ Invoked any time that an error or warning appears in the log. """
         if msg.type == 'warning':
-            print("Warning: " + self.current_test_desc + "\n" + msg.text + "\n")
+            self.console_warning = True
+            print('    Console Warning: ' + msg.text)
         elif msg.type == 'error':
-            self.fail(msg.text)
+            self.console_error = True
+            print('    Console Error: ' + msg.text)
 
-    async def setup_error_handlers(self):
+    async def handle_page_err(self, msg):
+        self.page_error = True
+        print('    Error on page: ', msg)
+
+    def setup_error_handlers(self):
+        self.console_warning = False
+        self.console_error = False
+        self.page_error = False
+
         self.page.on('console', lambda msg: self.handle_console_err(msg))
-        self.page.on('pageerror', lambda msg: self.fail(msg))
-#        self.page.on('requestfailed', lambda msg: self.fail(msg))
+        self.page.on('pageerror', lambda msg: self.handle_page_err(msg))
 
     async def setup_browser(self):
         """ Create a browser instance and print user agent info. """
@@ -425,7 +435,7 @@ class n2_gui_test_case(unittest.TestCase):
 
         self.page = await self.browser.newPage()
         await self.page.bringToFront()
-        await self.setup_error_handlers()
+        self.setup_error_handlers()
 
     def log_test(self, msg):
         global current_test
@@ -624,6 +634,16 @@ class n2_gui_test_case(unittest.TestCase):
             await self.run_model_script(self.scripts[bname])
 
         await self.browser.close()
+
+        if self.console_error:
+            msg = "Console log contains errors."
+            print(msg)
+            self.fail(msg)
+
+        if self.page_error:
+            msg = "There were errors on the page."
+            print(msg)
+            self.fail(msg)
 
     @parameterized.expand(n2_gui_test_models)
     def test_n2_gui(self, basename):
