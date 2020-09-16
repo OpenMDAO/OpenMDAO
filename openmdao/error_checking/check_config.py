@@ -372,7 +372,7 @@ def _check_auto_ivc_warnings(problem, logger):
     """
     if hasattr(problem.model, "_auto_ivc_warnings"):
         for i in problem.model._auto_ivc_warnings:
-            simple_warning(i)
+            logger.warning(i)
 
 
 def _check_system_configs(problem, logger):
