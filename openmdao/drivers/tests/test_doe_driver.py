@@ -1270,7 +1270,9 @@ class TestParallelDOE(unittest.TestCase):
         self.assertEqual(sum(num_cases), len(expected))
 
     def test_fan_in_grouped_parallel_2x2(self):
-        # the FanInGrouped model uses 2 processes
+        # run cases in parallel with 2 procs per model
+        # (cases will be split between the 2 parallel model instances)
+        run_parallel = True
         procs_per_model = 2
 
         prob = om.Problem(FanInGrouped())
@@ -1284,7 +1286,7 @@ class TestParallelDOE(unittest.TestCase):
         prob.driver = om.DOEDriver(om.FullFactorialGenerator(levels=3))
         prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
-        prob.driver.options['run_parallel'] = True
+        prob.driver.options['run_parallel'] = run_parallel
         prob.driver.options['procs_per_model'] = procs_per_model
 
         prob.setup()
@@ -1349,7 +1351,9 @@ class TestParallelDOE(unittest.TestCase):
         self.assertEqual(sum(num_cases), len(expected))
 
     def test_fan_in_grouped_parallel_4x1(self):
-        # run cases on all 4 procs (parallel model will run on single proc)
+        # run cases in parallel with 1 proc per model
+        # (cases will be split between the 4 serial model instances)
+        run_parallel = True
         procs_per_model = 1
 
         prob = om.Problem(FanInGrouped())
@@ -1362,7 +1366,8 @@ class TestParallelDOE(unittest.TestCase):
 
         prob.driver = om.DOEDriver(om.FullFactorialGenerator(levels=3))
         prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
-        prob.driver.options['run_parallel'] = True
+
+        prob.driver.options['run_parallel'] = run_parallel
         prob.driver.options['procs_per_model'] = procs_per_model
 
         prob.setup()
@@ -1419,7 +1424,9 @@ class TestParallelDOE(unittest.TestCase):
         self.assertEqual(sum(num_cases), len(expected))
 
     def test_fan_in_grouped_serial_2x2(self):
-        # the FanInGrouped model uses 2 processes
+        # do not run cases in parallel, but with 2 procs per model
+        # (all cases will run on each of the 2 parallel model instances)
+        run_parallel = False
         procs_per_model = 2
 
         prob = om.Problem(FanInGrouped())
@@ -1432,8 +1439,7 @@ class TestParallelDOE(unittest.TestCase):
         prob.driver = om.DOEDriver(om.FullFactorialGenerator(levels=3))
         prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
-        # do not run cases in parallel, each pair of procs will run all cases
-        prob.driver.options['run_parallel'] = False
+        prob.driver.options['run_parallel'] = run_parallel
         prob.driver.options['procs_per_model'] = procs_per_model
 
         prob.setup()
@@ -1488,6 +1494,80 @@ class TestParallelDOE(unittest.TestCase):
 
         # total number of cases recorded will be twice the number of cases
         # (every case will be recorded on all pairs of procs)
+        num_cases = prob.comm.allgather(num_cases)
+        self.assertEqual(sum(num_cases), num_models*len(expected))
+
+    def test_fan_in_grouped_serial_4x1(self):
+        # do not run cases in parallel, with 1 proc per model
+        # (all cases will run on each of the 4 serial model instances)
+        run_parallel = False
+        procs_per_model = 1
+
+        prob = om.Problem(FanInGrouped())
+        model = prob.model
+
+        model.add_design_var('x1', lower=0.0, upper=1.0)
+        model.add_design_var('x2', lower=0.0, upper=1.0)
+        model.add_objective('c3.y')
+
+        prob.driver = om.DOEDriver(om.FullFactorialGenerator(levels=3))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+
+        prob.driver.options['run_parallel'] = run_parallel
+        prob.driver.options['procs_per_model'] = procs_per_model
+
+        prob.setup()
+
+        failed, output = run_driver(prob)
+        self.assertFalse(failed)
+
+        prob.cleanup()
+
+        expected = [
+            {'x1': np.array([0.]), 'x2': np.array([0.]), 'c3.y': np.array([0.0])},
+            {'x1': np.array([.5]), 'x2': np.array([0.]), 'c3.y': np.array([-3.0])},
+            {'x1': np.array([1.]), 'x2': np.array([0.]), 'c3.y': np.array([-6.0])},
+
+            {'x1': np.array([0.]), 'x2': np.array([.5]), 'c3.y': np.array([17.5])},
+            {'x1': np.array([.5]), 'x2': np.array([.5]), 'c3.y': np.array([14.5])},
+            {'x1': np.array([1.]), 'x2': np.array([.5]), 'c3.y': np.array([11.5])},
+
+            {'x1': np.array([0.]), 'x2': np.array([1.]), 'c3.y': np.array([35.0])},
+            {'x1': np.array([.5]), 'x2': np.array([1.]), 'c3.y': np.array([32.0])},
+            {'x1': np.array([1.]), 'x2': np.array([1.]), 'c3.y': np.array([29.0])},
+        ]
+
+        rank = prob.comm.rank
+
+        # we are running the model on all four procs
+        num_models = prob.comm.size // procs_per_model
+
+        # there will be a separate case file for each proc, containing the cases
+        # run by the instance of the model that runs in serial mode on that proc
+        filename = "cases.sql_%d" % rank
+
+        expect_msg = "Cases from rank %d are being written to %s." % (rank, filename)
+        self.assertTrue(expect_msg in output)
+
+        # we are running 4 models in parallel, each using 1 proc
+        num_models = prob.comm.size // procs_per_model
+
+        cr = om.CaseReader(filename)
+        cases = cr.list_cases('driver', out_stream=None)
+
+        # cases recorded on this proc
+        num_cases = len(cases)
+        self.assertEqual(num_cases, len(expected))
+
+        for idx, case in enumerate(cases):
+            outputs = cr.get_case(case).outputs
+
+            self.assertEqual(outputs['x1'], expected[idx]['x1'])
+            self.assertEqual(outputs['x2'], expected[idx]['x2'])
+            self.assertEqual(outputs['c3.y'], expected[idx]['c3.y'])
+
+        # total number of cases recorded will be 4x the number of cases
+        # (every case will be recorded on all procs)
         num_cases = prob.comm.allgather(num_cases)
         self.assertEqual(sum(num_cases), num_models*len(expected))
 
