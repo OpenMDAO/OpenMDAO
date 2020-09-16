@@ -18,6 +18,7 @@ class ArrayMultiplyComp(om.ExplicitComponent):
         self.add_input('x', 1.)
         self.add_output('y', shape=array.shape)
 
+    def setup_partials(self):
         self.declare_partials(of='*', wrt='*')
 
     def compute(self, inputs, outputs):

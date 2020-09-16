@@ -66,6 +66,11 @@ CITATIONS = """@article{Hwang_maud_2018
 }
 """
 
+try:
+    DEFAULT_SIGNAL = signal.SIGUSR1
+except AttributeError:
+    DEFAULT_SIGNAL = None
+
 
 class UserRequestedException(Exception):
     """
@@ -151,6 +156,7 @@ class pyOptSparseDriver(Driver):
         # What we don't support yet
         self.supports['active_set'] = False
         self.supports['integer_design_vars'] = False
+        self.supports['distributed_design_vars'] = False
         self.supports._read_only = True
 
         # The user places optimizer-specific settings in here.
@@ -188,7 +194,7 @@ class pyOptSparseDriver(Driver):
         self.options.declare('gradient method', default='openmdao',
                              values={'openmdao', 'pyopt_fd', 'snopt_fd'},
                              desc='Finite difference implementation to use')
-        self.options.declare('user_terminate_signal', default=signal.SIGUSR1, allow_none=True,
+        self.options.declare('user_terminate_signal', default=DEFAULT_SIGNAL, allow_none=True,
                              desc='OS signal that triggers a clean user-termination. Only SNOPT'
                              'supports this option.')
 

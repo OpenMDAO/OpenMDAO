@@ -58,6 +58,13 @@ class DOEDriver(Driver):
 
         super(DOEDriver, self).__init__(**kwargs)
 
+        # What we support
+        self.supports['integer_design_vars'] = True
+
+        # What we don't support
+        self.supports['distributed_design_vars'] = False
+        self.supports._read_only = True
+
         if generator is not None:
             self.options['generator'] = generator
 

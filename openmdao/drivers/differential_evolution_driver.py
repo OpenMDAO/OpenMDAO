@@ -68,6 +68,7 @@ class DifferentialEvolutionDriver(Driver):
         self.supports['linear_constraints'] = False
         self.supports['simultaneous_derivatives'] = False
         self.supports['active_set'] = False
+        self.supports['distributed_design_vars'] = False
         self.supports._read_only = True
 
         self._desvar_idx = {}

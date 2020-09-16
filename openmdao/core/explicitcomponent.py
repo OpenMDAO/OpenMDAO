@@ -148,7 +148,8 @@ class ExplicitComponent(Component):
             self._set_approx_partials_meta()
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, tags=None):
+                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, tags=None,
+                   shape_by_conn=False, copy_shape=None):
         """
         Add an output variable to the component.
 
@@ -194,6 +195,11 @@ class ExplicitComponent(Component):
         tags : str or list of strs
             User defined tags that can be used to filter what gets listed when calling
             list_inputs and list_outputs and also when listing results from case recorders.
+        shape_by_conn : bool
+            If True, shape this output to match its connected input(s).
+        copy_shape : str or None
+            If a str, that str is the name of a variable. Shape this output to match that of
+            the named variable.
 
         Returns
         -------
@@ -208,7 +214,8 @@ class ExplicitComponent(Component):
                                                          res_units=res_units, desc=desc,
                                                          lower=lower, upper=upper,
                                                          ref=ref, ref0=ref0, res_ref=res_ref,
-                                                         tags=tags)
+                                                         tags=tags, shape_by_conn=shape_by_conn,
+                                                         copy_shape=copy_shape)
 
     def _approx_subjac_keys_iter(self):
         for abs_key, meta in self._subjacs_info.items():

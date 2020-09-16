@@ -132,6 +132,7 @@ class ExplicitCycleComp(ExplicitComponent):
         self.add_input(self._cycle_names['theta'], val=1.)
         self.add_output(self._cycle_names['theta_out'], shape=(1,))
 
+    def setup_partials(self):
         # Setup partials
 
         pd_type = self.options['partial_type']
@@ -336,7 +337,9 @@ class ExplicitLastComp(ExplicitFirstComp):
         self.add_output('x_norm2', shape=(1,))
         self._n = 1
 
+    def setup_partials(self):
         # Setup partials
+        super(ExplicitLastComp, self).setup_partials()
 
         pd_type = self.options['partial_type']
         method = self.options['partial_method']
