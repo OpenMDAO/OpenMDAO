@@ -286,7 +286,7 @@ class _pyDOE_Generator(DOEGenerator):
 
     def __init__(self, levels=_LEVELS):
         """
-        Initialize the FullFactorialGenerator.
+        Initialize the _pyDOE_Generator.
 
         Parameters
         ----------
@@ -296,7 +296,6 @@ class _pyDOE_Generator(DOEGenerator):
         """
         super(_pyDOE_Generator, self).__init__()
         self._levels = levels
-        self._level_lst = None
 
     def __call__(self, design_vars, model=None):
         """

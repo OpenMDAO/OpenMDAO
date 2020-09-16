@@ -1187,9 +1187,8 @@ def record_iteration(requester, prob, case_name):
     discrete_inputs = model._discrete_inputs
     discrete_outputs = model._discrete_outputs
 
-    data = {'input': {}, 'output': {}, 'residual': {}}
-
     opts = requester.recording_options
+    data = {'input': {}, 'output': {}, 'residual': {}}
     filt = requester._filtered_vars_to_record
 
     if opts['record_inputs'] and (inputs._names or len(discrete_inputs) > 0):
