@@ -61,11 +61,13 @@ except ImportError:
 class CmdlineTestCaseCheck(unittest.TestCase):
     def test_auto_ivc_warnings_check(self):
         cmd = 'openmdao check -c auto_ivc_warnings {}'.format(os.path.join(scriptdir, 'auto_ivc_warnings.py'))
-        msg = "UserWarning:Groups 'G1' and 'G1.G2' called set_input_defaults for the input 'x' with conflicting 'value'. The value (14.0) from 'G1' will be used.\n"
+        msg = "WARNING: Groups 'G1' and 'G1.G2' called set_input_defaults for the input 'x' with conflicting 'value'. The value (14.0) from 'G1' will be used."
 
         output = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        _, err = output.communicate()
-        self.assertEqual(err.decode('utf-8').rsplit(': ', 1)[1], msg)
+        out, _ = output.communicate()
+        for i in out.decode('utf-8').split("\n"):
+            if "WARNING:" in i:
+                self.assertEqual(i, msg)
 
 @use_tempdirs
 class CmdlineTestCase(unittest.TestCase):
