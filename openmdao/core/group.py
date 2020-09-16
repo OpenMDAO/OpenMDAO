@@ -24,7 +24,7 @@ from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import convert_neg, array_connection_compatible, \
     _flatten_src_indices
 from openmdao.utils.general_utils import ContainsAll, all_ancestors, simple_warning, \
-    common_subpath, conditional_error, _is_slicer_op, _slice_indices
+    common_subpath, conditional_error, _is_slicer_op, ensure_compatible
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 from openmdao.utils.coloring import Coloring, _STD_COLORING_FNAME
@@ -2855,7 +2855,7 @@ class Group(System):
         myrank = self.comm.rank
         with multi_proc_exception_check(self.comm):
             for src, tgts in auto2tgt.items():
-                tgt, sz, val, remote = self._get_auto_ivc_out_val(tgts, remote_vars, all_abs2meta,
+                tgt, _, val, remote = self._get_auto_ivc_out_val(tgts, remote_vars, all_abs2meta,
                                                                   abs2meta)
                 prom = abs2prom[tgt]
                 if prom not in self._group_inputs:
@@ -2872,18 +2872,28 @@ class Group(System):
                     val = gmeta['value']
 
                 # Add the output quickly.
-                # We don't need to ensure compatability or check for errors because we get the
-                # value straight from a source, and ivc metadata is minimal.
+                # We don't need to check for errors because we get the value straight from a
+                # source, and ivc metadata is minimal.
+                # auto_ivc.add_output(src.rsplit('.', 1)[-1], val=val, units=units)
+
+                def shape_to_len(shape):
+                    length = 1
+                    for dim in shape:
+                        length *= dim
+
+                    return length
+
                 name = src.rsplit('.', 1)[-1]
+                value, shape, _ = ensure_compatible(name, val, None)
                 metadata = {
-                    'value': val,
-                    'shape': (sz, ),
-                    'size': sz,
+                    'value': value,
+                    'shape': shape,
+                    'size': shape_to_len(shape),
                     'units': units,
                     'res_units': None,
                     'desc': '',
                     'distributed': False,
-                    'tags': None,
+                    'tags': set(),
                     'ref': 1.0,
                     'ref0': 0.0,
                     'res_ref': 1.0,
