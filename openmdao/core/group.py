@@ -89,6 +89,8 @@ class Group(System):
         Flag indicating whether connection errors are raised as an Exception.
     _order_set : bool
         Flag to check if set_order has been called.
+    _auto_ivc_warnings : list
+        List of Auto IVC warnings to be raised later with simple_warnings.
     _shapes_graph : nx.OrderedGraph
         Dynamic shape dependency graph, or None.
     _shape_knowns : set
@@ -900,16 +902,26 @@ class Group(System):
 
         self._vars_to_gather, self._dist_var_locality = self._find_remote_var_owners()
 
-    def _resolve_group_input_defaults(self):
+    def _resolve_group_input_defaults(self, show_warnings=False):
         """
         Resolve any ambiguities in group input defaults throughout the model.
+
+        Parameters
+        ----------
+        show_warnings : bool
+            Bool to show or hide the auto_ivc warnings.
         """
         skip = set(('path', 'use_tgt', 'prom'))
         prom2abs_in = self._var_allprocs_prom2abs_list['input']
 
+        self._auto_ivc_warnings = []
+
         for prom, metalist in self._group_inputs.items():
-            top_origin = metalist[0]['path']
-            top_prom = metalist[0]['prom']
+            try:
+                top_origin = metalist[0]['path']
+                top_prom = metalist[0]['prom']
+            except KeyError:
+                simple_warning("No auto IVCs found")
             allmeta = set()
             for meta in metalist:
                 allmeta.update(meta)
@@ -923,9 +935,14 @@ class Group(System):
                             origin_prom = submeta['prom']
                             val = fullmeta[key] = submeta[key]
                             if origin != top_origin:
-                                simple_warning(f"Group '{top_origin}' did not set a default "
-                                               f"'{key}' for input '{top_prom}', so the value of "
-                                               f"({val}) from group '{origin}' will be used.")
+                                msg = (f"Group '{top_origin}' did not set a default "
+                                       f"'{key}' for input '{top_prom}', so the value of "
+                                       f"({val}) from group '{origin}' will be used.")
+                                if show_warnings:
+                                    simple_warning(msg)
+                                else:
+                                    self._auto_ivc_warnings.append(msg)
+
                         else:
                             eq = submeta[key] == val
                             if isinstance(eq, np.ndarray):
@@ -933,11 +950,15 @@ class Group(System):
                             if not eq:
                                 # first, see if origin is an ancestor
                                 if not origin or submeta['path'].startswith(origin + '.'):
-                                    simple_warning(f"Groups '{origin}' and '{submeta['path']}' "
-                                                   f"called set_input_defaults for the input "
-                                                   f"'{origin_prom}' with conflicting '{key}'. "
-                                                   f"The value ({val}) from '{origin}' will be "
-                                                   "used.")
+                                    msg = (f"Groups '{origin}' and '{submeta['path']}' "
+                                           f"called set_input_defaults for the input "
+                                           f"'{origin_prom}' with conflicting '{key}'. "
+                                           f"The value ({val}) from '{origin}' will be "
+                                           "used.")
+                                    if show_warnings:
+                                        simple_warning(msg)
+                                    else:
+                                        self._auto_ivc_warnings.append(msg)
                                 else:  # origin is not an ancestor, so we have an ambiguity
                                     if origin_prom != submeta['prom']:
                                         prm = f"('{origin_prom}' / '{submeta['prom']}')"
