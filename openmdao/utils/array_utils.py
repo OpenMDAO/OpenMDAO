@@ -24,6 +24,9 @@ def shape_to_len(shape):
     int
         Length of multidimensional array.
     """
+    if shape is None:
+        return None
+
     length = 1
     for dim in shape:
         length *= dim

@@ -3072,6 +3072,8 @@ class Group(System):
                 'res_ref': 1.0,
                 'lower': None,
                 'upper': None,
+                'shape_by_conn': False,
+                'copy_shape': None
             }
 
             auto_ivc._static_var_rel2meta[name] = metadata
