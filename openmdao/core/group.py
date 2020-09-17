@@ -25,7 +25,7 @@ from openmdao.utils.array_utils import convert_neg, array_connection_compatible,
     _flatten_src_indices
 from openmdao.utils.general_utils import ContainsAll, all_ancestors, simple_warning, \
     common_subpath, conditional_error, _is_slicer_op, _slice_indices
-from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch
+from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 from openmdao.utils.coloring import Coloring, _STD_COLORING_FNAME
 import openmdao.utils.coloring as coloring_mod
@@ -3196,12 +3196,7 @@ class Group(System):
                     tmeta = abs2meta[tgt] if tgt in abs2meta else all_abs2meta[tgt]
                     tunits = tmeta['units'] if 'units' in tmeta else None
                     if 'units' not in gmeta and sunits != tunits:
-                        try:
-                            test_conv = unit_conversion(sunits, tunits)
-                            if abs(test_conv[0] - 1.0) > 1e-9 or abs(test_conv[1] - 0.0) > 1e-9:
-                                errs.add('units')
-                                metadata.add('units')
-                        except TypeError:
+                        if _find_unit(sunits) != _find_unit(tunits):
                             errs.add('units')
                             metadata.add('units')
                     if 'value' not in gmeta:

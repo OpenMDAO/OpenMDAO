@@ -914,8 +914,9 @@ class TestUnitConversion(unittest.TestCase):
                                             z={'value': 1.0, 'units': 'J/s'}),
                                             promotes_inputs=['x', 'z'])
         # trying to convert J/s/s to m/s**2 should cause Incompatible units TypeError exception
-        with self.assertRaises(TypeError):
+        with self.assertRaises(TypeError) as e:
             p.setup()
+        self.assertEqual(str(e.exception), 'Incompatible units')
 
 
 if __name__ == "__main__":
