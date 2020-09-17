@@ -297,17 +297,17 @@ class Component(System):
         self._owned_sizes = self._var_sizes['nonlinear']['output']
 
         if self._use_derivatives:
-            self._var_sizes['linear'] = self._var_sizes['nonlinear']
+            sizes = self._var_sizes
+            nl_sizes = sizes['nonlinear']
+            nl_abs2idx = self._var_allprocs_abs2idx['nonlinear']
+
+            sizes['linear'] = nl_sizes
             self._var_allprocs_relevant_names['linear'] = nl_allprocs_relnames
             self._var_relevant_names['linear'] = nl_relnames
-            self._var_allprocs_abs2idx['linear'] = self._var_allprocs_abs2idx['nonlinear']
-
-            sizes = self._var_sizes
-            nl_abs2idx = self._var_allprocs_abs2idx['nonlinear']
-            nl_sizes = self._var_sizes['nonlinear']
+            self._var_allprocs_abs2idx['linear'] = nl_abs2idx
 
             # Initialize size arrays for other linear vecs besides 'linear'
-            # (which is the same as 'nonlinear' and was computed in _setup_var_data)
+            # (which is the same as 'nonlinear')
             for vec_name in self._lin_rel_vec_name_list[1:]:
                 # at component level, _var_allprocs_* is the same as var_* since all vars exist in
                 # all procs for a given component, so we don't have to mess with figuring out what
@@ -514,7 +514,6 @@ class Component(System):
             'tags': make_set(tags),
             'shape_by_conn': shape_by_conn,
             'copy_shape': copy_shape,
-            'iotype': 'input',
         }
 
         if self._static_mode:
@@ -569,7 +568,6 @@ class Component(System):
             'type': type(val),
             'desc': desc,
             'tags': make_set(tags),
-            'iotype': 'input',
         }
 
         if metadata['type'] == np.ndarray:
@@ -739,7 +737,6 @@ class Component(System):
             'upper': upper,
             'shape_by_conn': shape_by_conn,
             'copy_shape': copy_shape,
-            'iotype': 'output',
         }
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
@@ -794,7 +791,6 @@ class Component(System):
             'type': type(val),
             'desc': desc,
             'tags': make_set(tags),
-            'iotype': 'output',
         }
 
         if metadata['type'] == np.ndarray:
@@ -851,18 +847,20 @@ class Component(System):
             return set()
 
         iproc = self.comm.rank
-        abs2meta = self._var_abs2meta['input']
+        abs2meta_in = self._var_abs2meta['input']
+        all_abs2meta_in = all_abs2meta['input']
+        all_abs2meta_out = all_abs2meta['output']
 
         sizes_in = self._var_sizes['nonlinear']['input']
         sizes_out = all_sizes['nonlinear']['output']
         added_src_inds = set()
         for i, iname in enumerate(self._var_allprocs_abs2meta['input']):
-            if iname in abs2meta and abs2meta[iname]['src_indices'] is None:
+            if iname in abs2meta_in and abs2meta_in[iname]['src_indices'] is None:
                 src = abs_in2out[iname]
                 out_i = all_abs2idx[src]
                 nzs = np.nonzero(sizes_out[:, out_i])[0]
-                if (all_abs2meta['output'][src]['global_size'] ==
-                        all_abs2meta['input'][iname]['global_size'] or nzs.size == self.comm.size):
+                if (all_abs2meta_out[src]['global_size'] ==
+                        all_abs2meta_in[iname]['global_size'] or nzs.size == self.comm.size):
                     # This offset assumes a 'full' distributed output
                     offset = np.sum(sizes_in[:iproc, i])
                     end = offset + sizes_in[iproc, i]
@@ -878,8 +876,8 @@ class Component(System):
                 simple_warning(f"{self.msginfo}: Component is distributed but input '{iname}' was "
                                "added without src_indices. Setting src_indices to "
                                f"range({offset}, {end}).")
-                abs2meta[iname]['src_indices'] = np.arange(offset, end, dtype=INT_DTYPE)
-                all_abs2meta['input'][iname]['has_src_indices'] = True
+                abs2meta_in[iname]['src_indices'] = np.arange(offset, end, dtype=INT_DTYPE)
+                all_abs2meta_in[iname]['has_src_indices'] = True
                 added_src_inds.add(iname)
 
         return added_src_inds
