@@ -3196,8 +3196,14 @@ class Group(System):
                     tmeta = abs2meta[tgt] if tgt in abs2meta else all_abs2meta[tgt]
                     tunits = tmeta['units'] if 'units' in tmeta else None
                     if 'units' not in gmeta and sunits != tunits:
-                        errs.add('units')
-                        metadata.add('units')
+                        try:
+                            test_conv = unit_conversion(sunits, tunits)
+                            if abs(test_conv[0] - 1.0) > 1e-9 or abs(test_conv[1] - 0.0) > 1e-9:
+                                errs.add('units')
+                                metadata.add('units')
+                        except TypeError:
+                            errs.add('units')
+                            metadata.add('units')
                     if 'value' not in gmeta:
                         if tval.shape == sval.shape:
                             if _has_val_mismatch(tunits, tval, sunits, sval):
