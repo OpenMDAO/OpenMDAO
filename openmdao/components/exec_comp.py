@@ -574,18 +574,13 @@ class _IODict(object):
         self._inputs = inputs
 
     def __getitem__(self, name):
-        if name in self._outputs:
-            return self._outputs[name]
-        else:
+        try:
             return self._inputs[name]
+        except KeyError:
+            return self._outputs[name]
 
     def __setitem__(self, name, value):
-        if name in self._outputs:
-            self._outputs[name] = value
-        elif name in self._inputs:
-            self._inputs[name] = value
-        else:
-            self._outputs[name] = value  # will raise KeyError
+        self._outputs[name] = value
 
     def __contains__(self, name):
         return name in self._outputs or name in self._inputs
