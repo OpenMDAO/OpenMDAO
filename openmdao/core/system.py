@@ -610,6 +610,41 @@ class System(object):
             self._approx_schemes[method] = _supported_methods[method]()
         return self._approx_schemes[method]
 
+    def get_source(self, name):
+        """
+        Return the source variable connected to the given named variable.
+
+        The name can be a promoted name or an absolute name.
+        If the given variable is an input, the absolute name of the connected source will
+        be returned.  If the given variable itself is a source, its own absolute name will
+        be returned.
+
+        Parameters
+        ----------
+        name : str
+            Absolute or promoted name of the variable.
+
+        Returns
+        -------
+        str
+            The absolute name of the source variable.
+        """
+        if self._problem_meta is None or 'prom2abs' not in self._problem_meta:
+            raise RuntimeError(f"{self.msginfo}: get_source cannot be called for variable {name} "
+                               "before Problem.setup is complete.")
+
+        model = self._problem_meta['model_ref']()
+        prom2abs = self._problem_meta['prom2abs']
+        if name in prom2abs['input']:
+            name = prom2abs['input'][name][0]
+        elif name in prom2abs['output']:
+            return prom2abs['output'][name][0]
+
+        if name in model._conn_global_abs_in2out:
+            return model._conn_global_abs_in2out[name]
+
+        return name
+
     def _setup(self, comm, mode, prob_meta):
         """
         Perform setup for this system and its descendant systems.
@@ -1401,7 +1436,6 @@ class System(object):
         """
         vois = set()
         vectorized_vois = {}
-        conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
 
         if self._use_derivatives:
             vec_names = ['nonlinear', 'linear']
@@ -1409,10 +1443,7 @@ class System(object):
             # auto_ivc source where applicable.
             for system in self.system_iter(include_self=True, recurse=True):
                 for name, meta in system._get_vec_names_from_vois(mode):
-                    if name in conns:
-                        vois.add(conns[name])
-                    else:
-                        vois.add(name)
+                    vois.add(system.get_source(name))
                     if meta['vectorize_derivs']:
                         vectorized_vois[name] = meta
 
@@ -1481,7 +1512,6 @@ class System(object):
         abs2meta = self._var_abs2meta['output']
         pro2abs = self._var_allprocs_prom2abs_list['output']
         pro2abs_in = self._var_allprocs_prom2abs_list['input']
-        conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
 
         dv = self._design_vars
         for name, meta in dv.items():
@@ -1496,13 +1526,7 @@ class System(object):
                 try:
                     units_src = meta['ivc_source']
                 except KeyError:
-                    if name in abs2meta:
-                        units_src = name
-                    elif name in pro2abs:
-                        units_src = pro2abs[name][0]
-                    else:
-                        in_abs = pro2abs_in[name][0]
-                        units_src = conns[in_abs]
+                    units_src = self.get_source(name)
 
                 var_units = abs2meta[units_src]['units']
 
@@ -1541,13 +1565,7 @@ class System(object):
                 try:
                     units_src = meta['ivc_source']
                 except KeyError:
-                    if name in abs2meta:
-                        units_src = name
-                    elif name in pro2abs:
-                        units_src = pro2abs[name][0]
-                    else:
-                        in_abs = pro2abs_in[name][0]
-                        units_src = conns[in_abs]
+                    units_src = self.get_source(name)
 
                 var_units = abs2meta[units_src]['units']
 
@@ -1594,7 +1612,6 @@ class System(object):
         else:
             self._relevant = relevant
 
-        conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
         self._rel_vec_name_list = ['nonlinear', 'linear']
         for vec_name in self._vec_names[2:]:
             rel, relsys = relevant[vec_name]['@all']
