@@ -482,9 +482,10 @@ class ParFDErrorsMPITestCase(unittest.TestCase):
         self.assertEqual(str(ctx.exception), "Group (<model>): num_par_fd = 3 but FD is not active.")
 
     def test_no_partial_approx(self):
+        p = _setup_problem(self.mat, partial_num_par_fd = 3, approx_totals=False)
         with self.assertRaises(RuntimeError) as ctx:
-            _setup_problem(self.mat, partial_num_par_fd = 3, approx_totals=False)
-
+            p.final_setup()
+            
         self.assertEqual(str(ctx.exception), "MatMultComp (comp): num_par_fd is > 1 but no FD is active.")
 
 

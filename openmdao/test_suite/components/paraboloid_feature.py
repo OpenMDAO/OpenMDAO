@@ -15,6 +15,7 @@ class Paraboloid(om.ExplicitComponent):
 
         self.add_output('f_xy', val=0.0)
 
+    def setup_partials(self):
         # Finite difference all partials.
         self.declare_partials('*', '*', method='fd')
 

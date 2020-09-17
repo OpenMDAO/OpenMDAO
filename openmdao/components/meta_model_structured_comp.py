@@ -166,7 +166,7 @@ class MetaModelStructuredComp(ExplicitComponent):
             'dependent': True,
         }
 
-        for name in self._outputs:
+        for name in self._var_rel_names['output']:
             self._declare_partials(of=name, wrt=pnames, dct=dct)
             if self.options['training_data_gradients']:
                 self._declare_partials(of=name, wrt="%s_train" % name, dct={'dependent': True})

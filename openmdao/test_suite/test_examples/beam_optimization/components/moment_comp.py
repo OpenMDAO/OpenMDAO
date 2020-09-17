@@ -15,7 +15,8 @@ class MomentOfInertiaComp(om.ExplicitComponent):
         self.add_input('h', shape=num_elements)
         self.add_output('I', shape=num_elements)
 
-        rows = cols = np.arange(num_elements)
+    def setup_partials(self):
+        rows = cols = np.arange(self.options['num_elements'])
         self.declare_partials('I', 'h', rows=rows, cols=cols)
 
     def compute(self, inputs, outputs):

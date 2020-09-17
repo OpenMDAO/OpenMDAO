@@ -49,9 +49,7 @@ class SellarDis1(om.ExplicitComponent):
         # Coupling output
         self.add_output('y1', val=1.0, lower=0.1, upper=1000., units=units, ref=ref)
 
-        self._do_declares()
-
-    def _do_declares(self):
+    def setup_partials(self):
         # Finite difference everything
         self.declare_partials('*', '*', method='fd')
 
@@ -76,7 +74,7 @@ class SellarDis1withDerivatives(SellarDis1):
     Component containing Discipline 1 -- derivatives version.
     """
 
-    def _do_declares(self):
+    def setup_partials(self):
         # Analytic Derivs
         self.declare_partials(of='*', wrt='*')
 
@@ -94,7 +92,7 @@ class SellarDis1CS(SellarDis1):
     Component containing Discipline 1 -- complex step version.
     """
 
-    def _do_declares(self):
+    def setup_partials(self):
         # Analytic Derivs
         self.declare_partials(of='*', wrt='*', method='cs')
 
@@ -130,9 +128,7 @@ class SellarDis2(om.ExplicitComponent):
         # Coupling output
         self.add_output('y2', val=1.0, lower=0.1, upper=1000., units=units, ref=ref)
 
-        self._do_declares()
-
-    def _do_declares(self):
+    def setup_partials(self):
         # Finite difference everything
         self.declare_partials('*', '*', method='fd')
 
@@ -162,7 +158,7 @@ class SellarDis2withDerivatives(SellarDis2):
     Component containing Discipline 2 -- derivatives version.
     """
 
-    def _do_declares(self):
+    def setup_partials(self):
         # Analytic Derivs
         self.declare_partials(of='*', wrt='*')
 
@@ -185,7 +181,7 @@ class SellarDis2CS(SellarDis2):
     Component containing Discipline 2 -- complex step version.
     """
 
-    def _do_declares(self):
+    def setup_partials(self):
         # Analytic Derivs
         self.declare_partials(of='*', wrt='*', method='cs')
 
@@ -431,6 +427,7 @@ class StateConnection(om.ImplicitComponent):
         # States
         self.add_output('y2_command', val=1.0)
 
+    def setup_partials(self):
         # Declare derivatives
         self.declare_partials(of='*', wrt='*')
 
@@ -559,6 +556,7 @@ class SellarImplicitDis1(om.ImplicitComponent):
         # Coupling output
         self.add_output('y1', val=1.0, lower=-0.1, upper=1000, units=units, ref=ref)
 
+    def setup_partials(self):
         # Derivatives
         self.declare_partials('*', '*')
 
@@ -618,6 +616,7 @@ class SellarImplicitDis2(om.ImplicitComponent):
         # Coupling output
         self.add_output('y2', val=1.0, lower=0.1, upper=1000., units=units, ref=ref)
 
+    def setup_partials(self):
         # Derivatives
         self.declare_partials('*', '*')
 

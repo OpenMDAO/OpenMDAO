@@ -56,6 +56,7 @@ class SimpleCompDependence(SimpleComp):
         self.add_output('f', shape=1)
         self.add_output('g', shape=(2, 2))
 
+    def setup_partials(self):
         self.declare_partials('f', 'y1', dependent=False)
         self.declare_partials('f', 'y2', dependent=False)
         self.declare_partials('f', 'y3', dependent=False)
@@ -73,6 +74,7 @@ class SimpleCompGlob(SimpleComp):
         self.add_output('f', shape=1)
         self.add_output('g', shape=(2, 2))
 
+    def setup_partials(self):
         # This matches y1, y2, and y3.
         self.declare_partials('f', 'y*', dependent=False)
 
@@ -91,6 +93,7 @@ class SimpleCompConst(om.ExplicitComponent):
         self.add_output('f', shape=1)
         self.add_output('g', shape=(2, 2))
 
+    def setup_partials(self):
         # Declare derivatives
 
         self.declare_partials('f', ['y1', 'y2', 'y3'], dependent=False)
@@ -117,9 +120,7 @@ class SimpleCompFD(SimpleComp):
         super(SimpleCompFD, self).__init__()
         self.kwargs = kwargs
 
-    def setup(self):
-        super(SimpleCompFD, self).setup()
-
+    def setup_partials(self):
         self.declare_partials('*', '*', method='fd', **self.kwargs)
 
     def compute_partials(self, inputs, partials):
@@ -131,9 +132,7 @@ class SimpleCompMixedFD(SimpleComp):
         super(SimpleCompMixedFD, self).__init__()
         self.kwargs = kwargs
 
-    def setup(self):
-        super(SimpleCompMixedFD, self).setup()
-
+    def setup_partials(self):
         self.declare_partials('f', ['x', 'z'])
         self.declare_partials('g', ['y1', 'y3'])
 
@@ -155,9 +154,7 @@ class SimpleCompKwarg(SimpleComp):
         self.partial_kwargs = partial_kwargs
         super(SimpleCompKwarg, self).__init__()
 
-    def setup(self):
-        super(SimpleCompKwarg, self).setup()
-
+    def setup_partials(self):
         self.declare_partials(**self.partial_kwargs)
 
     def compute_partials(self, inputs, partials):
@@ -344,6 +341,7 @@ class TestJacobianFeatures(unittest.TestCase):
                 self.add_output('flow:T', val=284., units="degR", desc="Temperature")
                 self.add_output('flow:P', val=1., units='lbf/inch**2', desc="Pressure")
 
+            def setup_partials(self):
                 self.declare_partials(of='*', wrt='*', method='fd')
 
             def compute(self, inputs, outputs):
@@ -390,6 +388,7 @@ class TestJacobianFeatures(unittest.TestCase):
                 self.add_output('z', shape=(3, ))
                 self.add_input('x', shape=(3, ), units='degF')
 
+            def setup_partials(self):
                 self.declare_partials(of='*', wrt='*')
 
             def compute_partials(self, inputs, partials):
@@ -452,6 +451,7 @@ class TestJacobianForDocs(unittest.TestCase):
                 self.add_input('x', shape=(4,))
                 self.add_output('f', shape=(2,))
 
+            def setup_partials(self):
                 self.declare_partials(of='f', wrt='x',
                                       rows=[0, 1, 1, 1],
                                       cols=[0, 1, 2, 3])
@@ -492,6 +492,7 @@ class TestJacobianForDocs(unittest.TestCase):
                 self.add_input('x', shape=(4,))
                 self.add_output('f', shape=(2,))
 
+            def setup_partials(self):
                 self.declare_partials(of='f', wrt='x',
                                       rows=[0, 1, 1, 1],
                                       cols=[0, 1, 2, 3])
@@ -522,6 +523,7 @@ class TestJacobianForDocs(unittest.TestCase):
                 self.add_input('y', shape=(2,))
                 self.add_output('f', shape=(2,))
 
+            def setup_partials(self):
                 self.declare_partials(of='f', wrt='x',
                                       rows=[0, 1, 1, 1],
                                       cols=[0, 1, 2, 3],
@@ -554,6 +556,7 @@ class TestJacobianForDocs(unittest.TestCase):
                 self.add_input('y2', shape=(2,))
                 self.add_output('f', shape=(2,))
 
+            def setup_partials(self):
                 self.declare_partials('f', 'y*', method='fd')
                 self.declare_partials('f', 'x', method='fd')
 
@@ -591,6 +594,7 @@ class TestJacobianForDocs(unittest.TestCase):
                 self.add_input('y2', shape=(2,))
                 self.add_output('f', shape=(2,))
 
+            def setup_partials(self):
                 self.declare_partials('f', 'y*', method='fd', form='backward', step=1e-6)
                 self.declare_partials('f', 'x', method='fd', form='central', step=1e-4)
 

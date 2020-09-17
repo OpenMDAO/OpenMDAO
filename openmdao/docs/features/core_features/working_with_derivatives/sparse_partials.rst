@@ -7,7 +7,7 @@ Sparse Partial Derivatives
 When a partial derivative is sparse (few nonzero entries compared to the total size of the matrix),
 it may be advantageous to utilize a format that stores only the nonzero entries. To use sparse
 partial derivatives, they must first be declared with the sparsity pattern in
-:code:`setup` using the :code:`declare_partials` method.
+:code:`setup_partials` using the :code:`declare_partials` method.
 
 Usage
 -----

@@ -2651,8 +2651,11 @@ class TestGroupAddInput(unittest.TestCase):
         g1.set_input_defaults('x', units='inch', val=2.)
 
         msg = "Groups 'G1' and 'G1.G2' called set_input_defaults for the input 'x' with conflicting 'units'. The value (inch) from 'G1' will be used."
-        with assert_warning(UserWarning, msg):
-            p.setup()
+        testlogger = TestLogger()
+        p.setup(check=True, logger=testlogger)
+        p.final_setup()
+
+        self.assertEqual(testlogger.get('warning')[1], msg)
 
     def test_sub_sub_override(self):
         p = om.Problem()
@@ -2665,8 +2668,11 @@ class TestGroupAddInput(unittest.TestCase):
         G3.add_subsystem('C2', om.ExecComp('y = 4.*x', x={'units': 'cm'}), promotes=['x'])
         G3.set_input_defaults('x', units='cm')
         msg = "Groups 'G1' and 'G1.G2.G3' called set_input_defaults for the input 'x' with conflicting 'units'. The value (mm) from 'G1' will be used."
-        with assert_warning(UserWarning, msg):
-            p.setup()
+        testlogger = TestLogger()
+        p.setup(check=True, logger=testlogger)
+        p.final_setup()
+
+        self.assertEqual(testlogger.get('warning')[1], msg)
 
     def test_sub_sets_parent_meta(self):
         p = om.Problem()
@@ -2677,8 +2683,11 @@ class TestGroupAddInput(unittest.TestCase):
         G2.add_subsystem('C1', om.ExecComp('y = 3.*x', x={'units': 'm'}), promotes=['x'])
         G2.set_input_defaults('x', units='cm')
         msg = "Group 'G1' did not set a default 'units' for input 'x', so the value of (cm) from group 'G1.G2' will be used."
-        with assert_warning(UserWarning, msg):
-            p.setup()
+        testlogger = TestLogger()
+        p.setup(check=True, logger=testlogger)
+        p.final_setup()
+
+        self.assertEqual(testlogger.get('warning')[1], msg)
 
     def test_sub_sub_override2(self):
         p = om.Problem()
@@ -2691,21 +2700,16 @@ class TestGroupAddInput(unittest.TestCase):
         G3.add_subsystem('C1', om.ExecComp('y = 3.*x', x={'units': 'm'}), promotes=['x'])
         G3.add_subsystem('C2', om.ExecComp('y = 4.*x', x={'units': 'cm'}), promotes=['x'])
         G3.set_input_defaults('x', units='cm')
+        testlogger = TestLogger()
+        p.setup(check=True, logger=testlogger)
         msgs = [
             "Groups 'G1' and 'G1.G2' called set_input_defaults for the input 'x' with conflicting 'units'. The value (mm) from 'G1' will be used.",
             "Groups 'G1' and 'G1.G2.G3' called set_input_defaults for the input 'x' with conflicting 'units'. The value (mm) from 'G1' will be used."
         ]
-        with reset_warning_registry():
-            with warnings.catch_warnings(record=True) as w:
-                warnings.simplefilter("always")
-                p.setup()
+        p.final_setup()
 
-        for msg in msgs:
-            for warn in w:
-                if (issubclass(warn.category, UserWarning) and str(warn.message) == msg):
-                    break
-            else:
-                raise AssertionError("Did not see expected UserWarning: %s" % msg)
+        self.assertEqual(testlogger.get('warning')[1], msgs[0])
+        self.assertEqual(testlogger.get('warning')[2], msgs[1])
 
     def test_conflicting_units_multi_level_par(self):
         # multiple Group.set_input_defaults calls at different tree levels with conflicting units args
@@ -3761,6 +3765,33 @@ class TestFeatureConfigure(unittest.TestCase):
         assert_near_equal(p.get_val('totalforcecomp.total_force', units='kN'),
                          np.array([[100, 200, 300], [0, -1, -2]]).T)
 
+    def test_configure_dyn_shape_err(self):
+
+        class MyComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', shape_by_conn=True, copy_shape='y')
+                self.add_output('y', shape_by_conn=True, copy_shape='x')
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = 3*inputs['x']
+
+        class MyGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('comp', MyComp())
+
+            def configure(self):
+                meta = self.comp.get_io_metadata('output', includes='y')
+
+        p = om.Problem()
+        p.model.add_subsystem("G", MyGroup())
+        p.model.add_subsystem("sink", om.ExecComp('y=5*x'))
+        p.model.connect('G.comp.y', 'sink.x')
+        with self.assertRaises(RuntimeError) as cm:
+            p.setup()
+
+        msg="MyComp (G.comp): Can't retrieve shape, size, or value for dynamically sized variable 'y' because they aren't known yet."
+        self.assertEqual(str(cm.exception), msg)
+
 
 class TestFeatureGuessNonlinear(unittest.TestCase):
 
@@ -3972,7 +4003,7 @@ class TestNaturalNamingMPI(unittest.TestCase):
                 p.model.comm.barrier()
                 self.assertEqual(p.get_val(name, get_remote=True), 9. + outcount)
 
-        self.assertEqual(p.model._gatherable_vars,
+        self.assertEqual(set(p.model._vars_to_gather),
                          {'par.g1.g2.g3.g4.c1.x', 'par.g1a.g2.g3.g4.c1.x', 'par.g1.g2.g3.g4.c1.y', 'par.g1a.g2.g3.g4.c1.y'})
 
 
