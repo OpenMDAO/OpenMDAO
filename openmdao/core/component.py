@@ -13,6 +13,7 @@ from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_M
 from openmdao.core.constants import _UNDEFINED, INT_DTYPE
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.vectors.vector import _full_slice
+from openmdao.utils.array_utils import shape_to_len
 from openmdao.utils.units import valid_units
 from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key, rel_name2abs_name
 from openmdao.utils.mpi import MPI
@@ -504,7 +505,7 @@ class Component(System):
         metadata = {
             'value': val,
             'shape': shape,
-            'size': np.prod(shape),
+            'size': shape_to_len(shape),
             'src_indices': src_indices,  # these will ultimately be converted to a flat index array
             'flat_src_indices': flat_src_indices,
             'src_slice': src_slice,  # store slice def here, if any.  This is never overwritten
@@ -724,7 +725,7 @@ class Component(System):
         metadata = {
             'value': val,
             'shape': shape,
-            'size': np.prod(shape),
+            'size': shape_to_len(shape),
             'units': units,
             'res_units': res_units,
             'desc': desc,
@@ -1226,7 +1227,7 @@ class Component(System):
 
         return opts
 
-    def _declare_partials(self, of, wrt, dct):
+    def _declare_partials(self, of, wrt, dct, quick_declare=False):
         """
         Store subjacobian metadata for later use.
 
@@ -1241,7 +1242,23 @@ class Component(System):
             May also contain glob patterns.
         dct : dict
             Metadata dict specifying shape, and/or approx properties.
+        quick_declare : bool
+            This is set to True when declaring the jacobian diagonal terms for explicit
+            components. The checks and conversions are all skipped to improve performance for
+            cases with large numbers of explicit components or indepvarcomps.
         """
+        if quick_declare:
+            abs_key = rel_key2abs_key(self, (of, wrt))
+
+            meta = {}
+            meta['rows'] = np.array(dct['rows'], dtype=INT_DTYPE, copy=False)
+            meta['cols'] = np.array(dct['cols'], dtype=INT_DTYPE, copy=False)
+            meta['shape'] = (len(dct['rows']), len(dct['cols']))
+            meta['value'] = dct['value']
+
+            self._subjacs_info[abs_key] = meta
+            return
+
         val = dct['value'] if 'value' in dct else None
         is_scalar = isscalar(val)
         dependent = dct['dependent']
