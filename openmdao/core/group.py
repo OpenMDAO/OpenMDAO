@@ -2306,8 +2306,6 @@ class Group(System):
         """
         Compute residuals. The model is assumed to be in a scaled state.
         """
-        name = self.pathname if self.pathname else 'root'
-
         self._transfer('nonlinear', 'fwd')
         # Apply recursion
         for subsys in self._subsystems_myproc:
