@@ -736,7 +736,7 @@ class Component(System):
             'lower': lower,
             'upper': upper,
             'shape_by_conn': shape_by_conn,
-            'copy_shape': copy_shape,
+            'copy_shape': copy_shape
         }
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
@@ -790,7 +790,7 @@ class Component(System):
             'value': val,
             'type': type(val),
             'desc': desc,
-            'tags': make_set(tags),
+            'tags': make_set(tags)
         }
 
         if metadata['type'] == np.ndarray:

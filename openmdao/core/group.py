@@ -759,7 +759,7 @@ class Group(System):
                     {'input': {}, 'output': {}},
                     False,
                     False,
-                    {},
+                    {}
                 )
 
             gathered = self.comm.allgather(raw)
