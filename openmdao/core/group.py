@@ -23,7 +23,7 @@ from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import array_connection_compatible, _flatten_src_indices, \
     shape_to_len
 from openmdao.utils.general_utils import ContainsAll, simple_warning, common_subpath, \
-    conditional_error, _is_slicer_op, ensure_compatible
+    conditional_error, _is_slicer_op
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit
 from openmdao.utils.mpi import MPI, check_mpi_exceptions
 import openmdao.utils.coloring as coloring_mod
@@ -3070,35 +3070,7 @@ class Group(System):
             if not remote and 'value' in gmeta:
                 val = gmeta['value']
             relsrc = src.rsplit('.', 1)[-1]
-
-            # Add the output quickly.
-            # We don't need to check for errors because we get the value straight from a
-            # source, and ivc metadata is minimal.
-
-            name = src.rsplit('.', 1)[-1]
-            value, shape, _ = ensure_compatible(name, val, None)
-            metadata = {
-                'value': value,
-                'shape': shape,
-                'size': shape_to_len(shape),
-                'units': units,
-                'res_units': None,
-                'desc': '',
-                'distributed': False,
-                'tags': set(),
-                'ref': 1.0,
-                'ref0': 0.0,
-                'res_ref': 1.0,
-                'lower': None,
-                'upper': None,
-                'shape_by_conn': False,
-                'copy_shape': None
-            }
-
-            auto_ivc._static_var_rel2meta[name] = metadata
-            auto_ivc._static_var_rel_names['output'].append(name)
-            auto_ivc._var_added(name)
-
+            auto_ivc.add_output(relsrc, val=val, units=units)
             if remote:
                 auto_ivc._add_remote(relsrc)
 
