@@ -2651,8 +2651,11 @@ class TestGroupAddInput(unittest.TestCase):
         g1.set_input_defaults('x', units='inch', val=2.)
 
         msg = "Groups 'G1' and 'G1.G2' called set_input_defaults for the input 'x' with conflicting 'units'. The value (inch) from 'G1' will be used."
-        with assert_warning(UserWarning, msg):
-            p.setup()
+        testlogger = TestLogger()
+        p.setup(check=True, logger=testlogger)
+        p.final_setup()
+
+        self.assertEqual(testlogger.get('warning')[1], msg)
 
     def test_sub_sub_override(self):
         p = om.Problem()
@@ -2665,8 +2668,11 @@ class TestGroupAddInput(unittest.TestCase):
         G3.add_subsystem('C2', om.ExecComp('y = 4.*x', x={'units': 'cm'}), promotes=['x'])
         G3.set_input_defaults('x', units='cm')
         msg = "Groups 'G1' and 'G1.G2.G3' called set_input_defaults for the input 'x' with conflicting 'units'. The value (mm) from 'G1' will be used."
-        with assert_warning(UserWarning, msg):
-            p.setup()
+        testlogger = TestLogger()
+        p.setup(check=True, logger=testlogger)
+        p.final_setup()
+
+        self.assertEqual(testlogger.get('warning')[1], msg)
 
     def test_sub_sets_parent_meta(self):
         p = om.Problem()
@@ -2677,8 +2683,11 @@ class TestGroupAddInput(unittest.TestCase):
         G2.add_subsystem('C1', om.ExecComp('y = 3.*x', x={'units': 'm'}), promotes=['x'])
         G2.set_input_defaults('x', units='cm')
         msg = "Group 'G1' did not set a default 'units' for input 'x', so the value of (cm) from group 'G1.G2' will be used."
-        with assert_warning(UserWarning, msg):
-            p.setup()
+        testlogger = TestLogger()
+        p.setup(check=True, logger=testlogger)
+        p.final_setup()
+
+        self.assertEqual(testlogger.get('warning')[1], msg)
 
     def test_sub_sub_override2(self):
         p = om.Problem()
@@ -2691,21 +2700,16 @@ class TestGroupAddInput(unittest.TestCase):
         G3.add_subsystem('C1', om.ExecComp('y = 3.*x', x={'units': 'm'}), promotes=['x'])
         G3.add_subsystem('C2', om.ExecComp('y = 4.*x', x={'units': 'cm'}), promotes=['x'])
         G3.set_input_defaults('x', units='cm')
+        testlogger = TestLogger()
+        p.setup(check=True, logger=testlogger)
         msgs = [
             "Groups 'G1' and 'G1.G2' called set_input_defaults for the input 'x' with conflicting 'units'. The value (mm) from 'G1' will be used.",
             "Groups 'G1' and 'G1.G2.G3' called set_input_defaults for the input 'x' with conflicting 'units'. The value (mm) from 'G1' will be used."
         ]
-        with reset_warning_registry():
-            with warnings.catch_warnings(record=True) as w:
-                warnings.simplefilter("always")
-                p.setup()
+        p.final_setup()
 
-        for msg in msgs:
-            for warn in w:
-                if (issubclass(warn.category, UserWarning) and str(warn.message) == msg):
-                    break
-            else:
-                raise AssertionError("Did not see expected UserWarning: %s" % msg)
+        self.assertEqual(testlogger.get('warning')[1], msgs[0])
+        self.assertEqual(testlogger.get('warning')[2], msgs[1])
 
     def test_conflicting_units_multi_level_par(self):
         # multiple Group.set_input_defaults calls at different tree levels with conflicting units args

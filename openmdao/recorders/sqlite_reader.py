@@ -529,7 +529,7 @@ class SqliteCaseReader(BaseCaseReader):
                     cases = []
                     source_cases = case_table.get_cases(source)
                     for case in source_cases:
-                        cases += self._list_cases_recurse_flat(case.name)
+                        cases += self._list_cases_recurse_flat(case.name, out_stream=out_stream)
                     return cases
                 else:
                     # return nested dict of cases from the source and child cases

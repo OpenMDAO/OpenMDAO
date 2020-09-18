@@ -218,11 +218,11 @@ class TestIndepVarComp(unittest.TestCase):
         msg = "IndepVarComp (p1): The '{}' argument was used when adding output '{}'. " + \
               "This argument has been deprecated and will be removed in a future version."
 
-        # ref, ref0
         prob = om.Problem()
 
         indep = prob.model.add_subsystem('p1', om.IndepVarComp())
 
+        # ref, ref0
         with assert_warnings([(DeprecationWarning, msg.format('ref', 'a')),
                               (DeprecationWarning, msg.format('ref0', 'a'))]):
             indep.add_output('a', 12., ref=0.0, ref0=1.)
