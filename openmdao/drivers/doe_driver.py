@@ -24,8 +24,8 @@ class DOEDriver(Driver):
         The name used to identify this driver in recorded cases.
     _recorders : list
         List of case recorders that have been added to this driver.
-    _comm : MPI.Comm or None
-        MPI communicator object.
+    _problem_comm : MPI.Comm or None
+        The MPI communicator for the Problem.
     _color : int or None
         In MPI, the cached color is used to determine which cases to run on this proc.
     """
@@ -70,7 +70,7 @@ class DOEDriver(Driver):
 
         self._name = ''
         self._recorders = []
-        self._comm = None
+        self._problem_comm = None
         self._color = None
 
     def _declare_options(self):
@@ -98,8 +98,9 @@ class DOEDriver(Driver):
         MPI.Comm or <FakeComm> or None
             The communicator for the Problem model.
         """
-        if MPI and self.options['run_parallel']:
-            self._comm = comm
+        self._problem_comm = comm
+
+        if MPI:
             procs_per_model = self.options['procs_per_model']
 
             full_size = comm.size
@@ -111,10 +112,8 @@ class DOEDriver(Driver):
                                    "specify a number of processors per model that divides "
                                    "into %d." % (procs_per_model, full_size))
             color = self._color = comm.rank % size
-
             model_comm = comm.Split(color)
         else:
-            self._comm = None
             model_comm = comm
 
         return model_comm
@@ -163,7 +162,7 @@ class DOEDriver(Driver):
         # set driver name with current generator
         self._set_name()
 
-        if self._comm:
+        if MPI and self.options['run_parallel']:
             case_gen = self._parallel_generator
         else:
             case_gen = self.options['generator']
@@ -228,7 +227,7 @@ class DOEDriver(Driver):
         list
             list of name, value tuples for the design variables.
         """
-        size = self._comm.size // self.options['procs_per_model']
+        size = self._problem_comm.size // self.options['procs_per_model']
         color = self._color
 
         generator = self.options['generator']
@@ -267,8 +266,8 @@ class DOEDriver(Driver):
                     if procs_per_model == 1:
                         recorder._record_on_proc = True
                     else:
-                        size = self._comm.size // procs_per_model
-                        if self._comm.rank < size:
+                        size = self._problem_comm.size // procs_per_model
+                        if self._problem_comm.rank < size:
                             recorder._record_on_proc = True
                         else:
                             recorder._record_on_proc = False

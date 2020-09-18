@@ -116,8 +116,6 @@ class ExplicitComponent(Component):
         for out_abs in self._var_abs_names['output']:
             meta = abs2meta[out_abs]
             size = meta['size']
-            out_name = abs2prom_out[out_abs]
-            arange = np.arange(size)
 
             # No need to FD outputs wrt other outputs
             abs_key = (out_abs, out_abs)
@@ -127,6 +125,8 @@ class ExplicitComponent(Component):
 
             # ExplicitComponent jacobians have -1 on the diagonal.
             if size > 0:
+                out_name = abs2prom_out[out_abs]
+                arange = np.arange(size)
 
                 dct = {
                     'rows': arange,

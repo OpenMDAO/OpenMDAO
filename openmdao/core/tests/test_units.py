@@ -880,6 +880,44 @@ class TestUnitConversion(unittest.TestCase):
         #self.assertTrue(iter_count < 20)
         #self.assertTrue(not np.isnan(prob['sub.cc2.y']))
 
+    def test_promotes_equivalent_units(self):
+        # multiple Group.set_input_defaults calls at same tree level with conflicting units args
+        p = om.Problem()
+
+        g1 = p.model.add_subsystem("G1", om.Group(), promotes_inputs=['x'])
+        g1.add_subsystem("C1", om.ExecComp("y = 2. * x * z",
+                                            x={'value': 5.0, 'units': 'm/s/s'},
+                                            y={'value': 1.0, 'units': None},
+                                            z={'value': 1.0, 'units': 'W'}),
+                                            promotes_inputs=['x', 'z'])
+        g1.add_subsystem("C2", om.ExecComp("y = 3. * x * z",
+                                            x={'value': 5.0, 'units': 'm/s**2'},
+                                            y={'value': 1.0, 'units': None},
+                                            z={'value': 1.0, 'units': 'J/s'}),
+                                            promotes_inputs=['x', 'z'])
+        # converting m/s/s to m/s**2 is allowed
+        p.setup()
+
+    def test_promotes_non_equivalent_units(self):
+        # multiple Group.set_input_defaults calls at same tree level with conflicting units args
+        p = om.Problem()
+
+        g1 = p.model.add_subsystem("G1", om.Group(), promotes_inputs=['x'])
+        g1.add_subsystem("C1", om.ExecComp("y = 2. * x * z",
+                                            x={'value': 5.0, 'units': 'J/s/s'},
+                                            y={'value': 1.0, 'units': None},
+                                            z={'value': 1.0, 'units': 'W'}),
+                                            promotes_inputs=['x', 'z'])
+        g1.add_subsystem("C2", om.ExecComp("y = 3. * x * z",
+                                            x={'value': 5.0, 'units': 'm/s**2'},
+                                            y={'value': 1.0, 'units': None},
+                                            z={'value': 1.0, 'units': 'J/s'}),
+                                            promotes_inputs=['x', 'z'])
+        # trying to convert J/s/s to m/s**2 should cause Incompatible units TypeError exception
+        with self.assertRaises(TypeError) as e:
+            p.setup()
+        self.assertEqual(str(e.exception), 'Incompatible units')
+
 
 if __name__ == "__main__":
     unittest.main()
