@@ -7,7 +7,6 @@ from itertools import product, chain
 from numbers import Number
 import inspect
 from fnmatch import fnmatchcase
-import copy
 
 import numpy as np
 import networkx as nx
@@ -21,13 +20,12 @@ from openmdao.jacobians.jacobian import SUBJAC_META_DEFAULTS
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
-from openmdao.utils.array_utils import convert_neg, array_connection_compatible, \
-    _flatten_src_indices
-from openmdao.utils.general_utils import ContainsAll, all_ancestors, simple_warning, \
-    common_subpath, conditional_error, _is_slicer_op, _slice_indices
-from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch
-from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
-from openmdao.utils.coloring import Coloring, _STD_COLORING_FNAME
+from openmdao.utils.array_utils import array_connection_compatible, _flatten_src_indices, \
+    shape_to_len
+from openmdao.utils.general_utils import ContainsAll, simple_warning, common_subpath, \
+    conditional_error, _is_slicer_op
+from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit
+from openmdao.utils.mpi import MPI, check_mpi_exceptions
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.core.constants import _SetupStatus
@@ -1766,11 +1764,11 @@ class Group(System):
 
                 elif src_indices is not None:
 
-                    if np.prod(src_indices.shape) == 0:
+                    if shape_to_len(src_indices.shape) == 0:
                         continue
 
                     flat_array_slice_check = not (has_slice and
-                                                  src_indices.size == np.prod(in_shape))
+                                                  src_indices.size == shape_to_len(in_shape))
 
                     if has_slice:
                         if meta_in['flat_src_indices'] is not None:
@@ -1821,7 +1819,7 @@ class Group(System):
                         if allprocs_abs2meta[abs_in]['distributed']:
                             out_size = np.sum(sizes_out[:, out_idxs[abs_out]])
                         else:
-                            out_size = np.prod(out_shape)
+                            out_size = shape_to_len(out_shape)
                         if src_indices.size > 0:
                             mx = np.max(src_indices)
                             mn = np.min(src_indices)
@@ -3056,8 +3054,8 @@ class Group(System):
         vars2gather = self._vars_to_gather
 
         for src, tgts in auto2tgt.items():
-            tgt, sz, val, remote = self._get_auto_ivc_out_val(tgts, vars2gather,
-                                                              all_abs2meta, abs2meta)
+            tgt, _, val, remote = self._get_auto_ivc_out_val(tgts, vars2gather,
+                                                             all_abs2meta, abs2meta)
             prom = abs2prom[tgt]
             if prom not in self._group_inputs:
                 self._group_inputs[prom] = [{'use_tgt': tgt}]
@@ -3196,8 +3194,9 @@ class Group(System):
                     tmeta = abs2meta[tgt] if tgt in abs2meta else all_abs2meta[tgt]
                     tunits = tmeta['units'] if 'units' in tmeta else None
                     if 'units' not in gmeta and sunits != tunits:
-                        errs.add('units')
-                        metadata.add('units')
+                        if _find_unit(sunits) != _find_unit(tunits):
+                            errs.add('units')
+                            metadata.add('units')
                     if 'value' not in gmeta:
                         if tval.shape == sval.shape:
                             if _has_val_mismatch(tunits, tval, sunits, sval):
