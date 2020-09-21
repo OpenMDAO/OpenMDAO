@@ -85,16 +85,18 @@ def _get_var_dict(system, typ, name):
         meta = system._var_discrete[typ][name]
         is_discrete = True
     else:
-        meta = system._var_abs2meta[name]
+        if name in system._var_abs2meta['output']:
+            meta = system._var_abs2meta['output'][name]
+        else:
+            meta = system._var_abs2meta['input'][name]
         name = system._var_abs2prom[typ][name]
         is_discrete = False
 
     var_dict = OrderedDict()
 
     var_dict['name'] = name
-    if typ == 'input':
-        var_dict['type'] = 'input'
-    elif typ == 'output':
+    var_dict['type'] = typ
+    if typ == 'output':
         isimplicit = isinstance(system, ImplicitComponent)
         var_dict['type'] = 'output'
         var_dict['implicit'] = isimplicit
@@ -160,7 +162,7 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
 
         children = []
         for typ in ['input', 'output']:
-            for abs_name in system._var_abs_names[typ]:
+            for abs_name in system._var_abs2meta[typ]:
                 children.append(_get_var_dict(system, typ, abs_name))
 
             for prom_name in system._var_discrete[typ]:

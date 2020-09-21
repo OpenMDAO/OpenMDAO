@@ -1,6 +1,6 @@
 """Base class used to define the interface for derivative approximation schemes."""
 from collections import defaultdict
-
+from itertools import chain
 from scipy.sparse import coo_matrix
 import numpy as np
 
@@ -146,7 +146,6 @@ class ApproximationScheme(object):
 
         outputs = system._outputs
         inputs = system._inputs
-        abs2meta = system._var_allprocs_abs2meta
         prom2abs_out = system._var_allprocs_prom2abs_list['output']
         prom2abs_in = system._var_allprocs_prom2abs_list['input']
         approx_wrt_idx = system._owns_approx_wrt_idx
@@ -171,8 +170,8 @@ class ApproximationScheme(object):
 
         if is_total and system.pathname == '':  # top level approx totals
             of_names = system._owns_approx_of
-            full_wrts = system._var_allprocs_abs_names['output'] + \
-                system._var_allprocs_abs_names['input']
+            full_wrts = list(chain(system._var_allprocs_abs2meta['output'],
+                                   system._var_allprocs_abs2meta['input']))
             wrt_names = system._owns_approx_wrt
         else:
             of_names, wrt_names = system._get_partials_varlists()
@@ -190,7 +189,7 @@ class ApproximationScheme(object):
 
         # FIXME: need to deal with mix of local/remote indices
 
-        len_full_ofs = len(system._var_allprocs_abs_names['output'])
+        len_full_ofs = len(system._var_allprocs_abs2meta['output'])
 
         full_idxs = []
         approx_of_idx = system._owns_approx_of_idx
@@ -211,7 +210,10 @@ class ApproximationScheme(object):
 
         if len(full_wrts) != len(wrt_matches) or approx_wrt_idx:
             if is_total and system.pathname == '':  # top level approx totals
-                full_wrt_sizes = [abs2meta[wrt]['size'] for wrt in full_wrts]
+                a2mi = system._var_allprocs_abs2meta['input']
+                a2mo = system._var_allprocs_abs2meta['output']
+                full_wrt_sizes = [a2mi[wrt]['size'] if wrt in a2mi else a2mo[wrt]['size']
+                                  for wrt in full_wrts]
             else:
                 _, full_wrt_sizes = system._get_partials_var_sizes()
 
@@ -274,7 +276,10 @@ class ApproximationScheme(object):
                     in_idx += slices[wrt].start
             else:
                 if arr is None:
-                    in_idx = range(abs2meta[wrt]['size'])
+                    if wrt in abs2meta['input']:
+                        in_idx = range(abs2meta['input'][wrt]['size'])
+                    else:
+                        in_idx = range(abs2meta['output'][wrt]['size'])
                 else:
                     in_idx = range(slices[wrt].start, slices[wrt].stop)
 
@@ -525,7 +530,8 @@ def _get_wrt_subjacs(system, approxs):
     each subjac.
     """
     abs2idx = system._var_allprocs_abs2idx['nonlinear']
-    abs2meta = system._var_allprocs_abs2meta
+    abs2meta_in = system._var_allprocs_abs2meta['input']
+    abs2meta_out = system._var_allprocs_abs2meta['output']
     approx_of_idx = system._owns_approx_of_idx
     approx_wrt_idx = system._owns_approx_wrt_idx
     approx_of = system._owns_approx_of
@@ -534,7 +540,7 @@ def _get_wrt_subjacs(system, approxs):
     ofdict = {}
     nondense = {}
     slicedict = system._outputs.get_slice_dict()
-    abs_out_names = [n for n in system._var_allprocs_abs_names['output'] if n in slicedict]
+    abs_out_names = [n for n in system._var_allprocs_abs2meta['output'] if n in slicedict]
 
     for key, options in approxs:
         of, wrt = key
@@ -550,7 +556,7 @@ def _get_wrt_subjacs(system, approxs):
                 out_idx = approx_of_idx[of]
                 out_size = len(out_idx)
             else:
-                out_size = abs2meta[of]['size']
+                out_size = abs2meta_out[of]['size']
                 out_idx = _full_slice
             ofdict[of] = (out_size, out_idx)
             J[wrt]['tot_rows'] += out_size
@@ -566,7 +572,8 @@ def _get_wrt_subjacs(system, approxs):
         elif wrt_idx is not _full_slice:
             J[wrt]['data'] = arr = np.zeros((J[wrt]['tot_rows'], len(wrt_idx)))
         else:
-            J[wrt]['data'] = arr = np.zeros((J[wrt]['tot_rows'], abs2meta[wrt]['size']))
+            sz = abs2meta_in[wrt]['size'] if wrt in abs2meta_in else abs2meta_out[wrt]['size']
+            J[wrt]['data'] = arr = np.zeros((J[wrt]['tot_rows'], sz))
 
         # sort ofs into the proper order to match outputs/resids vecs
         start = end = 0

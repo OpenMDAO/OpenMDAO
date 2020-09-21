@@ -109,7 +109,7 @@ class TestPhysicalUnit(unittest.TestCase):
         try:
             x < z
         except TypeError as err:
-            self.assertEqual(str(err), "Incompatible units")
+            self.assertEqual(str(err), "Units 'd' and 'ft' are incompatible.")
         else:
             self.fail("Expecting TypeError")
 
@@ -132,7 +132,7 @@ class TestPhysicalUnit(unittest.TestCase):
             x * z
         except TypeError as err:
             self.assertEqual(
-                str(err), "cannot multiply units with non-zero offset")
+                str(err), "Can't multiply units: either 'g' or 'degC' has a non-zero offset.")
         else:
             self.fail("Expecting TypeError")
 
@@ -162,7 +162,7 @@ class TestPhysicalUnit(unittest.TestCase):
             x / z
         except TypeError as err:
             self.assertEqual(
-                str(err), "cannot divide units with non-zero offset")
+                str(err), "Can't divide units: either 'g' or 'degC' has a non-zero offset.")
         else:
             self.fail("Expecting TypeError")
 
@@ -184,7 +184,7 @@ class TestPhysicalUnit(unittest.TestCase):
             y**17
         except TypeError as err:
             self.assertEqual(
-                str(err), 'cannot exponentiate units with non-zero offset')
+                str(err), "Can't exponentiate unit 'degF' because it has a non-zero offset.")
         else:
             self.fail('Expecting TypeError')
 
@@ -193,14 +193,14 @@ class TestPhysicalUnit(unittest.TestCase):
             x**1.2
         except TypeError as err:
             self.assertEqual(
-                str(err), 'Only integer and inverse integer exponents allowed')
+                str(err), "Can't exponentiate unit 'm': only integer and inverse integer exponents are allowed.")
         else:
             self.fail('Expecting TypeError')
         try:
             x**(5.0 / 2.0)
         except TypeError as err:
             self.assertEqual(
-                str(err), 'Only integer and inverse integer exponents allowed')
+                str(err), "Can't exponentiate unit 'm': only integer and inverse integer exponents are allowed.")
         else:
             self.fail('Expecting TypeError')
 
@@ -228,7 +228,7 @@ class TestPhysicalUnit(unittest.TestCase):
         try:
             x.conversion_tuple_to(z1)
         except TypeError as err:
-            self.assertEqual(str(err), "Incompatible units")
+            self.assertEqual(str(err), "Units 'm' and 'degC' are incompatible.")
         else:
             self.fail("Expecting TypeError")
 
@@ -252,7 +252,7 @@ class TestPhysicalUnit(unittest.TestCase):
         try:
             unit_conversion('km', 1.0)
         except RuntimeError as err:
-            self.assertEqual(str(err), "Cannot convert to new units: 1.0")
+            self.assertEqual(str(err), "Cannot convert to new units: '1.0'.")
         else:
             self.fail("Expecting RuntimeError")
 
@@ -266,7 +266,7 @@ class TestPhysicalUnit(unittest.TestCase):
         try:
             get_conversion('km', 1.0)
         except RuntimeError as err:
-            self.assertEqual(str(err), "Cannot convert to new units: 1.0")
+            self.assertEqual(str(err), "Cannot convert to new units: '1.0'.")
         else:
             self.fail("Expecting RuntimeError")
 
@@ -277,7 +277,7 @@ class TestModuleFunctions(unittest.TestCase):
             add_unit('ft', '20*m')
         except KeyError as err:
             self.assertEqual(
-                str(err), "'Unit ft already defined with different factor or powers'")
+                err.args[0], "Unit 'ft' already defined with different factor or powers.")
         else:
             self.fail("Expecting Key Error")
 
@@ -285,7 +285,7 @@ class TestModuleFunctions(unittest.TestCase):
             add_offset_unit('degR', 'degK', 20, 10)
         except KeyError as err:
             self.assertEqual(
-                str(err), "'Unit degR already defined with different factor or powers'")
+                err.args[0], "Unit 'degR' already defined with different factor or powers.")
         else:
             self.fail("Expecting Key Error")
 

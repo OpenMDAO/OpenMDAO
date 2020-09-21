@@ -156,9 +156,9 @@ _TOLS = {
 
 def _check_partial_matrix(system, jac, expected, method):
     blocks = []
-    for of in system._var_allprocs_abs_names['output']:
+    for of in system._var_allprocs_abs2meta['output']:
         cblocks = []
-        for wrt in system._var_allprocs_abs_names['input']:
+        for wrt in system._var_allprocs_abs2meta['input']:
             key = (of, wrt)
             if key in jac:
                 cblocks.append(jac[key]['value'])
@@ -170,9 +170,9 @@ def _check_partial_matrix(system, jac, expected, method):
 
 def _check_total_matrix(system, jac, expected, method):
     blocks = []
-    for of in system._var_allprocs_abs_names['output']:
+    for of in system._var_allprocs_abs2meta['output']:
         cblocks = []
-        for wrt in itertools.chain(system._var_allprocs_abs_names['output'], system._var_allprocs_abs_names['input']):
+        for wrt in itertools.chain(system._var_allprocs_abs2meta['output'], system._var_allprocs_abs2meta['input']):
             key = (of, wrt)
             if key in jac:
                 cblocks.append(jac[key])
@@ -184,9 +184,9 @@ def _check_total_matrix(system, jac, expected, method):
 
 def _check_semitotal_matrix(system, jac, expected, method):
     blocks = []
-    for of in system._var_allprocs_abs_names['output']:
+    for of in system._var_allprocs_abs2meta['output']:
         cblocks = []
-        for wrt in itertools.chain(system._var_allprocs_abs_names['output'], system._var_allprocs_abs_names['input']):
+        for wrt in itertools.chain(system._var_allprocs_abs2meta['output'], system._var_allprocs_abs2meta['input']):
             key = (of, wrt)
             if key in jac:
                 rows = jac[key]['rows']

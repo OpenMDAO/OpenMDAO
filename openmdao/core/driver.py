@@ -292,22 +292,21 @@ class Driver(object):
         # Only allow distributed design variables on drivers that support it.
         if self.supports['distributed_design_vars'] is False:
             dist_vars = []
+            abs2meta_in = model._var_allprocs_abs2meta['input']
+            discrete_in = model._var_allprocs_discrete['input']
             for dv, meta in self._designvars.items():
 
                 # For Auto-ivcs, we need to check the distributed metadata on the target instead.
                 if meta['ivc_source'].startswith('_auto_ivc.'):
-                    abs_names = model._var_allprocs_prom2abs_list['input'][dv]
-                    dist = False
-                    for abs_name in abs_names:
-                        if abs_name in model._var_allprocs_abs_names_discrete['input']:
+                    for abs_name in model._var_allprocs_prom2abs_list['input'][dv]:
+                        if abs_name in discrete_in:
                             # Discrete vars aren't distributed.
                             break
 
-                        dist = dist or model._var_allprocs_abs2meta[abs_name]['distributed']
-                else:
-                    dist = meta['distributed']
-
-                if dist:
+                        if abs2meta_in[abs_name]['distributed']:
+                            dist_vars.append(dv)
+                            break
+                elif meta['distributed']:
                     dist_vars.append(dv)
 
             if dist_vars:
@@ -334,10 +333,9 @@ class Driver(object):
             # to bcast to others later
             owning_ranks = model._owning_rank
             sizes = model._var_sizes['nonlinear']['output']
-            abs2meta = model._var_allprocs_abs2meta
             rank = model.comm.rank
             nprocs = model.comm.size
-            for i, vname in enumerate(model._var_allprocs_abs_names['output']):
+            for i, (vname, meta) in enumerate(model._var_allprocs_abs2meta['output'].items()):
                 if vname in responses:
                     indices = responses[vname].get('indices')
                 elif vname in src_design_vars:
@@ -345,7 +343,7 @@ class Driver(object):
                 else:
                     continue
 
-                if abs2meta[vname]['distributed']:
+                if meta['distributed']:
 
                     idx = model._var_allprocs_abs2idx['nonlinear'][vname]
                     dist_sizes = model._var_sizes['nonlinear']['output'][:, idx]
@@ -771,11 +769,11 @@ class Driver(object):
             else:
                 objs[name] = data
 
-        response_size = sum(resps[n]['size'] for n in self._get_ordered_nl_responses())
+        response_size = sum(resps[n]['global_size'] for n in self._get_ordered_nl_responses())
 
         # Gather up the information for design vars.
         self._designvars = designvars = model.get_design_vars(recurse=True, use_prom_ivc=True)
-        desvar_size = sum(data['size'] for data in designvars.values())
+        desvar_size = sum(data['global_size'] for data in designvars.values())
 
         return response_size, desvar_size
 

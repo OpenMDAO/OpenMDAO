@@ -916,7 +916,7 @@ class TestUnitConversion(unittest.TestCase):
         # trying to convert J/s/s to m/s**2 should cause Incompatible units TypeError exception
         with self.assertRaises(TypeError) as e:
             p.setup()
-        self.assertEqual(str(e.exception), 'Incompatible units')
+        self.assertEqual(str(e.exception), "Units 'm/s**2' and 'J/s**2' are incompatible.")
 
 
 if __name__ == "__main__":

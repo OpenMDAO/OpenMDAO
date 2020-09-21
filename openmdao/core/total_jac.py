@@ -228,7 +228,7 @@ class _TotalJacInfo(object):
         self.output_vec = {'fwd': model._vectors['output'], 'rev': model._vectors['residual']}
         self._dist_driver_vars = driver._dist_driver_vars
 
-        abs2meta = model._var_allprocs_abs2meta
+        abs2meta_out = model._var_allprocs_abs2meta['output']
 
         constraints = driver._cons
 
@@ -277,8 +277,8 @@ class _TotalJacInfo(object):
                 self.in_idx_map[mode], self.in_loc_idxs[mode], self.idx_iter_dict[mode], \
                     self.seeds[mode] = self._create_in_idx_map(mode)
 
-        self.of_meta, self.of_size = self._get_tuple_map(of, responses, abs2meta)
-        self.wrt_meta, self.wrt_size = self._get_tuple_map(wrt, design_vars, abs2meta)
+        self.of_meta, self.of_size = self._get_tuple_map(of, responses, abs2meta_out)
+        self.wrt_meta, self.wrt_size = self._get_tuple_map(wrt, design_vars, abs2meta_out)
 
         # always allocate a 2D dense array and we can assign views to dict keys later if
         # return format is 'dict' or 'flat_dict'.
@@ -303,7 +303,7 @@ class _TotalJacInfo(object):
 
                 self.sol2jac_map[mode] = self._get_sol2jac_map(self.output_list[mode],
                                                                self.output_meta[mode],
-                                                               abs2meta, mode)
+                                                               abs2meta_out, mode)
 
             self.jac_scatters = {}
             self.tgt_petsc = {n: {} for n in modes}
@@ -352,17 +352,17 @@ class _TotalJacInfo(object):
             myoffset = rowcol_size * myrank
             owns = self.model._owning_rank
 
+            abs2meta_out = self.model._var_allprocs_abs2meta['output']
             for vecname in model._lin_vec_names:
                 sizes = self.model._var_sizes[vecname]['output']
                 abs2idx = self.model._var_allprocs_abs2idx[vecname]
-                abs2meta = self.model._var_allprocs_abs2meta
                 full_j_tgts = []
                 full_j_srcs = []
 
                 for name in name2jinds:
                     if name not in abs2idx:
                         continue
-                    if abs2meta[name]['distributed']:
+                    if abs2meta_out[name]['distributed']:
                         srcinds = name2jinds[name]
                         myinds = srcinds + myoffset
                         for rank in range(nproc):
@@ -471,7 +471,7 @@ class _TotalJacInfo(object):
         model = self.model
         relevant = model._relevant
         has_par_deriv_color = False
-        abs2meta = model._var_allprocs_abs2meta
+        abs2meta_out = model._var_allprocs_abs2meta['output']
         var_sizes = model._var_sizes
         var_offsets = model._get_var_offsets()
         abs2idx = model._var_allprocs_abs2idx
@@ -494,11 +494,11 @@ class _TotalJacInfo(object):
 
         for name in input_list:
             rhsname = 'linear'
-            if name not in abs2meta:
+            if name not in abs2meta_out:
                 # could be promoted input name
                 abs_in = model._var_allprocs_prom2abs_list['input'][name][0]
                 name = model._conn_global_abs_in2out[abs_in]
-            in_var_meta = abs2meta[name]
+            in_var_meta = abs2meta_out[name]
 
             if name in vois:
                 # if name is in vois, then it has been declared as either a design var or
@@ -668,7 +668,7 @@ class _TotalJacInfo(object):
 
         return idx_map, loc_idxs, idx_iter_dict, seed
 
-    def _get_sol2jac_map(self, names, vois, allprocs_abs2meta, mode):
+    def _get_sol2jac_map(self, names, vois, allprocs_abs2meta_out, mode):
         """
         Create a dict mapping vecname and direction to an index array into the solution vector.
 
@@ -681,8 +681,8 @@ class _TotalJacInfo(object):
             Names of the variables making up the rows or columns of the jacobian.
         vois : dict
             Mapping of variable of interest (desvar or response) name to its metadata.
-        allprocs_abs2meta : dict
-            Mapping of absolute var name to metadata for that var across all procs.
+        allprocs_abs2meta_out : dict
+            Mapping of absolute output name to metadata for that var across all procs.
         mode : str
             Derivative solution direction.
 
@@ -713,7 +713,7 @@ class _TotalJacInfo(object):
 
             for name in names:
                 indices = vois[name]['indices'] if name in vois else None
-                meta = allprocs_abs2meta[name]
+                meta = allprocs_abs2meta_out[name]
 
                 if indices is not None:
                     sz = len(indices)
@@ -767,7 +767,7 @@ class _TotalJacInfo(object):
 
         return sol_idxs, jac_idxs, name2jinds
 
-    def _get_tuple_map(self, names, vois, abs2meta):
+    def _get_tuple_map(self, names, vois, abs2meta_out):
         """
         Create a dict that maps var name to metadata tuple.
 
@@ -779,8 +779,8 @@ class _TotalJacInfo(object):
             Names of the variables making up the rows or columns of the jacobian.
         vois : dict
             Mapping of variable of interest (desvar or response) name to its metadata.
-        abs2meta : dict
-            Mapping of absolute var name to metadata for that var.
+        abs2meta_out : dict
+            Mapping of absolute output var name to metadata for that var.
 
         Returns
         -------
@@ -803,12 +803,12 @@ class _TotalJacInfo(object):
                     size = voi['size']
                 indices = vois[name]['indices']
             else:
-                size = abs2meta[name]['global_size']
+                size = abs2meta_out[name]['global_size']
                 indices = None
 
             end += size
 
-            idx_map[name] = (slice(start, end), indices, abs2meta[name]['distributed'])
+            idx_map[name] = (slice(start, end), indices, abs2meta_out[name]['distributed'])
             start = end
 
         return idx_map, end  # after the loop, end is the total size

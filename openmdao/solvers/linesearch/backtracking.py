@@ -12,7 +12,6 @@ import numpy as np
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.solvers.solver import NonlinearSolver
 from openmdao.recorders.recording_iteration_stack import Recording
-from openmdao.utils.general_utils import simple_warning
 
 
 def _print_violations(outputs, lower, upper):
@@ -105,11 +104,11 @@ class LinesearchSolver(NonlinearSolver):
         """
         super(LinesearchSolver, self)._setup_solvers(system, depth)
         if system._has_bounds:
-            abs2meta = system._var_abs2meta
+            abs2meta_out = system._var_abs2meta['output']
             start = end = 0
             for abs_name, val in system._outputs._abs_item_iter():
                 end += val.size
-                meta = abs2meta[abs_name]
+                meta = abs2meta_out[abs_name]
                 var_lower = meta['lower']
                 var_upper = meta['upper']
 
