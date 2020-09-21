@@ -82,27 +82,16 @@ global_meta_names = {
 
 allowed_meta_names = {
     'value',
-    'shape',
     'global_shape',
-    'size',
     'global_size',
     'src_indices',
     'src_slice',
     'flat_src_indices',
-    'units',
-    'desc',
-    'distributed',
-    'tags',
     'type',
     'res_units',
-    'ref',
-    'ref0',
-    'res_ref',
-    'lower',
-    'upper',
-    'shape_by_conn',
-    'copy_shape',
 }
+allowed_meta_names.update(global_meta_names['input'])
+allowed_meta_names.update(global_meta_names['output'])
 
 
 class System(object):
@@ -156,25 +145,15 @@ class System(object):
         MPI communicator object used when System's comm is split for parallel FD.
     _solver_print_cache : list
         Allows solver iprints to be set to requested values after setup calls.
-    _subsystems_allprocs : [<System>, ...]
-        List of all subsystems (children of this system).
+    _subsystems_allprocs : OrderedDict
+        Dict mapping subsystem name to SysInfo(system, index) for children of this system.
     _subsystems_myproc : [<System>, ...]
         List of local subsystems that exist on this proc.
-    _subsystems_inds : dict
-        Dict mapping subsystem name to index into _subsystems_allprocs.
     _var_promotes : { 'any': [], 'input': [], 'output': [] }
         Dictionary of lists of variable names/wildcards specifying promotion
         (used to calculate promoted names)
     _var_promotes_src_indices : dict
         Dictionary mapping promoted input names/wildcards to (src_indices, flat_src_indices)
-    _var_allprocs_abs_names : {'input': [str, ...], 'output': [str, ...]}
-        List of absolute names of this system's variables on all procs.
-    _var_abs_names : {'input': [str, ...], 'output': [str, ...]}
-        List of absolute names of this system's variables existing on current proc.
-    _var_allprocs_abs_names_discrete : {'input': [str, ...], 'output': [str, ...]}
-        List of absolute names of this system's discrete variables on all procs.
-    _var_abs_names_discrete : {'input': [str, ...], 'output': [str, ...]}
-        List of absolute names of this system's discrete variables existing on current proc.
     _var_allprocs_prom2abs_list : {'input': dict, 'output': dict}
         Dictionary mapping promoted names to list of all absolute names.
         For outputs, the list will have length one since promoted output names are unique.
@@ -267,8 +246,8 @@ class System(object):
         dict of all driver responses added to the system.
     _rec_mgr : <RecordingManager>
         object that manages all recorders added to this system.
-    _static_subsystems_allprocs : [<System>, ...]
-        List of subsystems that stores all subsystems added outside of setup.
+    _static_subsystems_allprocs : OrderedDict
+        Dict of SysInfo(subsys, index) that stores all subsystems added outside of setup.
     _static_design_vars : dict of dict
         Driver design variables added outside of setup.
     _static_responses : dict of dict
@@ -389,24 +368,19 @@ class System(object):
 
         self._solver_print_cache = []
 
-        self._subsystems_allprocs = []
+        self._subsystems_allprocs = {}
         self._subsystems_myproc = []
-        self._subsystems_inds = {}
         self._vars_to_gather = {}
         self._dist_var_locality = {}
 
         self._var_promotes = {'input': [], 'output': [], 'any': []}
         self._var_promotes_src_indices = {}
 
-        self._var_allprocs_abs_names = {'input': [], 'output': []}
-        self._var_abs_names = {'input': [], 'output': []}
-        self._var_allprocs_abs_names_discrete = {'input': [], 'output': []}
-        self._var_abs_names_discrete = {'input': [], 'output': []}
         self._var_allprocs_prom2abs_list = None
         self._var_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2prom = {'input': {}, 'output': {}}
-        self._var_allprocs_abs2meta = {}
-        self._var_abs2meta = {}
+        self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
+        self._var_abs2meta = {'input': {}, 'output': {}}
         self._var_discrete = {'input': {}, 'output': {}}
         self._var_allprocs_discrete = {'input': {}, 'output': {}}
 
@@ -450,7 +424,7 @@ class System(object):
 
         self._conn_global_abs_in2out = {}
 
-        self._static_subsystems_allprocs = []
+        self._static_subsystems_allprocs = {}
         self._static_design_vars = OrderedDict()
         self._static_responses = OrderedDict()
 
@@ -506,6 +480,38 @@ class System(object):
 
     def _get_inst_id(self):
         return self.pathname
+
+    def abs_name_iter(self, iotype, local=True, cont=True, discrete=False):
+        """
+        Iterate over absolute variable names for this System.
+
+        By setting appropriate values for 'cont' and 'discrete', yielded variable
+        names can be continuous only, discrete only, or both.
+
+        Parameters
+        ----------
+        iotype : str
+            Either 'input' or 'output'.
+        local : bool
+            If True, include only names of local variables. Default is True.
+        cont : bool
+            If True, include names of continuous variables.  Default is True.
+        discrete : bool
+            If True, include names of discrete variables.  Default is False.
+        """
+        if cont:
+            if local:
+                yield from self._var_abs2meta[iotype]
+            else:
+                yield from self._var_allprocs_abs2meta[iotype]
+
+        if discrete:
+            if local:
+                prefix = self.pathname + '.' if self.pathname else ''
+                for name in self._var_discrete[iotype]:
+                    yield prefix + name
+            else:
+                yield from self._var_allprocs_discrete[iotype]
 
     def _declare_options(self):
         """
@@ -621,6 +627,41 @@ class System(object):
             self._approx_schemes[method] = _supported_methods[method]()
         return self._approx_schemes[method]
 
+    def get_source(self, name):
+        """
+        Return the source variable connected to the given named variable.
+
+        The name can be a promoted name or an absolute name.
+        If the given variable is an input, the absolute name of the connected source will
+        be returned.  If the given variable itself is a source, its own absolute name will
+        be returned.
+
+        Parameters
+        ----------
+        name : str
+            Absolute or promoted name of the variable.
+
+        Returns
+        -------
+        str
+            The absolute name of the source variable.
+        """
+        if self._problem_meta is None or 'prom2abs' not in self._problem_meta:
+            raise RuntimeError(f"{self.msginfo}: get_source cannot be called for variable {name} "
+                               "before Problem.setup is complete.")
+
+        model = self._problem_meta['model_ref']()
+        prom2abs = self._problem_meta['prom2abs']
+        if name in prom2abs['input']:
+            name = prom2abs['input'][name][0]
+        elif name in prom2abs['output']:
+            return prom2abs['output'][name][0]
+
+        if name in model._conn_global_abs_in2out:
+            return model._conn_global_abs_in2out[name]
+
+        return name
+
     def _setup(self, comm, mode, prob_meta):
         """
         Perform setup for this system and its descendant systems.
@@ -679,8 +720,7 @@ class System(object):
         self._problem_meta['vec_names'] = new_names
         self._problem_meta['lin_vec_names'] = new_names[1:]
 
-        self._setup_relevance(mode, self._relevant)
-        self._setup_var_index_ranges()
+        self._setup_relevance(mode)
         self._setup_var_sizes()
 
         self._top_level_post_sizes()
@@ -1062,8 +1102,8 @@ class System(object):
         """
         abs2meta = self._var_allprocs_abs2meta
         offset = end = 0
-        for of in self._var_allprocs_abs_names['output']:
-            end += abs2meta[of]['size']
+        for of, meta in self._var_allprocs_abs2meta['output'].items():
+            end += meta['size']
             yield of, offset, end, _full_slice
             offset = end
 
@@ -1088,9 +1128,9 @@ class System(object):
                 yield of, offset, end, sub_of_idx
                 offset = end
 
-        for wrt in self._var_allprocs_abs_names['input']:
+        for wrt, meta in self._var_allprocs_abs2meta['input'].items():
             if wrt in wrt_matches:
-                end += abs2meta[wrt]['size']
+                end += meta['size']
                 yield wrt, offset, end, _full_slice
                 offset = end
 
@@ -1285,6 +1325,7 @@ class System(object):
         Execute first phase of the setup process.
 
         Distribute processors, assign pathnames, and call setup on the component.
+        Also reset internal data structures.
 
         Parameters
         ----------
@@ -1302,6 +1343,8 @@ class System(object):
         self._problem_meta = prob_meta
         self._first_call_to_linearize = True
         self._is_local = True
+        self._vectors = {}
+        self._full_comm = None
 
         self.options._parent_name = self.msginfo
         self.recording_options._parent_name = self.msginfo
@@ -1311,65 +1354,47 @@ class System(object):
         self._design_vars.update(self._static_design_vars)
         self._responses.update(self._static_responses)
 
-    def _setup_var_index_ranges(self):
-        """
-        Compute the division of variables by subsystem.
-        """
-        self._setup_var_index_maps()
-
     def _setup_var_data(self):
         """
         Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
         """
-        self._var_allprocs_abs_names = {'input': [], 'output': []}
-        self._var_abs_names = {'input': [], 'output': []}
         self._var_allprocs_prom2abs_list = {'input': OrderedDict(), 'output': OrderedDict()}
         self._var_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2prom = {'input': {}, 'output': {}}
-        self._var_allprocs_abs2meta = {}
-        self._var_abs2meta = {}
+        self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
+        self._var_abs2meta = {'input': {}, 'output': {}}
+        self._var_allprocs_discrete = {'input': {}, 'output': {}}
         self._var_allprocs_abs2idx = {}
         self._owning_rank = defaultdict(int)
+        self._var_sizes = {'nonlinear': {}}
+        self._owned_sizes = None
+        self._var_allprocs_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
+        self._var_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
 
-    def _setup_var_index_maps(self):
+    def _setup_var_index_maps(self, vec_name):
         """
         Compute maps from abs var names to their index among allprocs variables in this system.
+
+        Parameters
+        ----------
+        vec_name : str
+            Name of vector.
         """
-        self._var_allprocs_abs2idx = abs2idx = {}
-
-        vec_names = self._lin_rel_vec_name_list if self._use_derivatives else self._vec_names
-
-        for vec_name in vec_names:
-            abs2idx[vec_name] = abs2idx_t = {}
-            for type_ in ['input', 'output']:
-                for i, abs_name in enumerate(self._var_allprocs_relevant_names[vec_name][type_]):
-                    abs2idx_t[abs_name] = i
-
-        if self._use_derivatives:
-            abs2idx['nonlinear'] = abs2idx['linear']
-
-        for subsys in self._subsystems_myproc:
-            subsys._setup_var_index_maps()
-
-    def _setup_var_sizes(self):
-        """
-        Compute the arrays of local variable sizes for all variables/procs on this system.
-        """
-        self._var_sizes = {}
-        self._owned_sizes = None
+        abs2idx = self._var_allprocs_abs2idx[vec_name] = {}
+        for io in ['input', 'output']:
+            for i, abs_name in enumerate(self._var_allprocs_relevant_names[vec_name][io]):
+                abs2idx[abs_name] = i
 
     def _setup_global_shapes(self):
         """
         Compute the global size and shape of all variables on this system.
         """
-        meta = self._var_allprocs_abs2meta
         loc_meta = self._var_abs2meta
 
         for io in ('input', 'output'):
             # now set global sizes and shapes into metadata for distributed variables
             sizes = self._var_sizes['nonlinear'][io]
-            for idx, abs_name in enumerate(self._var_allprocs_abs_names[io]):
-                mymeta = meta[abs_name]
+            for idx, (abs_name, mymeta) in enumerate(self._var_allprocs_abs2meta[io].items()):
                 local_shape = mymeta['shape']
                 if mymeta['distributed']:
                     global_size = np.sum(sizes[:, idx])
@@ -1394,9 +1419,9 @@ class System(object):
                     mymeta['global_size'] = mymeta['size']
                     mymeta['global_shape'] = local_shape
 
-                if abs_name in loc_meta:
-                    loc_meta[abs_name]['global_shape'] = mymeta['global_shape']
-                    loc_meta[abs_name]['global_size'] = mymeta['global_size']
+                if abs_name in loc_meta[io]:
+                    loc_meta[io][abs_name]['global_shape'] = mymeta['global_shape']
+                    loc_meta[io][abs_name]['global_size'] = mymeta['global_size']
 
     def _setup_global_connections(self, conns=None):
         """
@@ -1426,21 +1451,26 @@ class System(object):
         mode : str
             Derivative direction, either 'fwd' or 'rev'.
         """
+        vois = set()
+        vectorized_vois = {}
+
         if self._use_derivatives:
             vec_names = ['nonlinear', 'linear']
-            vois = {}
+            # Now that connections are setup, we need to convert relevant vector names into their
+            # auto_ivc source where applicable.
             for system in self.system_iter(include_self=True, recurse=True):
-                vois.update(tup for tup in system._get_vec_names_from_vois(mode))
+                for name, meta in system._get_vec_names_from_vois(mode):
+                    vois.add(system.get_source(name))
+                    if meta['vectorize_derivs']:
+                        vectorized_vois[name] = meta
 
             vec_names.extend(sorted(vois))
         else:
             vec_names = ['nonlinear']
-            vois = {}
 
         self._problem_meta['vec_names'] = vec_names
         self._problem_meta['lin_vec_names'] = vec_names[1:]
-        self._problem_meta['vectorized_vois'] = {n: d for n, d in vois.items()
-                                                 if d['vectorize_derivs']}
+        self._problem_meta['vectorized_vois'] = vectorized_vois
 
     def _get_vec_names_from_vois(self, mode):
         """
@@ -1453,24 +1483,19 @@ class System(object):
         mode : str
             Derivative direction, either 'fwd' or 'rev'.
         """
-        if mode == 'fwd':
-            vois = self._design_vars
-            typ = "design variable"
-        else:
-            vois = self._responses
-            typ = "response"
+        vois = self._design_vars if mode == 'fwd' else self._responses
 
-        pro2abs = self._var_allprocs_prom2abs_list['output']
-        pro2abs_in = self._var_allprocs_prom2abs_list['input']
+        pro2abs = self._var_allprocs_prom2abs_list
         try:
             for prom_name, data in vois.items():
                 if data['parallel_deriv_color'] is not None or data['vectorize_derivs']:
-                    if prom_name in pro2abs:
-                        yield pro2abs[prom_name][0], data
+                    if prom_name in pro2abs['output']:
+                        yield pro2abs['output'][prom_name][0], data
                     else:
-                        yield pro2abs_in[prom_name][0], data
+                        yield pro2abs['input'][prom_name][0], data
 
         except KeyError as err:
+            typ = 'design variable' if mode == 'fwd' else 'response'
             raise RuntimeError(f"{self.msginfo}: Output not found for {typ} {str(err)}.")
 
     def _init_relevance(self, mode):
@@ -1490,8 +1515,7 @@ class System(object):
         if self._use_derivatives:
             desvars = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
             responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
-            return get_relevant_vars(self._conn_global_abs_in2out, desvars, responses,
-                                     mode)
+            return self.get_relevant_vars(desvars, responses, mode)
         else:
             relevant = defaultdict(dict)
             relevant['nonlinear'] = {'@all': ({'input': ContainsAll(), 'output': ContainsAll()},
@@ -1502,10 +1526,9 @@ class System(object):
         """
         Compute unit conversions for driver variables.
         """
-        abs2meta = self._var_abs2meta
+        abs2meta = self._var_abs2meta['output']
         pro2abs = self._var_allprocs_prom2abs_list['output']
         pro2abs_in = self._var_allprocs_prom2abs_list['input']
-        conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
 
         dv = self._design_vars
         for name, meta in dv.items():
@@ -1520,13 +1543,7 @@ class System(object):
                 try:
                     units_src = meta['ivc_source']
                 except KeyError:
-                    if name in abs2meta:
-                        units_src = name
-                    elif name in pro2abs:
-                        units_src = pro2abs[name][0]
-                    else:
-                        in_abs = pro2abs_in[name][0]
-                        units_src = conns[in_abs]
+                    units_src = self.get_source(name)
 
                 var_units = abs2meta[units_src]['units']
 
@@ -1565,13 +1582,7 @@ class System(object):
                 try:
                     units_src = meta['ivc_source']
                 except KeyError:
-                    if name in abs2meta:
-                        units_src = name
-                    elif name in pro2abs:
-                        units_src = pro2abs[name][0]
-                    else:
-                        in_abs = pro2abs_in[name][0]
-                        units_src = conns[in_abs]
+                    units_src = self.get_source(name)
 
                 var_units = abs2meta[units_src]['units']
 
@@ -1618,19 +1629,17 @@ class System(object):
         else:
             self._relevant = relevant
 
-        self._var_allprocs_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
-        self._var_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
-
-        self._rel_vec_name_list = []
-        for vec_name in self._vec_names:
+        self._rel_vec_name_list = ['nonlinear', 'linear']
+        for vec_name in self._vec_names[2:]:
             rel, relsys = relevant[vec_name]['@all']
             if self.pathname in relsys:
                 self._rel_vec_name_list.append(vec_name)
-            for type_ in ('input', 'output'):
-                self._var_allprocs_relevant_names[vec_name][type_].extend(
-                    v for v in self._var_allprocs_abs_names[type_] if v in rel[type_])
-                self._var_relevant_names[vec_name][type_].extend(
-                    v for v in self._var_abs_names[type_] if v in rel[type_])
+            for io in ('input', 'output'):
+                relio = rel[io]
+                self._var_allprocs_relevant_names[vec_name][io].extend(
+                    v for v in self._var_allprocs_abs2meta[io] if v in relio)
+                self._var_relevant_names[vec_name][io].extend(
+                    v for v in self._var_abs2meta[io] if v in relio)
 
         self._rel_vec_names = frozenset(self._rel_vec_name_list)
         self._lin_rel_vec_name_list = self._rel_vec_name_list[1:]
@@ -1674,7 +1683,9 @@ class System(object):
 
         vector_class = self._vector_class
 
-        for vec_name in self._rel_vec_name_list:
+        vec_names = self._rel_vec_name_list if self._use_derivatives else self._vec_names
+
+        for vec_name in vec_names:
 
             # Only allocate complex in the vectors we need.
             vec_alloc_complex = root_vectors['output'][vec_name]._alloc_complex
@@ -1708,10 +1719,7 @@ class System(object):
             ('input', 'norm'): (0.0, 1.0)
         })
 
-        allprocs_meta_out = self._var_allprocs_abs2meta
-
-        for abs_name in self._var_allprocs_abs_names['output']:
-            meta = allprocs_meta_out[abs_name]
+        for abs_name, meta in self._var_allprocs_abs2meta['output'].items():
             ref0 = meta['ref0']
             res_ref = meta['res_ref']
             a0 = ref0
@@ -1798,12 +1806,11 @@ class System(object):
         """
         Set all input and output variables to their declared initial values.
         """
-        abs2meta = self._var_abs2meta
-        for abs_name in self._var_abs_names['input']:
-            self._inputs.set_var(abs_name, abs2meta[abs_name]['value'])
+        for abs_name, meta in self._var_abs2meta['input'].items():
+            self._inputs.set_var(abs_name, meta['value'])
 
-        for abs_name in self._var_abs_names['output']:
-            self._outputs.set_var(abs_name, abs2meta[abs_name]['value'])
+        for abs_name, meta in self._var_abs2meta['output'].items():
+            self._outputs.set_var(abs_name, meta['value'])
 
     def _get_maps(self, prom_names):
         """
@@ -1874,7 +1881,7 @@ class System(object):
                 src_indices, flat_src_indices = self._var_promotes_src_indices[key]
 
                 for abs_in in self._var_allprocs_prom2abs_list['input'][name]:
-                    meta = self._var_abs2meta[abs_in]
+                    meta = self._var_abs2meta['input'][abs_in]
 
                     _, _, src_indices = ensure_compatible(name, meta['value'], meta['shape'],
                                                           src_indices)
@@ -1950,7 +1957,8 @@ class System(object):
 
             not_found = (set(names).union(renames).union(patterns)) - found
             if not_found:
-                if not self._var_abs2meta and isinstance(self, openmdao.core.group.Group):
+                if (not self._var_abs2meta['input'] and not self._var_abs2meta['output'] and
+                        isinstance(self, openmdao.core.group.Group)):
                     empty_group_msg = ' Group contains no variables.'
                 else:
                     empty_group_msg = ''
@@ -2006,7 +2014,7 @@ class System(object):
         try:
             return self._scope_cache[None]
         except KeyError:
-            self._scope_cache[None] = (frozenset(self._var_abs_names['output']), _empty_frozen_set)
+            self._scope_cache[None] = (frozenset(self._var_abs2meta['output']), _empty_frozen_set)
             return self._scope_cache[None]
 
     def _get_potential_partials_lists(self, include_wrt_outputs=True):
@@ -2318,7 +2326,7 @@ class System(object):
         if self.nonlinear_solver is not None and type_ != 'LN':
             self.nonlinear_solver._set_solver_print(level=level, type_=type_)
 
-        for subsys in self._subsystems_allprocs:
+        for subsys, _ in self._subsystems_allprocs.values():
 
             current_depth = subsys.pathname.count('.')
             if current_depth >= depth:
@@ -2910,7 +2918,7 @@ class System(object):
         pro2abs_in = self._var_allprocs_prom2abs_list['input']
         model = self._problem_meta['model_ref']()
         conns = model._conn_global_abs_in2out
-        abs2meta = model._var_allprocs_abs2meta
+        abs2meta_out = model._var_allprocs_abs2meta['output']
 
         # Human readable error message during Driver setup.
         out = OrderedDict()
@@ -2923,14 +2931,14 @@ class System(object):
                     out[abs_name] = data
                     out[abs_name]['ivc_source'] = abs_name
                     out[abs_name]['distributed'] = \
-                        abs_name in abs2meta and abs2meta[abs_name]['distributed']
+                        abs_name in abs2meta_out and abs2meta_out[abs_name]['distributed']
 
                 else:  # assume an input name else KeyError
 
                     # Design variable on an auto_ivc input, so use connected output name.
                     in_abs = pro2abs_in[name][0]
                     ivc_path = conns[in_abs]
-                    distrib = ivc_path in abs2meta and abs2meta[ivc_path]['distributed']
+                    distrib = ivc_path in abs2meta_out and abs2meta_out[ivc_path]['distributed']
                     if use_prom_ivc:
                         out[name] = data
                         out[name]['ivc_source'] = ivc_path
@@ -2966,7 +2974,7 @@ class System(object):
                         meta['size'] = 0  # discrete var, don't know size
 
                 if src_name in abs2idx:
-                    meta = abs2meta[src_name]
+                    meta = abs2meta_out[src_name]
                     out[name]['distributed'] = meta['distributed']
                     out[name]['global_size'] = meta['global_size']
                 else:
@@ -3031,7 +3039,7 @@ class System(object):
         prom2abs_in = self._var_allprocs_prom2abs_list['input']
         model = self._problem_meta['model_ref']()
         conns = model._conn_global_abs_in2out
-        abs2meta = model._var_allprocs_abs2meta
+        abs2meta_out = model._var_allprocs_abs2meta['output']
 
         # Human readable error message during Driver setup.
         try:
@@ -3042,14 +3050,14 @@ class System(object):
                     out[abs_name] = data
                     out[abs_name]['ivc_source'] = abs_name
                     out[abs_name]['distributed'] = \
-                        abs_name in abs2meta and abs2meta[abs_name]['distributed']
+                        abs_name in abs2meta_out and abs2meta_out[abs_name]['distributed']
 
                 else:
                     # A constraint can actaully be on an auto_ivc input, so use connected
                     # output name.
                     in_abs = prom2abs_in[name][0]
                     ivc_path = conns[in_abs]
-                    distrib = ivc_path in abs2meta and abs2meta[ivc_path]['distributed']
+                    distrib = ivc_path in abs2meta_out and abs2meta_out[ivc_path]['distributed']
                     if use_prom_ivc:
                         out[name] = data
                         out[name]['ivc_source'] = ivc_path
@@ -3076,7 +3084,7 @@ class System(object):
                     response['size'] = response['global_size'] = 0  # discrete var, don't know size
                     continue
 
-                meta = abs2meta[name]
+                meta = abs2meta_out[name]
                 response['distributed'] = meta['distributed']
 
                 if response['indices'] is not None:
@@ -3252,6 +3260,7 @@ class System(object):
         it = self._var_allprocs_abs2prom if get_remote else self._var_abs2prom
 
         for iotype in iotypes:
+            cont2meta = metadict[iotype]
             disc2meta = disc_metadict[iotype]
 
             for abs_name, prom in it[iotype].items():
@@ -3260,11 +3269,11 @@ class System(object):
 
                 rel_name = abs_name[rel_idx:]
 
-                if abs_name in all2meta:  # continuous
-                    meta = metadict[abs_name] if abs_name in metadict else None
-                    distrib = all2meta[abs_name]['distributed']
+                if abs_name in all2meta[iotype]:  # continuous
+                    meta = cont2meta[abs_name] if abs_name in cont2meta else None
+                    distrib = all2meta[iotype][abs_name]['distributed']
                     if nodyn:
-                        a2m = all2meta[abs_name]
+                        a2m = all2meta[iotype][abs_name]
                         if a2m['shape'] is None and (a2m['shape_by_conn'] or a2m['copy_shape']):
                             raise RuntimeError(f"{self.msginfo}: Can't retrieve shape, size, or "
                                                f"value for dynamically sized variable '{prom}' "
@@ -3665,7 +3674,7 @@ class System(object):
         """
         var_list = []
 
-        real_vars = self._var_allprocs_abs_names
+        real_vars = self._var_allprocs_abs2meta
         disc_vars = self._var_allprocs_discrete
 
         in_or_out = []
@@ -3675,17 +3684,17 @@ class System(object):
             in_or_out.append('output')
 
         if self._subsystems_allprocs:
-            for subsys in self._subsystems_allprocs:
+            for subsys, _ in self._subsystems_allprocs.values():
                 prefix = subsys.pathname + '.'
-                for var_type in in_or_out:
-                    for var_name in chain(real_vars[var_type], disc_vars[var_type]):
+                for io in in_or_out:
+                    for var_name in chain(real_vars[io], disc_vars[io]):
                         if variables is None or var_name in variables:
                             if var_name.startswith(prefix):
                                 var_list.append(var_name)
         else:
             # For components with no children, self._subsystems_allprocs is empty.
-            for var_type in in_or_out:
-                for var_name in chain(real_vars[var_type], disc_vars[var_type]):
+            for io in in_or_out:
+                for var_name in chain(real_vars[io], disc_vars[io]):
                     if not variables or var_name in variables:
                         var_list.append(var_name)
 
@@ -4115,9 +4124,13 @@ class System(object):
         if from_root:
             all_meta = self._problem_meta['model_ref']()._var_allprocs_abs2meta
             my_meta = self._problem_meta['model_ref']()._var_abs2meta
+            io = 'output' if abs_name in all_meta['output'] else 'input'
+            all_meta = all_meta[io]
+            my_meta = my_meta[io]
         else:
-            all_meta = self._var_allprocs_abs2meta
-            my_meta = self._var_abs2meta
+            io = 'output' if abs_name in self._var_allprocs_abs2meta['output'] else 'input'
+            all_meta = self._var_allprocs_abs2meta[io]
+            my_meta = self._var_abs2meta[io]
 
         # if abs_name is non-discrete it should be found in all_meta
         if abs_name in all_meta:
@@ -4214,9 +4227,9 @@ class System(object):
                         tag = self._var_allprocs_abs2idx[vec_name][abs_name]
                         # avoid tag collisions between inputs, outputs, and resids
                         if kind != 'output':
-                            tag += len(self._var_allprocs_abs_names['output'])
+                            tag += len(self._var_allprocs_abs2meta['output'])
                             if kind == 'residual':
-                                tag += len(self._var_allprocs_abs_names['input'])
+                                tag += len(self._var_allprocs_abs2meta['input'])
                         if self.comm.rank == owner:
                             self.comm.send(val, dest=rank, tag=tag)
                         elif self.comm.rank == rank:
@@ -4346,19 +4359,19 @@ class System(object):
                 try:
                     units = scope_sys._group_inputs[name][0]['units']
                 except (KeyError, IndexError):
-                    unit0 = self._var_allprocs_abs2meta[abs_ins[0]]['units']
+                    unit0 = self._var_allprocs_abs2meta['input'][abs_ins[0]]['units']
                     for n in abs_ins[1:]:
-                        if unit0 != self._var_allprocs_abs2meta[n]['units']:
+                        if unit0 != self._var_allprocs_abs2meta['input'][n]['units']:
                             self._show_ambiguity_msg(name, ('units',), abs_ins)
                             break
 
-        if abs_name in self._var_abs2meta:  # input is local
-            vmeta = self._var_abs2meta[abs_name]
+        if abs_name in self._var_abs2meta['input']:  # input is local
+            vmeta = self._var_abs2meta['input'][abs_name]
             src_indices = vmeta['src_indices']
             has_src_indices = src_indices is not None
             distrib = vmeta['distributed']
         else:
-            vmeta = self._var_allprocs_abs2meta[abs_name]
+            vmeta = self._var_allprocs_abs2meta['input'][abs_name]
             src_indices = None  # FIXME: remote var could have src_indices
             has_src_indices = vmeta['has_src_indices']
             distrib = vmeta['distributed']
@@ -4368,9 +4381,9 @@ class System(object):
                                    "using `get_val(<name>, get_remote=True)` or from the "
                                    "local process using `get_val(<name>, get_remote=False)`.")
 
-        smeta = self._problem_meta['model_ref']()._var_allprocs_abs2meta[src]
+        smeta = self._problem_meta['model_ref']()._var_allprocs_abs2meta['output'][src]
         sdistrib = smeta['distributed']
-        slocal = src in self._problem_meta['model_ref']()._var_abs2meta
+        slocal = src in self._problem_meta['model_ref']()._var_abs2meta['output']
         if sdistrib and not distrib and not get_remote:
             raise RuntimeError(f"{self.msginfo}: Non-distributed variable '{abs_name}' has "
                                f"a distributed source, '{src}', so you must retrieve its value "
@@ -4427,7 +4440,7 @@ class System(object):
                         val = self.comm.bcast(None, root=self._owning_rank[abs_name])
 
             if distrib and get_remote:
-                val.shape = self._var_allprocs_abs2meta[abs_name]['global_shape']
+                val.shape = self._var_allprocs_abs2meta['input'][abs_name]['global_shape']
             elif val.size > 0:
                 val.shape = vmeta['shape']
         else:
@@ -4464,7 +4477,7 @@ class System(object):
         ndarray or None
             The value of src_indices for the given input variable.
         """
-        meta = self._var_abs2meta[varname]
+        meta = self._var_abs2meta['input'][varname]
         src_indices = meta['src_indices']
         if src_indices is not None:
             src_slice = meta['src_slice']
@@ -4473,8 +4486,8 @@ class System(object):
                 model = self._problem_meta['model_ref']()
                 src = model._conn_global_abs_in2out[varname]
                 try:
-                    global_size = model._var_allprocs_abs2meta[src]['global_size']
-                    global_shape = model._var_allprocs_abs2meta[src]['global_shape']
+                    global_size = model._var_allprocs_abs2meta['output'][src]['global_size']
+                    global_shape = model._var_allprocs_abs2meta['output'][src]['global_shape']
                 except KeyError:
                     raise RuntimeError(f"{self.msginfo}: Can't compute src_indices array from "
                                        f"src_slice for input '{varname}' because we don't know "
@@ -4558,7 +4571,8 @@ class System(object):
                             vdict[name] = get(ivc_path, get_remote=True, rank=0,
                                               vec_name=vec_name, kind='output')
             else:
-                meta = self._var_allprocs_abs2meta
+                io = 'input' if kind == 'input' else 'output'
+                meta = self._var_allprocs_abs2meta[io]
                 for name in variables:
                     if self._owning_rank[name] == 0 and not meta[name]['distributed']:
                         # if using a serial recorder and rank 0 owns the variable,
@@ -4691,14 +4705,20 @@ class System(object):
             meta_loc = self._var_abs2meta
 
         meta = None
-        if name in meta_all:
+        if name in meta_all['output']:
             abs_name = name
-            meta = meta_all[name]
+            meta = meta_all['output'][name]
+        elif name in meta_all['input']:
+            abs_name = name
+            meta = meta_all['input'][name]
 
         if meta is None:
             abs_name = name2abs_name(self, name)
-            if abs_name is not None and abs_name in meta_all:
-                meta = meta_all[abs_name]
+            if abs_name is not None:
+                if abs_name in meta_all['output']:
+                    meta = meta_all['output'][abs_name]
+                elif abs_name in meta_all['input']:
+                    meta = meta_all['input'][abs_name]
 
         if meta:
             if key in meta:
@@ -4707,11 +4727,20 @@ class System(object):
                 # key is either bogus or a key into the local metadata dict
                 # (like 'value' or 'src_indices'). If MPI is active, this val may be remote
                 # on some procs
-                if self.comm.size > 1:
-                    pass
-                elif abs_name in meta_loc:
+                if self.comm.size > 1 and abs_name in self._vars_to_gather:
+                    # TODO: fix this
+                    # cause a failure in all procs to avoid a hang
+                    raise RuntimeError(f"{self.msgifo}: No support yet for retrieving local "
+                                       f"metadata key '{key}' from a remote proc.")
+                elif abs_name in meta_loc['output']:
                     try:
-                        return meta_loc[abs_name][key]
+                        return meta_loc['output'][abs_name][key]
+                    except KeyError:
+                        raise KeyError(f"{self.msginfo}: Metadata key '{key}' not found for "
+                                       f"variable '{name}'.")
+                elif abs_name in meta_loc['input']:
+                    try:
+                        return meta_loc['input'][abs_name][key]
                     except KeyError:
                         raise KeyError(f"{self.msginfo}: Metadata key '{key}' not found for "
                                        f"variable '{name}'.")
@@ -4728,9 +4757,9 @@ class System(object):
             rel_idx = len(self.pathname) + 1 if self.pathname else 0
             relname = abs_name[rel_idx:]
             if relname in self._var_discrete['output']:
-                meta = self._var_discrete['output']
+                meta = self._var_discrete['output'][relname]
             elif relname in self._var_discrete['input']:
-                meta = self._var_discrete['input']
+                meta = self._var_discrete['input'][relname]
 
             if meta:
                 try:
@@ -4744,160 +4773,164 @@ class System(object):
     def _resolve_ambiguous_input_meta(self):
         pass
 
+    def get_relevant_vars(self, desvars, responses, mode):
+        """
+        Find all relevant vars between desvars and responses.
 
-def get_relevant_vars(connections, desvars, responses, mode):
-    """
-    Find all relevant vars between desvars and responses.
+        Both vars are assumed to be outputs (either design vars or responses).
 
-    Both vars are assumed to be outputs (either design vars or responses).
+        Parameters
+        ----------
+        desvars : list of str
+            Names of design variables.
+        responses : list of str
+            Names of response variables.
+        mode : str
+            Direction of derivatives, either 'fwd' or 'rev'.
 
-    Parameters
-    ----------
-    connections : dict
-        Mapping of targets to their sources.
-    desvars : list of str
-        Names of design variables.
-    responses : list of str
-        Names of response variables.
-    mode : str
-        Direction of derivatives, either 'fwd' or 'rev'.
+        Returns
+        -------
+        dict
+            Dict of ({'outputs': dep_outputs, 'inputs': dep_inputs, dep_systems)
+            keyed by design vars and responses.
+        """
+        conns = self._conn_global_abs_in2out
+        relevant = defaultdict(dict)
 
-    Returns
-    -------
-    dict
-        Dict of ({'outputs': dep_outputs, 'inputs': dep_inputs, dep_systems)
-        keyed by design vars and responses.
-    """
-    relevant = defaultdict(dict)
+        # Create a hybrid graph with components and all connected vars.  If a var is connected,
+        # also connect it to its corresponding component.
+        graph = nx.DiGraph()
+        for tgt, src in conns.items():
+            if src not in graph:
+                graph.add_node(src, type_='out')
+            graph.add_node(tgt, type_='in')
 
-    # Create a hybrid graph with components and all connected vars.  If a var is connected,
-    # also connect it to its corresponding component.
-    graph = nx.DiGraph()
-    for tgt, src in connections.items():
-        if src not in graph:
-            graph.add_node(src, type_='out')
-        graph.add_node(tgt, type_='in')
+            src_sys = src.rsplit('.', 1)[0]
+            graph.add_edge(src_sys, src)
 
-        src_sys = src.rsplit('.', 1)[0]
-        graph.add_edge(src_sys, src)
+            tgt_sys = tgt.rsplit('.', 1)[0]
+            graph.add_edge(tgt, tgt_sys)
 
-        tgt_sys = tgt.rsplit('.', 1)[0]
-        graph.add_edge(tgt, tgt_sys)
+            graph.add_edge(src, tgt)
 
-        graph.add_edge(src, tgt)
-
-    for dv in desvars:
-        if dv not in graph:
-            graph.add_node(dv, type_='out')
-            parts = dv.rsplit('.', 1)
-            if len(parts) == 1:
-                system = ''  # this happens when a component is the model
-                graph.add_edge(dv, system)
-            else:
-                system = parts[0]
-                graph.add_edge(system, dv)
-
-    for res in responses:
-        if res not in graph:
-            graph.add_node(res, type_='out')
-            parts = res.rsplit('.', 1)
-            if len(parts) == 1:
-                system = ''  # this happens when a component is the model
-            else:
-                system = parts[0]
-            graph.add_edge(system, res)
-
-    nodes = graph.nodes
-    grev = graph.reverse(copy=False)
-    dvcache = {}
-    rescache = {}
-
-    for desvar in desvars:
-        if desvar not in dvcache:
-            dvcache[desvar] = set(all_connected_nodes(graph, desvar))
-
-        for response in responses:
-            if response not in rescache:
-                rescache[response] = set(all_connected_nodes(grev, response))
-
-            common = dvcache[desvar].intersection(rescache[response])
-
-            if common:
-                input_deps = set()
-                output_deps = set()
-                sys_deps = set()
-                for node in common:
-                    if 'type_' in nodes[node]:
-                        typ = nodes[node]['type_']
-                        parts = node.rsplit('.', 1)
-                        if len(parts) == 1:
-                            system = ''
-                        else:
-                            system = parts[0]
-                        if typ == 'in':  # input var
-                            input_deps.add(node)
-                            if system not in sys_deps:
-                                sys_deps.update(all_ancestors(system))
-                        else:  # output var
-                            output_deps.add(node)
-                            if system not in sys_deps:
-                                sys_deps.update(all_ancestors(system))
-
-            elif desvar == response:
-                input_deps = set()
-                output_deps = set([response])
-                parts = desvar.rsplit('.', 1)
+        for dv in desvars:
+            if dv not in graph:
+                graph.add_node(dv, type_='out')
+                parts = dv.rsplit('.', 1)
                 if len(parts) == 1:
-                    s = ''
+                    system = ''  # this happens when a component is the model
+                    graph.add_edge(dv, system)
                 else:
-                    s = parts[0]
-                sys_deps = set(all_ancestors(s))
+                    system = parts[0]
+                    graph.add_edge(system, dv)
 
-            if common or desvar == response:
-                if mode == 'fwd' or mode == 'auto':
-                    relevant[desvar][response] = ({'input': input_deps,
-                                                   'output': output_deps}, sys_deps)
-                if mode == 'rev' or mode == 'auto':
-                    relevant[response][desvar] = ({'input': input_deps,
-                                                   'output': output_deps}, sys_deps)
-
-                sys_deps.add('')  # top level Group is always relevant
-
-    voi_lists = []
-    if mode == 'fwd' or mode == 'auto':
-        voi_lists.append((desvars, responses))
-    if mode == 'rev' or mode == 'auto':
-        voi_lists.append((responses, desvars))
-
-    # now calculate dependencies between each VOI and all other VOIs of the
-    # other type, e.g for each input VOI wrt all output VOIs.  This is only
-    # done for design vars in fwd mode or responses in rev mode. In auto mode,
-    # we combine the results for fwd and rev modes.
-    for inputs, outputs in voi_lists:
-        for inp in inputs:
-            relinp = relevant[inp]
-            if relinp:
-                if '@all' in relinp:
-                    dct, total_systems = relinp['@all']
-                    total_inps = dct['input']
-                    total_outs = dct['output']
+        for res in responses:
+            if res not in graph:
+                graph.add_node(res, type_='out')
+                parts = res.rsplit('.', 1)
+                if len(parts) == 1:
+                    system = ''  # this happens when a component is the model
                 else:
-                    total_inps = set()
-                    total_outs = set()
-                    total_systems = set()
-                for out in outputs:
-                    if out in relinp:
-                        dct, systems = relinp[out]
-                        total_inps.update(dct['input'])
-                        total_outs.update(dct['output'])
-                        total_systems.update(systems)
-                relinp['@all'] = ({'input': total_inps, 'output': total_outs},
-                                  total_systems)
-            else:
-                relinp['@all'] = ({'input': set(), 'output': set()}, set())
+                    system = parts[0]
+                graph.add_edge(system, res)
 
-    relevant['linear'] = {'@all': ({'input': ContainsAll(), 'output': ContainsAll()},
-                                   ContainsAll())}
-    relevant['nonlinear'] = relevant['linear']
+        nodes = graph.nodes
+        grev = graph.reverse(copy=False)
+        dvcache = {}
+        rescache = {}
 
-    return relevant
+        for desvar in desvars:
+            if desvar not in dvcache:
+                dvcache[desvar] = set(all_connected_nodes(graph, desvar))
+
+            for response in responses:
+                if response not in rescache:
+                    rescache[response] = set(all_connected_nodes(grev, response))
+
+                common = dvcache[desvar].intersection(rescache[response])
+
+                if common:
+                    input_deps = set()
+                    output_deps = set()
+                    sys_deps = set()
+                    for node in common:
+                        if 'type_' in nodes[node]:
+                            typ = nodes[node]['type_']
+                            parts = node.rsplit('.', 1)
+                            if len(parts) == 1:
+                                system = ''
+                            else:
+                                system = parts[0]
+                            if typ == 'in':  # input var
+                                input_deps.add(node)
+                                if system not in sys_deps:
+                                    sys_deps.update(all_ancestors(system))
+                            else:  # output var
+                                output_deps.add(node)
+                                if system not in sys_deps:
+                                    sys_deps.update(all_ancestors(system))
+
+                elif desvar == response:
+                    input_deps = set()
+                    output_deps = set([response])
+                    parts = desvar.rsplit('.', 1)
+                    if len(parts) == 1:
+                        s = ''
+                    else:
+                        s = parts[0]
+                    sys_deps = set(all_ancestors(s))
+
+                if common or desvar == response:
+                    if desvar in conns:
+                        desvar = conns[desvar]
+                    if response in conns:
+                        response = conns[response]
+                    if mode != 'rev':  # fwd or auto
+                        relevant[desvar][response] = ({'input': input_deps,
+                                                       'output': output_deps}, sys_deps)
+                    if mode != 'fwd':  # rev or auto
+                        relevant[response][desvar] = ({'input': input_deps,
+                                                       'output': output_deps}, sys_deps)
+
+                    sys_deps.add('')  # top level Group is always relevant
+
+        voi_lists = []
+        if mode != 'rev':
+            voi_lists.append((desvars, responses))
+        if mode != 'fwd':
+            voi_lists.append((responses, desvars))
+
+        # now calculate dependencies between each VOI and all other VOIs of the
+        # other type, e.g for each input VOI wrt all output VOIs.  This is only
+        # done for design vars in fwd mode or responses in rev mode. In auto mode,
+        # we combine the results for fwd and rev modes.
+        for inputs, outputs in voi_lists:
+            for inp in inputs:
+                if inp in conns:
+                    inp = conns[inp]
+                relinp = relevant[inp]
+                if relinp:
+                    if '@all' in relinp:
+                        dct, total_systems = relinp['@all']
+                        total_inps = dct['input']
+                        total_outs = dct['output']
+                    else:
+                        total_inps = set()
+                        total_outs = set()
+                        total_systems = set()
+                    for out in outputs:
+                        if out in relinp:
+                            dct, systems = relinp[out]
+                            total_inps.update(dct['input'])
+                            total_outs.update(dct['output'])
+                            total_systems.update(systems)
+                    relinp['@all'] = ({'input': total_inps, 'output': total_outs},
+                                      total_systems)
+                else:
+                    relinp['@all'] = ({'input': set(), 'output': set()}, set())
+
+        relevant['linear'] = {'@all': ({'input': ContainsAll(), 'output': ContainsAll()},
+                                       ContainsAll())}
+        relevant['nonlinear'] = relevant['linear']
+
+        return relevant

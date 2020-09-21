@@ -46,8 +46,8 @@ def _check_cycles(group, infos=None):
     """
     graph = group.compute_sys_graph(comps_only=False)
     sccs = get_sccs_topo(graph)
-    sub2i = {sub.name: i for i, sub in enumerate(group._subsystems_allprocs)}
-    cycles = [sorted(s, key=lambda n: sub2i[n]) for s in sccs if len(s) > 1]
+    cycles = [sorted(s, key=lambda n: group._subsystems_allprocs[n].index)
+              for s in sccs if len(s) > 1]
 
     if cycles and infos is not None:
         infos.append("   Group '%s' has the following cycles: %s\n" % (group.pathname, cycles))
@@ -155,13 +155,11 @@ def _get_used_before_calc_subs(group, input_srcs):
         A dict mapping names of target Systems to a set of names of their
         source Systems that execute after them.
     """
-    sub2i = {}
     parallel_solver = {}
-    for i, sub in enumerate(group._subsystems_allprocs):
+    allsubs = group._subsystems_allprocs
+    for sub, i in allsubs.values():
         if hasattr(sub, '_mpi_proc_allocator') and sub._mpi_proc_allocator.parallel:
             parallel_solver[sub.name] = sub.nonlinear_solver.SOLVER
-
-        sub2i[sub.name] = i
 
     glen = len(group.pathname.split('.')) if group.pathname else 0
 
@@ -182,8 +180,8 @@ def _get_used_before_calc_subs(group, input_srcs):
                                "to '%s' when connecting components inside parallel "
                                "groups" % (src_sys))
                 ubcs[tgt_abs.rsplit('.', 1)[0]].add(src_abs.rsplit('.', 1)[0])
-            if (src_sys in sub2i and tgt_sys in sub2i and
-                    (sub2i[src_sys] > sub2i[tgt_sys])):
+            if (src_sys in allsubs and tgt_sys in allsubs and
+                    (allsubs[src_sys].index > allsubs[tgt_sys].index)):
                 ubcs[tgt_sys].add(src_sys)
 
     return ubcs
@@ -354,7 +352,7 @@ def _check_comp_has_no_outputs(problem, logger):
     msg = []
 
     for comp in problem.model.system_iter(include_self=True, recurse=True, typ=Component):
-        if len(comp._var_allprocs_abs_names['output']) == 0:
+        if len(list(comp.abs_name_iter('output', local=False, discrete=True))) == 0:
             msg.append("   %s\n" % comp.pathname)
 
     if msg:
@@ -421,8 +419,8 @@ def _check_solvers(problem, logger):
         if isinstance(sys, Group):
             graph = sys.compute_sys_graph(comps_only=False)
             sccs = get_sccs_topo(graph)
-            sub2i = {sub.name: i for i, sub in enumerate(sys._subsystems_allprocs)}
-            has_cycles = [sorted(s, key=lambda n: sub2i[n]) for s in sccs if len(s) > 1]
+            allsubs = sys._subsystems_allprocs
+            has_cycles = [sorted(s, key=lambda n: allsubs[n].index) for s in sccs if len(s) > 1]
         else:
             has_cycles = []
 
@@ -678,7 +676,7 @@ def check_allocate_complex_ln(model, under_cs):
        model.nonlinear_solver.supports['gradients']:
         return True
 
-    for sub in model._subsystems_allprocs:
+    for sub, _ in model._subsystems_allprocs.values():
         chk = check_allocate_complex_ln(sub, under_cs)
 
         if chk:

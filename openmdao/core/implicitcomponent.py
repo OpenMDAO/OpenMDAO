@@ -440,7 +440,7 @@ class ImplicitComponent(Component):
             List of all states.
         """
         prefix = self.pathname + '.' if self.pathname else ''
-        return sorted(self._var_allprocs_abs_names['output'] +
+        return sorted(list(self._var_allprocs_abs2meta['output']) +
                       [prefix + n for n in self._var_discrete['output']])
 
     def _list_states_allprocs(self):

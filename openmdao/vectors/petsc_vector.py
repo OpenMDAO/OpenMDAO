@@ -119,7 +119,7 @@ class PETScVector(DefaultVector):
                 # Here, we find the indices that are not locally owned so that we can
                 # temporarilly zero them out for the norm calculation.
                 dup_inds = []
-                abs2meta = system._var_allprocs_abs2meta
+                abs2meta = system._var_allprocs_abs2meta[self._typ]
                 for name, idx_slice in self.get_slice_dict().items():
                     owning_rank = system._owning_rank[name]
                     if not abs2meta[name]['distributed'] and owning_rank != system.comm.rank:
