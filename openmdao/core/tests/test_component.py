@@ -190,11 +190,11 @@ class TestExplicitComponent(unittest.TestCase):
 
         class NewBase(ExplicitComponent):
             def __init__(self, **kwargs):
-                super(NewBase, self).__init__(**kwargs)
+                super().__init__(**kwargs)
 
         class MyComp(NewBase):
             def __init__(self, **kwargs):
-                super(MyComp, self).__init__(**kwargs)
+                super().__init__(**kwargs)
 
             def setup(self):
                 self.add_input('x', val=0.0)
@@ -315,7 +315,7 @@ class TestRangePartials(unittest.TestCase):
     def test_range_partials(self):
         class RangePartialsComp(ExplicitComponent):
             def __init__(self, size=4):
-                super(RangePartialsComp, self).__init__()
+                super().__init__()
                 self.size = size
 
             def setup(self):

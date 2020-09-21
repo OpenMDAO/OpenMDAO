@@ -35,7 +35,7 @@ class NewtonSolver(NonlinearSolver):
         **kwargs : dict
             options dictionary.
         """
-        super(NewtonSolver, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Slot for linear solver
         self.linear_solver = None
@@ -47,7 +47,7 @@ class NewtonSolver(NonlinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        super(NewtonSolver, self)._declare_options()
+        super()._declare_options()
 
         self.options.declare('solve_subsystems', types=bool,
                              desc='Set to True to turn on sub-solvers (Hybrid Newton).')
@@ -75,7 +75,7 @@ class NewtonSolver(NonlinearSolver):
         depth : int
             depth of the current system (already incremented).
         """
-        super(NewtonSolver, self)._setup_solvers(system, depth)
+        super()._setup_solvers(system, depth)
         rank = MPI.COMM_WORLD.rank if MPI is not None else 0
 
         self._disallow_discrete_outputs()
@@ -113,7 +113,7 @@ class NewtonSolver(NonlinearSolver):
         type_ : str
             Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
         """
-        super(NewtonSolver, self)._set_solver_print(level=level, type_=type_)
+        super()._set_solver_print(level=level, type_=type_)
 
         if self.linear_solver is not None and type_ != 'NL':
             self.linear_solver._set_solver_print(level=level, type_=type_)
@@ -285,7 +285,7 @@ class NewtonSolver(NonlinearSolver):
         """
         Clean up resources prior to exit.
         """
-        super(NewtonSolver, self).cleanup()
+        super().cleanup()
 
         if self.linear_solver:
             self.linear_solver.cleanup()

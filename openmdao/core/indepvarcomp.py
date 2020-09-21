@@ -26,7 +26,7 @@ class IndepVarComp(ExplicitComponent):
         **kwargs : dict
             keyword arguments.
         """
-        super(IndepVarComp, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         if 'tags' not in kwargs:
             kwargs['tags'] = {'indep_var'}
@@ -35,7 +35,7 @@ class IndepVarComp(ExplicitComponent):
 
         # A single variable is declared during instantiation
         if isinstance(name, str):
-            super(IndepVarComp, self).add_output(name, val, **kwargs)
+            super().add_output(name, val, **kwargs)
 
         elif name is None:
             pass
@@ -103,7 +103,7 @@ class IndepVarComp(ExplicitComponent):
                                "declared. They must either be declared during instantiation or "
                                "by calling add_output or add_discrete_output afterwards.")
 
-        super(IndepVarComp, self)._configure_check()
+        super()._configure_check()
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=None, ref0=None, res_ref=None, tags=None,
@@ -187,7 +187,7 @@ class IndepVarComp(ExplicitComponent):
                   'res_ref': res_ref, 'tags': tags, 'shape_by_conn': shape_by_conn,
                   'copy_shape': copy_shape,
                   }
-        super(IndepVarComp, self).add_output(name, val, **kwargs)
+        super().add_output(name, val, **kwargs)
 
     def add_discrete_output(self, name, val, desc='', tags=None):
         """
@@ -211,7 +211,7 @@ class IndepVarComp(ExplicitComponent):
             tags = make_set(tags, name='tags') | {'indep_var'}
 
         kwargs = {'desc': desc, 'tags': tags}
-        super(IndepVarComp, self).add_discrete_output(name, val, **kwargs)
+        super().add_discrete_output(name, val, **kwargs)
 
     def _linearize(self, jac=None, sub_do_ln=False):
         """
@@ -252,7 +252,7 @@ class _AutoIndepVarComp(IndepVarComp):
         **kwargs : dict
             keyword arguments.
         """
-        super(_AutoIndepVarComp, self).__init__(name, val, **kwargs)
+        super().__init__(name, val, **kwargs)
         self._remotes = set()
 
     def _add_remote(self, name):
@@ -271,7 +271,7 @@ class _AutoIndepVarComp(IndepVarComp):
             for name in all_remotes:
                 self._static_var_rel2meta[name]['distributed'] = True
 
-        super(_AutoIndepVarComp, self)._set_vector_class()
+        super()._set_vector_class()
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=None, ref0=None, res_ref=None, tags=None,

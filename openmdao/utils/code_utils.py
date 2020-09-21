@@ -42,7 +42,7 @@ class _SelfCallCollector(ast.NodeVisitor):
     """
 
     def __init__(self, class_):
-        super(_SelfCallCollector, self).__init__()
+        super().__init__()
         self.self_calls = defaultdict(list)
         self.class_ = class_
         self.mro = inspect.getmro(class_)
@@ -78,7 +78,7 @@ class _SelfCallCollector(ast.NodeVisitor):
                     self.generic_visit(node)
             else:
                 self.generic_visit(node)
-        # check for super(Class, self) call
+        # check for super() call
         elif isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Call):
             callnode = node.func.value
             n = _get_long_name(callnode.func)

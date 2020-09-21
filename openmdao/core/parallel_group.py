@@ -18,5 +18,5 @@ class ParallelGroup(Group):
             dict of arguments available here and in all descendants of this
             Group.
         """
-        super(ParallelGroup, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self._mpi_proc_allocator.parallel = True

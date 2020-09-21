@@ -792,7 +792,7 @@ class PromAbsDict(dict):
             connections or a promoted input name for multiple connections. This is for output
             display.
         """
-        super(PromAbsDict, self).__init__()
+        super().__init__()
 
         self._prom2abs = prom2abs
         self._abs2prom = abs2prom
@@ -812,27 +812,27 @@ class PromAbsDict(dict):
                     # key is auto_ivc, so translate to a readable input name.
                     self._values[key] = values[key]
                     in_key = auto_ivc_map[key]
-                    super(PromAbsDict, self).__setitem__(in_key, values[key])
+                    super().__setitem__(in_key, values[key])
                 elif key in abs2prom:
                     # key is absolute name
                     self._values[key] = values[key]
                     prom_key = abs2prom[key]
-                    super(PromAbsDict, self).__setitem__(prom_key, values[key])
+                    super().__setitem__(prom_key, values[key])
                 elif key in prom2abs:
                     # key is promoted name
                     for abs_key in prom2abs[key]:
                         self._values[abs_key] = values[key]
-                    super(PromAbsDict, self).__setitem__(key, values[key])
+                    super().__setitem__(key, values[key])
                 elif isinstance(key, tuple) or DERIV_KEY_SEP in key:
                     # derivative keys can be either (of, wrt) or 'of!wrt'
                     abs_keys, prom_key = self._deriv_keys(key)
                     for abs_key in abs_keys:
                         self._values[abs_key] = values[key]
-                    super(PromAbsDict, self).__setitem__(prom_key, values[key])
+                    super().__setitem__(prom_key, values[key])
                 elif in_prom2abs is not None and key in in_prom2abs:
                     # Auto-ivc outputs, use abs source (which is prom source.)
                     self._values[key] = values[key]
-                    super(PromAbsDict, self).__setitem__(key, values[key])
+                    super().__setitem__(key, values[key])
             self._keys = self._values.keys()
         else:
             # numpy structured array, which will always use absolute names
@@ -842,24 +842,24 @@ class PromAbsDict(dict):
                 if key in auto_ivc_map:
                     # key is auto_ivc, so translate to a readable input name.
                     in_key = auto_ivc_map[key]
-                    super(PromAbsDict, self).__setitem__(in_key, self._values[key])
+                    super().__setitem__(in_key, self._values[key])
                 elif key in abs2prom:
                     prom_key = abs2prom[key]
                     if prom_key in self:
                         # We already set a value for this promoted name, which means
                         # it is an input that maps to multiple absolute names. Set the
                         # value to AMBIGOUS and require access via absolute name.
-                        super(PromAbsDict, self).__setitem__(prom_key, _AMBIGOUS_PROM_NAME)
+                        super().__setitem__(prom_key, _AMBIGOUS_PROM_NAME)
                     else:
-                        super(PromAbsDict, self).__setitem__(prom_key, self._values[key])
+                        super().__setitem__(prom_key, self._values[key])
                 elif DERIV_KEY_SEP in key:
                     # derivative keys will be a string in the form of 'of!wrt'
                     abs_keys, prom_key = self._deriv_keys(key)
-                    super(PromAbsDict, self).__setitem__(prom_key, self._values[key])
+                    super().__setitem__(prom_key, self._values[key])
                 elif in_prom2abs is not None and key in in_prom2abs:
                     # Auto-ivc outputs, use abs source (which is prom source.)
                     # TODO - maybe get rid of this by always saving the source name
-                    super(PromAbsDict, self).__setitem__(key, self._values[key])
+                    super().__setitem__(key, self._values[key])
 
     def __str__(self):
         """
@@ -870,7 +870,7 @@ class PromAbsDict(dict):
         str
             String representation of the dictionary.
         """
-        return super(PromAbsDict, self).__str__()
+        return super().__str__()
 
     def _deriv_keys(self, key):
         """
@@ -944,7 +944,7 @@ class PromAbsDict(dict):
 
         elif key in self:
             # promoted name
-            val = super(PromAbsDict, self).__getitem__(key)
+            val = super().__getitem__(key)
             if val is _AMBIGOUS_PROM_NAME:
                 msg = "The promoted name '%s' is invalid because it refers to multiple " + \
                       "inputs: %s. Access the value using an absolute path name or the " + \
@@ -956,7 +956,7 @@ class PromAbsDict(dict):
         elif isinstance(key, tuple) or self._DERIV_KEY_SEP in key:
             # derivative keys can be either (of, wrt) or 'of!wrt'
             abs_keys, prom_key = self._deriv_keys(key)
-            return super(PromAbsDict, self).__getitem__(prom_key)
+            return super().__getitem__(prom_key)
 
         raise KeyError('Variable name "%s" not found.' % key)
 
@@ -982,28 +982,28 @@ class PromAbsDict(dict):
             for abs_key in abs_keys:
                 self._values[abs_key] = value
 
-            super(PromAbsDict, self).__setitem__(prom_key, value)
+            super().__setitem__(prom_key, value)
 
         elif key in abs2prom:
             if key in auto_ivc_map:
                 # key is auto_ivc, so translate to a readable input name.
                 self._values[key] = value
                 in_key = auto_ivc_map[key]
-                super(PromAbsDict, self).__setitem__(in_key, self._values[key])
+                super().__setitem__(in_key, self._values[key])
             else:
                 # absolute name
                 self._values[key] = value
-                super(PromAbsDict, self).__setitem__(self._abs2prom[key], value)
+                super().__setitem__(self._abs2prom[key], value)
         elif key in prom2abs:
             # promoted name, propagate to all connected absolute names
             for abs_key in self._prom2abs[key]:
                 if abs_key in self._keys:
                     self._values[abs_key] = value
-            super(PromAbsDict, self).__setitem__(key, value)
+            super().__setitem__(key, value)
         else:
             # Design variable by promoted input name.
             self._values[key] = value
-            super(PromAbsDict, self).__setitem__(key, value)
+            super().__setitem__(key, value)
 
     def absolute_names(self):
         """

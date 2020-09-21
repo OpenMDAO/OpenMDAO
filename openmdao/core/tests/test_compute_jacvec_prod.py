@@ -22,7 +22,7 @@ class SubProbComp(om.ExplicitComponent):
     together.
     """
     def __init__(self, input_size, num_nodes, mode, **kwargs):
-        super(SubProbComp, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.prob = None
         self.size = input_size
         self.num_nodes = num_nodes

@@ -55,7 +55,7 @@ class DifferentialEvolutionDriver(Driver):
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Driver options.
         """
-        super(DifferentialEvolutionDriver, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # What we support
         self.supports['inequality_constraints'] = True
@@ -124,7 +124,7 @@ class DifferentialEvolutionDriver(Driver):
         problem : <Problem>
             Pointer to the containing problem.
         """
-        super(DifferentialEvolutionDriver, self)._setup_driver(problem)
+        super()._setup_driver(problem)
 
         model_mpi = None
         comm = problem.comm

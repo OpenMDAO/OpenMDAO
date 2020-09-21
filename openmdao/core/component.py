@@ -87,7 +87,7 @@ class Component(System):
         **kwargs : dict of keyword arguments
             available here and in all descendants of this system.
         """
-        super(Component, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self._var_rel_names = {'input': [], 'output': []}
         self._var_rel2meta = {}
@@ -102,7 +102,7 @@ class Component(System):
         """
         Declare options before kwargs are processed in the init method.
         """
-        super(Component, self)._declare_options()
+        super()._declare_options()
 
         self.options.declare('distributed', types=bool, default=False,
                              desc='True if the component has variables that are distributed '
@@ -138,7 +138,7 @@ class Component(System):
         prob_meta : dict
             Problem level metadata.
         """
-        super(Component, self)._setup_procs(pathname, comm, mode, prob_meta)
+        super()._setup_procs(pathname, comm, mode, prob_meta)
 
         orig_comm = comm
         if self._num_par_fd > 1:
@@ -206,14 +206,14 @@ class Component(System):
                                "using default metadata and method='%s'." % (self.msginfo, method))
                 self.declare_partials('*', '*', method=method)
 
-        super(Component, self)._configure_check()
+        super()._configure_check()
 
     def _setup_var_data(self):
         """
         Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
         """
         global global_meta_names
-        super(Component, self)._setup_var_data()
+        super()._setup_var_data()
 
         allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
         abs2prom = self._var_allprocs_abs2prom = self._var_abs2prom
@@ -1100,10 +1100,11 @@ class Component(System):
         show_sparsity : bool
             If True, display sparsity with coloring info after generating coloring.
         """
-        super(Component, self).declare_coloring(wrt, method, form, step, per_instance,
-                                                num_full_jacs,
-                                                tol, orders, perturb_size, min_improve_pct,
-                                                show_summary, show_sparsity)
+        super().declare_coloring(wrt, method, form, step, per_instance,
+                                 num_full_jacs,
+                                 tol, orders, perturb_size, min_improve_pct,
+                                 show_summary, show_sparsity)
+
         # create approx partials for all matches
         meta = self.declare_partials('*', wrt, method=method, step=step, form=form)
         meta['coloring'] = True

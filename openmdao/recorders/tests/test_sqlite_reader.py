@@ -2661,7 +2661,7 @@ class TestSqliteCaseReader(unittest.TestCase):
             A simple component that has array inputs and outputs
             """
             def __init__(self, size):
-                super(ArrayAdder, self).__init__()
+                super().__init__()
                 self.size = size
 
             def setup(self):

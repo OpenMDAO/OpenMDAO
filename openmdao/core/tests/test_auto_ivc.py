@@ -38,7 +38,7 @@ def _test_func_name(func, num, param):
 
 class PathCompEx(om.ExplicitComponent):
     def __init__(self, s=''):
-        super(PathCompEx, self).__init__()
+        super().__init__()
         self.s = s
 
     def setup(self):

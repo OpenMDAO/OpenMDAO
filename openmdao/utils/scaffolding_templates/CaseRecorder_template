@@ -17,7 +17,7 @@ class {class_name}(CaseRecorder):
         record_viewer_data : bool, optional
             If True, record data needed for visualization.
         """
-        super({class_name}, self).__init__(record_viewer_data)
+        super().__init__(record_viewer_data)
 
         # initialize attributes here...
 
@@ -30,7 +30,7 @@ class {class_name}(CaseRecorder):
         recording_requester : object
             Object to which this recorder is attached.
         """
-        super({class_name}, self).startup(recording_requester)
+        super().startup(recording_requester)
 
         # put any necessary startup code here...
 

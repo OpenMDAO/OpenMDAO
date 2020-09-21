@@ -26,7 +26,7 @@ class ResponseSurface(SurrogateModel):
         """
         Initialize all attributes.
         """
-        super(ResponseSurface, self).__init__()
+        super().__init__()
 
         self.m = 0  # number of training points
         self.n = 0  # number of independents
@@ -44,7 +44,7 @@ class ResponseSurface(SurrogateModel):
         y : array-like
             Model responses at given inputs.
         """
-        super(ResponseSurface, self).train(x, y)
+        super().train(x, y)
 
         m = self.m = x.shape[0]
         n = self.n = x.shape[1]
@@ -86,7 +86,7 @@ class ResponseSurface(SurrogateModel):
         float
             Predicted response.
         """
-        super(ResponseSurface, self).predict(x)
+        super().predict(x)
 
         n = x.size
 

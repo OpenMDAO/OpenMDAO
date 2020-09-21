@@ -877,7 +877,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
     def test_apply_nonlinear_inputs_read_only(self):
         class BadComp(QuadraticComp):
             def apply_nonlinear(self, inputs, outputs, residuals):
-                super(BadComp, self).apply_nonlinear(inputs, outputs, residuals)
+                super().apply_nonlinear(inputs, outputs, residuals)
                 inputs['a'] = 0.  # should not be allowed
 
         prob = om.Problem()
@@ -896,7 +896,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
     def test_apply_nonlinear_outputs_read_only(self):
         class BadComp(QuadraticComp):
             def apply_nonlinear(self, inputs, outputs, residuals):
-                super(BadComp, self).apply_nonlinear(inputs, outputs, residuals)
+                super().apply_nonlinear(inputs, outputs, residuals)
                 outputs['x'] = 0.  # should not be allowed
 
         prob = om.Problem()
@@ -915,7 +915,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
     def test_apply_nonlinear_read_only_reset(self):
         class BadComp(QuadraticComp):
             def apply_nonlinear(self, inputs, outputs, residuals):
-                super(BadComp, self).apply_nonlinear(inputs, outputs, residuals)
+                super().apply_nonlinear(inputs, outputs, residuals)
                 raise om.AnalysisError("It's just a scratch.")
 
         prob = om.Problem()
@@ -933,7 +933,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
     def test_solve_nonlinear_inputs_read_only(self):
         class BadComp(QuadraticComp):
             def solve_nonlinear(self, inputs, outputs):
-                super(BadComp, self).solve_nonlinear(inputs, outputs)
+                super().solve_nonlinear(inputs, outputs)
                 inputs['a'] = 0.  # should not be allowed
 
         prob = om.Problem()
@@ -951,7 +951,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
     def test_solve_nonlinear_inputs_read_only_reset(self):
         class BadComp(QuadraticComp):
             def solve_nonlinear(self, inputs, outputs):
-                super(BadComp, self).solve_nonlinear(inputs, outputs)
+                super().solve_nonlinear(inputs, outputs)
                 raise om.AnalysisError("It's just a scratch.")
 
         prob = om.Problem()
@@ -967,7 +967,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
     def test_linearize_inputs_read_only(self):
         class BadComp(QuadraticLinearize):
             def linearize(self, inputs, outputs, partials):
-                super(BadComp, self).linearize(inputs, outputs, partials)
+                super().linearize(inputs, outputs, partials)
                 inputs['a'] = 0.  # should not be allowed
 
         prob = om.Problem()
@@ -986,7 +986,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
     def test_linearize_outputs_read_only(self):
         class BadComp(QuadraticLinearize):
             def linearize(self, inputs, outputs, partials):
-                super(BadComp, self).linearize(inputs, outputs, partials)
+                super().linearize(inputs, outputs, partials)
                 outputs['x'] = 0.  # should not be allowed
 
         prob = om.Problem()
@@ -1005,7 +1005,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
     def test_linearize_read_only_reset(self):
         class BadComp(QuadraticLinearize):
             def linearize(self, inputs, outputs, partials):
-                super(BadComp, self).linearize(inputs, outputs, partials)
+                super().linearize(inputs, outputs, partials)
                 raise om.AnalysisError("It's just a scratch.")
 
         prob = om.Problem()
@@ -1023,7 +1023,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
     def test_apply_linear_inputs_read_only(self):
         class BadComp(QuadraticJacVec):
             def apply_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
-                super(BadComp, self).apply_linear(inputs, outputs,
+                super().apply_linear(inputs, outputs,
                                                   d_inputs, d_outputs, d_residuals, mode)
                 inputs['a'] = 0.  # should not be allowed
 
@@ -1043,7 +1043,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
     def test_apply_linear_outputs_read_only(self):
         class BadComp(QuadraticJacVec):
             def apply_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
-                super(BadComp, self).apply_linear(inputs, outputs,
+                super().apply_linear(inputs, outputs,
                                                   d_inputs, d_outputs, d_residuals, mode)
                 outputs['x'] = 0.  # should not be allowed
 
@@ -1063,7 +1063,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
     def test_apply_linear_dinputs_read_only(self):
         class BadComp(QuadraticJacVec):
             def apply_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
-                super(BadComp, self).apply_linear(inputs, outputs,
+                super().apply_linear(inputs, outputs,
                                                   d_inputs, d_outputs, d_residuals, mode)
                 d_inputs['a'] = 0.  # should not be allowed
 
@@ -1083,7 +1083,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
     def test_apply_linear_doutputs_read_only(self):
         class BadComp(QuadraticJacVec):
             def apply_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
-                super(BadComp, self).apply_linear(inputs, outputs,
+                super().apply_linear(inputs, outputs,
                                                   d_inputs, d_outputs, d_residuals, mode)
                 d_outputs['x'] = 0.  # should not be allowed
 
@@ -1103,7 +1103,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
     def test_apply_linear_dresids_read_only(self):
         class BadComp(QuadraticJacVec):
             def apply_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
-                super(BadComp, self).apply_linear(inputs, outputs,
+                super().apply_linear(inputs, outputs,
                                                   d_inputs, d_outputs, d_residuals, mode)
                 d_residuals['x'] = 0.  # should not be allowed
 
@@ -1123,7 +1123,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
     def test_apply_linear_read_only_reset(self):
         class BadComp(QuadraticJacVec):
             def apply_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
-                super(BadComp, self).apply_linear(inputs, outputs,
+                super().apply_linear(inputs, outputs,
                                                   d_inputs, d_outputs, d_residuals, mode)
                 raise om.AnalysisError("It's just a scratch.")
 
@@ -1143,7 +1143,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
     def test_solve_linear_doutputs_read_only(self):
         class BadComp(QuadraticJacVec):
             def solve_linear(self, d_outputs, d_residuals, mode):
-                super(BadComp, self).solve_linear(d_outputs, d_residuals, mode)
+                super().solve_linear(d_outputs, d_residuals, mode)
                 d_outputs['x'] = 0.  # should not be allowed
 
         prob = om.Problem()
@@ -1163,7 +1163,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
     def test_solve_linear_dresids_read_only(self):
         class BadComp(QuadraticJacVec):
             def solve_linear(self, d_outputs, d_residuals, mode):
-                super(BadComp, self).solve_linear(d_outputs, d_residuals, mode)
+                super().solve_linear(d_outputs, d_residuals, mode)
                 d_residuals['x'] = 0.  # should not be allowed
 
         prob = om.Problem()
@@ -1183,7 +1183,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
     def test_solve_linear_read_only_reset(self):
         class BadComp(QuadraticJacVec):
             def solve_linear(self, d_outputs, d_residuals, mode):
-                super(BadComp, self).solve_linear(d_outputs, d_residuals, mode)
+                super().solve_linear(d_outputs, d_residuals, mode)
                 raise om.AnalysisError("It's just a scratch.")
 
         prob = om.Problem()

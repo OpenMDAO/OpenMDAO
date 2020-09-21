@@ -38,7 +38,7 @@ class LinearRunOnce(LinearBlockGS):
         """
         Declare options before kwargs are processed in the init method.
         """
-        super(LinearRunOnce, self)._declare_options()
+        super()._declare_options()
 
         # Remove unused options from base options here, so that users
         # attempting to set them will get KeyErrors.

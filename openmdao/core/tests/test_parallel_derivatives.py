@@ -584,7 +584,7 @@ class MatMatTestCase(unittest.TestCase):
 
 class SumComp(om.ExplicitComponent):
     def __init__(self, size):
-        super(SumComp, self).__init__()
+        super().__init__()
         self.size = size
 
     def setup(self):
@@ -606,7 +606,7 @@ class SlowComp(om.ExplicitComponent):
     """
 
     def __init__(self, delay=1.0, size=3, mult=2.0):
-        super(SlowComp, self).__init__()
+        super().__init__()
         self.delay = delay
         self.size = size
         self.mult = mult
@@ -625,7 +625,7 @@ class SlowComp(om.ExplicitComponent):
 
     def _apply_linear(self, jac, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
         time.sleep(self.delay)
-        super(SlowComp, self)._apply_linear(jac, vec_names, rel_systems, mode, scope_out, scope_in)
+        super()._apply_linear(jac, vec_names, rel_systems, mode, scope_out, scope_in)
 
 
 class PartialDependGroup(om.Group):

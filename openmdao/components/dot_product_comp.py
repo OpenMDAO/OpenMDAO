@@ -34,7 +34,7 @@ class DotProductComp(ExplicitComponent):
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Component options.
         """
-        super(DotProductComp, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self._products = []
 

@@ -458,7 +458,7 @@ class TestUnitConversion(unittest.TestCase):
             #"""
 
             #def __init__(self, n=2):
-                #super(Attitude_Angular, self).__init__()
+                #super().__init__()
 
                 #self.n = n
 
@@ -721,7 +721,7 @@ class TestUnitConversion(unittest.TestCase):
         #class TestComp(Component):
 
             #def __init__(self):
-                #super(TestComp, self).__init__()
+                #super().__init__()
 
                 ## Params
                 #self.add_param('x1', 1.0, units='mm')

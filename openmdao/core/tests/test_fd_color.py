@@ -80,18 +80,18 @@ def setup_indeps(isplit, ninputs, indeps_name, comp_name):
 
 class CounterGroup(Group):
     def __init__(self, *args, **kwargs):
-        super(CounterGroup, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self._nruns = 0
 
     def _solve_nonlinear(self, *args, **kwargs):
-        super(CounterGroup, self)._solve_nonlinear(*args, **kwargs)
+        super()._solve_nonlinear(*args, **kwargs)
         self._nruns += 1
 
 
 class SparseCompImplicit(ImplicitComponent):
 
     def __init__(self, sparsity, method='fd', isplit=1, osplit=1, **kwargs):
-        super(SparseCompImplicit, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.sparsity = sparsity
         self.isplit = isplit
         self.osplit = osplit
@@ -127,7 +127,7 @@ class SparseCompImplicit(ImplicitComponent):
 class SparseCompExplicit(ExplicitComponent):
 
     def __init__(self, sparsity, method='fd', isplit=1, osplit=1, **kwargs):
-        super(SparseCompExplicit, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.sparsity = sparsity
         self.isplit = isplit
         self.osplit = osplit

@@ -27,7 +27,7 @@ class DictionaryJacobian(Jacobian):
         **kwargs : dict
             options dictionary.
         """
-        super(DictionaryJacobian, self).__init__(system, **kwargs)
+        super().__init__(system, **kwargs)
         self._iter_keys = {}
 
     def _iter_abs_keys(self, system, vec_name):

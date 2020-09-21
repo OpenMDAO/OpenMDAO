@@ -28,7 +28,7 @@ class ImplicitComponent(Component):
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Component options.
         """
-        super(ImplicitComponent, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self._inst_functs = {name: getattr(self, name, None) for name in _inst_functs}
 

@@ -8,7 +8,7 @@ from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 class MockSurrogate(om.MultiFiSurrogateModel):
 
     def __init__(self):
-        super(MockSurrogate, self).__init__()
+        super().__init__()
         self.xtrain = None
         self.ytrain = None
 

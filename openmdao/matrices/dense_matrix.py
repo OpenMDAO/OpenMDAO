@@ -27,7 +27,7 @@ class DenseMatrix(COOMatrix):
         system : <System>
             owning system.
         """
-        super(DenseMatrix, self)._build(num_rows, num_cols)
+        super()._build(num_rows, num_cols)
         self._coo = self._matrix
 
     def _prod(self, in_vec, mode, mask=None):

@@ -31,7 +31,7 @@ class ExplicitComponent(Component):
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Component options.
         """
-        super(ExplicitComponent, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self._inst_functs = {name: getattr(self, name, None) for name in _inst_functs}
         self._has_compute_partials = overrides_method('compute_partials', self, ExplicitComponent)
@@ -105,7 +105,7 @@ class ExplicitComponent(Component):
         """
         Call setup_partials in components.
         """
-        super(ExplicitComponent, self)._setup_partials()
+        super()._setup_partials()
 
         abs2prom_out = self._var_abs2prom['output']
 
@@ -209,13 +209,12 @@ class ExplicitComponent(Component):
         if res_ref is None:
             res_ref = ref
 
-        return super(ExplicitComponent, self).add_output(name,
-                                                         val=val, shape=shape, units=units,
-                                                         res_units=res_units, desc=desc,
-                                                         lower=lower, upper=upper,
-                                                         ref=ref, ref0=ref0, res_ref=res_ref,
-                                                         tags=tags, shape_by_conn=shape_by_conn,
-                                                         copy_shape=copy_shape)
+        return super().add_output(name, val=val, shape=shape, units=units,
+                                  res_units=res_units, desc=desc,
+                                  lower=lower, upper=upper,
+                                  ref=ref, ref0=ref0, res_ref=res_ref,
+                                  tags=tags, shape_by_conn=shape_by_conn,
+                                  copy_shape=copy_shape)
 
     def _approx_subjac_keys_iter(self):
         for abs_key, meta in self._subjacs_info.items():

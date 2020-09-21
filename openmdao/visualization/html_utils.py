@@ -606,8 +606,7 @@ class DiagramWriter(TemplateWriter):
         styles : dict
             Dictionary of CSS styles.
         """
-        super(DiagramWriter, self).__init__(filename=filename, embeddable=embeddable, title=title,
-                                            styles=styles)
+        super().__init__(filename=filename, embeddable=embeddable, title=title, styles=styles)
         self.toolbar = Toolbar()
         self.help = None
 
@@ -647,4 +646,4 @@ class DiagramWriter(TemplateWriter):
         self.insert('{{toolbar}}', self.toolbar.write())
         if self.help is not None:
             self._replace('{{help}}', self.help)
-        super(DiagramWriter, self).write(outfile)
+        super().write(outfile)
