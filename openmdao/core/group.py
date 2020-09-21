@@ -1515,10 +1515,10 @@ class Group(System):
                             # can't compare shapes if one is dist and other is not. The mismatch
                             # will be caught later in setup_connections in that case.
                             if not (dist ^ known_dist):
-                                raise RuntimeError(f"{self.msginfo}: Shape mismatch,  "
-                                                   f"{a2m[node]['shape']} vs. "
-                                                   f"{known_shape} for variable '{node}' during "
-                                                   "dynamic shape determination.")
+                                conditional_error(f"{self.msginfo}: Shape mismatch,  "
+                                                  f"{a2m[node]['shape']} vs. "
+                                                  f"{known_shape} for variable '{node}' during "
+                                                  "dynamic shape determination.")
                     else:
                         # transfer the known shape info to the unshaped variable
                         copy_var_meta(known, node, distrib_sizes)
@@ -2101,11 +2101,8 @@ class Group(System):
             raise TypeError("%s: Subsystem '%s' should be an instance, but a %s class object was "
                             "found." % (self.msginfo, name, subsys.__name__))
 
-        for tup in chain(self._subsystems_allprocs.values(),
-                         self._static_subsystems_allprocs.values()):
-            if name == tup.system.name:
-                raise RuntimeError("%s: Subsystem name '%s' is already used." %
-                                   (self.msginfo, name))
+        if name in self._subsystems_allprocs or name in self._static_subsystems_allprocs:
+            raise RuntimeError("%s: Subsystem name '%s' is already used." % (self.msginfo, name))
 
         if hasattr(self, name) and not isinstance(getattr(self, name), System):
             # replacing a subsystem is ok (e.g. resetup) but no other attribute
@@ -2293,11 +2290,10 @@ class Group(System):
 
         system = self
         for subname in name.split('.'):
-            for tup in chain(system._static_subsystems_allprocs.values(),
-                             system._subsystems_allprocs.values()):
-                if tup.system.name == subname:
-                    system = tup.system
-                    break
+            if subname in system._subsystems_allprocs:
+                system = system._subsystems_allprocs[subname].system
+            elif subname in system._static_subsystems_allprocs:
+                system = system._static_subsystems_allprocs[subname].system
             else:
                 return None
         return system

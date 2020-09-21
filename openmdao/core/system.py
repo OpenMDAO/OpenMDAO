@@ -481,7 +481,24 @@ class System(object):
     def _get_inst_id(self):
         return self.pathname
 
-    def _abs_name_iter(self, iotype, local=True, cont=True, discrete=False):
+    def abs_name_iter(self, iotype, local=True, cont=True, discrete=False):
+        """
+        Iterate over absolute variable names for this System.
+
+        By setting appropriate values for 'cont' and 'discrete', yielded variable
+        names can be continuous only, discrete only, or both.
+
+        Parameters
+        ----------
+        iotype : str
+            Either 'input' or 'output'.
+        local : bool
+            If True, include only names of local variables. Default is True.
+        cont : bool
+            If True, include names of continuous variables.  Default is True.
+        discrete : bool
+            If True, include names of discrete variables.  Default is False.
+        """
         if cont:
             if local:
                 yield from self._var_abs2meta[iotype]
@@ -1618,10 +1635,11 @@ class System(object):
             if self.pathname in relsys:
                 self._rel_vec_name_list.append(vec_name)
             for io in ('input', 'output'):
+                relio = rel[io]
                 self._var_allprocs_relevant_names[vec_name][io].extend(
-                    v for v in self._var_allprocs_abs2meta[io] if v in rel[io])
+                    v for v in self._var_allprocs_abs2meta[io] if v in relio)
                 self._var_relevant_names[vec_name][io].extend(
-                    v for v in self._var_abs2meta[io] if v in rel[io])
+                    v for v in self._var_abs2meta[io] if v in relio)
 
         self._rel_vec_names = frozenset(self._rel_vec_name_list)
         self._lin_rel_vec_name_list = self._rel_vec_name_list[1:]
@@ -3668,15 +3686,15 @@ class System(object):
         if self._subsystems_allprocs:
             for subsys, _ in self._subsystems_allprocs.values():
                 prefix = subsys.pathname + '.'
-                for var_type in in_or_out:
-                    for var_name in chain(real_vars[var_type], disc_vars[var_type]):
+                for io in in_or_out:
+                    for var_name in chain(real_vars[io], disc_vars[io]):
                         if variables is None or var_name in variables:
                             if var_name.startswith(prefix):
                                 var_list.append(var_name)
         else:
             # For components with no children, self._subsystems_allprocs is empty.
-            for var_type in in_or_out:
-                for var_name in chain(real_vars[var_type], disc_vars[var_type]):
+            for io in in_or_out:
+                for var_name in chain(real_vars[io], disc_vars[io]):
                     if not variables or var_name in variables:
                         var_list.append(var_name)
 
