@@ -84,9 +84,16 @@ class _SelfCallCollector(ast.NodeVisitor):
             n = _get_long_name(callnode.func)
             # if this is a 'super' call, get the base of the specified class
             if n == 'super':  # this only works for a single call level
-                sup_1 = _get_long_name(callnode.args[1])
-                sup_0 = _get_long_name(callnode.args[0])
-                if sup_1 == 'self' and sup_0 is not None and len(sup_0.split('.')) == 1:
+                if len(callnode.args) == 0:
+                    sup_0 = self.mro[0].__name__
+                    visit_super = True
+                else:
+                    sup_1 = _get_long_name(callnode.args[1])
+                    sup_0 = _get_long_name(callnode.args[0])
+                    visit_super = (sup_1 == 'self' and
+                                   sup_0 is not None and len(sup_0.split('.')) == 1)
+
+                if visit_super:
                     for i, c in enumerate(self.mro[:-1]):
                         if sup_0 == c.__name__:
                             # we need super of the specified class
