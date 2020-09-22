@@ -12,6 +12,7 @@ class SrcComp(om.ExplicitComponent):
         self.add_input('x1', 100.0)
         self.add_output('x2', 100.0, units='degC')
 
+    def setup_partials(self):
         self.declare_partials('*', '*')
 
     def compute(self, inputs, outputs):
@@ -30,6 +31,7 @@ class SrcCompFD(SrcComp):
         self.add_input('x1', 100.0)
         self.add_output('x2', 100.0, units='degC')
 
+    def setup_partials(self):
         self.declare_partials('*', '*', method='fd')
 
     def compute_partials(self, inputs, partials):
@@ -44,6 +46,7 @@ class TgtCompF(om.ExplicitComponent):
         self.add_input('x2', 100.0, units='degF')
         self.add_output('x3', 100.0)
 
+    def setup_partials(self):
         self.declare_partials('*', '*')
 
     def compute(self, inputs, outputs):
@@ -62,6 +65,7 @@ class TgtCompFFD(TgtCompF):
         self.add_input('x2', 100.0, units='degF')
         self.add_output('x3', 100.0)
 
+    def setup_partials(self):
         self.declare_partials('*', '*', method='fd')
 
     def compute_partials(self, inputs, partials):
@@ -76,6 +80,7 @@ class TgtCompC(om.ExplicitComponent):
         self.add_input('x2', 100.0, units='degC')
         self.add_output('x3', 100.0)
 
+    def setup_partials(self):
         self.declare_partials('*', '*')
 
     def compute(self, inputs, outputs):
@@ -94,6 +99,7 @@ class TgtCompCFD(TgtCompC):
         self.add_input('x2', 100.0, units='degC')
         self.add_output('x3', 100.0)
 
+    def setup_partials(self):
         self.declare_partials('*', '*', method='fd')
 
     def compute_partials(self, inputs, partials):
@@ -108,6 +114,7 @@ class TgtCompK(om.ExplicitComponent):
         self.add_input('x2', 100.0, units='degK')
         self.add_output('x3', 100.0)
 
+    def setup_partials(self):
         self.declare_partials('*', '*')
 
     def compute(self, inputs, outputs):
@@ -126,6 +133,7 @@ class TgtCompKFD(TgtCompK):
         self.add_input('x2', 100.0, units='degK')
         self.add_output('x3', 100.0)
 
+    def setup_partials(self):
         self.declare_partials('*', '*', method='fd')
 
     def compute_partials(self, inputs, partials):
@@ -144,6 +152,7 @@ class TgtCompFMulti(om.ExplicitComponent):
         self.add_output('x3', 100.0)
         self.add_output('x3_', 100.0)
 
+    def setup_partials(self):
         self.declare_partials('*', '*')
 
     def compute(self, inputs, outputs):

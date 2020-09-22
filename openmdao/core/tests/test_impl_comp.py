@@ -27,6 +27,7 @@ class QuadraticComp(om.ImplicitComponent):
         self.add_input('c', val=1.)
         self.add_output('x', val=0., tags=['tag_x'])
 
+    def setup_partials(self):
         self.declare_partials(of='*', wrt='*')
 
     def apply_nonlinear(self, inputs, outputs, residuals):
@@ -144,13 +145,16 @@ class ImplicitCompTestCase(unittest.TestCase):
 
     def test_list_inputs_before_run(self):
         # cannot list_inputs on a Group before running
-        msg = "Group (<model>): Unable to list inputs on a Group until model has been run."
-        try:
-            self.prob.model.list_inputs()
-        except Exception as err:
-            self.assertEqual(str(err), msg)
-        else:
-            self.fail("Exception expected")
+        model_inputs = self.prob.model.list_inputs(desc=True, out_stream=None)
+        expected = {
+            'comp1.a': {'value': [1.], 'desc': ''},
+            'comp1.b': {'value': [1.], 'desc': ''},
+            'comp1.c': {'value': [1.], 'desc': ''},
+            'comp2.a': {'value': [1.], 'desc': ''},
+            'comp2.b': {'value': [1.], 'desc': ''},
+            'comp2.c': {'value': [1.], 'desc': ''},
+        }
+        self.assertEqual(dict(model_inputs), expected)
 
         # list_inputs on a component before running is okay
         c2_inputs = self.prob.model.comp2.list_inputs(desc=True, out_stream=None)
@@ -186,13 +190,12 @@ class ImplicitCompTestCase(unittest.TestCase):
 
     def test_list_outputs_before_run(self):
         # cannot list_outputs on a Group before running
-        msg = "Group (<model>): Unable to list outputs on a Group until model has been run."
-        try:
-            self.prob.model.list_outputs()
-        except Exception as err:
-            self.assertEqual(str(err), msg)
-        else:
-            self.fail("Exception expected")
+        model_outputs = self.prob.model.list_outputs(out_stream=None)
+        expected = {
+            'comp1.x': {'value': [0.]},
+            'comp2.x': {'value': [0.]},
+        }
+        self.assertEqual(dict(model_outputs), expected)
 
         # list_outputs on a component before running is okay
         c2_outputs = self.prob.model.comp2.list_outputs(out_stream=None)
@@ -280,7 +283,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.assertEqual(text.count('  c  '), 4)
 
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(num_non_empty_lines, 13)
+        self.assertEqual(num_non_empty_lines, 12)
 
     def test_list_explicit_outputs(self):
         self.prob.run_model()
@@ -320,8 +323,8 @@ class ImplicitCompTestCase(unittest.TestCase):
         stream = StringIO()
         states = self.prob.model.list_outputs(explicit=False, residuals=True,
                                               hierarchical=False, out_stream=stream)
-        self.assertTrue(('comp1.x', {'value': [3.], 'resids': [0.]}) in states, msg=None)
-        self.assertTrue(('comp2.x', {'value': [3.], 'resids': [0.]}) in states, msg=None)
+        self.assertEqual([('comp1.x', {'value': [3.], 'resids': [0.]}),
+                          ('comp2.x', {'value': [3.], 'resids': [0.]})], sorted(states))
         text = stream.getvalue()
         self.assertEqual(1, text.count('comp1.x'))
         self.assertEqual(1, text.count('comp2.x'))
@@ -340,7 +343,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.assertEqual(text.count('comp1.x'), 1)
         self.assertEqual(text.count('comp2.x'), 1)
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(num_non_empty_lines, 9)
+        self.assertEqual(num_non_empty_lines, 8)
 
     def test_list_residuals(self):
         self.prob.run_model()
@@ -1298,6 +1301,7 @@ class ListFeatureTestCase(unittest.TestCase):
                                 ref=1.1, ref0=2.1,
                                 units='inch')
 
+            def setup_partials(self):
                 self.declare_partials(of='*', wrt='*')
 
             def apply_nonlinear(self, inputs, outputs, residuals):
@@ -1353,12 +1357,11 @@ class ListFeatureTestCase(unittest.TestCase):
             ('sub.comp3.c', {}),
         ])
         self.assertEqual(1, text.count("6 Input(s) in 'model'"))
-        self.assertEqual(1, text.count("\nmodel"))
-        self.assertEqual(1, text.count("\n  sub"))
-        self.assertEqual(1, text.count("\n    comp2"))
-        self.assertEqual(2, text.count("\n      a"))
+        self.assertEqual(1, text.count("\nsub"))
+        self.assertEqual(1, text.count("\n  comp2"))
+        self.assertEqual(2, text.count("\n    a"))
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(num_non_empty_lines, 14)
+        self.assertEqual(num_non_empty_lines, 13)
 
         # list_outputs tests
         # list implicit outputs

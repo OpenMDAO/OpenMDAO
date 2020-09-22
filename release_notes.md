@@ -1,4 +1,71 @@
 **********************************
+# Release Notes for OpenMDAO 3.3.0
+
+September 04, 2020
+
+OpenMDAO 3.3.0 features some changes to the setup/configure stack that
+are intended to make it easier to implement complex models in OpenMDAO.
+
+The new group method `get_io_metadata` is available from the `configure`
+method of Groups.  During setup, a Group's configure method is run
+after the setup methods of all children have been run.
+The `get_io_metadata` method allows one to inquire about the inputs and outputs
+within the Group and its descendents.  For instance, it can be used to find the names,
+units, and shapes of inputs and outputs in the descendent components of a Group.
+
+A new Differential Evolution driver has been added.
+This driver is for use on problems with continuous design variables,
+and is roughly 3x faster than the existing Simple GA Driver.
+
+## Backwards Incompatible API Changes:
+
+- list_outputs will now return the system-relative promoted path of outputs
+- list_inputs will now return the system-relative absolute path of inputs
+
+## Backwards Incompatible NON-API Changes:
+
+None
+
+## New Features:
+
+- Added more information to the node info window in the n2. #1610
+- Removed warning when recording deprecated options in viewer data. #1613
+- <POEM 029> Adds get_io_metadata method to retrieve metadata of underlying inputs and outputs. #1618
+- Internal definition of undefined inputs is now managed with an _UNDEFINED constant in openmdao.core.constants. #1622
+- N2 code getting tree dict updated to use _UNDEFINED constant. #1623
+- When encountering an AnalysisError, drivers will now indicate which component raised the error. #1650
+- Differential Evolution driver added. #1662
+- <POEM 031> Added Aitken Relaxation to the Linear Block Gauss-Seidel solver. #1663
+- Tagging capability added to AddSubtractComp #1664
+
+## Bug Fixes:
+
+- Fix for a bug where design variables declared in a subsystem are not set up correctly. #1604
+- Fix for Keyerror when debug printing pyoptsparse derivatives with auto_ivc design vars. #1605
+- Fix for a bug in add_objective/add_constraint when adding using an input variable name #1616
+- Fixed pyoptsparse sparse specification for auto_ivc #1619
+- Fixed a bug where setting value with units on a simple component model would fail #1626
+- Fix for problem with view_connections when model has discrete variables #1627
+- Case recorders now save model options correctly if run_driver is called more than once. #1635
+- Added logic to stop error being raised if promotes '*' is used and no matches are found. #1636
+- Fixed mistake in error message: set_input_defaults expects keyword val not value. #1638
+- Fix for unserializable object failure when running n2. #1639
+- Fix for typo in handling of flat_src_indices. #1642
+- Fix for problem with src_indices applied during promotes called from parent when multiple subsystem inputs are promoted to the same name. #1645
+- Fix for issue with calling promotes on descendants that are not direct children. #1647
+- Clarified deprecation warnings for IndepVarComp args. #1649
+- Fix to avoid building ParOpt on travis without MPI #1652
+- Fixed a bug in the accuracy of SimpleGA Driver that was causing issues on CI. #
+- Added a new iteration counter for apply_nonlinear to address an issue with counting iterations. #1656
+
+## Miscellaneous:
+
+- Added some knobs to the N2 pre-collapsing functionality. #1614
+- Rewrote the unconnected input check to work as originally intended in the auto_ivc environment. #1658
+- Added error checks for a couple of get_val corner cases, plus some cleanups. #1660
+
+
+**********************************
 # Release Notes for OpenMDAO 3.2.1
 
 August 07, 2020

@@ -231,27 +231,6 @@ class TestConnectionsInSetup(unittest.TestCase):
 
 class TestAddSubcomponentIOInConfigure(unittest.TestCase):
 
-    def test_queue_subcomponent_io_in_configure(self):
-        """
-        This test queues IO to a component in configure, but that subcomponent resolves the
-        queued I/O at setup and therefore this will fail.
-        """
-        p = om.Problem(model=om.Group())
-
-        g = GroupQueuesIOInConfigure()
-
-        g.add_var_to_cube('foo', units='m')
-
-        p.model.add_subsystem('g', subsys=g)
-
-        with self.assertRaises(RuntimeError) as e:
-            p.setup()
-
-        err_msg = str(e.exception)
-        expected = "Cuber (g.cuber): 'promotes_inputs' failed to find any matches for the " \
-                   "following pattern: '*'."
-        self.assertEqual(err_msg, expected)
-
     def test_add_subcomponent_io_in_configure(self):
         """
         This test directly adds IO to a component in configure, and should behave as expected.

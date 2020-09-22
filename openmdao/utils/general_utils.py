@@ -22,6 +22,7 @@ import importlib
 import numpy as np
 import openmdao
 
+from openmdao.core.constants import INT_DTYPE
 
 # Certain command line tools can make use of this to allow visualization of models when errors
 # are present that would normally cause setup to abort.
@@ -44,7 +45,7 @@ def ignore_errors(flag=None):
     """
     global _ignore_errors
     if flag is not None:
-        _ignore_errors = True
+        _ignore_errors = flag
     return _ignore_errors
 
 
@@ -245,11 +246,12 @@ def ensure_compatible(name, value, shape=None, indices=None):
         value = np.asarray(value)
 
     if indices is not None:
-        indices = np.atleast_1d(indices)
         contains_slicer = _is_slicer_op(indices)
-        ind_shape = indices.shape
+        if not contains_slicer:
+            indices = np.atleast_1d(np.asarray(indices, dtype=INT_DTYPE))
+            ind_shape = indices.shape
     else:
-        contains_slicer = None
+        contains_slicer = False
 
     # if shape is not given, infer from value (if not scalar) or indices
     if shape is not None:
@@ -284,7 +286,7 @@ def ensure_compatible(name, value, shape=None, indices=None):
                                  "Expected %s but got %s." %
                                  (name, shape, value.shape))
 
-    if indices is not None and shape != ind_shape[:len(shape)] and not contains_slicer:
+    if indices is not None and not contains_slicer and shape != ind_shape[:len(shape)]:
         raise ValueError("Shape of indices does not match shape for '%s': "
                          "Expected %s but got %s." %
                          (name, shape, ind_shape[:len(shape)]))
@@ -830,6 +832,8 @@ def make_serializable(o):
     """
     Recursively convert numpy types to native types for JSON serialization.
 
+    This function should NOT be passed into json.dump or json.dumps as the 'default' arg.
+
     Parameters
     ----------
     o : object
@@ -850,6 +854,36 @@ def make_serializable(o):
         return o.__class__.__name__
     else:
         return o
+
+
+def default_noraise(o):
+    """
+    Try to convert some extra types during JSON serialization.
+
+    This is intended to be passed to json.dump or json.dumps as the 'default' arg.  It will
+    attempt to convert values if possible, but if no conversion works, will return
+    'unserializable object (<type>)' instead of raising a TypeError.
+
+    Parameters
+    ----------
+    o : object
+        the object to be converted
+
+    Returns
+    -------
+    object
+        The converted object.
+    """
+    if isinstance(o, _container_classes):
+        return [make_serializable(item) for item in o]
+    elif isinstance(o, np.ndarray):
+        return o.tolist()
+    elif isinstance(o, np.number):
+        return o.item()
+    elif hasattr(o, '__dict__'):
+        return o.__class__.__name__
+    else:
+        return f"unserializable object ({type(o).__name__})"
 
 
 def make_set(str_data, name=None):
@@ -883,7 +917,43 @@ def make_set(str_data, name=None):
         raise TypeError("The argument should be str, set, or list: {}".format(str_data))
 
 
-def match_includes_excludes(name, prom_name, includes, excludes):
+def match_includes_excludes(name, includes=None, excludes=None):
+    """
+    Check to see if the variable names pass through the includes and excludes filter.
+
+    Parameters
+    ----------
+    name : str
+        Name to be checked for match.
+    includes : iter of str or None
+        Glob patterns for name to include in the filtering.  None, the default, means
+        include all.
+    excludes : iter of str or None
+        Glob patterns for name to exclude in the filtering.
+
+    Returns
+    -------
+    bool
+        Return True if the name passes through the filtering of includes and excludes.
+    """
+    # Process excludes
+    if excludes is not None:
+        for pattern in excludes:
+            if fnmatchcase(name, pattern):
+                return False
+
+    # Process includes
+    if includes is None:
+        return True
+    else:
+        for pattern in includes:
+            if fnmatchcase(name, pattern):
+                return True
+
+    return False
+
+
+def match_prom_or_abs(name, prom_name, includes=None, excludes=None):
     """
     Check to see if the variable names pass through the includes and excludes filter.
 
@@ -893,34 +963,34 @@ def match_includes_excludes(name, prom_name, includes, excludes):
         Unpromoted variable name to be checked for match.
     prom_name : str
         Promoted variable name to be checked for match.
-    includes : None or list_like
-        List of glob patterns for name to include in the filtering.
-    excludes : None or list_like
-        List of glob patterns for name to exclude in the filtering.
+    includes : iter of str or None
+        Glob patterns for name to include in the filtering.  None, the default, means
+        to include all.
+    excludes : iter of str or None
+        Glob patterns for name to exclude in the filtering.
 
     Returns
     -------
     bool
         Return True if the name passes through the filtering of includes and excludes.
     """
-    # Process includes
-    if includes is not None:
-        for pattern in includes:
-            if fnmatchcase(name, pattern) or fnmatchcase(prom_name, pattern):
-                break
-        else:  # didn't find any match
-            return False
+    diff = name != prom_name
 
     # Process excludes
     if excludes is not None:
-        match = False
         for pattern in excludes:
-            if fnmatchcase(name, pattern) or fnmatchcase(prom_name, pattern):
-                match = True
-                break
-        return not match
+            if fnmatchcase(name, pattern) or (diff and fnmatchcase(prom_name, pattern)):
+                return False
 
-    return True
+    # Process includes
+    if includes is None:
+        return True
+    else:
+        for pattern in includes:
+            if fnmatchcase(name, pattern) or (diff and fnmatchcase(prom_name, pattern)):
+                return True
+
+    return False
 
 
 def env_truthy(env_var):
@@ -991,26 +1061,23 @@ def _is_slicer_op(indices):
     bool
         Returns True if indices contains a colon or ellipsis operator.
     """
-    if isinstance(indices, Iterable):
-        if isinstance(indices, (tuple, list, range, str)):
-            return any(isinstance(i, slice) or i is ... for i in indices)
-        else:
-            return any(isinstance(i, slice) or i is ... for i in indices.flatten())
-    else:
-        return isinstance(indices, slice)
+    if isinstance(indices, tuple):
+        return any(isinstance(i, slice) or i is ... for i in indices)
+
+    return isinstance(indices, slice)
 
 
-def _slice_indices(slicer, out_size, out_shape):
+def _slice_indices(slicer, arr_size, arr_shape):
     """
-    Check if an array of indices contains a slice object.
+    Return an index array based on a slice or slice tuple and the array size and shape.
 
     Parameters
     ----------
-    slicer : slice
+    slicer : slice or tuple containing slices
         Slice object to slice array
-    out_size : int
+    arr_size : int
         Size of output array
-    out_shape : tuple
+    arr_shape : tuple
         Tuple of output array shape
 
     Returns
@@ -1018,7 +1085,7 @@ def _slice_indices(slicer, out_size, out_shape):
     array
         Returns the sliced indices.
     """
-    return np.arange(out_size, dtype=int).reshape(out_shape)[tuple(slicer)]
+    return np.arange(arr_size, dtype=INT_DTYPE).reshape(arr_shape)[slicer]
 
 
 def prom2ivc_src_dict(prom_dict):

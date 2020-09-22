@@ -286,7 +286,7 @@ class _pyDOE_Generator(DOEGenerator):
 
     def __init__(self, levels=_LEVELS):
         """
-        Initialize the FullFactorialGenerator.
+        Initialize the _pyDOE_Generator.
 
         Parameters
         ----------
@@ -296,7 +296,6 @@ class _pyDOE_Generator(DOEGenerator):
         """
         super(_pyDOE_Generator, self).__init__()
         self._levels = levels
-        self._level_lst = None
 
     def __call__(self, design_vars, model=None):
         """
@@ -315,7 +314,7 @@ class _pyDOE_Generator(DOEGenerator):
         list
             list of name, value tuples for the design variables.
         """
-        size = sum([meta['size'] for name, meta in design_vars.items()])
+        size = sum([meta['global_size'] for name, meta in design_vars.items()])
 
         doe = self._generate_design(size)
 
@@ -327,7 +326,7 @@ class _pyDOE_Generator(DOEGenerator):
 
         row = 0
         for name, meta in design_vars.items():
-            size = meta['size']
+            size = meta['global_size']
 
             for k in range(size):
                 lower = meta['lower']
@@ -346,7 +345,7 @@ class _pyDOE_Generator(DOEGenerator):
             retval = []
             row = 0
             for name, meta in design_vars.items():
-                size = meta['size']
+                size = meta['global_size']
                 val = np.empty(size)
                 for k in range(size):
                     idx = idxs[row + k]

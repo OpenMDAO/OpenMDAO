@@ -15,12 +15,6 @@ _type_map = {
     'residual': 'output'
 }
 
-# This is the dtype we use for index arrays.  Petsc by default uses 32 bit ints
-if os.environ.get('OPENMDAO_USE_BIG_INTS'):
-    INT_DTYPE = np.dtype(np.int64)
-else:
-    INT_DTYPE = np.dtype(np.int32)
-
 
 class Vector(object):
     """
@@ -118,7 +112,6 @@ class Vector(object):
 
         self._system = weakref.ref(system)
 
-        self._iproc = system.comm.rank
         self._views = {}
         self._views_flat = {}
 
@@ -248,7 +241,7 @@ class Vector(object):
         path = system.pathname
         idx = len(path) + 1 if path else 0
 
-        return (n[idx:] for n in system._var_abs_names[self._typ] if n in self._names)
+        return (n[idx:] for n in system._var_abs2meta[self._typ] if n in self._names)
 
     def _abs_item_iter(self, flat=True):
         """

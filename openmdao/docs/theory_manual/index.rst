@@ -18,6 +18,7 @@ mathematical manner to help users gain a deeper understanding of how the framewo
    setup_stack.rst
    solver_api.rst
    scaling.rst
+   iter_count.rst
 
 
 Total Derivatives Theory

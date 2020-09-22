@@ -1,6 +1,7 @@
 """Define the MetaModelStructured class."""
 
 import numpy as np
+import inspect
 
 from openmdao.components.interp_util.outofbounds_error import OutOfBoundsError
 from openmdao.components.interp_util.interp import InterpND, TABLE_METHODS
@@ -165,7 +166,7 @@ class MetaModelStructuredComp(ExplicitComponent):
             'dependent': True,
         }
 
-        for name in self._outputs:
+        for name in self._var_rel_names['output']:
             self._declare_partials(of=name, wrt=pnames, dct=dct)
             if self.options['training_data_gradients']:
                 self._declare_partials(of=name, wrt="%s_train" % name, dct={'dependent': True})
@@ -201,7 +202,8 @@ class MetaModelStructuredComp(ExplicitComponent):
                     "was out of bounds ('{}', '{}') with " \
                     "value '{}'".format(self.msginfo, out_name, varname_causing_error,
                                         err.lower, err.upper, err.value)
-                raise AnalysisError(errmsg)
+                raise AnalysisError(errmsg, inspect.getframeinfo(inspect.currentframe()),
+                                    self.msginfo)
 
             except ValueError as err:
                 raise ValueError("{}: Error interpolating output '{}':\n{}".format(self.msginfo,

@@ -111,7 +111,8 @@ class TestGroupFiniteDifference(unittest.TestCase):
         # 1. run_model; 2. step x; 3. step y
         self.assertEqual(model.parab.count, 3)
         self.assertEqual(model.parab.iter_count_without_approx, 1)
-        self.assertEqual(model.parab.iter_count, 3)
+        self.assertEqual(model.parab.iter_count, 1)
+        self.assertEqual(model.parab.iter_count_apply, 2)
 
     def test_fd_count_driver(self):
         # Make sure we aren't doing FD wrt any var that isn't in the driver desvar set.
@@ -1849,8 +1850,8 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_near_equal(J['obj', 'z'][0][1], 1.78448534, .00001)
 
         outs = prob.model.list_outputs(residuals=True, out_stream=None)
-        for j in range(len(outs)):
-            val = np.linalg.norm(outs[j][1]['resids'])
+        for name, meta in outs:
+            val = np.linalg.norm(meta['resids'])
             self.assertLess(val, 1e-8, msg="Check if CS cleans up after itself.")
 
 
@@ -1962,8 +1963,8 @@ class TestComponentComplexStep(unittest.TestCase):
         assert_near_equal(J['obj', 'z'][0][1], 1.78448534, .00001)
 
         outs = prob.model.list_outputs(residuals=True, out_stream=None)
-        for j in range(len(outs)):
-            val = np.linalg.norm(outs[j][1]['resids'])
+        for name, meta in outs:
+            val = np.linalg.norm(meta['resids'])
             self.assertLess(val, 1e-8, msg="Check if CS cleans up after itself.")
 
     def test_stepsizes_under_complex_step(self):
@@ -2236,7 +2237,7 @@ class ApproxTotalsFeature(unittest.TestCase):
         assert_near_equal(prob['y2'], 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
-        self.assertLess(prob.model.nonlinear_solver._iter_count, 8)
+        self.assertLess(prob.model.nonlinear_solver._iter_count, 9)
 
 
 class ParallelFDParametricTestCase(unittest.TestCase):

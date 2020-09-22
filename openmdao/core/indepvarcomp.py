@@ -3,7 +3,8 @@
 import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent
-from openmdao.utils.general_utils import make_set, warn_deprecation
+from openmdao.utils.array_utils import shape_to_len
+from openmdao.utils.general_utils import make_set, warn_deprecation, ensure_compatible
 
 
 class IndepVarComp(ExplicitComponent):
@@ -67,7 +68,7 @@ class IndepVarComp(ExplicitComponent):
         opt.declare('res_units', types=str, default=None,
                     desc="Units in which the residuals of this output will be given to "
                          "the user when requested.")
-        opt.declare('desc', types=str,
+        opt.declare('desc', types=str, default=None,
                     desc="Description of the variable")
         opt.declare('lower', types=(int, float, list, tuple, np.ndarray), default=None,
                     desc="Lower bound(s) in user-defined units. It can be (1) a float, "
@@ -98,15 +99,15 @@ class IndepVarComp(ExplicitComponent):
         Do any error checking on i/o configuration.
         """
         if len(self._static_var_rel2meta) + len(self._var_rel2meta) == 0:
-            raise RuntimeError("{}: No outputs (independent variables) have been declared. "
-                               "They must either be declared during "
-                               "instantiation or by calling add_output or add_discrete_output "
-                               "afterwards.".format(self.msginfo))
+            raise RuntimeError(f"{self.msginfo}: No outputs (independent variables) have been "
+                               "declared. They must either be declared during instantiation or "
+                               "by calling add_output or add_discrete_output afterwards.")
 
         super(IndepVarComp, self)._configure_check()
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                   lower=None, upper=None, ref=None, ref0=None, res_ref=None, tags=None):
+                   lower=None, upper=None, ref=None, ref0=None, res_ref=None, tags=None,
+                   shape_by_conn=False, copy_shape=None):
         """
         Add an independent variable to this component.
 
@@ -139,21 +140,36 @@ class IndepVarComp(ExplicitComponent):
         tags : str or list of strs
             User defined tags that can be used to filter what gets listed when calling
             list_outputs.
+        shape_by_conn : bool
+            If True, shape this output to match its connected input(s).
+        copy_shape : str or None
+            If a str, that str is the name of a variable. Shape this output to match that of
+            the named variable.
         """
         if res_units is not None:
-            warn_deprecation(
-                "'res_units' has been deprecated and will be removed in a future version")
-        elif lower is not None:
-            warn_deprecation("'lower' has been deprecated and will be removed in a future version")
-        elif upper is not None:
-            warn_deprecation("'upper' has been deprecated and will be removed in a future version")
-        elif ref0 is not None:
-            warn_deprecation("'ref0' has been deprecated and will be removed in a future version")
-        elif res_ref is not None:
-            warn_deprecation(
-                "'res_ref' has been deprecated and will be removed in a future version")
-        elif ref is not None:
-            warn_deprecation("'ref' has been deprecated and will be removed in a future version")
+            warn_deprecation(f"{self.msginfo}: The 'res_units' argument was used when adding "
+                             f"output '{name}'. This argument has been deprecated and will be "
+                             "removed in a future version.")
+        if lower is not None:
+            warn_deprecation(f"{self.msginfo}: The 'lower' argument was used when adding "
+                             f"output '{name}'. This argument has been deprecated and will be "
+                             "removed in a future version.")
+        if upper is not None:
+            warn_deprecation(f"{self.msginfo}: The 'upper' argument was used when adding "
+                             f"output '{name}'. This argument has been deprecated and will be "
+                             "removed in a future version.")
+        if ref0 is not None:
+            warn_deprecation(f"{self.msginfo}: The 'ref0' argument was used when adding "
+                             f"output '{name}'. This argument has been deprecated and will be "
+                             "removed in a future version.")
+        if res_ref is not None:
+            warn_deprecation(f"{self.msginfo}: The 'res_ref' argument was used when adding "
+                             f"output '{name}'. This argument has been deprecated and will be "
+                             "removed in a future version.")
+        if ref is not None:
+            warn_deprecation(f"{self.msginfo}: The 'ref' argument was used when adding "
+                             f"output '{name}'. This argument has been deprecated and will be "
+                             "removed in a future version.")
 
         ref = 1.0
         ref0 = 0.0
@@ -168,7 +184,8 @@ class IndepVarComp(ExplicitComponent):
 
         kwargs = {'shape': shape, 'units': units, 'res_units': res_units, 'desc': desc,
                   'lower': lower, 'upper': upper, 'ref': ref, 'ref0': ref0,
-                  'res_ref': res_ref, 'tags': tags
+                  'res_ref': res_ref, 'tags': tags, 'shape_by_conn': shape_by_conn,
+                  'copy_shape': copy_shape,
                   }
         super(IndepVarComp, self).add_output(name, val, **kwargs)
 
@@ -251,24 +268,76 @@ class _AutoIndepVarComp(IndepVarComp):
                 self.options['distributed'] = True
 
             self._remotes = all_remotes
+            for name in all_remotes:
+                self._static_var_rel2meta[name]['distributed'] = True
 
         super(_AutoIndepVarComp, self)._set_vector_class()
 
-    def _setup_var_data(self):
+    def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
+                   lower=None, upper=None, ref=None, ref0=None, res_ref=None, tags=None,
+                   shape_by_conn=False, copy_shape=None):
         """
-        Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
+        Add an independent variable to this component.
+
+        This should never be called by a user, as it skips all checks.
 
         Parameters
         ----------
-        recurse : bool (ignored)
-            Whether to call this method in subsystems.
+        name : str
+            name of the variable in this component's namespace.
+        val : float or list or tuple or ndarray
+            The initial value of the variable being added in user-defined units. Default is 1.0.
+        shape : int or tuple or list or None
+            Shape of this variable, only required if val is not an array.
+            Default is None.
+        units : str or None
+            Units in which the output variables will be provided to the component during execution.
+            Default is None, which means it has no units.
+        res_units : None
+            This argument is deprecated because it was unused.
+        desc : str
+            description of the variable
+        lower : None
+            This argument is deprecated because it was unused.
+        upper : None
+            This argument is deprecated because it was unused.
+        ref : None
+            This argument is deprecated because it was unused.
+        ref0 : None
+            This argument is deprecated because it was unused.
+        res_ref : None
+            This argument is deprecated because it was unused.
+        tags : str or list of strs
+            User defined tags that can be used to filter what gets listed when calling
+            list_outputs.
+        shape_by_conn : bool
+            If True, shape this output to match its connected input(s).
+        copy_shape : str or None
+            If a str, that str is the name of a variable. Shape this output to match that of
+            the named variable.
         """
-        super(_AutoIndepVarComp, self)._setup_var_data()
-        if self.comm.size > 1:
-            all_abs2meta = self._var_allprocs_abs2meta
-            abs2meta = self._var_abs2meta
+        # Add the output quickly.
+        # We don't need to check for errors because we get the value straight from a
+        # source, and ivc metadata is minimal.
+        value, shape, _ = ensure_compatible(name, val, None)
+        metadata = {
+            'value': value,
+            'shape': shape,
+            'size': shape_to_len(shape),
+            'units': units,
+            'res_units': None,
+            'desc': '',
+            'distributed': False,
+            'tags': set(),
+            'ref': 1.0,
+            'ref0': 0.0,
+            'res_ref': 1.0,
+            'lower': None,
+            'upper': None,
+            'shape_by_conn': False,
+            'copy_shape': None
+        }
 
-            for name in self._remotes:
-                if name in abs2meta:
-                    abs2meta[name]['distributed'] = True
-                all_abs2meta[name]['distributed'] = True
+        self._static_var_rel2meta[name] = metadata
+        self._static_var_rel_names['output'].append(name)
+        self._var_added(name)

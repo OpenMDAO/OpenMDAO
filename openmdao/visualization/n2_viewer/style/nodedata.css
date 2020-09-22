@@ -43,6 +43,11 @@
     white-space: nowrap;
 }
 
+#node-info-table tbody .options-header {
+    background-color: #eeeeee;
+    text-align: center;
+}
+
 #node-info-table tbody td {
     text-align: left;
     font-size: 9pt;
@@ -83,7 +88,6 @@
     top: 5px;
     right: 8px;
     cursor: pointer;
-    padding: 0;
     margin: 0;
     border: 0;
     font-size: 12px;
@@ -99,4 +103,138 @@
     top: 4px;
     right: 9px;
     box-shadow: 1px 1px 1px 1px rgba(0, 0, 0, 0.2);
+}
+
+/******************* Node Value Window styling *******************/
+
+/* these next two are actually styling used in the node info window but are there for the node value window */
+.show_value_button {
+   background-color: #c1c1c1;
+}
+
+.copy_value_button {
+   background-color: #c1c1c1;
+}
+
+#node-value-containers {
+    visibility: hidden;
+}
+
+.node-value-container {
+    visibility: visible;
+    overflow: hidden;
+	background-color: white;
+	border-radius: 10px;
+	border: 1px solid #a0a0a0;
+    transition: opacity 0.25s;
+    box-shadow: 3px 3px 3px 1px rgba(0, 0, 0, 0.2);
+    border-collapse: separate;
+    opacity: .95;
+    z-index: 20;
+    position: absolute;
+    top: 400px;
+    left: 700px;
+}
+
+/*.node-value-grabber {*/
+/*    overflow:hidden;*/
+/*    width:100%;*/
+/*    height:100%;*/
+/*}*/
+
+/* Value window header */
+.node-value-header {
+    background-color: #42926b;
+    color: black;
+    margin: 0;
+    padding: 5px;
+    font-size: 11pt;
+    text-align: center;
+    cursor: grab;
+}
+
+.node-value-title {
+    color: black;
+    display: block;
+    overflow: auto;
+    position: relative;
+}
+
+/* grabber bars on the node value title bar */
+.node-value-title::before {
+    content: '\A789\A789\A789\A789\A789\A789';
+    color: black;
+    padding-left: 5px;
+    padding-right: 5px;
+}
+.node-value-title::after {
+    content: '\A789\A789\A789\A789\A789\A789';
+    color: black;
+    padding-left: 5px;
+    padding-right: 5px;
+}
+
+.close-value-window-button {
+	color: black;
+	float: right;
+    font-size: 11pt;
+	font-weight: bold;
+}
+
+.close-value-window-button:hover,
+.close-value-window-button:focus {
+	color: #f00;
+	text-decoration: none;
+	cursor: pointer;
+}
+
+/* Value window table */
+.node-value-table-div {
+    overflow: auto;
+    padding-right: 10px;
+    padding-bottom: 10px;
+}
+
+.node-value-table tbody td {
+    text-align: left;
+    font-size: 9pt;
+    margin-top: 0;
+    margin-left: 0;
+    border: 1px solid #a0a0a0;
+    padding: 3px;
+    white-space: nowrap;
+}
+
+/* Value window footer */
+.node-value-footer {
+    background-color: #42926b;
+    color: black;
+    margin: 0;
+    padding: 5px;
+}
+
+.node-value-resizer-box {
+    position: absolute;
+    right: -3px;
+}
+
+.node-value-resizer-handle {
+    position: absolute;
+    right: -2px;
+    bottom: 0;
+    margin: 0;
+    height: 18px;
+    cursor: nwse-resize;
+    pointer-events: initial;
+    overflow: hidden;
+}
+
+/* this is an off screen element that is used in the strange way you
+   need to put content on the clipboard.
+   It has to have visibility of visible to work
+ */
+#input-for-pastebuffer {
+    visibility: visible;
+    position: absolute;
+    left: -999em;
 }

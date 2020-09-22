@@ -15,7 +15,7 @@ VAR_RGX = re.compile(r'([.]*[_a-zA-Z]\w*[ ]*\(?)')
 # Names of metadata entries allowed for ExecComp variables.
 _allowed_meta = {'value', 'shape', 'units', 'res_units', 'desc',
                  'ref', 'ref0', 'res_ref', 'lower', 'upper', 'src_indices',
-                 'flat_src_indices', 'tags'}
+                 'flat_src_indices', 'tags', 'shape_by_conn', 'copy_shape'}
 
 # Names that are not allowed for input or output variables (keywords for options)
 _disallowed_names = {'has_diag_partials', 'units', 'shape'}
@@ -289,6 +289,12 @@ class ExecComp(ExplicitComponent):
                     init_vals[arg] = val['value']
                     del kwargs2[arg]['value']
 
+                if 'shape_by_conn' in val or 'copy_shape' in val:
+                    if val.get('shape') is not None or val.get('value') is not None:
+                        raise RuntimeError(f"{self.msginfo}: Can't set 'shape' or 'value' for "
+                                           f"variable '{arg}' along with 'copy_shape' or "
+                                           "'shape_by_conn'.")
+
                 if 'shape' in val:
                     if arg not in init_vals:
                         init_vals[arg] = np.ones(val['shape'])
@@ -302,13 +308,13 @@ class ExecComp(ExplicitComponent):
                 init_vals[arg] = val
 
         for var in sorted(allvars):
+            meta = kwargs2.get(var, {'units': units, 'shape': shape})
+
             # if user supplied an initial value, use it, otherwise set to 1.0
             if var in init_vals:
                 val = init_vals[var]
             else:
                 init_vals[var] = val = 1.0
-
-            meta = kwargs2.get(var, {'units': units, 'shape': shape})
 
             if var in outs:
                 self.add_output(var, val, **meta)
@@ -568,18 +574,13 @@ class _IODict(object):
         self._inputs = inputs
 
     def __getitem__(self, name):
-        if name in self._outputs:
-            return self._outputs[name]
-        else:
+        try:
             return self._inputs[name]
+        except KeyError:
+            return self._outputs[name]
 
     def __setitem__(self, name, value):
-        if name in self._outputs:
-            self._outputs[name] = value
-        elif name in self._inputs:
-            self._inputs[name] = value
-        else:
-            self._outputs[name] = value  # will raise KeyError
+        self._outputs[name] = value
 
     def __contains__(self, name):
         return name in self._outputs or name in self._inputs

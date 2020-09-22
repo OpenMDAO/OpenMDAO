@@ -4,6 +4,7 @@ import sys
 import pprint
 import os
 import logging
+import weakref
 
 from collections import defaultdict, namedtuple, OrderedDict
 from fnmatch import fnmatchcase
@@ -20,6 +21,7 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group, System
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.total_jac import _TotalJacInfo
+from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED, INT_DTYPE
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.solvers.solver import SolverInfo
@@ -33,12 +35,12 @@ from openmdao.utils.general_utils import ContainsAll, pad_name, simple_warning, 
 from openmdao.utils.mpi import FakeComm
 from openmdao.utils.mpi import MPI
 from openmdao.utils.name_maps import prom_name2abs_name, name2abs_names
-from openmdao.utils.options_dictionary import OptionsDictionary, _undefined
+from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import convert_units
 from openmdao.utils import coloring as coloring_mod
 from openmdao.core.constants import _SetupStatus
 from openmdao.utils.name_maps import abs_key2rel_key
-from openmdao.vectors.vector import _full_slice, INT_DTYPE
+from openmdao.vectors.vector import _full_slice
 from openmdao.vectors.default_vector import DefaultVector
 from openmdao.utils.logger_utils import get_logger, TestLogger
 import openmdao.utils.coloring as coloring_mod
@@ -51,9 +53,6 @@ except ImportError:
 
 from openmdao.utils.name_maps import rel_key2abs_key, rel_name2abs_name
 
-# Use this as a special value to be able to tell if the caller set a value for the optional
-#   out_stream argument. We run into problems running testflo if we use a default of sys.stdout.
-_DEFAULT_OUT_STREAM = object()
 
 ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
 MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])
@@ -118,6 +117,8 @@ class Problem(object):
         A flag to indicate whether the system options for all the systems have been recorded
     _metadata : dict
         Problem level metadata.
+    _run_counter : int
+        The number of times run_driver or run_model has been called.
     """
 
     def __init__(self, model=None, driver=None, comm=None, name=None, **options):
@@ -171,6 +172,7 @@ class Problem(object):
         self._initial_condition_cache = {}
 
         self._metadata = None
+        self._run_counter = -1
         self._system_options_recorded = False
         self._rec_mgr = RecordingManager()
 
@@ -281,7 +283,8 @@ class Problem(object):
             return sub is not None and sub._is_local
 
         # variable exists, but may be remote
-        return abs_name in self.model._var_abs2meta
+        return abs_name in self.model._var_abs2meta['input'] or \
+            abs_name in self.model._var_abs2meta['output']
 
     def _get_cached_val(self, name, get_remote=False):
         # We have set and cached already
@@ -302,22 +305,23 @@ class Problem(object):
                 raise KeyError('{}: Variable "{}" not found.'.format(self.model.msginfo, name))
 
             abs_name = abs_names[0]
-            remote_vars = self._metadata['remote_vars']
+            vars_to_gather = self._metadata['vars_to_gather']
 
-            if abs_name in meta:
+            io = 'output' if abs_name in meta['output'] else 'input'
+            if abs_name in meta[io]:
                 if abs_name in conns:
-                    val = meta[conns[abs_name]]['value']
+                    val = meta['output'][conns[abs_name]]['value']
                 else:
-                    val = meta[abs_name]['value']
+                    val = meta[io][abs_name]['value']
 
-            if get_remote and abs_name in remote_vars:
-                owner = remote_vars[abs_name]
+            if get_remote and abs_name in vars_to_gather:
+                owner = vars_to_gather[abs_name]
                 if self.model.comm.rank == owner:
                     self.model.comm.bcast(val, root=owner)
                 else:
                     val = self.model.comm.bcast(None, root=owner)
 
-            if val is not _undefined:
+            if val is not _UNDEFINED:
                 # Need to cache the "get" in case the user calls in-place numpy operations.
                 self._initial_condition_cache[name] = val
 
@@ -372,7 +376,7 @@ class Problem(object):
         """
         if self._metadata['setup_status'] == _SetupStatus.POST_SETUP:
             val = self._get_cached_val(name, get_remote=get_remote)
-            if val is not _undefined:
+            if val is not _UNDEFINED:
                 if indices is not None:
                     val = val[indices]
                 if units is not None:
@@ -381,7 +385,7 @@ class Problem(object):
             val = self.model.get_val(name, units=units, indices=indices, get_remote=get_remote,
                                      from_src=True)
 
-        if val is _undefined:
+        if val is _UNDEFINED:
             if get_remote:
                 raise KeyError('{}: Variable name "{}" not found.'.format(self.msginfo, name))
             else:
@@ -423,11 +427,12 @@ class Problem(object):
         """
         model = self.model
         if self._metadata is not None:
-            conns = self._metadata['connections']
+            conns = model._conn_global_abs_in2out
         else:
             raise RuntimeError(f"{self.msginfo}: '{name}' Cannot call set_val before setup.")
 
         all_meta = model._var_allprocs_abs2meta
+        loc_meta = model._var_abs2meta
         n_proms = 0  # if nonzero, name given was promoted input name w/o a matching prom output
 
         try:
@@ -449,18 +454,18 @@ class Problem(object):
             src = conns[abs_name]
             if abs_name not in model._var_allprocs_discrete['input']:
                 value = np.asarray(value)
-                tmeta = all_meta[abs_name]
+                tmeta = all_meta['input'][abs_name]
                 tunits = tmeta['units']
-                sunits = all_meta[src]['units']
-                if abs_name in model._var_abs2meta:
-                    tlocmeta = model._var_abs2meta[abs_name]
+                sunits = all_meta['output'][src]['units']
+                if abs_name in loc_meta['input']:
+                    tlocmeta = loc_meta['input'][abs_name]
                 else:
                     tlocmeta = None
 
                 gunits = ginputs[name][0].get('units') if name in ginputs else None
                 if n_proms > 1:  # promoted input name was used
                     if gunits is None:
-                        tunit_list = [all_meta[n]['units'] for n in abs_names]
+                        tunit_list = [all_meta['input'][n]['units'] for n in abs_names]
                         tu0 = tunit_list[0]
                         for tu in tunit_list:
                             if tu != tu0:
@@ -515,7 +520,8 @@ class Problem(object):
             elif abs_name in conns:  # input name given. Set value into output
                 if model._outputs._contains_abs(src):  # src is local
                     if (model._outputs._abs_get_val(src).size == 0 and
-                            src.rsplit('.', 1)[0] == '_auto_ivc' and all_meta[src]['distributed']):
+                            src.rsplit('.', 1)[0] == '_auto_ivc' and
+                            all_meta['output'][src]['distributed']):
                         pass  # special case, auto_ivc dist var with 0 local size
                     elif tmeta['has_src_indices'] and n_proms < 2:
                         if tlocmeta:  # target is local
@@ -599,6 +605,8 @@ class Problem(object):
             self.driver.iter_count = 0
             self.model._reset_iter_counts()
 
+        self._run_counter += 1
+
         self.final_setup()
         self.model._clear_iprint()
         self.model.run_solve_nonlinear()
@@ -634,6 +642,8 @@ class Problem(object):
         if self.model.iter_count > 0 and reset_iter_counts:
             self.driver.iter_count = 0
             self.model._reset_iter_counts()
+
+        self._run_counter += 1
 
         self.final_setup()
         self.model._clear_iprint()
@@ -854,20 +864,33 @@ class Problem(object):
 
         # this metadata will be shared by all Systems/Solvers in the system tree
         self._metadata = {
-            'coloring_dir': self.options['coloring_dir'],
-            'recording_iter': _RecIteration(),
+            'coloring_dir': self.options['coloring_dir'],  # directory for coloring files
+            'recording_iter': _RecIteration(),  # manager of recorder iterations
             'local_vector_class': local_vector_class,
             'distributed_vector_class': distributed_vector_class,
             'solver_info': SolverInfo(),
             'use_derivatives': derivatives,
             'force_alloc_complex': force_alloc_complex,
-            'connections': {},
-            'remote_systems': {},
-            'remote_vars': {},  # does not include distrib vars
+            'vars_to_gather': {},  # vars that are remote somewhere. does not include distrib vars
             'prom2abs': {'input': {}, 'output': {}},  # includes ALL promotes including buried ones
-            'setup_status': _SetupStatus.PRE_SETUP
+            'static_mode': False,  # used to determine where various 'static'
+                                   # and 'dynamic' data structures are stored.
+                                   # Dynamic ones are added during System
+                                   # setup/configure. They are wiped out and re-created during
+                                   # each Problem setup.  Static ones are added outside of
+                                   # Problem setup and they are never wiped out or re-created.
+            'config_info': None,  # used during config to determine if additional updates required
+            'parallel_groups': [],  # list of pathnames of parallel groups in this model (all procs)
+            'setup_status': _SetupStatus.PRE_SETUP,
+            'vec_names': None,  # names of all nonlinear and linear vectors
+            'lin_vec_names': None,  # names of linear vectors
+            'model_ref': weakref.ref(model)  # ref to the model (needed to get out-of-scope
+                                             # src data for inputs)
         }
         model._setup(model_comm, mode, self._metadata)
+
+        # set static mode back to True in all systems in this Problem
+        self._metadata['static_mode'] = True
 
         # Cache all args for final setup.
         self._check = check
@@ -1225,19 +1248,24 @@ class Problem(object):
                             except KeyError:
                                 indep_key[c_name].add(rel_key)
 
+                            if wrt in comp._var_abs2meta['input']:
+                                wrt_meta = comp._var_abs2meta['input'][wrt]
+                            else:
+                                wrt_meta = comp._var_abs2meta['output'][wrt]
+
                             if deriv_value is None:
                                 # Missing derivatives are assumed 0.
-                                in_size = comp._var_abs2meta[wrt]['size']
-                                out_size = comp._var_abs2meta[of]['size']
+                                in_size = wrt_meta['size']
+                                out_size = comp._var_abs2meta['output'][of]['size']
                                 deriv_value = np.zeros((out_size, in_size))
 
                             if force_dense:
                                 if rows is not None:
                                     try:
-                                        in_size = comp._var_abs2meta[wrt]['size']
+                                        in_size = wrt_meta['size']
                                     except KeyError:
-                                        in_size = comp._var_abs2meta[wrt]['size']
-                                    out_size = comp._var_abs2meta[of]['size']
+                                        in_size = wrt_meta['size']
+                                    out_size = comp._var_abs2meta['output'][of]['size']
                                     tmp_value = np.zeros((out_size, in_size))
                                     # if a scalar value is provided (in declare_partials),
                                     # expand to the correct size array value for zipping

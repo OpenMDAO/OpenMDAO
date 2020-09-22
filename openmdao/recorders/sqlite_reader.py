@@ -12,6 +12,7 @@ import numpy as np
 from openmdao.recorders.base_case_reader import BaseCaseReader
 from openmdao.recorders.case import Case
 
+from openmdao.core.constants import _DEFAULT_OUT_STREAM
 from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.variable_table import write_source_table
 from openmdao.utils.record_util import check_valid_sqlite3_db, get_source_system
@@ -20,8 +21,6 @@ from openmdao.recorders.sqlite_recorder import format_version
 
 import pickle
 from json import loads as json_loads
-
-_DEFAULT_OUT_STREAM = object()
 
 
 class SqliteCaseReader(BaseCaseReader):
@@ -34,7 +33,7 @@ class SqliteCaseReader(BaseCaseReader):
         Metadata about the problem, including the system hierachy and connections.
     solver_metadata : dict
         The solver options for each solver in the recorded model.
-    system_options : dict
+    _system_options : dict
         Metadata about each system in the recorded model, including options and scaling factors.
     _format_version : int
         The version of the format assumed when loading the file.
@@ -108,7 +107,7 @@ class SqliteCaseReader(BaseCaseReader):
 
             # collect data from the system_metadata table. this includes:
             #   component metadata and scaling factors for each system,
-            #   which is added to system_options
+            #   which is added to _system_options
             self._collect_system_metadata(cur)
 
             # collect data from the solver_metadata table. this includes:
@@ -263,10 +262,10 @@ class SqliteCaseReader(BaseCaseReader):
         cur.execute("SELECT id, scaling_factors, component_metadata FROM system_metadata")
         for row in cur:
             id = row[0]
-            self.system_options[id] = {}
+            self._system_options[id] = {}
 
-            self.system_options[id]['scaling_factors'] = pickle.loads(row[1])
-            self.system_options[id]['component_options'] = pickle.loads(row[2])
+            self._system_options[id]['scaling_factors'] = pickle.loads(row[1])
+            self._system_options[id]['component_options'] = pickle.loads(row[2])
 
     def _collect_solver_metadata(self, cur):
         """
@@ -410,6 +409,52 @@ class SqliteCaseReader(BaseCaseReader):
 
         return dct
 
+    def list_model_options(self, run_counter=None, out_stream=_DEFAULT_OUT_STREAM):
+        """
+        List of all model options.
+
+        Parameters
+        ----------
+        run_counter : int or None
+            Run_driver or run_model iteration to inspect
+        out_stream : file-like object
+            Where to send human readable output. Default is sys.stdout.
+            Set to None to suppress.
+
+        Returns
+        -------
+        dict
+            {'root':{key val}}
+        """
+        if out_stream:
+            if out_stream is _DEFAULT_OUT_STREAM:
+                out_stream = sys.stdout
+
+            dct = {}
+
+            for i in self._system_options:
+                if '_' in i:
+                    subsys, num = i.rsplit('_', 1)
+                else:
+                    subsys = i
+                    num = 0
+
+                if (run_counter is not None and run_counter == int(num) and subsys == 'root') or \
+                        (subsys == 'root' and run_counter is None):
+
+                    out_stream.write(
+                        'Run Number: {}\n    Subsystem: {}'.format(num, subsys))
+
+                    for j in self._system_options[i]['component_options']:
+                        option = "{0} : {1}".format(
+                            j, self._system_options[i]['component_options'][j])
+                        out_stream.write('\n        {}\n'.format(option))
+
+                        dct[subsys] = {}
+                        dct[subsys][j] = self._system_options[i]['component_options'][j]
+
+        return dct
+
     def list_cases(self, source=None, recurse=True, flat=True, out_stream=_DEFAULT_OUT_STREAM):
         """
         Iterate over Driver, Solver and System cases in order.
@@ -484,7 +529,7 @@ class SqliteCaseReader(BaseCaseReader):
                     cases = []
                     source_cases = case_table.get_cases(source)
                     for case in source_cases:
-                        cases += self._list_cases_recurse_flat(case.name)
+                        cases += self._list_cases_recurse_flat(case.name, out_stream=out_stream)
                     return cases
                 else:
                     # return nested dict of cases from the source and child cases

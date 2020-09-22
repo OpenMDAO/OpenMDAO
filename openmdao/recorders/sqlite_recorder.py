@@ -19,7 +19,7 @@ from openmdao.recorders.case_recorder import CaseRecorder
 from openmdao.utils.mpi import MPI
 from openmdao.utils.record_util import dict_to_structured_array
 from openmdao.utils.options_dictionary import OptionsDictionary
-from openmdao.utils.general_utils import simple_warning, make_serializable
+from openmdao.utils.general_utils import simple_warning, make_serializable, default_noraise
 from openmdao.core.driver import Driver
 from openmdao.core.system import System
 from openmdao.core.problem import Problem
@@ -314,11 +314,8 @@ class SqliteRecorder(CaseRecorder):
                 objectives = driver._objs
                 responses = driver._responses
 
-            inputs = system._var_allprocs_abs_names['input'] + \
-                system._var_allprocs_abs_names_discrete['input']
-
-            outputs = system._var_allprocs_abs_names['output'] + \
-                system._var_allprocs_abs_names_discrete['output']
+            inputs = list(system.abs_name_iter('input', local=False, discrete=True))
+            outputs = list(system.abs_name_iter('output', local=False, discrete=True))
 
             var_order = system._get_vars_exec_order(inputs=True, outputs=True)
 
@@ -342,8 +339,10 @@ class SqliteRecorder(CaseRecorder):
 
             # absolute pathname to metadata mappings for continuous & discrete variables
             # discrete mapping is sub-keyed on 'output' & 'input'
-            real_meta = system._var_allprocs_abs2meta
-            disc_meta = system._var_allprocs_discrete
+            real_meta_in = system._var_allprocs_abs2meta['input']
+            real_meta_out = system._var_allprocs_abs2meta['output']
+            disc_meta_in = system._var_allprocs_discrete['input']
+            disc_meta_out = system._var_allprocs_discrete['output']
 
             for var_set, var_type in full_var_set:
                 for name in var_set:
@@ -354,9 +353,9 @@ class SqliteRecorder(CaseRecorder):
 
                     if name not in self._abs2meta:
                         try:
-                            self._abs2meta[name] = real_meta[name].copy()
+                            self._abs2meta[name] = real_meta_out[name].copy()
                         except KeyError:
-                            self._abs2meta[name] = disc_meta['output'][name].copy()
+                            self._abs2meta[name] = disc_meta_out[name].copy()
                         self._abs2meta[name]['type'] = []
                         self._abs2meta[name]['explicit'] = name not in states
 
@@ -365,16 +364,18 @@ class SqliteRecorder(CaseRecorder):
 
             for name in inputs:
                 try:
-                    self._abs2meta[name] = real_meta[name].copy()
+                    self._abs2meta[name] = real_meta_in[name].copy()
                 except KeyError:
-                    self._abs2meta[name] = disc_meta['input'][name].copy()
+                    self._abs2meta[name] = disc_meta_in[name].copy()
                 self._abs2meta[name]['type'] = ['input']
                 self._abs2meta[name]['explicit'] = True
 
             # merge current abs2meta with this system's version
             for name, meta in self._abs2meta.items():
-                if name in system._var_allprocs_abs2meta:
-                    meta.update(system._var_allprocs_abs2meta[name])
+                for io in ('input', 'output'):
+                    if name in system._var_allprocs_abs2meta[io]:
+                        meta.update(system._var_allprocs_abs2meta[io][name])
+                        break
 
             self._cleanup_abs2meta()
 
@@ -382,7 +383,7 @@ class SqliteRecorder(CaseRecorder):
             abs2prom = json.dumps(self._abs2prom)
             prom2abs = json.dumps(self._prom2abs)
             abs2meta = json.dumps(self._abs2meta)
-            conns = json.dumps(system._problem_meta.get('connections', {}))
+            conns = json.dumps(system._problem_meta['model_ref']()._conn_global_abs_in2out)
 
             var_settings = {}
             var_settings.update(desvars)
@@ -612,7 +613,7 @@ class SqliteRecorder(CaseRecorder):
             The unique ID to use for this data in the table.
         """
         if self.connection:
-            json_data = json.dumps(model_viewer_data, default=make_serializable)
+            json_data = json.dumps(model_viewer_data, default=default_noraise)
 
             # Note: recorded to 'driver_metadata' table for legacy/compatibility reasons.
             try:
@@ -622,7 +623,7 @@ class SqliteRecorder(CaseRecorder):
             except sqlite3.IntegrityError:
                 print("Model viewer data has already has already been recorded for %s." % key)
 
-    def record_metadata_system(self, recording_requester):
+    def record_metadata_system(self, recording_requester, run_counter=None):
         """
         Record system metadata.
 
@@ -630,8 +631,11 @@ class SqliteRecorder(CaseRecorder):
         ----------
         recording_requester : System
             The System that would like to record its metadata.
+        run_counter : int or None
+            The number of times run_driver or run_model has been called.
         """
         if self.connection:
+
             scaling_vecs, user_options = self._get_metadata_system(recording_requester)
 
             if scaling_vecs is None:
@@ -663,10 +667,15 @@ class SqliteRecorder(CaseRecorder):
             #   the current OpenMDAO code will call this function each time and there will be
             #   SQL errors for "UNIQUE constraint failed: system_metadata.id"
             # Future versions of OpenMDAO will handle this better.
+            if run_counter is None:
+                name = path
+            else:
+                name = "{}_{}".format(path, str(run_counter))
             with self.connection as c:
                 c.execute("INSERT OR IGNORE INTO system_metadata"
                           "(id, scaling_factors, component_metadata) "
-                          "VALUES(?,?,?)", (path, scaling_factors, pickled_metadata))
+                          "VALUES(?,?,?)", (name, scaling_factors,
+                                            pickled_metadata))
 
     def record_metadata_solver(self, recording_requester):
         """

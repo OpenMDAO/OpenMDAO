@@ -4,7 +4,8 @@ import numbers
 
 import numpy as np
 
-from openmdao.vectors.vector import Vector, INT_DTYPE, _full_slice
+from openmdao.core.constants import INT_DTYPE
+from openmdao.vectors.vector import Vector, _full_slice
 from openmdao.vectors.default_transfer import DefaultTransfer
 from openmdao.utils.mpi import MPI, multi_proc_exception_check
 
@@ -118,7 +119,7 @@ class DefaultVector(Vector):
         _views_flat
         """
         system = self._system()
-        type_ = self._typ
+        io = self._typ
         kind = self._kind
         ncol = self._ncol
 
@@ -134,9 +135,9 @@ class DefaultVector(Vector):
         self._cplx_views = cplx_views = {}
         self._cplx_views_flat = cplx_views_flat = {}
 
-        abs2meta = system._var_abs2meta
+        abs2meta = system._var_abs2meta[io]
         start = end = 0
-        for abs_name in system._var_relevant_names[self._name][type_]:
+        for abs_name in system._var_relevant_names[self._name][io]:
             meta = abs2meta[abs_name]
             end = start + meta['size']
             shape = meta['shape']

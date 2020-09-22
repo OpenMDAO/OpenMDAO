@@ -8,9 +8,12 @@ import numpy as np
 from numpy import ndarray, isscalar, atleast_1d, atleast_2d, promote_types
 from scipy.sparse import issparse
 
-from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_META
+from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_META, \
+    global_meta_names
+from openmdao.core.constants import _UNDEFINED, INT_DTYPE
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
-from openmdao.vectors.vector import INT_DTYPE, _full_slice
+from openmdao.vectors.vector import _full_slice
+from openmdao.utils.array_utils import shape_to_len
 from openmdao.utils.units import valid_units
 from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key, rel_name2abs_name
 from openmdao.utils.mpi import MPI
@@ -18,13 +21,6 @@ from openmdao.utils.general_utils import format_as_float_or_array, ensure_compat
     find_matches, simple_warning, make_set, _is_slicer_op
 import openmdao.utils.coloring as coloring_mod
 
-
-# the following metadata will be accessible for vars on all procs
-global_meta_names = {
-    'input': ('units', 'shape', 'size', 'distributed', 'tags', 'desc'),
-    'output': ('units', 'shape', 'size', 'desc',
-               'ref', 'ref0', 'res_ref', 'distributed', 'lower', 'upper', 'tags'),
-}
 
 _forbidden_chars = ['.', '*', '?', '!', '[', ']']
 _whitespace = set([' ', '\t', '\r', '\n'])
@@ -144,8 +140,6 @@ class Component(System):
         """
         super(Component, self)._setup_procs(pathname, comm, mode, prob_meta)
 
-        self._vectors = {}
-
         orig_comm = comm
         if self._num_par_fd > 1:
             if comm.size > 1:
@@ -161,22 +155,22 @@ class Component(System):
         self._var_rel_names = {'input': [], 'output': []}
         self._var_rel2meta = {}
 
-        self._static_mode = False
+        # reset shape if any dynamic shape parameters are set in case this is a resetup
+        # NOTE: this is necessary because we allow variables to be added in __init__.
+        for meta in self._static_var_rel2meta.values():
+            if 'shape_by_conn' in meta and (meta['shape_by_conn'] or
+                                            meta['copy_shape'] is not None):
+                meta['shape'] = None
+                if not np.isscalar(meta['value']):
+                    if meta['value'].size > 0:
+                        meta['value'] = meta['value'].flatten()[0]
+                    else:
+                        meta['value'] = 1.0
+
         self._var_rel2meta.update(self._static_var_rel2meta)
-        for type_ in ['input', 'output']:
-            self._var_rel_names[type_].extend(self._static_var_rel_names[type_])
+        for io in ['input', 'output']:
+            self._var_rel_names[io].extend(self._static_var_rel_names[io])
         self.setup()
-
-        # check to make sure that if num_par_fd > 1 that this system is actually doing FD.
-        # Unfortunately we have to do this check after system setup has been called because that's
-        # when declare_partials generally happens, so we raise an exception here instead of just
-        # resetting the value of num_par_fd (because the comm has already been split and possibly
-        # used by the system setup).
-        if self._num_par_fd > 1 and orig_comm.size > 1 and not (self._owns_approx_jac or
-                                                                self._approx_schemes):
-            raise RuntimeError("%s: num_par_fd is > 1 but no FD is active." % self.msginfo)
-
-        self._static_mode = True
 
         self._set_vector_class()
 
@@ -221,61 +215,51 @@ class Component(System):
         global global_meta_names
         super(Component, self)._setup_var_data()
 
-        allprocs_abs_names = self._var_allprocs_abs_names
-        allprocs_abs_names_discrete = self._var_allprocs_abs_names_discrete
-
         allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
-
-        abs2prom = self._var_abs2prom
-
-        allprocs_abs2meta = self._var_allprocs_abs2meta
-        abs2meta = self._var_abs2meta
+        abs2prom = self._var_allprocs_abs2prom = self._var_abs2prom
 
         # Compute the prefix for turning rel/prom names into abs names
         prefix = self.pathname + '.' if self.pathname else ''
 
-        for type_ in ['input', 'output']:
-            for prom_name in self._var_rel_names[type_]:
-                abs_name = prefix + prom_name
-                metadata = self._var_rel2meta[prom_name]
+        iproc = self.comm.rank
 
-                # Compute allprocs_abs_names
-                allprocs_abs_names[type_].append(abs_name)
+        for io in ['input', 'output']:
+            abs2meta = self._var_abs2meta[io]
+            allprocs_abs2meta = self._var_allprocs_abs2meta[io]
+
+            is_input = io == 'input'
+            for i, prom_name in enumerate(self._var_rel_names[io]):
+                abs_name = prefix + prom_name
+                abs2meta[abs_name] = metadata = self._var_rel2meta[prom_name]
 
                 # Compute allprocs_prom2abs_list, abs2prom
-                allprocs_prom2abs_list[type_][prom_name] = [abs_name]
-                abs2prom[type_][abs_name] = prom_name
+                allprocs_prom2abs_list[io][prom_name] = [abs_name]
+                abs2prom[io][abs_name] = prom_name
 
-                # Compute allprocs_abs2meta
                 allprocs_abs2meta[abs_name] = {
                     meta_name: metadata[meta_name]
-                    for meta_name in global_meta_names[type_]
+                    for meta_name in global_meta_names[io]
                 }
-                if type_ == 'input':
-                    src_indices = metadata['src_indices']
-                    allprocs_abs2meta[abs_name]['has_src_indices'] = src_indices is not None
+                if is_input and 'src_indices' in metadata:
+                    allprocs_abs2meta[abs_name]['has_src_indices'] = \
+                        metadata['src_indices'] is not None
 
-                # Compute abs2meta
-                abs2meta[abs_name] = metadata
+                    # ensure that if src_indices is a slice we reset it to that instead of
+                    # the converted array value (in case this is a re-setup), so that we can
+                    # re-convert using potentially different sizing information.
+                    if metadata['src_slice'] is not None:
+                        metadata['src_indices'] = metadata['src_slice']
 
-            for prom_name, val in self._var_discrete[type_].items():
+            for prom_name, val in self._var_discrete[io].items():
                 abs_name = prefix + prom_name
 
-                # Compute allprocs_abs_names_discrete
-                allprocs_abs_names_discrete[type_].append(abs_name)
-
                 # Compute allprocs_prom2abs_list, abs2prom
-                allprocs_prom2abs_list[type_][prom_name] = [abs_name]
-                abs2prom[type_][abs_name] = prom_name
+                allprocs_prom2abs_list[io][prom_name] = [abs_name]
+                abs2prom[io][abs_name] = prom_name
 
                 # Compute allprocs_discrete (metadata for discrete vars)
-                self._var_allprocs_discrete[type_][abs_name] = v = val.copy()
+                self._var_allprocs_discrete[io][abs_name] = v = val.copy()
                 del v['value']
-
-        self._var_allprocs_abs2prom = abs2prom
-
-        self._var_abs_names = allprocs_abs_names
-        self._var_abs_names_discrete = allprocs_abs_names_discrete
 
         if self._var_discrete['input'] or self._var_discrete['output']:
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
@@ -285,58 +269,62 @@ class Component(System):
 
     def _setup_var_sizes(self):
         """
-        Compute the arrays of local variable sizes for all variables/procs on this system.
+        Compute the arrays of variable sizes for all variables/procs on this system.
         """
-        super(Component, self)._setup_var_sizes()
-
         iproc = self.comm.rank
-        nproc = self.comm.size
 
-        sizes = self._var_sizes
-        abs2meta = self._var_abs2meta
+        for io in ('input', 'output'):
+            sizes = self._var_sizes['nonlinear'][io] = np.zeros((self.comm.size,
+                                                                len(self._var_rel_names[io])),
+                                                                dtype=INT_DTYPE)
 
-        if self._use_derivatives:
-            vec_names = self._lin_rel_vec_name_list
-        else:
-            vec_names = self._vec_names
+            for i, (name, metadata) in enumerate(self._var_allprocs_abs2meta[io].items()):
+                sizes[iproc, i] = metadata['size']
 
-        # Initialize empty arrays
-        for vec_name in vec_names:
-            # at component level, _var_allprocs_* is the same as var_* since all vars exist in all
-            # procs for a given component, so we don't have to mess with figuring out what vars are
-            # local.
-            if self._use_derivatives:
-                relnames = self._var_allprocs_relevant_names[vec_name]
-            else:
-                relnames = self._var_allprocs_abs_names
+            if self.comm.size > 1:
+                my_sizes = sizes[iproc, :].copy()
+                self.comm.Allgather(my_sizes, sizes)
 
-            sizes[vec_name] = {}
-            for type_ in ('input', 'output'):
-                sizes[vec_name][type_] = sz = np.zeros((nproc, len(relnames[type_])), int)
+        # all names are relevant for the 'nonlinear' and 'linear' vectors.  We
+        # can then use them to compute the size arrays of for all other vectors
+        # based on the nonlinear size array.
+        nl_allprocs_relnames = self._var_allprocs_relevant_names['nonlinear']
+        nl_relnames = self._var_relevant_names['nonlinear']
+        for io in ('input', 'output'):
+            nl_allprocs_relnames[io] = list(self._var_allprocs_abs2meta[io])
+            nl_relnames[io] = list(self._var_abs2meta[io])
 
-                # Compute _var_sizes
-                for idx, abs_name in enumerate(relnames[type_]):
-                    sz[iproc, idx] = abs2meta[abs_name]['size']
-
-        if nproc > 1:
-            for vec_name in vec_names:
-                sizes = self._var_sizes[vec_name]
-                if self.options['distributed']:
-                    for type_ in ['input', 'output']:
-                        sizes_in = sizes[type_][iproc, :].copy()
-                        self.comm.Allgather(sizes_in, sizes[type_])
-                else:
-                    # if component isn't distributed, we don't need to allgather sizes since
-                    # they'll all be the same.
-                    for type_ in ['input', 'output']:
-                        sizes[type_] = np.tile(sizes[type_][iproc], (nproc, 1))
-
-        if self._use_derivatives:
-            self._var_sizes['nonlinear'] = self._var_sizes['linear']
-
+        self._setup_var_index_maps('nonlinear')
         self._owned_sizes = self._var_sizes['nonlinear']['output']
 
-        self._setup_global_shapes()
+        if self._use_derivatives:
+            sizes = self._var_sizes
+            nl_sizes = sizes['nonlinear']
+            nl_abs2idx = self._var_allprocs_abs2idx['nonlinear']
+
+            sizes['linear'] = nl_sizes
+            self._var_allprocs_relevant_names['linear'] = nl_allprocs_relnames
+            self._var_relevant_names['linear'] = nl_relnames
+            self._var_allprocs_abs2idx['linear'] = nl_abs2idx
+
+            # Initialize size arrays for other linear vecs besides 'linear'
+            # (which is the same as 'nonlinear')
+            for vec_name in self._lin_rel_vec_name_list[1:]:
+                # at component level, _var_allprocs_* is the same as var_* since all vars exist in
+                # all procs for a given component, so we don't have to mess with figuring out what
+                # vars are local.
+                relnames = self._var_allprocs_relevant_names[vec_name]
+
+                sizes[vec_name] = {}
+                for io in ('input', 'output'):
+                    sizes[vec_name][io] = sz = np.zeros((self.comm.size, len(relnames[io])),
+                                                        INT_DTYPE)
+                    # Variables for this vec_name are a subset of those for nonlinear, so just
+                    # take columns of the nonlinear sizes array
+                    for idx, abs_name in enumerate(relnames[io]):
+                        sz[:, idx] = nl_sizes[io][:, nl_abs2idx[abs_name]]
+
+                self._setup_var_index_maps(vec_name)
 
     def _setup_partials(self):
         """
@@ -345,9 +333,31 @@ class Component(System):
         self._subjacs_info = {}
         self._jacobian = DictionaryJacobian(system=self)
 
+        self.setup_partials()  # hook for component writers to specify sparsity patterns
+
+        # check to make sure that if num_par_fd > 1 that this system is actually doing FD.
+        # Unfortunately we have to do this check after system setup has been called because that's
+        # when declare_partials generally happens, so we raise an exception here instead of just
+        # resetting the value of num_par_fd (because the comm has already been split and possibly
+        # used by the system setup).
+        orig_comm = self._full_comm if self._full_comm is not None else self.comm
+        if self._num_par_fd > 1 and orig_comm.size > 1 and not (self._owns_approx_jac or
+                                                                self._approx_schemes):
+            raise RuntimeError("%s: num_par_fd is > 1 but no FD is active." % self.msginfo)
+
         for key, dct in self._declared_partials.items():
             of, wrt = key
             self._declare_partials(of, wrt, dct)
+
+    def setup_partials(self):
+        """
+        Declare partials.
+
+        This is meant to be overridden by component classes.  All partials should be
+        declared here since this is called after all size/shape information is known for
+        all variables.
+        """
+        pass
 
     def _update_wrt_matches(self, info):
         """
@@ -398,7 +408,7 @@ class Component(System):
                     self._subjacs_info[abs_key]['sparsity'] = tup
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
-                  units=None, desc='', tags=None):
+                  units=None, desc='', tags=None, shape_by_conn=False, copy_shape=None):
         """
         Add an input variable to the component.
 
@@ -429,6 +439,11 @@ class Component(System):
         tags : str or list of strs
             User defined tags that can be used to filter what gets listed when calling
             list_inputs and list_outputs.
+        shape_by_conn : bool
+            If True, shape this input to match its connected output.
+        copy_shape : str or None
+            If a str, that str is the name of a variable. Shape this input to match that of
+            the named variable.
 
         Returns
         -------
@@ -440,6 +455,7 @@ class Component(System):
             raise TypeError('%s: The name argument should be a string.' % self.msginfo)
         if not _valid_var_name(name):
             raise NameError("%s: '%s' is not a valid input name." % (self.msginfo, name))
+
         if not isscalar(val) and not isinstance(val, (list, tuple, ndarray, Iterable)):
             raise TypeError('%s: The val argument should be a float, list, tuple, ndarray or '
                             'Iterable' % self.msginfo)
@@ -460,27 +476,46 @@ class Component(System):
         if tags is not None and not isinstance(tags, (str, list)):
             raise TypeError('The tags argument should be a str or list')
 
-        # value, shape: based on args, making sure they are compatible
-        value, shape, src_indices = ensure_compatible(name, val, shape, src_indices)
-        distributed = self.options['distributed']
+        if (shape_by_conn or copy_shape):
+            if shape is not None or not isscalar(val):
+                raise ValueError("%s: If shape is to be set dynamically using 'shape_by_conn' or "
+                                 "'copy_shape', 'shape' and 'val' should be a scalar, "
+                                 "but shape of '%s' and val of '%s' was given for variable '%s'."
+                                 % (self.msginfo, shape, val, name))
+            if src_indices is not None:
+                raise ValueError("%s: Setting of 'src_indices' along with 'shape_by_conn' or "
+                                 "'copy_shape' for variable '%s' is currently unsupported." %
+                                 (self.msginfo, name))
+
+        src_slice = None
+        if not (shape_by_conn or copy_shape):
+            if src_indices is not None:
+                if _is_slicer_op(src_indices):
+                    src_slice = src_indices
+                    if flat_src_indices is not None:
+                        simple_warning(f"{self.msginfo}: Input '{name}' was added with slice "
+                                       "src_indices, so flat_src_indices is ignored.")
+                    flat_src_indices = True
+                else:
+                    src_indices = np.asarray(src_indices, dtype=INT_DTYPE)
+
+            # value, shape: based on args, making sure they are compatible
+            val, shape, src_indices = ensure_compatible(name, val, shape, src_indices)
 
         metadata = {
-            'value': value,
+            'value': val,
             'shape': shape,
-            'size': np.prod(shape),
-            'src_indices': None,
+            'size': shape_to_len(shape),
+            'src_indices': src_indices,  # these will ultimately be converted to a flat index array
             'flat_src_indices': flat_src_indices,
+            'src_slice': src_slice,  # store slice def here, if any.  This is never overwritten
             'units': units,
             'desc': desc,
-            'distributed': distributed,
+            'distributed': self.options['distributed'],
             'tags': make_set(tags),
+            'shape_by_conn': shape_by_conn,
+            'copy_shape': copy_shape,
         }
-
-        if src_indices is not None:
-            if _is_slicer_op(src_indices):
-                metadata['src_indices'] = src_indices
-            else:
-                metadata['src_indices'] = np.asarray(src_indices, dtype=INT_DTYPE)
 
         if self._static_mode:
             var_rel2meta = self._static_var_rel2meta
@@ -495,6 +530,8 @@ class Component(System):
 
         var_rel2meta[name] = metadata
         var_rel_names['input'].append(name)
+
+        self._var_added(name)
 
         return metadata
 
@@ -548,10 +585,13 @@ class Component(System):
 
         var_rel2meta[name] = self._var_discrete['input'][name] = metadata
 
+        self._var_added(name)
+
         return metadata
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, tags=None):
+                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, tags=None,
+                   shape_by_conn=False, copy_shape=None):
         """
         Add an output variable to the component.
 
@@ -594,28 +634,43 @@ class Component(System):
         tags : str or list of strs or set of strs
             User defined tags that can be used to filter what gets listed when calling
             list_inputs and list_outputs.
+        shape_by_conn : bool
+            If True, shape this output to match its connected input(s).
+        copy_shape : str or None
+            If a str, that str is the name of a variable. Shape this output to match that of
+            the named variable.
 
         Returns
         -------
         dict
             metadata for added variable
         """
+        # First, type check all arguments
+        if (shape_by_conn or copy_shape) and (shape is not None or not isscalar(val)):
+            raise ValueError("%s: If shape is to be set dynamically using 'shape_by_conn' or "
+                             "'copy_shape', 'shape' and 'val' should be scalar, "
+                             "but shape of '%s' and val of '%s' was given for variable '%s'."
+                             % (self.msginfo, shape, val, name))
+
         if not isinstance(name, str):
             raise TypeError('%s: The name argument should be a string.' % self.msginfo)
         if not _valid_var_name(name):
             raise NameError("%s: '%s' is not a valid output name." % (self.msginfo, name))
-        if not isscalar(val) and not isinstance(val, (list, tuple, ndarray, Iterable)):
-            msg = '%s: The val argument should be a float, list, tuple, ndarray or Iterable'
-            raise TypeError(msg % self.msginfo)
-        if not isscalar(ref) and not isinstance(val, (list, tuple, ndarray, Iterable)):
-            msg = '%s: The ref argument should be a float, list, tuple, ndarray or Iterable'
-            raise TypeError(msg % self.msginfo)
-        if not isscalar(ref0) and not isinstance(val, (list, tuple, ndarray, Iterable)):
-            msg = '%s: The ref0 argument should be a float, list, tuple, ndarray or Iterable'
-            raise TypeError(msg % self.msginfo)
-        if not isscalar(res_ref) and not isinstance(val, (list, tuple, ndarray, Iterable)):
-            msg = '%s: The res_ref argument should be a float, list, tuple, ndarray or Iterable'
-            raise TypeError(msg % self.msginfo)
+
+        if not (copy_shape or shape_by_conn):
+            if not isscalar(val) and not isinstance(val, (list, tuple, ndarray, Iterable)):
+                msg = '%s: The val argument should be a float, list, tuple, ndarray or Iterable'
+                raise TypeError(msg % self.msginfo)
+            if not isscalar(ref) and not isinstance(val, (list, tuple, ndarray, Iterable)):
+                msg = '%s: The ref argument should be a float, list, tuple, ndarray or Iterable'
+                raise TypeError(msg % self.msginfo)
+            if not isscalar(ref0) and not isinstance(val, (list, tuple, ndarray, Iterable)):
+                msg = '%s: The ref0 argument should be a float, list, tuple, ndarray or Iterable'
+                raise TypeError(msg % self.msginfo)
+            if not isscalar(res_ref) and not isinstance(val, (list, tuple, ndarray, Iterable)):
+                msg = '%s: The res_ref argument should be a float, list, tuple, ndarray or Iterable'
+                raise TypeError(msg % self.msginfo)
+
         if shape is not None and not isinstance(shape, (int, tuple, list, np.integer)):
             raise TypeError("%s: The shape argument should be an int, tuple, or list but "
                             "a '%s' was given" % (self.msginfo, type(shape)))
@@ -631,25 +686,26 @@ class Component(System):
         if tags is not None and not isinstance(tags, (str, set, list)):
             raise TypeError('The tags argument should be a str, set, or list')
 
-        # value, shape: based on args, making sure they are compatible
-        value, shape, _ = ensure_compatible(name, val, shape)
+        if not (copy_shape or shape_by_conn):
+            # value, shape: based on args, making sure they are compatible
+            val, shape, _ = ensure_compatible(name, val, shape)
 
-        if lower is not None:
-            lower = ensure_compatible(name, lower, shape)[0]
-            self._has_bounds = True
-        if upper is not None:
-            upper = ensure_compatible(name, upper, shape)[0]
-            self._has_bounds = True
+            if lower is not None:
+                lower = ensure_compatible(name, lower, shape)[0]
+                self._has_bounds = True
+            if upper is not None:
+                upper = ensure_compatible(name, upper, shape)[0]
+                self._has_bounds = True
 
-        # All refs: check the shape if necessary
-        for item, item_name in zip([ref, ref0, res_ref], ['ref', 'ref0', 'res_ref']):
-            if not isscalar(item):
-                it = atleast_1d(item)
-                if it.shape != shape:
-                    raise ValueError("{}: When adding output '{}', expected shape {} but got "
-                                     "shape {} for argument '{}'.".format(self.msginfo, name,
-                                                                          shape,
-                                                                          it.shape, item_name))
+            # All refs: check the shape if necessary
+            for item, item_name in zip([ref, ref0, res_ref], ['ref', 'ref0', 'res_ref']):
+                if not isscalar(item):
+                    it = atleast_1d(item)
+                    if it.shape != shape:
+                        raise ValueError("{}: When adding output '{}', expected shape {} but got "
+                                         "shape {} for argument '{}'.".format(self.msginfo, name,
+                                                                              shape, it.shape,
+                                                                              item_name))
 
         if isscalar(ref):
             self._has_output_scaling |= ref != 1.0
@@ -667,9 +723,9 @@ class Component(System):
             self._has_resid_scaling |= np.any(res_ref != 1.0)
 
         metadata = {
-            'value': value,
+            'value': val,
             'shape': shape,
-            'size': np.prod(shape),
+            'size': shape_to_len(shape),
             'units': units,
             'res_units': res_units,
             'desc': desc,
@@ -680,6 +736,8 @@ class Component(System):
             'res_ref': format_as_float_or_array('res_ref', res_ref, flatten=True),
             'lower': lower,
             'upper': upper,
+            'shape_by_conn': shape_by_conn,
+            'copy_shape': copy_shape
         }
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
@@ -696,6 +754,8 @@ class Component(System):
 
         var_rel2meta[name] = metadata
         var_rel_names['output'].append(name)
+
+        self._var_added(name)
 
         return metadata
 
@@ -748,7 +808,21 @@ class Component(System):
 
         var_rel2meta[name] = self._var_discrete['output'][name] = metadata
 
+        self._var_added(name)
+
         return metadata
+
+    def _var_added(self, name):
+        """
+        Notify config that a variable has been added to this Component.
+
+        Parameters
+        ----------
+        name : str
+            Name of the added variable.
+        """
+        if self._problem_meta is not None and self._problem_meta['config_info'] is not None:
+            self._problem_meta['config_info']._var_added(self.pathname, name)
 
     def _update_dist_src_indices(self, abs_in2out, all_abs2meta, all_abs2idx, all_sizes):
         """
@@ -774,18 +848,20 @@ class Component(System):
             return set()
 
         iproc = self.comm.rank
-        abs2meta = self._var_abs2meta
+        abs2meta_in = self._var_abs2meta['input']
+        all_abs2meta_in = all_abs2meta['input']
+        all_abs2meta_out = all_abs2meta['output']
 
         sizes_in = self._var_sizes['nonlinear']['input']
         sizes_out = all_sizes['nonlinear']['output']
         added_src_inds = set()
-        for i, iname in enumerate(self._var_allprocs_abs_names['input']):
-            if iname in abs2meta and abs2meta[iname]['src_indices'] is None:
+        for i, iname in enumerate(self._var_allprocs_abs2meta['input']):
+            if iname in abs2meta_in and abs2meta_in[iname]['src_indices'] is None:
                 src = abs_in2out[iname]
                 out_i = all_abs2idx[src]
                 nzs = np.nonzero(sizes_out[:, out_i])[0]
-                if (all_abs2meta[src]['global_size'] == all_abs2meta[iname]['global_size'] or
-                        nzs.size == self.comm.size):
+                if (all_abs2meta_out[src]['global_size'] ==
+                        all_abs2meta_in[iname]['global_size'] or nzs.size == self.comm.size):
                     # This offset assumes a 'full' distributed output
                     offset = np.sum(sizes_in[:iproc, i])
                     end = offset + sizes_in[iproc, i]
@@ -801,8 +877,8 @@ class Component(System):
                 simple_warning(f"{self.msginfo}: Component is distributed but input '{iname}' was "
                                "added without src_indices. Setting src_indices to "
                                f"range({offset}, {end}).")
-                abs2meta[iname]['src_indices'] = np.arange(offset, end, dtype=INT_DTYPE)
-                all_abs2meta[iname]['has_src_indices'] = True
+                abs2meta_in[iname]['src_indices'] = np.arange(offset, end, dtype=INT_DTYPE)
+                all_abs2meta_in[iname]['has_src_indices'] = True
                 added_src_inds.add(iname)
 
         return added_src_inds
@@ -1151,7 +1227,7 @@ class Component(System):
 
         return opts
 
-    def _declare_partials(self, of, wrt, dct):
+    def _declare_partials(self, of, wrt, dct, quick_declare=False):
         """
         Store subjacobian metadata for later use.
 
@@ -1166,7 +1242,23 @@ class Component(System):
             May also contain glob patterns.
         dct : dict
             Metadata dict specifying shape, and/or approx properties.
+        quick_declare : bool
+            This is set to True when declaring the jacobian diagonal terms for explicit
+            components. The checks and conversions are all skipped to improve performance for
+            cases with large numbers of explicit components or indepvarcomps.
         """
+        if quick_declare:
+            abs_key = rel_key2abs_key(self, (of, wrt))
+
+            meta = {}
+            meta['rows'] = np.array(dct['rows'], dtype=INT_DTYPE, copy=False)
+            meta['cols'] = np.array(dct['cols'], dtype=INT_DTYPE, copy=False)
+            meta['shape'] = (len(dct['rows']), len(dct['cols']))
+            meta['value'] = dct['value']
+
+            self._subjacs_info[abs_key] = meta
+            return
+
         val = dct['value'] if 'value' in dct else None
         is_scalar = isscalar(val)
         dependent = dct['dependent']
@@ -1222,7 +1314,8 @@ class Component(System):
                 cols = None
 
         pattern_matches = self._find_partial_matches(of, wrt)
-        abs2meta = self._var_abs2meta
+        abs2meta_in = self._var_abs2meta['input']
+        abs2meta_out = self._var_abs2meta['output']
 
         is_array = isinstance(val, ndarray)
         patmeta = dict(dct)
@@ -1251,23 +1344,29 @@ class Component(System):
                 else:
                     meta = patmeta.copy()
 
+                of, wrt = abs_key
                 meta['rows'] = rows
                 meta['cols'] = cols
-                meta['shape'] = shape = (abs2meta[abs_key[0]]['size'], abs2meta[abs_key[1]]['size'])
+                csz = abs2meta_in[wrt]['size'] if wrt in abs2meta_in else abs2meta_out[wrt]['size']
+                meta['shape'] = shape = (abs2meta_out[of]['size'], csz)
 
                 if shape[0] == 0 or shape[1] == 0:
                     msg = "{}: '{}' is an array of size 0"
                     if shape[0] == 0:
-                        if not abs2meta[abs_key[0]]['distributed']:
+                        if not abs2meta_out[of]['distributed']:
                             # non-distributed components are not allowed to have zero size inputs
-                            raise ValueError(msg.format(self.msginfo, abs_key[0]))
+                            raise ValueError(msg.format(self.msginfo, of))
                         else:
                             # distributed comp are allowed to have zero size inputs on some procs
                             rows_max = -1
                     if shape[1] == 0:
-                        if not abs2meta[abs_key[1]]['distributed']:
+                        if wrt in abs2meta_in:
+                            distrib = abs2meta_in[wrt]['distributed']
+                        else:
+                            distrib = abs2meta_out[wrt]['distributed']
+                        if not distrib:
                             # non-distributed components are not allowed to have zero size outputs
-                            raise ValueError(msg.format(self.msginfo, abs_key[1]))
+                            raise ValueError(msg.format(self.msginfo, wrt))
                         else:
                             # distributed comp are allowed to have zero size outputs on some procs
                             cols_max = -1

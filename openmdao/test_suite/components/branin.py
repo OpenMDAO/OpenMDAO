@@ -36,6 +36,7 @@ class Branin(om.ExplicitComponent):
         # Outputs
         self.add_output('f', val=0.0)
 
+    def setup_partials(self):
         self.declare_partials(of='f', wrt=['x0', 'x1'])
 
     def compute(self, inputs, outputs):
@@ -92,6 +93,7 @@ class BraninDiscrete(om.ExplicitComponent):
         # Outputs
         self.add_output('f', val=0.0)
 
+    def setup_partials(self):
         self.declare_partials(of='f', wrt=['x1'])
 
     def compute(self, inputs, outputs, discrete_inputs, discrete_outputs):
