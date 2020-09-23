@@ -937,7 +937,7 @@ class MultiFiCoKrigingSurrogate(MultiFiSurrogateModel):
         **kwargs : keyword args
             Some implementations of record_derivatives need additional args.
         """
-        super(MultiFiCoKrigingSurrogate, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.model = None
 
     def _declare_options(self):

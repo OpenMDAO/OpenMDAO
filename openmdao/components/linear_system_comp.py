@@ -29,7 +29,7 @@ class LinearSystemComp(ImplicitComponent):
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Component options.
         """
-        super(LinearSystemComp, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self._lup = None
 
     def initialize(self):

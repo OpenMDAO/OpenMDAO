@@ -152,7 +152,7 @@ else:
                  static_path=os.path.join(os.path.dirname(__file__), "static"),
             )
 
-            super(_Application, self).__init__(handlers, **settings)
+            super().__init__(handlers, **settings)
 
         def get_nodes(self, idx):
             """

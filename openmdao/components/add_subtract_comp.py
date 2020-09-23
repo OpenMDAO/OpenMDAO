@@ -69,7 +69,7 @@ class AddSubtractComp(ExplicitComponent):
             (same as add_output method for ExplicitComponent)
             Examples include units (str or None), desc (str)
         """
-        super(AddSubtractComp, self).__init__()
+        super().__init__()
 
         # Add systems is used to store those systems provided upon initialization
         self._equations = []
@@ -181,7 +181,7 @@ class AddSubtractComp(ExplicitComponent):
         else:
             shape = (vec_size, length)
 
-        super(AddSubtractComp, self).add_output(output_name, val, shape=shape, **kwargs)
+        super().add_output(output_name, val, shape=shape, **kwargs)
 
         self._equations.append((output_name, input_names, vec_size, length, val,
                                 scaling_factors, kwargs))

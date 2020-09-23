@@ -178,7 +178,7 @@ class UnitConvGroup(om.Group):
     conversion."""
 
     def __init__(self, **kwargs):
-        super(UnitConvGroup, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.add_subsystem('px1', om.IndepVarComp('x1', 100.0))
         self.add_subsystem('src', SrcComp())
@@ -201,7 +201,7 @@ class UnitConvGroupImplicitConns(om.Group):
     """
 
     def __init__(self):
-        super(UnitConvGroupImplicitConns, self).__init__()
+        super().__init__()
 
         self.add_subsystem('px1', om.IndepVarComp('x1', 100.0), promotes_outputs=['x1'])
         self.add_subsystem('src', SrcComp(), promotes_inputs=['x1'], promotes_outputs=['x2'])

@@ -15,7 +15,7 @@ from openmdao.utils.logger_utils import TestLogger
 
 class MyComp(om.ExecComp):
     def __init__(self):
-        super(MyComp, self).__init__(["y = 2.0*a", "z = 3.0*b"])
+        super().__init__(["y = 2.0*a", "z = 3.0*b"])
 
 
 class TestCheckConfig(unittest.TestCase):

@@ -224,11 +224,11 @@ class DistribCompWithDerivs(om.ExplicitComponent):
 class DistribInputDistribOutputDiscreteComp(DistribInputDistribOutputComp):
 
     def compute(self, inputs, outputs, discrete_inputs, discrete_outputs):
-        super(DistribInputDistribOutputDiscreteComp, self).compute(inputs, outputs)
+        super().compute(inputs, outputs)
         discrete_outputs['disc_out'] = discrete_inputs['disc_in'] + 'bar'
 
     def setup(self):
-        super(DistribInputDistribOutputDiscreteComp, self).setup()
+        super().setup()
         self.add_discrete_input('disc_in', 'foo')
         self.add_discrete_output('disc_out', 'foobar')
 

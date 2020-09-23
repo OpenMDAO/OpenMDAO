@@ -63,7 +63,7 @@ class ListGenerator(DOEGenerator):
         data : list
             list of collections of name, value pairs for the design variables
         """
-        super(ListGenerator, self).__init__()
+        super().__init__()
 
         if not isinstance(data, list):
             msg = "Invalid DOE case data, expected a list but got a {}."
@@ -145,7 +145,7 @@ class CSVGenerator(DOEGenerator):
         filename : str
                the name of the file from which to read cases
         """
-        super(CSVGenerator, self).__init__()
+        super().__init__()
 
         if not isinstance(filename, str):
             raise RuntimeError("'%s' is not a valid file name." % str(filename))
@@ -229,7 +229,7 @@ class UniformGenerator(DOEGenerator):
         seed : int or None, optional
             Seed for random number generator.
         """
-        super(UniformGenerator, self).__init__()
+        super().__init__()
 
         self._num_samples = num_samples
         self._seed = seed
@@ -294,7 +294,7 @@ class _pyDOE_Generator(DOEGenerator):
             The number of evenly spaced levels between each design variable
             lower and upper bound. Defaults to 2.
         """
-        super(_pyDOE_Generator, self).__init__()
+        super().__init__()
         self._levels = levels
 
     def __call__(self, design_vars, model=None):
@@ -402,7 +402,7 @@ class PlackettBurmanGenerator(_pyDOE_Generator):
         """
         Initialize the PlackettBurmanGenerator.
         """
-        super(PlackettBurmanGenerator, self).__init__(levels=2)
+        super().__init__(levels=2)
 
     def _generate_design(self, size):
         """
@@ -444,7 +444,7 @@ class BoxBehnkenGenerator(_pyDOE_Generator):
         center : int, optional
             The number of center points to include (default = None).
         """
-        super(BoxBehnkenGenerator, self).__init__(levels=3)
+        super().__init__(levels=3)
         self._center = center
 
     def _generate_design(self, size):
@@ -517,7 +517,7 @@ class LatinHypercubeGenerator(DOEGenerator):
         seed : int, optional
             Random seed to use if design is randomized. Defaults to None.
         """
-        super(LatinHypercubeGenerator, self).__init__()
+        super().__init__()
 
         if criterion not in self._supported_criterion:
             raise ValueError("Invalid criterion '%s' specified for %s. "

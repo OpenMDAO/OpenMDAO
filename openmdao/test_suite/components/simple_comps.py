@@ -11,7 +11,7 @@ class DoubleArrayComp(om.ExplicitComponent):
     """
 
     def __init__(self):
-        super(DoubleArrayComp, self).__init__()
+        super().__init__()
 
         self.JJ = np.array([[1.0, 3.0, -2.0, 7.0],
                             [6.0, 2.5, 2.0, 4.0],
@@ -56,7 +56,7 @@ class NonSquareArrayComp(om.ExplicitComponent):
     """
 
     def __init__(self):
-        super(NonSquareArrayComp, self).__init__()
+        super().__init__()
 
         self.JJ = np.array([[1.0, 3.0, -2.0, 7.0],
                             [6.0, 2.5, 2.0, 4.0],

@@ -334,7 +334,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
             with derivatives."""
 
             def __init__(self):
-                super(SellarModified, self).__init__()
+                super().__init__()
 
                 self.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
                 self.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
@@ -481,10 +481,10 @@ class TestNLBGaussSeidel(unittest.TestCase):
         class ContrivedSellarDis1(SellarDis1):
 
             def setup(self):
-                super(ContrivedSellarDis1, self).setup()
+                super().setup()
                 self.add_output('highly_nonlinear', val=1.0, res_ref=1e-4)
             def compute(self, inputs, outputs):
-                super(ContrivedSellarDis1, self).compute(inputs, outputs)
+                super().compute(inputs, outputs)
                 outputs['highly_nonlinear'] = 10*np.sin(10*inputs['y2'])
 
         p = om.Problem()

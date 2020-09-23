@@ -90,7 +90,7 @@ class FiniteDifference(ApproximationScheme):
         """
         Initialize the ApproximationScheme.
         """
-        super(FiniteDifference, self).__init__()
+        super().__init__()
         self._starting_ins = self._starting_outs = self._results_tmp = None
 
     def add_approximation(self, abs_key, system, kwargs, vector=None):

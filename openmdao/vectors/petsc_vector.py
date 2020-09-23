@@ -57,8 +57,8 @@ class PETScVector(DefaultVector):
         ncol : int
             Number of columns for multi-vectors.
         """
-        super(PETScVector, self).__init__(name, kind, system, root_vector=root_vector,
-                                          alloc_complex=alloc_complex, ncol=ncol)
+        super().__init__(name, kind, system, root_vector=root_vector,
+                         alloc_complex=alloc_complex, ncol=ncol)
 
         self._dup_inds = None
 
@@ -71,7 +71,7 @@ class PETScVector(DefaultVector):
         root_vector : Vector or None
             the root's vector instance or None, if we are at the root.
         """
-        super(PETScVector, self)._initialize_data(root_vector)
+        super()._initialize_data(root_vector)
 
         self._petsc = {}
         self._imag_petsc = {}

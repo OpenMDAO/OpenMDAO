@@ -72,7 +72,7 @@ class CompB(ImplicitComponent):
 class GroupG(Group):
 
     def __init__(self, **kwargs):
-        super(GroupG, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.add_subsystem('CA', CompA(), promotes=['*'])
         self.add_subsystem('CB', CompB(), promotes=['*'])
 

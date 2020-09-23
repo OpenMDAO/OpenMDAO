@@ -8,7 +8,7 @@ class ParaboloidProblem(om.Problem):
     """
 
     def __init__(self, **kwargs):
-        super(ParaboloidProblem, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         model = self.model
         model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])

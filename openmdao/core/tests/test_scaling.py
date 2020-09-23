@@ -515,7 +515,7 @@ class TestScaling(unittest.TestCase):
                 self.add_output('total_volume', val=1.)
 
             def compute(self, inputs, outputs):
-                super(ExpCompArrayScale, self).compute(inputs, outputs)
+                super().compute(inputs, outputs)
                 outputs['stuff'] = inputs['widths'] + inputs['lengths']
 
         prob = om.Problem()
@@ -557,7 +557,7 @@ class TestScaling(unittest.TestCase):
                 self.add_output('total_volume', val=1.)
 
             def compute(self, inputs, outputs):
-                super(ExpCompArrayScale, self).compute(inputs, outputs)
+                super().compute(inputs, outputs)
                 outputs['stuff'] = inputs['widths'] + inputs['lengths']
 
         prob = om.Problem()
@@ -603,7 +603,7 @@ class TestScaling(unittest.TestCase):
                 self.declare_partials(['*'], ['*'], method='cs')
 
             def compute(self, inputs, outputs):
-                super(ExpCompArrayScale, self).compute(inputs, outputs)
+                super().compute(inputs, outputs)
                 outputs['stuff'] = inputs['widths'] + inputs['lengths']
 
         prob = om.Problem()
@@ -679,7 +679,7 @@ class TestScaling(unittest.TestCase):
                 self.declare_partials('*', '*')
 
             def apply_nonlinear(self, inputs, outputs, residuals):
-                super(ImpCompArrayScale, self).apply_nonlinear(inputs, outputs, residuals)
+                super().apply_nonlinear(inputs, outputs, residuals)
                 residuals['extra'] = 2.0*self.mtx.dot(outputs['x']) - 3.0*inputs['rhs']
 
             def linearize(self, inputs, outputs, jacobian):
@@ -738,7 +738,7 @@ class TestScaling(unittest.TestCase):
                                 ref0=np.array([14.0, 17.0]))
 
             def apply_nonlinear(self, inputs, outputs, residuals):
-                super(ImpCompArrayScale, self).apply_nonlinear(inputs, outputs, residuals)
+                super().apply_nonlinear(inputs, outputs, residuals)
                 residuals['extra'] = 2.0*self.mtx.dot(outputs['x']) - 3.0*inputs['rhs']
 
             def linearize(self, inputs, outputs, jacobian):
@@ -811,7 +811,7 @@ class TestScaling(unittest.TestCase):
 
             def compute(self, inputs, outputs):
                 """ Don't need to do much."""
-                #super(ExpCompArrayScale, self).compute(inputs, outputs)
+                #super().compute(inputs, outputs)
                 outputs['stuff'] = inputs['widths'] * 2
                 outputs['areas'] = inputs['lengths'] * 2
 

@@ -37,7 +37,7 @@ class ComplexStep(ApproximationScheme):
         """
         Initialize the ApproximationScheme.
         """
-        super(ComplexStep, self).__init__()
+        super().__init__()
 
         # Only used when nested under complex step.
         self._fd = None

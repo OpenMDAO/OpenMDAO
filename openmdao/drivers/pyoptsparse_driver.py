@@ -142,7 +142,7 @@ class pyOptSparseDriver(Driver):
         if Optimization is None:
             raise RuntimeError('pyOptSparseDriver is not available, pyOptsparse is not installed.')
 
-        super(pyOptSparseDriver, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # What we support
         self.supports['inequality_constraints'] = True
@@ -216,7 +216,7 @@ class pyOptSparseDriver(Driver):
         problem : <Problem>
             Pointer to the containing problem.
         """
-        super(pyOptSparseDriver, self)._setup_driver(problem)
+        super()._setup_driver(problem)
 
         self.supports._read_only = False
         self.supports['gradients'] = self.options['optimizer'] in grad_drivers

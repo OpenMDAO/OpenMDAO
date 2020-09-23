@@ -241,7 +241,7 @@ class TestParallelGroups(unittest.TestCase):
         class MultComp(ExplicitComponent):
             def __init__(self, mult):
                 self.mult = mult
-                super(MultComp, self).__init__()
+                super().__init__()
 
             def setup(self):
                 if self.comm.rank == 0:
@@ -431,7 +431,7 @@ class ExComp(om.ExplicitComponent):
 
 class SubGroup(om.Group):
     def __init__(self, size, **kwargs):
-        super(SubGroup, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.size = size
 
     def setup(self):

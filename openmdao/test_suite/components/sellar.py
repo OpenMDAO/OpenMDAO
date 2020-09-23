@@ -20,7 +20,7 @@ class SellarDis1(om.ExplicitComponent):
     """
 
     def __init__(self, units=None, scaling=None):
-        super(SellarDis1, self).__init__()
+        super().__init__()
         self.execution_count = 0
         self._units = units
         self._do_scaling = scaling
@@ -103,7 +103,7 @@ class SellarDis2(om.ExplicitComponent):
     """
 
     def __init__(self, units=None, scaling=None):
-        super(SellarDis2, self).__init__()
+        super().__init__()
         self.execution_count = 0
         self._units = units
         self._do_scaling = scaling
@@ -528,7 +528,7 @@ class SellarImplicitDis1(om.ImplicitComponent):
     """
 
     def __init__(self, units=None, scaling=None):
-        super(SellarImplicitDis1, self).__init__()
+        super().__init__()
         self.execution_count = 0
         self._units = units
         self._do_scaling = scaling
@@ -591,7 +591,7 @@ class SellarImplicitDis2(om.ImplicitComponent):
     """
 
     def __init__(self, units=None, scaling=None):
-        super(SellarImplicitDis2, self).__init__()
+        super().__init__()
         self.execution_count = 0
         self._units = units
         self._do_scaling = scaling
@@ -661,7 +661,7 @@ class SellarProblem(om.Problem):
     """
 
     def __init__(self, model_class=SellarDerivatives, **kwargs):
-        super(SellarProblem, self).__init__(model_class(**kwargs))
+        super().__init__(model_class(**kwargs))
 
         model = self.model
         model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
@@ -680,7 +680,7 @@ class SellarProblemWithArrays(om.Problem):
     """
 
     def __init__(self, model_class=SellarDerivatives, **kwargs):
-        super(SellarProblemWithArrays, self).__init__(model_class(**kwargs))
+        super().__init__(model_class(**kwargs))
 
         model = self.model
         model.add_design_var('z', lower=np.array([-10.0, 0.0]),

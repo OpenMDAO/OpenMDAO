@@ -56,7 +56,7 @@ class DOEDriver(Driver):
                                 "but an instance of %s was found."
                                 % type(generator).__name__)
 
-        super(DOEDriver, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # What we support
         self.supports['integer_design_vars'] = True
@@ -248,7 +248,7 @@ class DOEDriver(Driver):
         # if we end up running in parallel
         self._recorders.append(recorder)
 
-        super(DOEDriver, self).add_recorder(recorder)
+        super().add_recorder(recorder)
 
     def _setup_recording(self):
         """
@@ -272,7 +272,7 @@ class DOEDriver(Driver):
                         else:
                             recorder._record_on_proc = False
 
-        super(DOEDriver, self)._setup_recording()
+        super()._setup_recording()
 
     def _get_recorder_metadata(self, case_name):
         """

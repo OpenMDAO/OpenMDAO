@@ -70,7 +70,7 @@ class BroydenSolver(NonlinearSolver):
         **kwargs : dict
             options dictionary.
         """
-        super(BroydenSolver, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Slot for linear solver
         self.linear_solver = None
@@ -98,7 +98,7 @@ class BroydenSolver(NonlinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        super(BroydenSolver, self)._declare_options()
+        super()._declare_options()
 
         self.options.declare('alpha', default=0.4,
                              desc="Value to scale the starting Jacobian, which is Identity. This "
@@ -149,7 +149,7 @@ class BroydenSolver(NonlinearSolver):
         depth : int
             Depth of the current system (already incremented).
         """
-        super(BroydenSolver, self)._setup_solvers(system, depth)
+        super()._setup_solvers(system, depth)
         self._recompute_jacobian = True
         self._computed_jacobians = 0
         iproc = system.comm.rank
@@ -261,7 +261,7 @@ class BroydenSolver(NonlinearSolver):
         type_ : str
             Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
         """
-        super(BroydenSolver, self)._set_solver_print(level=level, type_=type_)
+        super()._set_solver_print(level=level, type_=type_)
 
         if self.linear_solver is not None and type_ != 'NL':
             self.linear_solver._set_solver_print(level=level, type_=type_)
@@ -650,7 +650,7 @@ class BroydenSolver(NonlinearSolver):
         """
         Clean up resources prior to exit.
         """
-        super(BroydenSolver, self).cleanup()
+        super().cleanup()
 
         if self.linear_solver:
             self.linear_solver.cleanup()

@@ -29,7 +29,7 @@ class COOMatrix(Matrix):
         is_internal : bool
             If True, this is the int_mtx of an AssembledJacobian.
         """
-        super(COOMatrix, self).__init__(comm, is_internal)
+        super().__init__(comm, is_internal)
         self._coo = None
 
     def _build_coo(self, system):

@@ -10,7 +10,7 @@ import openmdao.api as om
 
 class MatMultComp(om.ExplicitComponent):
     def __init__(self, mat, approx_method='exact', sleep_time=0.1, **kwargs):
-        super(MatMultComp, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.mat = mat
         self.approx_method = approx_method
         self.sleep_time = sleep_time
