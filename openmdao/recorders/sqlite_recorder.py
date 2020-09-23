@@ -162,7 +162,7 @@ class SqliteRecorder(CaseRecorder):
         # default to record on all procs when running in parallel
         self._record_on_proc = True
 
-        super(SqliteRecorder, self).__init__(record_viewer_data)
+        super().__init__(record_viewer_data)
 
     def _initialize_database(self):
         """
@@ -272,7 +272,7 @@ class SqliteRecorder(CaseRecorder):
         recording_requester : object
             Object to which this recorder is attached.
         """
-        super(SqliteRecorder, self).startup(recording_requester)
+        super().startup(recording_requester)
 
         if not self._database_initialized:
             self._initialize_database()

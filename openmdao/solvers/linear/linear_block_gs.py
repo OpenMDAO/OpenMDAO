@@ -30,7 +30,7 @@ class LinearBlockGS(BlockLinearSolver):
         **kwargs : dict
             options dictionary.
         """
-        super(LinearBlockGS, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self._theta_n_1 = {}
         self._delta_d_n_1 = {}
@@ -39,7 +39,7 @@ class LinearBlockGS(BlockLinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        super(LinearBlockGS, self)._declare_options()
+        super()._declare_options()
 
         self.options.declare('use_aitken', types=bool, default=False,
                              desc='set to True to use Aitken relaxation')
@@ -72,7 +72,7 @@ class LinearBlockGS(BlockLinearSolver):
                 self._delta_d_n_1[vec_name] = d_vec[vec_name].asarray(copy=True)
                 self._theta_n_1[vec_name] = 1.0
 
-        return super(LinearBlockGS, self)._iter_initialize()
+        return super()._iter_initialize()
 
     def _single_iteration(self):
         """

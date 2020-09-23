@@ -43,7 +43,7 @@ class PETScTransfer(DefaultTransfer):
         comm : MPI.Comm or <FakeComm>
             communicator of the system that owns this transfer.
         """
-        super(PETScTransfer, self).__init__(in_vec, out_vec, in_inds, out_inds, comm)
+        super().__init__(in_vec, out_vec, in_inds, out_inds, comm)
         in_indexset = PETSc.IS().createGeneral(self._in_inds, comm=self._comm)
         out_indexset = PETSc.IS().createGeneral(self._out_inds, comm=self._comm)
 

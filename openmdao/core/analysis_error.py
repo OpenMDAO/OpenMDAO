@@ -28,7 +28,7 @@ class AnalysisError(Exception):
         msginfo : str
             Name of component that raise the AnalysisError.
         """
-        super(AnalysisError, self).__init__(error)
+        super().__init__(error)
         if location is not None:
             with reset_warning_registry():
                 warnings.formatwarning = _warn_simple_format

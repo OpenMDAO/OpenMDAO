@@ -361,7 +361,7 @@ class TestProblemCheckPartials(unittest.TestCase):
             """
 
             def __init__(self, i_var, o_var, val, units=None):
-                super(PassThrough, self).__init__()
+                super().__init__()
                 self.i_var = i_var
                 self.o_var = o_var
                 self.units = units
@@ -1381,7 +1381,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         class ArrayCompCS(ArrayComp):
             def setup(self):
-                super(ArrayCompCS, self).setup()
+                super().setup()
                 self.set_check_partial_options('x*', directional=True, method='cs')
 
         prob = om.Problem()

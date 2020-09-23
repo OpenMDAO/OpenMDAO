@@ -52,7 +52,7 @@ class KrigingSurrogate(SurrogateModel):
         **kwargs : dict
             options dictionary.
         """
-        super(KrigingSurrogate, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.n_dims = 0                 # number of independent
         self.n_samples = 0              # number of training points
@@ -102,7 +102,7 @@ class KrigingSurrogate(SurrogateModel):
         y : array-like
             Model responses at given inputs.
         """
-        super(KrigingSurrogate, self).train(x, y)
+        super().train(x, y)
 
         x, y = np.atleast_2d(x, y)
 
@@ -225,7 +225,7 @@ class KrigingSurrogate(SurrogateModel):
         ndarray, optional (if eval_rmse is True)
             Root mean square of the prediction error.
         """
-        super(KrigingSurrogate, self).predict(x)
+        super().predict(x)
 
         thetas = self.thetas
         if isinstance(x, list):

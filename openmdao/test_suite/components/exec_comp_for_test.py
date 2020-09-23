@@ -41,7 +41,7 @@ class ExecComp4Test(ExecComp):
                  req_procs=(1,1), fail_rank=-1, fails=(),
                  fail_hard=False, **kwargs):
 
-        super(ExecComp4Test, self).__init__(exprs, **kwargs)
+        super().__init__(exprs, **kwargs)
         self.nl_delay = nl_delay
         self.lin_delay = lin_delay
         self.num_nl_solves = 0
@@ -71,7 +71,7 @@ class ExecComp4Test(ExecComp):
                     raise RuntimeError("OMG, a critical error!")
                 else:
                     raise AnalysisError("just an analysis error")
-            super(ExecComp4Test, self).compute(inputs, outputs)
+            super().compute(inputs, outputs)
             time.sleep(self.nl_delay)
         finally:
             self.num_nl_solves += 1
@@ -88,6 +88,6 @@ class ExecComp4Test(ExecComp):
         partials : `Jacobian`
             Contains sub-jacobians.
         """
-        super(ExecComp4Test, self).compute_partials(inputs, partials)
+        super().compute_partials(inputs, partials)
         time.sleep(self.lin_delay)
         self.num_compute_partials += 1

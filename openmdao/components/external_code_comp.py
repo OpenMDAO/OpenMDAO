@@ -263,7 +263,7 @@ class ExternalCodeComp(ExplicitComponent):
             Keyword arguments that will be mapped into the Component options.
         """
         self._external_code_runner = ExternalCodeDelegate(self)
-        super(ExternalCodeComp, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.stdin = DEV_NULL
         self.stdout = None
@@ -278,7 +278,7 @@ class ExternalCodeComp(ExplicitComponent):
         Options are declared here because this class is intended to be subclassed by
         the end user. The `initialize` method is left available for user-defined options.
         """
-        super(ExternalCodeComp, self)._declare_options()
+        super()._declare_options()
         self._external_code_runner.declare_options()
 
     def check_config(self, logger):
@@ -340,7 +340,7 @@ class ExternalCodeImplicitComp(ImplicitComponent):
             Keyword arguments that will be mapped into the Component options.
         """
         self._external_code_runner = ExternalCodeDelegate(self)
-        super(ExternalCodeImplicitComp, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.stdin = DEV_NULL
         self.stdout = None
@@ -355,7 +355,7 @@ class ExternalCodeImplicitComp(ImplicitComponent):
         Options are declared here because this class is intended to be subclassed by
         the end user. The `initialize` method is left available for user-defined options.
         """
-        super(ExternalCodeImplicitComp, self)._declare_options()
+        super()._declare_options()
         self._external_code_runner.declare_options()
 
         # ImplicitComponent has two separate commands to run.

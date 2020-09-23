@@ -96,7 +96,7 @@ class EQConstraintComp(ExplicitComponent):
             Additional arguments to be passed for the creation of the output variable.
             (see `add_output` method).
         """
-        super(EQConstraintComp, self).__init__()
+        super().__init__()
         self._output_vars = {}
         if name is not None:
             self.add_eq_output(name, eq_units, lhs_name, rhs_name, rhs_val,

@@ -34,7 +34,7 @@ class OutOfBoundsError(Exception):
         upper : double
             upper bounds of the variable that is out of bounds.
         """
-        super(OutOfBoundsError, self).__init__(message)
+        super().__init__(message)
         self.idx = idx
         self.value = value
         self.lower = lower

@@ -69,7 +69,7 @@ class SetOrderGroup(om.Group):
 
 class ReportOrderComp(om.ExplicitComponent):
     def __init__(self, order_list):
-        super(ReportOrderComp, self).__init__()
+        super().__init__()
         self._order_list = order_list
 
     def setup(self):
@@ -2031,7 +2031,7 @@ class TestGroupPromotes(unittest.TestCase):
 
 class MyComp(om.ExplicitComponent):
     def __init__(self, input_shape, src_indices=None, flat_src_indices=False):
-        super(MyComp, self).__init__()
+        super().__init__()
         self._input_shape = input_shape
         self._src_indices = src_indices
         self._flat_src_indices = flat_src_indices
@@ -2785,7 +2785,7 @@ class MultComp(om.ExplicitComponent):
     of times _setup_var_data is called.
     """
     def __init__(self, mults=(), inits=None, **kwargs):
-        super(MultComp, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.mults = list(mults)
         self.var_setup_count = 0
         if inits is None:
@@ -2793,7 +2793,7 @@ class MultComp(om.ExplicitComponent):
         self.inits = inits
 
     def _setup_var_data(self):
-        super(MultComp, self)._setup_var_data()
+        super()._setup_var_data()
         self.var_setup_count += 1
 
     def add_mult(self, inp, mult, out):
@@ -2825,7 +2825,7 @@ class ConfigGroup(om.Group):
     times _setup_var_data is called.
     """
     def __init__(self, parallel=False, *args, **kwargs):
-        super(ConfigGroup, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.cfgproms = []
         self.cfg_group_ins = []
         self.cfgio = {}
@@ -2838,7 +2838,7 @@ class ConfigGroup(om.Group):
             self._mpi_proc_allocator.parallel = True
 
     def _setup_var_data(self):
-        super(ConfigGroup, self)._setup_var_data()
+        super()._setup_var_data()
         self.var_setup_count += 1
 
     def add_config_prom(self, child, prom):
@@ -3529,7 +3529,7 @@ class TestFeatureSetOrder(unittest.TestCase):
             """Adds name to list."""
 
             def __init__(self, order_list):
-                super(ReportOrderComp, self).__init__()
+                super().__init__()
                 self._order_list = order_list
 
             def compute(self, inputs, outputs):

@@ -1143,7 +1143,7 @@ class RecordingDebugging(Recording):
         self : object
             self
         """
-        super(RecordingDebugging, self).__enter__()
+        super().__enter__()
         self.recording_requester()._pre_run_model_debug_print()
         return self
 
@@ -1157,7 +1157,7 @@ class RecordingDebugging(Recording):
             Solver recording requires extra args.
         """
         self.recording_requester()._post_run_model_debug_print()
-        super(RecordingDebugging, self).__exit__()
+        super().__exit__()
 
 
 def record_iteration(requester, prob, case_name):

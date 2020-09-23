@@ -9,7 +9,7 @@ class FanOut(om.Group):
     """
 
     def __init__(self):
-        super(FanOut, self).__init__()
+        super().__init__()
 
         self.add_subsystem('p', om.IndepVarComp('x', 1.0))
         self.add_subsystem('comp1', om.ExecComp(['y=3.0*x']))
@@ -28,7 +28,7 @@ class FanOutGrouped(om.Group):
     """
 
     def __init__(self):
-        super(FanOutGrouped, self).__init__()
+        super().__init__()
 
         self.add_subsystem('iv', om.IndepVarComp('x', 1.0))
         self.add_subsystem('c1', om.ExecComp(['y=3.0*x']))
@@ -55,7 +55,7 @@ class FanIn(om.Group):
     """
 
     def __init__(self):
-        super(FanIn, self).__init__()
+        super().__init__()
 
         self.add_subsystem('p1', om.IndepVarComp('x1', 1.0))
         self.add_subsystem('p2', om.IndepVarComp('x2', 1.0))
@@ -76,7 +76,7 @@ class FanInGrouped(om.Group):
     """
 
     def __init__(self):
-        super(FanInGrouped, self).__init__()
+        super().__init__()
 
         self.set_input_defaults('x1', 1.0)
         self.set_input_defaults('x2', 1.0)
@@ -104,7 +104,7 @@ class FanInGrouped2(om.Group):
     """
 
     def __init__(self):
-        super(FanInGrouped2, self).__init__()
+        super().__init__()
 
         p1 = self.add_subsystem('p1', om.IndepVarComp('x', 1.0))
         p2 = self.add_subsystem('p2', om.IndepVarComp('x', 1.0))
@@ -129,7 +129,7 @@ class DiamondFlat(om.Group):
     This one is flat."""
 
     def __init__(self):
-        super(DiamondFlat, self).__init__()
+        super().__init__()
 
         self.add_subsystem('iv', om.IndepVarComp('x', 2.0))
 
@@ -158,7 +158,7 @@ class Diamond(om.Group):
     """
 
     def __init__(self):
-        super(Diamond, self).__init__()
+        super().__init__()
 
         self.add_subsystem('iv', om.IndepVarComp('x', 2.0))
 
@@ -191,7 +191,7 @@ class ConvergeDivergeFlat(om.Group):
     """
 
     def __init__(self):
-        super(ConvergeDivergeFlat, self).__init__()
+        super().__init__()
 
         self.add_subsystem('iv', om.IndepVarComp('x', 2.0))
 
@@ -234,7 +234,7 @@ class ConvergeDiverge(om.Group):
     """
 
     def __init__(self):
-        super(ConvergeDiverge, self).__init__()
+        super().__init__()
 
         self.add_subsystem('iv', om.IndepVarComp('x', 2.0))
 
@@ -281,7 +281,7 @@ class ConvergeDivergeGroups(om.Group):
     """
 
     def __init__(self):
-        super(ConvergeDivergeGroups, self).__init__()
+        super().__init__()
 
         self.add_subsystem('iv', om.IndepVarComp('x', 2.0))
 

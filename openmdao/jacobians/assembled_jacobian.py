@@ -55,7 +55,7 @@ class AssembledJacobian(Jacobian):
         # avoid circular imports
         from openmdao.core.component import Component
 
-        super(AssembledJacobian, self).__init__(system)
+        super().__init__(system)
         self._view_ranges = {}
         self._int_mtx = None
         self._ext_mtx = {}
@@ -414,7 +414,7 @@ class AssembledJacobian(Jacobian):
         active : bool
             Complex mode flag; set to True prior to commencing complex step.
         """
-        super(AssembledJacobian, self).set_complex_step_mode(active)
+        super().set_complex_step_mode(active)
 
         if self._int_mtx is not None:
             self._int_mtx.set_complex_step_mode(active)
@@ -437,7 +437,7 @@ class DenseJacobian(AssembledJacobian):
         system : System
             Parent system to this jacobian.
         """
-        super(DenseJacobian, self).__init__(DenseMatrix, system=system)
+        super().__init__(DenseMatrix, system=system)
 
 
 class COOJacobian(AssembledJacobian):
@@ -454,7 +454,7 @@ class COOJacobian(AssembledJacobian):
         system : System
             Parent system to this jacobian.
         """
-        super(COOJacobian, self).__init__(COOMatrix, system=system)
+        super().__init__(COOMatrix, system=system)
 
 
 class CSRJacobian(AssembledJacobian):
@@ -471,7 +471,7 @@ class CSRJacobian(AssembledJacobian):
         system : System
             Parent system to this jacobian.
         """
-        super(CSRJacobian, self).__init__(CSRMatrix, system=system)
+        super().__init__(CSRMatrix, system=system)
 
 
 class CSCJacobian(AssembledJacobian):
@@ -488,4 +488,4 @@ class CSCJacobian(AssembledJacobian):
         system : System
             Parent system to this jacobian.
         """
-        super(CSCJacobian, self).__init__(CSCMatrix, system=system)
+        super().__init__(CSCMatrix, system=system)

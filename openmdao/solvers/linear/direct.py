@@ -174,7 +174,7 @@ class DirectSolver(LinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        super(DirectSolver, self)._declare_options()
+        super()._declare_options()
 
         self.options.declare('err_on_singular', types=bool, default=True,
                              desc="Raise an error if LU decomposition is singular.")
@@ -200,7 +200,7 @@ class DirectSolver(LinearSolver):
         depth : int
             depth of the current system (already incremented).
         """
-        super(DirectSolver, self)._setup_solvers(system, depth)
+        super()._setup_solvers(system, depth)
         self._disallow_distrib_solve()
 
     def _linearize_children(self):

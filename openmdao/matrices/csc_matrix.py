@@ -24,7 +24,7 @@ class CSCMatrix(COOMatrix):
         system : <System>
             owning system.
         """
-        super(CSCMatrix, self)._build(num_rows, num_cols, system)
+        super()._build(num_rows, num_cols, system)
         self._coo = self._matrix
 
     def _pre_update(self):

@@ -119,7 +119,7 @@ class Group(System):
         self._mpi_proc_allocator = DefaultAllocator()
         self._proc_info = {}
 
-        super(Group, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self._subgroups_myproc = None
         self._manual_connections = {}
@@ -277,7 +277,7 @@ class Group(System):
         dict
             Mapping of each absolute var name to its corresponding scaling factor tuple.
         """
-        scale_factors = super(Group, self)._compute_root_scale_factors()
+        scale_factors = super()._compute_root_scale_factors()
 
         if self._has_input_scaling:
             abs2meta_in = self._var_abs2meta['input']
@@ -394,7 +394,7 @@ class Group(System):
         prob_meta : dict
             Problem level metadata.
         """
-        super(Group, self)._setup_procs(pathname, comm, mode, prob_meta)
+        super()._setup_procs(pathname, comm, mode, prob_meta)
         self._setup_procs_finished = False
 
         nproc = comm.size
@@ -513,7 +513,7 @@ class Group(System):
         for subsys in self._subsystems_myproc:
             subsys._configure_check()
 
-        super(Group, self)._configure_check()
+        super()._configure_check()
 
     def _list_states(self):
         """
@@ -686,7 +686,7 @@ class Group(System):
         else:
             old_prom2abs = self._var_allprocs_prom2abs_list['input']
 
-        super(Group, self)._setup_var_data()
+        super()._setup_var_data()
 
         var_discrete = self._var_discrete
         allprocs_discrete = self._var_allprocs_discrete
@@ -2701,7 +2701,7 @@ class Group(System):
                 yield of, offset, end, sub_of_idx
                 offset = end
         else:
-            for tup in super(Group, self)._jacobian_of_iter():
+            for tup in super()._jacobian_of_iter():
                 yield tup
 
     def _jacobian_wrt_iter(self, wrt_matches=None):
@@ -2748,7 +2748,7 @@ class Group(System):
                     yield wrt, offset, end, sub_wrt_idx
                     offset = end
         else:
-            yield from super(Group, self)._jacobian_wrt_iter(wrt_matches)
+            yield from super()._jacobian_wrt_iter(wrt_matches)
 
     def _update_wrt_matches(self, info):
         """

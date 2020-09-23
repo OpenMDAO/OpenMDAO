@@ -44,7 +44,7 @@ class MatrixVectorProductComp(ExplicitComponent):
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Component options.
         """
-        super(MatrixVectorProductComp, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self._products = []
 

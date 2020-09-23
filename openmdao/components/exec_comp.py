@@ -209,7 +209,7 @@ class ExecComp(ExplicitComponent):
             if name in kwargs:
                 options[name] = kwargs.pop(name)
 
-        super(ExecComp, self).__init__(**options)
+        super().__init__(**options)
 
         # if complex step is used for derivatives, this is the stepsize
         self.complex_stepsize = 1.e-40

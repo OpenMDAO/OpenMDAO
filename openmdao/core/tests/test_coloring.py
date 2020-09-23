@@ -52,18 +52,18 @@ class CounterGroup(om.Group):
         self._solve_count = 0
         self._solve_nl_count = 0
         self._apply_nl_count = 0
-        super(CounterGroup, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def _solve_linear(self, *args, **kwargs):
-        super(CounterGroup, self)._solve_linear(*args, **kwargs)
+        super()._solve_linear(*args, **kwargs)
         self._solve_count += 1
 
     def _solve_nonlinear(self, *args, **kwargs):
-        super(CounterGroup, self)._solve_nonlinear(*args, **kwargs)
+        super()._solve_nonlinear(*args, **kwargs)
         self._solve_nl_count += 1
 
     def _apply_nonlinear(self, *args, **kwargs):
-        super(CounterGroup, self)._apply_nonlinear(*args, **kwargs)
+        super()._apply_nonlinear(*args, **kwargs)
         self._apply_nl_count += 1
 
 
@@ -73,7 +73,7 @@ SIZE = 10
 
 class DynPartialsComp(om.ExplicitComponent):
     def __init__(self, size):
-        super(DynPartialsComp, self).__init__()
+        super().__init__()
         self.size = size
         self.num_computes = 0
 
@@ -361,7 +361,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
     def test_size_zero_array_in_component(self):
         class DynamicPartialsComp(om.ExplicitComponent):
             def __init__(self, size):
-                super(DynamicPartialsComp, self).__init__()
+                super().__init__()
                 self.size = size
                 self.num_computes = 0
 
@@ -401,7 +401,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
     def test_size_zero_array_declare_partials(self):
         class DynamicPartialsComp(om.ExplicitComponent):
             def __init__(self, size):
-                super(DynamicPartialsComp, self).__init__()
+                super().__init__()
                 self.size = size
                 self.num_computes = 0
 
@@ -710,7 +710,7 @@ class SimulColoringScipyTestCase(unittest.TestCase):
 
         class DynamicPartialsComp(om.ExplicitComponent):
             def __init__(self, size):
-                super(DynamicPartialsComp, self).__init__()
+                super().__init__()
                 self.size = size
                 self.num_computes = 0
 
@@ -1118,7 +1118,7 @@ class SimulColoringVarOutputTestClass(unittest.TestCase):
 
 class DumbComp(om.ExplicitComponent):
     def __init__(self, inputs, outputs, isizes, osizes, **kwargs):
-        super(DumbComp, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self._inames = inputs[:]
         self._onames = outputs[:]
         self._isizes = isizes[:]
