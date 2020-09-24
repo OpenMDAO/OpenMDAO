@@ -55,6 +55,8 @@ def _convert_nans_in_nested_list(val_as_list):
         else:
             if np.isnan(val):
                 val_as_list[i] = "nan"
+            elif np.isinf(val):
+                val_as_list[i] = "infinity"
             else:
                 val_as_list[i] = val
 
@@ -177,9 +179,9 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
 
         children = []
         for s in system._subsystems_myproc:
-            if (s.name != '_auto_ivc'):
-                children.append(_get_tree_dict(s, component_execution_orders,
-                                component_execution_index, is_parallel))
+        #    if (s.name != '_auto_ivc'):
+            children.append(_get_tree_dict(s, component_execution_orders,
+                            component_execution_index, is_parallel))
 
         if system.comm.size > 1:
             if system._subsystems_myproc:

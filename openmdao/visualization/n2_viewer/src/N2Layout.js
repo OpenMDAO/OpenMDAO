@@ -24,7 +24,6 @@ class N2Layout {
         this.zoomedElement = newZoomedElement;
         this.showLinearSolverNames = showLinearSolverNames;
 
-        this.outputNamingType = "Absolute";
         this.zoomedNodes = [];
         this.visibleNodes = [];
 
@@ -165,11 +164,11 @@ class N2Layout {
 
         let retVal = node.name;
 
-        if (this.outputNamingType == "Promoted" &&
-            node.isInputOrOutput() &&
-            this.zoomedElement.propExists('promotions') &&
-            this.zoomedElement.promotions.propExists(node.absPathName)) {
-            retVal = this.zoomedElement.promotions[node.absPathName];
+        if (node.name == '_auto_ivc') {
+            retVal = 'Auto-IVC';
+        }
+        else if (node.absPathName.match(/^_auto_ivc.*/) && node.promotedName !== undefined) {
+            retVal = node.promotedName;
         }
 
         return retVal;
@@ -237,7 +236,10 @@ class N2Layout {
         node.numLeaves = 0;
 
         if (! node.varIsHidden) {
-            if (this.model.nodeIds.length > Precollapse.minimumNodes) {
+            if (node.name == '_auto_ivc' && ! node.manuallyExpanded) {
+                node.minimize();
+            }
+            else if (this.model.nodeIds.length > Precollapse.minimumNodes) {
                 node.minimizeIfLarge(this.model.depthCount[node.depth]);
             }
 
