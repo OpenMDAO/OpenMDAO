@@ -818,17 +818,75 @@ class TestExecComp(unittest.TestCase):
     def test_has_diag_partials_error(self):
         p = om.Problem()
         model = p.model
-        model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(3)))
-        model.add_design_var('indep.x')
 
         mat = np.arange(15).reshape((3,5))
-        model.add_subsystem('comp', om.ExecComp('y=A.dot(x)', has_diag_partials=True, A=mat, x=np.ones(5), y=np.ones(3)))
-        model.connect('indep.x', 'comp.x')
+        model.add_subsystem('comp', om.ExecComp('y=A.dot(x)', has_diag_partials=True, A=mat,
+                                                x=np.ones(5), y=np.ones(3)))
 
         with self.assertRaises(Exception) as context:
             p.setup()
         self.assertEqual(str(context.exception),
                          "ExecComp (comp): has_diag_partials is True but partial(y, A) is not square (shape=(3, 15)).")
+
+    def test_has_diag_partials(self):
+        # Really check to see that the has_diag_partials argument had its intended effect
+        import numpy as np
+        import openmdao.api as om
+
+        # run with has_diag_partials=False
+        p = om.Problem()
+        model = p.model
+        comp = om.ExecComp('y=3.0*x + 2.5', has_diag_partials=False, x=np.ones(5), y=np.ones(5))
+        model.add_subsystem('comp', comp)
+        p.setup()
+
+        declared_partials = comp._declared_partials[('y','x')]
+        self.assertTrue('rows' not in declared_partials )
+        self.assertTrue('cols' not in declared_partials )
+
+        # run with has_diag_partials=True
+        p = om.Problem()
+        model = p.model
+        comp = om.ExecComp('y=3.0*x + 2.5', has_diag_partials=True, x=np.ones(5), y=np.ones(5))
+        model.add_subsystem('comp', comp)
+        p.setup()
+
+        declared_partials = comp._declared_partials[('y','x')]
+        self.assertTrue('rows' in declared_partials )
+        self.assertListEqual([0,1,2,3,4], list( comp._declared_partials[('y','x')]['rows']))
+        self.assertTrue('cols' in declared_partials )
+        self.assertListEqual([0,1,2,3,4], list( comp._declared_partials[('y','x')]['cols']))
+
+    def test_exec_comp_deriv_sparsity(self):
+        p = om.Problem()
+        model = p.model
+        comp = om.ExecComp(['y1=2.0*x1+1.', 'y2=3.0*x2-1.'])
+        model.add_subsystem('comp', comp)
+        p.setup()
+
+        declared_partials = comp._declared_partials
+        self.assertListEqual( sorted([('y1', 'x1'), ('y2', 'x2') ]),
+                              sorted(declared_partials.keys()))
+
+        # with has_diag_partials True
+        p = om.Problem()
+        model = p.model
+        comp = om.ExecComp(['y1=2.0*x1+1.', 'y2=3.0*x2-1.'], has_diag_partials=True,
+                           x1=np.ones(5), y1=np.ones(5), x2=np.ones(5), y2=np.ones(5) )
+        model.add_subsystem('comp', comp)
+        p.setup()
+
+        declared_partials = comp._declared_partials
+        self.assertListEqual( sorted([('y1', 'x1'), ('y2', 'x2') ]),
+                              sorted(declared_partials.keys()))
+        self.assertTrue('cols' in declared_partials[('y1', 'x1')] )
+        self.assertTrue('rows' in declared_partials[('y1', 'x1')] )
+        self.assertTrue('cols' in declared_partials[('y2', 'x2')] )
+        self.assertTrue('rows' in declared_partials[('y2', 'x2')] )
+        self.assertListEqual([0,1,2,3,4], list( comp._declared_partials[('y1','x1')]['rows']))
+        self.assertListEqual([0,1,2,3,4], list( comp._declared_partials[('y1','x1')]['cols']))
+        self.assertListEqual([0,1,2,3,4], list( comp._declared_partials[('y2','x2')]['rows']))
+        self.assertListEqual([0,1,2,3,4], list( comp._declared_partials[('y2','x2')]['cols']))
 
     def test_has_diag_partials_shape_only(self):
         p = om.Problem()
