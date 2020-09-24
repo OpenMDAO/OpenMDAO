@@ -128,7 +128,8 @@ def view_dyn_shapes(root, outfile='shape_dep_graph.png', show=True, title=None):
     # prepend the shape onto the variable name
     node_labels = {}
     for n in graph:
-        shape = abs2meta[n]['shape']
+        meta = abs2meta['input'][n] if n in abs2meta['input'] else abs2meta['output'][n]
+        shape = meta['shape']
         if shape is None:
             shape = '?'
         node_labels[n] = f"{shape}: {n[common_idx:]}"

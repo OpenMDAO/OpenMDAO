@@ -57,7 +57,7 @@ class Test(unittest.TestCase):
             system = p.model._get_subsystem(sname) if sname else p.model
             idxs = p.model._var_allprocs_abs2idx['linear']
             return np.array([
-                idxs[name] for name in system._var_abs_names[type_]
+                idxs[name] for name in system._var_abs2meta[type_]
             ])
 
         assert_near_equal(get_inds(self.p, '', 'input'), np.array([0]))
@@ -68,15 +68,6 @@ class Test(unittest.TestCase):
 
         assert_near_equal(get_inds(self.p, 'B', 'input'), np.array([0]))
         assert_near_equal(get_inds(self.p, 'B', 'output'), np.array([1]))
-
-    def test_var_allprocs_idx_range(self):
-        rng = self.p.model._subsystems_var_range
-
-        assert_near_equal(rng['nonlinear']['input']['A'], np.array([0,0]))
-        assert_near_equal(rng['nonlinear']['input']['B'], np.array([0,1]))
-
-        assert_near_equal(rng['nonlinear']['output']['A'], np.array([0,1]))
-        assert_near_equal(rng['nonlinear']['output']['B'], np.array([1,2]))
 
     def test_GS(self):
         root = self.p.model

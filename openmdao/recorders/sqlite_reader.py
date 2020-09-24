@@ -77,7 +77,7 @@ class SqliteCaseReader(BaseCaseReader):
         pre_load : bool
             If True, load all the data into memory during initialization.
         """
-        super(SqliteCaseReader, self).__init__(filename, pre_load)
+        super().__init__(filename, pre_load)
 
         check_valid_sqlite3_db(filename)
 
@@ -529,7 +529,7 @@ class SqliteCaseReader(BaseCaseReader):
                     cases = []
                     source_cases = case_table.get_cases(source)
                     for case in source_cases:
-                        cases += self._list_cases_recurse_flat(case.name)
+                        cases += self._list_cases_recurse_flat(case.name, out_stream=out_stream)
                     return cases
                 else:
                     # return nested dict of cases from the source and child cases
@@ -1196,10 +1196,10 @@ class DriverCases(CaseTable):
         var_info : dict
             Dictionary with information about variables (scaling, indices, execution order).
         """
-        super(DriverCases, self).__init__(filename, format_version,
-                                          'driver_iterations', 'iteration_coordinate', giter,
-                                          prom2abs, abs2prom, abs2meta, conns, auto_ivc_map,
-                                          var_info)
+        super().__init__(filename, format_version,
+                         'driver_iterations', 'iteration_coordinate', giter,
+                         prom2abs, abs2prom, abs2meta, conns, auto_ivc_map,
+                         var_info)
         self._var_info = var_info
 
     def cases(self, cache=False):
@@ -1376,10 +1376,10 @@ class SystemCases(CaseTable):
         var_info : dict
             Dictionary with information about variables (scaling, indices, execution order).
         """
-        super(SystemCases, self).__init__(filename, format_version,
-                                          'system_iterations', 'iteration_coordinate', giter,
-                                          prom2abs, abs2prom, abs2meta, conns, auto_ivc_map,
-                                          var_info)
+        super().__init__(filename, format_version,
+                         'system_iterations', 'iteration_coordinate', giter,
+                         prom2abs, abs2prom, abs2meta, conns, auto_ivc_map,
+                         var_info)
 
 
 class SolverCases(CaseTable):
@@ -1415,10 +1415,10 @@ class SolverCases(CaseTable):
         var_info : dict
             Dictionary with information about variables (scaling, indices, execution order).
         """
-        super(SolverCases, self).__init__(filename, format_version,
-                                          'solver_iterations', 'iteration_coordinate', giter,
-                                          prom2abs, abs2prom, abs2meta, conns, auto_ivc_map,
-                                          var_info)
+        super().__init__(filename, format_version,
+                         'solver_iterations', 'iteration_coordinate', giter,
+                         prom2abs, abs2prom, abs2meta, conns, auto_ivc_map,
+                         var_info)
 
     def _get_source(self, iteration_coordinate):
         """
@@ -1482,10 +1482,10 @@ class ProblemCases(CaseTable):
         var_info : dict
             Dictionary with information about variables (scaling, indices, execution order).
         """
-        super(ProblemCases, self).__init__(filename, format_version,
-                                           'problem_cases', 'case_name', giter,
-                                           prom2abs, abs2prom, abs2meta, conns, auto_ivc_map,
-                                           var_info)
+        super().__init__(filename, format_version,
+                         'problem_cases', 'case_name', giter,
+                         prom2abs, abs2prom, abs2meta, conns, auto_ivc_map,
+                         var_info)
 
     def list_sources(self):
         """

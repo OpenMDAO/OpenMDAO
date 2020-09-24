@@ -29,7 +29,7 @@ class DistributedAdder(ExplicitComponent):
     """
 
     def __init__(self, size):
-        super(DistributedAdder, self).__init__()
+        super().__init__()
 
         self.options['distributed'] = True
 
@@ -72,7 +72,7 @@ class Summer(ExplicitComponent):
     """
 
     def __init__(self, size):
-        super(Summer, self).__init__()
+        super().__init__()
         self.size = size
 
     def setup(self):

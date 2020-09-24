@@ -80,18 +80,18 @@ def setup_indeps(isplit, ninputs, indeps_name, comp_name):
 
 class CounterGroup(Group):
     def __init__(self, *args, **kwargs):
-        super(CounterGroup, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self._nruns = 0
 
     def _solve_nonlinear(self, *args, **kwargs):
-        super(CounterGroup, self)._solve_nonlinear(*args, **kwargs)
+        super()._solve_nonlinear(*args, **kwargs)
         self._nruns += 1
 
 
 class SparseCompImplicit(ImplicitComponent):
 
     def __init__(self, sparsity, method='fd', isplit=1, osplit=1, **kwargs):
-        super(SparseCompImplicit, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.sparsity = sparsity
         self.isplit = isplit
         self.osplit = osplit
@@ -127,7 +127,7 @@ class SparseCompImplicit(ImplicitComponent):
 class SparseCompExplicit(ExplicitComponent):
 
     def __init__(self, sparsity, method='fd', isplit=1, osplit=1, **kwargs):
-        super(SparseCompExplicit, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.sparsity = sparsity
         self.isplit = isplit
         self.osplit = osplit
@@ -156,9 +156,9 @@ _TOLS = {
 
 def _check_partial_matrix(system, jac, expected, method):
     blocks = []
-    for of in system._var_allprocs_abs_names['output']:
+    for of in system._var_allprocs_abs2meta['output']:
         cblocks = []
-        for wrt in system._var_allprocs_abs_names['input']:
+        for wrt in system._var_allprocs_abs2meta['input']:
             key = (of, wrt)
             if key in jac:
                 cblocks.append(jac[key]['value'])
@@ -170,9 +170,9 @@ def _check_partial_matrix(system, jac, expected, method):
 
 def _check_total_matrix(system, jac, expected, method):
     blocks = []
-    for of in system._var_allprocs_abs_names['output']:
+    for of in system._var_allprocs_abs2meta['output']:
         cblocks = []
-        for wrt in itertools.chain(system._var_allprocs_abs_names['output'], system._var_allprocs_abs_names['input']):
+        for wrt in itertools.chain(system._var_allprocs_abs2meta['output'], system._var_allprocs_abs2meta['input']):
             key = (of, wrt)
             if key in jac:
                 cblocks.append(jac[key])
@@ -184,9 +184,9 @@ def _check_total_matrix(system, jac, expected, method):
 
 def _check_semitotal_matrix(system, jac, expected, method):
     blocks = []
-    for of in system._var_allprocs_abs_names['output']:
+    for of in system._var_allprocs_abs2meta['output']:
         cblocks = []
-        for wrt in itertools.chain(system._var_allprocs_abs_names['output'], system._var_allprocs_abs_names['input']):
+        for wrt in itertools.chain(system._var_allprocs_abs2meta['output'], system._var_allprocs_abs2meta['input']):
             key = (of, wrt)
             if key in jac:
                 rows = jac[key]['rows']

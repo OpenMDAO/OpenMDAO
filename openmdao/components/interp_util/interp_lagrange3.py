@@ -28,7 +28,7 @@ class InterpLagrange3(InterpAlgorithm):
         **kwargs : dict
             Interpolator-specific options to pass onward.
         """
-        super(InterpLagrange3, self).__init__(grid, values, interp, **kwargs)
+        super().__init__(grid, values, interp, **kwargs)
         self.k = 4
         self._name = 'lagrange3'
 

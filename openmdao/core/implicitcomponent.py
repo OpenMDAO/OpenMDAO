@@ -28,7 +28,7 @@ class ImplicitComponent(Component):
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Component options.
         """
-        super(ImplicitComponent, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self._inst_functs = {name: getattr(self, name, None) for name in _inst_functs}
 
@@ -440,7 +440,7 @@ class ImplicitComponent(Component):
             List of all states.
         """
         prefix = self.pathname + '.' if self.pathname else ''
-        return sorted(self._var_allprocs_abs_names['output'] +
+        return sorted(list(self._var_allprocs_abs2meta['output']) +
                       [prefix + n for n in self._var_discrete['output']])
 
     def _list_states_allprocs(self):

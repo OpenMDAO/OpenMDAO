@@ -48,7 +48,7 @@ class MetaModelStructuredComp(ExplicitComponent):
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Component options.
         """
-        super(MetaModelStructuredComp, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.pnames = []
         self.inputs = []
@@ -95,7 +95,7 @@ class MetaModelStructuredComp(ExplicitComponent):
                 msg = "{}: Input {} must either be scalar, or of length equal to vec_size."
                 raise ValueError(msg.format(self.msginfo, name))
 
-        super(MetaModelStructuredComp, self).add_input(name, val * np.ones(n), **kwargs)
+        super().add_input(name, val * np.ones(n), **kwargs)
 
         self.pnames.append(name)
         self.inputs.append(np.asarray(training_data))
@@ -124,13 +124,12 @@ class MetaModelStructuredComp(ExplicitComponent):
                 msg = "{}: Output {} must either be scalar, or of length equal to vec_size."
                 raise ValueError(msg.format(self.msginfo, name))
 
-        super(MetaModelStructuredComp, self).add_output(name, val * np.ones(n), **kwargs)
+        super().add_output(name, val * np.ones(n), **kwargs)
 
         self.training_outputs[name] = training_data
 
         if self.options['training_data_gradients']:
-            super(MetaModelStructuredComp, self).add_input("%s_train" % name,
-                                                           val=training_data, **kwargs)
+            super().add_input("%s_train" % name, val=training_data, **kwargs)
 
     def _setup_var_data(self):
         """
@@ -149,7 +148,7 @@ class MetaModelStructuredComp(ExplicitComponent):
         if self.options['training_data_gradients']:
             self.grad_shape = tuple([self.options['vec_size']] + [i.size for i in self.inputs])
 
-        super(MetaModelStructuredComp, self)._setup_var_data()
+        super()._setup_var_data()
 
     def _setup_partials(self):
         """
@@ -157,7 +156,7 @@ class MetaModelStructuredComp(ExplicitComponent):
 
         Metamodel needs to declare its partials after inputs and outputs are known.
         """
-        super(MetaModelStructuredComp, self)._setup_partials()
+        super()._setup_partials()
         arange = np.arange(self.options['vec_size'])
         pnames = tuple(self.pnames)
         dct = {
@@ -198,17 +197,15 @@ class MetaModelStructuredComp(ExplicitComponent):
 
             except OutOfBoundsError as err:
                 varname_causing_error = '.'.join((self.pathname, self.pnames[err.idx]))
-                errmsg = "{}: Error interpolating output '{}' because input '{}' " \
-                    "was out of bounds ('{}', '{}') with " \
-                    "value '{}'".format(self.msginfo, out_name, varname_causing_error,
-                                        err.lower, err.upper, err.value)
+                errmsg = (f"{self.msginfo}: Error interpolating output '{out_name}' "
+                          f"because input '{varname_causing_error}' was out of bounds "
+                          f"('{ err.lower}', '{err.upper}') with value '{err.value}'")
                 raise AnalysisError(errmsg, inspect.getframeinfo(inspect.currentframe()),
                                     self.msginfo)
 
             except ValueError as err:
-                raise ValueError("{}: Error interpolating output '{}':\n{}".format(self.msginfo,
-                                                                                   out_name,
-                                                                                   str(err)))
+                raise ValueError(f"{self.msginfo}: Error interpolating output '{out_name}':\n"
+                                 f"{str(err)}")
             outputs[out_name] = val
 
     def compute_partials(self, inputs, partials):

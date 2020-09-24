@@ -194,7 +194,7 @@ class PETScKrylov(LinearSolver):
         **kwargs : dict
             dictionary of options set by the instantiating class/script.
         """
-        super(PETScKrylov, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         if PETSc is None:
             raise RuntimeError("{}: PETSc is not available.".format(self.msginfo))
@@ -209,7 +209,7 @@ class PETScKrylov(LinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        super(PETScKrylov, self)._declare_options()
+        super()._declare_options()
 
         self.options.declare('ksp_type', default='fgmres', values=KSP_TYPES,
                              desc="KSP algorithm to use. Default is 'fgmres'.")
@@ -245,7 +245,7 @@ class PETScKrylov(LinearSolver):
         depth : int
             depth of the current system (already incremented).
         """
-        super(PETScKrylov, self)._setup_solvers(system, depth)
+        super()._setup_solvers(system, depth)
 
         if self.precon is not None:
             self.precon._setup_solvers(self._system(), self._depth + 1)
@@ -263,7 +263,7 @@ class PETScKrylov(LinearSolver):
         type_ : str
             Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
         """
-        super(PETScKrylov, self)._set_solver_print(level=level, type_=type_)
+        super()._set_solver_print(level=level, type_=type_)
 
         if self.precon is not None and type_ != 'NL':
             self.precon._set_solver_print(level=level, type_=type_)

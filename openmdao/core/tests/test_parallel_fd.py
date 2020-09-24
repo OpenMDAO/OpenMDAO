@@ -26,7 +26,7 @@ except ImportError:
 class ScalableComp(om.ExplicitComponent):
 
     def __init__(self, size, mult=2.0, add=1.0):
-        super(ScalableComp, self).__init__()
+        super().__init__()
 
         self._size = size
         self._mult = mult
@@ -485,7 +485,7 @@ class ParFDErrorsMPITestCase(unittest.TestCase):
         p = _setup_problem(self.mat, partial_num_par_fd = 3, approx_totals=False)
         with self.assertRaises(RuntimeError) as ctx:
             p.final_setup()
-            
+
         self.assertEqual(str(ctx.exception), "MatMultComp (comp): num_par_fd is > 1 but no FD is active.")
 
 

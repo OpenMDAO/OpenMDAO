@@ -119,7 +119,7 @@ class ScipyOptimizeDriver(Driver):
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Driver options.
         """
-        super(ScipyOptimizeDriver, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # What we support
         self.supports['inequality_constraints'] = True
@@ -187,7 +187,7 @@ class ScipyOptimizeDriver(Driver):
         problem : <Problem>
             Pointer
         """
-        super(ScipyOptimizeDriver, self)._setup_driver(problem)
+        super()._setup_driver(problem)
         opt = self.options['optimizer']
 
         self.supports._read_only = False

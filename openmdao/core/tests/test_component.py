@@ -20,13 +20,13 @@ class TestExplicitComponent(unittest.TestCase):
 
         # check optional metadata (desc)
         self.assertEqual(
-            comp._var_abs2meta['length']['desc'],
+            comp._var_abs2meta['input']['length']['desc'],
             'length of rectangle')
         self.assertEqual(
-            comp._var_abs2meta['width']['desc'],
+            comp._var_abs2meta['input']['width']['desc'],
             'width of rectangle')
         self.assertEqual(
-            comp._var_abs2meta['area']['desc'],
+            comp._var_abs2meta['output']['area']['desc'],
             'area of rectangle')
 
         prob['length'] = 3.
@@ -190,11 +190,11 @@ class TestExplicitComponent(unittest.TestCase):
 
         class NewBase(ExplicitComponent):
             def __init__(self, **kwargs):
-                super(NewBase, self).__init__(**kwargs)
+                super().__init__(**kwargs)
 
         class MyComp(NewBase):
             def __init__(self, **kwargs):
-                super(MyComp, self).__init__(**kwargs)
+                super().__init__(**kwargs)
 
             def setup(self):
                 self.add_input('x', val=0.0)
@@ -205,13 +205,13 @@ class TestExplicitComponent(unittest.TestCase):
         comp = model.add_subsystem('comp', MyComp())
 
         prob.setup()
-        self.assertEqual(comp._var_abs_names['input'], ['comp.x'])
-        self.assertEqual(comp._var_abs_names['output'], ['comp.y'])
+        self.assertEqual(list(comp._var_abs2meta['input']), ['comp.x'])
+        self.assertEqual(list(comp._var_abs2meta['output']), ['comp.y'])
 
         prob.run_model()
         prob.setup()
-        self.assertEqual(comp._var_abs_names['input'], ['comp.x'])
-        self.assertEqual(comp._var_abs_names['output'], ['comp.y'])
+        self.assertEqual(list(comp._var_abs2meta['input']), ['comp.x'])
+        self.assertEqual(list(comp._var_abs2meta['output']), ['comp.y'])
 
     def test_add_input_output_dupes(self):
 
@@ -315,7 +315,7 @@ class TestRangePartials(unittest.TestCase):
     def test_range_partials(self):
         class RangePartialsComp(ExplicitComponent):
             def __init__(self, size=4):
-                super(RangePartialsComp, self).__init__()
+                super().__init__()
                 self.size = size
 
             def setup(self):

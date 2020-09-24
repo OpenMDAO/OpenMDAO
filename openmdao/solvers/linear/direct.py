@@ -29,7 +29,7 @@ def index_to_varname(system, loc):
     """
     start = end = 0
     varsizes = np.sum(system._owned_sizes, axis=0)
-    for i, name in enumerate(system._var_allprocs_abs_names['output']):
+    for i, name in enumerate(system._var_allprocs_abs2meta['output']):
         end += varsizes[i]
         if loc < end:
             varname = system._var_allprocs_abs2prom['output'][name]
@@ -153,7 +153,7 @@ def format_nan_error(system, matrix):
 
     varnames = []
     start = end = 0
-    for i, name in enumerate(system._var_allprocs_abs_names['output']):
+    for i, name in enumerate(system._var_allprocs_abs2meta['output']):
         end += varsizes[i]
         if np.any(nanrows[start:end]):
             varnames.append("'%s'" % system._var_allprocs_abs2prom['output'][name])
@@ -174,7 +174,7 @@ class DirectSolver(LinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        super(DirectSolver, self)._declare_options()
+        super()._declare_options()
 
         self.options.declare('err_on_singular', types=bool, default=True,
                              desc="Raise an error if LU decomposition is singular.")
@@ -200,7 +200,7 @@ class DirectSolver(LinearSolver):
         depth : int
             depth of the current system (already incremented).
         """
-        super(DirectSolver, self)._setup_solvers(system, depth)
+        super()._setup_solvers(system, depth)
         self._disallow_distrib_solve()
 
     def _linearize_children(self):

@@ -53,7 +53,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Component options.
         """
-        super(MetaModelUnStructuredComp, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # keep list of inputs and outputs that are not the training vars
         self._surrogate_input_names = []
@@ -95,7 +95,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         self._surrogate_output_names.extend(self._static_surrogate_output_names)
         self._input_size = self._static_input_size
 
-        super(MetaModelUnStructuredComp, self)._setup_procs(pathname, comm, mode, prob_meta)
+        super()._setup_procs(pathname, comm, mode, prob_meta)
 
     def initialize(self):
         """
@@ -128,7 +128,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         dict
             metadata for added variable
         """
-        metadata = super(MetaModelUnStructuredComp, self).add_input(name, val, **kwargs)
+        metadata = super().add_input(name, val, **kwargs)
         vec_size = self.options['vec_size']
 
         if vec_size > 1:
@@ -177,7 +177,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         dict
             metadata for added variable
         """
-        metadata = super(MetaModelUnStructuredComp, self).add_output(name, val, **kwargs)
+        metadata = super().add_output(name, val, **kwargs)
         vec_size = self.options['vec_size']
 
         if vec_size > 1:
@@ -235,7 +235,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         # training will occur on first execution after setup
         self.train = True
 
-        super(MetaModelUnStructuredComp, self)._setup_var_data()
+        super()._setup_var_data()
 
     def _setup_partials(self):
         """
@@ -243,7 +243,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
         Metamodel needs to declare its partials after inputs and outputs are known.
         """
-        super(MetaModelUnStructuredComp, self)._setup_partials()
+        super()._setup_partials()
 
         vec_size = self.options['vec_size']
         if vec_size > 1:
@@ -502,8 +502,8 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         """
         if method == 'cs':
             raise ValueError('Complex step has not been tested for MetaModelUnStructuredComp')
-        super(MetaModelUnStructuredComp, self).declare_partials(of, wrt, dependent, rows, cols,
-                                                                val, method, step, form, step_calc)
+        super().declare_partials(of, wrt, dependent, rows, cols,
+                                 val, method, step, form, step_calc)
 
     def compute_partials(self, inputs, partials):
         """

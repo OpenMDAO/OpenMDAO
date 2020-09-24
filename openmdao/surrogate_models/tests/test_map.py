@@ -8,7 +8,7 @@ import unittest
 class CompressorMap(MetaModelUnStructuredComp):
 
     def __init__(self):
-        super(CompressorMap, self).__init__()
+        super().__init__()
 
         self.add_input('Nc', val=1.0)
         self.add_input('Rline', val=2.0)

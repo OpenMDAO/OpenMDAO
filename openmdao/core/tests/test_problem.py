@@ -8,7 +8,6 @@ from io import StringIO
 import numpy as np
 
 import openmdao.api as om
-from openmdao.core.system import get_relevant_vars
 from openmdao.core.driver import Driver
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 import openmdao.utils.hooks as hooks
@@ -1532,9 +1531,8 @@ class TestProblem(unittest.TestCase):
 
         p.setup(check=False, mode='rev')
 
-        relevant = get_relevant_vars(model._conn_global_abs_in2out,
-                                     ['indep1.x', 'indep2.x'],
-                                     ['C8.y', 'Unconnected.y'], mode='rev')
+        relevant = model.get_relevant_vars(['indep1.x', 'indep2.x'],
+                                           ['C8.y', 'Unconnected.y'], mode='rev')
 
         indep1_ins = set(['C3.b', 'C3.c', 'C8.b', 'G1.C1.a', 'G2.C5.a', 'G2.C5.b'])
         indep1_outs = set(['C3.y', 'C8.y', 'G1.C1.z', 'G2.C5.x', 'indep1.x'])
@@ -2092,7 +2090,7 @@ class NestedProblemTestCase(unittest.TestCase):
                 p.setup()
                 p.run_model()
 
-                return super(_ProblemSolver, self).solve()
+                return super().solve()
 
         p = om.Problem()
         p.model.add_subsystem('indep', om.IndepVarComp('x', 1.0))

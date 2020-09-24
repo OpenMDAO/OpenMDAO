@@ -31,7 +31,7 @@ class ExplicitComponent(Component):
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Component options.
         """
-        super(ExplicitComponent, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self._inst_functs = {name: getattr(self, name, None) for name in _inst_functs}
         self._has_compute_partials = overrides_method('compute_partials', self, ExplicitComponent)
@@ -94,11 +94,10 @@ class ExplicitComponent(Component):
         """
         if wrt_matches is None:
             wrt_matches = ContainsAll()
-        abs2meta = self._var_allprocs_abs2meta
         offset = end = 0
-        for wrt in self._var_allprocs_abs_names['input']:
+        for wrt, meta in self._var_allprocs_abs2meta['input'].items():
             if wrt in wrt_matches:
-                end += abs2meta[wrt]['size']
+                end += meta['size']
                 yield wrt, offset, end, _full_slice
                 offset = end
 
@@ -106,17 +105,13 @@ class ExplicitComponent(Component):
         """
         Call setup_partials in components.
         """
-        super(ExplicitComponent, self)._setup_partials()
+        super()._setup_partials()
 
-        abs2meta = self._var_abs2meta
         abs2prom_out = self._var_abs2prom['output']
 
         # Note: These declare calls are outside of setup_partials so that users do not have to
         # call the super version of setup_partials. This is still in the final setup.
-        for out_abs in self._var_abs_names['output']:
-            meta = abs2meta[out_abs]
-            out_name = abs2prom_out[out_abs]
-            arange = np.arange(meta['size'])
+        for out_abs, meta in self._var_abs2meta['output'].items():
 
             # No need to FD outputs wrt other outputs
             abs_key = (out_abs, out_abs)
@@ -124,16 +119,21 @@ class ExplicitComponent(Component):
                 if 'method' in self._subjacs_info[abs_key]:
                     del self._subjacs_info[abs_key]['method']
 
-            dct = {
-                'rows': arange,
-                'cols': arange,
-                'value': np.full(meta['size'], -1.),
-                'dependent': True,
-            }
+            size = meta['size']
 
             # ExplicitComponent jacobians have -1 on the diagonal.
-            if arange.size > 0:
-                self._declare_partials(out_name, out_name, dct)
+            if size > 0:
+                out_name = abs2prom_out[out_abs]
+                arange = np.arange(size)
+
+                dct = {
+                    'rows': arange,
+                    'cols': arange,
+                    'value': np.full(size, -1.),
+                    'dependent': True,
+                }
+
+                self._declare_partials(out_name, out_name, dct, quick_declare=True)
 
     def _setup_jacobians(self, recurse=True):
         """
@@ -209,13 +209,12 @@ class ExplicitComponent(Component):
         if res_ref is None:
             res_ref = ref
 
-        return super(ExplicitComponent, self).add_output(name,
-                                                         val=val, shape=shape, units=units,
-                                                         res_units=res_units, desc=desc,
-                                                         lower=lower, upper=upper,
-                                                         ref=ref, ref0=ref0, res_ref=res_ref,
-                                                         tags=tags, shape_by_conn=shape_by_conn,
-                                                         copy_shape=copy_shape)
+        return super().add_output(name, val=val, shape=shape, units=units,
+                                  res_units=res_units, desc=desc,
+                                  lower=lower, upper=upper,
+                                  ref=ref, ref0=ref0, res_ref=res_ref,
+                                  tags=tags, shape_by_conn=shape_by_conn,
+                                  copy_shape=copy_shape)
 
     def _approx_subjac_keys_iter(self):
         for abs_key, meta in self._subjacs_info.items():

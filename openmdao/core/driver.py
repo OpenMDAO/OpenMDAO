@@ -292,22 +292,21 @@ class Driver(object):
         # Only allow distributed design variables on drivers that support it.
         if self.supports['distributed_design_vars'] is False:
             dist_vars = []
+            abs2meta_in = model._var_allprocs_abs2meta['input']
+            discrete_in = model._var_allprocs_discrete['input']
             for dv, meta in self._designvars.items():
 
                 # For Auto-ivcs, we need to check the distributed metadata on the target instead.
                 if meta['ivc_source'].startswith('_auto_ivc.'):
-                    abs_names = model._var_allprocs_prom2abs_list['input'][dv]
-                    dist = False
-                    for abs_name in abs_names:
-                        if abs_name in model._var_allprocs_abs_names_discrete['input']:
+                    for abs_name in model._var_allprocs_prom2abs_list['input'][dv]:
+                        if abs_name in discrete_in:
                             # Discrete vars aren't distributed.
                             break
 
-                        dist = dist or model._var_allprocs_abs2meta[abs_name]['distributed']
-                else:
-                    dist = meta['distributed']
-
-                if dist:
+                        if abs2meta_in[abs_name]['distributed']:
+                            dist_vars.append(dv)
+                            break
+                elif meta['distributed']:
                     dist_vars.append(dv)
 
             if dist_vars:
@@ -334,10 +333,9 @@ class Driver(object):
             # to bcast to others later
             owning_ranks = model._owning_rank
             sizes = model._var_sizes['nonlinear']['output']
-            abs2meta = model._var_allprocs_abs2meta
             rank = model.comm.rank
             nprocs = model.comm.size
-            for i, vname in enumerate(model._var_allprocs_abs_names['output']):
+            for i, (vname, meta) in enumerate(model._var_allprocs_abs2meta['output'].items()):
                 if vname in responses:
                     indices = responses[vname].get('indices')
                 elif vname in src_design_vars:
@@ -345,7 +343,7 @@ class Driver(object):
                 else:
                     continue
 
-                if abs2meta[vname]['distributed']:
+                if meta['distributed']:
 
                     idx = model._var_allprocs_abs2idx['nonlinear'][vname]
                     dist_sizes = model._var_sizes['nonlinear']['output'][:, idx]
@@ -771,11 +769,11 @@ class Driver(object):
             else:
                 objs[name] = data
 
-        response_size = sum(resps[n]['size'] for n in self._get_ordered_nl_responses())
+        response_size = sum(resps[n]['global_size'] for n in self._get_ordered_nl_responses())
 
         # Gather up the information for design vars.
         self._designvars = designvars = model.get_design_vars(recurse=True, use_prom_ivc=True)
-        desvar_size = sum(data['size'] for data in designvars.values())
+        desvar_size = sum(data['global_size'] for data in designvars.values())
 
         return response_size, desvar_size
 
@@ -1145,7 +1143,7 @@ class RecordingDebugging(Recording):
         self : object
             self
         """
-        super(RecordingDebugging, self).__enter__()
+        super().__enter__()
         self.recording_requester()._pre_run_model_debug_print()
         return self
 
@@ -1159,7 +1157,7 @@ class RecordingDebugging(Recording):
             Solver recording requires extra args.
         """
         self.recording_requester()._post_run_model_debug_print()
-        super(RecordingDebugging, self).__exit__()
+        super().__exit__()
 
 
 def record_iteration(requester, prob, case_name):
@@ -1175,48 +1173,45 @@ def record_iteration(requester, prob, case_name):
     case_name : str
         The name of this case.
     """
-    if not requester._rec_mgr._recorders:
+    rec_mgr = requester._rec_mgr
+    if not rec_mgr._recorders:
         return
 
     # Get the data to record (collective calls that get across all ranks)
-    filt = requester._filtered_vars_to_record
     model = prob.model
+    parallel = rec_mgr._check_parallel() if model.comm.size > 1 else False
 
     inputs, outputs, residuals = model.get_nonlinear_vectors()
-
-    parallel = requester._rec_mgr._check_parallel() if model.comm.size > 1 else False
-
     discrete_inputs = model._discrete_inputs
     discrete_outputs = model._discrete_outputs
 
+    opts = requester.recording_options
     data = {'input': {}, 'output': {}, 'residual': {}}
-    if requester.recording_options['record_inputs'] and (inputs._names or len(discrete_inputs) > 0):
+    filt = requester._filtered_vars_to_record
+
+    if opts['record_inputs'] and (inputs._names or len(discrete_inputs) > 0):
         data['input'] = model._retrieve_data_of_kind(filt, 'input', 'nonlinear', parallel)
 
-    if requester.recording_options['record_outputs'] and \
-            (outputs._names or len(discrete_outputs) > 0):
+    if opts['record_outputs'] and (outputs._names or len(discrete_outputs) > 0):
         data['output'] = model._retrieve_data_of_kind(filt, 'output', 'nonlinear', parallel)
 
-    if requester.recording_options['record_residuals'] and residuals._names:
+    if opts['record_residuals'] and residuals._names:
         data['residual'] = model._retrieve_data_of_kind(filt, 'residual', 'nonlinear', parallel)
 
     from openmdao.core.problem import Problem
     if isinstance(requester, Problem):
-        if requester.recording_options['record_derivatives'] and \
-                prob.driver._designvars and prob.driver._responses:
-            totals = requester.compute_totals(return_format='flat_dict_structured_key')
-            data['totals'] = totals
+        # Record total derivatives
+        if opts['record_derivatives'] and prob.driver._designvars and prob.driver._responses:
+            data['totals'] = requester.compute_totals(return_format='flat_dict_structured_key')
 
         # Record solver info
-        if requester.recording_options['record_abs_error'] or \
-                requester.recording_options['record_rel_error']:
-            norm = model._residuals.get_norm()
-        if requester.recording_options['record_abs_error']:
+        if opts['record_abs_error'] or opts['record_rel_error']:
+            norm = residuals.get_norm()
+        if opts['record_abs_error']:
             data['abs'] = norm
-        if requester.recording_options['record_rel_error']:
+        if opts['record_rel_error']:
             solver = model.nonlinear_solver
             norm0 = solver._norm0 if solver._norm0 != 0.0 else 1.0  # runonce never sets _norm0
             data['rel'] = norm / norm0
 
-    requester._rec_mgr.record_iteration(requester, data,
-                                        requester._get_recorder_metadata(case_name))
+    rec_mgr.record_iteration(requester, data, requester._get_recorder_metadata(case_name))

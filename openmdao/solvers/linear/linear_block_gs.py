@@ -30,7 +30,7 @@ class LinearBlockGS(BlockLinearSolver):
         **kwargs : dict
             options dictionary.
         """
-        super(LinearBlockGS, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self._theta_n_1 = {}
         self._delta_d_n_1 = {}
@@ -39,7 +39,7 @@ class LinearBlockGS(BlockLinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        super(LinearBlockGS, self)._declare_options()
+        super()._declare_options()
 
         self.options.declare('use_aitken', types=bool, default=False,
                              desc='set to True to use Aitken relaxation')
@@ -72,7 +72,7 @@ class LinearBlockGS(BlockLinearSolver):
                 self._delta_d_n_1[vec_name] = d_vec[vec_name].asarray(copy=True)
                 self._theta_n_1[vec_name] = 1.0
 
-        return super(LinearBlockGS, self)._iter_initialize()
+        return super()._iter_initialize()
 
     def _single_iteration(self):
         """
@@ -104,12 +104,12 @@ class LinearBlockGS(BlockLinearSolver):
                 delta_d_n[vec_name] = d_out_vec[vec_name].asarray(copy=True)
 
         if mode == 'fwd':
-            for isub, subsys in enumerate(system._subsystems_allprocs):
+            for subsys, _ in system._subsystems_allprocs.values():
                 if self._rel_systems is not None and subsys.pathname not in self._rel_systems:
                     continue
                 for vec_name in vec_names:
                     # must always do the transfer on all procs even if subsys not local
-                    system._transfer(vec_name, mode, isub)
+                    system._transfer(vec_name, mode, subsys.name)
 
                 if not subsys._is_local:
                     continue
@@ -124,9 +124,10 @@ class LinearBlockGS(BlockLinearSolver):
                 subsys._solve_linear(vec_names, mode, self._rel_systems)
 
         else:  # rev
-            subsystems = system._subsystems_allprocs
-            for isub in range(len(system._subsystems_allprocs) - 1, -1, -1):
-                subsys = subsystems[isub]
+            subsystems = list(system._subsystems_allprocs)
+            subsystems.reverse()
+            for sname in subsystems:
+                subsys, _ = system._subsystems_allprocs[sname]
 
                 if self._rel_systems is not None and subsys.pathname not in self._rel_systems:
                     continue
@@ -136,7 +137,7 @@ class LinearBlockGS(BlockLinearSolver):
                         if vec_name in subsys._rel_vec_names:
                             b_vec = system._vectors['output'][vec_name]
                             b_vec.set_val(0.0)
-                            system._transfer(vec_name, mode, isub)
+                            system._transfer(vec_name, mode, sname)
                             b_vec *= -1.0
                             b_vec += self._rhs_vecs[vec_name]
 
@@ -146,7 +147,7 @@ class LinearBlockGS(BlockLinearSolver):
                                          scope_out, scope_in)
                 else:   # subsys not local
                     for vec_name in vec_names:
-                        system._transfer(vec_name, mode, isub)
+                        system._transfer(vec_name, mode, sname)
 
         if use_aitken:
             for vec_name in vec_names:

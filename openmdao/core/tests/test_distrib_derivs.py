@@ -41,7 +41,7 @@ class DistribExecComp(om.ExecComp):
     """
 
     def __init__(self, exprs, arr_size=11, **kwargs):
-        super(DistribExecComp, self).__init__(exprs, **kwargs)
+        super().__init__(exprs, **kwargs)
         self.arr_size = arr_size
         self.options['distributed'] = True
 
@@ -86,12 +86,12 @@ class DistribExecComp(om.ExecComp):
                 meta['value'] = np.ones(sizes[rank], float)
                 meta['src_indices'] = np.arange(start, end, dtype=int)
 
-        super(DistribExecComp, self).setup()
+        super().setup()
 
 
 class DistribCoordComp(om.ExplicitComponent):
     def __init__(self, **kwargs):
-        super(DistribCoordComp, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.options['distributed'] = True
 

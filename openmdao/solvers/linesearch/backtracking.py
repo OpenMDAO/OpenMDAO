@@ -12,7 +12,6 @@ import numpy as np
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.solvers.solver import NonlinearSolver
 from openmdao.recorders.recording_iteration_stack import Recording
-from openmdao.utils.general_utils import simple_warning
 
 
 def _print_violations(outputs, lower, upper):
@@ -68,7 +67,7 @@ class LinesearchSolver(NonlinearSolver):
         **kwargs : dict
             Options dictionary.
         """
-        super(LinesearchSolver, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         # Parent solver sets this to control whether to solve subsystems.
         self._do_subsolve = False
         self._lower_bounds = None
@@ -78,7 +77,7 @@ class LinesearchSolver(NonlinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        super(LinesearchSolver, self)._declare_options()
+        super()._declare_options()
         opt = self.options
         opt.declare(
             'bound_enforcement', default='scalar', values=['vector', 'scalar', 'wall'],
@@ -103,13 +102,13 @@ class LinesearchSolver(NonlinearSolver):
         depth : int
             depth of the current system (already incremented).
         """
-        super(LinesearchSolver, self)._setup_solvers(system, depth)
+        super()._setup_solvers(system, depth)
         if system._has_bounds:
-            abs2meta = system._var_abs2meta
+            abs2meta_out = system._var_abs2meta['output']
             start = end = 0
             for abs_name, val in system._outputs._abs_item_iter():
                 end += val.size
-                meta = abs2meta[abs_name]
+                meta = abs2meta_out[abs_name]
                 var_lower = meta['lower']
                 var_upper = meta['upper']
 
@@ -190,7 +189,7 @@ class BoundsEnforceLS(LinesearchSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        super(BoundsEnforceLS, self)._declare_options()
+        super()._declare_options()
         opt = self.options
 
         # Remove unused options from base options here, so that users
@@ -254,7 +253,7 @@ class ArmijoGoldsteinLS(LinesearchSolver):
         **kwargs : dict
             Options dictionary.
         """
-        super(ArmijoGoldsteinLS, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self._analysis_error_raised = False
 
@@ -322,7 +321,7 @@ class ArmijoGoldsteinLS(LinesearchSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        super(ArmijoGoldsteinLS, self)._declare_options()
+        super()._declare_options()
         opt = self.options
         opt['maxiter'] = 5
         opt.declare('c', default=0.1, lower=0.0, upper=1.0, desc="Slope parameter for line of "

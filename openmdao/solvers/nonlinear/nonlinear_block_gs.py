@@ -31,7 +31,7 @@ class NonlinearBlockGS(NonlinearSolver):
         **kwargs : dict
             options dictionary.
         """
-        super(NonlinearBlockGS, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self._theta_n_1 = 1.0
         self._delta_outputs_n_1 = None
@@ -47,7 +47,7 @@ class NonlinearBlockGS(NonlinearSolver):
         depth : int
             depth of the current system (already incremented).
         """
-        super(NonlinearBlockGS, self)._setup_solvers(system, depth)
+        super()._setup_solvers(system, depth)
 
         rank = MPI.COMM_WORLD.rank if MPI is not None else 0
 
@@ -59,7 +59,7 @@ class NonlinearBlockGS(NonlinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        super(NonlinearBlockGS, self)._declare_options()
+        super()._declare_options()
 
         self.options.declare('use_aitken', types=bool, default=False,
                              desc='set to True to use Aitken relaxation')
@@ -106,7 +106,7 @@ class NonlinearBlockGS(NonlinearSolver):
         # Execute guess_nonlinear if specified.
         system._guess_nonlinear()
 
-        return super(NonlinearBlockGS, self)._iter_initialize()
+        return super()._iter_initialize()
 
     def _single_iteration(self):
         """
@@ -235,8 +235,8 @@ class NonlinearBlockGS(NonlinearSolver):
                 outputs_n = outputs.asarray(copy=True)
 
             self._solver_info.append_subsolver()
-            for isub, subsys in enumerate(system._subsystems_allprocs):
-                system._transfer('nonlinear', 'fwd', isub)
+            for subsys, _ in system._subsystems_allprocs.values():
+                system._transfer('nonlinear', 'fwd', subsys.name)
                 if subsys._is_local:
                     subsys._solve_nonlinear()
 

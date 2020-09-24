@@ -146,7 +146,7 @@ class KSComp(ExplicitComponent):
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Component options.
         """
-        super(KSComp, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.cite = CITATIONS
 

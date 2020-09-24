@@ -117,7 +117,7 @@ class SimpleCompConst(om.ExplicitComponent):
 
 class SimpleCompFD(SimpleComp):
     def __init__(self, **kwargs):
-        super(SimpleCompFD, self).__init__()
+        super().__init__()
         self.kwargs = kwargs
 
     def setup_partials(self):
@@ -129,7 +129,7 @@ class SimpleCompFD(SimpleComp):
 
 class SimpleCompMixedFD(SimpleComp):
     def __init__(self, **kwargs):
-        super(SimpleCompMixedFD, self).__init__()
+        super().__init__()
         self.kwargs = kwargs
 
     def setup_partials(self):
@@ -152,7 +152,7 @@ class SimpleCompMixedFD(SimpleComp):
 class SimpleCompKwarg(SimpleComp):
     def __init__(self, partial_kwargs):
         self.partial_kwargs = partial_kwargs
-        super(SimpleCompKwarg, self).__init__()
+        super().__init__()
 
     def setup_partials(self):
         self.declare_partials(**self.partial_kwargs)

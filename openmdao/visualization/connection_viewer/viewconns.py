@@ -67,18 +67,25 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
     src2tgts = defaultdict(list)
     units = defaultdict(lambda: '')
-    for n, data in system._var_allprocs_abs2meta.items():
-        u = data.get('units', '')
-        if u is None:
-            u = ''
-        units[n] = u
+    for io in ('input', 'output'):
+        for n, data in system._var_allprocs_abs2meta[io].items():
+            u = data.get('units', '')
+            if u is not None:
+                units[n] = u
 
     vals = {}
 
+    prefix = system.pathname + '.' if system.pathname else ''
+    all_vars = {}
+    for io in ('input', 'output'):
+        all_vars[io] = chain(system._var_abs2meta[io].items(),
+                             [(prefix + n, m) for n, m in system._var_discrete[io].items()])
+
     with printoptions(precision=precision, suppress=True, threshold=10000):
-        for t in chain(system._var_abs_names['input'], system._var_abs_names_discrete['input']):
-            if t in system._var_abs2meta:
-                idxs = system._var_abs2meta[t]['src_indices']
+
+        for t, meta in all_vars['input']:
+            if t in system._var_abs2meta['input']:
+                idxs = meta['src_indices']
             else:
                 idxs = None
 
@@ -106,12 +113,12 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
     src_systems = set()
     tgt_systems = set()
-    for s in chain(system._var_abs_names['output'], system._var_abs_names_discrete['output']):
+    for s, _ in all_vars['output']:
         parts = s.split('.')
         for i in range(len(parts)):
             src_systems.add('.'.join(parts[:i]))
 
-    for t in chain(system._var_abs_names['input'], system._var_abs_names_discrete['input']):
+    for t, _ in all_vars['input']:
         parts = t.split('.')
         for i in range(len(parts)):
             tgt_systems.add('.'.join(parts[:i]))
@@ -143,7 +150,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
         idx += 1
 
     # add rows for unconnected sources
-    for src in chain(system._var_abs_names['output'], system._var_abs_names_discrete['output']):
+    for src, _ in all_vars['output']:
         if src not in src2tgts:
             if show_values:
                 v = _val2str(system._abs_get_val(src))

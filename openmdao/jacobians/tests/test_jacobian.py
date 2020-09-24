@@ -23,7 +23,7 @@ except ImportError:
 
 class MyExplicitComp(ExplicitComponent):
     def __init__(self, jac_type):
-        super(MyExplicitComp, self).__init__()
+        super().__init__()
         self._jac_type = jac_type
 
     def setup(self):
@@ -71,7 +71,7 @@ class MyExplicitComp(ExplicitComponent):
 
 class MyExplicitComp2(ExplicitComponent):
     def __init__(self, jac_type):
-        super(MyExplicitComp2, self).__init__()
+        super().__init__()
         self._jac_type = jac_type
 
     def setup(self):
@@ -117,7 +117,7 @@ class ExplicitSetItemComp(ExplicitComponent):
         self._shape = shape
         self._value = value
         self._constructor = constructor
-        super(ExplicitSetItemComp, self).__init__()
+        super().__init__()
 
     def setup(self):
         if self._shape == 'scalar':

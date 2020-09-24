@@ -134,7 +134,7 @@ class MultiFiSurrogateModel(SurrogateModel):
         y : array-like
             Model responses at given inputs.
         """
-        super(MultiFiSurrogateModel, self).train(x, y)
+        super().train(x, y)
         self.train_multifi([x], [y])
 
     def train_multifi(self, x, y):

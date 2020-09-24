@@ -315,19 +315,19 @@ def config_summary(problem, stream=sys.stdout):
 
     printer()
 
-    input_names = model._var_allprocs_abs_names['input']
+    input_names = model._var_allprocs_abs2meta['input']
     ninputs = len(input_names)
     if setup_done:
         printer("Input variables:         %5d   Total size: %8d" %
-                (ninputs, sum(meta[n]['size'] for n in input_names)))
+                (ninputs, sum(meta['input'][n]['size'] for n in input_names)))
     else:
         printer("Input variables:         %5d" % ninputs)
 
-    output_names = model._var_allprocs_abs_names['output']
+    output_names = model._var_allprocs_abs2meta['output']
     noutputs = len(output_names)
     if setup_done:
         printer("Output variables:        %5d   Total size: %8d" %
-                (noutputs, sum(meta[n]['global_size'] for n in output_names)))
+                (noutputs, sum(meta['output'][n]['global_size'] for n in output_names)))
     else:
         printer("Output variables:        %5d" % noutputs)
 
@@ -335,7 +335,7 @@ def config_summary(problem, stream=sys.stdout):
         printer()
         conns = model._conn_global_abs_in2out
         printer("Total connections: %d   Total transfer data size: %d" %
-                (len(conns), sum(meta[n]['size'] for n in conns)))
+                (len(conns), sum(meta['input'][n]['size'] for n in conns)))
 
     printer()
     printer("Driver type: %s" % problem.driver.__class__.__name__)

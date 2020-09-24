@@ -132,10 +132,10 @@ class BalanceComp(ImplicitComponent):
             (see `add_output` method).
         """
         if 'guess_func' in kwargs:
-            super(BalanceComp, self).__init__(guess_func=kwargs['guess_func'])
+            super().__init__(guess_func=kwargs['guess_func'])
             kwargs.pop('guess_func')
         else:
-            super(BalanceComp, self).__init__()
+            super().__init__()
 
         self._state_vars = {}
 

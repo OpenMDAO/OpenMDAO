@@ -162,7 +162,7 @@ class SqliteRecorder(CaseRecorder):
         # default to record on all procs when running in parallel
         self._record_on_proc = True
 
-        super(SqliteRecorder, self).__init__(record_viewer_data)
+        super().__init__(record_viewer_data)
 
     def _initialize_database(self):
         """
@@ -272,7 +272,7 @@ class SqliteRecorder(CaseRecorder):
         recording_requester : object
             Object to which this recorder is attached.
         """
-        super(SqliteRecorder, self).startup(recording_requester)
+        super().startup(recording_requester)
 
         if not self._database_initialized:
             self._initialize_database()
@@ -314,11 +314,8 @@ class SqliteRecorder(CaseRecorder):
                 objectives = driver._objs
                 responses = driver._responses
 
-            inputs = system._var_allprocs_abs_names['input'] + \
-                system._var_allprocs_abs_names_discrete['input']
-
-            outputs = system._var_allprocs_abs_names['output'] + \
-                system._var_allprocs_abs_names_discrete['output']
+            inputs = list(system.abs_name_iter('input', local=False, discrete=True))
+            outputs = list(system.abs_name_iter('output', local=False, discrete=True))
 
             var_order = system._get_vars_exec_order(inputs=True, outputs=True)
 
@@ -342,8 +339,10 @@ class SqliteRecorder(CaseRecorder):
 
             # absolute pathname to metadata mappings for continuous & discrete variables
             # discrete mapping is sub-keyed on 'output' & 'input'
-            real_meta = system._var_allprocs_abs2meta
-            disc_meta = system._var_allprocs_discrete
+            real_meta_in = system._var_allprocs_abs2meta['input']
+            real_meta_out = system._var_allprocs_abs2meta['output']
+            disc_meta_in = system._var_allprocs_discrete['input']
+            disc_meta_out = system._var_allprocs_discrete['output']
 
             for var_set, var_type in full_var_set:
                 for name in var_set:
@@ -354,9 +353,9 @@ class SqliteRecorder(CaseRecorder):
 
                     if name not in self._abs2meta:
                         try:
-                            self._abs2meta[name] = real_meta[name].copy()
+                            self._abs2meta[name] = real_meta_out[name].copy()
                         except KeyError:
-                            self._abs2meta[name] = disc_meta['output'][name].copy()
+                            self._abs2meta[name] = disc_meta_out[name].copy()
                         self._abs2meta[name]['type'] = []
                         self._abs2meta[name]['explicit'] = name not in states
 
@@ -365,16 +364,18 @@ class SqliteRecorder(CaseRecorder):
 
             for name in inputs:
                 try:
-                    self._abs2meta[name] = real_meta[name].copy()
+                    self._abs2meta[name] = real_meta_in[name].copy()
                 except KeyError:
-                    self._abs2meta[name] = disc_meta['input'][name].copy()
+                    self._abs2meta[name] = disc_meta_in[name].copy()
                 self._abs2meta[name]['type'] = ['input']
                 self._abs2meta[name]['explicit'] = True
 
             # merge current abs2meta with this system's version
             for name, meta in self._abs2meta.items():
-                if name in system._var_allprocs_abs2meta:
-                    meta.update(system._var_allprocs_abs2meta[name])
+                for io in ('input', 'output'):
+                    if name in system._var_allprocs_abs2meta[io]:
+                        meta.update(system._var_allprocs_abs2meta[io][name])
+                        break
 
             self._cleanup_abs2meta()
 
