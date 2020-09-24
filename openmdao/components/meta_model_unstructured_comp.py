@@ -133,8 +133,8 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
         if vec_size > 1:
             if metadata['shape'][0] != vec_size:
-                raise RuntimeError("%s: First dimension of input '%s' must be %d"
-                                   % (self.msginfo, name, vec_size))
+                raise RuntimeError(f"{self.msginfo}: First dimension of input '{name}' "
+                                   f"must be {vec_size}")
             input_size = metadata['value'][0].size
         else:
             input_size = metadata['value'].size
@@ -182,8 +182,8 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
         if vec_size > 1:
             if metadata['shape'][0] != vec_size:
-                raise RuntimeError("%s: First dimension of output '%s' must be %d"
-                                   % (self.msginfo, name, vec_size))
+                raise RuntimeError(f"{self.msginfo}: First dimension of output '{name}' "
+                                   f"must be {vec_size}")
             output_shape = metadata['shape'][1:]
             if len(output_shape) == 0:
                 output_shape = 1
@@ -228,9 +228,6 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                 # surrogate specified.
                 surrogate = deepcopy(default_surrogate)
                 metadata['surrogate'] = surrogate
-
-            if 'surrogate' in metadata:
-                metadata['surrogate']._setup_var_data(self.pathname)
 
         # training will occur on first execution after setup
         self.train = True
@@ -563,17 +560,13 @@ class MetaModelUnStructuredComp(ExplicitComponent):
             if num_sample is None:
                 num_sample = len(val)
             elif len(val) != num_sample:
-                msg = "{}: Each variable must have the same number"\
-                      " of training points. Expected {} but found {} "\
-                      "points for '{}'."\
-                      .format(self.msginfo, num_sample, len(val), name)
-                raise RuntimeError(msg)
+                raise RuntimeError(f"{self.msginfo}: Each variable must have the same number "
+                                   f"of training points. Expected {num_sample} but found "
+                                   f"{len(val)} points for '{name}'.")
 
         if len(missing_training_data) > 0:
-            msg = "%s: The following training data sets must be " \
-                  "provided as options: " % self.msginfo + \
-                  str(missing_training_data)
-            raise RuntimeError(msg)
+            raise RuntimeError(f"{self.msginfo}: The following training data sets must be "
+                               f"provided as options: {missing_training_data}")
 
         inputs = np.zeros((num_sample, self._input_size))
         self._training_input = inputs
@@ -608,8 +601,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
             surrogate = self._metadata(name).get('surrogate')
             if surrogate is None:
-                raise RuntimeError("%s: No surrogate specified for output '%s'"
-                                   % (self.msginfo, name))
+                raise RuntimeError(f"{self.msginfo}: No surrogate specified for output '{name}'")
             else:
                 surrogate.train(self._training_input,
                                 self._training_output[name])

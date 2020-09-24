@@ -2194,7 +2194,7 @@ class System(object):
             if str(err).startswith(self.msginfo):
                 raise err
             else:
-                raise err_type(f"{self.msginfo} Error calling {fname}(), {err}.")
+                raise err_type(f"{self.msginfo}: Error calling {fname}(), {err}")
         finally:
             self._inputs.read_only = False
             self._outputs.read_only = False

@@ -672,8 +672,8 @@ class DiscreteTestCase(unittest.TestCase):
         with self.assertRaises(TypeError) as cm:
             p.run_model()
 
-        msg = ("BrokenComp (g0.g1.broken) Error calling compute(), "
-               "compute() takes 3 positional arguments but 5 were given.")
+        msg = ("BrokenComp (g0.g1.broken): Error calling compute(), "
+               "compute() takes 3 positional arguments but 5 were given")
         self.assertEqual(str(cm.exception), msg)
 
 class SolverDiscreteTestCase(unittest.TestCase):
