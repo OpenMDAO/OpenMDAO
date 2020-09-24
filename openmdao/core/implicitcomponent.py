@@ -66,15 +66,12 @@ class ImplicitComponent(Component):
         Compute residuals. The model is assumed to be in a scaled state.
         """
         with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
-            self._inputs.read_only = self._outputs.read_only = True
-            try:
+            with self._call_user_function('apply_nonlinear', protect_outputs=True):
                 if self._discrete_inputs or self._discrete_outputs:
                     self.apply_nonlinear(self._inputs, self._outputs, self._residuals,
                                          self._discrete_inputs, self._discrete_outputs)
                 else:
                     self.apply_nonlinear(self._inputs, self._outputs, self._residuals)
-            finally:
-                self._inputs.read_only = self._outputs.read_only = False
 
         self.iter_count_apply += 1
 
@@ -82,22 +79,18 @@ class ImplicitComponent(Component):
         """
         Compute outputs. The model is assumed to be in a scaled state.
         """
-        self._inputs.read_only = True
-
-        try:
-            if self._nonlinear_solver is not None:
+        if self._nonlinear_solver is not None:
+            with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
+                self._nonlinear_solver.solve()
+        else:
+            with self._unscaled_context(outputs=[self._outputs]):
                 with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
-                    self._nonlinear_solver.solve()
-            else:
-                with self._unscaled_context(outputs=[self._outputs]):
-                    with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
+                    with self._call_user_function('solve_nonlinear'):
                         if self._discrete_inputs or self._discrete_outputs:
                             self.solve_nonlinear(self._inputs, self._outputs,
                                                  self._discrete_inputs, self._discrete_outputs)
                         else:
                             self.solve_nonlinear(self._inputs, self._outputs)
-        finally:
-            self._inputs.read_only = False
 
         # Iteration counter is incremented in the Recording context manager at exit.
 
@@ -107,7 +100,6 @@ class ImplicitComponent(Component):
         """
         if self._has_guess:
             self._apply_nonlinear()
-            self._inputs.read_only = self._residuals.read_only = True
             complex_step = self._inputs._under_complex_step
 
             try:
@@ -116,11 +108,13 @@ class ImplicitComponent(Component):
                         self._inputs.set_complex_step_mode(False, keep_real=True)
                         self._outputs.set_complex_step_mode(False, keep_real=True)
                         self._residuals.set_complex_step_mode(False, keep_real=True)
-                    if self._discrete_inputs or self._discrete_outputs:
-                        self.guess_nonlinear(self._inputs, self._outputs, self._residuals,
-                                             self._discrete_inputs, self._discrete_outputs)
-                    else:
-                        self.guess_nonlinear(self._inputs, self._outputs, self._residuals)
+
+                    with self._call_user_function('guess_nonlinear', protect_residuals=True):
+                        if self._discrete_inputs or self._discrete_outputs:
+                            self.guess_nonlinear(self._inputs, self._outputs, self._residuals,
+                                                 self._discrete_inputs, self._discrete_outputs)
+                        else:
+                            self.guess_nonlinear(self._inputs, self._outputs, self._residuals)
             finally:
                 if complex_step:
                     # Note: passing in False swaps back to the complex vector, which is valid since
@@ -130,7 +124,6 @@ class ImplicitComponent(Component):
                     self._outputs.set_complex_step_mode(True)
                     self._residuals.set_complex_step_mode(False)
                     self._residuals._under_complex_step = True
-                self._inputs.read_only = self._residuals.read_only = False
 
     def _apply_linear(self, jac, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
         """
@@ -176,7 +169,6 @@ class ImplicitComponent(Component):
                         outputs=[self._outputs, d_outputs], residuals=[d_residuals]):
 
                     # set appropriate vectors to read_only to help prevent user error
-                    self._inputs.read_only = self._outputs.read_only = True
                     if mode == 'fwd':
                         d_inputs.read_only = d_outputs.read_only = True
                     elif mode == 'rev':
@@ -185,25 +177,29 @@ class ImplicitComponent(Component):
                     try:
                         if d_inputs._ncol > 1:
                             if self.has_apply_multi_linear:
-                                self.apply_multi_linear(self._inputs, self._outputs,
-                                                        d_inputs, d_outputs, d_residuals, mode)
+                                with self._call_user_function('apply_multi_linear',
+                                                              protect_outputs=True):
+                                    self.apply_multi_linear(self._inputs, self._outputs,
+                                                            d_inputs, d_outputs, d_residuals, mode)
                             else:
-                                for i in range(d_inputs._ncol):
-                                    # need to make the multivecs look like regular single vecs
-                                    # since the component doesn't know about multivecs.
-                                    d_inputs._icol = i
-                                    d_outputs._icol = i
-                                    d_residuals._icol = i
-                                    self.apply_linear(self._inputs, self._outputs,
-                                                      d_inputs, d_outputs, d_residuals, mode)
+                                with self._call_user_function('apply_linear',
+                                                              protect_outputs=True):
+                                    for i in range(d_inputs._ncol):
+                                        # need to make the multivecs look like regular single vecs
+                                        # since the component doesn't know about multivecs.
+                                        d_inputs._icol = i
+                                        d_outputs._icol = i
+                                        d_residuals._icol = i
+                                        self.apply_linear(self._inputs, self._outputs,
+                                                          d_inputs, d_outputs, d_residuals, mode)
                                 d_inputs._icol = None
                                 d_outputs._icol = None
                                 d_residuals._icol = None
                         else:
-                            self.apply_linear(self._inputs, self._outputs,
-                                              d_inputs, d_outputs, d_residuals, mode)
+                            with self._call_user_function('apply_linear', protect_outputs=True):
+                                self.apply_linear(self._inputs, self._outputs,
+                                                  d_inputs, d_outputs, d_residuals, mode)
                     finally:
-                        self._inputs.read_only = self._outputs.read_only = False
                         d_inputs.read_only = d_outputs.read_only = d_residuals.read_only = False
 
     def _solve_linear(self, vec_names, mode, rel_systems):
@@ -240,19 +236,22 @@ class ImplicitComponent(Component):
                     try:
                         if d_outputs._ncol > 1:
                             if self.has_solve_multi_linear:
-                                self.solve_multi_linear(d_outputs, d_residuals, mode)
+                                with self._call_user_function('solve_multi_linear'):
+                                    self.solve_multi_linear(d_outputs, d_residuals, mode)
                             else:
-                                for i in range(d_outputs._ncol):
-                                    # need to make the multivecs look like regular single vecs
-                                    # since the component doesn't know about multivecs.
-                                    d_outputs._icol = i
-                                    d_residuals._icol = i
-                                    self.solve_linear(d_outputs, d_residuals, mode)
+                                with self._call_user_function('solve_linear'):
+                                    for i in range(d_outputs._ncol):
+                                        # need to make the multivecs look like regular single vecs
+                                        # since the component doesn't know about multivecs.
+                                        d_outputs._icol = i
+                                        d_residuals._icol = i
+                                        self.solve_linear(d_outputs, d_residuals, mode)
 
-                                d_outputs._icol = None
-                                d_residuals._icol = None
+                                    d_outputs._icol = None
+                                    d_residuals._icol = None
                         else:
-                            self.solve_linear(d_outputs, d_residuals, mode)
+                            with self._call_user_function('solve_linear'):
+                                self.solve_linear(d_outputs, d_residuals, mode)
                     finally:
                         d_outputs.read_only = d_residuals.read_only = False
 
@@ -282,16 +281,12 @@ class ImplicitComponent(Component):
             for approximation in self._approx_schemes.values():
                 approximation.compute_approximations(self, jac=self._jacobian)
 
-            self._inputs.read_only = self._outputs.read_only = True
-
-            try:
+            with self._call_user_function('linearize', protect_outputs=True):
                 if self._discrete_inputs or self._discrete_outputs:
                     self.linearize(self._inputs, self._outputs, self._jacobian,
                                    self._discrete_inputs, self._discrete_outputs)
                 else:
                     self.linearize(self._inputs, self._outputs, self._jacobian)
-            finally:
-                self._inputs.read_only = self._outputs.read_only = False
 
         if (jac is None or jac is self._assembled_jac) and self._assembled_jac is not None:
             self._assembled_jac._update(self)

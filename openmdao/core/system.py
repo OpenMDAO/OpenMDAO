@@ -2163,6 +2163,43 @@ class System(object):
             d_inputs._names = old_ins
             d_outputs._names = old_outs
 
+    @contextmanager
+    def _call_user_function(self, fname, protect_inputs=True,
+                            protect_outputs=False, protect_residuals=False):
+        """
+        Context manager that wraps a call to a user defined function.
+
+        Protect any vectors that should not be modified to help prevent user error
+        and add information about the system to any errors that don't have it already.
+
+        Parameters
+        ----------
+        fname : str
+            Name of the user defined function.
+        protect_inputs : bool
+            If True, then set the inputs vector to be read only
+        protect_outputs : bool
+            If True, then set the outputs vector to be read only
+        protect_residuals : bool
+            If True, then set the residuals vector to be read only
+        """
+        self._inputs.read_only = protect_inputs
+        self._outputs.read_only = protect_outputs
+        self._residuals.read_only = protect_residuals
+
+        try:
+            yield
+        except Exception:
+            err_type, err, trace = sys.exc_info()
+            if str(err).startswith(self.msginfo):
+                raise err
+            else:
+                raise err_type(f"{self.msginfo} Error calling {fname}(), {err}.")
+        finally:
+            self._inputs.read_only = False
+            self._outputs.read_only = False
+            self._residuals.read_only = False
+
     def get_nonlinear_vectors(self):
         """
         Return the inputs, outputs, and residuals vectors.
