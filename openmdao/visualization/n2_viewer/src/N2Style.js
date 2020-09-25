@@ -239,7 +239,7 @@ N2Style.color = {
     'inputArrow': 'salmon',
     'outputArrow': 'seagreen',
     'declaredPartial': 'black',
-    'autoivcInput': '#30B0AD'
+    'autoivcInput': '#ff7000'
 };
 
 Object.freeze(N2Style.color); // Make it the equivalent of a constant
