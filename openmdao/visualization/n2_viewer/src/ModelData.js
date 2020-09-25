@@ -224,7 +224,7 @@ class ModelData {
     hasAutoIvcSrc(elementPath) {
         for (let conn of this.conns) {
             if (conn.tgt == elementPath && conn.src.match(/^_auto_ivc.*$/)) {
-                debugInfo(elementPath + " source is an auto-ivc input.");
+                debugInfo(elementPath + " source is an auto-ivc output.");
                 this.autoivcSources++;
                 return true;
             }
