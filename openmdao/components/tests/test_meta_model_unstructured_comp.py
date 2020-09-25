@@ -1065,8 +1065,8 @@ class MetaModelTestCase(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             prob.run_model()
 
-        self.assertEqual(str(cm.exception), 'sin_mm: KrigingSurrogate requires at least'
-                                            ' 2 training points.')
+        self.assertEqual(str(cm.exception), 'MetaModelUnStructuredComp (sin_mm): '
+                         'Error calling compute(), KrigingSurrogate requires at least 2 training points.')
 
 
 class MetaModelUnstructuredSurrogatesFeatureTestCase(unittest.TestCase):

@@ -273,10 +273,9 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
                 if num_sample[fi] is None:
                     num_sample[fi] = len(val)
                 elif len(val) != num_sample[fi]:
-                    msg = "{}: Each variable must have the same number"\
-                          " of training points. Expected {} but found {} "\
-                          "points for '{}'."\
-                          .format(self.msginfo, num_sample[fi], len(val), name)
+                    msg = f"{self.msginfo}: Each variable must have the same number " \
+                          f"of training points. Expected {num_sample[fi]} but found {len(val)} " \
+                          f"points for '{name}'."
                     raise RuntimeError(msg)
 
         inputs = [np.zeros((num_sample[fi], self._input_sizes[fi]))
@@ -318,8 +317,8 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
 
             surrogate = self._metadata(name_root).get('surrogate')
             if surrogate is None:
-                msg = "{}: No surrogate specified for output '{}'"
-                raise RuntimeError(msg.format(self.msginfo, name_root))
+                msg = f"{self.msginfo}: No surrogate specified for output '{name_root}'"
+                raise RuntimeError(msg)
             else:
                 surrogate.train_multifi(inputs, self._training_output[name])
 
