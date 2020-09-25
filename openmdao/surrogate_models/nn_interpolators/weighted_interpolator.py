@@ -63,8 +63,8 @@ class WeightedInterpolator(NNBase):
         """
         if self._ntpts < num_neighbors:
             raise ValueError('WeightedInterpolant does not have sufficient '
-                             'training data to use num_neighbors={0}, only {1} points'
-                             ' available.'.format(num_neighbors, self._ntpts))
+                             f'training data to use num_neighbors={num_neighbors}, '
+                             f'only {self._ntpts} points available.')
 
         if dist_eff == 0:
             # If default, use #dims + 1
@@ -120,8 +120,8 @@ class WeightedInterpolator(NNBase):
         """
         if self._ntpts < num_neighbors:
             raise ValueError('WeightedInterpolant does not have sufficient '
-                             'training data to use num_neighbors={0}, only {1} points '
-                             'available.'.format(num_neighbors, self._ntpts))
+                             f'training data to use num_neighbors={num_neighbors}, '
+                             f'only {self._ntpts} points available.')
 
         if dist_eff == 0:
             # If default, use #dims + 1

@@ -630,7 +630,7 @@ class DiscreteTestCase(unittest.TestCase):
             prob.setup()
 
         msg = ("Group (<model>): Attempted to connect from 'C1.y' to 'C2.y', "
-            "but 'C2.y' is an output. All connections must be from an output to an input.")
+               "but 'C2.y' is an output. All connections must be from an output to an input.")
         self.assertEqual(str(cm.exception), msg)
 
     def test_connection_from_input(self):

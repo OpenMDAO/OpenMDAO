@@ -809,22 +809,22 @@ class MultiFiCoKriging(object):
         if type(self.theta) is not list:
             self.theta = nlevel * [self.theta]
         elif len(self.theta) != nlevel:
-            raise ValueError("theta must be a list of %d element(s)." % nlevel)
+            raise ValueError(f"theta must be a list of {nlevel} element(s).")
 
         if type(self.theta0) is not list:
             self.theta0 = nlevel * [self.theta0]
         elif len(self.theta0) != nlevel:
-            raise ValueError("theta0 must be a list of %d element(s)." % nlevel)
+            raise ValueError(f"theta0 must be a list of {nlevel} element(s).")
 
         if type(self.thetaL) is not list:
             self.thetaL = nlevel * [self.thetaL]
         elif len(self.thetaL) != nlevel:
-            raise ValueError("thetaL must be a list of %d element(s)." % nlevel)
+            raise ValueError(f"thetaL must be a list of {nlevel} element(s).")
 
         if type(self.thetaU) is not list:
             self.thetaU = nlevel * [self.thetaU]
         elif len(self.thetaU) != nlevel:
-            raise ValueError("thetaU must be a list of %d element(s)." % nlevel)
+            raise ValueError(f"thetaU must be a list of {nlevel} element(s).")
 
         self.nlevel = nlevel
         self.X = X[:]
@@ -842,16 +842,16 @@ class MultiFiCoKriging(object):
             if self.regr in self._regression_types:
                 self.regr = self._regression_types[self.regr]
             else:
-                raise ValueError("regr should be one of %s or callable, %s was given."
-                                 % (self._regression_types.keys(), self.regr))
+                raise ValueError(f"regr should be one of {self._regression_types.keys()} or "
+                                 f"callable, {self.regr} was given.")
 
         # Check rho regression model
         if not callable(self.rho_regr):
             if self.rho_regr in self._regression_types:
                 self.rho_regr = self._regression_types[self.rho_regr]
             else:
-                raise ValueError("rho_regr should be one of %s or callable, %s was given."
-                                 % (self._regression_types.keys(), self.rho_regr))
+                raise ValueError(f"regr should be one of {self._regression_types.keys()} or "
+                                 f"callable, {self.rho_regr} was given.")
 
         for i in range(self.nlevel):
             # Check correlation parameters
