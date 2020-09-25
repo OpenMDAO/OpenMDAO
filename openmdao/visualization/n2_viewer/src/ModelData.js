@@ -424,6 +424,9 @@ class ModelData {
         }
     }
 
+    /**
+     * 
+     */
     _updateAutoIvcNames() {
         const aivc = this.nodePaths['_auto_ivc'];
         if (aivc !== undefined && aivc.hasChildren()) {

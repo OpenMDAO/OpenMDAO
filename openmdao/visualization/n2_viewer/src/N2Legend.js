@@ -19,7 +19,7 @@ class N2Legend {
             'component': false,
             'input': false,
             'unconnectedInput': false,
-            'autoivcInput': false,
+        //    'autoivcInput': false,
             'outputExplicit': false,
             'outputImplicit': false,
             'collapsed': true,
@@ -151,6 +151,7 @@ class N2Legend {
                         'color': N2Style.color.outputImplicit
                     })
                 }
+                /*
                 else if (!this.showSysVar.autoivcInput && node.isAutoIvcInput()) {
                     this.showSysVar.autoivcInput = true;
                     this.sysAndVar.push({
@@ -158,6 +159,7 @@ class N2Legend {
                         'color': N2Style.color.autoivcInput
                     })
                 }
+                */
                 else if (!this.showSysVar.unconnectedInput && node.isUnconnectedInput()) {
                     this.showSysVar.unconnectedInput = true;
                     this.sysAndVar.push({

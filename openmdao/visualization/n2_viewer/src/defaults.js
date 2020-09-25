@@ -55,7 +55,7 @@ Object.freeze(Precollapse);
 
 let DebugFlags = {
     'timings': false,
-    'info': true
+    'info': false
 }
 
 // Object.freeze(N2TransitionDefaults);

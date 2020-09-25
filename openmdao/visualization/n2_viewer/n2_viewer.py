@@ -179,7 +179,6 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
 
         children = []
         for s in system._subsystems_myproc:
-        #    if (s.name != '_auto_ivc'):
             children.append(_get_tree_dict(s, component_execution_orders,
                             component_execution_index, is_parallel))
 
@@ -503,6 +502,7 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
         'N2Search', \
         'N2Toolbar', \
         'N2Diagram', \
+        'NodeInfo', \
         'N2UserInterface', \
         'defaults', \
         'ptN2'
