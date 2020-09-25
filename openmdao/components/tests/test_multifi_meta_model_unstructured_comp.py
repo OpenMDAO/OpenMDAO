@@ -372,8 +372,8 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             prob.run_model()
 
-        expected = ("mm: Multiple input features cannot have the same value.")
-        self.assertEqual(str(cm.exception), expected)
+        self.assertEqual(str(cm.exception), "MultiFiMetaModelUnStructuredComp (mm): "
+                         "Error calling compute(), Multiple input features cannot have the same value.")
 
     def test_om_slice_in_add_input(self):
 

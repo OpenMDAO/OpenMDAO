@@ -1,5 +1,6 @@
 """Define the ExplicitComponent class."""
 
+import sys
 import numpy as np
 
 from openmdao.core.component import Component, _full_slice
@@ -236,15 +237,12 @@ class ExplicitComponent(Component):
             # Sign of the residual is minus the sign of the output vector.
             residuals *= -1.0
 
-            self._inputs.read_only = True
-            try:
+            with self._call_user_function('compute'):
                 if self._discrete_inputs or self._discrete_outputs:
                     self.compute(self._inputs, self._outputs, self._discrete_inputs,
                                  self._discrete_outputs)
                 else:
                     self.compute(self._inputs, self._outputs)
-            finally:
-                self._inputs.read_only = False
 
             residuals += outputs
             outputs -= residuals
@@ -258,17 +256,14 @@ class ExplicitComponent(Component):
         with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
             with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
                 self._residuals.set_val(0.0)
-                self._inputs.read_only = True
-                try:
+                with self._call_user_function('compute'):
                     if self._discrete_inputs or self._discrete_outputs:
                         self.compute(self._inputs, self._outputs, self._discrete_inputs,
                                      self._discrete_outputs)
                     else:
                         self.compute(self._inputs, self._outputs)
-                finally:
-                    self._inputs.read_only = False
 
-        # Iteration counter is incremented in the Recording context manager at exit.
+            # Iteration counter is incremented in the Recording context manager at exit.
 
     def _apply_linear(self, jac, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
         """
@@ -313,7 +308,6 @@ class ExplicitComponent(Component):
                         outputs=[self._outputs], residuals=[d_residuals]):
 
                     # set appropriate vectors to read_only to help prevent user error
-                    self._inputs.read_only = True
                     if mode == 'fwd':
                         d_inputs.read_only = True
                     elif mode == 'rev':
@@ -327,20 +321,22 @@ class ExplicitComponent(Component):
                         # We used to negate the residual here, and then re-negate after the hook
                         if d_inputs._ncol > 1:
                             if self.supports_multivecs:
-                                self.compute_multi_jacvec_product(*args)
+                                with self._call_user_function('compute_multi_jacvec_product'):
+                                    self.compute_multi_jacvec_product(*args)
                             else:
                                 for i in range(d_inputs._ncol):
                                     # need to make the multivecs look like regular single vecs
                                     # since the component doesn't know about multivecs.
                                     d_inputs._icol = i
                                     d_residuals._icol = i
-                                    self.compute_jacvec_product(*args)
+                                    with self._call_user_function('compute_jacvec_product'):
+                                        self.compute_jacvec_product(*args)
                                 d_inputs._icol = None
                                 d_residuals._icol = None
                         else:
-                            self.compute_jacvec_product(*args)
+                            with self._call_user_function('compute_jacvec_product'):
+                                self.compute_jacvec_product(*args)
                     finally:
-                        self._inputs.read_only = False
                         d_inputs.read_only = d_residuals.read_only = False
 
     def _solve_linear(self, vec_names, mode, rel_systems):
@@ -407,20 +403,17 @@ class ExplicitComponent(Component):
                 approximation.compute_approximations(self, jac=self._jacobian)
 
             if self._has_compute_partials:
-                self._inputs.read_only = True
-
                 # We don't need to set the _system attribute on jac here because jac (if not None)
                 # shares the _subjacs_info metadata with our _jacobian, and our _jacobian knows
                 # how to properly convert relative names (used by the component in compute_partials)
                 # to absolute names (used by all jacobians internally).
-                try:
-                    # We used to negate the jacobian here, and then re-negate after the hook.
+
+                # We used to negate the jacobian here, and then re-negate after the hook.
+                with self._call_user_function('compute_partials'):
                     if self._discrete_inputs:
                         self.compute_partials(self._inputs, self._jacobian, self._discrete_inputs)
                     else:
                         self.compute_partials(self._inputs, self._jacobian)
-                finally:
-                    self._inputs.read_only = False
 
     def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
         """

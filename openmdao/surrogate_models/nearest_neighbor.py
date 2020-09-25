@@ -68,8 +68,6 @@ class NearestNeighbor(SurrogateModel):
             Model responses at given inputs.
         """
         super().train(x, y)
-        nn_opts = self.interpolant_init_args
-        nn_opts['parent_name'] = self._parent_name
         self.interpolant = _interpolators[self.options['interpolant_type']](
             x, y, **self.interpolant_init_args)
 
