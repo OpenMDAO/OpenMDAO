@@ -904,19 +904,6 @@ class TestExecComp(unittest.TestCase):
         J = p.compute_totals(of=['comp.y2'], wrt=['comp.x2'], return_format='array')
         self.assertTrue(np.all(3.0*np.identity(5) == J))
 
-
-    def test_junk(self):
-        p = om.Problem()
-        model = p.model
-        comp1 = om.ExecComp('y1=2.0*x1+1.', x1=1.0)
-        comp2 = om.ExecComp('y2=3.0*x2-1.', x2=2.0)
-        model.add_subsystem('comp1', comp1)
-        model.add_subsystem('comp2', comp2)
-        p.setup()
-        p.run_model()
-        J = p.compute_totals(of=['comp2.y2'], wrt=['comp1.x1'], return_format='array')
-        print(J)
-
     def test_has_diag_partials_shape_only(self):
         p = om.Problem()
         model = p.model
