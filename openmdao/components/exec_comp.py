@@ -325,7 +325,6 @@ class ExecComp(ExplicitComponent):
             lhs, _ = expr.split('=', 1)
             outs = self._parse_for_out_vars(lhs)
             all = self._parse_for_vars(expr)  # gets in and out
-            outs = sorted(outs)
             ins = sorted(set(all) - set(outs))
             outs = sorted(outs)
             for out in outs:
@@ -483,9 +482,10 @@ class ExecComp(ExplicitComponent):
                     self._residuals.set_val(0.0)
                     self.compute(pwrap, uwrap)
 
-                    for u in out_names:
-                        # set the column in the Jacobian entry
-                        partials[(u, input)][:, i] = imag(uwrap[u] * inv_stepsize).flat
+                    for out, inp in self._declared_partials.keys():
+                        if inp == input:
+                            # set the column in the Jacobian entry
+                            partials[(out, input)][:, i] = imag(uwrap[out] * inv_stepsize).flat
 
                     # restore old input value
                     pwrap[input][idx] -= step

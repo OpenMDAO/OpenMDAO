@@ -804,8 +804,6 @@ class TestExecComp(unittest.TestCase):
 
     def test_has_diag_partials(self):
         # Really check to see that the has_diag_partials argument had its intended effect
-        import numpy as np
-        import openmdao.api as om
 
         # run with has_diag_partials=False
         p = om.Problem()
@@ -832,9 +830,40 @@ class TestExecComp(unittest.TestCase):
         self.assertListEqual([0,1,2,3,4], list( comp._declared_partials[('y','x')]['cols']))
 
     def test_exec_comp_deriv_sparsity(self):
+        # Check to make sure that when an ExecComp has more than one
+        # expression that only the partials that are needed are declared and computed
+
+        # with has_diag_partials set to the default of False and just scalars
         p = om.Problem()
         model = p.model
-        comp = om.ExecComp(['y1=2.0*x1+1.', 'y2=3.0*x2-1.'])
+        comp = om.ExecComp(['y1=2.0*x1+1.', 'y2=3.0*x2-1.'],x1=1.0, x2=2.0)
+        model.add_subsystem('comp', comp)
+        p.setup()
+
+        # make sure only the partials that are needed are declared
+        declared_partials = comp._declared_partials
+        self.assertListEqual( sorted([('y1', 'x1'), ('y2', 'x2') ]),
+                              sorted(declared_partials.keys()))
+
+        p.run_model()
+
+        # make sure only what is needed was computed
+        subjacs_info = comp._jacobian._subjacs_info
+        self.assertListEqual(sorted([('comp.y1', 'comp.x1'), ('comp.y2', 'comp.x2'),
+                                     ('comp.y1', 'comp.y1'),('comp.y2', 'comp.y2')]),
+                             sorted(subjacs_info.keys()))
+
+        # make sure the result of compute_partials is correct
+        J = p.compute_totals(of=['comp.y1'], wrt=['comp.x1'], return_format='array')
+        self.assertEqual(2.0, J)
+        J = p.compute_totals(of=['comp.y2'], wrt=['comp.x2'], return_format='array')
+        self.assertEqual(3.0, J)
+
+        # make sure this works with arrays and when has_diag_partials is the default of False
+        p = om.Problem()
+        model = p.model
+        comp = om.ExecComp(['y1=2.0*x1+1.', 'y2=3.0*x2-1.'],
+                           x1=np.ones(5), y1=np.ones(5), x2=np.ones(5), y2=np.ones(5))
         model.add_subsystem('comp', comp)
         p.setup()
 
@@ -842,7 +871,13 @@ class TestExecComp(unittest.TestCase):
         self.assertListEqual( sorted([('y1', 'x1'), ('y2', 'x2') ]),
                               sorted(declared_partials.keys()))
 
-        # with has_diag_partials True
+        p.run_model()
+        J = p.compute_totals(of=['comp.y1'], wrt=['comp.x1'], return_format='array')
+        self.assertTrue(np.all(2.0*np.identity(5) == J))
+        J = p.compute_totals(of=['comp.y2'], wrt=['comp.x2'], return_format='array')
+        self.assertTrue(np.all(3.0*np.identity(5) == J))
+
+        # with has_diag_partials True to make sure that still works with arrays
         p = om.Problem()
         model = p.model
         comp = om.ExecComp(['y1=2.0*x1+1.', 'y2=3.0*x2-1.'], has_diag_partials=True,
@@ -861,6 +896,26 @@ class TestExecComp(unittest.TestCase):
         self.assertListEqual([0,1,2,3,4], list( comp._declared_partials[('y1','x1')]['cols']))
         self.assertListEqual([0,1,2,3,4], list( comp._declared_partials[('y2','x2')]['rows']))
         self.assertListEqual([0,1,2,3,4], list( comp._declared_partials[('y2','x2')]['cols']))
+
+        p.run_model()
+
+        J = p.compute_totals(of=['comp.y1'], wrt=['comp.x1'], return_format='array')
+        self.assertTrue(np.all(2.0*np.identity(5) == J))
+        J = p.compute_totals(of=['comp.y2'], wrt=['comp.x2'], return_format='array')
+        self.assertTrue(np.all(3.0*np.identity(5) == J))
+
+
+    def test_junk(self):
+        p = om.Problem()
+        model = p.model
+        comp1 = om.ExecComp('y1=2.0*x1+1.', x1=1.0)
+        comp2 = om.ExecComp('y2=3.0*x2-1.', x2=2.0)
+        model.add_subsystem('comp1', comp1)
+        model.add_subsystem('comp2', comp2)
+        p.setup()
+        p.run_model()
+        J = p.compute_totals(of=['comp2.y2'], wrt=['comp1.x1'], return_format='array')
+        print(J)
 
     def test_has_diag_partials_shape_only(self):
         p = om.Problem()
