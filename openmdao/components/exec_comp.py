@@ -482,10 +482,10 @@ class ExecComp(ExplicitComponent):
                     self._residuals.set_val(0.0)
                     self.compute(pwrap, uwrap)
 
-                    for out, inp in self._declared_partials.keys():
-                        if inp == input:
+                    for u in out_names:
+                        if (u, input) in self._declared_partials:
                             # set the column in the Jacobian entry
-                            partials[(out, input)][:, i] = imag(uwrap[out] * inv_stepsize).flat
+                            partials[(u, input)][:, i] = imag(uwrap[u] * inv_stepsize).flat
 
                     # restore old input value
                     pwrap[input][idx] -= step
