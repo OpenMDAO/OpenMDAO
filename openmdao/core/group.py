@@ -1661,13 +1661,14 @@ class Group(System):
             in_units = allprocs_abs2meta_in[abs_in]['units']
 
             if out_units:
-                unit = _find_unit(out_units)
-                base_powers = any(i >= 1 for i in unit._powers)
-                if not in_units and base_powers:
+                out_unit_meta = _find_unit(out_units) if out_units else None
+                out_unit_base_powers = any(i >= 1 for i in out_unit_meta._powers)
+
+                if not in_units and out_unit_base_powers:
                     msg = f"{self.msginfo}: Output '{abs_out}' with units of '{out_units}' " + \
                           f"is connected to input '{abs_in}' which has no units."
                     simple_warning(msg)
-                elif base_powers and not is_compatible(in_units, out_units):
+                elif out_unit_base_powers and not is_compatible(in_units, out_units):
                     msg = f"{self.msginfo}: Output units of '{out_units}' for '{abs_out}' " + \
                           f"are incompatible with input units of '{in_units}' for '{abs_in}'."
                     if self._raise_connection_errors:
@@ -1675,9 +1676,12 @@ class Group(System):
                     else:
                         simple_warning(msg)
             elif in_units is not None:
-                msg = f"{self.msginfo}: Input '{abs_in}' with units of '{in_units}' is " + \
-                      f"connected to output '{abs_out}' which has no units."
-                simple_warning(msg)
+                in_unit_meta = _find_unit(in_units) if in_units else None
+                in_unit_base_powers = any(i >= 1 for i in in_unit_meta._powers)
+                if in_unit_base_powers:
+                    msg = f"{self.msginfo}: Input '{abs_in}' with units of '{in_units}' is " + \
+                        f"connected to output '{abs_out}' which has no units."
+                    simple_warning(msg)
 
             fail = False
 
