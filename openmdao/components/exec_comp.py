@@ -209,7 +209,7 @@ class ExecComp(ExplicitComponent):
             if name in kwargs:
                 options[name] = kwargs.pop(name)
 
-        super(ExecComp, self).__init__(**options)
+        super().__init__(**options)
 
         # if complex step is used for derivatives, this is the stepsize
         self.complex_stepsize = 1.e-40
@@ -321,27 +321,31 @@ class ExecComp(ExplicitComponent):
             else:
                 self.add_input(var, val, **meta)
 
-        if self.options['has_diag_partials']:
-            # check that sizes of any input/output vars match or one of them is size 1
-            osorted = sorted(self._var_rel_names['output'])
-            for inp in sorted(self._var_rel_names['input']):
-                ival = init_vals[inp]
-                iarray = isinstance(ival, ndarray) and ival.size > 1
-                for out in osorted:
-                    oval = init_vals[out]
-                    if iarray and isinstance(oval, ndarray) and oval.size > 1:
-                        if oval.size != ival.size:
-                            raise RuntimeError("%s: has_diag_partials is True but partial(%s, %s) "
-                                               "is not square (shape=(%d, %d))." %
-                                               (self.msginfo, out, inp, oval.size, ival.size))
-                        # partial will be declared as diagonal
-                        inds = np.arange(oval.size, dtype=int)
+        for expr in self._exprs:
+            lhs, _ = expr.split('=', 1)
+            outs = self._parse_for_out_vars(lhs)
+            all = self._parse_for_vars(expr)  # gets in and out
+            ins = sorted(set(all) - set(outs))
+            outs = sorted(outs)
+            for out in outs:
+                for inp in ins:
+                    if self.options['has_diag_partials']:
+                        ival = init_vals[inp]
+                        iarray = isinstance(ival, ndarray) and ival.size > 1
+                        oval = init_vals[out]
+                        if iarray and isinstance(oval, ndarray) and oval.size > 1:
+                            if oval.size != ival.size:
+                                raise RuntimeError(
+                                    "%s: has_diag_partials is True but partial(%s, %s) "
+                                    "is not square (shape=(%d, %d))." %
+                                    (self.msginfo, out, inp, oval.size, ival.size))
+                            # partial will be declared as diagonal
+                            inds = np.arange(oval.size, dtype=int)
+                        else:
+                            inds = None
+                        self.declare_partials(of=out, wrt=inp, rows=inds, cols=inds)
                     else:
-                        inds = None
-                    self.declare_partials(of=out, wrt=inp, rows=inds, cols=inds)
-        else:
-            # All derivatives are defined as dense
-            self.declare_partials(of='*', wrt='*')
+                        self.declare_partials(of=out, wrt=inp)
 
         self._codes = self._compile_exprs(self._exprs)
 
@@ -462,7 +466,8 @@ class ExecComp(ExplicitComponent):
                 self.compute(pwrap, uwrap)
 
                 for u in out_names:
-                    partials[(u, input)] = imag(uwrap[u] * inv_stepsize).flat
+                    if (u, input) in self._declared_partials:
+                        partials[(u, input)] = imag(uwrap[u] * inv_stepsize).flat
 
                 # restore old input value
                 pwrap[input] -= step
@@ -478,8 +483,9 @@ class ExecComp(ExplicitComponent):
                     self.compute(pwrap, uwrap)
 
                     for u in out_names:
-                        # set the column in the Jacobian entry
-                        partials[(u, input)][:, i] = imag(uwrap[u] * inv_stepsize).flat
+                        if (u, input) in self._declared_partials:
+                            # set the column in the Jacobian entry
+                            partials[(u, input)][:, i] = imag(uwrap[u] * inv_stepsize).flat
 
                     # restore old input value
                     pwrap[input][idx] -= step

@@ -8,7 +8,7 @@ from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 class MockSurrogate(om.MultiFiSurrogateModel):
 
     def __init__(self):
-        super(MockSurrogate, self).__init__()
+        super().__init__()
         self.xtrain = None
         self.ytrain = None
 
@@ -372,8 +372,8 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             prob.run_model()
 
-        expected = ("mm: Multiple input features cannot have the same value.")
-        self.assertEqual(str(cm.exception), expected)
+        self.assertEqual(str(cm.exception), "MultiFiMetaModelUnStructuredComp (mm): "
+                         "Error calling compute(), Multiple input features cannot have the same value.")
 
     def test_om_slice_in_add_input(self):
 

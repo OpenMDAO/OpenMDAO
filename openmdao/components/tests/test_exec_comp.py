@@ -490,31 +490,25 @@ class TestExecComp(unittest.TestCase):
     def test_shape_and_value(self):
         p = om.Problem()
         model = p.model
-        model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(5)))
 
         model.add_subsystem('comp', om.ExecComp('y=3.0*x + 2.5',
                                                 x={'shape': (5,), 'value': np.zeros(5)},
                                                 y={'shape': (5,), 'value': np.zeros(5)}))
 
-        model.connect('indep.x', 'comp.x')
-
         p.setup()
         p.run_model()
 
-        J = p.compute_totals(of=['comp.y'], wrt=['indep.x'], return_format='array')
+        J = p.compute_totals(of=['comp.y'], wrt=['comp.x'], return_format='array')
 
         assert_almost_equal(J, np.eye(5)*3., decimal=6)
 
     def test_conflicting_shape(self):
         p = om.Problem()
         model = p.model
-        model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(5)))
 
         model.add_subsystem('comp', om.ExecComp('y=3.0*x + 2.5',
                                                 x={'shape': (5,), 'value': 5},
                                                 y={'shape': (5,)}))
-
-        model.connect('indep.x', 'comp.x')
 
         with self.assertRaises(Exception) as context:
             p.setup()
@@ -526,46 +520,37 @@ class TestExecComp(unittest.TestCase):
     def test_common_shape(self):
         p = om.Problem()
         model = p.model
-        model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(5)))
 
         model.add_subsystem('comp', om.ExecComp('y=3.0*x + 2.5', shape=(5,)))
-
-        model.connect('indep.x', 'comp.x')
 
         p.setup()
         p.run_model()
 
-        J = p.compute_totals(of=['comp.y'], wrt=['indep.x'], return_format='array')
+        J = p.compute_totals(of=['comp.y'], wrt=['comp.x'], return_format='array')
 
         assert_almost_equal(J, np.eye(5)*3., decimal=6)
 
     def test_common_shape_with_values(self):
         p = om.Problem()
         model = p.model
-        model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(5)))
 
         model.add_subsystem('comp', om.ExecComp('y=3.0*x + 2.5', shape=(5,),
                                                 x={'value': np.zeros(5)},
                                                 y={'value': np.zeros(5)}))
 
-        model.connect('indep.x', 'comp.x')
-
         p.setup()
         p.run_model()
 
-        J = p.compute_totals(of=['comp.y'], wrt=['indep.x'], return_format='array')
+        J = p.compute_totals(of=['comp.y'], wrt=['comp.x'], return_format='array')
 
         assert_almost_equal(J, np.eye(5)*3., decimal=6)
 
     def test_common_shape_conflicting_shape(self):
         p = om.Problem()
         model = p.model
-        model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(5)))
 
         model.add_subsystem('comp', om.ExecComp('y=3.0*x + 2.5', shape=(5,),
                                                 y={'shape': (10,)}))
-
-        model.connect('indep.x', 'comp.x')
 
         with self.assertRaises(Exception) as context:
             p.setup()
@@ -577,12 +562,9 @@ class TestExecComp(unittest.TestCase):
     def test_common_shape_conflicting_value(self):
         p = om.Problem()
         model = p.model
-        model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(5)))
 
         model.add_subsystem('comp', om.ExecComp('y=3.0*x + 2.5', shape=(5,),
                                                 x={'value': 5}))
-
-        model.connect('indep.x', 'comp.x')
 
         with self.assertRaises(Exception) as context:
             p.setup()
@@ -687,12 +669,9 @@ class TestExecComp(unittest.TestCase):
 
     def test_simple_array_model(self):
         prob = om.Problem()
-        prob.model.add_subsystem('p1', om.IndepVarComp('x', np.ones([2])))
         prob.model.add_subsystem('comp', om.ExecComp(['y[0]=2.0*x[0]+7.0*x[1]',
                                                       'y[1]=5.0*x[0]-3.0*x[1]'],
                                                      x=np.zeros([2]), y=np.zeros([2])))
-
-        prob.model.connect('p1.x', 'comp.x')
 
         prob.setup()
         prob.set_solver_print(level=0)
@@ -704,12 +683,9 @@ class TestExecComp(unittest.TestCase):
 
     def test_simple_array_model2(self):
         prob = om.Problem()
-        prob.model.add_subsystem('p1', om.IndepVarComp('x', np.ones([2])))
         prob.model.add_subsystem('comp', om.ExecComp('y = mat.dot(x)',
                                                      x=np.zeros((2,)), y=np.zeros((2,)),
                                                      mat=np.array([[2., 7.], [5., -3.]])))
-
-        prob.model.connect('p1.x', 'comp.x')
 
         prob.setup()
         prob.set_solver_print(level=0)
@@ -742,22 +718,20 @@ class TestExecComp(unittest.TestCase):
 
     def test_complex_step2(self):
         prob = om.Problem(om.Group())
-        prob.model.add_subsystem('p1', om.IndepVarComp('x', 2.0))
-        prob.model.add_subsystem('comp', om.ExecComp('y=x*x + x*2.0'))
-        prob.model.connect('p1.x', 'comp.x')
+        prob.model.add_subsystem('comp', om.ExecComp('y=x*x + x*2.0', x=2.0))
         prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
 
-        J = prob.compute_totals(['comp.y'], ['p1.x'], return_format='flat_dict')
-        assert_near_equal(J['comp.y', 'p1.x'], np.array([[6.0]]), 0.00001)
+        J = prob.compute_totals(['comp.y'], ['comp.x'], return_format='flat_dict')
+        assert_near_equal(J['comp.y', 'comp.x'], np.array([[6.0]]), 0.00001)
 
         prob.setup(check=False, mode='rev')
         prob.run_model()
 
-        J = prob.compute_totals(['comp.y'], ['p1.x'], return_format='flat_dict')
-        assert_near_equal(J['comp.y', 'p1.x'], np.array([[6.0]]), 0.00001)
+        J = prob.compute_totals(['comp.y'], ['comp.x'], return_format='flat_dict')
+        assert_near_equal(J['comp.y', 'comp.x'], np.array([[6.0]]), 0.00001)
 
     def test_abs_complex_step(self):
         prob = om.Problem()
@@ -818,43 +792,139 @@ class TestExecComp(unittest.TestCase):
     def test_has_diag_partials_error(self):
         p = om.Problem()
         model = p.model
-        model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(3)))
-        model.add_design_var('indep.x')
 
         mat = np.arange(15).reshape((3,5))
-        model.add_subsystem('comp', om.ExecComp('y=A.dot(x)', has_diag_partials=True, A=mat, x=np.ones(5), y=np.ones(3)))
-        model.connect('indep.x', 'comp.x')
+        model.add_subsystem('comp', om.ExecComp('y=A.dot(x)', has_diag_partials=True, A=mat,
+                                                x=np.ones(5), y=np.ones(3)))
 
         with self.assertRaises(Exception) as context:
             p.setup()
         self.assertEqual(str(context.exception),
                          "ExecComp (comp): has_diag_partials is True but partial(y, A) is not square (shape=(3, 15)).")
 
+    def test_has_diag_partials(self):
+        # Really check to see that the has_diag_partials argument had its intended effect
+
+        # run with has_diag_partials=False
+        p = om.Problem()
+        model = p.model
+        comp = om.ExecComp('y=3.0*x + 2.5', has_diag_partials=False, x=np.ones(5), y=np.ones(5))
+        model.add_subsystem('comp', comp)
+        p.setup()
+
+        declared_partials = comp._declared_partials[('y','x')]
+        self.assertTrue('rows' not in declared_partials )
+        self.assertTrue('cols' not in declared_partials )
+
+        # run with has_diag_partials=True
+        p = om.Problem()
+        model = p.model
+        comp = om.ExecComp('y=3.0*x + 2.5', has_diag_partials=True, x=np.ones(5), y=np.ones(5))
+        model.add_subsystem('comp', comp)
+        p.setup()
+
+        declared_partials = comp._declared_partials[('y','x')]
+        self.assertTrue('rows' in declared_partials )
+        self.assertListEqual([0,1,2,3,4], list( comp._declared_partials[('y','x')]['rows']))
+        self.assertTrue('cols' in declared_partials )
+        self.assertListEqual([0,1,2,3,4], list( comp._declared_partials[('y','x')]['cols']))
+
+    def test_exec_comp_deriv_sparsity(self):
+        # Check to make sure that when an ExecComp has more than one
+        # expression that only the partials that are needed are declared and computed
+
+        # with has_diag_partials set to the default of False and just scalars
+        p = om.Problem()
+        model = p.model
+        comp = om.ExecComp(['y1=2.0*x1+1.', 'y2=3.0*x2-1.'],x1=1.0, x2=2.0)
+        model.add_subsystem('comp', comp)
+        p.setup()
+
+        # make sure only the partials that are needed are declared
+        declared_partials = comp._declared_partials
+        self.assertListEqual( sorted([('y1', 'x1'), ('y2', 'x2') ]),
+                              sorted(declared_partials.keys()))
+
+        p.run_model()
+
+        # make sure only what is needed was computed
+        subjacs_info = comp._jacobian._subjacs_info
+        self.assertListEqual(sorted([('comp.y1', 'comp.x1'), ('comp.y2', 'comp.x2'),
+                                     ('comp.y1', 'comp.y1'),('comp.y2', 'comp.y2')]),
+                             sorted(subjacs_info.keys()))
+
+        # make sure the result of compute_partials is correct
+        J = p.compute_totals(of=['comp.y1'], wrt=['comp.x1'], return_format='array')
+        self.assertEqual(2.0, J)
+        J = p.compute_totals(of=['comp.y2'], wrt=['comp.x2'], return_format='array')
+        self.assertEqual(3.0, J)
+
+        # make sure this works with arrays and when has_diag_partials is the default of False
+        p = om.Problem()
+        model = p.model
+        comp = om.ExecComp(['y1=2.0*x1+1.', 'y2=3.0*x2-1.'],
+                           x1=np.ones(5), y1=np.ones(5), x2=np.ones(5), y2=np.ones(5))
+        model.add_subsystem('comp', comp)
+        p.setup()
+
+        declared_partials = comp._declared_partials
+        self.assertListEqual( sorted([('y1', 'x1'), ('y2', 'x2') ]),
+                              sorted(declared_partials.keys()))
+
+        p.run_model()
+        J = p.compute_totals(of=['comp.y1'], wrt=['comp.x1'], return_format='array')
+        self.assertTrue(np.all(2.0*np.identity(5) == J))
+        J = p.compute_totals(of=['comp.y2'], wrt=['comp.x2'], return_format='array')
+        self.assertTrue(np.all(3.0*np.identity(5) == J))
+
+        # with has_diag_partials True to make sure that still works with arrays
+        p = om.Problem()
+        model = p.model
+        comp = om.ExecComp(['y1=2.0*x1+1.', 'y2=3.0*x2-1.'], has_diag_partials=True,
+                           x1=np.ones(5), y1=np.ones(5), x2=np.ones(5), y2=np.ones(5) )
+        model.add_subsystem('comp', comp)
+        p.setup()
+
+        declared_partials = comp._declared_partials
+        self.assertListEqual( sorted([('y1', 'x1'), ('y2', 'x2') ]),
+                              sorted(declared_partials.keys()))
+        self.assertTrue('cols' in declared_partials[('y1', 'x1')] )
+        self.assertTrue('rows' in declared_partials[('y1', 'x1')] )
+        self.assertTrue('cols' in declared_partials[('y2', 'x2')] )
+        self.assertTrue('rows' in declared_partials[('y2', 'x2')] )
+        self.assertListEqual([0,1,2,3,4], list( comp._declared_partials[('y1','x1')]['rows']))
+        self.assertListEqual([0,1,2,3,4], list( comp._declared_partials[('y1','x1')]['cols']))
+        self.assertListEqual([0,1,2,3,4], list( comp._declared_partials[('y2','x2')]['rows']))
+        self.assertListEqual([0,1,2,3,4], list( comp._declared_partials[('y2','x2')]['cols']))
+
+        p.run_model()
+
+        J = p.compute_totals(of=['comp.y1'], wrt=['comp.x1'], return_format='array')
+        self.assertTrue(np.all(2.0*np.identity(5) == J))
+        J = p.compute_totals(of=['comp.y2'], wrt=['comp.x2'], return_format='array')
+        self.assertTrue(np.all(3.0*np.identity(5) == J))
+
     def test_has_diag_partials_shape_only(self):
         p = om.Problem()
         model = p.model
-        model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(5)))
 
         model.add_subsystem('comp', om.ExecComp('y=3.0*x + 2.5', has_diag_partials=True,
                                                 x={'shape': (5,)}, y={'shape': (5,)}))
-        model.connect('indep.x', 'comp.x')
 
         p.setup()
         p.run_model()
 
-        J = p.compute_totals(of=['comp.y'], wrt=['indep.x'], return_format='array')
+        J = p.compute_totals(of=['comp.y'], wrt=['comp.x'], return_format='array')
 
         assert_almost_equal(J, np.eye(5)*3., decimal=6)
 
     def test_tags(self):
         prob = om.Problem(model=om.Group())
-        prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0, units='cm'))
         C1 = prob.model.add_subsystem('C1', om.ExecComp('y=x+z+1.',
                                                      x={'value': 1.0, 'units': 'm', 'tags': 'tagx'},
                                                      y={'units': 'm', 'tags': ['tagy','tagq']},
                                                      z={'value': 2.0, 'tags': 'tagz'},
                                                      ))
-        prob.model.connect('indep.x', 'C1.x')
 
         prob.setup(check=False)
 
@@ -889,7 +959,6 @@ class TestExecComp(unittest.TestCase):
         outputs = prob.model.list_outputs(values=False, out_stream=None)
         self.assertEqual(sorted(outputs), [
             ('C1.y', {}),
-            ('indep.x', {}),
         ])
 
         # Outputs with tags
@@ -1011,9 +1080,7 @@ class TestExecComp(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p', om.IndepVarComp('x', np.array([1., 2., 3.])))
-        model.add_subsystem('comp', om.ExecComp('y=sum(x)', x=np.zeros((3, ))))
-        model.connect('p.x', 'comp.x')
+        model.add_subsystem('comp', om.ExecComp('y=sum(x)', x=np.array([1., 2., 3.])))
 
         prob.setup()
 

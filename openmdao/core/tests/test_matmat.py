@@ -83,7 +83,7 @@ class QCVProblem(om.Problem):
     """
 
     def __init__(self, comp_class=QuadraticCompVectorized):
-        super(QCVProblem, self).__init__()
+        super().__init__()
 
         model = self.model
 
@@ -786,7 +786,7 @@ class MatMatTestCase(unittest.TestCase):
 class JacVec(om.ExplicitComponent):
 
     def __init__(self, size):
-        super(JacVec, self).__init__()
+        super().__init__()
         self.size = size
 
     def setup(self):

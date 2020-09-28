@@ -27,7 +27,7 @@ class MuxComp(ExplicitComponent):
         **kwargs : dict
             Arguments to be passed to the component initialization method.
         """
-        super(MuxComp, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self._vars = {}
         self._input_names = {}

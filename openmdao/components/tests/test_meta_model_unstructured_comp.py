@@ -951,7 +951,7 @@ class MetaModelTestCase(unittest.TestCase):
     def test_metamodel_setup_called_twice_bug_called_outside_setup(self):
         class Trig(om.MetaModelUnStructuredComp):
             def __init__(self):
-                super(Trig, self).__init__()
+                super().__init__()
                 self.add_input('x', 0.,
                                training_data=np.linspace(0, 10, 20))
 
@@ -1065,8 +1065,8 @@ class MetaModelTestCase(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             prob.run_model()
 
-        self.assertEqual(str(cm.exception), 'sin_mm: KrigingSurrogate requires at least'
-                                            ' 2 training points.')
+        self.assertEqual(str(cm.exception), 'MetaModelUnStructuredComp (sin_mm): '
+                         'Error calling compute(), KrigingSurrogate requires at least 2 training points.')
 
 
 class MetaModelUnstructuredSurrogatesFeatureTestCase(unittest.TestCase):

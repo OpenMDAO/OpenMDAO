@@ -23,7 +23,7 @@ class RBFInterpolator(NNBase):
         Weights for each interpolation point.
     """
 
-    def __init__(self, training_points, training_values, num_leaves=2, parent_name='',
+    def __init__(self, training_points, training_values, num_leaves=2,
                  num_neighbors=5, rbf_family=2):
         """
         Initialize all attributes.
@@ -36,8 +36,6 @@ class RBFInterpolator(NNBase):
             ndarray of shape (num_points x dependent dims) containing training output values.
         num_leaves : int
             How many leaves the tree should have.
-        parent_name : str
-            Absolute pathname of metamodel component that owns this surrogate.
         num_neighbors : int
             The number of neighbors to use for interpolation.
         rbf_family : int
@@ -45,8 +43,7 @@ class RBFInterpolator(NNBase):
             <-2> uses an 11th order, <-1> uses a 9th order, and any value from <0> to <4> uses an
             order equal to <floor((dimensions-1)/2) + (3*comp) +1>.
         """
-        super(RBFInterpolator, self).__init__(training_points, training_values, num_leaves,
-                                              parent_name=parent_name)
+        super().__init__(training_points, training_values, num_leaves)
 
         if self._ntpts < num_neighbors:
             self._raise('RBFInterpolator only given {0} training points, '

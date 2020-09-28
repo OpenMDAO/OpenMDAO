@@ -28,7 +28,7 @@ class InterpLinear(InterpAlgorithm):
         **kwargs : dict
             Interpolator-specific options to pass onward.
         """
-        super(InterpLinear, self).__init__(grid, values, interp, **kwargs)
+        super().__init__(grid, values, interp, **kwargs)
         self.k = 2
         self._name = 'slinear'
 

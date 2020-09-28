@@ -53,7 +53,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Component options.
         """
-        super(MetaModelUnStructuredComp, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # keep list of inputs and outputs that are not the training vars
         self._surrogate_input_names = []
@@ -95,7 +95,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         self._surrogate_output_names.extend(self._static_surrogate_output_names)
         self._input_size = self._static_input_size
 
-        super(MetaModelUnStructuredComp, self)._setup_procs(pathname, comm, mode, prob_meta)
+        super()._setup_procs(pathname, comm, mode, prob_meta)
 
     def initialize(self):
         """
@@ -128,13 +128,13 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         dict
             metadata for added variable
         """
-        metadata = super(MetaModelUnStructuredComp, self).add_input(name, val, **kwargs)
+        metadata = super().add_input(name, val, **kwargs)
         vec_size = self.options['vec_size']
 
         if vec_size > 1:
             if metadata['shape'][0] != vec_size:
-                raise RuntimeError("%s: First dimension of input '%s' must be %d"
-                                   % (self.msginfo, name, vec_size))
+                raise RuntimeError(f"{self.msginfo}: First dimension of input '{name}' "
+                                   f"must be {vec_size}")
             input_size = metadata['value'][0].size
         else:
             input_size = metadata['value'].size
@@ -177,13 +177,13 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         dict
             metadata for added variable
         """
-        metadata = super(MetaModelUnStructuredComp, self).add_output(name, val, **kwargs)
+        metadata = super().add_output(name, val, **kwargs)
         vec_size = self.options['vec_size']
 
         if vec_size > 1:
             if metadata['shape'][0] != vec_size:
-                raise RuntimeError("%s: First dimension of output '%s' must be %d"
-                                   % (self.msginfo, name, vec_size))
+                raise RuntimeError(f"{self.msginfo}: First dimension of output '{name}' "
+                                   f"must be {vec_size}")
             output_shape = metadata['shape'][1:]
             if len(output_shape) == 0:
                 output_shape = 1
@@ -229,13 +229,10 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                 surrogate = deepcopy(default_surrogate)
                 metadata['surrogate'] = surrogate
 
-            if 'surrogate' in metadata:
-                metadata['surrogate']._setup_var_data(self.pathname)
-
         # training will occur on first execution after setup
         self.train = True
 
-        super(MetaModelUnStructuredComp, self)._setup_var_data()
+        super()._setup_var_data()
 
     def _setup_partials(self):
         """
@@ -243,7 +240,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
         Metamodel needs to declare its partials after inputs and outputs are known.
         """
-        super(MetaModelUnStructuredComp, self)._setup_partials()
+        super()._setup_partials()
 
         vec_size = self.options['vec_size']
         if vec_size > 1:
@@ -502,8 +499,8 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         """
         if method == 'cs':
             raise ValueError('Complex step has not been tested for MetaModelUnStructuredComp')
-        super(MetaModelUnStructuredComp, self).declare_partials(of, wrt, dependent, rows, cols,
-                                                                val, method, step, form, step_calc)
+        super().declare_partials(of, wrt, dependent, rows, cols,
+                                 val, method, step, form, step_calc)
 
     def compute_partials(self, inputs, partials):
         """
@@ -563,17 +560,13 @@ class MetaModelUnStructuredComp(ExplicitComponent):
             if num_sample is None:
                 num_sample = len(val)
             elif len(val) != num_sample:
-                msg = "{}: Each variable must have the same number"\
-                      " of training points. Expected {} but found {} "\
-                      "points for '{}'."\
-                      .format(self.msginfo, num_sample, len(val), name)
-                raise RuntimeError(msg)
+                raise RuntimeError(f"{self.msginfo}: Each variable must have the same number "
+                                   f"of training points. Expected {num_sample} but found "
+                                   f"{len(val)} points for '{name}'.")
 
         if len(missing_training_data) > 0:
-            msg = "%s: The following training data sets must be " \
-                  "provided as options: " % self.msginfo + \
-                  str(missing_training_data)
-            raise RuntimeError(msg)
+            raise RuntimeError(f"{self.msginfo}: The following training data sets must be "
+                               f"provided as options: {missing_training_data}")
 
         inputs = np.zeros((num_sample, self._input_size))
         self._training_input = inputs
@@ -608,8 +601,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
             surrogate = self._metadata(name).get('surrogate')
             if surrogate is None:
-                raise RuntimeError("%s: No surrogate specified for output '%s'"
-                                   % (self.msginfo, name))
+                raise RuntimeError(f"{self.msginfo}: No surrogate specified for output '{name}'")
             else:
                 surrogate.train(self._training_input,
                                 self._training_output[name])

@@ -52,7 +52,7 @@ class KrigingSurrogate(SurrogateModel):
         **kwargs : dict
             options dictionary.
         """
-        super(KrigingSurrogate, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.n_dims = 0                 # number of independent
         self.n_samples = 0              # number of training points
@@ -102,15 +102,14 @@ class KrigingSurrogate(SurrogateModel):
         y : array-like
             Model responses at given inputs.
         """
-        super(KrigingSurrogate, self).train(x, y)
+        super().train(x, y)
 
         x, y = np.atleast_2d(x, y)
 
         self.n_samples, self.n_dims = x.shape
 
         if self.n_samples <= 1:
-            self._raise('KrigingSurrogate requires at least 2 training points.',
-                        exc_type=ValueError)
+            raise ValueError('KrigingSurrogate requires at least 2 training points.')
 
         # Normalize the data
         X_mean = np.mean(x, axis=0)
@@ -141,8 +140,7 @@ class KrigingSurrogate(SurrogateModel):
                              bounds=bounds)
 
         if not optResult.success:
-            msg = 'Kriging Hyper-parameter optimization failed: {0}'.format(optResult.message)
-            self._raise(msg, exc_type=ValueError)
+            raise ValueError(f'Kriging Hyper-parameter optimization failed: {optResult.message}')
 
         self.thetas = np.exp(optResult.x)
         _, params = self._calculate_reduced_likelihood_params()
@@ -225,7 +223,7 @@ class KrigingSurrogate(SurrogateModel):
         ndarray, optional (if eval_rmse is True)
             Root mean square of the prediction error.
         """
-        super(KrigingSurrogate, self).predict(x)
+        super().predict(x)
 
         thetas = self.thetas
         if isinstance(x, list):

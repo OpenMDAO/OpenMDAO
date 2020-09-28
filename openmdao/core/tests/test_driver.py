@@ -817,7 +817,7 @@ class TestDriverMPI(unittest.TestCase):
         class MyDriver(Driver):
 
             def __init__(self, generator=None, **kwargs):
-                super(MyDriver, self).__init__(**kwargs)
+                super().__init__(**kwargs)
                 self.supports['distributed_design_vars'] = False
                 self.supports._read_only = True
 

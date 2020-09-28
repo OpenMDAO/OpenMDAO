@@ -245,7 +245,8 @@ class TestAnalysisErrorExplicit(unittest.TestCase):
         with self.assertRaises(om.AnalysisError) as context:
             top.run_model()
 
-        self.assertEqual(str(context.exception), 'Try Again.')
+        self.assertEqual(str(context.exception),
+                         'ParaboloidAE (par): Error calling compute(), Try Again.')
 
 
 class ImplCompTwoStatesAE(om.ImplicitComponent):
@@ -606,7 +607,7 @@ class SellarDis1withDerivativesMod(SellarDis1):
 class SubSellarMod(om.Group):
 
     def __init__(self, units=None, scaling=None, **kwargs):
-        super(SubSellarMod, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.add_subsystem('d1', SellarDis1withDerivativesMod(units=units, scaling=scaling),
                            promotes=['x', 'z', 'y1', 'y2'])
@@ -617,7 +618,7 @@ class SubSellarMod(om.Group):
 class DoubleSellarMod(om.Group):
 
     def __init__(self, units=None, scaling=None, **kwargs):
-        super(DoubleSellarMod, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.add_subsystem('g1', SubSellarMod(units=units, scaling=scaling))
         self.add_subsystem('g2', SubSellarMod(units=units, scaling=scaling))

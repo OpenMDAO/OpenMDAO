@@ -1116,7 +1116,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
       p.set_val('x', 0.75)
 
       msg = "Analysis Error: MetaModelStructuredComp " \
-            "(interp) Line 205 of file {}".format(inspect.getsourcefile(om.MetaModelStructuredComp))
+            "(interp) Line 203 of file {}".format(inspect.getsourcefile(om.MetaModelStructuredComp))
       with assert_warning(UserWarning, msg):
           p.run_driver()
 

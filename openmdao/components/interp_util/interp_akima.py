@@ -95,7 +95,7 @@ class InterpAkima(InterpAlgorithm):
         **kwargs : dict
             Interpolator-specific options to pass onward.
         """
-        super(InterpAkima, self).__init__(grid, values, interp, **kwargs)
+        super().__init__(grid, values, interp, **kwargs)
         self.k = 4
         self._name = 'akima'
 

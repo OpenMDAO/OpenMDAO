@@ -32,7 +32,7 @@ class ParaboloidAE(om.ExplicitComponent):
     The AE in ParaboloidAE stands for AnalysisError."""
 
     def __init__(self):
-        super(ParaboloidAE, self).__init__()
+        super().__init__()
         self.fail_hard = False
 
     def setup(self):
@@ -2459,7 +2459,7 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
 
 class MatMultCompExact(om.ExplicitComponent):
     def __init__(self, mat, sparse=False, **kwargs):
-        super(MatMultCompExact, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.mat = mat
         self.sparse = sparse
 
@@ -2497,7 +2497,7 @@ class MatMultCompExact(om.ExplicitComponent):
 
 class MyGroup(om.Group):
     def __init__(self, size=5):
-        super(MyGroup, self).__init__()
+        super().__init__()
         self.size = size
 
     def setup(self):

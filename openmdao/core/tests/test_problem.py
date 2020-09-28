@@ -2090,7 +2090,7 @@ class NestedProblemTestCase(unittest.TestCase):
                 p.setup()
                 p.run_model()
 
-                return super(_ProblemSolver, self).solve()
+                return super().solve()
 
         p = om.Problem()
         p.model.add_subsystem('indep', om.IndepVarComp('x', 1.0))

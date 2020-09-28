@@ -15,7 +15,7 @@ class {class_name}(Driver):
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Driver options.
         """
-        super({class_name}, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Specify what we support and what we don't
         self.supports['integer_design_vars'] = False
@@ -49,7 +49,7 @@ class {class_name}(Driver):
         problem : <Problem>
             Pointer to the containing problem.
         """
-        super({class_name}, self)._setup_driver(problem)
+        super()._setup_driver(problem)
 
         # perform setup actions here...
 

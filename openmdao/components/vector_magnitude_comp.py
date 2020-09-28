@@ -31,7 +31,7 @@ class VectorMagnitudeComp(ExplicitComponent):
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Component options.
         """
-        super(VectorMagnitudeComp, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self._magnitudes = []
 

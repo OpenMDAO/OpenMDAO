@@ -515,7 +515,7 @@ class NonlinearSolver(Solver):
         **kwargs : dict
             options dictionary.
         """
-        super(NonlinearSolver, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self._err_cache = OrderedDict()
 
     def _declare_options(self):
@@ -755,7 +755,7 @@ class LinearSolver(Solver):
         """
         self._rel_systems = None
         self._assembled_jac = None
-        super(LinearSolver, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
     def _assembled_jac_solver_iter(self):
         """
@@ -795,7 +795,7 @@ class LinearSolver(Solver):
         depth : int
             depth of the current system (already incremented).
         """
-        super(LinearSolver, self)._setup_solvers(system, depth)
+        super()._setup_solvers(system, depth)
         if self.options['assemble_jac'] and not self.supports['assembled_jac']:
             raise RuntimeError("Linear solver %s doesn't support assembled "
                                "jacobians." % self.msginfo)
@@ -910,7 +910,7 @@ class BlockLinearSolver(LinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        super(BlockLinearSolver, self)._declare_options()
+        super()._declare_options()
         self.supports['assembled_jac'] = False
 
     def _setup_solvers(self, system, depth):
@@ -924,7 +924,7 @@ class BlockLinearSolver(LinearSolver):
         depth : int
             depth of the current system (already incremented).
         """
-        super(BlockLinearSolver, self)._setup_solvers(system, depth)
+        super()._setup_solvers(system, depth)
         if system._use_derivatives:
             self._create_rhs_vecs()
 

@@ -316,7 +316,7 @@ class ExplicitFirstComp(ExplicitCycleComp):
         self.add_input('psi', val=1.)
         self.angle_param = 'psi'
         self._cycle_names['psi'] = 'psi'
-        super(ExplicitFirstComp, self).setup()
+        super().setup()
 
     def compute(self, inputs, outputs):
         theta = inputs[self._cycle_names['theta']]
@@ -332,14 +332,14 @@ class ExplicitLastComp(ExplicitFirstComp):
         return 'Explicit Cycle Component - Last'
 
     def setup(self):
-        super(ExplicitLastComp, self).setup()
+        super().setup()
 
         self.add_output('x_norm2', shape=(1,))
         self._n = 1
 
     def setup_partials(self):
         # Setup partials
-        super(ExplicitLastComp, self).setup_partials()
+        super().setup_partials()
 
         pd_type = self.options['partial_type']
         method = self.options['partial_method']

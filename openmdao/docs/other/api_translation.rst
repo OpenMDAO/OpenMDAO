@@ -25,7 +25,7 @@ Declare a Component with distributed variables
     class DistribComp(ExplicitComponent):
 
         def __init__(self, size):
-            super(DistribComp, self).__init__()
+            super().__init__()
             self.distributed = True
 
 
