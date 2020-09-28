@@ -24,8 +24,7 @@ from openmdao.utils.array_utils import array_connection_compatible, _flatten_src
     shape_to_len
 from openmdao.utils.general_utils import ContainsAll, simple_warning, common_subpath, \
     conditional_error, _is_slicer_op
-from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
-    valid_units
+from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit
 from openmdao.utils.mpi import MPI, check_mpi_exceptions
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.array_utils import evenly_distrib_idxs
