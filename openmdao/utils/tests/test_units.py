@@ -342,5 +342,21 @@ class TestModuleFunctions(unittest.TestCase):
         p.run_model()
         assert_near_equal(p.get_val('exec_comp.z'), 15.0)
 
+    def test_incompatible(self):
+        p = om.Problem()
+        ivc = p.model.add_subsystem('indeps', om.IndepVarComp(), promotes_outputs=['x', 'y'])
+        ivc.add_output('x', val=5.0, units='1/s*s')
+        ivc.add_output('y', val=10.0, units='Hz*s')
+        p.model.add_subsystem('exec_comp', om.ExecComp('z = x + y', z={'units': None},
+                                                       x={'units': None}, y={'units': 'ft'}),
+                              promotes_inputs=['x', 'y'])
+
+        msg = ("Group (<model>): Output units of 'Hz*s' for 'indeps.y' are incompatible with input "
+               "units of 'ft' for 'exec_comp.y'.")
+
+        with self.assertRaises(RuntimeError) as cm:
+            p.setup()
+        self.assertEqual(str(cm.exception), msg)
+
 if __name__ == "__main__":
     unittest.main()
