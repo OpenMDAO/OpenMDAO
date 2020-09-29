@@ -844,9 +844,11 @@ def _update_library(cfg):
 
 _UNIT_CACHE = {}
 
-def is_unitless(units):
+
+def _is_unitless(units):
     unit_meta = _find_unit(units) if units else None
     return any(i >= 1 for i in unit_meta._powers)
+
 
 def _find_unit(unit):
     """

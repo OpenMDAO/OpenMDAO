@@ -1662,11 +1662,11 @@ class Group(System):
             in_units = allprocs_abs2meta_in[abs_in]['units']
 
             if out_units:
-                if not in_units and is_unitless(out_units):
+                if not in_units and _is_unitless(out_units):
                     msg = f"{self.msginfo}: Output '{abs_out}' with units of '{out_units}' " + \
                           f"is connected to input '{abs_in}' which has no units."
                     simple_warning(msg)
-                elif is_unitless(out_units) and not is_compatible(in_units, out_units):
+                elif _is_unitless(out_units) and not is_compatible(in_units, out_units):
                     msg = f"{self.msginfo}: Output units of '{out_units}' for '{abs_out}' " + \
                           f"are incompatible with input units of '{in_units}' for '{abs_in}'."
                     if self._raise_connection_errors:
@@ -1674,7 +1674,7 @@ class Group(System):
                     else:
                         simple_warning(msg)
             elif in_units is not None:
-                if is_unitless(in_units):
+                if _is_unitless(in_units):
                     msg = f"{self.msginfo}: Input '{abs_in}' with units of '{in_units}' is " + \
                         f"connected to output '{abs_out}' which has no units."
                     simple_warning(msg)
