@@ -1663,7 +1663,7 @@ class Group(System):
 
             if out_units:
                 if not in_units:
-                    if _is_unitless(out_units):
+                    if not _is_unitless(out_units):
                         msg = f"{self.msginfo}: Output '{abs_out}' with units of '{out_units}' " + \
                             f"is connected to input '{abs_in}' which has no units."
                         simple_warning(msg)
@@ -1675,7 +1675,7 @@ class Group(System):
                     else:
                         simple_warning(msg)
             elif in_units is not None:
-                if _is_unitless(in_units):
+                if not _is_unitless(in_units):
                     msg = f"{self.msginfo}: Input '{abs_in}' with units of '{in_units}' is " + \
                         f"connected to output '{abs_out}' which has no units."
                     simple_warning(msg)

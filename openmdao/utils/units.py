@@ -846,8 +846,8 @@ _UNIT_CACHE = {}
 
 
 def _is_unitless(units):
-    unit_meta = _find_unit(units) if units else None
-    return not unit_meta.is_dimensionless()
+    unit_meta = _find_unit(units)
+    return unit_meta.is_dimensionless()
 
 
 def _find_unit(unit):
