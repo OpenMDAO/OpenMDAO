@@ -24,7 +24,8 @@ from openmdao.utils.array_utils import array_connection_compatible, _flatten_src
     shape_to_len
 from openmdao.utils.general_utils import ContainsAll, simple_warning, common_subpath, \
     conditional_error, _is_slicer_op
-from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit
+from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
+    is_unitless
 from openmdao.utils.mpi import MPI, check_mpi_exceptions
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.array_utils import evenly_distrib_idxs
@@ -1661,14 +1662,11 @@ class Group(System):
             in_units = allprocs_abs2meta_in[abs_in]['units']
 
             if out_units:
-                out_unit_meta = _find_unit(out_units) if out_units else None
-                out_unit_base_powers = any(i >= 1 for i in out_unit_meta._powers)
-
-                if not in_units and out_unit_base_powers:
+                if not in_units and is_unitless(out_units):
                     msg = f"{self.msginfo}: Output '{abs_out}' with units of '{out_units}' " + \
                           f"is connected to input '{abs_in}' which has no units."
                     simple_warning(msg)
-                elif out_unit_base_powers and not is_compatible(in_units, out_units):
+                elif is_unitless(out_units) and not is_compatible(in_units, out_units):
                     msg = f"{self.msginfo}: Output units of '{out_units}' for '{abs_out}' " + \
                           f"are incompatible with input units of '{in_units}' for '{abs_in}'."
                     if self._raise_connection_errors:
@@ -1676,9 +1674,7 @@ class Group(System):
                     else:
                         simple_warning(msg)
             elif in_units is not None:
-                in_unit_meta = _find_unit(in_units) if in_units else None
-                in_unit_base_powers = any(i >= 1 for i in in_unit_meta._powers)
-                if in_unit_base_powers:
+                if is_unitless(in_units):
                     msg = f"{self.msginfo}: Input '{abs_in}' with units of '{in_units}' is " + \
                         f"connected to output '{abs_out}' which has no units."
                     simple_warning(msg)
