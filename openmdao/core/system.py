@@ -473,9 +473,9 @@ class System(object):
         if self.pathname == '':
             return '{} (<model>)'.format(type(self).__name__)
         if self.pathname is not None:
-            return '{} ({})'.format(type(self).__name__, self.pathname)
+            return "class {} named '{}'".format(type(self).__name__, self.pathname)
         if self.name:
-            return '{} ({})'.format(type(self).__name__, self.name)
+            return "class {} named '{}'".format(type(self).__name__, self.name)
         return type(self).__name__
 
     def _get_inst_id(self):
