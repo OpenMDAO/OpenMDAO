@@ -1215,14 +1215,19 @@ class Group(System):
                     if abs_in in abs2meta:
                         meta = abs2meta[abs_in]
                         if meta['src_indices'] is not None:
-                            msg = f"{self.msginfo}: src_indices has been defined in both " + \
-                                  f"connect('{prom_out}', '{prom_in}') and " + \
-                                  f"add_input('{prom_in}', ...)."
-                            if self._raise_connection_errors:
-                                raise RuntimeError(msg)
+                            if flat_src_indices and meta['flat_src_indices']:
+                                # Flat-to-flat src_indices can be cascaded.
+                                src_indices = src_indices[meta['src_indices']]
                             else:
-                                simple_warning(msg)
-                                continue
+                                msg = f"{self.msginfo}: src_indices has been defined in both " + \
+                                      f"connect('{prom_out}', '{prom_in}') and " + \
+                                      f"add_input('{prom_in}', ...)."
+                                if self._raise_connection_errors:
+                                    raise RuntimeError(msg)
+                                else:
+                                    simple_warning(msg)
+                                    continue
+
                         meta['src_indices'] = src_indices
                         if _is_slicer_op(src_indices):
                             meta['src_slice'] = src_indices

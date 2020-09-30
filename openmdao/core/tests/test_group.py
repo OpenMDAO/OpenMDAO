@@ -2028,6 +2028,42 @@ class TestGroupPromotes(unittest.TestCase):
             "SubGroup (sub): Trying to promote input 'a' with src_indices [0 1 2], "
             "but src_indices have already been specified as [0 2 4].")
 
+    def test_flat_src_indices_promote_connect(self):
+
+        class Inner(om.Group):
+
+            def setup(self):
+                comp = om.ExecComp('y=2*x', x=np.zeros((3, 2)), y=np.zeros((3, 2)))
+                self.add_subsystem('comp', comp)
+
+        class Outer(om.Group):
+
+            def setup(self):
+                self.add_subsystem('inner', Inner())
+
+            def configure(self):
+                self.promotes('inner', inputs=[('comp.x', 'desvar:x')],
+                              src_indices=np.array([[0, 1], [0, 1], [0, 1]]), flat_src_indices=True)
+
+        prob = om.Problem()
+        model = prob.model
+
+        comp = om.ExecComp('y=3*x', x=np.zeros((7)), y=np.zeros((7)))
+        model.add_subsystem('src', comp)
+        model.add_subsystem('outer', Outer())
+
+        model.connect('src.y', 'outer.desvar:x', src_indices=[2, 4], flat_src_indices=True)
+
+        prob.setup()
+        prob.set_val('src.x', np.array([1.0, 3.0, 5.0, 7.0, 9.0, 11.0, 13.0]))
+
+        prob.run_model()
+
+        expected = np.array([[15., 27.],
+                             [15., 27.],
+                             [15., 27.]])
+        assert_near_equal(prob.get_val('outer.desvar:x'), expected, 1e-6)
+
 
 class MyComp(om.ExplicitComponent):
     def __init__(self, input_shape, src_indices=None, flat_src_indices=False):
