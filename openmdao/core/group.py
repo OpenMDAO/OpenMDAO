@@ -1674,7 +1674,7 @@ class Group(System):
                         raise RuntimeError(msg)
                     else:
                         simple_warning(msg)
-            elif in_units is not None:
+            elif not in_units:
                 if not _is_unitless(in_units):
                     msg = f"{self.msginfo}: Input '{abs_in}' with units of '{in_units}' is " + \
                         f"connected to output '{abs_out}' which has no units."

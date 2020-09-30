@@ -358,5 +358,6 @@ class TestModuleFunctions(unittest.TestCase):
             p.setup()
         self.assertEqual(str(cm.exception), msg)
 
+
 if __name__ == "__main__":
     unittest.main()
