@@ -110,6 +110,23 @@ class SlicerComp(om.ExplicitComponent):
         outputs['y'] = np.sum(inputs['x'])**2.0
 
 
+class Inner(om.Group):
+
+    def setup(self):
+        comp = om.ExecComp('y=2*x', x=np.zeros((3, 2)), y=np.zeros((3, 2)))
+        self.add_subsystem('comp', comp)
+
+
+class Outer(om.Group):
+
+    def setup(self):
+        self.add_subsystem('inner', Inner())
+
+    def configure(self):
+        self.promotes('inner', inputs=[('comp.x', 'desvar:x')],
+                      src_indices=np.array([[0, 1], [0, 1], [0, 1]]), flat_src_indices=True)
+
+
 class TestGroup(unittest.TestCase):
 
     def test_add_subsystem_class(self):
@@ -2030,21 +2047,6 @@ class TestGroupPromotes(unittest.TestCase):
 
     def test_flat_src_indices_promote_connect(self):
 
-        class Inner(om.Group):
-
-            def setup(self):
-                comp = om.ExecComp('y=2*x', x=np.zeros((3, 2)), y=np.zeros((3, 2)))
-                self.add_subsystem('comp', comp)
-
-        class Outer(om.Group):
-
-            def setup(self):
-                self.add_subsystem('inner', Inner())
-
-            def configure(self):
-                self.promotes('inner', inputs=[('comp.x', 'desvar:x')],
-                              src_indices=np.array([[0, 1], [0, 1], [0, 1]]), flat_src_indices=True)
-
         prob = om.Problem()
         model = prob.model
 
@@ -2063,6 +2065,26 @@ class TestGroupPromotes(unittest.TestCase):
                              [15., 27.],
                              [15., 27.]])
         assert_near_equal(prob.get_val('outer.desvar:x'), expected, 1e-6)
+
+    def test_flat_src_indices_promote_connect_size_error(self):
+
+        prob = om.Problem()
+        model = prob.model
+
+        comp = om.ExecComp('y=3*x', x=np.zeros((7)), y=np.zeros((7)))
+        model.add_subsystem('src', comp)
+        model.add_subsystem('outer', Outer())
+
+        model.connect('src.y', 'outer.desvar:x', src_indices=[2], flat_src_indices=True)
+
+        with self.assertRaises(RuntimeError) as context:
+            prob.setup()
+
+        msg = "Group (<model>): flat src_indices in connect and " + \
+            "promotes are incompatible for connection from " + \
+            "'src.y' to 'outer.desvar:x'."
+
+        self.assertEqual(str(context.exception), msg)
 
 
 class MyComp(om.ExplicitComponent):

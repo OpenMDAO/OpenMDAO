@@ -1217,8 +1217,19 @@ class Group(System):
                         meta = abs2meta[abs_in]
                         if meta['src_indices'] is not None:
                             if flat_src_indices and meta['flat_src_indices']:
+
                                 # Flat-to-flat src_indices can be cascaded.
-                                src_indices = src_indices[meta['src_indices']]
+                                try:
+                                    src_indices = src_indices[meta['src_indices']]
+                                except IndexError:
+                                    msg = f"{self.msginfo}: flat src_indices in connect and " + \
+                                        f"promotes are incompatible for connection from " + \
+                                        f"'{prom_out}' to '{prom_in}'."
+                                    if self._raise_connection_errors:
+                                        raise RuntimeError(msg)
+                                    else:
+                                        simple_warning(msg)
+                                        continue
                             else:
                                 msg = f"{self.msginfo}: src_indices has been defined in both " + \
                                       f"connect('{prom_out}', '{prom_in}') and " + \
