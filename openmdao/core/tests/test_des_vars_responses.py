@@ -604,7 +604,7 @@ class TestAddConstraintMPI(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             prob.setup(mode='rev')
 
-        msg = "SellarDerivatives (sub): Output not found for response 'd1.junk'."
+        msg = "'sub' <class SellarDerivatives>: Output not found for response 'd1.junk'."
         self.assertEqual(str(context.exception), msg)
 
 

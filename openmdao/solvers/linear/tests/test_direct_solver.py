@@ -229,7 +229,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        expected_msg = "Singular entry found in Group (thrust_equilibrium_group) for row associated with state/residual 'thrust' ('thrust_equilibrium_group.thrust_bal.thrust') index 0."
+        expected_msg = "Singular entry found in 'thrust_equilibrium_group' <class Group> for row associated with state/residual 'thrust' ('thrust_equilibrium_group.thrust_bal.thrust') index 0."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -245,7 +245,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(Exception) as cm:
             prob.setup()
 
-        expected_msg = "DupPartialsComp (dupcomp): d(x)/d(c): declare_partials has been called with rows and cols that specify the following duplicate subjacobian entries: [(4, 11), (10, 2)]."
+        expected_msg = "'dupcomp' <class DupPartialsComp>: d(x)/d(c): declare_partials has been called with rows and cols that specify the following duplicate subjacobian entries: [(4, 11), (10, 2)]."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -283,7 +283,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        expected_msg = "Singular entry found in Group (thrust_equilibrium_group) for row associated with state/residual 'thrust' ('thrust_equilibrium_group.thrust_bal.thrust') index 0."
+        expected_msg = "Singular entry found in 'thrust_equilibrium_group' <class Group> for row associated with state/residual 'thrust' ('thrust_equilibrium_group.thrust_bal.thrust') index 0."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -320,7 +320,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        expected_msg = "Singular entry found in Group (thrust_equilibrium_group) for row associated with state/residual 'thrust' ('thrust_equilibrium_group.thrust_bal.thrust') index 0."
+        expected_msg = "Singular entry found in 'thrust_equilibrium_group' <class Group> for row associated with state/residual 'thrust' ('thrust_equilibrium_group.thrust_bal.thrust') index 0."
 
         self.assertEqual(expected_msg, str(cm.exception))
 

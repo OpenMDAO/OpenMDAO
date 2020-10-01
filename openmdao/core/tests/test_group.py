@@ -182,7 +182,7 @@ class TestGroup(unittest.TestCase):
         g.add_subsystem('ivc', om.IndepVarComp('x', 2.), promotes_outputs=['x'])
         g.add_subsystem('c0', om.ExecComp('y = 2*x'), promotes_inputs=['x'])
 
-        expected = "Group (gouter): The following inputs have multiple connections: " \
+        expected = "'gouter' <class Group>: The following inputs have multiple connections: " \
                    "gouter.g.c0.x from ['gouter.couter.xx', 'gouter.g.ivc.x']"
 
         with self.assertRaises(RuntimeError) as cm:
@@ -334,7 +334,7 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as err:
             p.setup()
         self.assertEqual(str(err.exception),
-                         "IndepVarComp (comp1): 'promotes_outputs' failed to find any matches for "
+                         "'comp1' <class IndepVarComp>: 'promotes_outputs' failed to find any matches for "
                          "the following names or patterns: ['xx'].")
 
     def test_group_renames_errors_bad_tuple(self):
@@ -407,7 +407,7 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as err:
             p.setup()
         self.assertEqual(str(err.exception),
-                         "SellarDis2 (d1): 'promotes_outputs' failed to find any matches for "
+                         "'d1' <class SellarDis2>: 'promotes_outputs' failed to find any matches for "
                          "the following names or patterns: ['foo'].")
 
     def test_group_nested_conn(self):
@@ -543,7 +543,7 @@ class TestGroup(unittest.TestCase):
 
         p.model.add_subsystem('phase', Phase())
 
-        msg = "Phase (phase): src_indices shape (1,) does not match phase.comp2.x shape (1, 2)."
+        msg = "'phase' <class Phase>: src_indices shape (1,) does not match phase.comp2.x shape (1, 2)."
 
         with self.assertRaises(ValueError) as context:
             p.setup()
@@ -1042,7 +1042,7 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.setup()
         self.assertEqual(str(context.exception),
-                         "ExecComp (C2): 'promotes_outputs' failed to find any matches for the "
+                         "'C2' <class ExecComp>: 'promotes_outputs' failed to find any matches for the "
                          "following pattern: 'x*'.")
 
     def test_promote_not_found2(self):
@@ -1055,7 +1055,7 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.setup()
         self.assertEqual(str(context.exception),
-                         "ExecComp (C2): 'promotes_inputs' failed to find any matches for "
+                         "'C2' <class ExecComp>: 'promotes_inputs' failed to find any matches for "
                          "the following names or patterns: ['xx'].")
 
     def test_promote_not_found3(self):
@@ -1068,7 +1068,7 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.setup()
         self.assertEqual(str(context.exception),
-                         "ExecComp (C2): 'promotes' failed to find any matches for "
+                         "'C2' <class ExecComp>: 'promotes' failed to find any matches for "
                          "the following names or patterns: ['xx'].")
 
     def test_empty_group(self):
@@ -1089,7 +1089,7 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.setup()
         self.assertEqual(str(context.exception),
-                         "ExecComp (d1): 'promotes_inputs' failed to find any matches for "
+                         "'d1' <class ExecComp>: 'promotes_inputs' failed to find any matches for "
                          "the following names or patterns: ['foo'].")
 
     def test_missing_promote_var2(self):
@@ -1104,7 +1104,7 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.setup()
         self.assertEqual(str(context.exception),
-                         "ExecComp (d1): 'promotes_outputs' failed to find any matches for "
+                         "'d1' <class ExecComp>: 'promotes_outputs' failed to find any matches for "
                          "the following names or patterns: ['bar', 'blammo'].")
 
     def test_promote_src_indices_nonflat_to_scalars(self):
@@ -1340,7 +1340,7 @@ class TestGroup(unittest.TestCase):
         model.add_subsystem('C1', SimpleGroup())
         model.add_subsystem('C2', SimpleGroup())
 
-        msg = "SimpleGroup (C1): Cannot call set_order in the configure method"
+        msg = "'C1' <class SimpleGroup>: Cannot call set_order in the configure method"
         with self.assertRaises(RuntimeError) as cm:
             prob.setup()
 
@@ -1610,7 +1610,7 @@ class TestGroupPromotes(unittest.TestCase):
             top.setup()
 
         self.assertEqual(str(context.exception),
-                         "SubGroup (sub): Trying to promote 'b' when it has been aliased to 'bb'.")
+                         "'sub' <class SubGroup>: Trying to promote 'b' when it has been aliased to 'bb'.")
 
     def test_promotes_alias_src_indices(self):
 
@@ -1654,7 +1654,7 @@ class TestGroupPromotes(unittest.TestCase):
             top.setup()
 
         self.assertEqual(str(context.exception),
-                         "ExecComp (sub.comp1): promotes_inputs 'b*' matched 'bb' but 'bb' has been "
+                         "'sub.comp1' <class ExecComp>: promotes_inputs 'b*' matched 'bb' but 'bb' has been "
                          "aliased to 'xx'.")
 
     def test_promotes_wildcard_name(self):
@@ -2025,7 +2025,7 @@ class TestGroupPromotes(unittest.TestCase):
             p.setup()
 
         self.assertEqual(str(cm.exception),
-            "SubGroup (sub): Trying to promote input 'a' with src_indices [0 1 2], "
+            "'sub' <class SubGroup>: Trying to promote input 'a' with src_indices [0 1 2], "
             "but src_indices have already been specified as [0 2 4].")
 
 
@@ -2098,7 +2098,7 @@ class TestConnect(unittest.TestCase):
             self.sub.connect('cmp.x', 'tgt.x', src_indices=[1])
 
     def test_invalid_source(self):
-        msg = "Group (sub): Attempted to connect from 'src.z' to 'tgt.x', but 'src.z' doesn't exist."
+        msg = "'sub' <class Group>: Attempted to connect from 'src.z' to 'tgt.x', but 'src.z' doesn't exist."
 
         # source and target names can't be checked until setup
         # because setup is not called until then
@@ -2115,7 +2115,7 @@ class TestConnect(unittest.TestCase):
             self.prob.setup()
 
     def test_connect_to_output(self):
-        msg = "Group (sub): Attempted to connect from 'tgt.y' to 'cmp.z', " + \
+        msg = "'sub' <class Group>: Attempted to connect from 'tgt.y' to 'cmp.z', " + \
               "but 'cmp.z' is an output. " + \
               "All connections must be from an output to an input."
 
@@ -2134,7 +2134,7 @@ class TestConnect(unittest.TestCase):
             self.prob.setup()
 
     def test_connect_from_input(self):
-        msg = "Group (sub): Attempted to connect from 'tgt.x' to 'cmp.x', " + \
+        msg = "'sub' <class Group>: Attempted to connect from 'tgt.x' to 'cmp.x', " + \
               "but 'tgt.x' is an input. " + \
               "All connections must be from an output to an input."
 
@@ -2165,7 +2165,7 @@ class TestConnect(unittest.TestCase):
         p['x']
 
     def test_invalid_target(self):
-        msg = "Group (sub): Attempted to connect from 'src.x' to 'tgt.z', but 'tgt.z' doesn't exist."
+        msg = "'sub' <class Group>: Attempted to connect from 'src.x' to 'tgt.z', but 'tgt.z' doesn't exist."
 
         # source and target names can't be checked until setup
         # because setup is not called until then
@@ -2195,7 +2195,7 @@ class TestConnect(unittest.TestCase):
         sub.add_subsystem('tgt', om.ExecComp('y = x'), promotes_outputs=['y'])
         sub.connect('y', 'tgt.x', src_indices=[1])
 
-        msg = "Group (sub): Output and input are in the same System for " + \
+        msg = "'sub' <class Group>: Output and input are in the same System for " + \
               "connection from 'y' to 'tgt.x'."
 
         with self.assertRaises(RuntimeError) as ctx:
@@ -2298,7 +2298,7 @@ class TestConnect(unittest.TestCase):
             prob.setup()
 
         self.assertEqual(str(context.exception),
-                         "ExecComp (src): 'promotes' cannot be used at the same time as "
+                         "'src' <class ExecComp>: 'promotes' cannot be used at the same time as "
                          "'promotes_inputs' or 'promotes_outputs'.")
 
     def test_mix_promotes_types2(self):
@@ -2309,7 +2309,7 @@ class TestConnect(unittest.TestCase):
             prob.setup()
 
         self.assertEqual(str(context.exception),
-                         "ExecComp (src): 'promotes' cannot be used at the same time as "
+                         "'src' <class ExecComp>: 'promotes' cannot be used at the same time as "
                          "'promotes_inputs' or 'promotes_outputs'.")
 
     def test_nested_nested_conn(self):
@@ -2338,7 +2338,7 @@ class TestConnect(unittest.TestCase):
     def test_bad_shapes(self):
         self.sub.connect('src.s', 'arr.x')
 
-        msg = "Group (sub): The source and target shapes do not match or are ambiguous " + \
+        msg = "'sub' <class Group>: The source and target shapes do not match or are ambiguous " + \
               "for the connection 'sub.src.s' to 'sub.arr.x'. The source shape is (1,) " + \
               "but the target shape is (2,)."
 
@@ -2377,7 +2377,7 @@ class TestConnect(unittest.TestCase):
         self.sub.connect('src.x', 'arr.x', src_indices=[(2, -1, 2), (2, 2, 2)],
                          flat_src_indices=False)
 
-        msg = ("Group (sub): The source indices [[ 2 -1  2] [ 2  2  2]] do not specify a "
+        msg = ("'sub' <class Group>: The source indices [[ 2 -1  2] [ 2  2  2]] do not specify a "
                "valid shape for the connection 'sub.src.x' to 'sub.arr.x'. "
                "The source has 2 dimensions but the indices expect 3.")
 
@@ -2398,7 +2398,7 @@ class TestConnect(unittest.TestCase):
         self.sub.connect('src.x', 'arr.x', src_indices=[(2, -1), (4, 4)],
                          flat_src_indices=False)
 
-        msg = ("Group (sub): The source indices do not specify a valid index for the "
+        msg = ("'sub' <class Group>: The source indices do not specify a valid index for the "
                "connection 'sub.src.x' to 'sub.arr.x'. Index '4' "
                "is out of range for source dimension of size 3.")
 
@@ -2753,7 +2753,7 @@ class TestGroupAddInput(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             p.setup()
 
-        self.assertEqual(cm.exception.args[0], "Group (G1.G2): The following group inputs, passed to set_input_defaults(), could not be found: ['xx'].")
+        self.assertEqual(cm.exception.args[0], "'G1.G2' <class Group>: The following group inputs, passed to set_input_defaults(), could not be found: ['xx'].")
 
     def test_conflicting_val(self):
         p = self._make_tree_model(diff_vals=True)
@@ -3013,7 +3013,7 @@ class Test3Deep(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             p.setup()
 
-        self.assertEqual(cm.exception.args[0], "ConfigGroup (cfg.sub): ['foo'] are not valid metadata entry names.")
+        self.assertEqual(cm.exception.args[0], "'cfg.sub' <class ConfigGroup>: ['foo'] are not valid metadata entry names.")
 
     def test_promote_descendant(self):
         p = self.build_model()
@@ -3790,7 +3790,7 @@ class TestFeatureConfigure(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             p.setup()
 
-        msg="MyComp (G.comp): Can't retrieve shape, size, or value for dynamically sized variable 'y' because they aren't known yet."
+        msg="'G.comp' <class MyComp>: Can't retrieve shape, size, or value for dynamically sized variable 'y' because they aren't known yet."
         self.assertEqual(str(cm.exception), msg)
 
 

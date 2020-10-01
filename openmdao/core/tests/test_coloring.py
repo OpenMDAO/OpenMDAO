@@ -396,7 +396,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.run_driver()
         self.assertEqual(str(context.exception),
-                         "DynamicPartialsComp (arctan_yox): 'arctan_yox.g' is an array of size 0")
+                         "'arctan_yox' <class DynamicPartialsComp>: 'arctan_yox.g' is an array of size 0")
 
     def test_size_zero_array_declare_partials(self):
         class DynamicPartialsComp(om.ExplicitComponent):
@@ -437,7 +437,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.run_driver()
         self.assertEqual(str(context.exception),
-                         "DynamicPartialsComp (arctan_yox): 'arctan_yox.y' is an array of size 0")
+                         "'arctan_yox' <class DynamicPartialsComp>: 'arctan_yox.y' is an array of size 0")
 
 
     def test_dynamic_total_coloring_pyoptsparse_slsqp_auto(self):
@@ -1231,7 +1231,7 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
         with self.assertRaises(RuntimeError) as ctx:
             p.run_driver()
 
-        self.assertEqual(str(ctx.exception), "DumbComp (comp): Current coloring configuration does not match the configuration of the current model.\n   The following row vars were added: ['z'].\n   The following column vars were added: ['z_in'].\nMake sure you don't have different problems that have the same coloring directory. Set the coloring directory by setting the value of problem.options['coloring_dir'].")
+        self.assertEqual(str(ctx.exception), "'comp' <class DumbComp>: Current coloring configuration does not match the configuration of the current model.\n   The following row vars were added: ['z'].\n   The following column vars were added: ['z_in'].\nMake sure you don't have different problems that have the same coloring directory. Set the coloring directory by setting the value of problem.options['coloring_dir'].")
 
     def test_removed_name_total(self):
         p = self._build_model(ofnames=['w', 'x', 'y'], wrtnames=['a', 'b', 'c'],
@@ -1256,7 +1256,7 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
             p.run_driver()
 
         self.assertEqual(str(ctx.exception),
-                         "DumbComp (comp): Current coloring configuration does not match the configuration of the current model.\n   The following row vars were removed: ['x'].\n   The following column vars were removed: ['x_in'].\nMake sure you don't have different problems that have the same coloring directory. Set the coloring directory by setting the value of problem.options['coloring_dir'].")
+                         "'comp' <class DumbComp>: Current coloring configuration does not match the configuration of the current model.\n   The following row vars were removed: ['x'].\n   The following column vars were removed: ['x_in'].\nMake sure you don't have different problems that have the same coloring directory. Set the coloring directory by setting the value of problem.options['coloring_dir'].")
 
     def test_reordered_name_total(self):
         p = self._build_model(ofnames=['w', 'x', 'y'], wrtnames=['a', 'b', 'c'],
@@ -1279,7 +1279,7 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
         with self.assertRaises(RuntimeError) as ctx:
             p.run_driver()
 
-        self.assertEqual(str(ctx.exception), "class DumbComp named 'comp': Current coloring configuration does not match the configuration of the current model.\n   The row vars have changed order.\n   The column vars have changed order.\nMake sure you don't have different problems that have the same coloring directory. Set the coloring directory by setting the value of problem.options['coloring_dir'].")
+        self.assertEqual(str(ctx.exception), "'comp' <class DumbComp>: Current coloring configuration does not match the configuration of the current model.\n   The row vars have changed order.\n   The column vars have changed order.\nMake sure you don't have different problems that have the same coloring directory. Set the coloring directory by setting the value of problem.options['coloring_dir'].")
 
     def test_size_change_total(self):
         p = self._build_model(ofnames=['w', 'x', 'y'], wrtnames=['a', 'b', 'c'],
@@ -1302,7 +1302,7 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
         with self.assertRaises(RuntimeError) as ctx:
             p.run_driver()
 
-        self.assertEqual(str(ctx.exception), "DumbComp (comp): Current coloring configuration does not match the configuration of the current model.\n   The following variables have changed sizes: ['y', 'y_in'].\nMake sure you don't have different problems that have the same coloring directory. Set the coloring directory by setting the value of problem.options['coloring_dir'].")
+        self.assertEqual(str(ctx.exception), "'comp' <class DumbComp>: Current coloring configuration does not match the configuration of the current model.\n   The following variables have changed sizes: ['y', 'y_in'].\nMake sure you don't have different problems that have the same coloring directory. Set the coloring directory by setting the value of problem.options['coloring_dir'].")
 
 
 if __name__ == '__main__':

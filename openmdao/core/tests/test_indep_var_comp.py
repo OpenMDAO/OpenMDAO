@@ -215,7 +215,7 @@ class TestIndepVarComp(unittest.TestCase):
         self.assertEqual(prob.get_val('val_y'), 2.5)
 
     def test_ivc_deprecations(self):
-        msg = "IndepVarComp (p1): The '{}' argument was used when adding output '{}'. " + \
+        msg = "'p1' <class IndepVarComp>: The '{}' argument was used when adding output '{}'. " + \
               "This argument has been deprecated and will be removed in a future version."
 
         prob = om.Problem()

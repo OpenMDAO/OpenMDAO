@@ -461,7 +461,7 @@ class ParFDWarningsTestCase(unittest.TestCase):
             _setup_problem(self.mat, total_method='fd', total_num_par_fd = 3, approx_totals=True)
 
     def test_partial_no_mpi(self):
-        msg = "MatMultComp (comp): MPI is not active but num_par_fd = 3. No parallel finite difference will be performed."
+        msg = "'comp' <class MatMultComp>: MPI is not active but num_par_fd = 3. No parallel finite difference will be performed."
 
         with assert_warning(UserWarning, msg):
             _setup_problem(self.mat, partial_method='fd', partial_num_par_fd = 3)
@@ -486,7 +486,7 @@ class ParFDErrorsMPITestCase(unittest.TestCase):
         with self.assertRaises(RuntimeError) as ctx:
             p.final_setup()
 
-        self.assertEqual(str(ctx.exception), "MatMultComp (comp): num_par_fd is > 1 but no FD is active.")
+        self.assertEqual(str(ctx.exception), "'comp' <class MatMultComp>: num_par_fd is > 1 but no FD is active.")
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
