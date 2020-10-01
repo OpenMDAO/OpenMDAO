@@ -840,7 +840,7 @@ class TestNewton(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             prob.run_model()
 
-        msg = "NewtonSolver in Group (<model>): solve_subsystems must be set by the user."
+        msg = "NewtonSolver in <model> <class Group>: solve_subsystems must be set by the user."
         self.assertEqual(str(context.exception), msg)
 
 

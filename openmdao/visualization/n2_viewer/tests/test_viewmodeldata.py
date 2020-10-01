@@ -82,20 +82,32 @@ class TestViewModelData(unittest.TestCase):
                     "con_cmp2.y2": "con_cmp2.y2"
                 },
                 "output": {
-                    "x": "x",
-                    "z": "z",
                     "sub.state_eq_group.state_eq.y2_command": "state_eq.y2_command",
                     "sub.d1.y1": "y1",
                     "sub.d2.y2": "d2.y2",
                     "obj_cmp.obj": "obj",
                     "con_cmp1.con1": "con1",
-                    "con_cmp2.con2": "con2"
+                    "con_cmp2.con2": "con2",
+                    "_auto_ivc.v0": "_auto_ivc.v0",
+                    "_auto_ivc.v1": "_auto_ivc.v1"
                 }
             }
         """)
 
         self.expected_declare_partials = json.loads("""
-        ["sub.state_eq_group.state_eq.y2_command > sub.state_eq_group.state_eq.y2_actual", "sub.d1.y1 > sub.d1.z", "sub.d1.y1 > sub.d1.x", "sub.d1.y1 > sub.d1.y2", "sub.d2.y2 > sub.d2.z", "sub.d2.y2 > sub.d2.y1", "obj_cmp.obj > obj_cmp.x", "obj_cmp.obj > obj_cmp.y1", "obj_cmp.obj > obj_cmp.y2", "obj_cmp.obj > obj_cmp.z", "con_cmp1.con1 > con_cmp1.y1", "con_cmp2.con2 > con_cmp2.y2"]
+        [
+            "sub.state_eq_group.state_eq.y2_command > sub.state_eq_group.state_eq.y2_actual",
+            "sub.d1.y1 > sub.d1.z",
+            "sub.d1.y1 > sub.d1.x",
+            "sub.d1.y1 > sub.d1.y2",
+            "sub.d2.y2 > sub.d2.z",
+            "sub.d2.y2 > sub.d2.y1",
+            "obj_cmp.obj > obj_cmp.x",
+            "obj_cmp.obj > obj_cmp.y1",
+            "obj_cmp.obj > obj_cmp.y2",
+            "obj_cmp.obj > obj_cmp.z",
+            "con_cmp1.con1 > con_cmp1.y1",
+            "con_cmp2.con2 > con_cmp2.y2"]
         """)
 
         self.expected_driver_name = 'Driver'
@@ -254,7 +266,7 @@ class TestViewModelData(unittest.TestCase):
         # To generate the reference JSON file, use this code
         # from openmdao.utils.testing_utils import _ModelViewerDataTreeEncoder
         # with open('betz_tree_new.json', 'w') as outfile:
-        #     json.dump(model_viewer_data['tree'], outfile,cls=_ModelViewerDataTreeEncoder, indent=4)
+        #    json.dump(model_viewer_data['tree'], outfile,cls=_ModelViewerDataTreeEncoder, indent=4)
 
         with open(os.path.join(self.parent_dir, 'betz_tree.json')) as json_file:
             expected_tree_betz = json.load(json_file)
@@ -335,7 +347,7 @@ class TestViewModelData(unittest.TestCase):
         prob.model.add_subsystem('comp', SystemWithNdArrayOption(arr=numpy.ones(2)))
         prob.setup()
         model_viewer_data = _get_viewer_data(prob)
-        numpy.testing.assert_equal(model_viewer_data['tree']['children'][0]['options']['arr'],
+        numpy.testing.assert_equal(model_viewer_data['tree']['children'][1]['options']['arr'],
                                    numpy.ones(2))
 
     def test_n2_from_problem(self):
@@ -446,7 +458,7 @@ class TestViewModelData(unittest.TestCase):
         # this would be set by the command line hook
         p.model._raise_connection_errors = False
 
-        expected = "Group (sub): Attempted to connect from 'tgt.x' to 'cmp.x', but " + \
+        expected = "'sub' <class Group>: Attempted to connect from 'tgt.x' to 'cmp.x', but " + \
                    "'tgt.x' is an input. All connections must be from an output to an input."
 
         with assert_warning(UserWarning, expected):

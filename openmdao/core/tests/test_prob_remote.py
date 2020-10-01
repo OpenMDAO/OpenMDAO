@@ -173,11 +173,11 @@ class ProbRemoteTestCase(unittest.TestCase):
 
         self.maxDiff = None
 
-        remote_msg = ("MyModel (<model>): Variable '{name}' is not local to rank {rank}. "
+        remote_msg = ("<model> <class MyModel>: Variable '{name}' is not local to rank {rank}. "
                       "You can retrieve values from other processes using "
                       "`get_val(<name>, get_remote=True)`.")
 
-        distrib_msg = ("MyModel (<model>): Variable '{name}' is a distributed variable. "
+        distrib_msg = ("<model> <class MyModel>: Variable '{name}' is a distributed variable. "
                        "You can retrieve values from all processes using "
                        "`get_val(<name>, get_remote=True)` or from the local "
                        "process using `get_val(<name>, get_remote=False)`.")

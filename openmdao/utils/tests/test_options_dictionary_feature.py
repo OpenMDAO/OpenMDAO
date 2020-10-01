@@ -32,7 +32,7 @@ class TestOptionsDictionaryFeature(unittest.TestCase):
         try:
             prob.setup()
         except RuntimeError as err:
-            self.assertEqual(str(err), "VectorDoublingComp (double): Option 'size' is required but has not been set.")
+            self.assertEqual(str(err), "'double' <class VectorDoublingComp>: Option 'size' is required but has not been set.")
 
     def test_with_default(self):
         import openmdao.api as om

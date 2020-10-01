@@ -429,7 +429,7 @@ class MPITests(unittest.TestCase):
         model.connect('Cdist.outvec', 'Cserial.invec')
         p.setup()
         p.run_model()
-        msg = "Group (<model>): Non-distributed variable 'Cserial.invec' has a distributed source, 'Cdist.outvec', so you must retrieve its value using 'get_remote=True'."
+        msg = "<model> <class Group>: Non-distributed variable 'Cserial.invec' has a distributed source, 'Cdist.outvec', so you must retrieve its value using 'get_remote=True'."
         with self.assertRaises(Exception) as cm:
             p['Cserial.invec']
         self.assertEqual(str(cm.exception), msg)
@@ -454,7 +454,7 @@ class MPITests(unittest.TestCase):
 
         p.setup()
         p.run_model()
-        msg = "Group (<model>): Can't retrieve distributed variable 'Cdist2.invec' because its src_indices reference entries from other processes. You can retrieve values from all processes using `get_val(<name>, get_remote=True)`."
+        msg = "<model> <class Group>: Can't retrieve distributed variable 'Cdist2.invec' because its src_indices reference entries from other processes. You can retrieve values from all processes using `get_val(<name>, get_remote=True)`."
         with self.assertRaises(Exception) as cm:
             p.get_val('Cdist2.invec', get_remote=False)
         self.assertEqual(str(cm.exception), msg)

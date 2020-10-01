@@ -118,7 +118,7 @@ class TestGetSetVariables(unittest.TestCase):
 
         # -------------------------------------------------------------------
 
-        msg = '\'Group (<model>): Variable "{}" not found.\''
+        msg = '\'<model> <class Group>: Variable "{}" not found.\''
 
         # inputs
         with self.assertRaises(KeyError) as ctx:
@@ -142,29 +142,29 @@ class TestGetSetVariables(unittest.TestCase):
 
         p.final_setup()
 
-        msg = "Group (g): Variable name '{}' not found."
+        msg = "'g' <class Group>: Variable name '{}' not found."
         inputs, outputs, residuals = g.get_nonlinear_vectors()
 
         # inputs
         for vname in ['x', 'g.c.x']:
             with self.assertRaises(KeyError) as cm:
                inputs[vname] = 5.0
-            self.assertEqual(cm.exception.args[0], f"Group (g): Variable name '{vname}' not found.")
+            self.assertEqual(cm.exception.args[0], f"'g' <class Group>: Variable name '{vname}' not found.")
 
             with self.assertRaises(KeyError) as cm:
                inputs[vname]
-            self.assertEqual(cm.exception.args[0], f"Group (g): Variable name '{vname}' not found.")
+            self.assertEqual(cm.exception.args[0], f"'g' <class Group>: Variable name '{vname}' not found.")
 
 
         # outputs
         for vname in ['y', 'g.c.y']:
             with self.assertRaises(KeyError) as cm:
                outputs[vname] = 5.0
-            self.assertEqual(cm.exception.args[0], f"Group (g): Variable name '{vname}' not found.")
+            self.assertEqual(cm.exception.args[0], f"'g' <class Group>: Variable name '{vname}' not found.")
 
             with self.assertRaises(KeyError) as cm:
                outputs[vname]
-            self.assertEqual(cm.exception.args[0], f"Group (g): Variable name '{vname}' not found.")
+            self.assertEqual(cm.exception.args[0], f"'g' <class Group>: Variable name '{vname}' not found.")
 
         msg = r'Variable name pair \("{}", "{}"\) not found.'
         jac = g.linear_solver._assembled_jac
@@ -216,7 +216,7 @@ class TestGetSetVariables(unittest.TestCase):
 
         # -------------------------------------------------------------------
 
-        msg1 = "Group (g): Variable name '{}' not found."
+        msg1 = "'g' <class Group>: Variable name '{}' not found."
         msg2 = "The promoted name x is invalid because it refers to multiple inputs: " \
                "[g.c2.x ,g.c3.x]. Access the value from the connected output variable x instead."
 
@@ -360,7 +360,7 @@ class TestGetSetVariables(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             p.setup()
 
-        self.assertEqual(str(cm.exception), "Group (<model>): The following inputs, ['C1.x', 'C2.x', 'C3.x'], promoted to 'x', are connected but their metadata entries ['units'] differ. Call <group>.set_input_defaults('x', units=?), where <group> is the model to remove the ambiguity.")
+        self.assertEqual(str(cm.exception), "<model> <class Group>: The following inputs, ['C1.x', 'C2.x', 'C3.x'], promoted to 'x', are connected but their metadata entries ['units'] differ. Call <group>.set_input_defaults('x', units=?), where <group> is the model to remove the ambiguity.")
 
     def test_serial_multi_src_inds_units_setval_promoted(self):
         p = Problem()

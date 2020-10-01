@@ -2,11 +2,13 @@
 
 import os
 import unittest
+import warnings
 
 # from openmdao.utils.assert_utils import assert_near_equal
+import openmdao.api as om
 from openmdao.utils.units import NumberDict, PhysicalUnit, _find_unit, import_library, \
     add_unit, add_offset_unit, unit_conversion, get_conversion
-from openmdao.utils.assert_utils import assert_warning
+from openmdao.utils.assert_utils import assert_warning, assert_near_equal
 
 
 class TestNumberDict(unittest.TestCase):
@@ -288,6 +290,73 @@ class TestModuleFunctions(unittest.TestCase):
                 err.args[0], "Unit 'degR' already defined with different factor or powers.")
         else:
             self.fail("Expecting Key Error")
+
+    def test_connect_unitless_to_none(self):
+        import warnings
+        p = om.Problem()
+        ivc = p.model.add_subsystem('indeps', om.IndepVarComp())
+        ivc.add_output('x', val=5.0, units='1/s*s')
+        ivc.add_output('y', val=10.0, units='Hz*s')
+        p.model.add_subsystem('exec_comp', om.ExecComp('z = x + y', z={'units': None},
+                                                       x={'units': None}, y={'units': None}))
+        p.model.connect('indeps.x', 'exec_comp.x')
+        p.model.connect('indeps.y', 'exec_comp.y')
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            p.setup()
+
+        p.run_model()
+        assert_near_equal(p.get_val('exec_comp.z'), 15.0)
+
+    def test_promote_unitless_and_none(self):
+        p = om.Problem()
+        ivc = p.model.add_subsystem('indeps', om.IndepVarComp(), promotes_outputs=['x', 'y'])
+        ivc.add_output('x', val=5.0, units='1/s*s')
+        ivc.add_output('y', val=10.0, units='Hz*s')
+        p.model.add_subsystem('exec_comp', om.ExecComp('z = x + y', z={'units': None},
+                                                       x={'units': None}, y={'units': None}),
+                              promotes_inputs=['x', 'y'])
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            p.setup()
+
+        p.run_model()
+        assert_near_equal(p.get_val('exec_comp.z'), 15.0)
+
+    def test_promote_unitless_ivc_to_exec_comp(self):
+        p = om.Problem()
+        ivc = p.model.add_subsystem('indeps', om.IndepVarComp())
+        ivc.add_output('x', val=5.0, units=None)
+        ivc.add_output('y', val=10.0, units='Hz*s')
+        p.model.add_subsystem('exec_comp', om.ExecComp('z = x + y', z={'units': None},
+                                                       x={'units': '1/s*s'}, y={'units': None}))
+        p.model.connect('indeps.x', 'exec_comp.x')
+        p.model.connect('indeps.y', 'exec_comp.y')
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            p.setup()
+
+        p.run_model()
+        assert_near_equal(p.get_val('exec_comp.z'), 15.0)
+
+    def test_incompatible(self):
+        p = om.Problem()
+        ivc = p.model.add_subsystem('indeps', om.IndepVarComp(), promotes_outputs=['x', 'y'])
+        ivc.add_output('x', val=5.0, units='1/s*s')
+        ivc.add_output('y', val=10.0, units='Hz*s')
+        p.model.add_subsystem('exec_comp', om.ExecComp('z = x + y', z={'units': None},
+                                                       x={'units': None}, y={'units': 'ft'}),
+                              promotes_inputs=['x', 'y'])
+
+        msg = ("<model> <class Group>: Output units of 'Hz*s' for 'indeps.y' are incompatible with input "
+               "units of 'ft' for 'exec_comp.y'.")
+
+        with self.assertRaises(RuntimeError) as cm:
+            p.setup()
+        self.assertEqual(str(cm.exception), msg)
 
 
 if __name__ == "__main__":

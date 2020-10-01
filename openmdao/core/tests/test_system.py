@@ -84,7 +84,7 @@ class TestSystem(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             d_inputs, d_outputs, d_residuals = model.get_linear_vectors('bad_name')
         self.assertEqual(str(cm.exception),
-                         "Group (<model>): There is no linear vector named %s" % 'bad_name')
+                         "<model> <class Group>: There is no linear vector named %s" % 'bad_name')
 
     def test_set_checks_shape(self):
         indep = IndepVarComp()
@@ -114,7 +114,7 @@ class TestSystem(unittest.TestCase):
         p.set_solver_print(level=0)
         p.run_model()
 
-        msg = "Group (.*): Failed to set value of '.*': could not broadcast input array from shape (.*) into shape (.*)."
+        msg = "'.*' <class Group>: Failed to set value of '.*': could not broadcast input array from shape (.*) into shape (.*)."
 
         num_val = -10
         arr_val = -10*np.ones((5, 1))

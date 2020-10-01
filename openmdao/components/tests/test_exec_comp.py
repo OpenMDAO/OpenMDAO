@@ -281,7 +281,7 @@ class TestExecComp(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             prob.setup()
         self.assertEqual(str(context.exception),
-                         "ExecComp (C1): No valid expressions provided to ExecComp(): [].")
+                         "'C1' <class ExecComp>: No valid expressions provided to ExecComp(): [].")
 
     def test_colon_vars(self):
         prob = om.Problem()
@@ -289,7 +289,7 @@ class TestExecComp(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             prob.setup()
         self.assertEqual(str(context.exception),
-                         "ExecComp (C1): failed to compile expression 'y=foo:bar+1.'.")
+                         "'C1' <class ExecComp>: failed to compile expression 'y=foo:bar+1.'.")
 
     def test_bad_kwargs(self):
         prob = om.Problem()
@@ -297,7 +297,7 @@ class TestExecComp(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             prob.setup()
         self.assertEqual(str(context.exception),
-                         "ExecComp (C1): arg 'xx' in call to ExecComp() does not refer to any variable "
+                         "'C1' <class ExecComp>: arg 'xx' in call to ExecComp() does not refer to any variable "
                          "in the expressions ['y=x+1.']")
 
     def test_bad_kwargs_meta(self):
@@ -307,7 +307,7 @@ class TestExecComp(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             prob.setup()
         self.assertEqual(str(context.exception),
-                         "ExecComp (C1): the following metadata names were not recognized for "
+                         "'C1' <class ExecComp>: the following metadata names were not recognized for "
                          "variable 'x': ['high', 'low', 'val']")
 
     def test_name_collision_const(self):
@@ -316,7 +316,7 @@ class TestExecComp(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             prob.setup()
         self.assertEqual(str(context.exception),
-                         "ExecComp (C1): cannot assign to variable 'e' because it's already defined "
+                         "'C1' <class ExecComp>: cannot assign to variable 'e' because it's already defined "
                          "as an internal function or constant.")
 
     def test_name_collision_func(self):
@@ -325,7 +325,7 @@ class TestExecComp(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             prob.setup()
         self.assertEqual(str(context.exception),
-                         "ExecComp (C1): cannot assign to variable 'sin' because it's already defined "
+                         "'C1' <class ExecComp>: cannot assign to variable 'sin' because it's already defined "
                          "as an internal function or constant.")
 
     def test_func_as_rhs_var(self):
@@ -334,7 +334,7 @@ class TestExecComp(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             prob.setup()
         self.assertEqual(str(context.exception),
-                         "ExecComp (C1): cannot use 'sin' as a variable because it's already defined "
+                         "'C1' <class ExecComp>: cannot use 'sin' as a variable because it's already defined "
                          "as an internal function.")
 
     def test_mixed_type(self):
@@ -441,7 +441,7 @@ class TestExecComp(unittest.TestCase):
             prob.setup()
 
         self.assertEqual(str(cm.exception),
-                         "ExecComp (C1): cannot use variable name 'units' because it's a reserved keyword.")
+                         "'C1' <class ExecComp>: cannot use variable name 'units' because it's a reserved keyword.")
 
     def test_common_units(self):
         # all variables in the ExecComp have the same units
@@ -484,7 +484,7 @@ class TestExecComp(unittest.TestCase):
             prob.setup()
 
         self.assertEqual(str(cm.exception),
-                         "ExecComp (C1): units of 'km' have been specified for variable 'x', but "
+                         "'C1' <class ExecComp>: units of 'km' have been specified for variable 'x', but "
                          "units of 'm' have been specified for the entire component.")
 
     def test_shape_and_value(self):
@@ -514,7 +514,7 @@ class TestExecComp(unittest.TestCase):
             p.setup()
 
         self.assertEqual(str(context.exception).replace('L,', ','),  # L on Windows
-                         "ExecComp (comp): shape of (5,) has been specified for variable 'x', "
+                         "'comp' <class ExecComp>: shape of (5,) has been specified for variable 'x', "
                          "but a value of shape (1,) has been provided.")
 
     def test_common_shape(self):
@@ -556,7 +556,7 @@ class TestExecComp(unittest.TestCase):
             p.setup()
 
         self.assertEqual(str(context.exception).replace('L,', ','),  # L on Windows
-                         "ExecComp (comp): shape of (10,) has been specified for variable 'y', "
+                         "'comp' <class ExecComp>: shape of (10,) has been specified for variable 'y', "
                          "but shape of (5,) has been specified for the entire component.")
 
     def test_common_shape_conflicting_value(self):
@@ -570,7 +570,7 @@ class TestExecComp(unittest.TestCase):
             p.setup()
 
         self.assertEqual(str(context.exception).replace('1L,', '1,'),  # 1L on Windows
-                         "ExecComp (comp): value of shape (1,) has been specified for variable 'x', "
+                         "'comp' <class ExecComp>: value of shape (1,) has been specified for variable 'x', "
                          "but shape of (5,) has been specified for the entire component.")
 
     def test_math(self):
@@ -599,7 +599,7 @@ class TestExecComp(unittest.TestCase):
           prob.run_model()
 
         self.assertEqual(str(context.exception),
-            "ExecComp (C1): Error occurred evaluating 'y2=np.cos(x)'\n"
+            "'C1' <class ExecComp>: Error occurred evaluating 'y2=np.cos(x)'\n"
             "    ExecComp supports a subset of numpy functions directly, without the 'np' prefix.\n"
             "    'cos' is supported (See the documentation).")
 
@@ -612,7 +612,7 @@ class TestExecComp(unittest.TestCase):
           prob.run_model()
 
         self.assertEqual(str(context.exception),
-            "ExecComp (C1): Error occurred evaluating 'y=numpy.sin(x)'\n"
+            "'C1' <class ExecComp>: Error occurred evaluating 'y=numpy.sin(x)'\n"
             "    ExecComp supports a subset of numpy functions directly, without the 'numpy' prefix.\n"
             "    'sin' is supported (See the documentation).")
 
@@ -625,7 +625,7 @@ class TestExecComp(unittest.TestCase):
           prob.run_model()
 
         self.assertEqual(str(context.exception),
-            "ExecComp (C1): Error occurred evaluating 'y=numpy.fft(x)'\n"
+            "'C1' <class ExecComp>: Error occurred evaluating 'y=numpy.fft(x)'\n"
             "    ExecComp supports a subset of numpy functions directly, without the 'numpy' prefix.\n"
             "    'fft' is not supported (See the documentation).")
 
@@ -800,7 +800,7 @@ class TestExecComp(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.setup()
         self.assertEqual(str(context.exception),
-                         "ExecComp (comp): has_diag_partials is True but partial(y, A) is not square (shape=(3, 15)).")
+                         "'comp' <class ExecComp>: has_diag_partials is True but partial(y, A) is not square (shape=(3, 15)).")
 
     def test_has_diag_partials(self):
         # Really check to see that the has_diag_partials argument had its intended effect

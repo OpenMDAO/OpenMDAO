@@ -471,11 +471,11 @@ class System(object):
             Either our instance pathname or class name.
         """
         if self.pathname == '':
-            return '{} (<model>)'.format(type(self).__name__)
+            return '<model> <class {}>'.format(type(self).__name__)
         if self.pathname is not None:
-            return '{} ({})'.format(type(self).__name__, self.pathname)
+            return "'{}' <class {}>".format(self.pathname, type(self).__name__)
         if self.name:
-            return '{} ({})'.format(type(self).__name__, self.name)
+            return "'{}' <class {}>".format(self.name, type(self).__name__)
         return type(self).__name__
 
     def _get_inst_id(self):

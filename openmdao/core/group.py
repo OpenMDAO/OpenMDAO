@@ -24,7 +24,8 @@ from openmdao.utils.array_utils import array_connection_compatible, _flatten_src
     shape_to_len
 from openmdao.utils.general_utils import ContainsAll, simple_warning, common_subpath, \
     conditional_error, _is_slicer_op
-from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit
+from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
+    _is_unitless
 from openmdao.utils.mpi import MPI, check_mpi_exceptions
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.array_utils import evenly_distrib_idxs
@@ -1662,9 +1663,10 @@ class Group(System):
 
             if out_units:
                 if not in_units:
-                    msg = f"{self.msginfo}: Output '{abs_out}' with units of '{out_units}' " + \
-                          f"is connected to input '{abs_in}' which has no units."
-                    simple_warning(msg)
+                    if not _is_unitless(out_units):
+                        msg = f"{self.msginfo}: Output '{abs_out}' with units of '{out_units}' " + \
+                            f"is connected to input '{abs_in}' which has no units."
+                        simple_warning(msg)
                 elif not is_compatible(in_units, out_units):
                     msg = f"{self.msginfo}: Output units of '{out_units}' for '{abs_out}' " + \
                           f"are incompatible with input units of '{in_units}' for '{abs_in}'."
@@ -1673,9 +1675,10 @@ class Group(System):
                     else:
                         simple_warning(msg)
             elif in_units is not None:
-                msg = f"{self.msginfo}: Input '{abs_in}' with units of '{in_units}' is " + \
-                      f"connected to output '{abs_out}' which has no units."
-                simple_warning(msg)
+                if not _is_unitless(in_units):
+                    msg = f"{self.msginfo}: Input '{abs_in}' with units of '{in_units}' is " + \
+                        f"connected to output '{abs_out}' which has no units."
+                    simple_warning(msg)
 
             fail = False
 
