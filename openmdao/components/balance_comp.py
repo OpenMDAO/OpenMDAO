@@ -7,6 +7,13 @@ import numpy as np
 
 from openmdao.core.implicitcomponent import ImplicitComponent
 
+def _cs_abs(x):
+    if isinstance(x, np.ndarray):
+        return x * np.sign(x)
+    elif x.real < 0.0:
+        return -x
+    return x
+
 
 class BalanceComp(ImplicitComponent):
     """
@@ -167,12 +174,12 @@ class BalanceComp(ImplicitComponent):
 
             if options['normalize']:
                 # Indices where the rhs is near zero or not near zero
-                idxs_nz = np.where(np.abs(rhs) < 2)[0]
-                idxs_nnz = np.where(np.abs(rhs) >= 2)[0]
+                idxs_nz = np.where(_cs_abs(rhs) < 2)[0]
+                idxs_nnz = np.where(_cs_abs(rhs) >= 2)[0]
 
                 # Compute scaling factors
                 # scale factor that normalizes by the rhs, except near 0
-                self._scale_factor[idxs_nnz] = 1.0 / np.abs(rhs[idxs_nnz])
+                self._scale_factor[idxs_nnz] = 1.0 / _cs_abs(rhs[idxs_nnz])
                 self._scale_factor[idxs_nz] = 1.0 / (.25 * rhs[idxs_nz] ** 2 + 1)
             else:
                 self._scale_factor[:] = 1.0
@@ -181,6 +188,7 @@ class BalanceComp(ImplicitComponent):
                 residuals[name] = (inputs[options['mult_name']] * lhs - rhs) * self._scale_factor
             else:
                 residuals[name] = (lhs - rhs) * self._scale_factor
+
 
     def linearize(self, inputs, outputs, jacobian):
         """
@@ -209,11 +217,11 @@ class BalanceComp(ImplicitComponent):
 
             if options['normalize']:
                 # Indices where the rhs is near zero or not near zero
-                idxs_nz = np.where(np.abs(rhs) < 2)[0]
-                idxs_nnz = np.where(np.abs(rhs) >= 2)[0]
+                idxs_nz = np.where(_cs_abs(rhs) < 2)[0]
+                idxs_nnz = np.where(_cs_abs(rhs) >= 2)[0]
 
                 # scale factor that normalizes by the rhs, except near 0
-                self._scale_factor[idxs_nnz] = 1.0 / np.abs(rhs[idxs_nnz])
+                self._scale_factor[idxs_nnz] = 1.0 / _cs_abs(rhs[idxs_nnz])
                 self._scale_factor[idxs_nz] = 1.0 / (.25 * rhs[idxs_nz] ** 2 + 1)
 
                 self._dscale_drhs[idxs_nnz] = -np.sign(rhs[idxs_nnz]) / rhs[idxs_nnz]**2
@@ -233,12 +241,13 @@ class BalanceComp(ImplicitComponent):
                 mult = 1.0
 
             # Partials of residual wrt rhs
-            deriv = (mult * lhs - rhs) * self._dscale_drhs - self._scale_factor
+            deriv = mult * lhs * self._dscale_drhs - (self._scale_factor + rhs*self._dscale_drhs)
             jacobian[name, rhs_name] = deriv.flatten()
 
             # Partials of residual wrt lhs
             deriv = mult * self._scale_factor
             jacobian[name, lhs_name] = deriv.flatten()
+
 
     def guess_nonlinear(self, inputs, outputs, residuals):
         """
