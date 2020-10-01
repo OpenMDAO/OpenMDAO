@@ -880,7 +880,7 @@ class ExplCompTestCase(unittest.TestCase):
             prob.run_model()
 
         self.assertEqual(str(cm.exception),
-                         "BadComp (<model>): Attempt to set value of 'length' in input vector when it is read only.")
+                         "<model> <class BadComp>: Attempt to set value of 'length' in input vector when it is read only.")
 
     def test_compute_inputs_read_only_reset(self):
         class BadComp(TestExplCompSimple):
@@ -910,7 +910,7 @@ class ExplCompTestCase(unittest.TestCase):
             prob.check_partials()
 
         self.assertEqual(str(cm.exception),
-                         "BadComp (<model>): Attempt to set value of 'length' in input vector "
+                         "<model> <class BadComp>: Attempt to set value of 'length' in input vector "
                          "when it is read only.")
 
     def test_compute_partials_inputs_read_only_reset(self):
@@ -943,7 +943,7 @@ class ExplCompTestCase(unittest.TestCase):
             prob.check_partials()
 
         self.assertEqual(str(cm.exception),
-                         "BadComp (<model>): Attempt to set value of 'length' in input vector "
+                         "<model> <class BadComp>: Attempt to set value of 'length' in input vector "
                          "when it is read only.")
 
     def test_compute_jacvec_product_inputs_read_only_reset(self):

@@ -99,7 +99,7 @@ class TestSubsystemConfigError(unittest.TestCase):
             top.setup()
 
         self.assertEqual(str(cm.exception),
-                         "SimpleGroup (<model>): Cannot call add_subsystem in the configure method")
+                         "<model> <class SimpleGroup>: Cannot call add_subsystem in the configure method")
 
 class SlicerComp(om.ExplicitComponent):
     def setup(self):
@@ -517,7 +517,7 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.setup()
         self.assertEqual(str(context.exception),
-                         "Group (<model>): src_indices has been defined in both "
+                         "<model> <class Group>: src_indices has been defined in both "
                          "connect('indep.x', 'C1.x') and add_input('C1.x', ...).")
 
     def test_incompatible_src_indices_error(self):
@@ -598,7 +598,7 @@ class TestGroup(unittest.TestCase):
         p.model.connect('indep.x', 'row123_comp.x', src_indices=om.slicer[idxs, ...],
                         flat_src_indices=True)
 
-        msg = "Group (<model>): Connection from 'indep.x' to 'row123_comp.x' was added with slice src_indices, so flat_src_indices is ignored."
+        msg = "<model> <class Group>: Connection from 'indep.x' to 'row123_comp.x' was added with slice src_indices, so flat_src_indices is ignored."
         with assert_warning(UserWarning, msg):
             p.setup()
         p.run_model()
@@ -1236,22 +1236,22 @@ class TestGroup(unittest.TestCase):
             model.set_order(['C2', 'junk', 'C1', 'C3'])
 
         self.assertEqual(str(cm.exception),
-                         "Group (<model>): subsystem(s) ['junk'] found in subsystem order but don't exist.")
+                         "<model> <class Group>: subsystem(s) ['junk'] found in subsystem order but don't exist.")
 
         # Missing
         with self.assertRaises(ValueError) as cm:
             model.set_order(['C2', 'C3'])
 
         self.assertEqual(str(cm.exception),
-                         "Group (<model>): ['C1'] expected in subsystem order and not found.")
+                         "<model> <class Group>: ['C1'] expected in subsystem order and not found.")
 
         # Extra and Missing
         with self.assertRaises(ValueError) as cm:
             model.set_order(['C2', 'junk', 'C1', 'junk2'])
 
         self.assertEqual(str(cm.exception),
-                         "Group (<model>): ['C3'] expected in subsystem order and not found.\n"
-                         "Group (<model>): subsystem(s) ['junk', 'junk2'] found in subsystem order "
+                         "<model> <class Group>: ['C3'] expected in subsystem order and not found.\n"
+                         "<model> <class Group>: subsystem(s) ['junk', 'junk2'] found in subsystem order "
                          "but don't exist.")
 
         # Dupes
@@ -1259,7 +1259,7 @@ class TestGroup(unittest.TestCase):
             model.set_order(['C2', 'C1', 'C3', 'C1'])
 
         self.assertEqual(str(cm.exception),
-                         "Group (<model>): Duplicate name(s) found in subsystem order list: ['C1']")
+                         "<model> <class Group>: Duplicate name(s) found in subsystem order list: ['C1']")
 
     def test_set_order_init_subsystems(self):
         prob = om.Problem()
@@ -1526,7 +1526,7 @@ class TestGroupPromotes(unittest.TestCase):
             top['a']
 
         self.assertEqual(str(cm.exception),
-                         "'SimpleGroup (<model>): Variable \"a\" not found.'")
+                         "'<model> <class SimpleGroup>: Variable \"a\" not found.'")
 
     def test_promotes_inputs_in_config(self):
 
@@ -1546,7 +1546,7 @@ class TestGroupPromotes(unittest.TestCase):
             top['b']
 
         self.assertEqual(str(cm.exception),
-                         "'SimpleGroup (<model>): Variable \"b\" not found.'")
+                         "'<model> <class SimpleGroup>: Variable \"b\" not found.'")
 
     def test_promotes_any_in_config(self):
 
@@ -1566,7 +1566,7 @@ class TestGroupPromotes(unittest.TestCase):
             top['a']
 
         self.assertEqual(str(cm.exception),
-                         "'SimpleGroup (<model>): Variable \"a\" not found.'")
+                         "'<model> <class SimpleGroup>: Variable \"a\" not found.'")
 
     def test_promotes_alias(self):
         class SubGroup(om.Group):
@@ -1698,7 +1698,7 @@ class TestGroupPromotes(unittest.TestCase):
             top['Branch1.G1.comp1.a']
 
         self.assertEqual(str(cm.exception),
-                         "'BranchGroup (<model>): Variable \"Branch1.G1.comp1.a\" not found.'")
+                         "'<model> <class BranchGroup>: Variable \"Branch1.G1.comp1.a\" not found.'")
 
     def test_multiple_promotes_collision(self):
 
@@ -1780,7 +1780,7 @@ class TestGroupPromotes(unittest.TestCase):
             top.setup()
 
         self.assertEqual(str(cm.exception),
-            "SimpleGroup (<model>): Trying to promote inputs='a', "
+            "<model> <class SimpleGroup>: Trying to promote inputs='a', "
             "but an iterator of strings and/or tuples is required.")
 
     def test_promotes_src_indices_bad_type(self):
@@ -1798,7 +1798,7 @@ class TestGroupPromotes(unittest.TestCase):
             top.setup()
 
         self.assertEqual(str(cm.exception),
-            "SimpleGroup (<model>): The src_indices argument should be an int, list, "
+            "<model> <class SimpleGroup>: The src_indices argument should be an int, list, "
             "tuple, ndarray or Iterable, but src_indices for promotes from 'comp2' are "
             "<class 'float'>.")
 
@@ -1817,7 +1817,7 @@ class TestGroupPromotes(unittest.TestCase):
             top.setup()
 
         self.assertEqual(str(cm.exception),
-            "SimpleGroup (<model>): src_indices must contain integers, but src_indices "
+            "<model> <class SimpleGroup>: src_indices must contain integers, but src_indices "
             "for promotes from 'comp2' are type <class 'numpy.complex128'>.")
 
     def test_promotes_src_indices_bad_shape(self):
@@ -1962,7 +1962,7 @@ class TestGroupPromotes(unittest.TestCase):
         p = om.Problem(model=SimpleGroup())
 
         with assert_warning(UserWarning,
-                            "SimpleGroup (<model>): src_indices have been specified with promotes 'any'. "
+                            "<model> <class SimpleGroup>: src_indices have been specified with promotes 'any'. "
                             "Note that src_indices only apply to matching inputs."):
             p.setup()
 
@@ -1993,7 +1993,7 @@ class TestGroupPromotes(unittest.TestCase):
             p.setup()
 
         self.assertEqual(str(cm.exception),
-            "SimpleGroup (<model>): Trying to promote outputs ['*'] "
+            "<model> <class SimpleGroup>: Trying to promote outputs ['*'] "
             "while specifying src_indices [0, 2, 4] is not meaningful.")
 
     def test_promotes_src_indices_collision(self):
@@ -2217,7 +2217,7 @@ class TestConnect(unittest.TestCase):
         prob.model.connect('px1.x1', 'src.x1')
         prob.model.connect('src.x2', 'tgt.x')
 
-        msg = "Group (<model>): Output 'src.x2' with units of 'degC' is connected " \
+        msg = "<model> <class Group>: Output 'src.x2' with units of 'degC' is connected " \
               "to input 'tgt.x' which has no units."
 
         with assert_warning(UserWarning, msg):
@@ -2229,7 +2229,7 @@ class TestConnect(unittest.TestCase):
             prob.setup()
 
     def test_connect_incompatible_units(self):
-        msg = "Group (<model>): Output units of 'degC' for 'src.x2' are incompatible " + \
+        msg = "<model> <class Group>: Output units of 'degC' for 'src.x2' are incompatible " + \
               "with input units of 'm' for 'tgt.x'."
 
         prob = om.Problem()
@@ -2261,7 +2261,7 @@ class TestConnect(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        msg = "Group (<model>): Input 'tgt.x' with units of 'degC' is " \
+        msg = "<model> <class Group>: Input 'tgt.x' with units of 'degC' is " \
               "connected to output 'src.x2' which has no units."
 
         with assert_warning(UserWarning, msg):
@@ -2279,7 +2279,7 @@ class TestConnect(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        msg = "Group (<model>): Input 'tgt.y' with units of 'degC' is " \
+        msg = "<model> <class Group>: Input 'tgt.y' with units of 'degC' is " \
               "connected to output 'src.y' which has no units."
 
         with assert_warning(UserWarning, msg):
@@ -2359,7 +2359,7 @@ class TestConnect(unittest.TestCase):
 
         p.model.connect('IV.x', 'C1.x', src_indices=[(1, 1)])
 
-        msg = "Group (<model>): The source indices [[1 1]] do not specify a valid shape " + \
+        msg = "<model> <class Group>: The source indices [[1 1]] do not specify a valid shape " + \
               "for the connection 'IV.x' to 'C1.x'. The target shape is (2, 2) but " + \
               "indices are (1, 2)."
 
@@ -2441,7 +2441,7 @@ class TestSrcIndices(unittest.TestCase):
                             flat_src_indices=True)
 
     def test_src_indices_shape_bad_idx_flat(self):
-        msg = "Group (<model>): The source indices do not specify a valid index " + \
+        msg = "<model> <class Group>: The source indices do not specify a valid index " + \
               "for the connection 'indeps.x' to 'C1.x'. " + \
               "Index '9' is out of range for source dimension of size 9."
 
@@ -2461,7 +2461,7 @@ class TestSrcIndices(unittest.TestCase):
                                 raise_connection_errors=False)
 
     def test_src_indices_shape_bad_idx_flat_promotes(self):
-        msg = "Group (<model>): The source indices do not specify a valid index " + \
+        msg = "<model> <class Group>: The source indices do not specify a valid index " + \
               "for the connection 'indeps.x' to 'C1.x'. " + \
               "Index '9' is out of range for source dimension of size 9."
         try:
@@ -2480,7 +2480,7 @@ class TestSrcIndices(unittest.TestCase):
                                 raise_connection_errors=False)
 
     def test_src_indices_shape_bad_idx_flat_neg(self):
-        msg = "Group (<model>): The source indices do not specify a valid index " + \
+        msg = "<model> <class Group>: The source indices do not specify a valid index " + \
               "for the connection 'indeps.x' to 'C1.x'. " + \
               "Index '-10' is out of range for source dimension of size 9."
         try:
@@ -2579,7 +2579,7 @@ class TestGroupAddInput(unittest.TestCase):
            p.setup()
 
         self.assertEqual(cm.exception.args[0],
-                         "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but their metadata entries ['units', 'value'] differ. Call <group>.set_input_defaults('x', units=?, val=?), where <group> is the Group named 'par' to remove the ambiguity.")
+                         "<model> <class Group>: The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but their metadata entries ['units', 'value'] differ. Call <group>.set_input_defaults('x', units=?, val=?), where <group> is the Group named 'par' to remove the ambiguity.")
 
     def test_missing_diff_vals(self):
         p = om.Problem()
@@ -2593,7 +2593,7 @@ class TestGroupAddInput(unittest.TestCase):
            p.setup()
 
         self.assertEqual(cm.exception.args[0],
-                         "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but their metadata entries ['value'] differ. Call <group>.set_input_defaults('x', val=?), where <group> is the Group named 'par' to remove the ambiguity.")
+                         "<model> <class Group>: The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but their metadata entries ['value'] differ. Call <group>.set_input_defaults('x', val=?), where <group> is the Group named 'par' to remove the ambiguity.")
 
     def test_conflicting_units(self):
         # multiple Group.set_input_defaults calls at same tree level with conflicting units args
@@ -2614,7 +2614,7 @@ class TestGroupAddInput(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             p.setup()
 
-        self.assertEqual(cm.exception.args[0], "Group (<model>): The subsystems G1.G2 and par.G4 called set_input_defaults for promoted input 'x' with conflicting values for 'units'. Call <group>.set_input_defaults('x', units=?), where <group> is the model to remove the ambiguity.")
+        self.assertEqual(cm.exception.args[0], "<model> <class Group>: The subsystems G1.G2 and par.G4 called set_input_defaults for promoted input 'x' with conflicting values for 'units'. Call <group>.set_input_defaults('x', units=?), where <group> is the model to remove the ambiguity.")
 
     def test_conflicting_units_multi_level(self):
         # multiple Group.set_input_defaults calls at different tree levels with conflicting units args
@@ -2638,7 +2638,7 @@ class TestGroupAddInput(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             p.setup()
 
-        self.assertEqual(cm.exception.args[0], "Group (<model>): The subsystems G1 and par.G4 called set_input_defaults for promoted input 'x' with conflicting values for 'units'. Call <group>.set_input_defaults('x', units=?), where <group> is the model to remove the ambiguity.")
+        self.assertEqual(cm.exception.args[0], "<model> <class Group>: The subsystems G1 and par.G4 called set_input_defaults for promoted input 'x' with conflicting values for 'units'. Call <group>.set_input_defaults('x', units=?), where <group> is the model to remove the ambiguity.")
 
     def test_override_units(self):
         # multiple Group.set_input_defaults calls at different tree levels with conflicting units args
@@ -2733,7 +2733,7 @@ class TestGroupAddInput(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             p.setup()
 
-        self.assertEqual(cm.exception.args[0], "Group (<model>): The subsystems G1.G2 and par called set_input_defaults for promoted input 'x' with conflicting values for 'units'. Call <group>.set_input_defaults('x', units=?), where <group> is the model to remove the ambiguity.")
+        self.assertEqual(cm.exception.args[0], "<model> <class Group>: The subsystems G1.G2 and par called set_input_defaults for promoted input 'x' with conflicting values for 'units'. Call <group>.set_input_defaults('x', units=?), where <group> is the model to remove the ambiguity.")
 
     def test_group_input_not_found(self):
         p = self._make_tree_model(diff_units=True)
@@ -2776,7 +2776,7 @@ class TestGroupAddInput(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             p.setup()
 
-        self.assertEqual(cm.exception.args[0], "Group (<model>): The subsystems G1 and par.G4 called set_input_defaults for promoted input 'x' with conflicting values for 'value'. Call <group>.set_input_defaults('x', value=?), where <group> is the model to remove the ambiguity.")
+        self.assertEqual(cm.exception.args[0], "<model> <class Group>: The subsystems G1 and par.G4 called set_input_defaults for promoted input 'x' with conflicting values for 'value'. Call <group>.set_input_defaults('x', value=?), where <group> is the model to remove the ambiguity.")
 
 
 class MultComp(om.ExplicitComponent):

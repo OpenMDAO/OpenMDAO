@@ -164,7 +164,7 @@ class TestIndepVarComp(unittest.TestCase):
             prob = om.Problem(om.IndepVarComp()).setup()
         except Exception as err:
             self.assertEqual(str(err),
-                "IndepVarComp (<model>): No outputs (independent variables) have been declared. They must either be declared during "
+                "<model> <class IndepVarComp>: No outputs (independent variables) have been declared. They must either be declared during "
                 "instantiation or by calling add_output or add_discrete_output afterwards.")
         else:
             self.fail('Exception expected.')

@@ -84,7 +84,7 @@ class TestSystem(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             d_inputs, d_outputs, d_residuals = model.get_linear_vectors('bad_name')
         self.assertEqual(str(cm.exception),
-                         "Group (<model>): There is no linear vector named %s" % 'bad_name')
+                         "<model> <class Group>: There is no linear vector named %s" % 'bad_name')
 
     def test_set_checks_shape(self):
         indep = IndepVarComp()

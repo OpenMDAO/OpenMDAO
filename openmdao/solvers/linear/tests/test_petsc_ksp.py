@@ -377,7 +377,7 @@ class TestPETScKrylov(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             J = prob.compute_totals(of=['obj'], wrt=['z'])
 
-        msg = 'PETScKrylov in Group (<model>): PETScKrylov solver is not supported under complex step.'
+        msg = 'PETScKrylov in <model> <class Group>: PETScKrylov solver is not supported under complex step.'
         self.assertEqual(str(cm.exception), msg)
 
 

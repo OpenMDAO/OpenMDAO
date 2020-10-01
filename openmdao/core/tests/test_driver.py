@@ -657,7 +657,7 @@ class TestDriver(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             prob.final_setup()
 
-        msg = "Group (<model>): Target for design variable x has 'degF' units, but 'ft' units were specified."
+        msg = "<model> <class Group>: Target for design variable x has 'degF' units, but 'ft' units were specified."
         self.assertEqual(str(context.exception), msg)
 
         prob = om.Problem()
@@ -678,7 +678,7 @@ class TestDriver(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             prob.final_setup()
 
-        msg = "Group (<model>): Target for constraint x has 'degF' units, but 'ft' units were specified."
+        msg = "<model> <class Group>: Target for constraint x has 'degF' units, but 'ft' units were specified."
         self.assertEqual(str(context.exception), msg)
 
         prob = om.Problem()
@@ -699,7 +699,7 @@ class TestDriver(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             prob.final_setup()
 
-        msg = "Group (<model>): Target for design variable x has no units, but 'ft' units were specified."
+        msg = "<model> <class Group>: Target for design variable x has no units, but 'ft' units were specified."
         self.assertEqual(str(context.exception), msg)
 
         prob = om.Problem()
@@ -720,7 +720,7 @@ class TestDriver(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             prob.final_setup()
 
-        msg = "Group (<model>): Target for constraint x has no units, but 'ft' units were specified."
+        msg = "<model> <class Group>: Target for constraint x has no units, but 'ft' units were specified."
         self.assertEqual(str(context.exception), msg)
 
     def test_get_desvar_subsystem(self):

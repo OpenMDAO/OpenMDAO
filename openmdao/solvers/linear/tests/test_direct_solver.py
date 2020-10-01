@@ -386,7 +386,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.compute_totals(of=['c5.y'], wrt=['p.x'])
 
-        expected_msg = "NaN entries found in Group (<model>) for rows associated with states/residuals ['sub.c2.y', 'c4.y']."
+        expected_msg = "NaN entries found in <model> <class Group> for rows associated with states/residuals ['sub.c2.y', 'c4.y']."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -419,7 +419,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.compute_totals(of=['c5.y'], wrt=['p.x'])
 
-        expected_msg = "NaN entries found in Group (<model>) for rows associated with states/residuals ['sub.c2.y', 'c4.y']."
+        expected_msg = "NaN entries found in <model> <class Group> for rows associated with states/residuals ['sub.c2.y', 'c4.y']."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -452,7 +452,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.compute_totals(of=['c5.y'], wrt=['p.x'])
 
-        expected_msg = "NaN entries found in Group (<model>) for rows associated with states/residuals ['sub.c2.y', 'c4.y']."
+        expected_msg = "NaN entries found in <model> <class Group> for rows associated with states/residuals ['sub.c2.y', 'c4.y']."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -481,7 +481,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.compute_totals(of=['c5.y'], wrt=['p.x'])
 
-        expected_msg = "NaN entries found in Group (<model>) for rows associated with states/residuals ['c5.y']."
+        expected_msg = "NaN entries found in <model> <class Group> for rows associated with states/residuals ['c5.y']."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -510,7 +510,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.compute_totals(of=['c5.y'], wrt=['p.x'])
 
-        expected_msg = "Singular entry found in Group (<model>) for row associated with state/residual 'c5.y' index 0."
+        expected_msg = "Singular entry found in <model> <class Group> for row associated with state/residual 'c5.y' index 0."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -540,7 +540,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.compute_totals(of=['c5.y'], wrt=['p.x'])
 
-        expected_msg = "Singular entry found in Group (<model>) for row associated with state/residual 'c5.y' index 0."
+        expected_msg = "Singular entry found in <model> <class Group> for row associated with state/residual 'c5.y' index 0."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -863,7 +863,7 @@ class TestDirectSolverRemoteErrors(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             prob.run_model()
 
-        msg = "DirectSolver linear solver in Group (<model>) cannot be used in or above a ParallelGroup or a " + \
+        msg = "DirectSolver linear solver in <model> <class Group> cannot be used in or above a ParallelGroup or a " + \
             "distributed component."
         self.assertEqual(str(cm.exception), msg)
 
@@ -890,7 +890,7 @@ class TestDirectSolverRemoteErrors(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             prob.run_model()
 
-        msg = "DirectSolver linear solver in Group (<model>) cannot be used in or above a ParallelGroup or a " + \
+        msg = "DirectSolver linear solver in <model> <class Group> cannot be used in or above a ParallelGroup or a " + \
             "distributed component."
         self.assertEqual(str(cm.exception), msg)
 
@@ -919,7 +919,7 @@ class TestDirectSolverRemoteErrors(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             prob.run_model()
 
-        msg = "DirectSolver linear solver in Group (<model>) cannot be used in or above a ParallelGroup or a " + \
+        msg = "DirectSolver linear solver in <model> <class Group> cannot be used in or above a ParallelGroup or a " + \
             "distributed component."
         self.assertEqual(str(cm.exception), msg)
 
@@ -940,7 +940,7 @@ class TestDirectSolverRemoteErrors(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             prob.run_model()
 
-        msg = "DirectSolver linear solver in Group (<model>) cannot be used in or above a ParallelGroup or a " + \
+        msg = "DirectSolver linear solver in <model> <class Group> cannot be used in or above a ParallelGroup or a " + \
             "distributed component."
         self.assertEqual(str(cm.exception), msg)
 
