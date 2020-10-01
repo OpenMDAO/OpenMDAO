@@ -24,7 +24,6 @@ class N2Layout {
         this.zoomedElement = newZoomedElement;
         this.showLinearSolverNames = showLinearSolverNames;
 
-        this.outputNamingType = "Absolute";
         this.zoomedNodes = [];
         this.visibleNodes = [];
 
@@ -46,9 +45,6 @@ class N2Layout {
         this._updateTextWidths();
         stopTimer('N2Layout._updateTextWidths');
 
-        startTimer('N2Layout._updateSolverTextWidths');
-        this._updateSolverTextWidths();
-        stopTimer('N2Layout._updateSolverTextWidths');
         delete (this.textRenderer);
 
         startTimer('N2Layout._computeColumnWidths');
@@ -165,11 +161,11 @@ class N2Layout {
 
         let retVal = node.name;
 
-        if (this.outputNamingType == "Promoted" &&
-            node.isInputOrOutput() &&
-            this.zoomedElement.propExists('promotions') &&
-            this.zoomedElement.promotions.propExists(node.absPathName)) {
-            retVal = this.zoomedElement.promotions[node.absPathName];
+        if (node.name == '_auto_ivc') {
+            retVal = 'Auto-IVC';
+        }
+        else if (node.absPathName.match(/^_auto_ivc.*/) && node.promotedName !== undefined) {
+            retVal = node.promotedName;
         }
 
         return retVal;
@@ -203,6 +199,11 @@ class N2Layout {
         node.nameWidthPx = this._getTextWidth(this.getText(node)) + 2 *
             this.size.rightTextMargin;
 
+        if (!node.isInputOrOutput()) {
+            node.nameSolverWidthPx = this._getTextWidth(this.getSolverText(node)) + 2 *
+                this.size.rightTextMargin;
+        }
+
         if (node.hasChildren() && !node.isMinimized) {
             for (let child of node.children) {
                 this._updateTextWidths(child);
@@ -211,33 +212,18 @@ class N2Layout {
     }
 
     /**
-     * Determine text width for this and all decendents if node is a solver.
-     * @param {N2TreeNode} [node = this.zoomedElement] Item to begin looking from.
-     */
-    _updateSolverTextWidths(node = this.zoomedElement) {
-        if (node.isInput() || node.varIsHidden) {
-            return;
-        }
-
-        node.nameSolverWidthPx = this._getTextWidth(this.getSolverText(node)) + 2 *
-            this.size.rightTextMargin;
-
-        if (node.hasChildren() && !node.isMinimized) {
-            for (let child of node.children) {
-                this._updateSolverTextWidths(child);
-            }
-        }
-    }
-
-    /** Recurse through the tree and add up the number of leaves that each
+     * Recurse through the tree and add up the number of leaves that each
      * node has, based on their array of visible children.
      * @param {N2TreeNode} [node = this.model.root] The starting node.
      */
     _computeLeaves(node = this.model.root) {
         node.numLeaves = 0;
 
-        if (! node.varIsHidden) {
-            if (this.model.nodeIds.length > Precollapse.minimumNodes) {
+        if (!node.varIsHidden) {
+            if (node.name == '_auto_ivc' && !node.manuallyExpanded) {
+                node.minimize();
+            }
+            else if (this.model.nodeIds.length > Precollapse.minimumNodes) {
                 node.minimizeIfLarge(this.model.depthCount[node.depth]);
             }
 
@@ -253,7 +239,8 @@ class N2Layout {
         }
     }
 
-    /** For visible nodes with children, choose a column width
+    /**
+     * For visible nodes with children, choose a column width
      * large enough to accomodate the widest label in their column.
      * @param {N2TreeNode} node The item to operate on.
      * @param {string} childrenProp Either 'children' or 'subsystem_children'.
@@ -284,7 +271,8 @@ class N2Layout {
         }
     }
 
-    /** Compute column widths across the model, then adjust ends as needed.
+    /**
+     * Compute column widths across the model, then adjust ends as needed.
      * @param {N2TreeNode} [node = this.zoomedElement] Item to operate on.
      */
     _computeColumnWidths(node = this.zoomedElement) {
@@ -313,7 +301,8 @@ class N2Layout {
         this.cols[this.greatestDepth].width = lastColumnWidth;
     }
 
-    /** Compute solver column widths across the model, then adjust ends as needed.
+    /**
+     * Compute solver column widths across the model, then adjust ends as needed.
      * @param {N2TreeNode} [node = this.zoomedElement] Item to operate on.
      */
     _computeSolverColumnWidths(node = this.zoomedElement) {
@@ -342,9 +331,7 @@ class N2Layout {
         this.solverCols[this.greatestDepth].width = lastColumnWidth;
     }
 
-    /** Set the location of the columns based on the width of the columns
-     * to the left.
-     */
+    /** Set the location of the columns based on the width of the columns to the left. */
     _setColumnLocations() {
         this.size.partitionTree.width = 0;
         this.size.solverTree.width = 0;
@@ -523,7 +510,7 @@ class N2Layout {
             .duration(N2TransitionDefaults.duration)
             .delay(transitionStartDelay)
             // Hide the transition waiting animation when it ends:
-            .on('end', function() { dom.waiter.attr('class', 'no-show'); });
+            .on('end', function () { dom.waiter.attr('class', 'no-show'); });
 
         this.transitionStartDelay = N2TransitionDefaults.startDelay;
 
