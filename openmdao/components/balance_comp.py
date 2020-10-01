@@ -7,6 +7,7 @@ import numpy as np
 
 from openmdao.core.implicitcomponent import ImplicitComponent
 
+
 def _cs_abs(x):
     if isinstance(x, np.ndarray):
         return x * np.sign(x)
@@ -189,7 +190,6 @@ class BalanceComp(ImplicitComponent):
             else:
                 residuals[name] = (lhs - rhs) * self._scale_factor
 
-
     def linearize(self, inputs, outputs, jacobian):
         """
         Calculate the partials of the residual for each balance.
@@ -247,7 +247,6 @@ class BalanceComp(ImplicitComponent):
             # Partials of residual wrt lhs
             deriv = mult * self._scale_factor
             jacobian[name, lhs_name] = deriv.flatten()
-
 
     def guess_nonlinear(self, inputs, outputs, residuals):
         """
