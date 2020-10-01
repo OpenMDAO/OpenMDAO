@@ -241,7 +241,7 @@ class BalanceComp(ImplicitComponent):
                 mult = 1.0
 
             # Partials of residual wrt rhs
-            deriv = mult * lhs * self._dscale_drhs - (self._scale_factor + rhs*self._dscale_drhs)
+            deriv = (mult * lhs - rhs) * self._dscale_drhs - self._scale_factor
             jacobian[name, rhs_name] = deriv.flatten()
 
             # Partials of residual wrt lhs
