@@ -336,8 +336,8 @@ class TestForExceptions(unittest.TestCase):
             adder.add_equation('adder_output', ['input_a', 'input_b', 'input_c'], vec_size=self.nn,
                                length=3, scaling_factors=[1, -1])
 
-        expected_msg = 'AddSubtractComp (add_subtract_comp): Scaling factors list needs to be ' \
-                       'same length as input names'
+        expected_msg = "'add_subtract_comp' <class AddSubtractComp>: Scaling factors list needs to be " \
+                       "same length as input names"
 
         self.assertEqual(str(err.exception), expected_msg)
 
@@ -362,8 +362,8 @@ class TestForExceptions(unittest.TestCase):
             adder.add_equation('adder_output', ['input_a',], vec_size=self.nn,
                                length=3, scaling_factors=[1, -1])
 
-        expected_msg = 'AddSubtractComp (add_subtract_comp): must specify more than one input ' \
-                       'name for an equation, but only one given'
+        expected_msg = "'add_subtract_comp' <class AddSubtractComp>: must specify more than one input " \
+                       "name for an equation, but only one given"
 
         self.assertEqual(str(err.exception), expected_msg)
 
@@ -371,8 +371,8 @@ class TestForExceptions(unittest.TestCase):
             adder.add_equation('adder_output', 'input_a', vec_size=self.nn,
                                length=3, scaling_factors=[1, -1])
 
-        expected_msg = 'AddSubtractComp (add_subtract_comp): must specify more than one input ' \
-                       'name for an equation, but only one given'
+        expected_msg = "'add_subtract_comp' <class AddSubtractComp>: must specify more than one input " \
+                       "name for an equation, but only one given"
 
         self.assertEqual(str(err.exception), expected_msg)
 

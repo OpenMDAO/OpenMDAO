@@ -351,7 +351,7 @@ class TestModuleFunctions(unittest.TestCase):
                                                        x={'units': None}, y={'units': 'ft'}),
                               promotes_inputs=['x', 'y'])
 
-        msg = ("Group (<model>): Output units of 'Hz*s' for 'indeps.y' are incompatible with input "
+        msg = ("<model> <class Group>: Output units of 'Hz*s' for 'indeps.y' are incompatible with input "
                "units of 'ft' for 'exec_comp.y'.")
 
         with self.assertRaises(RuntimeError) as cm:

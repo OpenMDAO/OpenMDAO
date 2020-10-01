@@ -116,7 +116,7 @@ class TestExternalCodeComp(unittest.TestCase):
         try:
             self.prob.run_model()
         except om.AnalysisError as exc:
-            self.assertEqual(str(exc), "ExternalCodeComp (extcode): Error calling compute(), "
+            self.assertEqual(str(exc), "'extcode' <class ExternalCodeComp>: Error calling compute(), "
                              "Timed out after 1.0 sec.")
         else:
             self.fail('Expected AnalysisError')
@@ -195,7 +195,7 @@ class TestExternalCodeComp(unittest.TestCase):
         try:
             self.prob.run_model()
         except ValueError as exc:
-            self.assertEqual(str(exc), "ExternalCodeComp (extcode): Error calling compute(), "
+            self.assertEqual(str(exc), "'extcode' <class ExternalCodeComp>: Error calling compute(), "
                              "The command to be executed, 'no-such-command', cannot be found")
             self.assertEqual(self.extcode.return_code, -999999)
         else:
@@ -209,7 +209,7 @@ class TestExternalCodeComp(unittest.TestCase):
         try:
             self.prob.run_model()
         except ValueError as exc:
-            self.assertEqual(str(exc), "ExternalCodeComp (extcode): Error calling compute(), "
+            self.assertEqual(str(exc), "'extcode' <class ExternalCodeComp>: Error calling compute(), "
                              "Empty command list")
         else:
             self.fail('Expected ValueError')

@@ -455,13 +455,13 @@ class ParFDWarningsTestCase(unittest.TestCase):
         self.mat = np.random.random(5 * size).reshape((5, size)) - 0.5
 
     def test_total_no_mpi(self):
-        msg = "Group (<model>): MPI is not active but num_par_fd = 3. No parallel finite difference will be performed."
+        msg = "<model> <class Group>: MPI is not active but num_par_fd = 3. No parallel finite difference will be performed."
 
         with assert_warning(UserWarning, msg):
             _setup_problem(self.mat, total_method='fd', total_num_par_fd = 3, approx_totals=True)
 
     def test_partial_no_mpi(self):
-        msg = "MatMultComp (comp): MPI is not active but num_par_fd = 3. No parallel finite difference will be performed."
+        msg = "'comp' <class MatMultComp>: MPI is not active but num_par_fd = 3. No parallel finite difference will be performed."
 
         with assert_warning(UserWarning, msg):
             _setup_problem(self.mat, partial_method='fd', partial_num_par_fd = 3)
@@ -479,14 +479,14 @@ class ParFDErrorsMPITestCase(unittest.TestCase):
         with self.assertRaises(RuntimeError) as ctx:
             _setup_problem(self.mat, total_method='fd', total_num_par_fd = 3, approx_totals=False)
 
-        self.assertEqual(str(ctx.exception), "Group (<model>): num_par_fd = 3 but FD is not active.")
+        self.assertEqual(str(ctx.exception), "<model> <class Group>: num_par_fd = 3 but FD is not active.")
 
     def test_no_partial_approx(self):
         p = _setup_problem(self.mat, partial_num_par_fd = 3, approx_totals=False)
         with self.assertRaises(RuntimeError) as ctx:
             p.final_setup()
 
-        self.assertEqual(str(ctx.exception), "MatMultComp (comp): num_par_fd is > 1 but no FD is active.")
+        self.assertEqual(str(ctx.exception), "'comp' <class MatMultComp>: num_par_fd is > 1 but no FD is active.")
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")

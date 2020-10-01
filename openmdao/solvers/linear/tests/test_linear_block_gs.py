@@ -46,7 +46,7 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
             prob.run_model()
 
         self.assertEqual(str(context.exception),
-                         "Linear solver LinearBlockGS in Group (<model>) doesn't support assembled jacobians.")
+                         "Linear solver LinearBlockGS in <model> <class Group> doesn't support assembled jacobians.")
 
     def test_simple_implicit(self):
         # This verifies that we can perform lgs around an implicit comp and get the right answer
