@@ -492,6 +492,18 @@ class _TotalJacInfo(object):
         start = 0
         end = 0
 
+        # If we call compute_totals with any 'wrt' or 'of' that is outside of an existing driver
+        # var set, then we need to ignore the computed relevancy and perform GS iterations on all
+        # comps. Note, the inputs are handled individually by direct check vs the relevancy dict,
+        # so we just bulk check the outputs here.
+        qoi_i = self.input_meta[mode]
+        qoi_o = self.output_meta[mode]
+        if qoi_i and qoi_o:
+            non_rel_outs = [out for out in self.output_list[mode]
+                            if out not in qoi_i and out not in qoi_o]
+        else:
+            non_rel_outs = None
+
         for name in input_list:
             rhsname = 'linear'
             if name not in abs2meta_out:
@@ -625,7 +637,7 @@ class _TotalJacInfo(object):
                 imeta['idx_list'] = np.arange(start, end, dtype=INT_DTYPE)
                 idx_iter_dict[name] = (imeta, self.single_index_iter)
 
-            if name in relevant:
+            if name in relevant and not non_rel_outs:
                 tup = (rhsname, relevant[name]['@all'][1], cache_lin_sol)
             else:
                 tup = (rhsname, _contains_all, cache_lin_sol)

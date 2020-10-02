@@ -849,6 +849,62 @@ class TestJacobian(unittest.TestCase):
                 ):
             assert_near_equal(act,exp, 1e-5)
 
+    def test_compute_totals_relevancy(self):
+        # When a model has desvars and responses defined, components that don't lie in the relevancy
+        # graph between them do not take part in the linear solve. This led to some derivatives
+        # being returned as zero in certain instances when it was called with wrt or of not in the
+        # set.
+        class DParaboloid(ExplicitComponent):
+
+            def setup(self):
+                ndvs = 3
+                self.add_input('w', val=1.)
+                self.add_input('x', shape=ndvs)
+
+                self.add_output('y', shape=1)
+                self.add_output('z', shape=ndvs)
+                self.declare_partials('y', 'x')
+                self.declare_partials('y', 'w')
+                self.declare_partials('z', 'x')
+
+            def compute(self, inputs, outputs):
+                x = inputs['x']
+                local_y = np.sum((x-5)**2)
+                y_g = np.zeros(self.comm.size)
+                self.comm.Allgather(local_y, y_g)
+                outputs['y'] = np.sum(y_g) + (inputs['w']-10)**2
+                outputs['z'] = x**2
+
+            def compute_partials(self, inputs, J):
+                x = inputs['x']
+                J['y', 'x'] = 2*(x-5)
+                J['y', 'w'] = 2*(inputs['w']-10)
+                J['z', 'x'] = np.diag(2*x)
+
+        p = Problem()
+        d_ivc = p.model.add_subsystem('distrib_ivc',
+                                       IndepVarComp(distributed=False),
+                                       promotes=['*'])
+        ndvs = 3
+        d_ivc.add_output('x', 2*np.ones(ndvs))
+
+        ivc = p.model.add_subsystem('ivc',
+                                    IndepVarComp(distributed=False),
+                                    promotes=['*'])
+        ivc.add_output('w', 2.0)
+        p.model.add_subsystem('dp', DParaboloid(), promotes=['*'])
+
+
+        p.model.add_design_var('x', lower=-100, upper=100)
+        p.model.add_objective('y')
+
+        p.setup(mode='rev')
+        p.run_model()
+        J = p.compute_totals(of=['y', 'z'], wrt=['w', 'x'])
+
+        assert(J['y','w'][0,0] == -16)
+
+
 class MySparseComp(ExplicitComponent):
     def setup(self):
         self.add_input('y', np.zeros(2))
