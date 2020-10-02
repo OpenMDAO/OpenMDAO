@@ -869,9 +869,7 @@ class TestJacobian(unittest.TestCase):
 
             def compute(self, inputs, outputs):
                 x = inputs['x']
-                local_y = np.sum((x-5)**2)
-                y_g = np.zeros(self.comm.size)
-                self.comm.Allgather(local_y, y_g)
+                y_g = np.sum((x-5)**2)
                 outputs['y'] = np.sum(y_g) + (inputs['w']-10)**2
                 outputs['z'] = x**2
 
@@ -883,13 +881,13 @@ class TestJacobian(unittest.TestCase):
 
         p = Problem()
         d_ivc = p.model.add_subsystem('distrib_ivc',
-                                       IndepVarComp(distributed=False),
+                                       IndepVarComp(),
                                        promotes=['*'])
         ndvs = 3
         d_ivc.add_output('x', 2*np.ones(ndvs))
 
         ivc = p.model.add_subsystem('ivc',
-                                    IndepVarComp(distributed=False),
+                                    IndepVarComp(),
                                     promotes=['*'])
         ivc.add_output('w', 2.0)
         p.model.add_subsystem('dp', DParaboloid(), promotes=['*'])
