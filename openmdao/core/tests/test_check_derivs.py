@@ -2237,6 +2237,40 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
 class TestProblemCheckTotals(unittest.TestCase):
 
+    def test_check_totals_linear_constraint(self):
+        prob = om.Problem()
+        prob.model = SellarDerivatives()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
+
+        prob.model.add_design_var('x', lower=-100, upper=100)
+        prob.model.add_design_var('z', lower=-100, upper=100)
+        prob.model.add_objective('obj')
+        prob.model.add_constraint('con1', upper=0.0)
+        prob.model.add_constraint('con2', upper=0.0)
+
+        prob.set_solver_print(level=0)
+
+        prob.setup(force_alloc_complex=True)
+
+        prob.model.nonlinear_solver.options['atol'] = 1e-15
+        prob.model.nonlinear_solver.options['rtol'] = 1e-15
+
+        # We don't call run_driver() here because we don't
+        # actually want the optimizer to run
+        prob.run_model()
+
+        # check derivatives with complex step and a larger step size.
+        stream = StringIO()
+        totals = prob.check_totals(method='cs', out_stream=stream)
+
+        lines = stream.getvalue().splitlines()
+
+        self.assertEqual(lines[3], "  Full Model: 'con_cmp1.con1' wrt 'x' (constraint)")
+        self.assertEqual(lines[17], "  Full Model: 'con_cmp1.con1' wrt 'z' (constraint)")
+        self.assertEqual(lines[31], "  Full Model: 'con_cmp2.con2' wrt 'x' (constraint)")
+        self.assertEqual(lines[45], "  Full Model: 'con_cmp2.con2' wrt 'z' (constraint)")
+        self.assertEqual(lines[59], "  Full Model: 'obj_cmp.obj' wrt 'x'")
+
     def test_cs(self):
         prob = om.Problem()
         prob.model = SellarDerivatives()

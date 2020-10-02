@@ -1528,7 +1528,8 @@ class Problem(object):
             out_stream = sys.stdout
 
         _assemble_derivative_data(data, rel_err_tol, abs_err_tol, out_stream, compact_print,
-                                  [model], {'': fd_args}, totals=True)
+                                  [model], {'': fd_args}, totals=True,
+                                  linear_constraints=self.driver._cons)
         return data['']
 
     def compute_totals(self, of=None, wrt=None, return_format='flat_dict', debug_print=False,
@@ -1824,7 +1825,7 @@ class Problem(object):
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
                               compact_print, system_list, global_options, totals=False,
-                              indep_key=None, print_reverse=False,
+                              linear_constraints=None, indep_key=None, print_reverse=False,
                               show_only_incorrect=False):
     """
     Compute the relative and absolute errors in the given derivatives and print to the out_stream.
@@ -2133,7 +2134,11 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         if directional:
                             out_buffer.write("  {}: '{}' wrt (d)'{}'\n".format(sys_name, of, wrt))
                         else:
-                            out_buffer.write("  {}: '{}' wrt '{}'\n".format(sys_name, of, wrt))
+                            if linear_constraints is not None and of in linear_constraints.keys():
+                                out_buffer.write(
+                                    "  {}: '{}' wrt '{}' (constraint)\n".format(sys_name, of, wrt))
+                            else:
+                                out_buffer.write("  {}: '{}' wrt '{}'\n".format(sys_name, of, wrt))
                         out_buffer.write('    Forward Magnitude : {:.6e}\n'.format(
                             magnitude.forward))
                     if do_rev:
