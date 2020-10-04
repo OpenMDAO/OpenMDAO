@@ -11,7 +11,7 @@ def abs(x):
 
     Parameters
     ----------
-    x: ndarray
+    x : ndarray
         array value to be computed on
 
     Returns
@@ -31,9 +31,9 @@ def norm(x, axis=None):
 
     Parameters
     ----------
-    x: ndarray
+    x : ndarray
         array value to be computed on
-    axis: None or int
+    axis : None or int
         axis to perform the norm up to
 
     Returns
