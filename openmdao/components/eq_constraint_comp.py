@@ -5,6 +5,7 @@ from numbers import Number
 import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent
+from openmdao.utils import cs_safe
 
 
 class EQConstraintComp(ExplicitComponent):
@@ -127,10 +128,10 @@ class EQConstraintComp(ExplicitComponent):
             # scale factor that normalizes by the rhs, except near 0
             if options['normalize']:
                 # Indices where the rhs is near zero or not near zero
-                idxs_nz = np.where(np.abs(rhs) < 2)[0]
-                idxs_nnz = np.where(np.abs(rhs) >= 2)[0]
+                idxs_nz = np.where(cs_save.abs(rhs) < 2)[0]
+                idxs_nnz = np.where(cs_save.abs(rhs) >= 2)[0]
 
-                self._scale_factor[idxs_nnz] = 1.0 / np.abs(rhs[idxs_nnz])
+                self._scale_factor[idxs_nnz] = 1.0 / cs_save.abs(rhs[idxs_nnz])
                 self._scale_factor[idxs_nz] = 1.0 / (.25 * rhs[idxs_nz] ** 2 + 1)
             else:
                 self._scale_factor[:] = 1.0
@@ -165,11 +166,11 @@ class EQConstraintComp(ExplicitComponent):
 
             if options['normalize']:
                 # Indices where the rhs is near zero or not near zero
-                idxs_nz = np.where(np.abs(rhs) < 2)[0]
-                idxs_nnz = np.where(np.abs(rhs) >= 2)[0]
+                idxs_nz = np.where(cs_save.abs(rhs) < 2)[0]
+                idxs_nnz = np.where(cs_save.abs(rhs) >= 2)[0]
 
                 # scale factor that normalizes by the rhs, except near 0
-                self._scale_factor[idxs_nnz] = 1.0 / np.abs(rhs[idxs_nnz])
+                self._scale_factor[idxs_nnz] = 1.0 / cs_save.abs(rhs[idxs_nnz])
                 self._scale_factor[idxs_nz] = 1.0 / (.25 * rhs[idxs_nz] ** 2 + 1)
 
                 self._dscale_drhs[idxs_nnz] = -np.sign(rhs[idxs_nnz]) / rhs[idxs_nnz]**2

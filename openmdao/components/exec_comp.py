@@ -8,6 +8,7 @@ from numpy import ndarray, imag, complex as npcomplex
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.units import valid_units
 from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils import cs_safe
 
 # regex to check for variable names.
 VAR_RGX = re.compile(r'([.]*[_a-zA-Z]\w*[ ]*\(?)')
@@ -665,18 +666,9 @@ else:
     _expr_dict['factorial'] = factorial
 
 
-# Put any functions here that need special versions to work under
-# complex step
+# put any functions that need custom complex-safe versions here
 
-def _cs_abs(x):
-    if isinstance(x, ndarray):
-        return x * np.sign(x)
-    elif x.real < 0.0:
-        return -x
-    return x
-
-
-_expr_dict['abs'] = _cs_abs
+_expr_dict['abs'] = cs_safe.abs
 
 
 class _NumpyMsg(object):
