@@ -11,7 +11,6 @@ from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils import cs_safe
 
 # regex to check for variable names.
-# VAR_RGX = re.compile(r'([.]*[_a-zA-Z]\w*[ ]*\(?)')
 VAR_RGX = re.compile('([_a-zA-Z]\w*(?::[_a-zA-Z]\w*)*[ ]*\(?)')
 
 # Names of metadata entries allowed for ExecComp variables.
@@ -24,17 +23,26 @@ _disallowed_names = {'has_diag_partials', 'units', 'shape'}
 
 
 def _valid_name(s, exprs):
-    """Replace colons with numbers such that the new name does not exist in any
-    of the given expressions.
+    """
+    Replace colons with numbers.
+
+    Replace colons with numbers such that the new name
+    does not exist in any of the given expressions.
+
+    Parameters
+    ----------
+    s: str
+        variable name
+    exprs: list
+        list of expressions
     """
     i = 0
     check = ' '.join(exprs)
     while True:
-        n = s.replace(':','%d'%i)
+        n = s.replace(':', '%d' % i)
         if n not in check:
             return n
         i += 1
-
 
 def check_option(option, value):
     """
@@ -362,8 +370,8 @@ class ExecComp(ExplicitComponent):
                     else:
                         self.declare_partials(of=out, wrt=inp)
 
-        self._to_colons = {} 
-        from_colons = self._from_colons = {} 
+        self._to_colons = {}
+        from_colons = self._from_colons = {}
         for n in allvars:
             if ':' in n:
                 no_colon = _valid_name(n, exprs)
@@ -372,7 +380,7 @@ class ExecComp(ExplicitComponent):
             self._to_colons[no_colon] = n
             from_colons[n] = no_colon
 
-        self._colon_names = { n for n in allvars if ':' in n }
+        self._colon_names = {n for n in allvars if ':' in n}
 
         self._codes = self._compile_exprs(self._exprs)
 
