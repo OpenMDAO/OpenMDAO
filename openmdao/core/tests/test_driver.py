@@ -10,6 +10,7 @@ import numpy as np
 
 import openmdao.api as om
 from openmdao.core.driver import Driver
+from openmdao.utils.units import convert_units
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.general_utils import printoptions
 from openmdao.utils.testing_utils import use_tempdirs
@@ -637,6 +638,30 @@ class TestDriver(unittest.TestCase):
 
         con = case.get_constraints()
         assert_near_equal(con['comp1.y1'][0], ((38.0 * 5 / 9) + 77.0) * 3.5, 1e-8)
+
+    def test_units_compute_totals(self):
+        p = om.Problem()
+
+        p.model.add_subsystem('stuff', om.ExecComp(['y = x', 'cy = x'],
+                                                   x={'units': 'inch'},
+                                                   y={'units': 'kg'},
+                                                   cy={'units': 'kg'}),
+                              promotes=['*'])
+
+        p.model.add_design_var('x', units='ft')
+        p.model.add_objective('y', units='lbm')
+        p.model.add_constraint('cy', units='lbm', lower=0)
+
+        p.setup()
+
+        p['x'] = 1.0
+        p.run_model()
+
+        J_driver = p.driver._compute_totals()
+
+        fact = convert_units(1.0, 'kg/inch', 'lbm/ft')
+        assert_near_equal(J_driver['stuff.y', 'x'][0,0], fact, 1e-5)
+        assert_near_equal(J_driver['stuff.cy', 'x'][0,0], fact, 1e-5)
 
     def test_units_error_messages(self):
         prob = om.Problem()

@@ -1,8 +1,8 @@
 .. _`declaring-variables`:
 
-*******************
-Declaring Variables
-*******************
+******************************
+Declaring Continuous Variables
+******************************
 
 Calling add_input and add_output
 --------------------------------
