@@ -627,7 +627,7 @@ _import_functs(np, _expr_dict,
                       'e', 'pi',  # Constants
                       'isinf', 'isnan',  # Logic
                       'log', 'log10', 'log1p', 'power',  # Math operations
-                      'exp', 'expm1', 'fmax',
+                      'exp', 'expm1', 'fmax', 'min', 'max', 'diff',
                       'fmin', 'maximum', 'minimum',
                       'sum', 'dot', 'prod',  # Reductions
                       'tensordot', 'matmul',  # Linear algebra
