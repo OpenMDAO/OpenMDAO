@@ -13,3 +13,4 @@ Core Features
     running/index.rst
     controlling_solvers/index.rst
     working_with_derivatives/index.rst
+    discrete_vars.rst

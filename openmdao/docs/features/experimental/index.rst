@@ -9,7 +9,6 @@ Anything documented here is functional but not fully tested.
 .. toctree::
    :maxdepth: 2
 
-   discrete_vars.rst
    simul_coloring_fd_cs.rst
    plugins.rst
    dynamic_shapes.rst
