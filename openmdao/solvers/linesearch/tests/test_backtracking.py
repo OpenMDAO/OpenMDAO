@@ -245,7 +245,8 @@ class TestAnalysisErrorExplicit(unittest.TestCase):
         with self.assertRaises(om.AnalysisError) as context:
             top.run_model()
 
-        self.assertEqual(str(context.exception), 'Try Again.')
+        self.assertEqual(str(context.exception),
+                         "'par' <class ParaboloidAE>: Error calling compute(), Try Again.")
 
 
 class ImplCompTwoStatesAE(om.ImplicitComponent):

@@ -198,7 +198,7 @@ class TestScaling(unittest.TestCase):
         model = prob.model
         model.add_subsystem('comp', EComp())
 
-        msg = "EComp (comp): When adding output 'zz', expected shape (4, 2) but got shape (3, 5) for argument 'ref'."
+        msg = "'comp' <class EComp>: When adding output 'zz', expected shape (4, 2) but got shape (3, 5) for argument 'ref'."
         with self.assertRaises(ValueError) as context:
             prob.setup()
         self.assertEqual(_winfix(str(context.exception)), msg)
@@ -211,7 +211,7 @@ class TestScaling(unittest.TestCase):
         model = prob.model
         model.add_subsystem('comp', EComp())
 
-        msg = "EComp (comp): When adding output 'zz', expected shape (4, 2) but got shape (3, 5) for argument 'ref0'."
+        msg = "'comp' <class EComp>: When adding output 'zz', expected shape (4, 2) but got shape (3, 5) for argument 'ref0'."
         with self.assertRaises(ValueError) as context:
             prob.setup()
         self.assertEqual(_winfix(str(context.exception)), msg)
@@ -224,7 +224,7 @@ class TestScaling(unittest.TestCase):
         model = prob.model
         model.add_subsystem('comp', EComp())
 
-        msg = "EComp (comp): When adding output 'zz', expected shape (4, 2) but got shape (3, 5) for argument 'res_ref'."
+        msg = "'comp' <class EComp>: When adding output 'zz', expected shape (4, 2) but got shape (3, 5) for argument 'res_ref'."
         with self.assertRaises(ValueError) as context:
             prob.setup()
         self.assertEqual(_winfix(str(context.exception)), msg)

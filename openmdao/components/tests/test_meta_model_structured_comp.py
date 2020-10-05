@@ -525,7 +525,7 @@ class TestMetaModelStructuredScipy(unittest.TestCase):
         # The interpolating output name is given as a regexp because the exception could
         #   happen with f or g first. The order those are evaluated comes from the keys of
         #   dict so no guarantee on the order except for Python 3.6 !
-        msg = "MetaModelStructuredComp \(comp\): Error interpolating output '[f|g]' because input 'comp.z' was " \
+        msg = "'comp' <class MetaModelStructuredComp>: Error interpolating output '[f|g]' because input 'comp.z' was " \
               "out of bounds \('.*', '.*'\) with value '9.0'"
         with self.assertRaisesRegex(om.AnalysisError, msg):
             self.run_and_check_derivs(self.prob)
@@ -668,7 +668,7 @@ class TestMetaModelStructuredScipy(unittest.TestCase):
         with self.assertRaises(om.AnalysisError) as cm:
             p.run_model()
 
-        msg = ("MMComp (MM): Error interpolating output 'y' because input 'MM.x' was out of bounds ('0.0', '1.0') with value '1.1'")
+        msg = ("'MM' <class MMComp>: Error interpolating output 'y' because input 'MM.x' was out of bounds ('0.0', '1.0') with value '1.1'")
         self.assertEqual(str(cm.exception), msg)
 
 
@@ -1115,8 +1115,8 @@ class TestMetaModelStructuredPython(unittest.TestCase):
 
       p.set_val('x', 0.75)
 
-      msg = "Analysis Error: MetaModelStructuredComp " \
-            "(interp) Line 203 of file {}".format(inspect.getsourcefile(om.MetaModelStructuredComp))
+      msg = "Analysis Error: 'interp' <class MetaModelStructuredComp> " \
+            "Line 203 of file {}".format(inspect.getsourcefile(om.MetaModelStructuredComp))
       with assert_warning(UserWarning, msg):
           p.run_driver()
 

@@ -92,6 +92,9 @@ class N2Style {
                 'fill-opacity': '.8',
                 'fill': N2Style.color.collapsed,
             },
+            '#tree > g.minimized > text': {
+                'fill': N2Style.color.collapsedText,
+            },
             '#tree > g.autoivc_input > rect': {
                 'cursor': 'pointer',
                 'fill-opacity': '.8',
@@ -231,11 +234,12 @@ N2Style.color = {
     'group': '#6092B5',
     'component': '#02BFFF',
     'collapsed': '#555555',
+    'collapsedText': 'white',
     'unconnectedInput': '#F42F0D',
     'inputArrow': 'salmon',
     'outputArrow': 'seagreen',
     'declaredPartial': 'black',
-    'autoivcInput': '#F42F0D'
+    'autoivcInput': '#ff7000'
 };
 
 Object.freeze(N2Style.color); // Make it the equivalent of a constant

@@ -204,10 +204,10 @@
     color: white;
 }
 
-#draggable-legend-dots p {
+.draggable-legend-dots p {
     color: white;
-    padding-left: 5px;
-    padding-right: 5px;
+    margin-left: 5px;
+    margin-right: 5px;
 }
 
 #close-legend {
@@ -239,5 +239,5 @@
 }
 
 p.legend-dots::before {
-    content: '\A789\A789\A789\A789\A789\A789';
+    content: '::::::';
 }

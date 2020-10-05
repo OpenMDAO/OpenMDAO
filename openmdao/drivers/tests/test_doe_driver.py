@@ -1213,7 +1213,7 @@ class TestParallelDOE(unittest.TestCase):
             prob.setup()
 
         self.assertEqual(str(context.exception),
-                         "FanInGrouped (<model>): MPI process allocation failed: can't meet "
+                         "<model> <class FanInGrouped>: MPI process allocation failed: can't meet "
                          "min_procs required for the following subsystems: ['sub']")
 
     def test_full_factorial(self):

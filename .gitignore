@@ -3,6 +3,8 @@
 .DS_Store
 .dropbox
 .idea
+.vscode/
+.spyproject/
 wingproj.wpr
 openmdao.egg-info/*
 openmdao/docs/_build/

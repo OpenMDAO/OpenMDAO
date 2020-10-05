@@ -109,8 +109,7 @@ class KrigingSurrogate(SurrogateModel):
         self.n_samples, self.n_dims = x.shape
 
         if self.n_samples <= 1:
-            self._raise('KrigingSurrogate requires at least 2 training points.',
-                        exc_type=ValueError)
+            raise ValueError('KrigingSurrogate requires at least 2 training points.')
 
         # Normalize the data
         X_mean = np.mean(x, axis=0)
@@ -141,8 +140,7 @@ class KrigingSurrogate(SurrogateModel):
                              bounds=bounds)
 
         if not optResult.success:
-            msg = 'Kriging Hyper-parameter optimization failed: {0}'.format(optResult.message)
-            self._raise(msg, exc_type=ValueError)
+            raise ValueError(f'Kriging Hyper-parameter optimization failed: {optResult.message}')
 
         self.thetas = np.exp(optResult.x)
         _, params = self._calculate_reduced_likelihood_params()

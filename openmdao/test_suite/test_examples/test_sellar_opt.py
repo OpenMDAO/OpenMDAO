@@ -24,11 +24,11 @@ class TestSellarOpt(unittest.TestCase):
         prob.model.add_constraint('con1', upper=0)
         prob.model.add_constraint('con2', upper=0)
 
-        prob.setup()
-        prob.set_solver_print(level=0)
-
         # Ask OpenMDAO to finite-difference across the model to compute the gradients for the optimizer
         prob.model.approx_totals()
+
+        prob.setup()
+        prob.set_solver_print(level=0)
 
         prob.run_driver()
 

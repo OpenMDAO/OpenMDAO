@@ -356,7 +356,7 @@ class TestProblem(unittest.TestCase):
         bad_val = -10*np.ones((10))
         prob['indep.num'] = bad_val
         with self.assertRaisesRegex(ValueError,
-                "Group (.*): Failed to set value of '.*': could not broadcast input array from shape (.*) into shape (.*)."):
+                "<model> <class Group>: Failed to set value of '.*': could not broadcast input array from shape (.*) into shape (.*)."):
             prob.final_setup()
         prob._initial_condition_cache = {}
 
@@ -371,7 +371,7 @@ class TestProblem(unittest.TestCase):
         prob['indep.arr'] = new_val
         assert_near_equal(prob['indep.arr'], new_val, 1e-10)
 
-        msg = "Group (.*): Failed to set value of '.*': could not broadcast input array from shape (.*) into shape (.*)."
+        msg = "<model> <class Group>: Failed to set value of '.*': could not broadcast input array from shape (.*) into shape (.*)."
         # check bad array value
         bad_val = -10*np.ones((9,1))
         with self.assertRaisesRegex(ValueError, msg):
@@ -1067,7 +1067,7 @@ class TestProblem(unittest.TestCase):
         try:
             prob.setup()
         except RuntimeError as err:
-            self.assertEqual(str(err), "Group (<model>): The following inputs, ['C1.x', 'C2.x'], promoted to 'x', are connected but their metadata entries ['units', 'value'] differ. Call <group>.set_input_defaults('x', units=?, val=?), where <group> is the model to remove the ambiguity.")
+            self.assertEqual(str(err), "<model> <class Group>: The following inputs, ['C1.x', 'C2.x'], promoted to 'x', are connected but their metadata entries ['units', 'value'] differ. Call <group>.set_input_defaults('x', units=?, val=?), where <group> is the model to remove the ambiguity.")
         else:
             self.fail("Exception expected.")
 
@@ -1224,7 +1224,7 @@ class TestProblem(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             x = prob['G1.x']
 
-        msg = "Group (<model>): The following inputs, ['G1.C1.x', 'G1.C2.x'], promoted to 'G1.x', are connected but their metadata entries ['units'] differ. Call <group>.set_input_defaults('x', units=?), where <group> is the Group named 'G1' to remove the ambiguity."
+        msg = "<model> <class Group>: The following inputs, ['G1.C1.x', 'G1.C2.x'], promoted to 'G1.x', are connected but their metadata entries ['units'] differ. Call <group>.set_input_defaults('x', units=?), where <group> is the Group named 'G1' to remove the ambiguity."
         self.assertEqual(cm.exception.args[0], msg)
 
     def test_get_set_with_units_error_messages(self):

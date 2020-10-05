@@ -904,8 +904,8 @@ class TestGroupFiniteDifferenceMPI(unittest.TestCase):
         prob = om.Problem()
         prob.model = FanInSubbedIDVC()
 
-        prob.setup(local_vector_class=vector_class, check=False, mode='rev')
         prob.model.approx_totals()
+        prob.setup(local_vector_class=vector_class, check=False, mode='rev')
         prob.set_solver_print(level=0)
         prob.run_model()
 

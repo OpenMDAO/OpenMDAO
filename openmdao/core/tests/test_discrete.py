@@ -460,7 +460,7 @@ class DiscreteTestCase(unittest.TestCase):
         with self.assertRaises(Exception) as ctx:
             prob.setup()
         self.assertEqual(str(ctx.exception),
-                         "Group (<model>): Can't connect continuous output 'indep.x' to discrete input 'comp.x'.")
+                         "<model> <class Group>: Can't connect continuous output 'indep.x' to discrete input 'comp.x'.")
 
     def test_discrete_to_float_error(self):
         prob = om.Problem()
@@ -475,7 +475,7 @@ class DiscreteTestCase(unittest.TestCase):
         with self.assertRaises(Exception) as ctx:
             prob.setup()
         self.assertEqual(str(ctx.exception),
-                         "Group (<model>): Can't connect discrete output 'indep.x' to continuous input 'comp.x'.")
+                         "<model> <class Group>: Can't connect discrete output 'indep.x' to continuous input 'comp.x'.")
 
     def test_discrete_mismatch_error(self):
         prob = om.Problem()
@@ -490,7 +490,7 @@ class DiscreteTestCase(unittest.TestCase):
         with self.assertRaises(Exception) as ctx:
             prob.setup()
         self.assertEqual(str(ctx.exception),
-                         "Group (<model>): Type 'str' of output 'indep.x' is incompatible with type 'int' of input 'comp.x'.")
+                         "<model> <class Group>: Type 'str' of output 'indep.x' is incompatible with type 'int' of input 'comp.x'.")
 
     def test_driver_discrete_enforce_int(self):
         # Drivers require discrete vars to be int or ndarrays of int.
@@ -629,7 +629,8 @@ class DiscreteTestCase(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             prob.setup()
 
-        msg = "Group (<model>): Attempted to connect from 'C1.y' to 'C2.y', but 'C2.y' is an output. All connections must be from an output to an input."
+        msg = ("<model> <class Group>: Attempted to connect from 'C1.y' to 'C2.y', "
+               "but 'C2.y' is an output. All connections must be from an output to an input.")
         self.assertEqual(str(cm.exception), msg)
 
     def test_connection_from_input(self):
@@ -644,9 +645,36 @@ class DiscreteTestCase(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             prob.setup()
 
-        msg = "Group (<model>): Attempted to connect from 'C1.x' to 'C2.x', but 'C1.x' is an input. All connections must be from an output to an input."
+        msg = ("<model> <class Group>: Attempted to connect from 'C1.x' to 'C2.x', "
+               "but 'C1.x' is an input. All connections must be from an output to an input.")
         self.assertEqual(str(cm.exception), msg)
 
+    def test_forgotten_args_error(self):
+
+        class BrokenComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', val=1)
+                self.add_discrete_input('y', val='bar')
+                self.add_output('z', val=3)
+
+            def compute(self, inputs, outputs):
+                # forgot the discrete_inputs and discrete_outputs args
+                pass
+
+        p = om.Problem()
+
+        g0 = p.model.add_subsystem('g0', om.Group())
+        g1 = g0.add_subsystem('g1', om.Group())
+        g1.add_subsystem('broken', BrokenComp())
+
+        p.setup()
+
+        with self.assertRaises(TypeError) as cm:
+            p.run_model()
+
+        msg = ("'g0.g1.broken' <class BrokenComp>: Error calling compute(), "
+               "compute() takes 3 positional arguments but 5 were given")
+        self.assertEqual(str(cm.exception), msg)
 
 class SolverDiscreteTestCase(unittest.TestCase):
     def _setup_model(self, solver_class):
@@ -696,7 +724,7 @@ class SolverDiscreteTestCase(unittest.TestCase):
             prob.run_model()
 
         self.assertEqual(str(ctx.exception),
-                         "Group (<model>) has a NewtonSolver solver and contains discrete outputs ['discrete_g.C1.y'].")
+                         "<model> <class Group> has a NewtonSolver solver and contains discrete outputs ['discrete_g.C1.y'].")
 
     def test_discrete_err_broyden(self):
         prob = self._setup_model(om.BroydenSolver)
@@ -705,7 +733,7 @@ class SolverDiscreteTestCase(unittest.TestCase):
             prob.run_model()
 
         self.assertEqual(str(ctx.exception),
-                         "Group (<model>) has a BroydenSolver solver and contains discrete outputs ['discrete_g.C1.y'].")
+                         "<model> <class Group> has a BroydenSolver solver and contains discrete outputs ['discrete_g.C1.y'].")
 
 
 class DiscretePromTestCase(unittest.TestCase):

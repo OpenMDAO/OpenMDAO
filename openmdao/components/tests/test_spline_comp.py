@@ -312,7 +312,7 @@ class SplineCompTestCase(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             prob.setup()
 
-        msg = "SplineComp (interp): 'x_cp_val' is not a valid option when using method 'bsplines'. "
+        msg = "'interp' <class SplineComp>: 'x_cp_val' is not a valid option when using method 'bsplines'. "
         msg += "Set 'num_cp' instead."
         self.assertEqual(str(cm.exception), msg)
 
@@ -327,7 +327,7 @@ class SplineCompTestCase(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             prob.setup()
 
-        msg = "SplineComp (interp): It is not valid to set both options 'x_cp_val' and 'num_cp'."
+        msg = "'interp' <class SplineComp>: It is not valid to set both options 'x_cp_val' and 'num_cp'."
         self.assertEqual(str(cm.exception), msg)
 
         prob = om.Problem()
@@ -341,7 +341,7 @@ class SplineCompTestCase(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             prob.setup()
 
-        msg = "SplineComp (interp): Either option 'x_cp_val' or 'num_cp' must be set."
+        msg = "'interp' <class SplineComp>: Either option 'x_cp_val' or 'num_cp' must be set."
         self.assertEqual(str(cm.exception), msg)
 
     def test_y_units(self):

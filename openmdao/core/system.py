@@ -471,11 +471,11 @@ class System(object):
             Either our instance pathname or class name.
         """
         if self.pathname == '':
-            return '{} (<model>)'.format(type(self).__name__)
+            return '<model> <class {}>'.format(type(self).__name__)
         if self.pathname is not None:
-            return '{} ({})'.format(type(self).__name__, self.pathname)
+            return "'{}' <class {}>".format(self.pathname, type(self).__name__)
         if self.name:
-            return '{} ({})'.format(type(self).__name__, self.name)
+            return "'{}' <class {}>".format(self.name, type(self).__name__)
         return type(self).__name__
 
     def _get_inst_id(self):
@@ -2162,6 +2162,43 @@ class System(object):
             # reset _names so users will see full vector contents
             d_inputs._names = old_ins
             d_outputs._names = old_outs
+
+    @contextmanager
+    def _call_user_function(self, fname, protect_inputs=True,
+                            protect_outputs=False, protect_residuals=False):
+        """
+        Context manager that wraps a call to a user defined function.
+
+        Protect any vectors that should not be modified to help prevent user error
+        and add information about the system to any errors that don't have it already.
+
+        Parameters
+        ----------
+        fname : str
+            Name of the user defined function.
+        protect_inputs : bool
+            If True, then set the inputs vector to be read only
+        protect_outputs : bool
+            If True, then set the outputs vector to be read only
+        protect_residuals : bool
+            If True, then set the residuals vector to be read only
+        """
+        self._inputs.read_only = protect_inputs
+        self._outputs.read_only = protect_outputs
+        self._residuals.read_only = protect_residuals
+
+        try:
+            yield
+        except Exception:
+            err_type, err, trace = sys.exc_info()
+            if str(err).startswith(self.msginfo):
+                raise err
+            else:
+                raise err_type(f"{self.msginfo}: Error calling {fname}(), {err}")
+        finally:
+            self._inputs.read_only = False
+            self._outputs.read_only = False
+            self._residuals.read_only = False
 
     def get_nonlinear_vectors(self):
         """

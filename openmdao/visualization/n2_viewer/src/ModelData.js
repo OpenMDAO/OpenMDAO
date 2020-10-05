@@ -37,6 +37,8 @@ class ModelData {
         this._computeConnections();
         stopTimer('ModelData._computeConnections');
 
+        this._updateAutoIvcNames();
+
         debugInfo("New model: ", this);
         // this.errorCheck();
     }
@@ -44,6 +46,9 @@ class ModelData {
     static uncompressModel(b64str) {
         const compressedData = atob(b64str);
         const jsonStr = window.pako.inflate(compressedData, { to: 'string' });
+        /* for ( let pos = 0; pos < jsonStr.length; pos += 100) {
+            console.log(pos, jsonStr.substring(pos, pos+99));
+        } */
         return JSON.parse(jsonStr);
     }
 
@@ -113,6 +118,13 @@ class ModelData {
             node.absPathName += node.name;
 
             this.nodePaths[node.absPathName] = node;
+
+            if (this.abs2prom.input[node.absPathName] !== undefined) {
+                node.promotedName = this.abs2prom.input[node.absPathName];
+            }
+            else if (this.abs2prom.output[node.absPathName] !== undefined) {
+                node.promotedName = this.abs2prom.output[node.absPathName];
+            }
         }
 
         this.identifyUnconnectedInput(node);
@@ -222,6 +234,24 @@ class ModelData {
     }
 
     /**
+     * Find the target of an Auto-IVC variable.
+     * @param {String} elementPath The full path of the element to check. Must start with _auto_ivc.
+     * @return {String} The absolute path of the target element, or undefined if not found.
+     */
+    getAutoIvcTgt(elementPath) {
+        if (!elementPath.match(/^_auto_ivc.*$/)) return undefined;
+
+        for (let conn of this.conns) {
+            if (conn.src == elementPath) {
+                return conn.tgt;
+            }
+        }
+
+        console.warn(`No target connection found for ${elementPath}.`)
+        return undefined;
+    }
+
+    /**
      * Create an array in each node containing references to its
      * children that are subsystems. Runs recursively over the node's
      * children array.
@@ -286,9 +316,6 @@ class ModelData {
         let throwLbl = 'ModelData._computeConnections: ';
 
         for (let conn of this.conns) {
-            // Ignore connections from _auto_ivc, which is intentionally not included.
-            if (conn.src.match(/^_auto_ivc.*$/)) continue;
-
             // Process sources
             let srcObj = this.nodePaths[conn.src];
 
@@ -393,6 +420,21 @@ class ModelData {
                     "src": srcObj,
                     "arrows": cycleArrowsArray
                 });
+            }
+        }
+    }
+
+    /**
+     * 
+     */
+    _updateAutoIvcNames() {
+        const aivc = this.nodePaths['_auto_ivc'];
+        if (aivc !== undefined && aivc.hasChildren()) {
+            for (const ivc of aivc.children) {
+                const tgtPath = this.getAutoIvcTgt(ivc.absPathName);
+                if (tgtPath !== undefined) {
+                    ivc.promotedName = this.nodePaths[tgtPath].promotedName;
+                }
             }
         }
     }

@@ -194,7 +194,7 @@ class TestPassSize(unittest.TestCase):
 
         exception = raises_cm.exception
 
-        msg = "Group (<model>): Failed to resolve shapes for ['B.in', 'B.out', 'C.in', 'C.out']. To see the dynamic shape dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
+        msg = "<model> <class Group>: Failed to resolve shapes for ['B.in', 'B.out', 'C.in', 'C.out']. To see the dynamic shape dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
         self.assertEqual(exception.args[0], msg)
 
 
@@ -520,7 +520,7 @@ class TestDynShapes(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             p.setup()
 
-        msg = "Group (<model>): Failed to resolve shapes for ['comp.x1', 'comp.x2']. To see the dynamic shape dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
+        msg = "<model> <class Group>: Failed to resolve shapes for ['comp.x1', 'comp.x2']. To see the dynamic shape dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
         self.assertEqual(cm.exception.args[0], msg)
 
     def test_mismatched_dyn_shapes(self):
@@ -541,7 +541,7 @@ class TestDynShapes(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             p.setup()
 
-        msg = "Group (<model>): Shape mismatch,  (3, 2) vs. (4, 2) for variable 'sink.x2' during dynamic shape determination."
+        msg = "<model> <class Group>: Shape mismatch,  (3, 2) vs. (4, 2) for variable 'sink.x2' during dynamic shape determination."
         self.assertEqual(str(cm.exception), msg)
 
     def test_baseline_conn_inputs(self):
@@ -650,7 +650,7 @@ class TestDynShapes(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             p.setup()
 
-        msg = "Group (<model>): Failed to resolve shapes for ['Gdyn.C1.x2', 'Gdyn.C1.y2', 'Gdyn.C2.x2', 'Gdyn.C2.y2', 'Gdyn.C3.x2', 'Gdyn.C3.y2', 'sink.x2', 'sink.y2']. To see the dynamic shape dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
+        msg = "<model> <class Group>: Failed to resolve shapes for ['Gdyn.C1.x2', 'Gdyn.C1.y2', 'Gdyn.C2.x2', 'Gdyn.C2.y2', 'Gdyn.C3.x2', 'Gdyn.C3.y2', 'sink.x2', 'sink.y2']. To see the dynamic shape dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
         self.assertEqual(str(cm.exception), msg)
 
     def test_bad_copy_shape_name(self):
@@ -663,7 +663,7 @@ class TestDynShapes(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             p.setup()
 
-        msg = "Group (<model>): Can't copy shape of variable 'sink.x11'. Variable doesn't exist."
+        msg = "<model> <class Group>: Can't copy shape of variable 'sink.x11'. Variable doesn't exist."
         self.assertEqual(str(cm.exception), msg)
 
 

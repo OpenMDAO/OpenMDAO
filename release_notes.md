@@ -1,4 +1,49 @@
 **********************************
+# Release Notes for OpenMDAO 3.4.0
+
+October 01, 2020
+
+OpenMDAO 3.4.0 adds an experimental feature that allows inputs to be
+shaped based upon their source.  We're still testing this feature but we
+encourage users to try it out and see if it works for their use cases.
+
+## Backwards Incompatible API Changes:
+
+- list_outputs will now return the system-relative promoted path of outputs
+- list_inputs will now return the system-relative absolute path of inputs
+
+## Backwards Incompatible NON-API Changes:
+
+- Refactor of internal data structures and some cleanups. #1693
+
+## New Features:
+
+- Implementation for POEM_022 - Determining variable shape at runtime based on connections #1671
+- AnalysisErrors reached during optimization now produce noisy warnings in pyOptSparseDriver. #1672
+- Added check to optionally hide noisy AutoIVC warnings #1680
+- Errors in user-defined methods (e.g. compute, apply_linear, etc.) now report the class and pathname where the error occurred. #1697
+- Auto-ivc component visible again in N2, and connections sourced from it are now highlighted #1698
+
+## Bug Fixes:
+
+- Added support for distributed design variables in get_design_vars #1659
+- Fixed a bug in pyoptsparse where, on certain Windows setups, the signal package may not have SIGUSR1 defined and the user gets an AttributeError when instantiating the Driver. #1675
+- Fix bug where the N2 was gathering options that are not recordable. #1676
+- Add support for Nan values in the N2 diagram #1677
+- Fixed N2 testing code to detect console errors and added regression test for nan value bug in N2 #1679
+- Fixed issue with case recording on a DOEDriver with a parallel model where it did not record all remote variables. #1689
+- Fixed a bug where equivalent units promoted to the same name were requiring set_input_defaults unnecessarily. #1690
+- Added some improvements in the sparsity of derivatives for ExecComps with multiple expressions #1699
+- Connection of unitless variables is more reliable for automatically generated units #1704
+
+## Miscellaneous:
+- Added declaration for distributed design variables to the `supports` dictionary. #1678
+- Added miscellaneous speedups for models with large numbers of inputs. #1686
+- Change calls to super to use Python3 syntax. #1695
+
+
+
+**********************************
 # Release Notes for OpenMDAO 3.3.0
 
 September 04, 2020
