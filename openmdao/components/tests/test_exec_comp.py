@@ -285,11 +285,10 @@ class TestExecComp(unittest.TestCase):
 
     def test_colon_vars(self):
         prob = om.Problem()
-        prob.model.add_subsystem('C1', om.ExecComp('y=foo:bar+1.'))
-        with self.assertRaises(Exception) as context:
-            prob.setup()
-        self.assertEqual(str(context.exception),
-                         "'C1' <class ExecComp>: failed to compile expression 'y=foo:bar+1.'.")
+        prob.model.add_subsystem('C1', om.ExecComp('foo:bar=x+1.', x=2.0))
+        prob.setup()
+        prob.run_model()
+        assert_near_equal(prob['C1.foo:bar'], 3.0, 0.00001)
 
     def test_bad_kwargs(self):
         prob = om.Problem()

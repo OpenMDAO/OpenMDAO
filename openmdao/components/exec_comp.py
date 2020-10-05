@@ -11,7 +11,8 @@ from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils import cs_safe
 
 # regex to check for variable names.
-VAR_RGX = re.compile(r'([.]*[_a-zA-Z]\w*[ ]*\(?)')
+# VAR_RGX = re.compile(r'([.]*[_a-zA-Z]\w*[ ]*\(?)')
+VAR_RGX = re.compile('([_a-zA-Z]\w*(?::[_a-zA-Z]\w*)*[ ]*\(?)')
 
 # Names of metadata entries allowed for ExecComp variables.
 _allowed_meta = {'value', 'shape', 'units', 'res_units', 'desc',
@@ -20,6 +21,19 @@ _allowed_meta = {'value', 'shape', 'units', 'res_units', 'desc',
 
 # Names that are not allowed for input or output variables (keywords for options)
 _disallowed_names = {'has_diag_partials', 'units', 'shape'}
+
+
+def _valid_name(s, exprs):
+    """Replace colons with numbers such that the new name does not exist in any
+    of the given expressions.
+    """
+    i = 0
+    check = ' '.join(exprs)
+    while True:
+        n = s.replace(':','%d'%i)
+        if n not in check:
+            return n
+        i += 1
 
 
 def check_option(option, value):
@@ -348,9 +362,27 @@ class ExecComp(ExplicitComponent):
                     else:
                         self.declare_partials(of=out, wrt=inp)
 
+        self._to_colons = {} 
+        from_colons = self._from_colons = {} 
+        for n in allvars:
+            if ':' in n:
+                no_colon = _valid_name(n, exprs)
+            else:
+                no_colon = n
+            self._to_colons[no_colon] = n
+            from_colons[n] = no_colon
+
+        self._colon_names = { n for n in allvars if ':' in n }
+
         self._codes = self._compile_exprs(self._exprs)
 
     def _compile_exprs(self, exprs):
+
+        exprs = exprs[:]
+        for i in range(len(exprs)):
+            for n in self._colon_names:
+                exprs[i] = exprs[i].replace(n, self._from_colons[n])
+
         compiled = []
         for i, expr in enumerate(exprs):
             try:
@@ -427,7 +459,7 @@ class ExecComp(ExplicitComponent):
         """
         for i, expr in enumerate(self._codes):
             try:
-                exec(expr, _expr_dict, _IODict(outputs, inputs))
+                exec(expr, _expr_dict, _IODict(outputs, inputs, self._to_colons))
             except Exception as err:
                 raise RuntimeError("%s: Error occurred evaluating '%s'\n%s"
                                    % (self.msginfo, self._exprs[i], str(err)))
@@ -565,7 +597,7 @@ class _IODict(object):
         The outputs object to be wrapped.
     """
 
-    def __init__(self, outputs, inputs):
+    def __init__(self, outputs, inputs, to_colons):
         """
         Create the dict wrapper.
 
@@ -579,14 +611,17 @@ class _IODict(object):
         """
         self._outputs = outputs
         self._inputs = inputs
+        self._to_colons = to_colons
 
     def __getitem__(self, name):
+        name = self._to_colons[name]
         try:
             return self._inputs[name]
         except KeyError:
             return self._outputs[name]
 
     def __setitem__(self, name, value):
+        name = self._to_colons[name]
         self._outputs[name] = value
 
     def __contains__(self, name):
