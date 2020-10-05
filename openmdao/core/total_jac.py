@@ -1602,10 +1602,10 @@ class _TotalJacInfo(object):
 
         if self.return_format in ('dict', 'array'):
             for prom_out, odict in J.items():
-                oscaler = responses[prom_out]['scaler']
+                oscaler = responses[prom_out]['total_scaler']
 
                 for prom_in, val in odict.items():
-                    iscaler = desvars[prom_in]['scaler']
+                    iscaler = desvars[prom_in]['total_scaler']
 
                     # Scale response side
                     if oscaler is not None:
@@ -1618,8 +1618,8 @@ class _TotalJacInfo(object):
         elif self.return_format == 'flat_dict':
             for tup, val in J.items():
                 prom_out, prom_in = tup
-                oscaler = responses[prom_out]['scaler']
-                iscaler = desvars[prom_in]['scaler']
+                oscaler = responses[prom_out]['total_scaler']
+                iscaler = desvars[prom_in]['total_scaler']
 
                 # Scale response side
                 if oscaler is not None:
