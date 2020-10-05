@@ -691,13 +691,13 @@ class TestDistribDynShapes(unittest.TestCase):
         np.testing.assert_allclose(p['sink.y1'], np.ones(5)*8.)
 
 
-class PartialsComp(om.ExplicitComponent):
+class DynPartialsComp(om.ExplicitComponent):
     def setup(self):
         self.add_input('x', shape_by_conn=True, copy_shape='y')
         self.add_output('y', shape_by_conn=True, copy_shape='x')
 
     def setup_partials(self):
-        size = self._var_rel2meta['x']['size']
+        size = self.get_var_meta('x', 'size')
         self.mat = np.eye(size) * 3.
         rng = np.arange(size)
         self.declare_partials('y', 'x', rows=rng, cols=rng, val=3.0)
@@ -706,17 +706,67 @@ class PartialsComp(om.ExplicitComponent):
         outputs['y'] = self.mat.dot(inputs['x'])
 
 
+class TestDynShapeFeature(unittest.TestCase):
+    def test_feature_fwd(self):
+        import numpy as np
+        import openmdao.api as om
+        from openmdao.core.tests.test_dyn_sizing import DynPartialsComp
 
-class TestDynWithSetupPartials(unittest.TestCase):
-    def test_setup_partials(sefl):
         p = om.Problem()
-        p.model.add_subsystem('comp', PartialsComp())
-        p.model.add_subsystem('sink', om.ExecComp('y=x', shape=10))
+        p.model.add_subsystem('indeps', om.IndepVarComp('x', val=np.ones(5)))
+        p.model.add_subsystem('comp', DynPartialsComp())
+        p.model.add_subsystem('sink', om.ExecComp('y=x',
+                                                  x={'shape_by_conn': True, 'copy_shape': 'y'},
+                                                  y={'shape_by_conn': True, 'copy_shape': 'x'}))
+        p.model.connect('indeps.x', 'comp.x')
+        p.model.connect('comp.y', 'sink.x')
+        p.setup()
+        p.run_model()
+        J = p.compute_totals(of=['sink.y'], wrt=['indeps.x'])
+        assert_near_equal(J['sink.y', 'indeps.x'], np.eye(5)*3.)
+
+    def test_feature_rev(sefl):
+        import numpy as np
+        import openmdao.api as om
+        from openmdao.core.tests.test_dyn_sizing import DynPartialsComp
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', DynPartialsComp())
+        p.model.add_subsystem('sink', om.ExecComp('y=x', shape=5))
         p.model.connect('comp.y', 'sink.x')
         p.setup()
         p.run_model()
         J = p.compute_totals(of=['sink.y'], wrt=['comp.x'])
-        np.testing.assert_allclose(J['sink.y', 'comp.x'], np.eye(10)*3.)
+        assert_near_equal(J['sink.y', 'comp.x'], np.eye(5)*3.)
+
+    def test_feature_middle(self):
+        import numpy as np
+        import openmdao.api as om
+
+        class PartialsComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', val=np.ones(5))
+                self.add_output('y', val=np.ones(5))
+
+            def setup_partials(self):
+                self.mat = np.eye(5) * 3.
+                rng = np.arange(5)
+                self.declare_partials('y', 'x', rows=rng, cols=rng, val=3.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = self.mat.dot(inputs['x'])
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', PartialsComp())
+        p.model.add_subsystem('sink', om.ExecComp('y=x',
+                                                  x={'shape_by_conn': True, 'copy_shape': 'y'},
+                                                  y={'shape_by_conn': True, 'copy_shape': 'x'}))
+        p.model.connect('comp.y', 'sink.x')
+        p.setup()
+        p.run_model()
+        J = p.compute_totals(of=['sink.y'], wrt=['comp.x'])
+        assert_near_equal(J['sink.y', 'comp.x'], np.eye(5)*3.)
+
 
 if __name__ == "__main__":
     unittest.main()
