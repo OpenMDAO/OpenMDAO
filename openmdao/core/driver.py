@@ -484,7 +484,8 @@ class Driver(object):
 
         self._rec_mgr.startup(self)
 
-    def _get_voi_val(self, name, meta, remote_vois, driver_scaling=True, rank=None):
+    def _get_voi_val(self, name, meta, remote_vois, driver_scaling=True,
+                     get_remote=True, rank=None):
         """
         Get the value of a variable of interest (objective, constraint, or design var).
 
@@ -503,6 +504,12 @@ class Driver(object):
             When True, return values that are scaled according to either the adder and scaler or
             the ref and ref0 values that were specified when add_design_var, add_objective, and
             add_constraint were called on the model. Default is True.
+        get_remote : bool or None
+            If True, retrieve the value even if it is on a remote process.  Note that if the
+            variable is remote on ANY process, this function must be called on EVERY process
+            in the Problem's MPI communicator.
+            If False, only retrieve the value if it is on the current process, or only the part
+            of the value that's on the current process for a distributed variable.
         rank : int or None
             If not None, gather value to this rank only.
 
@@ -532,7 +539,7 @@ class Driver(object):
             # if var is distributed or only gathering to one rank
             # TODO - support distributed var under a parallel group.
             if owner is None or rank is not None:
-                val = model.get_val(src_name, get_remote=True, rank=rank, flat=True)
+                val = model.get_val(src_name, get_remote=get_remote, rank=rank, flat=True)
                 if indices is not None:
                     val = val[indices]
             else:
@@ -546,17 +553,22 @@ class Driver(object):
                         size = len(indices)
                     val = np.empty(size)
 
-                comm.Bcast(val, root=owner)
+                if get_remote:
+                    comm.Bcast(val, root=owner)
 
         elif distributed:
-            local_val = model.get_val(src_name, flat=True)
+            local_val = model.get_val(src_name, get_remote=False, flat=True)
             local_indices, sizes, _ = distributed_vars[src_name]
             if local_indices is not None:
                 local_val = local_val[local_indices]
-            offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
-            offsets[1:] = np.cumsum(sizes[:-1])
-            val = np.zeros(np.sum(sizes))
-            comm.Allgatherv(local_val, [val, sizes, offsets, MPI.DOUBLE])
+
+            if get_remote:
+                offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
+                offsets[1:] = np.cumsum(sizes[:-1])
+                val = np.zeros(np.sum(sizes))
+                comm.Allgatherv(local_val, [val, sizes, offsets, MPI.DOUBLE])
+            else:
+                val = local_val
 
         else:
             if name in self._designvars_discrete:
@@ -590,19 +602,28 @@ class Driver(object):
 
         return val
 
-    def get_design_var_values(self):
+    def get_design_var_values(self, get_remote=False):
         """
         Return the design variable values.
+
+        Parameters
+        ----------
+        get_remote : bool or None
+            If True, retrieve the value even if it is on a remote process.  Note that if the
+            variable is remote on ANY process, this function must be called on EVERY process
+            in the Problem's MPI communicator.
+            If False, only retrieve the value if it is on the current process, or only the part
+            of the value that's on the current process for a distributed variable.
 
         Returns
         -------
         dict
            Dictionary containing values of each design variable.
         """
-        return {n: self._get_voi_val(n, dv, self._remote_dvs)
+        return {n: self._get_voi_val(n, dv, self._remote_dvs, get_remote=get_remote)
                 for n, dv in self._designvars.items()}
 
-    def set_design_var(self, name, value):
+    def set_design_var(self, name, value, set_remote=True):
         """
         Set the value of a design variable.
 
@@ -612,6 +633,9 @@ class Driver(object):
             Global pathname of the design variable.
         value : float or ndarray
             Value for the design variable.
+        set_remote : bool
+            If True, set the global value of the variable (value must be of the global size).
+            If False, set the local value of the variable (value must be of the local size).
         """
         problem = self._problem()
         meta = self._designvars[name]
@@ -651,7 +675,12 @@ class Driver(object):
                 loc_idxs = indices
                 dist_idxs = _full_slice
 
-            desvar[loc_idxs] = np.atleast_1d(value)[dist_idxs]
+            if set_remote:
+                # provided value is the global value, use indices for this proc
+                desvar[loc_idxs] = np.atleast_1d(value)[dist_idxs]
+            else:
+                # provided value is the local value
+                desvar[loc_idxs] = np.atleast_1d(value)
 
             # Undo driver scaling when setting design var values into model.
             if self._has_scaling:
