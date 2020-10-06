@@ -216,7 +216,7 @@ class DistributedRecorderTest(unittest.TestCase):
         # current values in the problem. This next section is about getting those values
 
         # These involve collective gathers so all ranks need to run this
-        expected_outputs = driver.get_design_var_values()
+        expected_outputs = driver.get_design_var_values(get_remote=True)
         expected_outputs.update(driver.get_objective_values())
         expected_outputs.update(driver.get_constraint_values())
 
