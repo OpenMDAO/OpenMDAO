@@ -44,6 +44,7 @@ def _valid_name(s, exprs):
             return n
         i += 1
 
+
 def check_option(option, value):
     """
     Check option for validity.
