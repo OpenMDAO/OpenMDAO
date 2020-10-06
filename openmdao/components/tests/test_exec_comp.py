@@ -290,6 +290,25 @@ class TestExecComp(unittest.TestCase):
         prob.run_model()
         assert_near_equal(prob['C1.foo:bar'], 3.0, 0.00001)
 
+    def test_multiple_colon_vars(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('C1', om.ExecComp('foo:bar=tree:leaf_count + tree:leaf_count'))
+        prob.setup()
+        prob['C1.tree:leaf_count'] = 2.
+        prob.run_model()
+        assert_near_equal(prob['C1.foo:bar'], 4.0, 0.00001)
+
+    def test_multiple_colon_exprs(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('C1', om.ExecComp(['foo:bar=tree:leaf_count + tree:leaf_count',
+                                                    'tree:bats=cave:size / 2.']))
+        prob.setup()
+        prob['C1.tree:leaf_count'] = 2.
+        prob['C1.cave:size'] = 5.5
+        prob.run_model()
+        assert_near_equal(prob['C1.foo:bar'], 4.0, 0.00001)
+        assert_near_equal(prob['C1.tree:bats'], 2.75, 0.00001)
+
     def test_bad_kwargs(self):
         prob = om.Problem()
         prob.model.add_subsystem('C1', om.ExecComp('y=x+1.', xx=2.0))
