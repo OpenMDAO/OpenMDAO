@@ -11,7 +11,7 @@ from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils import cs_safe
 
 # regex to check for variable names.
-VAR_RGX = re.compile('([_a-zA-Z]\w*(?::[_a-zA-Z]\w*)*[ ]*\(?)')
+VAR_RGX = re.compile('([_a-zA-Z]\\w*(?::[_a-zA-Z]\\w*)*[ ]*\\(?)')
 
 # Names of metadata entries allowed for ExecComp variables.
 _allowed_meta = {'value', 'shape', 'units', 'res_units', 'desc',
