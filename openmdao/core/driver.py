@@ -602,7 +602,7 @@ class Driver(object):
 
         return val
 
-    def get_design_var_values(self, get_remote=True):
+    def get_design_var_values(self, get_remote=False):
         """
         Return the design variable values.
 
