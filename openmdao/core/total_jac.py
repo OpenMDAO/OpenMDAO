@@ -1443,7 +1443,7 @@ class _TotalJacInfo(object):
 
         return self.J_final
 
-    def compute_totals_approx(self, initialize=False, show_progress=True):
+    def compute_totals_approx(self, initialize=False, show_progress=True, out_stream=None):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -1494,9 +1494,16 @@ class _TotalJacInfo(object):
             if model._coloring_info['coloring'] is not None:
                 model._update_wrt_matches(model._coloring_info)
 
+        if show_progress:
+            setattr(model._approx_schemes, "out_stream", out_stream)
+            setattr(model._approx_schemes, "_show_progress", show_progress)
+
         # Linearize Model
         model._linearize(model._assembled_jac,
-                         sub_do_ln=model._linear_solver._linearize_children())
+                        sub_do_ln=model._linear_solver._linearize_children())
+        if show_progress:
+            del model._approx_schemes.out_stream
+            del model._approx_schemes._show_progress
 
         approx_jac = model._jacobian._subjacs_info
 

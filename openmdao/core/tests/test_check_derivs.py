@@ -2312,10 +2312,12 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         # check derivatives with complex step and a larger step size.
         stream = StringIO()
-        totals = prob.check_totals(method='cs', show_progress=True, out_stream=stream)
+        totals = prob.check_totals(method='fd', show_progress=True, out_stream=stream)
 
         lines = stream.getvalue().splitlines()
         self.assertTrue(lines[0], "1/3: Checking derivatives with respect to: '_auto_ivc.v0 [0]' ... 0.0088 seconds")
+        self.assertTrue(lines[1], "2/3: Checking derivatives with respect to: '_auto_ivc.v0 [1]' ... 9.2891 seconds")
+        self.assertTrue(lines[2], "3/3: Checking derivatives with respect to: '_auto_ivc.v1 [2]' ... 0.0087 seconds")
 
     def test_desvar_as_obj(self):
         prob = om.Problem()

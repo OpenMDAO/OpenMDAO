@@ -1471,8 +1471,6 @@ class Problem(object):
                   "setup on the problem, e.g. 'problem.setup(force_alloc_complex=True)'"
             raise RuntimeError(msg)
 
-        setattr(self.model, "_show_progress", show_progress)
-
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
         # Calculate Total Derivatives
@@ -1502,7 +1500,7 @@ class Problem(object):
                             step_calc=step_calc if method == 'fd' else None)
         total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict', approx=True,
                                    driver_scaling=driver_scaling)
-        Jfd = total_info.compute_totals_approx(initialize=True)
+        Jfd = total_info.compute_totals_approx(initialize=True, out_stream=out_stream)
         # reset the _owns_approx_jac flag after approximation is complete.
         if not approx:
             model._jacobian = old_jac
