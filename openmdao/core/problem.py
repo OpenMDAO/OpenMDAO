@@ -1664,7 +1664,7 @@ class Problem(object):
 
         # Design vars
         desvars = self.driver._designvars
-        vals = self.driver.get_design_var_values()
+        vals = self.driver.get_design_var_values(get_remote=True)
         header = "Design Variables"
         col_names = default_col_names + desvar_opts
         self._write_var_info_table(header, col_names, desvars, vals,
