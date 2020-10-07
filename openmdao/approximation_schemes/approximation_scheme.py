@@ -34,6 +34,8 @@ class ApproximationScheme(object):
         Array of sizes of data chunks that make up _j_colored. (Used for MPI Allgatherv)
     _j_data_offsets : ndarray of int
         Array of offsets of each data chunk that makes up _j_colored. (Used for MPI Allgatherv)
+    _progress_out : None
+        Attribute to output the progress of check_totals
     """
 
     def __init__(self):
@@ -47,6 +49,7 @@ class ApproximationScheme(object):
         self._j_data_offsets = None
         self._approx_groups_cached_under_cs = False
         self._exec_dict = defaultdict(list)
+        self._progress_out = None
 
     def __repr__(self):
         """
@@ -297,15 +300,7 @@ class ApproximationScheme(object):
     def _compute_approximations(self, system, jac, total, under_cs):
         from openmdao.core.component import Component
 
-        if hasattr(system._approx_schemes, "out_stream"):
-            out_stream = system._approx_schemes.out_stream
-        else:
-            out_stream = None
-
-        if hasattr(system._approx_schemes, "_show_progress"):
-            show_progress = system._approx_schemes._show_progress
-        else:
-            show_progress = None
+        self._progress_out = self.out_stream if hasattr(self, "out_stream") else None
 
         # Set system flag that we're under approximation to true
         system._set_approx_mode(True)
@@ -379,7 +374,8 @@ class ApproximationScheme(object):
 
         # now do uncolored solves
         for wrt, data, col_idxs, tmpJ, idx_info, nz_rows in approx_groups:
-            start_time = time.time()
+            if self._progress_out:
+                start_time = time.time()
 
             J = tmpJ[wrt]
             full_idxs = J['loc_outvec_idxs']
@@ -406,11 +402,11 @@ class ApproximationScheme(object):
                     else:
                         J['data'][:, i_count] = self._transform_result(result[full_idxs])
 
-                end_time = time.time()
-                if show_progress is not None and out_stream is not None:
-                    out_stream.write(f"{fd_count+1}/{len(full_idxs)}: Checking "
-                                     f"derivatives with respect to: '{wrt} [{idxs}]' ... "
-                                     f"{round(end_time-start_time, 4)} seconds\n")
+                if self._progress_out:
+                    end_time = time.time()
+                    self.out_stream.write(f"{fd_count+1}/{len(full_idxs)}: Checking "
+                                          f"derivatives with respect to: '{wrt} [{idxs}]' ... "
+                                          f"{round(end_time-start_time, 4)} seconds\n")
 
                 fd_count += 1
 

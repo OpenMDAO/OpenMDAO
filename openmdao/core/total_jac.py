@@ -1500,15 +1500,11 @@ class _TotalJacInfo(object):
                 model._update_wrt_matches(model._coloring_info)
 
         if show_progress:
-            setattr(model._approx_schemes, "out_stream", out_stream)
-            setattr(model._approx_schemes, "_show_progress", show_progress)
+            model._approx_schemes[method].out_stream = out_stream
 
         # Linearize Model
         model._linearize(model._assembled_jac,
                          sub_do_ln=model._linear_solver._linearize_children())
-        if show_progress:
-            del model._approx_schemes.out_stream
-            del model._approx_schemes._show_progress
 
         approx_jac = model._jacobian._subjacs_info
 

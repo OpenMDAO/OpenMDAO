@@ -1500,7 +1500,8 @@ class Problem(object):
                             step_calc=step_calc if method == 'fd' else None)
         total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict', approx=True,
                                    driver_scaling=driver_scaling)
-        Jfd = total_info.compute_totals_approx(initialize=True, out_stream=out_stream)
+        Jfd = total_info.compute_totals_approx(initialize=True, show_progress=show_progress,
+                                               out_stream=out_stream)
         # reset the _owns_approx_jac flag after approximation is complete.
         if not approx:
             model._jacobian = old_jac
