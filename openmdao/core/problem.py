@@ -1049,8 +1049,7 @@ class Problem(object):
 
         comps = []
         for comp in model.system_iter(typ=Component, include_self=True):
-            if isinstance(comp, IndepVarComp) or \
-               (hasattr(comp, '_no_partials') and comp._no_partials):
+            if hasattr(comp, '_no_check_partials') and comp._no_check_partials:
                 continue
 
             name = comp.pathname

@@ -631,6 +631,9 @@ class TestMetaModelStructuredScipy(unittest.TestCase):
         """Runs check_partials and compares to analytic derivatives."""
 
         prob.run_model()
+
+        prob.model.comp._no_check_partials = False  # override skipping of check_partials
+
         derivs = prob.check_partials(out_stream=None)
 
         for i in derivs['comp'].keys():
@@ -714,6 +717,9 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         """Runs check_partials and compares to analytic derivatives."""
 
         prob.run_model()
+
+        prob.model.comp._no_check_partials = False  # override skipping of check_partials
+
         derivs = prob.check_partials(method='cs', out_stream=None)
 
         for i in derivs['comp'].keys():
@@ -1116,9 +1122,9 @@ class TestMetaModelStructuredPython(unittest.TestCase):
       p.set_val('x', 0.75)
 
       msg = "Analysis Error: 'interp' <class MetaModelStructuredComp> " \
-            "Line 203 of file {}".format(inspect.getsourcefile(om.MetaModelStructuredComp))
+            "Line 207 of file {}".format(inspect.getsourcefile(om.MetaModelStructuredComp))
       with assert_warning(UserWarning, msg):
-          p.run_driver()
+        p.run_driver()
 
 
 @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
