@@ -55,3 +55,77 @@ follows:
 
 
 This way, `y` can be used to determine the shape of `x`, or `x` can determine the shape of `y`.
+
+
+Examples
+--------
+
+In the following examples we look at different ways that variable shape information can be
+propagated through a model.  Some of the examples use the following simple dynamically shaped
+component:
+
+.. embed-code::
+    openmdao.core.tests.test_dyn_sizing.DynPartialsComp
+
+Note that this component has sparse partials, and those are specified within the `setup_partials`
+method which is called after all of the shape information is known.
+
+Note also that we show how to make an ExecComp dyanamically shaped by setting `shape_by_conn` and
+`copy_shape` in the metadata we pass into `ExecComp.__init__` for `x` and `y`.
+
+
+In the first example, we specify the shape of the IndepVarComp that feeds into the rest of the
+model, and all other shapes are determined based on that.
+
+
+.. embed-code::
+    openmdao.core.tests.test_dyn_sizing.TestDynShapeFeature.test_feature_fwd
+    :layout: code, output
+
+
+In the second example, the middle component determines the size of the auto-IndepVarComp and the
+sink.
+
+.. embed-code::
+    openmdao.core.tests.test_dyn_sizing.TestDynShapeFeature.test_feature_middle
+    :layout: code, output
+
+
+Finally, the sink determines all of the upstream shapes.
+
+.. embed-code::
+    openmdao.core.tests.test_dyn_sizing.TestDynShapeFeature.test_feature_rev
+    :layout: code, output
+
+
+Debugging
+---------
+
+Sometimes, when the shapes of some variables are unresolvable, it can be difficult to understand
+why.  There is an OpenMDAO command line tool, `openmdao view_dyn_shapes`, that can be used to
+show a graph of the dynamically shaped variables and any statically shaped variables that
+connect directly to them.  Each node in the graph is a variable, and each edge is a connection
+between that variable and another.  Note that this connection does not have to be a
+connection in the normal OpenMDAO sense.  It could be a connection internal to a component
+created by declaring a `copy_shape` in the metadata of one variable that refers to another
+variable.
+
+The nodes in the graph are colored to make it easier to locate static/dynamic/unresolved
+variable shapes.  Statically shaped variables are colored green, dynamically shaped
+variables that have been resolved are colored blue, and any variables with unresolved shapes
+are colored red.  Each node is labeled with the shape of the variable, if known, or a '?' if
+unknown, followed by the absolute pathname of the variable in the model.
+
+The plot is somewhat crude and the node labels sometimes overlap, but it's possible to zoom
+in to part of the graph to make it more readable using the button that looks like a magnifying glass.
+
+Below is an example plot for the followng case containing unresolved variable shapes.
+
+.. embed-code::
+    openmdao.core.tests.test_dyn_sizing.TestDynShapes.test_cycle_unresolved
+    :layout: code
+    :imports-not-required:
+
+
+.. image:: view_dyn_shapes.png
+   :width: 900

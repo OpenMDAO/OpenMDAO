@@ -124,14 +124,20 @@ def view_dyn_shapes(root, outfile='shape_dep_graph.png', show=True, title=None):
     abs2meta = system._var_allprocs_abs2meta
 
     # label variables with known shape at the start of the algorithm in green, unknowns in red.
-    node_colors = ['green' if n in knowns else 'red' for n in graph]
     # prepend the shape onto the variable name
+    node_colors = []
     node_labels = {}
     for n in graph:
         meta = abs2meta['input'][n] if n in abs2meta['input'] else abs2meta['output'][n]
         shape = meta['shape']
         if shape is None:
             shape = '?'
+            node_colors.append('red')
+        else:
+            if meta.get('shape_by_conn', False) or meta.get('copy_shape', False):
+                node_colors.append('blue')
+            else:
+                node_colors.append('green')
         node_labels[n] = f"{shape}: {n[common_idx:]}"
 
     nx.draw_networkx(graph, with_labels=True, node_color=node_colors, labels=node_labels)
