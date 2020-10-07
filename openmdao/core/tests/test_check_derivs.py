@@ -219,6 +219,49 @@ class TestProblemCheckPartials(unittest.TestCase):
         assert_near_equal(data['comp1'][('y', 'x')]['J_fd'][0][0], 2., 1e-9)
         assert_near_equal(data['comp1'][('y', 'x')]['J_fwd'][0][0], 2., 1e-15)
 
+    def test_component_no_partials(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem("indep", om.IndepVarComp('x', 5.))
+        model.add_subsystem("comp1", om.ExecComp("y=2*x"))
+
+        comp2 = model.add_subsystem("comp2", om.ExecComp("y=4*x"))
+        comp2._no_partials = True
+
+        model.connect('indep.x', ['comp1.x', 'comp2.x'])
+
+        prob.setup()
+        prob.run_model()
+
+        data = prob.check_partials(out_stream=None)
+
+        # no derivative data for 'comp2'
+        self.assertFalse('comp2' in data)
+
+        # but we still get good derivative data for 'comp1'
+        self.assertTrue('comp1' in data)
+
+        assert_near_equal(data['comp1'][('y', 'x')]['J_fd'][0][0], 2., 1e-9)
+        assert_near_equal(data['comp1'][('y', 'x')]['J_fwd'][0][0], 2., 1e-15)
+
+        comp2._no_partials = False
+
+        data = prob.check_partials(out_stream=None)
+
+        # now we should have derivative data for 'comp2'
+        self.assertTrue('comp2' in data)
+
+        assert_near_equal(data['comp2'][('y', 'x')]['J_fd'][0][0], 4., 1e-9)
+        assert_near_equal(data['comp2'][('y', 'x')]['J_fwd'][0][0], 4., 1e-15)
+
+        # and still get good derivative data for 'comp1'
+        self.assertTrue('comp1' in data)
+
+        assert_near_equal(data['comp1'][('y', 'x')]['J_fd'][0][0], 2., 1e-9)
+        assert_near_equal(data['comp1'][('y', 'x')]['J_fwd'][0][0], 2., 1e-15)
+
+
     def test_missing_entry(self):
         class MyComp(om.ExplicitComponent):
             def setup(self):
