@@ -155,17 +155,15 @@ class _TotalJacInfo(object):
         driver_wrt = list(driver._designvars)
         driver_of = driver._get_ordered_nl_responses()
 
-        # Convert of and wrt names from promoted to absolute
+        # In normal use, of and wrt always contain variable names. However, there are unit tests
+        # that don't specify them, so we need these here.
         if wrt is None:
-            if driver_wrt:
-                prom_wrt = driver_wrt
-            else:
-                raise RuntimeError("Driver is not providing any design variables "
-                                   "for compute_totals.")
-        else:
-            prom_wrt = wrt
+            wrt = driver_wrt
+        if of is None:
+            of = driver_of
 
         # Convert 'wrt' names from promoted to absolute
+        prom_wrt = wrt
         wrt = []
         self.ivc_print_names = {}
         for name in prom_wrt:
@@ -179,16 +177,8 @@ class _TotalJacInfo(object):
                 wrt_name = name
             wrt.append(wrt_name)
 
-        if of is None:
-            if driver_of:
-                prom_of = driver_of
-            else:
-                raise RuntimeError("Driver is not providing any response variables "
-                                   "for compute_totals.")
-        else:
-            prom_of = of
-
         # Convert 'of' names from promoted to absolute
+        prom_of = of
         of = []
         for name in prom_of:
             if name in prom2abs:
