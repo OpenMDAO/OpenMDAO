@@ -1505,7 +1505,7 @@ class _TotalJacInfo(object):
 
         # Linearize Model
         model._linearize(model._assembled_jac,
-                        sub_do_ln=model._linear_solver._linearize_children())
+                         sub_do_ln=model._linear_solver._linearize_children())
         if show_progress:
             del model._approx_schemes.out_stream
             del model._approx_schemes._show_progress
