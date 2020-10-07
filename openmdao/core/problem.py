@@ -1473,18 +1473,18 @@ class Problem(object):
 
         if wrt is None:
             wrt = list(self.driver._designvars)
-            if wrt is None:
+            if not wrt:
                 raise RuntimeError("Driver is not providing any design variables "
                                    "for compute_totals.")
 
         if of is None:
             of = list(self.driver._objs)
             of.extend(self.driver._cons)
-            lcons = [n for n, meta in self.driver._cons.items()
-                     if ('linear' in meta and meta['linear'])]
-            if of is None:
+            if not of:
                 raise RuntimeError("Driver is not providing any response variables "
                                    "for compute_totals.")
+            lcons = [n for n, meta in self.driver._cons.items()
+                     if ('linear' in meta and meta['linear'])]
 
         # Calculate Total Derivatives
         total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict',
