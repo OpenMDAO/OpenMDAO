@@ -1,4 +1,6 @@
 """Base class used to define the interface for derivative approximation schemes."""
+import sys
+import time
 from collections import defaultdict
 from itertools import chain
 from scipy.sparse import coo_matrix
@@ -9,6 +11,7 @@ import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.mpi import MPI
 from openmdao.jacobians.jacobian import Jacobian
 from openmdao.vectors.vector import _full_slice
+from openmdao.core.constants import _DEFAULT_OUT_STREAM
 
 
 class ApproximationScheme(object):
@@ -293,8 +296,11 @@ class ApproximationScheme(object):
 
             self._approx_groups.append((wrt, data, in_idx, tmpJ, [(arr, in_idx)], None))
 
-    def _compute_approximations(self, system, jac, total, under_cs):
+    def _compute_approximations(self, system, jac, total, under_cs, out_stream=_DEFAULT_OUT_STREAM):
         from openmdao.core.component import Component
+
+        if out_stream == _DEFAULT_OUT_STREAM:
+            out_stream = sys.stdout
 
         # Set system flag that we're under approximation to true
         system._set_approx_mode(True)
@@ -368,6 +374,8 @@ class ApproximationScheme(object):
 
         # now do uncolored solves
         for wrt, data, col_idxs, tmpJ, idx_info, nz_rows in approx_groups:
+            start_time = time.time()
+
             J = tmpJ[wrt]
             full_idxs = J['loc_outvec_idxs']
             out_slices = tmpJ['@out_slices']
@@ -392,6 +400,12 @@ class ApproximationScheme(object):
                                             result[out_slices[of]][out_idxs]).copy()))
                     else:
                         J['data'][:, i_count] = self._transform_result(result[full_idxs])
+
+                end_time = time.time()
+                if system._show_progress:
+                    out_stream.write(f"{fd_count+1}/{len(full_idxs)}: Checking "
+                                     f"derivatives with respect to: '{wrt} [{idxs}]' ... "
+                                     f"{round(end_time-start_time, 4)} seconds\n")
 
                 fd_count += 1
 

@@ -1443,7 +1443,7 @@ class _TotalJacInfo(object):
 
         return self.J_final
 
-    def compute_totals_approx(self, initialize=False):
+    def compute_totals_approx(self, initialize=False, show_progress=True):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
