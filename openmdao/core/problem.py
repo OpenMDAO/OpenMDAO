@@ -1405,7 +1405,7 @@ class Problem(object):
 
     def check_totals(self, of=None, wrt=None, out_stream=_DEFAULT_OUT_STREAM, compact_print=False,
                      driver_scaling=False, abs_err_tol=1e-6, rel_err_tol=1e-6,
-                     method='fd', step=None, form=None, step_calc='abs', show_progress=True):
+                     method='fd', step=None, form=None, step_calc='abs', show_progress=False):
         """
         Check total derivatives for the model vs. finite difference.
 

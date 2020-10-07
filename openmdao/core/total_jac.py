@@ -1443,7 +1443,7 @@ class _TotalJacInfo(object):
 
         return self.J_final
 
-    def compute_totals_approx(self, initialize=False, show_progress=True, out_stream=None):
+    def compute_totals_approx(self, initialize=False, show_progress=False, out_stream=None):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -1454,6 +1454,11 @@ class _TotalJacInfo(object):
         initialize : bool
             Set to True to re-initialize the FD in model. This is only needed when manually
             calling compute_totals on the problem.
+        show_progress : bool
+            Bool to show progress of check_totals
+        out_stream : file-like object
+            Where to send human readable output. By default it goes to stdout.
+            Set to None to suppress.
 
         Returns
         -------

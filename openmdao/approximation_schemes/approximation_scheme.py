@@ -1,5 +1,4 @@
 """Base class used to define the interface for derivative approximation schemes."""
-import sys
 import time
 from collections import defaultdict
 from itertools import chain
@@ -11,7 +10,6 @@ import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.mpi import MPI
 from openmdao.jacobians.jacobian import Jacobian
 from openmdao.vectors.vector import _full_slice
-from openmdao.core.constants import _DEFAULT_OUT_STREAM
 
 
 class ApproximationScheme(object):
