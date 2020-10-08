@@ -1378,12 +1378,14 @@ class _TotalJacInfo(object):
             vec_dresid[vec_name].set_val(0.0)
 
         # Linearize Model
+        ln_solver = model._linear_solver
         with model._scaled_context_all():
             model._linearize(model._assembled_jac,
-                             sub_do_ln=model._linear_solver._linearize_children())
-        if model.linear_solver._assembled_jac is not None:
+                             sub_do_ln=ln_solver._linearize_children())
+        if ln_solver._assembled_jac is not None and \
+           ln_solver._assembled_jac._under_complex_step:
             model.linear_solver._assembled_jac._update(model)
-        model._linear_solver._linearize()
+        ln_solver._linearize()
         self.J[:] = 0.0
 
         # Main loop over columns (fwd) or rows (rev) of the jacobian
