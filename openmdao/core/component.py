@@ -674,14 +674,14 @@ class Component(System):
         if shape is not None and not isinstance(shape, (int, tuple, list, np.integer)):
             raise TypeError("%s: The shape argument should be an int, tuple, or list but "
                             "a '%s' was given" % (self.msginfo, type(shape)))
-        if units is not None and not isinstance(units, str):
-            raise TypeError('%s: The units argument should be a str or None' % self.msginfo)
         if res_units is not None and not isinstance(res_units, str):
             raise TypeError('%s: The res_units argument should be a str or None' % self.msginfo)
 
-        # Check that units are valid
-        if units is not None and not valid_units(units):
-            raise ValueError("%s: The units '%s' are invalid" % (self.msginfo, units))
+        if units is not None:
+            if not isinstance(units, str):
+                raise TypeError('%s: The units argument should be a str or None' % self.msginfo)
+            if not valid_units(units):
+                raise ValueError("%s: The units '%s' are invalid" % (self.msginfo, units))
 
         if tags is not None and not isinstance(tags, (str, set, list)):
             raise TypeError('The tags argument should be a str, set, or list')
