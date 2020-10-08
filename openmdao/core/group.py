@@ -191,7 +191,7 @@ class Group(System):
         """
         pass
 
-    def set_input_defaults(self, name, val=_UNDEFINED, units=None):
+    def set_input_defaults(self, name, val=_UNDEFINED, units=None, src_shape=None):
         """
         Specify metadata to be assumed when multiple inputs are promoted to the same name.
 
@@ -203,12 +203,16 @@ class Group(System):
             Value to assume for the promoted input.
         units : str or None
             Units to assume for the promoted input.
+        src_shape : int or tuple
+            Assumed shape of any connected source or higher level promoted input.
         """
         meta = {'prom': name}
         if val is not _UNDEFINED:
             meta['value'] = val
         if units is not None:
             meta['units'] = units
+        if src_shape is not None:
+            meta['src_shape'] = src_shape
 
         if self._static_mode:
             dct = self._static_group_inputs
@@ -1963,7 +1967,7 @@ class Group(System):
             self._vector_class.TRANSFER._setup_discrete_transfers(self)
 
     def promotes(self, subsys_name, any=None, inputs=None, outputs=None,
-                 src_indices=None, flat_src_indices=None):
+                 src_indices=None, flat_src_indices=None, src_shape=None):
         """
         Promote a variable in the model tree.
 
@@ -1993,7 +1997,9 @@ class Group(System):
             If True, each entry of src_indices is assumed to be an index into the
             flattened source.  Otherwise each entry must be a tuple or list of size equal
             to the number of dimensions of the source.
-        """
+        src_shape : int or tuple
+            Assumed shape of any connected source or higher level promoted input.
+         """
         if isinstance(any, str):
             raise RuntimeError(f"{self.msginfo}: Trying to promote any='{any}', "
                                "but an iterator of strings and/or tuples is required.")
@@ -2032,11 +2038,9 @@ class Group(System):
 
             # src_indices will applied when promotes are resolved
             if inputs is not None:
-                for inp in inputs:
-                    subsys._var_promotes_src_indices[inp] = (src_indices, flat_src_indices)
+                subsys._add_promotes_src_indices(inputs, src_indices, flat_src_indices)
             if any is not None:
-                for inp in any:
-                    subsys._var_promotes_src_indices[inp] = (src_indices, flat_src_indices)
+                subsys._add_promotes_src_indices(any, src_indices, flat_src_indices)
 
         # check for attempt to promote with different alias
         list_comp = [i if isinstance(i, tuple) else (i, i) for i in subsys._var_promotes['input']]

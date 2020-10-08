@@ -2002,6 +2002,12 @@ class System(object):
 
         return maps
 
+    def _add_promotes_src_indices(self, promlist, src_indices, flat_src_indices):
+        for entry in promlist:
+            if isinstance(entry, str):
+                self._var_promotes_src_indices[entry] = (src_indices, flat_src_indices)
+
+
     def _get_scope(self):
         """
         Find the input and output variables that are needed for a particular matvec product.
