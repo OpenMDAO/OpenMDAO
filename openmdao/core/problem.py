@@ -1471,9 +1471,16 @@ class Problem(object):
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
         # Calculate Total Derivatives
-        total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict',
-                                   driver_scaling=driver_scaling)
-        Jcalc = total_info.compute_totals()
+        if model._owns_approx_jac:
+            # Support this, even though it is a bit silly (though you could compare fd with cs.)
+            total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict',
+                                       approx=True, driver_scaling=driver_scaling)
+            Jcalc = total_info.compute_totals_approx(initialize=True)
+
+        else:
+            total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict',
+                                       driver_scaling=driver_scaling)
+            Jcalc = total_info.compute_totals()
 
         if step is None:
             if method == 'cs':
