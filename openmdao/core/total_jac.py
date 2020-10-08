@@ -1381,6 +1381,8 @@ class _TotalJacInfo(object):
         with model._scaled_context_all():
             model._linearize(model._assembled_jac,
                              sub_do_ln=model._linear_solver._linearize_children())
+        if model.linear_solver._assembled_jac is not None:
+            model.linear_solver._assembled_jac._update(model)
         model._linear_solver._linearize()
         self.J[:] = 0.0
 

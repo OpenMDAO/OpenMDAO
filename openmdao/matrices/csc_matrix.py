@@ -61,3 +61,27 @@ class CSCMatrix(COOMatrix):
         coo = self._coo
         csc = csc_matrix((mask, (coo.row, coo.col)), shape=coo.shape)
         return csc.data
+
+    def set_complex_step_mode(self, active):
+        """
+        Turn on or off complex stepping mode.
+
+        When turned on, the value in each subjac is cast as complex, and when turned
+        off, they are returned to real values.
+
+        Parameters
+        ----------
+        active : bool
+            Complex mode flag; set to True prior to commencing complex step.
+        """
+        if active:
+            if 'complex' not in self._matrix.dtype.__str__():
+                self._matrix.data = self._matrix.data.astype(np.complex)
+                self._matrix.dtype = np.complex
+                self._coo.data = self._coo.data.astype(np.complex)
+                self._coo.dtype = np.complex
+        else:
+            self._matrix.data = self._matrix.data.real
+            self._matrix.dtype = np.float
+            self._coo.data = self._coo.data.real
+            self._coo.dtype = np.float

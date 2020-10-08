@@ -2780,6 +2780,36 @@ class TestProblemCheckTotals(unittest.TestCase):
         for key, val in totals.items():
             assert_near_equal(val['rel error'][0], 0.0, 1e-6)
 
+    def test_cs_around_newton_top_sparse(self):
+        prob = om.Problem()
+        prob.model = SellarDerivatives()
+
+        prob.setup(force_alloc_complex=True)
+
+        prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=True)
+        prob.model.linear_solver = om.DirectSolver(assemble_jac=True)
+        prob.run_model()
+
+        totals = prob.check_totals(of=['obj', 'con1'], wrt=['x', 'z'], method='cs', out_stream=None)
+
+        for key, val in totals.items():
+            assert_near_equal(val['rel error'][0], 0.0, 3e-8)
+
+    def test_cs_around_broyden_top_sparse(self):
+        prob = om.Problem()
+        prob.model = SellarDerivatives()
+
+        prob.setup(force_alloc_complex=True)
+
+        prob.model.nonlinear_solver = om.BroydenSolver()
+        prob.model.linear_solver = om.DirectSolver(assemble_jac=True)
+        prob.run_model()
+
+        totals = prob.check_totals(of=['obj', 'con1'], wrt=['x', 'z'], method='cs', out_stream=None)
+
+        for key, val in totals.items():
+            assert_near_equal(val['rel error'][0], 0.0, 3e-8)
+
     def test_cs_error_allocate(self):
         prob = om.Problem()
         model = prob.model
