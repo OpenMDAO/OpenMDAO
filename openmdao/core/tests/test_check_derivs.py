@@ -2808,7 +2808,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         totals = prob.check_totals(of=['obj', 'con1'], wrt=['x', 'z'], method='cs', out_stream=None)
 
         for key, val in totals.items():
-            assert_near_equal(val['rel error'][0], 0.0, 3e-8)
+            assert_near_equal(val['rel error'][0], 0.0, 7e-8)
 
     def test_check_totals_on_approx_model(self):
         prob = om.Problem()
