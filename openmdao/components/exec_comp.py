@@ -222,6 +222,8 @@ class ExecComp(ExplicitComponent):
         self._codes = None
         self._kwargs = kwargs
 
+        self._no_check_partials = True
+
     def setup(self):
         """
         Set up variable name and metadata lists.

@@ -32,6 +32,8 @@ class LinearSystemComp(ImplicitComponent):
         super().__init__(**kwargs)
         self._lup = None
 
+        self._no_check_partials = True
+
     def initialize(self):
         """
         Declare options.

@@ -104,6 +104,8 @@ class EQConstraintComp(ExplicitComponent):
                                use_mult, mult_name, mult_val, normalize, add_constraint, ref, ref0,
                                adder, scaler, **kwargs)
 
+        self._no_check_partials = True
+
     def compute(self, inputs, outputs):
         """
         Calculate the output for each equality constraint.

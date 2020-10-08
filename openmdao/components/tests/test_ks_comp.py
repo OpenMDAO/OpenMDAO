@@ -61,6 +61,8 @@ class TestKSFunction(unittest.TestCase):
         assert_near_equal(prob.get_val('ks.KS', indices=1), 34.0)
         assert_near_equal(prob.get_val('ks.KS', indices=2), 51.0)
 
+        prob.model.ks._no_check_partials = False  # override skipping of check_partials
+
         partials = prob.check_partials(includes=['ks'], out_stream=None)
 
         for (of, wrt) in partials['ks']:
