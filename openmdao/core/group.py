@@ -25,7 +25,7 @@ from openmdao.utils.array_utils import array_connection_compatible, _flatten_src
 from openmdao.utils.general_utils import ContainsAll, simple_warning, common_subpath, \
     conditional_error, _is_slicer_op
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
-    _is_unitless
+    _is_unitless, valid_units
 from openmdao.utils.mpi import MPI, check_mpi_exceptions
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.array_utils import evenly_distrib_idxs
@@ -208,6 +208,8 @@ class Group(System):
         if val is not _UNDEFINED:
             meta['value'] = val
         if units is not None:
+            if not valid_units(units):
+                raise ValueError(f"{self.msginfo}: The units '{units}' are invalid.")
             meta['units'] = units
 
         if self._static_mode:

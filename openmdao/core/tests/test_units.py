@@ -918,6 +918,17 @@ class TestUnitConversion(unittest.TestCase):
             p.setup()
         self.assertEqual(str(e.exception), "Units 'm/s**2' and 'J/s**2' are incompatible.")
 
+    def test_input_defaults_unit_compat(self):
+        p = om.Problem()
+
+        p.model.add_subsystem('comp', om.ExecComp('y=2*x', units='inch'))
+
+        with self.assertRaises(ValueError) as cm:
+            p.model.set_input_defaults('comp.x', val=2., units='in**2')
+
+        msg = ("Group: The units 'in**2' are invalid.")
+        self.assertEqual(cm.exception.args[0], msg)
+
 
 if __name__ == "__main__":
     unittest.main()

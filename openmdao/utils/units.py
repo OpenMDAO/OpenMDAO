@@ -978,7 +978,11 @@ def is_compatible(old_units, new_units):
         return True
 
     old_unit = _find_unit(old_units)
+    if old_unit is None:
+        raise ValueError(f"The units '{old_units}' are invalid.")
     new_unit = _find_unit(new_units)
+    if new_unit is None:
+        raise ValueError(f"The units '{new_units}' are invalid.")
 
     return old_unit.is_compatible(new_unit)
 
@@ -1050,8 +1054,13 @@ def convert_units(val, old_units, new_units=None):
         return val
 
     old_unit = _find_unit(old_units)
+    if old_unit is None:
+        raise ValueError(f"The units '{old_units}' are invalid.")
+
     if new_units:
         new_unit = _find_unit(new_units)
+        if new_unit is None:
+            raise ValueError(f"The units '{new_units}' are invalid.")
     else:
         new_unit = old_unit.in_base_units()
 

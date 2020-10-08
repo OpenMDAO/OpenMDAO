@@ -466,12 +466,12 @@ class Component(System):
                                                                     ndarray, Iterable)):
             raise TypeError('%s: The src_indices argument should be an int, list, '
                             'tuple, ndarray or Iterable' % self.msginfo)
-        if units is not None and not isinstance(units, str):
-            raise TypeError('%s: The units argument should be a str or None' % self.msginfo)
+        if units is not None:
+            if not isinstance(units, str):
+                raise TypeError('%s: The units argument should be a str or None.' % self.msginfo)
 
-        # Check that units are valid
-        if units is not None and not valid_units(units):
-            raise ValueError("%s: The units '%s' are invalid" % (self.msginfo, units))
+            if not valid_units(units):
+                raise ValueError("%s: The units '%s' are invalid." % (self.msginfo, units))
 
         if tags is not None and not isinstance(tags, (str, list)):
             raise TypeError('The tags argument should be a str or list')
