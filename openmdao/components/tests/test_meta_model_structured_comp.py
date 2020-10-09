@@ -671,7 +671,8 @@ class TestMetaModelStructuredScipy(unittest.TestCase):
         with self.assertRaises(om.AnalysisError) as cm:
             p.run_model()
 
-        msg = ("'MM' <class MMComp>: Error interpolating output 'y' because input 'MM.x' was out of bounds ('0.0', '1.0') with value '1.1'")
+        msg = ("'MM' <class MMComp>: Error interpolating output 'y' because "
+               "input 'MM.x' was out of bounds ('0.0', '1.0') with value '1.1'")
         self.assertEqual(str(cm.exception), msg)
 
 
@@ -1122,7 +1123,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         p.set_val('x', 0.75)
 
         msg = "Analysis Error: 'interp' <class MetaModelStructuredComp> " \
-              "Line 207 of file {}".format(inspect.getsourcefile(om.MetaModelStructuredComp))
+              "Line 205 of file {}".format(inspect.getsourcefile(om.MetaModelStructuredComp))
         with assert_warning(UserWarning, msg):
             p.run_driver()
 
