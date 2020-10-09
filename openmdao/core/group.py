@@ -749,7 +749,10 @@ class Group(System):
 
                 sub_loc_proms = subsys._var_abs2prom[io]
                 for sub_prom, sub_abs in subsys._var_allprocs_prom2abs_list[io].items():
-                    prom_name, _, _ = subprom2prom[sub_prom]
+                    if sub_prom in subprom2prom:
+                        prom_name, _, _ = subprom2prom[sub_prom]
+                    else:
+                        prom_name = sub_prefix + sub_prom
                     if prom_name not in allprocs_prom2abs_list[io]:
                         allprocs_prom2abs_list[io][prom_name] = []
                     allprocs_prom2abs_list[io][prom_name].extend(sub_abs)
@@ -760,7 +763,10 @@ class Group(System):
             if isinstance(subsys, Group):
                 subprom2prom = var_maps['input']
                 for sub_prom, metalist in subsys._group_inputs.items():
-                    key, _, _ = subprom2prom[sub_prom]
+                    if sub_prom in subprom2prom:
+                        key, _, _ = subprom2prom[sub_prom]
+                    else:
+                        key = sub_prefix + sub_prom
                     if key not in self._group_inputs:
                         self._group_inputs[key] = []
                     self._group_inputs[key].extend(metalist)

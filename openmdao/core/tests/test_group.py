@@ -1673,7 +1673,7 @@ class TestGroupPromotes(unittest.TestCase):
 
         top = om.Problem(model=TopGroup())
 
-        msg = "'sub.comp1' <class ExecComp>: input variable 'bb' was already promoted. New promotion ignored."
+        msg = "'sub.comp1' <class ExecComp>: input variable 'bb' was already promoted."
         with assert_warning(UserWarning, msg):
             top.setup()
 

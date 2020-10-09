@@ -1926,18 +1926,20 @@ class System(object):
                     meta['flat_src_indices'] = flat_src_indices
 
         def report_dup(io, matches, match_type, name, tup):
-            if match_type == _MatchType.PATTERN:
-                matcher = tup[0]
-            else:
-                matcher = name
+            """
+            Report error or warning when attempting to promote a variable twice.
 
-            if (not self._var_abs2meta['input'] and not self._var_abs2meta['output'] and
-                    isinstance(self, openmdao.core.group.Group)):
-                empty_group_msg = ' Group contains no variables.'
-            else:
-                empty_group_msg = ''
-            pname = f"promoted {io} '{matcher}'"
-
+            Parameters
+            ----------
+            matches : dict {'input': ..., 'output': ...}
+                Dict of promoted names and associated info.
+            match_type : IntEnum
+                Indicates whether match is an explicit name, rename, or pattern match.
+            name : str
+                Name of promoted variable that is specified multiple times.
+            tup : tuple (?, ?, _PromotesInfo)
+                First two entries can be names, renames, or patterns depending on the match type.
+            """
             if match_type == _MatchType.RENAME:
                 raise RuntimeError(f"{self.msginfo}: Can't alias promoted {io} '{name}' to "
                                    f"'{tup[0]}' because '{name}' has already been promoted.")
@@ -1949,8 +1951,7 @@ class System(object):
                                    f"pattern '{tup[0]}' because '{name}' was previously aliased "
                                    f"to '{old_key}'.")
             else:
-                simple_warning(f"{self.msginfo}: {io} variable '{name}' was already promoted. "
-                               "New promotion ignored.")
+                simple_warning(f"{self.msginfo}: {io} variable '{name}' was already promoted.")
 
         def resolve(to_match, io_types, matches, proms):
             """
@@ -1959,11 +1960,6 @@ class System(object):
             This is called once for promotes or separately for promotes_inputs and promotes_outputs.
             """
             if not to_match:
-                for typ in io_types:
-                    if gname:
-                        matches[typ] = {name: (gname + name, None, None) for name in proms[typ]}
-                    else:
-                        matches[typ] = {name: (name, None, None) for name in proms[typ]}
                 return
 
             found = set()
@@ -2023,12 +2019,6 @@ class System(object):
                                    (self.msginfo, call,
                                     sorted(not_found, key=lambda x: x
                                            if isinstance(x, str) else x[0]), empty_group_msg))
-
-            # Default: prepend the parent system's name
-            for io in io_types:
-                pmap = matches[io]
-                for name in set(proms[io]).difference(pmap):
-                    pmap[name] = (gname + name, None, None) if gname else (name, None, None)
 
         maps = {'input': {}, 'output': {}}
 
