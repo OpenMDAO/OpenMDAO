@@ -1995,7 +1995,7 @@ class System(object):
                             if key in pmap:
                                 report_dup(io, matches, match_type, key, tup)
                             pmap[key] = (s, key, pinfo)
-                            if s == key:
+                            if match_type == _MatchType.NAME:
                                 found.add(key)
                             else:
                                 found.add((key, s))
@@ -2014,11 +2014,9 @@ class System(object):
                 else:
                     call = 'promotes_%ss' % io_types[0]
 
-                raise RuntimeError("%s: '%s' failed to find any matches for the following "
-                                   "names or patterns: %s.%s" %
-                                   (self.msginfo, call,
-                                    sorted(not_found, key=lambda x: x
-                                           if isinstance(x, str) else x[0]), empty_group_msg))
+                not_found = sorted(not_found, key=lambda x: x if isinstance(x, str) else x[0])
+                raise RuntimeError(f"{self.msginfo}: '{call}' failed to find any matches for the "
+                                   f"following names or patterns: {not_found}.{empty_group_msg}")
 
         maps = {'input': {}, 'output': {}}
 
