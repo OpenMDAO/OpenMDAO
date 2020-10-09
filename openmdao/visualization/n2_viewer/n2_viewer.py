@@ -251,7 +251,8 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
             elif val is _UNDEFINED:
                 options[k] = str(val)
             else:
-                options[k] = val
+                options[k] = default_noraise(val)
+
     tree_dict['options'] = options
 
     if not tree_dict['name']:
