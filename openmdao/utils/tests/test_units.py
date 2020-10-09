@@ -253,8 +253,8 @@ class TestPhysicalUnit(unittest.TestCase):
 
         try:
             unit_conversion('km', 1.0)
-        except RuntimeError as err:
-            self.assertEqual(str(err), "Cannot convert to new units: '1.0'.")
+        except ValueError as err:
+            self.assertEqual(str(err), "The units '1.0' are invalid.")
         else:
             self.fail("Expecting RuntimeError")
 
@@ -267,10 +267,10 @@ class TestPhysicalUnit(unittest.TestCase):
 
         try:
             get_conversion('km', 1.0)
-        except RuntimeError as err:
-            self.assertEqual(str(err), "Cannot convert to new units: '1.0'.")
+        except ValueError as err:
+            self.assertEqual(str(err), "The units '1.0' are invalid.")
         else:
-            self.fail("Expecting RuntimeError")
+            self.fail("Expecting ValueError")
 
 
 class TestModuleFunctions(unittest.TestCase):
