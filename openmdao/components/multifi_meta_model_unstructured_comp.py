@@ -80,8 +80,6 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
         number of levels of fidelity
     _training_input : dict
         Training data for inputs.
-    _no_check_partials : bool
-        When this attribute exists and is True, check_partials will ignore this system.
     """
 
     def __init__(self, **kwargs):

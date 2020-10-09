@@ -10,11 +10,6 @@ from openmdao.utils.general_utils import make_set, warn_deprecation, ensure_comp
 class IndepVarComp(ExplicitComponent):
     """
     Class to use when all output variables are independent.
-
-    Attributes
-    ----------
-    _no_check_partials : bool
-        When this attribute exists and is True, check_partials will ignore this system.
     """
 
     def __init__(self, name=None, val=1.0, **kwargs):

@@ -302,6 +302,8 @@ class System(object):
         If True, this is the first call to _linearize.
     _is_local : bool
         If True, this system is local to this mpi process.
+    _no_check_partials : bool
+        When this attribute exists and is True, check_partials will ignore this system.
     """
 
     def __init__(self, num_par_fd=1, **kwargs):

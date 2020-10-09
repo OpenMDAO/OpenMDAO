@@ -42,8 +42,6 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         Training data for inputs.
     _training_output : dict
         Training data for outputs.
-    _no_check_partials : bool
-        When this attribute exists and is True, check_partials will ignore this system.
     """
 
     def __init__(self, **kwargs):
