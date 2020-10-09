@@ -271,8 +271,9 @@ class COOMatrix(Matrix):
             Complex mode flag; set to True prior to commencing complex step.
         """
         if active:
-            self._coo.data = self._coo.data.astype(np.complex)
-            self._coo.dtype = np.complex
+            if 'complex' not in self._coo.dtype.__str__():
+                self._coo.data = self._coo.data.astype(np.complex)
+                self._coo.dtype = np.complex
         else:
             self._coo.data = self._coo.data.real
             self._coo.dtype = np.float

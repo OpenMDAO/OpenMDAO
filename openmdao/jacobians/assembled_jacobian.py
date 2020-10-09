@@ -357,6 +357,11 @@ class AssembledJacobian(Jacobian):
         if ext_mtx is not None:
             ext_mtx._post_update()
 
+        if self._under_complex_step:
+            # If we create a new _int_mtx while under complex step, we need to convert it to a
+            # complex data type.
+            self._int_mtx.set_complex_step_mode(True)
+
     def _apply(self, system, d_inputs, d_outputs, d_residuals, mode):
         """
         Compute matrix-vector product.
