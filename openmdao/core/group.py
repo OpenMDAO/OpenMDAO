@@ -51,6 +51,23 @@ class _SysInfo(object):
         yield self.index
 
 
+class _PromotesInfo(object):
+    __slots__ = ['src_indices', 'flat_src_indices', 'src_shape']
+
+    def __init__(self, src_indices=None, flat_src_indices=None, src_shape=None):
+        self.src_indices = src_indices
+        self.flat_src_indices = flat_src_indices
+        self.src_shape = src_shape
+
+    def __iter__(self):
+        yield self.src_indices
+        yield self.flat_src_indices
+        yield self.src_shape
+
+    def __repr__(self):
+        return f"_PromotesInfo({src_indices}, {self.flat_src_indices}, {self.src_shape})"
+
+
 class Group(System):
     """
     Class used to group systems together; instantiate or inherit.
@@ -717,7 +734,7 @@ class Group(System):
             else:
                 self._has_distrib_vars |= subsys._has_distrib_vars
 
-            var_maps = subsys._get_maps(subsys._var_allprocs_prom2abs_list)
+            var_maps = subsys._get_promotion_maps(subsys._var_allprocs_prom2abs_list)
 
             sub_prefix = subsys.name + '.'
 
@@ -732,7 +749,7 @@ class Group(System):
 
                 sub_loc_proms = subsys._var_abs2prom[io]
                 for sub_prom, sub_abs in subsys._var_allprocs_prom2abs_list[io].items():
-                    prom_name = subprom2prom[sub_prom]
+                    prom_name, _, _ = subprom2prom[sub_prom]
                     if prom_name not in allprocs_prom2abs_list[io]:
                         allprocs_prom2abs_list[io][prom_name] = []
                     allprocs_prom2abs_list[io][prom_name].extend(sub_abs)
@@ -743,7 +760,7 @@ class Group(System):
             if isinstance(subsys, Group):
                 subprom2prom = var_maps['input']
                 for sub_prom, metalist in subsys._group_inputs.items():
-                    key = subprom2prom[sub_prom]
+                    key, _, _ = subprom2prom[sub_prom]
                     if key not in self._group_inputs:
                         self._group_inputs[key] = []
                     self._group_inputs[key].extend(metalist)
@@ -1999,7 +2016,7 @@ class Group(System):
             to the number of dimensions of the source.
         src_shape : int or tuple
             Assumed shape of any connected source or higher level promoted input.
-         """
+        """
         if isinstance(any, str):
             raise RuntimeError(f"{self.msginfo}: Trying to promote any='{any}', "
                                "but an iterator of strings and/or tuples is required.")
@@ -2010,13 +2027,18 @@ class Group(System):
             raise RuntimeError(f"{self.msginfo}: Trying to promote outputs='{outputs}', "
                                "but an iterator of strings and/or tuples is required.")
 
+        if src_indices is None and flat_src_indices is None and src_shape is None:
+            prominfo = None
+        else:
+            prominfo = _PromotesInfo(src_indices, flat_src_indices, src_shape)
+
         subsys = getattr(self, subsys_name)
         if any:
-            subsys._var_promotes['any'].extend(any)
+            subsys._var_promotes['any'].extend((a, prominfo) for a in any)
         if inputs:
-            subsys._var_promotes['input'].extend(inputs)
+            subsys._var_promotes['input'].extend((i, prominfo) for i in inputs)
         if outputs:
-            subsys._var_promotes['output'].extend(outputs)
+            subsys._var_promotes['output'].extend((o, None) for o in outputs)
 
         if src_indices is not None:
             if outputs:
@@ -2036,14 +2058,9 @@ class Group(System):
                     simple_warning(f"{self.msginfo}: src_indices have been specified with promotes"
                                    " 'any'. Note that src_indices only apply to matching inputs.")
 
-            # src_indices will applied when promotes are resolved
-            if inputs is not None:
-                subsys._add_promotes_src_indices(inputs, src_indices, flat_src_indices)
-            if any is not None:
-                subsys._add_promotes_src_indices(any, src_indices, flat_src_indices)
-
         # check for attempt to promote with different alias
-        list_comp = [i if isinstance(i, tuple) else (i, i) for i in subsys._var_promotes['input']]
+        list_comp = [i if isinstance(i, tuple) else (i, i)
+                     for i, _ in subsys._var_promotes['input']]
 
         for original, new in list_comp:
             for original_inside, new_inside in list_comp:
@@ -2127,12 +2144,15 @@ class Group(System):
            isinstance(promotes_outputs, str):
             raise RuntimeError("%s: promotes must be an iterator of strings and/or tuples."
                                % self.msginfo)
+
+        prominfo = None
+
         if promotes:
-            subsys._var_promotes['any'] = promotes
+            subsys._var_promotes['any'] = [(p, prominfo) for p in promotes]
         if promotes_inputs:
-            subsys._var_promotes['input'] = promotes_inputs
+            subsys._var_promotes['input'] = [(p, prominfo) for p in promotes_inputs]
         if promotes_outputs:
-            subsys._var_promotes['output'] = promotes_outputs
+            subsys._var_promotes['output'] = [(p, prominfo) for p in promotes_outputs]
 
         if self._static_mode:
             subsystems_allprocs = self._static_subsystems_allprocs

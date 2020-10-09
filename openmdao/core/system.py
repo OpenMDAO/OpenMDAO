@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from collections import OrderedDict, defaultdict
 from collections.abc import Iterable
 from itertools import chain
+from enum import IntEnum
 
 import re
 from fnmatch import fnmatchcase
@@ -92,6 +93,25 @@ allowed_meta_names = {
 }
 allowed_meta_names.update(global_meta_names['input'])
 allowed_meta_names.update(global_meta_names['output'])
+
+
+class _MatchType(IntEnum):
+    """
+    Class used to define different types of promoted name matches.
+
+    Attributes
+    ----------
+    NAME : int
+        Literal name match.
+    RENAME : int
+        Rename match.
+    PATTERN : int
+        Glob pattern match.
+    """
+
+    NAME = 0
+    RENAME = 1
+    PATTERN = 2
 
 
 class System(object):
@@ -1812,7 +1832,7 @@ class System(object):
         for abs_name, meta in self._var_abs2meta['output'].items():
             self._outputs.set_var(abs_name, meta['value'])
 
-    def _get_maps(self, prom_names):
+    def _get_promotion_maps(self, prom_names):
         """
         Define variable maps based on promotes lists.
 
@@ -1823,9 +1843,9 @@ class System(object):
 
         Returns
         -------
-        dict of {'input': {str:str, ...}, 'output': {str:str, ...}}
+        dict of {'input': {str:(str, info), ...}, 'output': {str:(str, info), ...}}
             dictionary mapping input/output variable names
-            to promoted variable names.
+            to (promoted name, promotion_info) tuple.
         """
         gname = self.name + '.' if self.name else ''
 
@@ -1838,34 +1858,30 @@ class System(object):
             lst : list
                 List of names, patterns and/or tuples specifying promotes.
 
-            Returns
-            -------
-            names : list
-                list of names
-            patterns : list
-                list of patterns
-            renames : dict
-                dictionary of name mappings
+            Yields
+            ------
+            Enum
+                match type
+            str
+                name or pattern string
+            (str, _PromotesInfo)
+                name/rename/pattern, promotion info (src_indices, etc.)
             """
-            names = []
-            patterns = []
-            renames = {}
             for entry in lst:
-                if isinstance(entry, str):
+                key, pinfo = entry
+                if isinstance(key, str):
                     # note, conditional here is faster than using precompiled regex
-                    if '*' in entry or '?' in entry or '[' in entry:
-                        patterns.append(entry)
+                    if '*' in key or '?' in key or '[' in key:
+                        yield _MatchType.PATTERN, key, entry
                     else:
-                        names.append(entry)
-                elif isinstance(entry, tuple) and len(entry) == 2:
-                    renames[entry[0]] = entry[1]
+                        yield _MatchType.NAME, key, entry
+                elif isinstance(key, tuple) and len(key) == 2:
+                    yield _MatchType.RENAME, key[0], (key[1], pinfo)
                 else:
-                    raise TypeError("when adding subsystem '%s', entry '%s'"
-                                    " is not a string or tuple of size 2" %
-                                    (self.pathname, entry))
-            return names, patterns, renames
+                    raise TypeError(f"when adding subsystem '{self.pathname}', entry '{key}'"
+                                    " is not a string or tuple of size 2.")
 
-        def update_src_indices(name, key):
+        def update_src_indices(name, tup):
             """
             Update metadata for promoted inputs that have had src_indices specified.
 
@@ -1873,12 +1889,12 @@ class System(object):
             ----------
             name : str
                 Name of an input variable that may have associated src_indices.
-            key : str or tuple
-                Name, pattern or tuple by which src_indices would have been specified
-                when the input variable was promoted.
+            tup : tuple
+                (name/rename, pattern/name, promotes_info).
             """
-            if key in self._var_promotes_src_indices:
-                src_indices, flat_src_indices = self._var_promotes_src_indices[key]
+            _, _, prominfo = tup
+            if prominfo is not None:
+                src_indices, flat_src_indices, src_shape = prominfo
 
                 for abs_in in self._var_allprocs_prom2abs_list['input'][name]:
                     meta = self._var_abs2meta['input'][abs_in]
@@ -1909,6 +1925,33 @@ class System(object):
                         flat_src_indices = True
                     meta['flat_src_indices'] = flat_src_indices
 
+        def report_dup(io, matches, match_type, name, tup):
+            if match_type == _MatchType.PATTERN:
+                matcher = tup[0]
+            else:
+                matcher = name
+
+            if (not self._var_abs2meta['input'] and not self._var_abs2meta['output'] and
+                    isinstance(self, openmdao.core.group.Group)):
+                empty_group_msg = ' Group contains no variables.'
+            else:
+                empty_group_msg = ''
+            pname = f"promoted {io} '{matcher}'"
+
+            if match_type == _MatchType.RENAME:
+                raise RuntimeError(f"{self.msginfo}: Can't alias promoted {io} '{name}' to "
+                                   f"'{tup[0]}' because '{name}' has already been promoted.")
+
+            old_key, _, old_info = matches[io][name]
+            if old_key != name and not ('*' in old_key or '?' in old_key or '[' in old_key):
+                # old promote was a rename, so new promote is an error
+                raise RuntimeError(f"{self.msginfo}: Can't promote {io} variable '{name}' via "
+                                   f"pattern '{tup[0]}' because '{name}' was previously aliased "
+                                   f"to '{old_key}'.")
+            else:
+                simple_warning(f"{self.msginfo}: {io} variable '{name}' was already promoted. "
+                               "New promotion ignored.")
+
         def resolve(to_match, io_types, matches, proms):
             """
             Determine the mapping of promoted names to the parent scope for a promotion type.
@@ -1918,44 +1961,52 @@ class System(object):
             if not to_match:
                 for typ in io_types:
                     if gname:
-                        matches[typ] = {name: gname + name for name in proms[typ]}
+                        matches[typ] = {name: (gname + name, None, None) for name in proms[typ]}
                     else:
-                        matches[typ] = {name: name for name in proms[typ]}
-                return True
+                        matches[typ] = {name: (name, None, None) for name in proms[typ]}
+                return
 
             found = set()
-            names, patterns, renames = split_list(to_match)
 
-            for typ in io_types:
-                is_input = typ == 'input'
-                pmap = matches[typ]
-                for name in proms[typ]:
-                    if name in names:
-                        pmap[name] = name
-                        found.add(name)
-                        if is_input:
-                            update_src_indices(name, name)
-                    elif name in renames:
-                        pmap[name] = renames[name]
-                        found.add(name)
-                        if is_input:
-                            update_src_indices(name, (name, renames[name]))
+            for match_type, key, tup in split_list(to_match):
+                s, pinfo = tup
+                if match_type == _MatchType.PATTERN:
+                    if key == '*':  # special case. add everything
+                        found.add('*')
+                        for io in io_types:
+                            pmap = matches[io]
+                            for n in proms[io]:
+                                if n in pmap:
+                                    report_dup(io, matches, match_type, n, tup)
+                                pmap[n] = (n, key, pinfo)
+                                if pinfo is not None and io == 'input':
+                                    update_src_indices(n, pmap[n])
                     else:
-                        for pattern in patterns:
-                            # if name matches, promote that variable to parent
-                            if pattern == '*' or fnmatchcase(name, pattern):
-                                pmap[name] = name
-                                found.add(pattern)
-                                if is_input:
-                                    update_src_indices(name, pattern)
-                                break
-                        else:
-                            # Default: prepend the parent system's name
-                            pmap[name] = gname + name if gname else name
-                            if is_input:
-                                update_src_indices(name, name)
+                        for io in io_types:
+                            pmap = matches[io]
+                            for n in proms[io]:
+                                if fnmatchcase(n, key):
+                                    found.add(key)
+                                    if n in pmap:
+                                        report_dup(io, matches, match_type, n, tup)
+                                    pmap[n] = (n, key, pinfo)
+                                    if pinfo is not None and io == 'input':
+                                        update_src_indices(n, pmap[n])
+                else:  # NAME or RENAME
+                    for io in io_types:
+                        pmap = matches[io]
+                        if key in proms[io]:
+                            if key in pmap:
+                                report_dup(io, matches, match_type, key, tup)
+                            pmap[key] = (s, key, pinfo)
+                            if s == key:
+                                found.add(key)
+                            else:
+                                found.add((key, s))
+                            if pinfo is not None:
+                                update_src_indices(key, pmap[key])
 
-            not_found = (set(names).union(renames).union(patterns)) - found
+            not_found = set(n for n, _ in to_match) - found
             if not_found:
                 if (not self._var_abs2meta['input'] and not self._var_abs2meta['output'] and
                         isinstance(self, openmdao.core.group.Group)):
@@ -1967,27 +2018,17 @@ class System(object):
                 else:
                     call = 'promotes_%ss' % io_types[0]
 
-                for p in patterns:
-                    for name, alias in renames.items():
-                        if fnmatchcase(name, p):
-                            raise RuntimeError("%s: %s '%s' matched '%s' but '%s' has been aliased "
-                                               "to '%s'." % (self.msginfo, call, p, name,
-                                                             name, alias))
+                raise RuntimeError("%s: '%s' failed to find any matches for the following "
+                                   "names or patterns: %s.%s" %
+                                   (self.msginfo, call,
+                                    sorted(not_found, key=lambda x: x
+                                           if isinstance(x, str) else x[0]), empty_group_msg))
 
-                    for i in names:
-                        if fnmatchcase(i, p):
-                            break
-                    else:
-                        if p != '*':
-                            raise RuntimeError("%s: '%s' failed to find any matches for the "
-                                               "following pattern: '%s'.%s" %
-                                               (self.msginfo, call, p, empty_group_msg))
-                    if p == patterns[-1]:
-                        break
-                else:
-                    raise RuntimeError("%s: '%s' failed to find any matches for the following "
-                                       "names or patterns: %s.%s" %
-                                       (self.msginfo, call, sorted(not_found), empty_group_msg))
+            # Default: prepend the parent system's name
+            for io in io_types:
+                pmap = matches[io]
+                for name in set(proms[io]).difference(pmap):
+                    pmap[name] = (gname + name, None, None) if gname else (name, None, None)
 
         maps = {'input': {}, 'output': {}}
 
@@ -2001,12 +2042,6 @@ class System(object):
             resolve(self._var_promotes['any'], ('input', 'output'), maps, prom_names)
 
         return maps
-
-    def _add_promotes_src_indices(self, promlist, src_indices, flat_src_indices):
-        for entry in promlist:
-            if isinstance(entry, str):
-                self._var_promotes_src_indices[entry] = (src_indices, flat_src_indices)
-
 
     def _get_scope(self):
         """

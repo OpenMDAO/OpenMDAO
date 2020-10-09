@@ -335,7 +335,7 @@ class TestGroup(unittest.TestCase):
             p.setup()
         self.assertEqual(str(err.exception),
                          "'comp1' <class IndepVarComp>: 'promotes_outputs' failed to find any matches for "
-                         "the following names or patterns: ['xx'].")
+                         "the following names or patterns: [('xx', 'foo')].")
 
     def test_group_renames_errors_bad_tuple(self):
         p = om.Problem()
@@ -347,7 +347,7 @@ class TestGroup(unittest.TestCase):
             p.setup()
         self.assertEqual(str(err.exception),
                          "when adding subsystem 'comp1', entry '('x', 'foo', 'bar')' "
-                         "is not a string or tuple of size 2")
+                         "is not a string or tuple of size 2.")
 
     def test_group_promotes_multiple(self):
         """Promoting multiple variables."""
@@ -1043,7 +1043,7 @@ class TestGroup(unittest.TestCase):
             p.setup()
         self.assertEqual(str(context.exception),
                          "'C2' <class ExecComp>: 'promotes_outputs' failed to find any matches for the "
-                         "following pattern: 'x*'.")
+                         "following names or patterns: ['x*'].")
 
     def test_promote_not_found2(self):
         p = om.Problem()
@@ -1105,7 +1105,7 @@ class TestGroup(unittest.TestCase):
             p.setup()
         self.assertEqual(str(context.exception),
                          "'d1' <class ExecComp>: 'promotes_outputs' failed to find any matches for "
-                         "the following names or patterns: ['bar', 'blammo'].")
+                         "the following names or patterns: [('bar', 'blah'), 'blammo'].")
 
     def test_promote_src_indices_nonflat_to_scalars(self):
         class MyComp(om.ExplicitComponent):
@@ -1654,8 +1654,7 @@ class TestGroupPromotes(unittest.TestCase):
             top.setup()
 
         self.assertEqual(str(context.exception),
-                         "'sub.comp1' <class ExecComp>: promotes_inputs 'b*' matched 'bb' but 'bb' has been "
-                         "aliased to 'xx'.")
+                         "'sub.comp1' <class ExecComp>: Can't alias promoted input 'bb' to 'xx' because 'bb' has already been promoted.")
 
     def test_promotes_wildcard_name(self):
         class SubGroup(om.Group):
@@ -1674,7 +1673,9 @@ class TestGroupPromotes(unittest.TestCase):
 
         top = om.Problem(model=TopGroup())
 
-        top.setup()
+        msg = "'sub.comp1' <class ExecComp>: input variable 'bb' was already promoted. New promotion ignored."
+        with assert_warning(UserWarning, msg):
+            top.setup()
 
     def test_multiple_promotes(self):
 
