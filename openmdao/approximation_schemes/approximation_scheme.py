@@ -7,6 +7,7 @@ import numpy as np
 
 from openmdao.utils.array_utils import sub2full_indices, get_input_idx_split
 import openmdao.utils.coloring as coloring_mod
+from openmdao.utils.general_utils import _convert_auto_ivc_to_conn_name
 from openmdao.utils.mpi import MPI
 from openmdao.jacobians.jacobian import Jacobian
 from openmdao.vectors.vector import _full_slice
@@ -409,9 +410,11 @@ class ApproximationScheme(object):
 
                 if self._progress_out:
                     end_time = time.time()
+                    prom_name = _convert_auto_ivc_to_conn_name(system._conn_global_abs_in2out, wrt)
                     self._progress_out.write(f"{fd_count+1}/{len(full_idxs)}: Checking "
-                                          f"derivatives with respect to: '{wrt} [{idxs}]' ... "
-                                          f"{round(end_time-start_time, 4)} seconds\n")
+                                             f"derivatives with respect to: "
+                                             f"'{prom_name} [{idxs}]' ... "
+                                             f"{round(end_time-start_time, 4)} seconds\n")
 
                 fd_count += 1
 

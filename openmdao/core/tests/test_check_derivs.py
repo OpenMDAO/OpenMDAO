@@ -6,6 +6,7 @@ from io import StringIO
 import unittest
 
 import numpy as np
+import sys
 
 import openmdao.api as om
 from openmdao.core.tests.test_impl_comp import QuadraticLinearize, QuadraticJacVec
@@ -2314,20 +2315,18 @@ class TestProblemCheckTotals(unittest.TestCase):
         totals = prob.check_totals(method='fd', show_progress=True, out_stream=stream)
 
         lines = stream.getvalue().splitlines()
-        self.assertTrue("1/3: Checking derivatives with respect to: '_auto_ivc.v0 [0]' ..." in lines[0])
-        self.assertTrue("2/3: Checking derivatives with respect to: '_auto_ivc.v0 [1]' ..." in lines[1])
-        self.assertTrue("3/3: Checking derivatives with respect to: '_auto_ivc.v1 [2]' ..." in lines[2])
+        self.assertTrue("1/3: Checking derivatives with respect to: 'd1.z [0]' ..." in lines[0])
+        self.assertTrue("2/3: Checking derivatives with respect to: 'd1.z [1]' ..." in lines[1])
+        self.assertTrue("3/3: Checking derivatives with respect to: 'd1.x [2]' ..." in lines[2])
 
         prob.run_model()
 
-        # check derivatives with complex step and a larger step size.
+        # Check to make sure nothing is going to output
         stream = StringIO()
-        totals = prob.check_totals(method='fd', show_progress=False)
+        totals = prob.check_totals(method='fd', show_progress=False, out_stream=stream)
 
         lines = stream.getvalue().splitlines()
-        self.assertFalse("1/3: Checking derivatives with respect to" in lines)
-        self.assertFalse("2/3: Checking derivatives with respect to" in lines)
-        self.assertFalse("3/3: Checking derivatives with respect to" in lines)
+        self.assertFalse("Checking derivatives with respect to" in "\n".join(lines))
 
     def test_desvar_as_obj(self):
         prob = om.Problem()
