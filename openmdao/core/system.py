@@ -173,7 +173,7 @@ class System(object):
         Dictionary of lists of variable names/wildcards specifying promotion
         (used to calculate promoted names)
     _var_promotes_src_indices : dict
-        Dictionary mapping promoted input names/wildcards to (src_indices, flat_src_indices)
+        Dictionary mapping promoted input names to (src_indices, flat_src_indices, src_shape)
     _var_allprocs_prom2abs_list : {'input': dict, 'output': dict}
         Dictionary mapping promoted names to list of all absolute names.
         For outputs, the list will have length one since promoted output names are unique.
@@ -1851,7 +1851,7 @@ class System(object):
 
         def split_list(lst):
             """
-            Return names, patterns, and renames found in lst.
+            Yield match type, name/pattern/tuple info, and src_indices info.
 
             Parameters
             ----------
@@ -1962,32 +1962,32 @@ class System(object):
             if not to_match:
                 return
 
-            found = set()
+            # always add '*' and so we won't report if it matches nothing (in the case where the
+            # system has no variables of that io type)
+            found = set(('*',))
 
             for match_type, key, tup in split_list(to_match):
                 s, pinfo = tup
                 if match_type == _MatchType.PATTERN:
-                    if key == '*':  # special case. add everything
-                        found.add('*')
-                        for io in io_types:
-                            pmap = matches[io]
+                    for io in io_types:
+                        pmap = matches[io]
+                        do_update_src_inds = pinfo is not None and io == 'input'
+                        if key == '*' and not pmap:  # special case. add everything
                             for n in proms[io]:
-                                if n in pmap:
-                                    report_dup(io, matches, match_type, n, tup)
                                 pmap[n] = (n, key, pinfo)
-                                if pinfo is not None and io == 'input':
+                                if do_update_src_inds:
                                     update_src_indices(n, pmap[n])
-                    else:
-                        for io in io_types:
-                            pmap = matches[io]
+                        else:
+                            nmatch = len(pmap)
                             for n in proms[io]:
                                 if fnmatchcase(n, key):
-                                    found.add(key)
                                     if n in pmap:
                                         report_dup(io, matches, match_type, n, tup)
                                     pmap[n] = (n, key, pinfo)
-                                    if pinfo is not None and io == 'input':
+                                    if do_update_src_inds:
                                         update_src_indices(n, pmap[n])
+                            if len(pmap) > nmatch:
+                                found.add(key)
                 else:  # NAME or RENAME
                     for io in io_types:
                         pmap = matches[io]
