@@ -23,7 +23,7 @@ from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import array_connection_compatible, _flatten_src_indices, \
     shape_to_len
 from openmdao.utils.general_utils import ContainsAll, simple_warning, common_subpath, \
-    conditional_error, _is_slicer_op
+    conditional_error, _is_slicer_op, ensure_compatible
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless
 from openmdao.utils.mpi import MPI, check_mpi_exceptions
@@ -726,6 +726,50 @@ class Group(System):
 
         self._has_distrib_vars = False
 
+        def update_src_indices(subsys, name, tup):
+            """
+            Update metadata for promoted inputs that have had src_indices specified.
+
+            Parameters
+            ----------
+            name : str
+                Name of an input variable that may have associated src_indices.
+            tup : tuple
+                (name/rename, pattern/name, promotes_info).
+            """
+            _, _, prominfo = tup
+            if prominfo is not None:
+                src_indices, flat_src_indices, src_shape = prominfo
+
+                for abs_in in subsys._var_allprocs_prom2abs_list['input'][name]:
+                    meta = subsys._var_abs2meta['input'][abs_in]
+
+                    _, _, src_indices = ensure_compatible(name, meta['value'], meta['shape'],
+                                                          src_indices)
+
+                    is_array = isinstance(src_indices, np.ndarray)
+                    if is_array and 'src_indices' in meta and meta['src_indices'] is not None:
+                        if not np.array_equal(meta['src_indices'], src_indices):
+                            raise RuntimeError(f"{subsys.msginfo}: Trying to promote input '{name}' "
+                                               f"with src_indices {str(src_indices)},"
+                                               f" but src_indices have already been specified as "
+                                               f"{str(meta['src_indices'])}.")
+                    if 'flat_src_indices' in meta and meta['flat_src_indices'] is not None:
+                        if not meta['flat_src_indices'] == flat_src_indices:
+                            raise RuntimeError(f"{subsys.msginfo}: Trying to promote input '{name}' "
+                                               f"with flat_src_indices={str(flat_src_indices)} but "
+                                               f"flat_src_indices has already been specified as"
+                                               f" {str(meta['flat_src_indices'])}.")
+
+                    meta['src_indices'] = src_indices
+                    if _is_slicer_op(src_indices):
+                        meta['src_slice'] = src_indices
+                        if flat_src_indices is not None:
+                            simple_warning(f"{subsys.msginfo}: Input '{name}' was promoted with "
+                                           "slice src_indices, so flat_src_indices is ignored.")
+                        flat_src_indices = True
+                    meta['flat_src_indices'] = flat_src_indices
+
         for subsys in self._subsystems_myproc:
             self._has_output_scaling |= subsys._has_output_scaling
             self._has_resid_scaling |= subsys._has_resid_scaling
@@ -735,6 +779,10 @@ class Group(System):
                 self._has_distrib_vars |= subsys._has_distrib_vars
 
             var_maps = subsys._get_promotion_maps(subsys._var_allprocs_prom2abs_list)
+            self._var_promotes_src_indices = {n: data for n, data in var_maps['input'].items()
+                                              if data[2] is not None}
+            for n, tup in self._var_promotes_src_indices.items():
+                update_src_indices(subsys, n, tup)
 
             sub_prefix = subsys.name + '.'
 
@@ -2033,20 +2081,12 @@ class Group(System):
             raise RuntimeError(f"{self.msginfo}: Trying to promote outputs='{outputs}', "
                                "but an iterator of strings and/or tuples is required.")
 
-        if src_indices is None and flat_src_indices is None and src_shape is None:
+        if src_indices is None:
             prominfo = None
+            if flat_src_indices is not None or src_shape is not None:
+                simple_warning(f"{self.msginfo}: ignored flat_src_indices and/or src_shape because"
+                               " src_indices was not specified.")
         else:
-            prominfo = _PromotesInfo(src_indices, flat_src_indices, src_shape)
-
-        subsys = getattr(self, subsys_name)
-        if any:
-            subsys._var_promotes['any'].extend((a, prominfo) for a in any)
-        if inputs:
-            subsys._var_promotes['input'].extend((i, prominfo) for i in inputs)
-        if outputs:
-            subsys._var_promotes['output'].extend((o, None) for o in outputs)
-
-        if src_indices is not None:
             if outputs:
                 raise RuntimeError(f"{self.msginfo}: Trying to promote outputs {outputs} while "
                                    f"specifying src_indices {src_indices} is not meaningful.")
@@ -2063,6 +2103,16 @@ class Group(System):
                 if any:
                     simple_warning(f"{self.msginfo}: src_indices have been specified with promotes"
                                    " 'any'. Note that src_indices only apply to matching inputs.")
+
+            prominfo = _PromotesInfo(src_indices, flat_src_indices, src_shape)
+
+        subsys = getattr(self, subsys_name)
+        if any:
+            subsys._var_promotes['any'].extend((a, prominfo) for a in any)
+        if inputs:
+            subsys._var_promotes['input'].extend((i, prominfo) for i in inputs)
+        if outputs:
+            subsys._var_promotes['output'].extend((o, None) for o in outputs)
 
         # check for attempt to promote with different alias
         list_comp = [i if isinstance(i, tuple) else (i, i)

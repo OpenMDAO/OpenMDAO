@@ -1965,31 +1965,36 @@ class System(object):
             # always add '*' and so we won't report if it matches nothing (in the case where the
             # system has no variables of that io type)
             found = set(('*',))
+            src_inds_save = self._var_promotes_src_indices
 
             for match_type, key, tup in split_list(to_match):
                 s, pinfo = tup
                 if match_type == _MatchType.PATTERN:
                     for io in io_types:
-                        pmap = matches[io]
-                        do_update_src_inds = pinfo is not None and io == 'input'
-                        if key == '*' and not pmap:  # special case. add everything
-                            for n in proms[io]:
-                                pmap[n] = (n, key, pinfo)
-                                if do_update_src_inds:
-                                    update_src_indices(n, pmap[n])
+                        if io == 'output':
+                            pinfo = None
+                        if key == '*' and not matches[io]:  # special case. add everything
+                            matches[io] = pmap = {n: (n, key, pinfo) for n in proms[io]}
+                            # if pinfo is not None:
+                            #     for n in proms[io]:
+                            #         src_inds_save[n] = pmap[n]
+                            #         update_src_indices(n, pmap[n])
                         else:
+                            pmap = matches[io]
                             nmatch = len(pmap)
                             for n in proms[io]:
                                 if fnmatchcase(n, key):
                                     if n in pmap:
                                         report_dup(io, matches, match_type, n, tup)
                                     pmap[n] = (n, key, pinfo)
-                                    if do_update_src_inds:
-                                        update_src_indices(n, pmap[n])
+                                    # if pinfo is not None:
+                                    #     update_src_indices(n, pmap[n])
                             if len(pmap) > nmatch:
                                 found.add(key)
                 else:  # NAME or RENAME
                     for io in io_types:
+                        if io == 'output':
+                            pinfo = None
                         pmap = matches[io]
                         if key in proms[io]:
                             if key in pmap:
@@ -1999,8 +2004,8 @@ class System(object):
                                 found.add(key)
                             else:
                                 found.add((key, s))
-                            if pinfo is not None:
-                                update_src_indices(key, pmap[key])
+                            # if pinfo is not None:
+                            #     update_src_indices(key, pmap[key])
 
             not_found = set(n for n, _ in to_match) - found
             if not_found:
@@ -2019,6 +2024,7 @@ class System(object):
                                    f"following names or patterns: {not_found}.{empty_group_msg}")
 
         maps = {'input': {}, 'output': {}}
+        self._var_promotes_src_indices = {}
 
         if self._var_promotes['input'] or self._var_promotes['output']:
             if self._var_promotes['any']:
