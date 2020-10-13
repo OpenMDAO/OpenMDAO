@@ -856,7 +856,7 @@ def make_serializable(o):
         return o.item()
     elif isinstance(o, (str, float, int)):
         return o
-    elif isinstance(o, bool):
+    elif isinstance(o, bool) or np.iscomplex(o):
         return str(o)
     elif hasattr(o, '__dict__'):
         return o.__class__.__name__
@@ -921,7 +921,7 @@ def default_noraise(o):
         return o.item()
     elif isinstance(o, (str, float, int)):
         return o
-    elif isinstance(o, bool):
+    elif isinstance(o, bool) or np.iscomplex(o):
         return str(o)
     elif hasattr(o, '__dict__'):
         return o.__class__.__name__
@@ -952,10 +952,19 @@ def make_set(str_data, name=None):
         return set()
     elif isinstance(str_data, str):
         return {str_data}
-    elif isinstance(str_data, set):
-        return str_data
-    elif isinstance(str_data, list):
-        return set(str_data)
+    elif isinstance(str_data, (set, list)):
+
+        for item in str_data:
+            if not isinstance(item, str):
+                typ = type(item).__name__
+                msg = f"Items in tags should be of type string, but type '{typ}' was found."
+                raise TypeError(msg)
+
+        if isinstance(str_data, set):
+            return str_data
+        elif isinstance(str_data, list):
+            return set(str_data)
+
     elif name:
         raise TypeError("The {} argument should be str, set, or list: {}".format(name, str_data))
     else:

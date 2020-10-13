@@ -798,6 +798,34 @@ class ExplCompTestCase(unittest.TestCase):
         outputs = prob.model.list_outputs(out_stream=None, tags="tag3")
         self.assertEqual(sorted(outputs), [])
 
+    def test_tags_error_messages(self):
+
+        class Comp1(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('a', 1.0, tags=['a', dict()])
+
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', Comp1())
+
+        with self.assertRaises(TypeError) as cm:
+            prob.setup(self)
+
+        msg = "Items in tags should be of type string, but type 'dict' was found."
+        self.assertEqual(str(cm.exception), msg)
+
+        class Comp1(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('a', 1.0, tags=333)
+
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', Comp1())
+
+        with self.assertRaises(TypeError) as cm:
+            prob.setup(self)
+
+        msg = "The tags argument should be a str or list"
+        self.assertEqual(str(cm.exception), msg)
+
     def test_feature_simple_var_tags(self):
         from openmdao.api import Problem, ExplicitComponent
 
