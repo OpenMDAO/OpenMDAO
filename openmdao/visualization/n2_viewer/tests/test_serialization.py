@@ -26,7 +26,7 @@ class NonSerComp(om.ExplicitComponent):
                        tags=['a', 'b'])
 
         self.add_discrete_input('dx', [{('Discrete_i', BadOpt): (2, {((1, ), (2, )): 'stuff'})}])
-        self.add_discrete_input('dy', [{('Discrete_o', BadOpt): (2, {((1, ), (2, )): 'stuff'})}])
+        self.add_discrete_output('dy', [{('Discrete_o', BadOpt): (2, {((1, ), (2, )): 'stuff'})}])
         self.add_discrete_input('dcomplex', 3 + 5j)
 
     def initialize(self):
@@ -135,7 +135,7 @@ class TestSerialization(unittest.TestCase):
         self.assertEqual(cr.problem_metadata['tree']['children'][1]['options']['cx'],
                          '(3+7j)')
 
-        dval = cr.problem_metadata['tree']['children'][1]['children'][2]['value']
+        dval = cr.problem_metadata['tree']['children'][1]['children'][4]['value']
         key, val = [(k, v) for k, v in dval[0].items()][0]
         self.assertTrue("Discrete_o', <class" in key)
         self.assertEqual(val, [2, {'((1,), (2,))': 'stuff'}])
@@ -145,7 +145,7 @@ class TestSerialization(unittest.TestCase):
         self.assertTrue("Discrete_i', <class" in key)
         self.assertEqual(val, [2, {'((1,), (2,))': 'stuff'}])
 
-        self.assertEqual(cr.problem_metadata['tree']['children'][1]['children'][3]['value'],
+        self.assertEqual(cr.problem_metadata['tree']['children'][1]['children'][2]['value'],
                          '(3+5j)')
 
 
