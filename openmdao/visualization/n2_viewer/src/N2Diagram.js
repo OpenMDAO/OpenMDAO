@@ -336,10 +336,7 @@ class N2Diagram {
             })
             .on("click", function (d) {
                 if (self.ui.nodeInfoBox.hidden) { self.ui.leftClick(d); } // Zoom if not in info panel mode
-                else { // Pin/unpin the info panel
-                    self.ui.nodeInfoBox.togglePin();
-                    self.ui.nodeInfoBox.update(d3.event, d, d3.select(this).select('rect').style('fill'));
-                }
+                else { self.ui.nodeInfoBox.pin(); } // Create a persistent panel
             })
             .on("contextmenu", function (d) {
                 self.ui.rightClick(d, this);
@@ -482,16 +479,13 @@ class N2Diagram {
             })
             .on("click", function (d) {
                 if (self.ui.nodeInfoBox.hidden) { self.ui.leftClick(d); } // Zoom if not in info panel mode
-                else { // Pin/unpin the info panel
-                    self.ui.nodeInfoBox.togglePin();
-                    self.ui.nodeInfoBox.update_solver(d3.event, d, d3.select(this).select('rect').style('fill'))
-                }
+                else { self.ui.nodeInfoBox.pin(); } // Create a persistent panel
             })
             .on("contextmenu", function (d) {
                 self.ui.rightClick(d, this);
             })
             .on("mouseover", function (d) {
-                self.ui.nodeInfoBox.update_solver(d3.event, d, d3.select(this).select('rect').style('fill'))
+                self.ui.nodeInfoBox.update(d3.event, d, d3.select(this).select('rect').style('fill'), true)
 
                 if (self.model.abs2prom != undefined) {
                     if (d.isInput()) {
@@ -809,9 +803,8 @@ class N2Diagram {
         if (this.ui.nodeInfoBox.hidden) { // If not in info-panel mode, pin/unpin arrows
             this.arrowMgr.togglePin(cell.id);
         }
-        else { // Pin/unpin the info panel
-            this.ui.nodeInfoBox.togglePin();
-            this.ui.nodeInfoBox.update(d3.event, cell.obj, cell.color());
+        else { // Make a persistent info panel
+            this.ui.nodeInfoBox.pin();
         }
     }
 

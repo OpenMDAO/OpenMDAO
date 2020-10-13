@@ -236,7 +236,7 @@ class ValueInfo {
         this.initial_height = parseInt(this.table.style('height'));
     }
 
-    /** Listen for the event to begin dragging the value the value window */
+    /** Listen for the event to begin dragging the value window */
     _setupDrag() {
         const self = this;
 
@@ -377,29 +377,24 @@ class NodeInfo {
         ];
 
         this.ui = ui;
-        this.table = d3.select('#node-info-table');
         this.container = d3.select('#node-info-container');
+        this.table = this.container.select('.node-info-table');
         this.thead = this.table.select('thead');
         this.tbody = this.table.select('tbody');
         this.toolbarButton = d3.select('#info-button');
         this.hidden = true;
-        this.pinned = false;
-
-        const self = this;
-        this.pinButton = d3.select('#node-info-pin')
-            .on('click', e => { self.unpin(); })
     }
 
     /** Make the info box visible if it's hidden */
     show() {
-        this.toolbarButton.attr('class', 'fas icon-info-circle active-tab-icon');
+        this.toolbarButton.classed('active-tab-icon', true);
         this.hidden = false;
         d3.select('#all_pt_n2_content_div').classed('node-data-cursor', true);
     }
 
     /** Make the info box hidden if it's visible */
     hide() {
-        this.toolbarButton.attr('class', 'fas icon-info-circle');
+        this.toolbarButton.classed('active-tab-icon', false);
         this.hidden = true;
         d3.select('#all_pt_n2_content_div').classed('node-data-cursor', false);
     }
@@ -411,19 +406,8 @@ class NodeInfo {
     }
 
     pin() {
-        this.pinned = true;
-        this.pinButton.attr('class', 'info-visible');
-    }
-
-    unpin() {
-        this.pinned = false;
-        this.pinButton.attr('class', 'info-hidden');
+        new PersistentNodeInfo(this);
         this.clear();
-    }
-
-    togglePin() {
-        if (this.pinned) this.unpin();
-        else this.pin();
     }
 
     _addPropertyRow(label, val, obj, capitalize = false) {
@@ -440,7 +424,8 @@ class NodeInfo {
                 if (val == null) {
                     td = newRow.append('td')
                         .html("Value too large to include in N2");
-                } else {
+                }
+                else {
                     let val_string = val_to_string(val)
                     let max_length = ValueInfo.TRUNCATE_LIMIT;
                     let isTruncated = val_string.length > max_length;
@@ -480,7 +465,8 @@ class NodeInfo {
                     .text(nodeInfoVal);
             }
             if (capitalize) td.attr('class', 'caps');
-        } else {
+        }
+        else {
             // Add Options to the Node Info table
             if (Object.keys(val).length !== 0) {
                 if (label === 'Non-Linear Solver Options') {
@@ -511,10 +497,11 @@ class NodeInfo {
      * if the specified object contains them.
      * @param {Object} event The related event so we can get position.
      * @param {N2TreeNode} obj The node to examine.
-     * @param {N2TreeNode} color The color to make the title bar.
+     * @param {String} color Match the color of the node for the header/footer.
+     * @param {Boolean} [isSolver = false] Whether to use solver properties or not.
      */
-    update(event, obj, color = '#42926b') {
-        if (this.hidden || this.pinned) return;
+    update(event, obj, color, isSolver = false) {
+        if (this.hidden) return;
 
         this.clear();
         // Put the name in the title
@@ -538,7 +525,9 @@ class NodeInfo {
             this._addPropertyRow('Manually Expanded', obj.manuallyExpanded.toString(), obj)
         }
 
-        for (const prop of this.propList) {
+        const propList = isSolver ? this.propListSolvers : this.propList;
+
+        for (const prop of propList) {
             if (prop.key === 'value') {
                 if (obj.hasOwnProperty('value')) {
                     this._addPropertyRow(prop.desc, prop.output(obj[prop.key]), obj, prop.capitalize)
@@ -557,70 +546,15 @@ class NodeInfo {
             .style('height', this.table.node().scrollHeight + 'px')
 
         this.move(event);
-        this.container.attr('class', 'info-visible');
-    }
-
-    /**
-     * Iterate over the list of known properties of solvers and display them
-     * if the specified object contains them.
-     * @param {Object} event The related event so we can get position.
-     * @param {N2TreeNode} obj The node to examine.
-     * @param {N2TreeNode} color The color to make the title bar.
-     */
-    update_solver(event, obj, color = '#42926b') {
-        if (this.hidden || this.pinned) return;
-
-        this.clear();
-        // Put the name in the title
-        this.table.select('thead th')
-            .style('background-color', color)
-            .text(obj.name);
-
-        this.name = obj.absPathName;
-
-        this.table.select('tfoot th')
-            .style('background-color', color);
-
-        if (obj.promotedName) {
-            this._addPropertyRow('Promoted Name', obj.promotedName, obj);
-        }
-
-        if (DebugFlags.info && obj.hasChildren()) {
-            this._addPropertyRow('Children', obj.children.length, obj);
-            this._addPropertyRow('Descendants', obj.numDescendants, obj);
-            this._addPropertyRow('Leaves', obj.numLeaves, obj);
-            this._addPropertyRow('Manually Expanded', obj.manuallyExpanded.toString(), obj)
-        }
-
-        // for (const prop of this.propList) {
-        for (const prop of this.propListSolvers) {
-            // if (obj.propExists(prop.key) && obj[prop.key] != '') {
-            if (prop.key === 'value') {
-                if (obj.hasOwnProperty('value')) {
-                    this._addPropertyRow(prop.desc, prop.output(obj[prop.key]), obj, prop.capitalize)
-                }
-            } else {
-                if (prop.canShow(obj)) {
-                    this._addPropertyRow(prop.desc, prop.output(obj[prop.key]), obj, prop.capitalize)
-                }
-            }
-        }
-
-        // Solidify the size of the table after populating so that
-        // it can be positioned reliably by move().
-        this.table
-            .style('width', this.table.node().scrollWidth + 'px')
-            .style('height', this.table.node().scrollHeight + 'px')
-
-        this.move(event);
-        this.container.attr('class', 'info-visible');
+        this.container.classed('info-hidden', true).classed('info-visible', true);
     }
 
     /** Wipe the contents of the table body */
     clear() {
-        if (this.hidden || this.pinned) return;
+        if (this.hidden) return;
         this.container
-            .attr('class', 'info-hidden')
+            .classed('info-visible', false)
+            .classed('info-hidden', true)
             .style('width', 'auto')
             .style('height', 'auto');
 
@@ -636,7 +570,7 @@ class NodeInfo {
      * @param {Object} event The triggering event containing the position.
      */
     move(event) {
-        if (this.hidden || this.pinned) return;
+        if (this.hidden) return;
         const offset = 30;
 
         // Mouse is in left half of window, put box to right of mouse
@@ -647,18 +581,77 @@ class NodeInfo {
         // Mouse is in right half of window, put box to left of mouse
         else {
             this.container.style('left', 'auto');
-            this.container.style('right', (window.innerWidth - event.clientX + offset) + 'px')
+            this.container.style('right', (window.innerWidth - event.clientX + offset) + 'px');
         }
 
         // Mouse is in top half of window, put box below mouse
         if (event.clientY < window.innerHeight / 2) {
             this.container.style('bottom', 'auto');
-            this.container.style('top', (event.clientY - offset) + 'px')
+            this.container.style('top', (event.clientY - offset) + 'px');
         }
         // Mouse is in bottom half of window, put box above mouse
         else {
             this.container.style('top', 'auto');
-            this.container.style('bottom', (window.innerHeight - event.clientY - offset) + 'px')
+            this.container.style('bottom', (window.innerHeight - event.clientY - offset) + 'px');
         }
+    }
+}
+
+/** Event handlers for Node Info panels that were pinned */
+class PersistentNodeInfo {
+    constructor(nodeInfo) {
+        this.container = nodeInfo.container.clone(true);
+        this.container.classed('persistent-panel', true);
+        this.container.attr('id', uuidv4()).style('z-index', '9');
+        this.thead = this.container.select('thead');
+        this.translate = [0, 0];
+
+        const self = this;
+        this.pinButton = this.container.select('#node-info-pin')
+            .on('click', e => { self.unpin(); })
+        this.pinButton.attr('class', 'info-visible');
+
+        this._setupDrag();
+    }
+
+    /** Listen for the event to begin dragging a persistent info panel */
+    _setupDrag() {
+        const self = this;
+
+        this.thead.on('mousedown', function () {
+            const dragDiv = self.container;
+
+            let zIndex = self.container.style('z-index').valueOf() + 1;
+            self.container.style('z-index', zIndex);
+
+            dragDiv.style('cursor', 'grabbing')
+                .select('th').style('cursor', 'grabbing');
+
+            self._initPos = [d3.event.pageX, d3.event.pageY];
+
+            const w = d3.select(window)
+                .on("mousemove", e => {
+                    self._offset = [
+                        self.translate[0] + d3.event.pageX - self._initPos[0],
+                        self.translate[1] + d3.event.pageY - self._initPos[1]
+                    ];
+
+                    dragDiv.style('transform', `translate(${self._offset[0]}px, ${self._offset[1]}px)`)
+                })
+                .on("mouseup", e => {
+                    self.translate = [ self._offset[0], self._offset[1] ];
+                    dragDiv.style('cursor', 'text')
+                        .select('th').style('cursor', 'grab');
+                    w.on("mousemove", null).on("mouseup", null);
+                });
+
+            d3.event.preventDefault();
+        });
+    }
+
+    unpin() {
+        this.thead.on('mousedown', null);
+        this.pinButton.on('click', null);
+        this.container.remove();
     }
 }

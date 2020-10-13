@@ -1,11 +1,11 @@
 /******************* Node Data styling *******************/
-#node-info-container {
+div.info-panel {
     position: absolute;
-    z-index: 10;
+    z-index: 200;
     height: auto;
 }
 
-#node-info-table {
+.node-info-table {
 	overflow: hidden;
 	background-color: white;
 	border-radius: 10px;
@@ -25,14 +25,15 @@
     visibility: visible;
 }
 
-#node-info-table thead th {
+.node-info-table thead th {
     background-color: #42926b;
     color: black;
     padding: 5px;
     font-size: 11pt;
+    cursor: grab;
 }
 
-#node-info-table tbody th {
+.node-info-table tbody th {
     text-align: right;
     font-size: 9pt;
     margin-top: 0;
@@ -43,12 +44,12 @@
     white-space: nowrap;
 }
 
-#node-info-table tbody .options-header {
+.node-info-table tbody .options-header {
     background-color: #eeeeee;
     text-align: center;
 }
 
-#node-info-table tbody td {
+.node-info-table tbody td {
     text-align: left;
     font-size: 9pt;
     margin-top: 0;
@@ -60,7 +61,7 @@
     white-space: nowrap;
 }
 
-#node-info-table tfoot th {
+.node-info-table tfoot th {
     background-color: #42926b;
     padding: 2px;
     font-size: 11pt;

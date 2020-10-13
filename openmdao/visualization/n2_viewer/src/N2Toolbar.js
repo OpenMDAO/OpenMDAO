@@ -305,7 +305,6 @@ class N2Toolbar {
             ["Show detailed node information", "Hide detailed node information"],
             pred => { return n2ui.nodeInfoBox.hidden; },
             e => {
-                n2ui.nodeInfoBox.unpin();
                 n2ui.nodeInfoBox.clear();
                 n2ui.nodeInfoBox.toggle();
             }
