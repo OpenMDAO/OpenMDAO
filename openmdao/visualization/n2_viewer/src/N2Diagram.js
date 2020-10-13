@@ -11,7 +11,6 @@
  * @property {N2TreeNode} zoomedElementPrev Reference to last zoomedElement.
  * @property {Object} dom Container for references to web page elements.
  * @property {Object} dom.parentDiv The outermost div we work with.
- * @property {Object} dom.d3ContentDiv The div containing all of the diagram's content.
  * @property {Object} dom.svgDiv The div containing the SVG element.
  * @property {Object} dom.svg The SVG element.
  * @property {Object} dom.svgStyle Object where SVG style changes can be made.
@@ -157,7 +156,6 @@ class N2Diagram {
     _referenceD3Elements() {
         this.dom = {
             'parentDiv': document.getElementById("ptN2ContentDivId"),
-            'd3ContentDiv': parentDiv.querySelector("#d3_content_div"),
             'svgDiv': d3.select("#svgDiv"),
             'svg': d3.select("#svgId"),
             'svgStyle': d3.select("#svgId style"),

@@ -160,7 +160,7 @@ class N2Toolbar {
         // Expand the search bar and set focus when search button clicked
         d3.select('#searchbar-container').on('click', function () {
             self.searchCount.html('0 matches');
-            
+
             self.searchBar.node().value = '';
             d3.select('#searchbar-and-label').attr('class', 'searchbar-visible');
 
@@ -313,7 +313,13 @@ class N2Toolbar {
         new N2ToolbarButtonToggle('#question-button', tooltipBox,
             ["Hide N2 diagram help", "Show N2 diagram help"],
             pred => { return d3.select("#myModal").style('display') == "block"; },
-            DisplayModal
+            e => {
+                d3.select("#myModal").style('display', 'block');
+                d3.select("#idSpanModalClose").on('click', c => {
+                    d3.select("#myModal").style('display', 'none');
+                    d3.select("#idSpanModalClose").on('click', null);
+                });
+            }
         );
 
         new N2ToolbarButtonToggle('#hide-toolbar', tooltipBox,

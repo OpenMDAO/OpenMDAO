@@ -532,7 +532,8 @@ class NodeInfo {
                 if (obj.hasOwnProperty('value')) {
                     this._addPropertyRow(prop.desc, prop.output(obj[prop.key]), obj, prop.capitalize)
                 }
-            } else {
+            }
+            else {
                 if (prop.canShow(obj)) {
                     this._addPropertyRow(prop.desc, prop.output(obj[prop.key]), obj, prop.capitalize)
                 }
@@ -597,12 +598,22 @@ class NodeInfo {
     }
 }
 
-/** Event handlers for Node Info panels that were pinned */
+/**
+ * Make a persistent copy of the NodeInfo panel and handle its drag/close events
+ * @typedef PersistentNodeInfo
+ */
 class PersistentNodeInfo {
     constructor(nodeInfo) {
-        this.container = nodeInfo.container.clone(true);
+        this.orig = nodeInfo.container;
+        this.container = this.orig.clone(true);
         this.container.classed('persistent-panel', true);
-        this.container.attr('id', uuidv4()).style('z-index', '9');
+        this.container.attr('id', uuidv4());
+
+        // Keep increasing z-index of original info panel to keep it on top.
+        // Max z-index is 2147483647
+        let zIndex = parseInt(this.orig.style('z-index')) + 1; 
+        this.orig.style('z-index', zIndex);
+        
         this.thead = this.container.select('thead');
         this.translate = [0, 0];
 
@@ -620,26 +631,29 @@ class PersistentNodeInfo {
 
         this.thead.on('mousedown', function () {
             const dragDiv = self.container;
-
-            let zIndex = self.container.style('z-index').valueOf() + 1;
-            self.container.style('z-index', zIndex);
-
+            let zIndex = parseInt(self.orig.style('z-index'));
+            
             dragDiv.style('cursor', 'grabbing')
+                .style('z-index', zIndex)
                 .select('th').style('cursor', 'grabbing');
 
-            self._initPos = [d3.event.pageX, d3.event.pageY];
+            self.orig.style('z-index', zIndex + 1)
+
+            const dragStart = [d3.event.pageX, d3.event.pageY];
+            let newTrans = [...self.translate];
 
             const w = d3.select(window)
                 .on("mousemove", e => {
-                    self._offset = [
-                        self.translate[0] + d3.event.pageX - self._initPos[0],
-                        self.translate[1] + d3.event.pageY - self._initPos[1]
+                    newTrans = [
+                        self.translate[0] + d3.event.pageX - dragStart[0],
+                        self.translate[1] + d3.event.pageY - dragStart[1]
                     ];
 
-                    dragDiv.style('transform', `translate(${self._offset[0]}px, ${self._offset[1]}px)`)
+                    dragDiv.style('transform', `translate(${newTrans[0]}px, ${newTrans[1]}px)`)
                 })
                 .on("mouseup", e => {
-                    self.translate = [ self._offset[0], self._offset[1] ];
+                    self.translate = [newTrans[0], newTrans[1]];
+
                     dragDiv.style('cursor', 'text')
                         .select('th').style('cursor', 'grab');
                     w.on("mousemove", null).on("mouseup", null);

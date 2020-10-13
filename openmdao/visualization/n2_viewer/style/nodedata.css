@@ -1,7 +1,7 @@
 /******************* Node Data styling *******************/
 div.info-panel {
     position: absolute;
-    z-index: 200;
+    z-index: 20;
     height: auto;
 }
 
