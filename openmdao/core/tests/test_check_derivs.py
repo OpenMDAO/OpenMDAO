@@ -1168,11 +1168,13 @@ class TestProblemCheckPartials(unittest.TestCase):
         stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=False)
         # So for this case, they do all provide them, so rev should not be shown
-        self.assertEqual(stream.getvalue().count('Forward Magnitude'), 2)
+        self.assertEqual(stream.getvalue().count('Analytic Magnitude'), 2)
+        self.assertEqual(stream.getvalue().count('Forward Magnitude'), 0)
         self.assertEqual(stream.getvalue().count('Reverse Magnitude'), 0)
         self.assertEqual(stream.getvalue().count('Absolute Error'), 2)
         self.assertEqual(stream.getvalue().count('Relative Error'), 2)
-        self.assertEqual(stream.getvalue().count('Raw Forward Derivative'), 2)
+        self.assertEqual(stream.getvalue().count('Raw Analytic Derivative'), 2)
+        self.assertEqual(stream.getvalue().count('Raw Forward Derivative'), 0)
         self.assertEqual(stream.getvalue().count('Raw Reverse Derivative'), 0)
         self.assertEqual(stream.getvalue().count('Raw FD Derivative'), 2)
 
@@ -1220,11 +1222,13 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=False)
-        self.assertEqual(stream.getvalue().count('Forward Magnitude'), 4)
+        self.assertEqual(stream.getvalue().count('Analytic Magnitude'), 2)
+        self.assertEqual(stream.getvalue().count('Forward Magnitude'), 2)
         self.assertEqual(stream.getvalue().count('Reverse Magnitude'), 2)
         self.assertEqual(stream.getvalue().count('Absolute Error'), 8)
         self.assertEqual(stream.getvalue().count('Relative Error'), 8)
-        self.assertEqual(stream.getvalue().count('Raw Forward Derivative'), 4)
+        self.assertEqual(stream.getvalue().count('Raw Analytic Derivative'), 2)
+        self.assertEqual(stream.getvalue().count('Raw Forward Derivative'), 2)
         self.assertEqual(stream.getvalue().count('Raw Reverse Derivative'), 2)
         self.assertEqual(stream.getvalue().count('Raw FD Derivative'), 4)
 
@@ -1815,7 +1819,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         data = prob.check_partials(out_stream=stream)
         lines = stream.getvalue().splitlines()
 
-        self.assertTrue("Relative Error (Jfor  - Jfd) : 1." in lines[8])
+        self.assertTrue("Relative Error (Jan - Jfd) / Jan : 1." in lines[8])
 
     def test_directional_bug_implicit(self):
         # Test for bug in directional derivative direction for implicit var and matrix-free.
@@ -2894,6 +2898,34 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.check_totals(out_stream=stream)
         lines = stream.getvalue().splitlines()
         self.assertTrue('index size: 1' in lines[3])
+
+    def test_linear_cons(self):
+        # Linear constraints were mistakenly forgotten.
+        p = om.Problem()
+        p.model.add_subsystem('stuff', om.ExecComp(['y = x', 'cy = x', 'lcy = 3*x'],
+                                                   x={'units': 'inch'},
+                                                   y={'units': 'kg'},
+                                                   lcy={'units': 'kg'}),
+                              promotes=['*'])
+
+        p.model.add_design_var('x', units='ft')
+        p.model.add_objective('y', units='lbm')
+        p.model.add_constraint('lcy', units='lbm', lower=0, linear=True)
+
+        p.setup()
+        p['x'] = 1.0
+        p.run_model()
+
+        stream = StringIO()
+        J_driver = p.check_totals(out_stream=stream)
+        lines = stream.getvalue().splitlines()
+
+        self.assertTrue("Full Model: 'stuff.lcy' wrt 'x' (Linear constraint)" in lines[3])
+        self.assertTrue("Absolute Error (Jan - Jfd)" in lines[6])
+        self.assertTrue("Relative Error (Jan - Jfd) / Jfd" in lines[8])
+
+        assert_near_equal(J_driver['stuff.y', 'x']['J_fwd'][0, 0], 1.0)
+        assert_near_equal(J_driver['stuff.lcy', 'x']['J_fwd'][0, 0], 3.0)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
