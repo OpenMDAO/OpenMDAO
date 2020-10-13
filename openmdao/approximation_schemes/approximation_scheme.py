@@ -35,7 +35,7 @@ class ApproximationScheme(object):
         Array of sizes of data chunks that make up _j_colored. (Used for MPI Allgatherv)
     _j_data_offsets : ndarray of int
         Array of offsets of each data chunk that makes up _j_colored. (Used for MPI Allgatherv)
-    _progress_out : None
+    _progress_out : None or file-like object
         Attribute to output the progress of check_totals
     """
 
