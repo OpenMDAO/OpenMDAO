@@ -149,9 +149,5 @@ class TestSerialization(unittest.TestCase):
                          '(3+5j)')
 
 
-
-        print('done')
-
-
 if __name__ == "__main__":
     unittest.main()
