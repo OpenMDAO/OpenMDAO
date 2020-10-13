@@ -300,7 +300,12 @@ class ApproximationScheme(object):
     def _compute_approximations(self, system, jac, total, under_cs):
         from openmdao.core.component import Component
 
-        self._progress_out = self.out_stream if hasattr(self, "out_stream") else None
+        if hasattr(self, "progress_out_stream"):
+            self._progress_out = self.progress_out_stream
+        elif hasattr(system._approx_schemes, "progress_out_stream"):
+            self._progress_out = system._approx_schemes.progress_out_stream
+        else:
+            self._progress_out = None
 
         # Set system flag that we're under approximation to true
         system._set_approx_mode(True)
@@ -404,7 +409,7 @@ class ApproximationScheme(object):
 
                 if self._progress_out:
                     end_time = time.time()
-                    self.out_stream.write(f"{fd_count+1}/{len(full_idxs)}: Checking "
+                    self._progress_out.write(f"{fd_count+1}/{len(full_idxs)}: Checking "
                                           f"derivatives with respect to: '{wrt} [{idxs}]' ... "
                                           f"{round(end_time-start_time, 4)} seconds\n")
 

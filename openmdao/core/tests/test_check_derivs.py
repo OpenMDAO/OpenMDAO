@@ -2314,40 +2314,20 @@ class TestProblemCheckTotals(unittest.TestCase):
         totals = prob.check_totals(method='fd', show_progress=True, out_stream=stream)
 
         lines = stream.getvalue().splitlines()
-        self.assertTrue(lines[0], "1/3: Checking derivatives with respect to: '_auto_ivc.v0 [0]' ... 0.0088 seconds")
-        self.assertTrue(lines[1], "2/3: Checking derivatives with respect to: '_auto_ivc.v0 [1]' ... 9.2891 seconds")
-        self.assertTrue(lines[2], "3/3: Checking derivatives with respect to: '_auto_ivc.v1 [2]' ... 0.0087 seconds")
+        self.assertTrue("1/3: Checking derivatives with respect to: '_auto_ivc.v0 [0]' ..." in lines[0])
+        self.assertTrue("2/3: Checking derivatives with respect to: '_auto_ivc.v0 [1]' ..." in lines[1])
+        self.assertTrue("3/3: Checking derivatives with respect to: '_auto_ivc.v1 [2]' ..." in lines[2])
 
-    def test_check_totals_show_progress_false(self):
-        prob = om.Problem()
-        prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = om.NonlinearBlockGS()
-
-        prob.model.add_design_var('x', lower=-100, upper=100)
-        prob.model.add_design_var('z', lower=-100, upper=100)
-        prob.model.add_objective('obj')
-        prob.model.add_constraint('con1', upper=0.0)
-        prob.model.add_constraint('con2', upper=0.0)
-
-        prob.set_solver_print(level=0)
-
-        prob.setup(force_alloc_complex=True)
-
-        prob.model.nonlinear_solver.options['atol'] = 1e-15
-        prob.model.nonlinear_solver.options['rtol'] = 1e-15
-
-        # We don't call run_driver() here because we don't
-        # actually want the optimizer to run
         prob.run_model()
 
         # check derivatives with complex step and a larger step size.
         stream = StringIO()
-        totals = prob.check_totals(method='fd', show_progress=False, out_stream=stream)
+        totals = prob.check_totals(method='fd', show_progress=False)
 
         lines = stream.getvalue().splitlines()
-        self.assertNotEqual(lines[0], "1/3: Checking derivatives with respect to: '_auto_ivc.v0 [0]' ... 0.0088 seconds")
-        self.assertNotEqual(lines[1], "2/3: Checking derivatives with respect to: '_auto_ivc.v0 [1]' ... 9.2891 seconds")
-        self.assertNotEqual(lines[2], "3/3: Checking derivatives with respect to: '_auto_ivc.v1 [2]' ... 0.0087 seconds")
+        self.assertFalse("1/3: Checking derivatives with respect to" in lines)
+        self.assertFalse("2/3: Checking derivatives with respect to" in lines)
+        self.assertFalse("3/3: Checking derivatives with respect to" in lines)
 
     def test_desvar_as_obj(self):
         prob = om.Problem()

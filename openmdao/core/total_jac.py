@@ -1443,7 +1443,7 @@ class _TotalJacInfo(object):
 
         return self.J_final
 
-    def compute_totals_approx(self, initialize=False, show_progress=False, out_stream=None):
+    def compute_totals_approx(self, initialize=False, progress_out_stream=None):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -1454,9 +1454,7 @@ class _TotalJacInfo(object):
         initialize : bool
             Set to True to re-initialize the FD in model. This is only needed when manually
             calling compute_totals on the problem.
-        show_progress : bool
-            Bool to show progress of check_totals
-        out_stream : file-like object
+        progress_out_stream : None or file-like object
             Where to send human readable output. By default it goes to stdout.
             Set to None to suppress.
 
@@ -1491,16 +1489,20 @@ class _TotalJacInfo(object):
                 method = list(model._approx_schemes)[0]
                 kwargs = model._owns_approx_jac_meta
                 model.approx_totals(method=method, **kwargs)
+                # if progress_out_stream is not None:
+                #     model._approx_schemes[method].progress_out_stream = progress_out_stream
             else:
                 model.approx_totals(method='fd')
+                # if progress_out_stream is not None:
+                #     model._approx_schemes.progress_out_stream = progress_out_stream
 
             model._setup_jacobians(recurse=False)
             model._setup_approx_partials()
             if model._coloring_info['coloring'] is not None:
                 model._update_wrt_matches(model._coloring_info)
 
-        if show_progress:
-            model._approx_schemes[method].out_stream = out_stream
+        if progress_out_stream is not None:
+            model._approx_schemes.progress_out_stream = progress_out_stream
 
         # Linearize Model
         model._linearize(model._assembled_jac,
