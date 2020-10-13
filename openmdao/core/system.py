@@ -1975,10 +1975,6 @@ class System(object):
                             pinfo = None
                         if key == '*' and not matches[io]:  # special case. add everything
                             matches[io] = pmap = {n: (n, key, pinfo) for n in proms[io]}
-                            # if pinfo is not None:
-                            #     for n in proms[io]:
-                            #         src_inds_save[n] = pmap[n]
-                            #         update_src_indices(n, pmap[n])
                         else:
                             pmap = matches[io]
                             nmatch = len(pmap)
@@ -1987,8 +1983,6 @@ class System(object):
                                     if n in pmap:
                                         report_dup(io, matches, match_type, n, tup)
                                     pmap[n] = (n, key, pinfo)
-                                    # if pinfo is not None:
-                                    #     update_src_indices(n, pmap[n])
                             if len(pmap) > nmatch:
                                 found.add(key)
                 else:  # NAME or RENAME
@@ -2004,8 +1998,6 @@ class System(object):
                                 found.add(key)
                             else:
                                 found.add((key, s))
-                            # if pinfo is not None:
-                            #     update_src_indices(key, pmap[key])
 
             not_found = set(n for n, _ in to_match) - found
             if not_found:
@@ -2034,6 +2026,9 @@ class System(object):
             resolve(self._var_promotes['output'], ('output',), maps, prom_names)
         else:
             resolve(self._var_promotes['any'], ('input', 'output'), maps, prom_names)
+
+        self._var_promotes_src_indices = {n: data for n, data in maps['input'].items()
+                                          if data[2] is not None}
 
         return maps
 

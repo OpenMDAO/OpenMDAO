@@ -726,50 +726,6 @@ class Group(System):
 
         self._has_distrib_vars = False
 
-        def update_src_indices(subsys, name, tup):
-            """
-            Update metadata for promoted inputs that have had src_indices specified.
-
-            Parameters
-            ----------
-            name : str
-                Name of an input variable that may have associated src_indices.
-            tup : tuple
-                (name/rename, pattern/name, promotes_info).
-            """
-            _, _, prominfo = tup
-            if prominfo is not None:
-                src_indices, flat_src_indices, src_shape = prominfo
-
-                for abs_in in subsys._var_allprocs_prom2abs_list['input'][name]:
-                    meta = subsys._var_abs2meta['input'][abs_in]
-
-                    _, _, src_indices = ensure_compatible(name, meta['value'], meta['shape'],
-                                                          src_indices)
-
-                    is_array = isinstance(src_indices, np.ndarray)
-                    if is_array and 'src_indices' in meta and meta['src_indices'] is not None:
-                        if not np.array_equal(meta['src_indices'], src_indices):
-                            raise RuntimeError(f"{subsys.msginfo}: Trying to promote input '{name}' "
-                                               f"with src_indices {str(src_indices)},"
-                                               f" but src_indices have already been specified as "
-                                               f"{str(meta['src_indices'])}.")
-                    if 'flat_src_indices' in meta and meta['flat_src_indices'] is not None:
-                        if not meta['flat_src_indices'] == flat_src_indices:
-                            raise RuntimeError(f"{subsys.msginfo}: Trying to promote input '{name}' "
-                                               f"with flat_src_indices={str(flat_src_indices)} but "
-                                               f"flat_src_indices has already been specified as"
-                                               f" {str(meta['flat_src_indices'])}.")
-
-                    meta['src_indices'] = src_indices
-                    if _is_slicer_op(src_indices):
-                        meta['src_slice'] = src_indices
-                        if flat_src_indices is not None:
-                            simple_warning(f"{subsys.msginfo}: Input '{name}' was promoted with "
-                                           "slice src_indices, so flat_src_indices is ignored.")
-                        flat_src_indices = True
-                    meta['flat_src_indices'] = flat_src_indices
-
         for subsys in self._subsystems_myproc:
             self._has_output_scaling |= subsys._has_output_scaling
             self._has_resid_scaling |= subsys._has_resid_scaling
@@ -779,10 +735,6 @@ class Group(System):
                 self._has_distrib_vars |= subsys._has_distrib_vars
 
             var_maps = subsys._get_promotion_maps(subsys._var_allprocs_prom2abs_list)
-            self._var_promotes_src_indices = {n: data for n, data in var_maps['input'].items()
-                                              if data[2] is not None}
-            for n, tup in self._var_promotes_src_indices.items():
-                update_src_indices(subsys, n, tup)
 
             sub_prefix = subsys.name + '.'
 
@@ -1218,9 +1170,12 @@ class Group(System):
         abs2meta = self._var_abs2meta['input']
         allprocs_abs2meta = self._var_allprocs_abs2meta['input']
 
+        for subsys in self._subsystems_myproc:
+            for n, tup in subsys._var_promotes_src_indices.items():
+                update_src_indices(subsys, n, tup)
+
         # Add explicit connections (only ones declared by this group)
-        for prom_in, (prom_out, src_indices, flat_src_indices) in \
-                self._manual_connections.items():
+        for prom_in, (prom_out, src_indices, flat) in self._manual_connections.items():
 
             # throw an exception if either output or input doesn't exist
             # (not traceable to a connect statement, so provide context)
@@ -1302,7 +1257,7 @@ class Group(System):
                         meta['src_indices'] = src_indices
                         if _is_slicer_op(src_indices):
                             meta['src_slice'] = src_indices
-                        meta['flat_src_indices'] = flat_src_indices
+                        meta['flat_src_indices'] = flat
 
                     src_ind_inputs.add(abs_in)
 
@@ -3301,3 +3256,48 @@ class Group(System):
                           f"to '{prom}', are connected but their metadata entries {meta}"
                           f" differ. Call <group>.set_input_defaults('{gprom}', {args}), "
                           f"where <group> is the {gname} to remove the ambiguity.")
+
+
+def update_src_indices(subsys, name, tup):
+    """
+    Update metadata for promoted inputs that have had src_indices specified.
+
+    Parameters
+    ----------
+    name : str
+        Name of an input variable that may have associated src_indices.
+    tup : tuple
+        (name/rename, pattern/name, promotes_info).
+    """
+    _, _, prominfo = tup
+    if prominfo is not None:
+        src_indices, flat_src_indices, src_shape = prominfo
+
+        for abs_in in subsys._var_allprocs_prom2abs_list['input'][name]:
+            meta = subsys._var_abs2meta['input'][abs_in]
+
+            _, _, src_indices = ensure_compatible(name, meta['value'], meta['shape'],
+                                                  src_indices)
+
+            is_array = isinstance(src_indices, np.ndarray)
+            if is_array and 'src_indices' in meta and meta['src_indices'] is not None:
+                if not np.array_equal(meta['src_indices'], src_indices):
+                    raise RuntimeError(f"{subsys.msginfo}: Trying to promote input '{name}' "
+                                       f"with src_indices {str(src_indices)},"
+                                       f" but src_indices have already been specified as "
+                                       f"{str(meta['src_indices'])}.")
+            if 'flat_src_indices' in meta and meta['flat_src_indices'] is not None:
+                if not meta['flat_src_indices'] == flat_src_indices:
+                    raise RuntimeError(f"{subsys.msginfo}: Trying to promote input '{name}' "
+                                       f"with flat_src_indices={str(flat_src_indices)} but "
+                                       f"flat_src_indices has already been specified as"
+                                       f" {str(meta['flat_src_indices'])}.")
+
+            meta['src_indices'] = src_indices
+            if _is_slicer_op(src_indices):
+                meta['src_slice'] = src_indices
+                if flat_src_indices is not None:
+                    simple_warning(f"{subsys.msginfo}: Input '{name}' was promoted with "
+                                   "slice src_indices, so flat_src_indices is ignored.")
+                flat_src_indices = True
+            meta['flat_src_indices'] = flat_src_indices
