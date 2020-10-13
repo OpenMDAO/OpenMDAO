@@ -1445,7 +1445,7 @@ class Problem(object):
             Step type for finite difference, can be 'abs' for absolute', or 'rel' for relative.
             Default is 'abs'.
         show_progress : bool
-            Bool to show progress of check_totals
+            True to show progress of check_totals
 
         Returns
         -------

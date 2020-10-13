@@ -1489,20 +1489,17 @@ class _TotalJacInfo(object):
                 method = list(model._approx_schemes)[0]
                 kwargs = model._owns_approx_jac_meta
                 model.approx_totals(method=method, **kwargs)
-                # if progress_out_stream is not None:
-                #     model._approx_schemes[method].progress_out_stream = progress_out_stream
+                if progress_out_stream is not None:
+                    model._approx_schemes[method]._progress_out = progress_out_stream
             else:
                 model.approx_totals(method='fd')
-                # if progress_out_stream is not None:
-                #     model._approx_schemes.progress_out_stream = progress_out_stream
+                if progress_out_stream is not None:
+                    model._approx_schemes['fd']._progress_out = progress_out_stream
 
             model._setup_jacobians(recurse=False)
             model._setup_approx_partials()
             if model._coloring_info['coloring'] is not None:
                 model._update_wrt_matches(model._coloring_info)
-
-        if progress_out_stream is not None:
-            model._approx_schemes.progress_out_stream = progress_out_stream
 
         # Linearize Model
         model._linearize(model._assembled_jac,

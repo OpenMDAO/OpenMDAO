@@ -301,13 +301,6 @@ class ApproximationScheme(object):
     def _compute_approximations(self, system, jac, total, under_cs):
         from openmdao.core.component import Component
 
-        if hasattr(self, "progress_out_stream"):
-            self._progress_out = self.progress_out_stream
-        elif hasattr(system._approx_schemes, "progress_out_stream"):
-            self._progress_out = system._approx_schemes.progress_out_stream
-        else:
-            self._progress_out = None
-
         # Set system flag that we're under approximation to true
         system._set_approx_mode(True)
 
