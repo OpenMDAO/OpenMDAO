@@ -194,7 +194,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         model = prob.model
 
         model.add_subsystem("indep", om.IndepVarComp('x', 5.))
-        model.add_subsystem("comp1", om.ExecComp("y=2*x"))
+        model.add_subsystem("comp1", Paraboloid())
 
         comp2 = model.add_subsystem("comp2", om.ExplicitComponent())
         comp2.add_input('x', val=0.)
@@ -216,8 +216,55 @@ class TestProblemCheckPartials(unittest.TestCase):
         # but we still get good derivative data for 'comp1'
         self.assertTrue('comp1' in data)
 
-        assert_near_equal(data['comp1'][('y', 'x')]['J_fd'][0][0], 2., 1e-9)
-        assert_near_equal(data['comp1'][('y', 'x')]['J_fwd'][0][0], 2., 1e-15)
+        assert_near_equal(data['comp1'][('f_xy', 'x')]['J_fd'][0][0], 4., 1e-6)
+        assert_near_equal(data['comp1'][('f_xy', 'x')]['J_fwd'][0][0], 4., 1e-15)
+
+    def test_component_no_check_partials(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem("indep", om.IndepVarComp('x', 5.))
+        model.add_subsystem("comp1", Paraboloid())
+
+        comp2 = model.add_subsystem("comp2", Paraboloid())
+
+        model.connect('indep.x', ['comp1.x', 'comp2.x'])
+
+        prob.setup()
+        prob.run_model()
+
+        #
+        # disable partials on comp2
+        #
+        comp2._no_check_partials = True
+        data = prob.check_partials(out_stream=None)
+
+        # no derivative data for 'comp2'
+        self.assertFalse('comp2' in data)
+
+        # but we still get good derivative data for 'comp1'
+        self.assertTrue('comp1' in data)
+
+        assert_near_equal(data['comp1'][('f_xy', 'x')]['J_fd'][0][0], 4., 1e-6)
+        assert_near_equal(data['comp1'][('f_xy', 'x')]['J_fwd'][0][0], 4., 1e-15)
+
+        #
+        # re-enable partials on comp2
+        #
+        comp2._no_check_partials = False
+        data = prob.check_partials(out_stream=None)
+
+        # now we should have derivative data for 'comp2'
+        self.assertTrue('comp2' in data)
+
+        assert_near_equal(data['comp2'][('f_xy', 'x')]['J_fd'][0][0], 4., 1e-6)
+        assert_near_equal(data['comp2'][('f_xy', 'x')]['J_fwd'][0][0], 4., 1e-15)
+
+        # and still get good derivative data for 'comp1'
+        self.assertTrue('comp1' in data)
+
+        assert_near_equal(data['comp1'][('f_xy', 'x')]['J_fd'][0][0], 4., 1e-6)
+        assert_near_equal(data['comp1'][('f_xy', 'x')]['J_fwd'][0][0], 4., 1e-15)
 
     def test_missing_entry(self):
         class MyComp(om.ExplicitComponent):
@@ -1318,15 +1365,15 @@ class TestProblemCheckPartials(unittest.TestCase):
         model = prob.model
 
         sub = model.add_subsystem('c1c', om.Group())
-        sub.add_subsystem('d1', om.ExecComp('y=2*x'))
-        sub.add_subsystem('e1', om.ExecComp('y=2*x'))
+        sub.add_subsystem('d1', Paraboloid())
+        sub.add_subsystem('e1', Paraboloid())
 
         sub2 = model.add_subsystem('sss', om.Group())
         sub3 = sub2.add_subsystem('sss2', om.Group())
-        sub2.add_subsystem('d1', om.ExecComp('y=2*x'))
-        sub3.add_subsystem('e1', om.ExecComp('y=2*x'))
+        sub2.add_subsystem('d1', Paraboloid())
+        sub3.add_subsystem('e1', Paraboloid())
 
-        model.add_subsystem('abc1cab', om.ExecComp('y=2*x'))
+        model.add_subsystem('abc1cab', Paraboloid())
 
         prob.setup()
         prob.run_model()
@@ -2112,20 +2159,21 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
     def test_includes_excludes(self):
         import openmdao.api as om
+        from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = om.Problem()
         model = prob.model
 
         sub = model.add_subsystem('c1c', om.Group())
-        sub.add_subsystem('d1', om.ExecComp('y=2*x'))
-        sub.add_subsystem('e1', om.ExecComp('y=2*x'))
+        sub.add_subsystem('d1', Paraboloid())
+        sub.add_subsystem('e1', Paraboloid())
 
         sub2 = model.add_subsystem('sss', om.Group())
         sub3 = sub2.add_subsystem('sss2', om.Group())
-        sub2.add_subsystem('d1', om.ExecComp('y=2*x'))
-        sub3.add_subsystem('e1', om.ExecComp('y=2*x'))
+        sub2.add_subsystem('d1', Paraboloid())
+        sub3.add_subsystem('e1', Paraboloid())
 
-        model.add_subsystem('abc1cab', om.ExecComp('y=2*x'))
+        model.add_subsystem('abc1cab', Paraboloid())
 
         prob.setup()
         prob.run_model()

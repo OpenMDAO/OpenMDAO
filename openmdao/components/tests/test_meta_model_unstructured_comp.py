@@ -404,6 +404,8 @@ class MetaModelTestCase(unittest.TestCase):
         prob['x'] = 0.125
         prob.run_model()
 
+        mm._no_check_partials = False  # override skipping of check_partials
+
         data = prob.check_partials(out_stream=None)
 
         Jf = data['mm'][('f', 'x')]['J_fwd']

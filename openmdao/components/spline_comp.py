@@ -38,6 +38,8 @@ class SplineComp(ExplicitComponent):
         self._spline_cache = []
         self._n_cp = None
 
+        self._no_check_partials = True
+
     def _declare_options(self):
         """
         Declare options.

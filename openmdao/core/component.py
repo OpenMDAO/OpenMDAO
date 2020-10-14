@@ -76,6 +76,8 @@ class Component(System):
         Cached storage of user-declared partials.
     _declared_partial_checks : list
         Cached storage of user-declared check partial options.
+    _no_check_partials : bool
+        If True, the check_partials function will ignore this component.
     """
 
     def __init__(self, **kwargs):
@@ -97,6 +99,7 @@ class Component(System):
 
         self._declared_partials = defaultdict(dict)
         self._declared_partial_checks = []
+        self._no_check_partials = False
 
     def _declare_options(self):
         """
