@@ -6,7 +6,6 @@ from io import StringIO
 import unittest
 
 import numpy as np
-import sys
 
 import openmdao.api as om
 from openmdao.core.tests.test_impl_comp import QuadraticLinearize, QuadraticJacVec
@@ -2326,7 +2325,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         totals = prob.check_totals(method='fd', show_progress=False, out_stream=stream)
 
         lines = stream.getvalue().splitlines()
-        self.assertFalse("Checking derivatives with respect to" in "\n".join(lines))
+        self.assertFalse("Checking derivatives with respect to" in lines)
 
     def test_desvar_as_obj(self):
         prob = om.Problem()

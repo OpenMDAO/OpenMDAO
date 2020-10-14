@@ -1455,8 +1455,7 @@ class _TotalJacInfo(object):
             Set to True to re-initialize the FD in model. This is only needed when manually
             calling compute_totals on the problem.
         progress_out_stream : None or file-like object
-            Where to send human readable output. By default it goes to stdout.
-            Set to None to suppress.
+            Where to send human readable output. None by default which suppresses the output.
 
         Returns
         -------
