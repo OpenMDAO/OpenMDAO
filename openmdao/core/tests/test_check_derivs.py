@@ -2324,7 +2324,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         stream = StringIO()
         totals = prob.check_totals(method='fd', show_progress=False, out_stream=stream)
 
-        lines = stream.getvalue().splitlines()
+        lines = stream.getvalue()
         self.assertFalse("Checking derivatives with respect to" in lines)
 
     def test_desvar_as_obj(self):
