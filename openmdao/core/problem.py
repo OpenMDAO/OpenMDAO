@@ -5,6 +5,7 @@ import pprint
 import os
 import logging
 import weakref
+import time
 
 from collections import defaultdict, namedtuple, OrderedDict
 from fnmatch import fnmatchcase
@@ -1404,7 +1405,7 @@ class Problem(object):
 
     def check_totals(self, of=None, wrt=None, out_stream=_DEFAULT_OUT_STREAM, compact_print=False,
                      driver_scaling=False, abs_err_tol=1e-6, rel_err_tol=1e-6,
-                     method='fd', step=None, form=None, step_calc='abs'):
+                     method='fd', step=None, form=None, step_calc='abs', show_progress=False):
         """
         Check total derivatives for the model vs. finite difference.
 
@@ -1443,6 +1444,8 @@ class Problem(object):
         step_calc : string
             Step type for finite difference, can be 'abs' for absolute', or 'rel' for relative.
             Default is 'abs'.
+        show_progress : bool
+            True to show progress of check_totals
 
         Returns
         -------
@@ -1520,8 +1523,10 @@ class Problem(object):
                             step_calc=step_calc if method == 'fd' else None)
         total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict', approx=True,
                                    driver_scaling=driver_scaling)
-        Jfd = total_info.compute_totals_approx(initialize=True)
-
+        if show_progress:
+            Jfd = total_info.compute_totals_approx(initialize=True, progress_out_stream=out_stream)
+        else:
+            Jfd = total_info.compute_totals_approx(initialize=True)
         # reset the _owns_approx_jac flag after approximation is complete.
         if not approx:
             model._jacobian = old_jac

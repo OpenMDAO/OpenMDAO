@@ -1437,7 +1437,7 @@ class _TotalJacInfo(object):
 
         return self.J_final
 
-    def compute_totals_approx(self, initialize=False):
+    def compute_totals_approx(self, initialize=False, progress_out_stream=None):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -1448,6 +1448,8 @@ class _TotalJacInfo(object):
         initialize : bool
             Set to True to re-initialize the FD in model. This is only needed when manually
             calling compute_totals on the problem.
+        progress_out_stream : None or file-like object
+            Where to send human readable output. None by default which suppresses the output.
 
         Returns
         -------
@@ -1480,8 +1482,12 @@ class _TotalJacInfo(object):
                 method = list(model._approx_schemes)[0]
                 kwargs = model._owns_approx_jac_meta
                 model.approx_totals(method=method, **kwargs)
+                if progress_out_stream is not None:
+                    model._approx_schemes[method]._progress_out = progress_out_stream
             else:
                 model.approx_totals(method='fd')
+                if progress_out_stream is not None:
+                    model._approx_schemes['fd']._progress_out = progress_out_stream
 
             model._setup_jacobians(recurse=False)
             model._setup_approx_partials()

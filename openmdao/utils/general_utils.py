@@ -29,6 +29,27 @@ from openmdao.core.constants import INT_DTYPE
 _ignore_errors = False
 
 
+def _convert_auto_ivc_to_conn_name(conns_dict, name):
+    """
+    Convert name of auto_ivc val to promoted input name.
+
+    Parameters
+    ----------
+    conns_dict : dict
+        Dictionary of global connections.
+    name : str
+        Name of auto_ivc to be found.
+
+    Returns
+    -------
+    str
+        Promoted input name.
+    """
+    for key, val in conns_dict.items():
+        if val == name:
+            return key
+
+
 def ignore_errors(flag=None):
     """
     Disable certain errors that will prevent setup from completing.
