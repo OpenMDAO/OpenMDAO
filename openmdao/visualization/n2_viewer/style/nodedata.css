@@ -223,6 +223,10 @@ div.info-panel {
     right: -3px;
 }
 
+.node-value-hidden {
+    display: none;
+}
+
 .node-value-resizer-handle {
     position: absolute;
     right: -2px;

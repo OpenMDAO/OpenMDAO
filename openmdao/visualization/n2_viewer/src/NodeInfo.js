@@ -199,7 +199,7 @@ class InfoPropArray extends InfoPropDefault {
 
         let html = isTruncated ? valStr.substring(0, maxLen - 3) + "..." : valStr;
 
-        if (isTruncated && ValueInfo.canValueBeDisplayedInValueWindow(array)) {
+        if (isTruncated && ValueInfo.canDisplay(array)) {
             html += ` <button type='button' class='show_value_button' id='${this.key}'>Show more</button>`;
         }
         html += ` <button type='button' class='copy_value_button' id='${this.key}'>Copy</button>`;
@@ -254,7 +254,7 @@ class ValueInfo {
     /**
      * Build a list of the properties we care about and set up
      * references to the HTML elements.
-     * @param {str} name Variable name.
+     * @param {String} name Variable name.
      * @param {Number} val Variable value.
      */
     constructor(name, val, ui) {
@@ -262,20 +262,14 @@ class ValueInfo {
         this.val = val;
 
         /* Construct the DOM elements that make up the window */
-        const top_container = d3.select('#node-value-containers');
-        this.container = top_container.append('div').attr('class', 'node-value-container');
-        this.header = this.container.append('div').attr('class', 'node-value-header');
-        const close_button = this.header.append('span').attr('class', 'close-value-window-button').text('x');
-        this.title = this.header.append('span').attr('class', 'node-value-title');
-        this.table_div = this.container.append('div').attr('class', 'node-value-table-div');
-        this.table = this.table_div.append('table').attr('class', 'node-value-table')
-        this.container.append('div').attr('class', 'node-value-footer');
-        const resizer_box = this.container.append('div').attr('class', 'node-value-resizer-box inactive-resizer-box')
-        this.resizer_handle = resizer_box.append('p').attr('class', 'node-value-resizer-handle inactive-resizer-handle')
+        this.container = d3.select('div#node-value-containers div#template').clone(true);
+        this.container.classed('node-value-hidden', false)
+            .attr('id', 'node-value-' + uuidv4());
+        this.header = this.container.select('.node-value-header');
+        this.table = this.container.select('table');
+        this.title = this.container.select('.node-value-title');
 
-        close_button.on(
-            'click',
-            function () {
+        this.container.select('.close-value-window-button').on('click', function () {
                 ui.valueInfoManager.remove(name);
             }
         );
@@ -286,12 +280,12 @@ class ValueInfo {
     }
 
     clear() {
-        const node = this.container.node();
-        node.parentNode.removeChild(node);
+        this.container.remove();
     }
 
     update() {
-        this.title.text("Initial value for " + this.name);
+        this.container.select('.node-value-title')
+            .text("Initial value for " + this.name);
 
         // Capture the width of the header before the table is created
         // We use this to limit how small the window can be as the user resizes
@@ -305,12 +299,11 @@ class ValueInfo {
         }
 
         // Construct the table displaying the variable value
-        const tbody = this.table.append("tbody");
-        const rows = tbody.selectAll('tr').data(val).enter().append('tr')
-        const cells = rows.selectAll('td')
-            .data(function (row) {
-                return row;
-            })
+        const rows = this.table.select("tbody")
+            .selectAll('tr').data(val).enter().append('tr')
+        
+        rows.selectAll('td')
+            .data(function (row) { return row; })
             .enter()
             .append('td')
             .text(function (d) {
@@ -359,9 +352,9 @@ class ValueInfo {
 
     /** Set up event handlers for grabbing the bottom corner and dragging */
     _setupResizerDrag() {
-        const handle = this.resizer_handle;
+        const handle = this.container.select('.node-value-resizer-handle');
         const body = d3.select('body');
-        const tableDiv = this.table_div;
+        const tableDiv = this.container.select('.node-value-table-div');
 
         handle.on('mousedown', e => {
             const startPos = {
@@ -406,10 +399,10 @@ ValueInfo.TRUNCATE_LIMIT = 80;
 /**
  * Based on the number of dimensions of the value,
  * indicate whether a value window display is needed or even practical
- * @param {val} int, float, list,... The variable value.
-  * @returns {str} the string of the converted array.
-*/
-ValueInfo.canValueBeDisplayedInValueWindow = function (val) {
+ * @param {Object} val int, float, list,... The variable value.
+ * @returns {String} The converted array.
+ */
+ValueInfo.canDisplay = function (val) {
     if (!val) return false; // if no value, cannot display
 
     if (!Array.isArray(val)) return false; // scalars don't need separate display
