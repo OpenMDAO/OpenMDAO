@@ -3,7 +3,7 @@
  * @typedef InfoPropDefault
  * @property {String} key The identifier of the property.
  * @property {String} desc The description (label) to display.
- * @property {Boolean} capitalize Whether to capitialize every word in the desc.
+ * @property {Boolean} [ capitalize = false ] Whether to capitialize every word in the desc.
  */
 class InfoPropDefault {
     constructor(key, desc, capitalize = false) {
@@ -51,7 +51,7 @@ class InfoPropDefault {
 }
 
 /**
- * Outputs a Yes or No to display. 
+ * Output a Yes or No to display. 
  * @typedef InfoPropYesNo
  */
 class InfoPropYesNo extends InfoPropDefault {
@@ -63,17 +63,29 @@ class InfoPropYesNo extends InfoPropDefault {
     /** Return Yes or No when given True or False */
     output(boolVal) { return boolVal ? 'Yes' : 'No'; }
 
+    /** Determine whether the value represents False */
+    isFalse(node) {
+        const val = node[this.key];
+        if (!val) return true;
+        return (val.toString().match(/0|no|false|off/i));
+    }
+
+    /** Also check the showIfFalse flag */
     canShow(node) {
-        return (super.canShow(node) && this.showIfFalse == false);
+        const valIsFalse = this.isFalse(node);
+        const showAble = (!valIsFalse || (valIsFalse && this.showIfFalse));
+        return (super.canShow(node) && showAble);
     }
 }
 
+/** Display a subsection of options values in the info panel */
 class InfoPropOptions extends InfoPropDefault {
     constructor(key, desc, solverType = null) {
         super(key, desc, false);
         this.solverType = solverType;
     }
 
+    /** Also check whether there are any options in the list */
     canShow(node) {
         return (super.canShow(node) && Object.keys(node[this.key]).length > 0);
     }
@@ -100,36 +112,10 @@ class InfoPropOptions extends InfoPropDefault {
             .attr('class', 'options-header');
 
         for (const key of Object.keys(val).sort()) {
-            const optVal = (val[key] === null)? 'None' : val[key];
+            const optVal = (val[key] === null) ? 'None' : val[key];
             InfoPropDefault.addRowWithVal(tbody, key, optVal);
         }
     }
-}
-
-/**
- * TODO: Move to PersistentNodeInfo
- * Convert the value to a string that can be used in Python code.
- * @param {val} array,string,int,... The value to convert.
- * @returns {str} the string of the converted array.
- */
-function val_to_copy_string(val) {
-    if (!Array.isArray(val)) {
-        return element_to_string(val);
-    }
-    let s = 'array([';
-    for (const element of val) {
-        if (Array.isArray(element)) {
-            s += val_to_copy_string(element);
-        } else {
-            s += element_to_string(element);
-        }
-        s += ', ';
-    }
-    if (val.length > 0) {
-        s = s.slice(0, -2); // chop off the last comma and space
-    }
-    s += '])';
-    return s;
 }
 
 /**
@@ -137,8 +123,10 @@ function val_to_copy_string(val) {
  * @typedef InfoPropArray
  */
 class InfoPropArray extends InfoPropDefault {
-    constructor(key, desc, capitalize = false) {
+    constructor(key, desc, values, capitalize = false) {
         super(key, desc, capitalize);
+
+        this.values = values;
     }
 
     static floatFormatter = d3.format('g');
@@ -159,7 +147,7 @@ class InfoPropArray extends InfoPropDefault {
     }
 
     /**
-     * Convert an item to a string that is human readable.
+     * Convert a value to a string that is human readable.
      * @param {Object} val The item to convert.
      * @param {Number} level The level of nesting in the display.
      * @returns {String} The string version of the converted array.
@@ -168,56 +156,67 @@ class InfoPropArray extends InfoPropDefault {
         if (!Array.isArray(val)) { return this.elementToString(val); }
 
         let indent = ' '.repeat(level);
-        let s = indent + '[';
+        let valStr = indent + '[';
 
         for (const element of val) {
-            s += this.valToString(element, level + 1) + ' ';
+            valStr += this.valToString(element, level + 1) + ' ';
         }
 
-        return s.replace(/^(.+) ?$/, '$1]\n');
+        return valStr.replace(/^(.+) $/, '$1]\n');
     }
 
+    /**
+     * Convert a value to a string that can be used in Python code.
+     * @param {Object} val The value to convert.
+     * @returns {String} The string of the converted object.
+     */
+    static valToCopyString(val) {
+        if (!Array.isArray(val)) { return this.elementToString(val); }
+
+        let valStr = 'array([';
+        for (const element of val) {
+            valStr += this.valToCopyString(element) + ', ';
+        }
+
+        if (val.length > 0) {
+            return valStr.replace(/^(.+)(, )$/, '$1])');
+        }
+    }
+
+    /**
+     * Convert the array to a string that can be displayed in the info panel. Save
+     * the array value, the string, and a Python version of the string in the
+     * values Object so it can be copied if the panel is pinned.
+     * @param {Array} array The array to display and save.
+     * @returns {String} A string representation of the array.
+     */
     output(array) {
         if (array == null) { return 'Value too large to include in N2'; }
 
-        const valStr = InfoPropArray.valToString(array)
+        const valStr = InfoPropArray.valToString(array);
         const maxLen = ValueInfo.TRUNCATE_LIMIT;
         const isTruncated = valStr.length > maxLen;
 
         let html = isTruncated ? valStr.substring(0, maxLen - 3) + "..." : valStr;
 
         if (isTruncated && ValueInfo.canValueBeDisplayedInValueWindow(array)) {
-            html += " <button type='button' class='show_value_button'>Show more</button>";
+            html += ` <button type='button' class='show_value_button' id='${this.key}'>Show more</button>`;
         }
-        html += " <button type='button' class='copy_value_button'>Copy</button>";
+        html += ` <button type='button' class='copy_value_button' id='${this.key}'>Copy</button>`;
+
+        // Store the original value and formatted value so they can be passed if the panel is pinned.
+        this.values[this.key] = {
+            'val': array,
+            'str': valStr,
+            'copyStr': InfoPropArray.valToCopyString(array),
+            'isTruncated': isTruncated
+        }
 
         return html;
-
-        /* TODO: Move to PersistentNodeInfo
-        if (isTruncated && ValueInfo.canValueBeDisplayedInValueWindow(val)) {
-            let showValueButton = td.select('.show_value_button');
-            const self = this;
-            showValueButton.on('click', function () {
-                self.ui.valueInfoManager.add(self.name, val);
-            });
-        }
-        // Copy value button
-        let copyValueButton = td.select('.copy_value_button');
-        copyValueButton.on('click',
-            function () {
-                // This is the strange way you can get something on the clipboard
-                let copyText = document.querySelector("#input-for-pastebuffer");
-                copyText.value = val_to_copy_string(val);
-                copyText.select();
-                document.execCommand("copy");
-            }
-        );
-        */
     }
 
     /** Make sure the node has the property and it's got a value. */
     canShow(node) { return node.propExists(this.key); }
-
 }
 
 /**
@@ -315,7 +314,7 @@ class ValueInfo {
             .enter()
             .append('td')
             .text(function (d) {
-                return val_float_formatter(d);
+                return InfoPropArray.floatFormatter(d);
             })
 
         // Save the width and height of the table when it is fully
@@ -438,6 +437,8 @@ class NodeInfo {
      */
     constructor(ui) {
 
+        this.values = {};
+
         // Potential properties
         this.propList = [
             new InfoPropDefault('promotedName', 'Promoted Name'),
@@ -450,7 +451,7 @@ class NodeInfo {
             new InfoPropDefault('shape', 'Shape'),
             new InfoPropYesNo('is_discrete', 'Discrete'),
             new InfoPropYesNo('distributed', 'Distributed'),
-            new InfoPropArray('value', 'Value'),
+            new InfoPropArray('value', 'Value', this.values),
 
             new InfoPropDefault('subsystem_type', 'Subsystem Type', true),
             new InfoPropDefault('component_type', 'Component Type', true),
@@ -476,6 +477,7 @@ class NodeInfo {
         this.thead = this.table.select('thead');
         this.tbody = this.table.select('tbody');
         this.toolbarButton = d3.select('#info-button');
+        this.dataDiv = this.container.select('div.node-info-data');
         this.hidden = true;
     }
 
@@ -502,86 +504,6 @@ class NodeInfo {
     pin() {
         new PersistentNodeInfo(this);
         this.clear();
-    }
-
-    _addPropertyRow2(label, val, obj, capitalize = false) {
-        if (!['Options', 'Linear Solver Options', 'Non-Linear Solver Options'].includes(label)) {
-            const newRow = this.tbody.append('tr');
-
-            const th = newRow.append('th')
-                .attr('scope', 'row')
-                .text(label)
-
-            let nodeInfoVal = val;
-            const td = newRow.append('td');
-            if (label === 'Value') {
-                if (val == null) {
-                    td.html("Value too large to include in N2");
-                }
-                else {
-                    let val_string = val_to_string(val)
-                    let max_length = ValueInfo.TRUNCATE_LIMIT;
-                    let isTruncated = val_string.length > max_length;
-                    nodeInfoVal = isTruncated ?
-                        val_string.substring(0, max_length - 3) + "..." :
-                        val_string;
-
-                    let html = nodeInfoVal;
-                    if (isTruncated && ValueInfo.canValueBeDisplayedInValueWindow(val)) {
-                        html += " <button type='button' class='show_value_button'>Show more</button>";
-                    }
-                    html += " <button type='button' class='copy_value_button'>Copy</button>";
-                    td.html(html);
-
-                    if (isTruncated && ValueInfo.canValueBeDisplayedInValueWindow(val)) {
-                        let showValueButton = td.select('.show_value_button');
-                        const self = this;
-                        showValueButton.on('click', function () {
-                            self.ui.valueInfoManager.add(self.name, val);
-                        });
-                    }
-                    // Copy value button
-                    let copyValueButton = td.select('.copy_value_button');
-                    copyValueButton.on('click',
-                        function () {
-                            // This is the strange way you can get something on the clipboard
-                            let copyText = document.querySelector("#input-for-pastebuffer");
-                            copyText.value = val_to_copy_string(val);
-                            copyText.select();
-                            document.execCommand("copy");
-                        }
-                    );
-                }
-            }
-            else {
-                td.text(nodeInfoVal);
-            }
-            if (capitalize) td.attr('class', 'caps');
-        }
-        else {
-            // Add Options to the Node Info table
-            if (Object.keys(val).length !== 0) {
-                if (label === 'Non-Linear Solver Options') {
-                    label += ': ' + obj.nonlinear_solver.substring(3);
-                }
-                if (label === 'Linear Solver Options') {
-                    label += ': ' + obj.linear_solver.substring(3);
-                }
-                const tr = this.tbody.append('th').text(label).attr('colspan', '2').attr('class', 'options-header');
-
-                for (const key of Object.keys(val).sort()) {
-                    const tr = this.tbody.append('tr');
-                    const th = tr.append('th').text(key);
-                    let v;
-                    if (val[key] === null) {
-                        v = "None";
-                    } else {
-                        v = val[key];
-                    }
-                    const td = tr.append('td').text(v);
-                }
-            }
-        }
     }
 
     /**
@@ -625,7 +547,8 @@ class NodeInfo {
             .style('height', this.table.node().scrollHeight + 'px')
 
         this.move(event);
-        this.container.classed('info-hidden', true).classed('info-visible', true);
+        // this.container.classed('info-hidden', true).classed('info-visible', true);
+        this.container.classed('info-hidden', false).classed('info-visible', true);
     }
 
     /** Wipe the contents of the table body */
@@ -641,7 +564,12 @@ class NodeInfo {
             .style('width', 'auto')
             .style('height', 'auto');
 
+        this.dataDiv.html('');
         this.tbody.html('');
+        
+        // Don't just replace with {} because some InfoProps rely
+        // on the reference to this.values:
+        wipeObj(this.values); 
     }
 
     /**
@@ -683,6 +611,9 @@ class NodeInfo {
 class PersistentNodeInfo {
     constructor(nodeInfo) {
         this.orig = nodeInfo.container;
+        // Avoid just copying the reference because nodeInfo.values will be wiped:
+        this.values = JSON.parse(JSON.stringify(nodeInfo.values));
+        this.ui = nodeInfo.ui;
         this.container = this.orig.clone(true);
         this.container.classed('persistent-panel', true);
         this.container.attr('id', uuidv4());
@@ -703,7 +634,38 @@ class PersistentNodeInfo {
             .on('click', e => { self.unpin(); })
         this.pinButton.attr('class', 'info-visible');
 
+        this._setupShowMoreButtons(nodeInfo.name);
+        this._setupCopyButtons();
         this._setupDrag();
+    }
+
+    /** Set up event handlers for any "Show More" buttons in the panel */
+    _setupShowMoreButtons(name) {
+        const self = this;
+
+        for (const valName in this.values) {
+            if (this.values[valName].isTruncated) {
+                this.container.select(`button#${valName}.show_value_button`).on('click', c => {
+                    console.log("clicked show more")
+                    self.ui.valueInfoManager.add(name, this.values[valName].val);
+                })
+            }
+        }
+    }
+
+    /** Set up event handlers for any "Copy" buttons in the panel */
+    _setupCopyButtons() {
+        const self = this;
+
+        for (const valName in this.values) {
+            this.container.select(`button#${valName}.copy_value_button`).on('click', c => {
+                const copyText = d3.select("#input-for-pastebuffer");
+                copyText.text(this.values[valName].copyStr);
+                copyText.node().select();
+                document.execCommand('copy');
+            })
+        }
+
     }
 
     /** Listen for the event to begin dragging a persistent info panel */
@@ -745,6 +707,7 @@ class PersistentNodeInfo {
         });
     }
 
+    /** Destroy this instance of the persistent info panel */
     unpin() {
         this.thead.on('mousedown', null);
         this.pinButton.on('click', null);

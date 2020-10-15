@@ -71,6 +71,10 @@ div.info-panel {
     text-transform: capitalize;
 }
 
+.node-info-data {
+    display: none;
+}
+
 .info-header {
 	background-color: #42926b;
 }
