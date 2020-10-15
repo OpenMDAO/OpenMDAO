@@ -12,10 +12,42 @@ class InfoPropDefault {
         this.capitalize = capitalize;
     }
 
-    /** Return the same message since this is the base class */
+    /** Return the same message since this is the base class. */
     output(msg) { return msg; }
 
-    canShow(obj) { return (obj.propExists(this.key) && obj[this.key] != '') }
+    /** Make sure the node has the property and it's got a value. */
+    canShow(node) { return (node.propExists(this.key) && node[this.key] != '') }
+
+    /**
+     * Add a table row with the supplied description and value.
+     * @param {Object} tbody D3 reference to an existing table body.
+     * @param {String} desc Description of the value.
+     * @param {String} val The text or html value to display.
+     * @param {Boolean} [ capitalize = false ] Whether to apply the caps class.
+     */
+    static addRowWithVal(tbody, desc, val, capitalize = false) {
+        const newRow = tbody.append('tr');
+
+        newRow.append('th')
+            .attr('scope', 'row')
+            .text(desc);
+
+        const td = newRow.append('td').html(val);
+        if (capitalize) td.attr('class', 'caps');
+    }
+
+    /**
+     * If the object contains a non-empty property with our key, create
+     * a new row with it in the supplied table body.
+     * @param {Object} tbody D3 reference to an existing table body.
+     * @param {N2NodeInfo} node Reference to the node that may have the property.
+     */
+    addRow(tbody, node) {
+        if (this.canShow(node)) {
+            InfoPropDefault.addRowWithVal(tbody, this.desc,
+                this.output(node[this.key]), this.capitalize)
+        }
+    }
 }
 
 /**
@@ -23,73 +55,59 @@ class InfoPropDefault {
  * @typedef InfoPropYesNo
  */
 class InfoPropYesNo extends InfoPropDefault {
-    constructor(key, desc, capitalize = false, showIfFalse = false) {
-        super(key, desc, capitalize);
+    constructor(key, desc, showIfFalse = false) {
+        super(key, desc, false);
         this.showIfFalse = showIfFalse;
     }
 
     /** Return Yes or No when given True or False */
     output(boolVal) { return boolVal ? 'Yes' : 'No'; }
 
-    canShow(obj) { return (obj.propExists(this.key) && obj[this.key] != '' && this.showIfFalse == false) }
+    canShow(node) {
+        return (super.canShow(node) && this.showIfFalse == false);
+    }
 }
 
-// Used to format that floats displayed
-let val_float_formatter = d3.format("g");
+class InfoPropOptions extends InfoPropDefault {
+    constructor(key, desc, solverType = null) {
+        super(key, desc, false);
+        this.solverType = solverType;
+    }
 
+    canShow(node) {
+        return (super.canShow(node) && Object.keys(node[this.key]).length > 0);
+    }
 
-/**
- * Convert an element to a string that is human readable.
- * @param {element} string, int,... The item to convert. Not an array!
- * @returns {str} the string of the converted element.
- */
-function element_to_string(element) {
-    let val_string;
-    if (typeof element === 'number') {
-        if (Number.isInteger(element)) {
-            val_string = element.toString();
-        } else { /* float */
-            val_string = val_float_formatter(element);
+    /**
+     * There may be a list of options, so create a subsection in the table for them.
+     * @param {Object} tbody D3 reference to an existing table body.
+     * @param {N2NodeInfo} node Reference to the node that may have the property.
+     */
+    addRow(tbody, node) {
+        if (!this.canShow(node)) return;
+
+        const val = node[this.key];
+
+        let desc = this.desc;
+        if (this.solverType) {
+            desc += ': ' + node[this.solverType + '_solver'].substring(3);
         }
-    } else {
-        if (element === 'nan') {
-            return element;
-        } else {
-            return JSON.stringify(element);
+
+        // Add a subsection header for the option rows to follow
+        tbody.append('tr').append('th')
+            .text(desc)
+            .attr('colspan', '2')
+            .attr('class', 'options-header');
+
+        for (const key of Object.keys(val).sort()) {
+            const optVal = (val[key] === null)? 'None' : val[key];
+            InfoPropDefault.addRowWithVal(tbody, key, optVal);
         }
     }
-    return val_string;
-}
-
-/**
- * Convert an item to a string that is human readable.
- * @param {val} arr,string, int,... The item to convert.
- * @param {level} int The level of nesting in the display.
- * @returns {str} the string of the converted array.
- */
-function val_to_string(val, level = 0) {
-    if (!Array.isArray(val)) {
-        return element_to_string(val);
-    }
-    let indent = ' '.repeat(level);
-    let s = indent + '[';
-
-    for (const element of val) {
-        if (Array.isArray(element)) {
-            s += val_to_string(element, level + 1);
-        } else {
-            s += element_to_string(element);
-        }
-        s += ' ';
-    }
-    if (val.length > 0) {
-        s = s.slice(0, -1); // chop off the last space
-    }
-    s += ']\n';
-    return s;
 }
 
 /**
+ * TODO: Move to PersistentNodeInfo
  * Convert the value to a string that can be used in Python code.
  * @param {val} array,string,int,... The value to convert.
  * @returns {str} the string of the converted array.
@@ -123,10 +141,82 @@ class InfoPropArray extends InfoPropDefault {
         super(key, desc, capitalize);
     }
 
-    /** Simply return the array value */
-    output(array) {
-        return array;
+    static floatFormatter = d3.format('g');
+
+    /**
+     * Convert an element to a string that is human readable.
+     * @param {Object} element The scalar item to convert.
+     * @returns {String} The string representation of the element.
+     */
+    static elementToString(element) {
+        if (typeof element === 'number') {
+            if (Number.isInteger(element)) { return element.toString(); }
+            return this.floatFormatter(element); /* float */
+        }
+
+        if (element === 'nan') { return element; }
+        return JSON.stringify(element);
     }
+
+    /**
+     * Convert an item to a string that is human readable.
+     * @param {Object} val The item to convert.
+     * @param {Number} level The level of nesting in the display.
+     * @returns {String} The string version of the converted array.
+     */
+    static valToString(val, level = 0) {
+        if (!Array.isArray(val)) { return this.elementToString(val); }
+
+        let indent = ' '.repeat(level);
+        let s = indent + '[';
+
+        for (const element of val) {
+            s += this.valToString(element, level + 1) + ' ';
+        }
+
+        return s.replace(/^(.+) ?$/, '$1]\n');
+    }
+
+    output(array) {
+        if (array == null) { return 'Value too large to include in N2'; }
+
+        const valStr = InfoPropArray.valToString(array)
+        const maxLen = ValueInfo.TRUNCATE_LIMIT;
+        const isTruncated = valStr.length > maxLen;
+
+        let html = isTruncated ? valStr.substring(0, maxLen - 3) + "..." : valStr;
+
+        if (isTruncated && ValueInfo.canValueBeDisplayedInValueWindow(array)) {
+            html += " <button type='button' class='show_value_button'>Show more</button>";
+        }
+        html += " <button type='button' class='copy_value_button'>Copy</button>";
+
+        return html;
+
+        /* TODO: Move to PersistentNodeInfo
+        if (isTruncated && ValueInfo.canValueBeDisplayedInValueWindow(val)) {
+            let showValueButton = td.select('.show_value_button');
+            const self = this;
+            showValueButton.on('click', function () {
+                self.ui.valueInfoManager.add(self.name, val);
+            });
+        }
+        // Copy value button
+        let copyValueButton = td.select('.copy_value_button');
+        copyValueButton.on('click',
+            function () {
+                // This is the strange way you can get something on the clipboard
+                let copyText = document.querySelector("#input-for-pastebuffer");
+                copyText.value = val_to_copy_string(val);
+                copyText.select();
+                document.execCommand("copy");
+            }
+        );
+        */
+    }
+
+    /** Make sure the node has the property and it's got a value. */
+    canShow(node) { return node.propExists(this.key); }
 
 }
 
@@ -347,7 +437,10 @@ class NodeInfo {
      * references to the HTML elements.
      */
     constructor(ui) {
+
+        // Potential properties
         this.propList = [
+            new InfoPropDefault('promotedName', 'Promoted Name'),
             new InfoPropDefault('absPathName', 'Absolute Name'),
             new InfoPropDefault('class', 'Class'),
             new InfoPropDefault('type', 'Type', true),
@@ -365,15 +458,16 @@ class NodeInfo {
             new InfoPropYesNo('is_parallel', 'Parallel'),
             new InfoPropDefault('linear_solver', 'Linear Solver'),
             new InfoPropDefault('nonlinear_solver', 'Non-Linear Solver'),
-            new InfoPropDefault('options', 'Options'),
-            new InfoPropDefault('linear_solver_options', 'Linear Solver Options'),
-            new InfoPropDefault('nonlinear_solver_options', 'Non-Linear Solver Options'),
+            new InfoPropOptions('options', 'Options'),
+            new InfoPropOptions('linear_solver_options', 'Linear Solver Options', 'linear'),
+            new InfoPropOptions('nonlinear_solver_options', 'Non-Linear Solver Options', 'nonlinear'),
         ];
 
+        // Potential solver properties
         this.propListSolvers = [
             new InfoPropDefault('absPathName', 'Absolute Name'),
-            new InfoPropDefault('linear_solver_options', 'Linear Solver Options'),
-            new InfoPropDefault('nonlinear_solver_options', 'Non-Linear Solver Options'),
+            new InfoPropOptions('linear_solver_options', 'Linear Solver Options', 'linear'),
+            new InfoPropOptions('nonlinear_solver_options', 'Non-Linear Solver Options', 'nonlinear'),
         ];
 
         this.ui = ui;
@@ -410,7 +504,7 @@ class NodeInfo {
         this.clear();
     }
 
-    _addPropertyRow(label, val, obj, capitalize = false) {
+    _addPropertyRow2(label, val, obj, capitalize = false) {
         if (!['Options', 'Linear Solver Options', 'Non-Linear Solver Options'].includes(label)) {
             const newRow = this.tbody.append('tr');
 
@@ -419,11 +513,10 @@ class NodeInfo {
                 .text(label)
 
             let nodeInfoVal = val;
-            let td;
+            const td = newRow.append('td');
             if (label === 'Value') {
                 if (val == null) {
-                    td = newRow.append('td')
-                        .html("Value too large to include in N2");
+                    td.html("Value too large to include in N2");
                 }
                 else {
                     let val_string = val_to_string(val)
@@ -438,7 +531,7 @@ class NodeInfo {
                         html += " <button type='button' class='show_value_button'>Show more</button>";
                     }
                     html += " <button type='button' class='copy_value_button'>Copy</button>";
-                    td = newRow.append('td').html(html);
+                    td.html(html);
 
                     if (isTruncated && ValueInfo.canValueBeDisplayedInValueWindow(val)) {
                         let showValueButton = td.select('.show_value_button');
@@ -461,8 +554,7 @@ class NodeInfo {
                 }
             }
             else {
-                td = newRow.append('td')
-                    .text(nodeInfoVal);
+                td.text(nodeInfoVal);
             }
             if (capitalize) td.attr('class', 'caps');
         }
@@ -496,48 +588,34 @@ class NodeInfo {
      * Iterate over the list of known properties and display them
      * if the specified object contains them.
      * @param {Object} event The related event so we can get position.
-     * @param {N2TreeNode} obj The node to examine.
+     * @param {N2TreeNode} node The node to examine.
      * @param {String} color Match the color of the node for the header/footer.
      * @param {Boolean} [isSolver = false] Whether to use solver properties or not.
      */
-    update(event, obj, color, isSolver = false) {
+    update(event, node, color, isSolver = false) {
         if (this.hidden) return;
 
         this.clear();
+
         // Put the name in the title
         this.table.select('thead th')
             .style('background-color', color)
-            .text(obj.name);
+            .text(node.name);
 
-        this.name = obj.absPathName;
+        this.name = node.absPathName;
+        this.table.select('tfoot th').style('background-color', color);
 
-        this.table.select('tfoot th')
-            .style('background-color', color);
-
-        if (obj.promotedName) {
-            this._addPropertyRow('Promoted Name', obj.promotedName, obj);
-        }
-
-        if (DebugFlags.info && obj.hasChildren()) {
-            this._addPropertyRow('Children', obj.children.length, obj);
-            this._addPropertyRow('Descendants', obj.numDescendants, obj);
-            this._addPropertyRow('Leaves', obj.numLeaves, obj);
-            this._addPropertyRow('Manually Expanded', obj.manuallyExpanded.toString(), obj)
+        if (DebugFlags.info && node.hasChildren()) {
+            InfoPropDefault.addRowWithVal(this.tbody, 'Children', node.children.length);
+            InfoPropDefault.addRowWithVal(this.tbody, 'Descendants', node.numDescendants);
+            InfoPropDefault.addRowWithVal(this.tbody, 'Leaves', node.numLeaves);
+            InfoPropDefault.addRowWithVal(this.tbody, 'Manually Expanded', node.manuallyExpanded.toString());
         }
 
         const propList = isSolver ? this.propListSolvers : this.propList;
 
         for (const prop of propList) {
-            if (prop.key === 'value') {
-                if (obj.hasOwnProperty('value')) {
-                    this._addPropertyRow(prop.desc, prop.output(obj[prop.key]), obj, prop.capitalize)
-                }
-            }
-            else {
-                if (prop.canShow(obj)) {
-                    this._addPropertyRow(prop.desc, prop.output(obj[prop.key]), obj, prop.capitalize)
-                }
-            }
+            prop.addRow(this.tbody, node);
         }
 
         // Solidify the size of the table after populating so that
@@ -609,11 +687,14 @@ class PersistentNodeInfo {
         this.container.classed('persistent-panel', true);
         this.container.attr('id', uuidv4());
 
-        // Keep increasing z-index of original info panel to keep it on top.
-        // Max z-index is 2147483647
-        let zIndex = parseInt(this.orig.style('z-index')) + 1; 
+        /* Keep increasing z-index of original info panel to keep it on top.
+         * Max z-index is 2147483647. It will be unusual here for it to climb
+         * above 100, and even extreme cases (e.g. a diagram that's been in use
+         * for weeks with lots of info panels pinned) shouldn't get above a few
+         * thousand. */
+        let zIndex = parseInt(this.orig.style('z-index')) + 1;
         this.orig.style('z-index', zIndex);
-        
+
         this.thead = this.container.select('thead');
         this.translate = [0, 0];
 
@@ -631,12 +712,13 @@ class PersistentNodeInfo {
 
         this.thead.on('mousedown', function () {
             const dragDiv = self.container;
+
+            // Assign ourselves the current highest info panel z-index and
+            // increment that of the original.
             let zIndex = parseInt(self.orig.style('z-index'));
-            
             dragDiv.style('cursor', 'grabbing')
                 .style('z-index', zIndex)
                 .select('th').style('cursor', 'grabbing');
-
             self.orig.style('z-index', zIndex + 1)
 
             const dragStart = [d3.event.pageX, d3.event.pageY];
@@ -652,7 +734,7 @@ class PersistentNodeInfo {
                     dragDiv.style('transform', `translate(${newTrans[0]}px, ${newTrans[1]}px)`)
                 })
                 .on("mouseup", e => {
-                    self.translate = [newTrans[0], newTrans[1]];
+                    self.translate = [...newTrans];
 
                     dragDiv.style('cursor', 'text')
                         .select('th').style('cursor', 'grab');
