@@ -884,8 +884,10 @@ class Problem(object):
             'setup_status': _SetupStatus.PRE_SETUP,
             'vec_names': None,  # names of all nonlinear and linear vectors
             'lin_vec_names': None,  # names of linear vectors
-            'model_ref': weakref.ref(model)  # ref to the model (needed to get out-of-scope
-                                             # src data for inputs)
+            'model_ref': weakref.ref(model),  # ref to the model (needed to get out-of-scope
+                                              # src data for inputs)
+            'promotes_src_indices': {},  # maps prom name to prom src_indices data per system
+            'conn_src_indices': {},  # maps prom name to connected src_indices per system
         }
         model._setup(model_comm, mode, self._metadata)
 

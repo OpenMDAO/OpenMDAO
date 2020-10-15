@@ -1,6 +1,6 @@
 """Define the Group class."""
 import os
-from collections import Counter, OrderedDict, defaultdict
+from collections import Counter, OrderedDict, defaultdict, deque
 from collections.abc import Iterable
 
 from itertools import product, chain
@@ -26,7 +26,7 @@ from openmdao.utils.general_utils import ContainsAll, simple_warning, common_sub
     conditional_error, _is_slicer_op, ensure_compatible
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless
-from openmdao.utils.mpi import MPI, check_mpi_exceptions
+from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.core.constants import _SetupStatus
@@ -54,18 +54,24 @@ class _SysInfo(object):
 class _PromotesInfo(object):
     __slots__ = ['src_indices', 'flat_src_indices', 'src_shape']
 
-    def __init__(self, src_indices=None, flat_src_indices=None, src_shape=None):
+    def __init__(self, src_indices=None, flat=None, src_shape=None):
         self.src_indices = src_indices
-        self.flat_src_indices = flat_src_indices
+        self.flat = flat
         self.src_shape = src_shape
 
     def __iter__(self):
         yield self.src_indices
-        yield self.flat_src_indices
+        yield self.flat
         yield self.src_shape
 
     def __repr__(self):
-        return f"_PromotesInfo({src_indices}, {self.flat_src_indices}, {self.src_shape})"
+        return f"_PromotesInfo({self.src_indices}, {self.flat}, {self.src_shape})"
+
+    def conv_src_inds(self, src_indices):
+        if src_indices is None or self.src_indices is None:
+            return self.src_indices
+        # TODO: handle nonflat src_indices?
+        return src_indices[self.src_indices]
 
 
 class Group(System):
@@ -699,6 +705,129 @@ class Group(System):
                         if src.startswith('_auto_ivc.'):
                             all_abs2meta_out[src]['distributed'] = True
 
+        self._resolve_src_indices()
+
+    def _resolve_src_indices(self):
+        sys2prom_src_inds = self._problem_meta['promotes_src_indices']
+        meta_in = self._var_abs2meta['input']
+        all_meta_in = self._var_allprocs_abs2meta['input']
+        all_meta_out = self._var_allprocs_abs2meta['output']
+
+        rev_conns = defaultdict(list)
+        for tgt, src in self._conn_global_abs_in2out.items():
+            rev_conns[src].append(tgt)
+
+        class Node(object):
+            __slots__ = ['data', 'children', 'src_shape', 'final_src_inds']
+            def __init__(self, data, src_shape):
+                self.data = data
+                self.src_shape = src_shape
+                self.final_src_inds = None
+                self.children = set()
+
+            def add(self, name):
+                self.children.add(name)
+
+            def check_shapes(self, dct):
+                if self.children:
+                    if self.src_shape is None:
+                        src_shape = dct[self.children[0]].src_shape
+                    else:
+                        src_shape = self.src_shape
+                    for name in self.children:
+                        shape = dct[name].src_shape
+                        if shape is not None and shape != src_shape:
+                            return False
+                return True
+
+        # def tree_iter(node):
+        #     stack
+        systems = {}
+
+        for s in self.system_iter(recurse=True):
+            if s.pathname in sys2prom_src_inds or (isinstance(s, Group) and s._group_inputs):
+                systems[s.pathname] = s
+
+        with multi_proc_exception_check(self.comm):
+            for src, tgts in rev_conns.items():
+                node_dct = {}
+                tops = []
+                splt = src.rsplit('.', 2)
+                src_parent = splt[0] if len(splt) > 2 else ''
+                start_src_inds = None
+                for tgt in tgts:
+                    if tgt not in meta_in:
+                        continue  # either discrete or not local
+                    nodes = []
+                    snames = tgt.split('.')[:-1]
+
+                    meta = meta_in[tgt]
+                    if meta['src_indices']:
+                        if meta.get('add_input_src_indices'):
+                            sysname = '.'.join(snames)
+                            pname = tgt.rsplit('.', 1)[1]
+                            nodes.append('.'.join((sysname, pname)),
+                                         (pname, pname,
+                                          _PromotesInfo(meta['src_indices'],
+                                                        meta['flat_src_indices'], None)))
+                        else:
+                            start_src_inds = meta['src_indices']
+
+                    # travel up the tree from tgt
+                    while snames:
+                        sysname = '.'.join(snames)
+                        if sysname == src_parent:
+                            break
+                        if sysname in systems:
+                            s = systems[sysname]
+                            pname = s._var_abs2prom['input'][tgt]
+                            src_shape = None
+                            if isinstance(s, Group) and s._group_inputs:
+                                if pname in s._group_inputs:
+                                    meta = s._group_inputs[pname]
+                                    if 'src_shape' in meta:
+                                        src_shape = meta['src_shape']
+
+                            if sysname in sys2prom_src_inds:
+                                p2info = sys2prom_src_inds[sysname]
+                                if pname in p2info:
+                                    nodes.append(('.'.join((sysname, pname)), p2info[pname],
+                                                  src_shape))
+                            elif src_shape is not None:
+                                nodes.append(('.'.join((sysname, pname)), None, src_shape))
+
+                        snames.pop()
+
+                    if nodes:
+                        # last node is the highest in the tree
+                        name, info, src_shape = nodes[-1]
+                        if name in node_dct:
+                            parent = node_dct[name]
+                        else:
+                            node_dct[name] = parent = Node(info, src_shape)
+                            tops.append(name)
+
+                        for name, info, src_shape in nodes[:-1][::-1]:
+                            if name not in node_dct:
+                                node_dct[name] = Node(info, src_shape)
+                            parent.add(name)
+                            parent = node_dct[name]
+
+                assert len(tops) < 2
+                for top in tops:
+                    if start_src_inds is None:
+                        src_inds = np.arange(all_meta_out[src]['global_size'], dtype=INT_DTYPE)
+                    else:
+                        src_inds = start_src_inds
+                    node = node_dct[top]
+                    if node.data is None:
+                        node.final_src_inds = src_inds
+                    else:
+                        node.final_src_inds = node.data.conv_src_inds(src_inds)
+
+                    print(top)
+
+
     def _setup_var_data(self):
         """
         Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
@@ -1170,10 +1299,6 @@ class Group(System):
         abs2meta = self._var_abs2meta['input']
         allprocs_abs2meta = self._var_allprocs_abs2meta['input']
 
-        for subsys in self._subsystems_myproc:
-            for n, tup in subsys._var_promotes_src_indices.items():
-                update_src_indices(subsys, n, tup)
-
         # Add explicit connections (only ones declared by this group)
         for prom_in, (prom_out, src_indices, flat) in self._manual_connections.items():
 
@@ -1275,6 +1400,11 @@ class Group(System):
                 # if connection is contained in a subgroup, add to conns to pass down to subsystems.
                 if inparts[:nparts + 1] == outparts[:nparts + 1]:
                     new_conns[inparts[nparts]][abs_in] = abs_out
+
+            # if src_indices is not None:
+            #     if self.pathname not in self._problem_meta['conn_src_indices']:
+            #         self._problem_meta['conn_src_indices'][self.pathname] = {}
+            #     self._problem_meta['conn_src_indices'][self.pathname][prom_in] = (src_indices, flat)
 
         # Compute global_abs_in2out by first adding this group's contributions,
         # then adding contributions from systems above/below, then allgathering.
@@ -3009,10 +3139,9 @@ class Group(System):
                 return tgt, abs2meta_in[tgt]['size'], abs2meta_in[tgt]['value'], False
 
         if src_idx_found:  # auto_ivc connected to local vars with src_indices
-            tgts = ', '.join(src_idx_found)
-            msg = 'The following inputs [{}] are defined using src_indices but the total source '
-            msg += 'size is undetermined.  Please add an IndepVarComp as the source.'
-            raise RuntimeError(msg.format(tgts))
+            raise RuntimeError(f"The following inputs {src_idx_found} are defined using "
+                               "src_indices bu the total source size is undetermined.  Please add "
+                               "an IndepVarComp as the source.")
 
         # return max sized (tgt, size, value, remote)
         return sorted(info, key=lambda x: x[1])[-1]

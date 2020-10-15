@@ -2224,8 +2224,6 @@ class TestConnect(unittest.TestCase):
         with assert_warning(UserWarning, msg):
             prob.setup()
 
-        self.prob.model._raise_connection_errors = False
-
         with assert_warning(UserWarning, msg):
             prob.setup()
 
@@ -3037,6 +3035,8 @@ class Test3Deep(unittest.TestCase):
         p.model.cfg.sub.add_config_prom('C3', ['x'])
         p.model.cfg.sub.add_config_prom('C4', ['y'])
         p.setup()
+
+        p.model._raise_connection_errors = False
 
         names = self.get_matching_var_setup_counts(p, 1)
         expected = {'', 'cfg', 'cfg.C1', 'cfg.C2', 'cfg.sub', 'cfg.sub.C3', 'cfg.sub.C4'}

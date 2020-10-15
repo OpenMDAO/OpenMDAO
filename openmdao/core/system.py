@@ -172,8 +172,6 @@ class System(object):
     _var_promotes : { 'any': [], 'input': [], 'output': [] }
         Dictionary of lists of variable names/wildcards specifying promotion
         (used to calculate promoted names)
-    _var_promotes_src_indices : dict
-        Dictionary mapping promoted input names to (src_indices, flat_src_indices, src_shape)
     _var_allprocs_prom2abs_list : {'input': dict, 'output': dict}
         Dictionary mapping promoted names to list of all absolute names.
         For outputs, the list will have length one since promoted output names are unique.
@@ -394,7 +392,6 @@ class System(object):
         self._dist_var_locality = {}
 
         self._var_promotes = {'input': [], 'output': [], 'any': []}
-        self._var_promotes_src_indices = {}
 
         self._var_allprocs_prom2abs_list = None
         self._var_abs2prom = {'input': {}, 'output': {}}
@@ -1965,7 +1962,6 @@ class System(object):
             # always add '*' and so we won't report if it matches nothing (in the case where the
             # system has no variables of that io type)
             found = set(('*',))
-            src_inds_save = self._var_promotes_src_indices
 
             for match_type, key, tup in split_list(to_match):
                 s, pinfo = tup
@@ -2016,7 +2012,6 @@ class System(object):
                                    f"following names or patterns: {not_found}.{empty_group_msg}")
 
         maps = {'input': {}, 'output': {}}
-        self._var_promotes_src_indices = {}
 
         if self._var_promotes['input'] or self._var_promotes['output']:
             if self._var_promotes['any']:
@@ -2027,8 +2022,10 @@ class System(object):
         else:
             resolve(self._var_promotes['any'], ('input', 'output'), maps, prom_names)
 
-        self._var_promotes_src_indices = {n: data for n, data in maps['input'].items()
-                                          if data[2] is not None}
+        promotes_src_indices = {n: data for n, data in maps['input'].items()
+                                if data[2] is not None}
+        if promotes_src_indices:
+            self._problem_meta['promotes_src_indices'][self.pathname] = promotes_src_indices
 
         return maps
 
