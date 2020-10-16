@@ -40,7 +40,7 @@ class InfoPropDefault {
      * If the object contains a non-empty property with our key, create
      * a new row with it in the supplied table body.
      * @param {Object} tbody D3 reference to an existing table body.
-     * @param {N2NodeInfo} node Reference to the node that may have the property.
+     * @param {N2TreeNode} node Reference to the node that may have the property.
      */
     addRow(tbody, node) {
         if (this.canShow(node)) {
@@ -93,7 +93,7 @@ class InfoPropOptions extends InfoPropDefault {
     /**
      * There may be a list of options, so create a subsection in the table for them.
      * @param {Object} tbody D3 reference to an existing table body.
-     * @param {N2NodeInfo} node Reference to the node that may have the property.
+     * @param {N2TreeNode} node Reference to the node that may have the property.
      */
     addRow(tbody, node) {
         if (!this.canShow(node)) return;
@@ -128,8 +128,6 @@ class InfoPropArray extends InfoPropDefault {
 
         this.values = values;
     }
-
-    static floatFormatter = d3.format('g');
 
     /**
      * Convert an element to a string that is human readable.
@@ -219,6 +217,8 @@ class InfoPropArray extends InfoPropDefault {
     canShow(node) { return node.propExists(this.key); }
 }
 
+InfoPropArray.floatFormatter = d3.format('g');
+
 /**
  * Manage the windows that display the values of variables
  * @typedef ValueInfoManager
@@ -269,16 +269,35 @@ class ValueInfo {
         this.table = this.container.select('table');
         this.title = this.container.select('.node-value-title');
 
-        this.container.select('.close-value-window-button').on('click', function () {
-                ui.valueInfoManager.remove(name);
-            }
-        );
+        this.container.select('.close-value-window-button')
+            .on('click', function () { ui.valueInfoManager.remove(name); });
 
         this.bringToFront();
 
         this.update();
         this._setupDrag();
         this._setupResizerDrag();
+    }
+
+    /**
+     * Based on the number of dimensions of the value,
+     * indicate whether a value window display is needed or even practical
+     * @param {Object} val int, float, list,... The variable value.
+     * @returns {String} The converted array.
+     */
+    static canDisplay(val) {
+        if (!val) return false; // if no value, cannot display
+
+        if (!Array.isArray(val)) return false; // scalars don't need separate display
+
+        // 1-D arrays can be displayed
+        if (!Array.isArray(val[0])) return true;
+
+        // Handle 2-D array
+        if (!Array.isArray(val[0][0])) return true;
+
+        // More than 2-D array - punt for now - no practical way to display
+        return false;
     }
 
     /**
@@ -324,25 +343,30 @@ class ValueInfo {
 
         topRow.selectAll('th.node-value-index')
             .data(valIdxArr)
-            .enter().append('th').classed('node-value-index', true).text(function (d) { return d; });
+            .enter()
+            .append('th')
+            .classed('node-value-index', true)
+            .text(function (d) { return d; });
 
         // Construct the table displaying the variable value
+        const evenOdd = ['even', 'odd'];
         const rows = this.table.select("tbody")
             .selectAll('tr.array-row')
             .data(val)
             .enter()
             .append('tr')
-            .attr('class', function (d, i) { return 'array-row ' + ((i % 2 == 0)? 'even' : 'odd')})
-        
-        rows.append('th').text(function (d,i) { return i;} );
-        
+            // Style alternating rows differently:
+            .attr('class', function (d, i) { return `array-row ${evenOdd[i % 2]}`; });
+
+        // Insert the array index into the first column:
+        rows.append('th').text(function (d, i) { return i; });
+
+        // Add the contents of the array:
         rows.selectAll('td')
             .data(function (row) { return row; })
             .enter()
             .append('td')
-            .text(function (d) {
-                return InfoPropArray.floatFormatter(d);
-            })
+            .text(function (d) { return InfoPropArray.floatFormatter(d); })
 
         // Save the width and height of the table when it is fully
         // constructed. This will be used later to limit the resizing
@@ -363,9 +387,9 @@ class ValueInfo {
             self.bringToFront();
 
             dragDiv.style('cursor', 'grabbing')
-                 // top style needs to be set explicitly before releasing bottom:
-                 .style('top', dragDiv.style('top'))
-                 .style('bottom', 'initial');
+                // top style needs to be set explicitly before releasing bottom:
+                .style('top', dragDiv.style('top'))
+                .style('bottom', 'initial');
 
             self._startPos = [d3.event.clientX, d3.event.clientY]
             self._offset = [d3.event.clientX - parseInt(dragDiv.style('left')),
@@ -434,27 +458,6 @@ class ValueInfo {
 ValueInfo.TRUNCATE_LIMIT = 80;
 
 /**
- * Based on the number of dimensions of the value,
- * indicate whether a value window display is needed or even practical
- * @param {Object} val int, float, list,... The variable value.
- * @returns {String} The converted array.
- */
-ValueInfo.canDisplay = function (val) {
-    if (!val) return false; // if no value, cannot display
-
-    if (!Array.isArray(val)) return false; // scalars don't need separate display
-
-    // 1-D arrays can be displayed
-    if (!Array.isArray(val[0])) return true;
-
-    // Handle 2-D array
-    if (!Array.isArray(val[0][0])) return true;
-
-    // More than 2-D array - punt for now - no practical way to display
-    return false;
-}
-
-/**
  * Manage a table containing all available metadata properties for
  * the currently active node, as well as whether the table is
  * visible or not.
@@ -466,7 +469,6 @@ class NodeInfo {
      * references to the HTML elements.
      */
     constructor(ui) {
-
         this.values = {};
 
         // Potential properties
@@ -596,10 +598,10 @@ class NodeInfo {
 
         this.dataDiv.html('');
         this.tbody.html('');
-        
+
         // Don't just replace with {} because some InfoProps rely
         // on the reference to this.values:
-        wipeObj(this.values); 
+        wipeObj(this.values);
     }
 
     /**
