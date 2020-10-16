@@ -683,5 +683,57 @@ class TestConnectionsError(unittest.TestCase):
                          "dimension of size 2.")
 
 
+@unittest.skipUnless(MPI, "MPI is required.")
+class TestConnectionsMPIBug(unittest.TestCase):
+    N_PROCS = 2
+
+    def test_bug_2d_src_indices(self):
+        # This model gave an exception during setup.
+
+        class Burn(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_input('x', np.arange(12))
+                self.add_output('y', np.arange(12))
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = inputs['x'] * 2.0
+
+        class LinkageComp(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_input('in1', np.zeros((3, 2)))
+                self.add_input('in2', np.zeros((3, 2)))
+                self.add_output('out', np.zeros((3, 2)))
+
+            def compute(self, inputs, outputs):
+                outputs['out'] = 3 * inputs['in2'] - 2.5 * inputs['in1']
+
+        class Phases(om.ParallelGroup):
+
+            def setup(self):
+                self.add_subsystem('burn1', Burn())
+                self.add_subsystem('burn2', Burn())
+
+        class Linkages(om.Group):
+
+            def setup(self):
+                self.add_subsystem('linkage', LinkageComp())
+
+        class Traj(om.Group):
+
+            def setup(self):
+                self.add_subsystem('phases', Phases())
+                self.add_subsystem('linkages', Linkages())
+
+            def configure(self):
+                self.connect('phases.burn1.y', 'linkages.linkage.in1', src_indices=np.array([[0, 3], [4, 6], [2, 1]]))
+                self.connect('phases.burn2.y', 'linkages.linkage.in2', src_indices=np.array([[0, 3], [4, 6], [2, 1]]))
+
+        prob = om.Problem(model=Traj())
+        prob.setup()
+        prob.run_model()
+
+
 if __name__ == "__main__":
     unittest.main()
