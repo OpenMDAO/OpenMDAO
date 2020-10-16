@@ -106,6 +106,8 @@ class SrcIndicesTestCase(unittest.TestCase):
         g1.promotes('g2', inputs=['y'], src_indices=[0, 0, 0, 0], src_shape=(1,))
 
         p.model.promotes('g1', inputs=['a'], src_indices=[0])
+        
+        p.setup()
 
 if __name__ == '__main__':
     unittest.main()
