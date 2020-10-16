@@ -867,14 +867,49 @@ def make_serializable(o):
     """
     if isinstance(o, _container_classes):
         return [make_serializable(item) for item in o]
+    elif isinstance(o, dict):
+        s_key = [make_serializable_key(item) for item in o.keys()]
+        s_val = [make_serializable(item) for item in o.values()]
+        return dict(zip(s_key, s_val))
     elif isinstance(o, np.ndarray):
         return o.tolist()
+    elif isinstance(o, np.number):
+        return o.item()
+    elif isinstance(o, (str, float, int)):
+        return o
+    elif isinstance(o, bool) or np.iscomplex(o):
+        return str(o)
+    elif hasattr(o, '__dict__'):
+        return o.__class__.__name__
+    else:
+        return o
+
+
+def make_serializable_key(o):
+    """
+    Recursively convert numpy types to native types for JSON serialization.
+
+    This function is for making serizializable dictionary keys, so no containers.
+    This function should NOT be passed into json.dump or json.dumps as the 'default' arg.
+
+    Parameters
+    ----------
+    o : object
+        the object to be converted
+
+    Returns
+    -------
+    object
+        The converted object.
+    """
+    if isinstance(o, str):
+        return o
     elif isinstance(o, np.number):
         return o.item()
     elif hasattr(o, '__dict__'):
         return o.__class__.__name__
     else:
-        return o
+        return str(o)
 
 
 def default_noraise(o):
@@ -896,13 +931,23 @@ def default_noraise(o):
         The converted object.
     """
     if isinstance(o, _container_classes):
-        return [make_serializable(item) for item in o]
+        return [default_noraise(item) for item in o]
+    elif isinstance(o, dict):
+        s_key = [make_serializable_key(item) for item in o.keys()]
+        s_val = [default_noraise(item) for item in o.values()]
+        return dict(zip(s_key, s_val))
     elif isinstance(o, np.ndarray):
         return o.tolist()
     elif isinstance(o, np.number):
         return o.item()
+    elif isinstance(o, (str, float, int)):
+        return o
+    elif isinstance(o, bool) or np.iscomplex(o):
+        return str(o)
     elif hasattr(o, '__dict__'):
         return o.__class__.__name__
+    elif o is None:
+        return None
     else:
         return f"unserializable object ({type(o).__name__})"
 
@@ -928,10 +973,19 @@ def make_set(str_data, name=None):
         return set()
     elif isinstance(str_data, str):
         return {str_data}
-    elif isinstance(str_data, set):
-        return str_data
-    elif isinstance(str_data, list):
-        return set(str_data)
+    elif isinstance(str_data, (set, list)):
+
+        for item in str_data:
+            if not isinstance(item, str):
+                typ = type(item).__name__
+                msg = f"Items in tags should be of type string, but type '{typ}' was found."
+                raise TypeError(msg)
+
+        if isinstance(str_data, set):
+            return str_data
+        elif isinstance(str_data, list):
+            return set(str_data)
+
     elif name:
         raise TypeError("The {} argument should be str, set, or list: {}".format(name, str_data))
     else:
