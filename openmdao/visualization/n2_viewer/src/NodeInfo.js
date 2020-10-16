@@ -274,9 +274,27 @@ class ValueInfo {
             }
         );
 
+        this.bringToFront();
+
         this.update();
         this._setupDrag();
         this._setupResizerDrag();
+    }
+
+    /**
+     * Keep increasing z-index of original info panel to keep it on top.
+     * Max z-index is 2147483647. It will be unusual here for it to climb
+     * above 100, and even extreme cases (e.g. a diagram that's been in use
+     * for weeks with lots of info panels pinned) shouldn't get above a few
+     * thousand.
+     */
+    bringToFront() {
+        // Assign ourselves the current highest info panel z-index and
+        // increment that of the original info panel.
+        const mainPanel = d3.select('#node-info-container');
+        const zIndex = parseInt(mainPanel.style('z-index'));
+        mainPanel.style('z-index', zIndex + 1)
+        this.container.style('z-index', zIndex);
     }
 
     clear() {
@@ -285,7 +303,7 @@ class ValueInfo {
 
     update() {
         this.container.select('.node-value-title')
-            .text("Initial value for " + this.name);
+            .text(`${this.name} Initial Value`);
 
         // Capture the width of the header before the table is created
         // We use this to limit how small the window can be as the user resizes
@@ -298,9 +316,25 @@ class ValueInfo {
             val = [val];
         }
 
+        // Make the top row of the table the indices of the sub-arrays
+        const topRow = this.table.select("tbody")
+            .append('tr');
+        topRow.append('th'); // Top left corner spot is empty
+        const valIdxArr = Array.from(val[0].keys());
+
+        topRow.selectAll('th.node-value-index')
+            .data(valIdxArr)
+            .enter().append('th').classed('node-value-index', true).text(function (d) { return d; });
+
         // Construct the table displaying the variable value
         const rows = this.table.select("tbody")
-            .selectAll('tr').data(val).enter().append('tr')
+            .selectAll('tr.array-row')
+            .data(val)
+            .enter()
+            .append('tr')
+            .attr('class', function (d, i) { return 'array-row ' + ((i % 2 == 0)? 'even' : 'odd')})
+        
+        rows.append('th').text(function (d,i) { return i;} );
         
         rows.selectAll('td')
             .data(function (row) { return row; })
@@ -325,10 +359,13 @@ class ValueInfo {
         this.title.on('mousedown', function () {
             self.title.style('cursor', 'grabbing');
             const dragDiv = self.container;
+
+            self.bringToFront();
+
             dragDiv.style('cursor', 'grabbing')
-                // top style needs to be set explicitly before releasing bottom:
-                .style('top', dragDiv.style('top'))
-                .style('bottom', 'initial');
+                 // top style needs to be set explicitly before releasing bottom:
+                 .style('top', dragDiv.style('top'))
+                 .style('bottom', 'initial');
 
             self._startPos = [d3.event.clientX, d3.event.clientY]
             self._offset = [d3.event.clientX - parseInt(dragDiv.style('left')),
@@ -611,13 +648,7 @@ class PersistentNodeInfo {
         this.container.classed('persistent-panel', true);
         this.container.attr('id', uuidv4());
 
-        /* Keep increasing z-index of original info panel to keep it on top.
-         * Max z-index is 2147483647. It will be unusual here for it to climb
-         * above 100, and even extreme cases (e.g. a diagram that's been in use
-         * for weeks with lots of info panels pinned) shouldn't get above a few
-         * thousand. */
-        let zIndex = parseInt(this.orig.style('z-index')) + 1;
-        this.orig.style('z-index', zIndex);
+        this.bringToFront();
 
         this.thead = this.container.select('thead');
         this.translate = [0, 0];
@@ -632,6 +663,22 @@ class PersistentNodeInfo {
         this._setupDrag();
     }
 
+    /**
+     * Keep increasing z-index of original info panel to keep it on top.
+     * Max z-index is 2147483647. It will be unusual here for it to climb
+     * above 100, and even extreme cases (e.g. a diagram that's been in use
+     * for weeks with lots of info panels pinned) shouldn't get above a few
+     * thousand.
+     */
+    bringToFront() {
+        // Assign ourselves the current highest info panel z-index and
+        // increment that of the original info panel.
+        const mainPanel = d3.select('#node-info-container');
+        const zIndex = parseInt(mainPanel.style('z-index'));
+        mainPanel.style('z-index', zIndex + 1)
+        this.container.style('z-index', zIndex);
+    }
+
     /** Set up event handlers for any "Show More" buttons in the panel */
     _setupShowMoreButtons(name) {
         const self = this;
@@ -639,7 +686,6 @@ class PersistentNodeInfo {
         for (const valName in this.values) {
             if (this.values[valName].isTruncated) {
                 this.container.select(`button#${valName}.show_value_button`).on('click', c => {
-                    console.log("clicked show more")
                     self.ui.valueInfoManager.add(name, this.values[valName].val);
                 })
             }
@@ -668,13 +714,9 @@ class PersistentNodeInfo {
         this.thead.on('mousedown', function () {
             const dragDiv = self.container;
 
-            // Assign ourselves the current highest info panel z-index and
-            // increment that of the original.
-            let zIndex = parseInt(self.orig.style('z-index'));
+            self.bringToFront();
             dragDiv.style('cursor', 'grabbing')
-                .style('z-index', zIndex)
                 .select('th').style('cursor', 'grabbing');
-            self.orig.style('z-index', zIndex + 1)
 
             const dragStart = [d3.event.pageX, d3.event.pageY];
             let newTrans = [...self.translate];

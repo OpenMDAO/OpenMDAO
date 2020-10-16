@@ -15,6 +15,7 @@ div.info-panel {
     min-width: 200px;
     border-collapse: separate;
     opacity: .95;
+    border-spacing: 0;
 }
 
 .info-hidden {
@@ -163,9 +164,11 @@ div.info-panel {
     display: block;
     overflow: auto;
     position: relative;
+    font-weight: bold;
 }
 
 /* grabber bars on the node value title bar */
+/*
 .node-value-title::before {
     content: '\A789\A789\A789\A789\A789\A789';
     color: black;
@@ -178,6 +181,7 @@ div.info-panel {
     padding-left: 5px;
     padding-right: 5px;
 }
+*/
 
 .close-value-window-button {
 	color: black;
@@ -196,18 +200,37 @@ div.info-panel {
 /* Value window table */
 .node-value-table-div {
     overflow: auto;
-    padding-right: 10px;
-    padding-bottom: 10px;
+}
+
+.node-value-table {
+    border: 1px solid #a0a0a0;
+    border-collapse: collapse;
+}
+
+.node-value-table tbody th {
+    border: 1px solid #a0a0a0;
+    background-color: #c0c0c0;
+    text-align: center;
+    color: #202020;
+    font-size: 8pt;
+    min-width: 30px;
+    font-weight: 300;
 }
 
 .node-value-table tbody td {
+    border: 1px solid #a0a0a0;
     text-align: left;
     font-size: 9pt;
-    margin-top: 0;
-    margin-left: 0;
-    border: 1px solid #a0a0a0;
     padding: 3px;
     white-space: nowrap;
+}
+
+.node-value-table tbody tr.even td {
+    background-color:white;
+}
+
+.node-value-table tbody tr.odd td {
+    background-color: #e8ffe8;
 }
 
 /* Value window footer */
