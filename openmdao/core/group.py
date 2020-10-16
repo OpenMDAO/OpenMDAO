@@ -1838,6 +1838,16 @@ class Group(System):
                                                      all_abs_out['global_shape'],
                                                      all_abs_out['global_size'])
 
+            elif abs_in in abs2meta_in:
+                # Source is not local, but target is. We need to flatten the src_indices here too.
+                meta_in = abs2meta_in[abs_in]
+                src_indices = self._get_src_inds_array(abs_in)
+                if src_indices is not None:
+                    meta_in['src_indices'] = \
+                        _flatten_src_indices(src_indices, meta_in['shape'],
+                                             all_abs_out['global_shape'],
+                                             all_abs_out['global_size'])
+
     def _set_subsys_connection_errors(self, val=True):
         """
         Set flag in all subgroups indicating whether connection errors just issue a Warning.
