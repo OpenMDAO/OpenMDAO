@@ -3206,7 +3206,7 @@ class Group(System):
 
         if src_idx_found:  # auto_ivc connected to local vars with src_indices
             raise RuntimeError(f"The following inputs {src_idx_found} are defined using "
-                               "src_indices bu the total source size is undetermined.  Please add "
+                               "src_indices but the total source size is undetermined.  Please add "
                                "an IndepVarComp as the source.")
 
         # return max sized (tgt, size, value, remote)
