@@ -852,7 +852,7 @@ def _is_unitless(units):
     return unit_meta is not None and unit_meta.is_dimensionless()
 
 
-def _find_unit(unit):
+def _find_unit(unit, error=False):
     """
     Find unit helper function.
 
@@ -860,6 +860,8 @@ def _find_unit(unit):
     ----------
     unit : str
         str representing the desired unit
+    error : bool
+        If True, raise exception if unit isn't found.
 
     Returns
     -------
@@ -904,13 +906,19 @@ def _find_unit(unit):
 
                         # no prefixes found, unknown unit
                         else:
+                            if error:
+                                raise ValueError(f"The units '{name}' are invalid.")
                             return None
 
                 unit = eval(name, {'__builtins__': None}, _UNIT_LIB.unit_table)
 
             _UNIT_CACHE[name] = unit
+    else:
+        name = unit
 
     if not isinstance(unit, PhysicalUnit):
+        if error:
+            raise ValueError(f"The units '{name}' are invalid.")
         return None
 
     return unit
@@ -951,7 +959,7 @@ def conversion_to_base_units(units):
     """
     if not units:  # dimensionless
         return 0., 1.
-    unit = _find_unit(units)
+    unit = _find_unit(units, error=True)
 
     return unit._offset, unit._factor
 
@@ -977,8 +985,8 @@ def is_compatible(old_units, new_units):
     if not old_units and not new_units:  # dimensionless
         return True
 
-    old_unit = _find_unit(old_units)
-    new_unit = _find_unit(new_units)
+    old_unit = _find_unit(old_units, error=True)
+    new_unit = _find_unit(new_units, error=True)
 
     return old_unit.is_compatible(new_unit)
 
@@ -999,11 +1007,7 @@ def unit_conversion(old_units, new_units):
     (float, float)
         Conversion factor and offset
     """
-    new_physical_units = _find_unit(new_units)
-    if new_physical_units is None:
-        raise RuntimeError(f"Cannot convert to new units: '{new_units}'.")
-
-    return _find_unit(old_units).conversion_tuple_to(new_physical_units)
+    return _find_unit(old_units, error=True).conversion_tuple_to(_find_unit(new_units, error=True))
 
 
 def get_conversion(old_units, new_units):
@@ -1049,9 +1053,9 @@ def convert_units(val, old_units, new_units=None):
     if not old_units or not new_units:  # one side has no units
         return val
 
-    old_unit = _find_unit(old_units)
+    old_unit = _find_unit(old_units, error=True)
     if new_units:
-        new_unit = _find_unit(new_units)
+        new_unit = _find_unit(new_units, error=True)
     else:
         new_unit = old_unit.in_base_units()
 

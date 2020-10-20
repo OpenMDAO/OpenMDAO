@@ -194,7 +194,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         model = prob.model
 
         model.add_subsystem("indep", om.IndepVarComp('x', 5.))
-        model.add_subsystem("comp1", om.ExecComp("y=2*x"))
+        model.add_subsystem("comp1", Paraboloid())
 
         comp2 = model.add_subsystem("comp2", om.ExplicitComponent())
         comp2.add_input('x', val=0.)
@@ -216,8 +216,55 @@ class TestProblemCheckPartials(unittest.TestCase):
         # but we still get good derivative data for 'comp1'
         self.assertTrue('comp1' in data)
 
-        assert_near_equal(data['comp1'][('y', 'x')]['J_fd'][0][0], 2., 1e-9)
-        assert_near_equal(data['comp1'][('y', 'x')]['J_fwd'][0][0], 2., 1e-15)
+        assert_near_equal(data['comp1'][('f_xy', 'x')]['J_fd'][0][0], 4., 1e-6)
+        assert_near_equal(data['comp1'][('f_xy', 'x')]['J_fwd'][0][0], 4., 1e-15)
+
+    def test_component_no_check_partials(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem("indep", om.IndepVarComp('x', 5.))
+        model.add_subsystem("comp1", Paraboloid())
+
+        comp2 = model.add_subsystem("comp2", Paraboloid())
+
+        model.connect('indep.x', ['comp1.x', 'comp2.x'])
+
+        prob.setup()
+        prob.run_model()
+
+        #
+        # disable partials on comp2
+        #
+        comp2._no_check_partials = True
+        data = prob.check_partials(out_stream=None)
+
+        # no derivative data for 'comp2'
+        self.assertFalse('comp2' in data)
+
+        # but we still get good derivative data for 'comp1'
+        self.assertTrue('comp1' in data)
+
+        assert_near_equal(data['comp1'][('f_xy', 'x')]['J_fd'][0][0], 4., 1e-6)
+        assert_near_equal(data['comp1'][('f_xy', 'x')]['J_fwd'][0][0], 4., 1e-15)
+
+        #
+        # re-enable partials on comp2
+        #
+        comp2._no_check_partials = False
+        data = prob.check_partials(out_stream=None)
+
+        # now we should have derivative data for 'comp2'
+        self.assertTrue('comp2' in data)
+
+        assert_near_equal(data['comp2'][('f_xy', 'x')]['J_fd'][0][0], 4., 1e-6)
+        assert_near_equal(data['comp2'][('f_xy', 'x')]['J_fwd'][0][0], 4., 1e-15)
+
+        # and still get good derivative data for 'comp1'
+        self.assertTrue('comp1' in data)
+
+        assert_near_equal(data['comp1'][('f_xy', 'x')]['J_fd'][0][0], 4., 1e-6)
+        assert_near_equal(data['comp1'][('f_xy', 'x')]['J_fwd'][0][0], 4., 1e-15)
 
     def test_missing_entry(self):
         class MyComp(om.ExplicitComponent):
@@ -1168,11 +1215,13 @@ class TestProblemCheckPartials(unittest.TestCase):
         stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=False)
         # So for this case, they do all provide them, so rev should not be shown
-        self.assertEqual(stream.getvalue().count('Forward Magnitude'), 2)
+        self.assertEqual(stream.getvalue().count('Analytic Magnitude'), 2)
+        self.assertEqual(stream.getvalue().count('Forward Magnitude'), 0)
         self.assertEqual(stream.getvalue().count('Reverse Magnitude'), 0)
         self.assertEqual(stream.getvalue().count('Absolute Error'), 2)
         self.assertEqual(stream.getvalue().count('Relative Error'), 2)
-        self.assertEqual(stream.getvalue().count('Raw Forward Derivative'), 2)
+        self.assertEqual(stream.getvalue().count('Raw Analytic Derivative'), 2)
+        self.assertEqual(stream.getvalue().count('Raw Forward Derivative'), 0)
         self.assertEqual(stream.getvalue().count('Raw Reverse Derivative'), 0)
         self.assertEqual(stream.getvalue().count('Raw FD Derivative'), 2)
 
@@ -1220,11 +1269,13 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=False)
-        self.assertEqual(stream.getvalue().count('Forward Magnitude'), 4)
+        self.assertEqual(stream.getvalue().count('Analytic Magnitude'), 2)
+        self.assertEqual(stream.getvalue().count('Forward Magnitude'), 2)
         self.assertEqual(stream.getvalue().count('Reverse Magnitude'), 2)
         self.assertEqual(stream.getvalue().count('Absolute Error'), 8)
         self.assertEqual(stream.getvalue().count('Relative Error'), 8)
-        self.assertEqual(stream.getvalue().count('Raw Forward Derivative'), 4)
+        self.assertEqual(stream.getvalue().count('Raw Analytic Derivative'), 2)
+        self.assertEqual(stream.getvalue().count('Raw Forward Derivative'), 2)
         self.assertEqual(stream.getvalue().count('Raw Reverse Derivative'), 2)
         self.assertEqual(stream.getvalue().count('Raw FD Derivative'), 4)
 
@@ -1314,15 +1365,15 @@ class TestProblemCheckPartials(unittest.TestCase):
         model = prob.model
 
         sub = model.add_subsystem('c1c', om.Group())
-        sub.add_subsystem('d1', om.ExecComp('y=2*x'))
-        sub.add_subsystem('e1', om.ExecComp('y=2*x'))
+        sub.add_subsystem('d1', Paraboloid())
+        sub.add_subsystem('e1', Paraboloid())
 
         sub2 = model.add_subsystem('sss', om.Group())
         sub3 = sub2.add_subsystem('sss2', om.Group())
-        sub2.add_subsystem('d1', om.ExecComp('y=2*x'))
-        sub3.add_subsystem('e1', om.ExecComp('y=2*x'))
+        sub2.add_subsystem('d1', Paraboloid())
+        sub3.add_subsystem('e1', Paraboloid())
 
-        model.add_subsystem('abc1cab', om.ExecComp('y=2*x'))
+        model.add_subsystem('abc1cab', Paraboloid())
 
         prob.setup()
         prob.run_model()
@@ -1815,7 +1866,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         data = prob.check_partials(out_stream=stream)
         lines = stream.getvalue().splitlines()
 
-        self.assertTrue("Relative Error (Jfor  - Jfd) : 1." in lines[8])
+        self.assertTrue("Relative Error (Jan - Jfd) / Jan : 1." in lines[8])
 
     def test_directional_bug_implicit(self):
         # Test for bug in directional derivative direction for implicit var and matrix-free.
@@ -2108,20 +2159,21 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
     def test_includes_excludes(self):
         import openmdao.api as om
+        from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = om.Problem()
         model = prob.model
 
         sub = model.add_subsystem('c1c', om.Group())
-        sub.add_subsystem('d1', om.ExecComp('y=2*x'))
-        sub.add_subsystem('e1', om.ExecComp('y=2*x'))
+        sub.add_subsystem('d1', Paraboloid())
+        sub.add_subsystem('e1', Paraboloid())
 
         sub2 = model.add_subsystem('sss', om.Group())
         sub3 = sub2.add_subsystem('sss2', om.Group())
-        sub2.add_subsystem('d1', om.ExecComp('y=2*x'))
-        sub3.add_subsystem('e1', om.ExecComp('y=2*x'))
+        sub2.add_subsystem('d1', Paraboloid())
+        sub3.add_subsystem('e1', Paraboloid())
 
-        model.add_subsystem('abc1cab', om.ExecComp('y=2*x'))
+        model.add_subsystem('abc1cab', Paraboloid())
 
         prob.setup()
         prob.run_model()
@@ -2286,6 +2338,46 @@ class TestProblemCheckTotals(unittest.TestCase):
             "'<output>' not found in '%s'" % compact_lines[4])
         self.assertTrue('9.7743e+00' in compact_lines[11],
             "'9.7743e+00' not found in '%s'" % compact_lines[11])
+
+    def test_check_totals_show_progress(self):
+        prob = om.Problem()
+        prob.model = SellarDerivatives()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
+
+        prob.model.add_design_var('x', lower=-100, upper=100)
+        prob.model.add_design_var('z', lower=-100, upper=100)
+        prob.model.add_objective('obj')
+        prob.model.add_constraint('con1', upper=0.0)
+        prob.model.add_constraint('con2', upper=0.0)
+
+        prob.set_solver_print(level=0)
+
+        prob.setup(force_alloc_complex=True)
+
+        prob.model.nonlinear_solver.options['atol'] = 1e-15
+        prob.model.nonlinear_solver.options['rtol'] = 1e-15
+
+        # We don't call run_driver() here because we don't
+        # actually want the optimizer to run
+        prob.run_model()
+
+        # check derivatives with complex step and a larger step size.
+        stream = StringIO()
+        totals = prob.check_totals(method='fd', show_progress=True, out_stream=stream)
+
+        lines = stream.getvalue().splitlines()
+        self.assertTrue("1/3: Checking derivatives with respect to: 'd1.z [0]' ..." in lines[0])
+        self.assertTrue("2/3: Checking derivatives with respect to: 'd1.z [1]' ..." in lines[1])
+        self.assertTrue("3/3: Checking derivatives with respect to: 'd1.x [2]' ..." in lines[2])
+
+        prob.run_model()
+
+        # Check to make sure nothing is going to output
+        stream = StringIO()
+        totals = prob.check_totals(method='fd', show_progress=False, out_stream=stream)
+
+        lines = stream.getvalue()
+        self.assertFalse("Checking derivatives with respect to" in lines)
 
     def test_desvar_as_obj(self):
         prob = om.Problem()
@@ -2780,6 +2872,53 @@ class TestProblemCheckTotals(unittest.TestCase):
         for key, val in totals.items():
             assert_near_equal(val['rel error'][0], 0.0, 1e-6)
 
+    def test_cs_around_newton_top_sparse(self):
+        prob = om.Problem()
+        prob.model = SellarDerivatives()
+
+        prob.setup(force_alloc_complex=True)
+
+        prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=True)
+        prob.model.linear_solver = om.DirectSolver(assemble_jac=True)
+        prob.run_model()
+
+        totals = prob.check_totals(of=['obj', 'con1'], wrt=['x', 'z'], method='cs', out_stream=None)
+
+        for key, val in totals.items():
+            assert_near_equal(val['rel error'][0], 0.0, 3e-8)
+
+    def test_cs_around_broyden_top_sparse(self):
+        prob = om.Problem()
+        prob.model = SellarDerivatives()
+
+        prob.setup(force_alloc_complex=True)
+
+        prob.model.nonlinear_solver = om.BroydenSolver()
+        prob.model.linear_solver = om.DirectSolver(assemble_jac=True)
+        prob.run_model()
+
+        totals = prob.check_totals(of=['obj', 'con1'], wrt=['x', 'z'], method='cs', out_stream=None)
+
+        for key, val in totals.items():
+            assert_near_equal(val['rel error'][0], 0.0, 7e-8)
+
+    def test_check_totals_on_approx_model(self):
+        prob = om.Problem()
+        prob.model = SellarDerivatives()
+
+        prob.model.approx_totals(method='cs')
+
+        prob.setup(force_alloc_complex=True)
+
+        prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=True)
+        prob.model.linear_solver = om.DirectSolver()
+        prob.run_model()
+
+        totals = prob.check_totals(of=['obj', 'con1'], wrt=['x', 'z'], method='cs', out_stream=None)
+
+        for key, val in totals.items():
+            assert_near_equal(val['rel error'][0], 0.0, 3e-8)
+
     def test_cs_error_allocate(self):
         prob = om.Problem()
         model = prob.model
@@ -2847,6 +2986,34 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.check_totals(out_stream=stream)
         lines = stream.getvalue().splitlines()
         self.assertTrue('index size: 1' in lines[3])
+
+    def test_linear_cons(self):
+        # Linear constraints were mistakenly forgotten.
+        p = om.Problem()
+        p.model.add_subsystem('stuff', om.ExecComp(['y = x', 'cy = x', 'lcy = 3*x'],
+                                                   x={'units': 'inch'},
+                                                   y={'units': 'kg'},
+                                                   lcy={'units': 'kg'}),
+                              promotes=['*'])
+
+        p.model.add_design_var('x', units='ft')
+        p.model.add_objective('y', units='lbm')
+        p.model.add_constraint('lcy', units='lbm', lower=0, linear=True)
+
+        p.setup()
+        p['x'] = 1.0
+        p.run_model()
+
+        stream = StringIO()
+        J_driver = p.check_totals(out_stream=stream)
+        lines = stream.getvalue().splitlines()
+
+        self.assertTrue("Full Model: 'stuff.lcy' wrt 'x' (Linear constraint)" in lines[3])
+        self.assertTrue("Absolute Error (Jan - Jfd)" in lines[6])
+        self.assertTrue("Relative Error (Jan - Jfd) / Jfd" in lines[8])
+
+        assert_near_equal(J_driver['stuff.y', 'x']['J_fwd'][0, 0], 1.0)
+        assert_near_equal(J_driver['stuff.lcy', 'x']['J_fwd'][0, 0], 3.0)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")

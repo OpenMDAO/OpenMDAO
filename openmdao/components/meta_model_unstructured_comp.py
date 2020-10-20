@@ -70,6 +70,8 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         self._static_surrogate_output_names = []
         self._static_input_size = 0
 
+        self._no_check_partials = True
+
     def _setup_procs(self, pathname, comm, mode, prob_meta):
         """
         Execute first phase of the setup process.

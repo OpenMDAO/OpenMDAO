@@ -56,6 +56,8 @@ class MetaModelStructuredComp(ExplicitComponent):
         self.interps = {}
         self.grad_shape = ()
 
+        self._no_check_partials = True
+
     def initialize(self):
         """
         Initialize the component.

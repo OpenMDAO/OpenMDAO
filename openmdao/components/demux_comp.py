@@ -32,6 +32,8 @@ class DemuxComp(ExplicitComponent):
         self._vars = {}
         self._output_names = {}
 
+        self._no_check_partials = True
+
     def initialize(self):
         """
         Declare options.

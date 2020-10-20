@@ -32,6 +32,8 @@ class MuxComp(ExplicitComponent):
         self._vars = {}
         self._input_names = {}
 
+        self._no_check_partials = True
+
     def initialize(self):
         """
         Declare options.

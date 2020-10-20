@@ -631,6 +631,9 @@ class TestMetaModelStructuredScipy(unittest.TestCase):
         """Runs check_partials and compares to analytic derivatives."""
 
         prob.run_model()
+
+        prob.model.comp._no_check_partials = False  # override skipping of check_partials
+
         derivs = prob.check_partials(out_stream=None)
 
         for i in derivs['comp'].keys():
@@ -668,7 +671,8 @@ class TestMetaModelStructuredScipy(unittest.TestCase):
         with self.assertRaises(om.AnalysisError) as cm:
             p.run_model()
 
-        msg = ("'MM' <class MMComp>: Error interpolating output 'y' because input 'MM.x' was out of bounds ('0.0', '1.0') with value '1.1'")
+        msg = ("'MM' <class MMComp>: Error interpolating output 'y' because "
+               "input 'MM.x' was out of bounds ('0.0', '1.0') with value '1.1'")
         self.assertEqual(str(cm.exception), msg)
 
 
@@ -714,6 +718,9 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         """Runs check_partials and compares to analytic derivatives."""
 
         prob.run_model()
+
+        prob.model.comp._no_check_partials = False  # override skipping of check_partials
+
         derivs = prob.check_partials(method='cs', out_stream=None)
 
         for i in derivs['comp'].keys():
@@ -1095,30 +1102,30 @@ class TestMetaModelStructuredPython(unittest.TestCase):
 
     @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
     def test_analysis_error_warning_msg(self):
-      x_tr = np.linspace(0, 2*np.pi, 100)
-      y_tr = np.sin(x_tr)
+        x_tr = np.linspace(0, 2*np.pi, 100)
+        y_tr = np.sin(x_tr)
 
-      p = om.Problem(model=om.Group())
+        p = om.Problem(model=om.Group())
 
-      p.driver = om.pyOptSparseDriver(optimizer=OPTIMIZER)
+        p.driver = om.pyOptSparseDriver(optimizer=OPTIMIZER)
 
-      mm = om.MetaModelStructuredComp(extrapolate=False)
-      mm.add_input('x', val=1.0, training_data=x_tr)
-      mm.add_output('y', val=1.0, training_data=y_tr)
-      p.model.add_subsystem('interp', mm, promotes_inputs=['x'], promotes_outputs=['y'])
+        mm = om.MetaModelStructuredComp(extrapolate=False)
+        mm.add_input('x', val=1.0, training_data=x_tr)
+        mm.add_output('y', val=1.0, training_data=y_tr)
+        p.model.add_subsystem('interp', mm, promotes_inputs=['x'], promotes_outputs=['y'])
 
-      p.model.add_objective('y', scaler=-1)
-      p.model.add_design_var('x', lower=6, upper=10)
+        p.model.add_objective('y', scaler=-1)
+        p.model.add_design_var('x', lower=6, upper=10)
 
-      p.set_solver_print(level=0)
-      p.setup()
+        p.set_solver_print(level=0)
+        p.setup()
 
-      p.set_val('x', 0.75)
+        p.set_val('x', 0.75)
 
-      msg = "Analysis Error: 'interp' <class MetaModelStructuredComp> " \
-            "Line 203 of file {}".format(inspect.getsourcefile(om.MetaModelStructuredComp))
-      with assert_warning(UserWarning, msg):
-          p.run_driver()
+        msg = "Analysis Error: 'interp' <class MetaModelStructuredComp> " \
+              "Line 205 of file {}".format(inspect.getsourcefile(om.MetaModelStructuredComp))
+        with assert_warning(UserWarning, msg):
+            p.run_driver()
 
 
 @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")

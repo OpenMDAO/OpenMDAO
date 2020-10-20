@@ -959,6 +959,41 @@ class TestDriverMPI(unittest.TestCase):
         assert_near_equal(p.get_val('dc.y', get_remote=True), [81, 96])
         assert_near_equal(p.get_val('dc.z', get_remote=True), [25, 25, 25, 81, 81])
 
+    def test_distrib_desvar_bug(self):
+        class MiniModel(om.Group):
+            def setup(self):
+                self.add_subsystem('dv', om.IndepVarComp('x', 3.0))
+                self.add_subsystem('comp', om.ExecComp('y = (x-2)**2'))
+                self.connect('dv.x', 'comp.x')
+
+                self.add_design_var('dv.x', lower=-10, upper=10)
+
+        class ParModel(om.ParallelGroup):
+            def setup(self):
+                self.add_subsystem('g0', MiniModel())
+                self.add_subsystem('g1', MiniModel())
+
+        p = om.Problem()
+
+        pg = p.model.add_subsystem('par_group', ParModel())
+        p.model.add_subsystem('obj', om.ExecComp('f = y0 + y1'))
+
+        p.model.connect('par_group.g0.comp.y', 'obj.y0')
+        p.model.connect('par_group.g1.comp.y', 'obj.y1')
+
+        p.model.add_objective('obj.f')
+
+        p.driver = om.ScipyOptimizeDriver()
+
+        p.setup()
+        p.run_driver()
+
+        p.model.list_outputs()
+
+        dvs = p.driver.get_design_var_values(get_remote=True)
+
+        assert_near_equal(dvs['par_group.g0.dv.x'], 2)
+        assert_near_equal(dvs['par_group.g1.dv.x'], 2)
 
 if __name__ == "__main__":
     unittest.main()

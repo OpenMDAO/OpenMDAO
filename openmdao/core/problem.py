@@ -5,6 +5,7 @@ import pprint
 import os
 import logging
 import weakref
+import time
 
 from collections import defaultdict, namedtuple, OrderedDict
 from fnmatch import fnmatchcase
@@ -1050,7 +1051,7 @@ class Problem(object):
 
         comps = []
         for comp in model.system_iter(typ=Component, include_self=True):
-            if isinstance(comp, IndepVarComp):
+            if comp._no_check_partials:
                 continue
 
             name = comp.pathname
@@ -1405,7 +1406,7 @@ class Problem(object):
 
     def check_totals(self, of=None, wrt=None, out_stream=_DEFAULT_OUT_STREAM, compact_print=False,
                      driver_scaling=False, abs_err_tol=1e-6, rel_err_tol=1e-6,
-                     method='fd', step=None, form=None, step_calc='abs'):
+                     method='fd', step=None, form=None, step_calc='abs', show_progress=False):
         """
         Check total derivatives for the model vs. finite difference.
 
@@ -1444,6 +1445,8 @@ class Problem(object):
         step_calc : string
             Step type for finite difference, can be 'abs' for absolute', or 'rel' for relative.
             Default is 'abs'.
+        show_progress : bool
+            True to show progress of check_totals
 
         Returns
         -------
@@ -1462,6 +1465,7 @@ class Problem(object):
                                "derivatives can be checked.")
 
         model = self.model
+        lcons = []
 
         if method == 'cs' and not model._outputs._alloc_complex:
             msg = "\n" + self.msginfo + ": To enable complex step, specify "\
@@ -1471,10 +1475,32 @@ class Problem(object):
 
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
+        if wrt is None:
+            wrt = list(self.driver._designvars)
+            if not wrt:
+                raise RuntimeError("Driver is not providing any design variables "
+                                   "for compute_totals.")
+
+        if of is None:
+            of = list(self.driver._objs)
+            of.extend(self.driver._cons)
+            if not of:
+                raise RuntimeError("Driver is not providing any response variables "
+                                   "for compute_totals.")
+            lcons = [n for n, meta in self.driver._cons.items()
+                     if ('linear' in meta and meta['linear'])]
+
         # Calculate Total Derivatives
-        total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict',
-                                   driver_scaling=driver_scaling)
-        Jcalc = total_info.compute_totals()
+        if model._owns_approx_jac:
+            # Support this, even though it is a bit silly (though you could compare fd with cs.)
+            total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict',
+                                       approx=True, driver_scaling=driver_scaling)
+            Jcalc = total_info.compute_totals_approx(initialize=True)
+
+        else:
+            total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict',
+                                       driver_scaling=driver_scaling)
+            Jcalc = total_info.compute_totals()
 
         if step is None:
             if method == 'cs':
@@ -1498,8 +1524,10 @@ class Problem(object):
                             step_calc=step_calc if method == 'fd' else None)
         total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict', approx=True,
                                    driver_scaling=driver_scaling)
-        Jfd = total_info.compute_totals_approx(initialize=True)
-
+        if show_progress:
+            Jfd = total_info.compute_totals_approx(initialize=True, progress_out_stream=out_stream)
+        else:
+            Jfd = total_info.compute_totals_approx(initialize=True)
         # reset the _owns_approx_jac flag after approximation is complete.
         if not approx:
             model._jacobian = old_jac
@@ -1529,7 +1557,7 @@ class Problem(object):
             out_stream = sys.stdout
 
         _assemble_derivative_data(data, rel_err_tol, abs_err_tol, out_stream, compact_print,
-                                  [model], {'': fd_args}, totals=True)
+                                  [model], {'': fd_args}, totals=True, lcons=lcons)
         return data['']
 
     def compute_totals(self, of=None, wrt=None, return_format='flat_dict', debug_print=False,
@@ -1565,6 +1593,19 @@ class Problem(object):
         """
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
             self.final_setup()
+
+        if wrt is None:
+            wrt = list(self.driver._designvars)
+            if not wrt:
+                raise RuntimeError("Driver is not providing any design variables "
+                                   "for compute_totals.")
+
+        if of is None:
+            of = list(self.driver._objs)
+            of.extend(self.driver._cons)
+            if not of:
+                raise RuntimeError("Driver is not providing any response variables "
+                                   "for compute_totals.")
 
         if self.model._owns_approx_jac:
             total_info = _TotalJacInfo(self, of, wrt, use_abs_names, return_format,
@@ -1826,7 +1867,7 @@ class Problem(object):
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
                               compact_print, system_list, global_options, totals=False,
                               indep_key=None, print_reverse=False,
-                              show_only_incorrect=False):
+                              show_only_incorrect=False, lcons=None):
     """
     Compute the relative and absolute errors in the given derivatives and print to the out_stream.
 
@@ -1855,6 +1896,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         Set to True if compact_print results need to include columns for reverse mode.
     show_only_incorrect : bool, optional
         Set to True if output should print only the subjacs found to be incorrect.
+    lcons : list or None
+        For total derivatives only, list of outputs that are actually linear constraints.
     """
     nan = float('nan')
     suppress_output = out_stream is None
@@ -1954,10 +1997,10 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                             .format(
                                 pad_name('<output>', max_width_of, quotes=True),
                                 pad_name('<variable>', max_width_wrt, quotes=True),
-                                pad_name('fwd mag.'),
+                                pad_name('calc mag.'),
                                 pad_name('check mag.'),
-                                pad_name('a(fwd-chk)'),
-                                pad_name('r(fwd-chk)'),
+                                pad_name('a(cal-chk)'),
+                                pad_name('r(cal-chk)'),
                             )
 
                 if out_stream:
@@ -2132,27 +2175,34 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                     # Magnitudes
                     if out_stream:
                         if directional:
-                            out_buffer.write("  {}: '{}' wrt (d)'{}'\n".format(sys_name, of, wrt))
+                            out_buffer.write(f"  {sys_name}: '{of}' wrt (d)'{wrt}'")
                         else:
-                            out_buffer.write("  {}: '{}' wrt '{}'\n".format(sys_name, of, wrt))
-                        out_buffer.write('    Forward Magnitude : {:.6e}\n'.format(
-                            magnitude.forward))
+                            out_buffer.write(f"  {sys_name}: '{of}' wrt '{wrt}'")
+                        if lcons and of in lcons:
+                            out_buffer.write(" (Linear constraint)")
+
+                        out_buffer.write('\n')
+                        if do_rev or do_rev_dp:
+                            out_buffer.write('     Forward')
+                        else:
+                            out_buffer.write('    Analytic')
+                        out_buffer.write(' Magnitude : {:.6e}\n'.format(magnitude.forward))
                     if do_rev:
-                        txt = '    Reverse Magnitude : {:.6e}'
+                        txt = '     Reverse Magnitude : {:.6e}'
                         if out_stream:
                             out_buffer.write(txt.format(magnitude.reverse) + '\n')
                     if out_stream:
-                        out_buffer.write('         Fd Magnitude : {:.6e} ({})\n'.format(
+                        out_buffer.write('          Fd Magnitude : {:.6e} ({})\n'.format(
                             magnitude.fd, fd_desc))
 
                     # Absolute Errors
                     if do_rev:
-                        error_descs = ('(Jfor  - Jfd) ', '(Jrev  - Jfd) ', '(Jfor  - Jrev)')
+                        error_descs = ('(Jfor - Jfd) ', '(Jrev - Jfd) ', '(Jfor - Jrev)')
                     elif do_rev_dp:
-                        error_descs = ('(Jfor  - Jfd) ', '(Jrev - Jfd  Dot Product Test) ',
+                        error_descs = ('(Jfor - Jfd) ', '(Jrev - Jfd  Dot Product Test) ',
                                        '(Jrev - Jfor Dot Product Test) ')
                     else:
-                        error_descs = ('(Jfor  - Jfd) ', )
+                        error_descs = ('(Jan - Jfd) ', )
 
                     for error, desc in zip(abs_err, error_descs):
                         error_str = _format_error(error, abs_error_tol)
@@ -2164,8 +2214,27 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         out_buffer.write('\n')
 
                     # Relative Errors
-                    if do_rev_dp:
-                        error_descs = ('(Jfor  - Jfd) ', )
+                    if do_rev:
+                        if fd_norm == 0.:
+                            error_descs = ('(Jfor - Jfd) / Jfor ', '(Jrev - Jfd) / Jfor ',
+                                           '(Jfor - Jrev) / Jfor')
+                        else:
+                            error_descs = ('(Jfor - Jfd) / Jfd ', '(Jrev - Jfd) / Jfd ',
+                                           '(Jfor - Jrev) / Jfd')
+                    elif do_rev_dp:
+                        if fd_norm == 0.:
+                            error_descs = ('(Jfor - Jfd) / Jfor ',
+                                           '(Jrev - Jfd  Dot Product Test) / Jfor ',
+                                           '(Jrev - Jfor Dot Product Test) / Jfor ')
+                        else:
+                            error_descs = ('(Jfor - Jfd) / Jfd ',
+                                           '(Jrev - Jfd  Dot Product Test) / Jfd ',
+                                           '(Jrev - Jfor Dot Product Test) / Jfd ')
+                    else:
+                        if fd_norm == 0.:
+                            error_descs = ('(Jan - Jfd) / Jan ', )
+                        else:
+                            error_descs = ('(Jan - Jfd) / Jfd ', )
 
                     for error, desc in zip(rel_err, error_descs):
                         error_str = _format_error(error, rel_error_tol)
@@ -2184,7 +2253,11 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         if do_rev_dp:
                             out_buffer.write('    Directional Forward Derivative (Jfor)\n')
                         else:
-                            out_buffer.write('    Raw Forward Derivative (Jfor)\n')
+                            if not totals and matrix_free:
+                                out_buffer.write('    Raw Forward')
+                            else:
+                                out_buffer.write('    Raw Analytic')
+                            out_buffer.write(' Derivative (Jfor)\n')
                         out_buffer.write(str(forward) + '\n')
                         out_buffer.write('\n')
 

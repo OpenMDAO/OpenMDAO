@@ -53,6 +53,8 @@ class MatrixVectorProductComp(ExplicitComponent):
                          b_units=opt['b_units'], A_units=opt['A_units'], x_units=opt['x_units'],
                          vec_size=opt['vec_size'], A_shape=opt['A_shape'])
 
+        self._no_check_partials = True
+
     def initialize(self):
         """
         Declare options.

@@ -76,6 +76,8 @@ class Component(System):
         Cached storage of user-declared partials.
     _declared_partial_checks : list
         Cached storage of user-declared check partial options.
+    _no_check_partials : bool
+        If True, the check_partials function will ignore this component.
     """
 
     def __init__(self, **kwargs):
@@ -97,6 +99,7 @@ class Component(System):
 
         self._declared_partials = defaultdict(dict)
         self._declared_partial_checks = []
+        self._no_check_partials = False
 
     def _declare_options(self):
         """
@@ -466,12 +469,12 @@ class Component(System):
                                                                     ndarray, Iterable)):
             raise TypeError('%s: The src_indices argument should be an int, list, '
                             'tuple, ndarray or Iterable' % self.msginfo)
-        if units is not None and not isinstance(units, str):
-            raise TypeError('%s: The units argument should be a str or None' % self.msginfo)
+        if units is not None:
+            if not isinstance(units, str):
+                raise TypeError('%s: The units argument should be a str or None.' % self.msginfo)
 
-        # Check that units are valid
-        if units is not None and not valid_units(units):
-            raise ValueError("%s: The units '%s' are invalid" % (self.msginfo, units))
+            if not valid_units(units):
+                raise ValueError("%s: The units '%s' are invalid." % (self.msginfo, units))
 
         if tags is not None and not isinstance(tags, (str, list)):
             raise TypeError('The tags argument should be a str or list')
@@ -677,14 +680,14 @@ class Component(System):
         if shape is not None and not isinstance(shape, (int, tuple, list, np.integer)):
             raise TypeError("%s: The shape argument should be an int, tuple, or list but "
                             "a '%s' was given" % (self.msginfo, type(shape)))
-        if units is not None and not isinstance(units, str):
-            raise TypeError('%s: The units argument should be a str or None' % self.msginfo)
         if res_units is not None and not isinstance(res_units, str):
             raise TypeError('%s: The res_units argument should be a str or None' % self.msginfo)
 
-        # Check that units are valid
-        if units is not None and not valid_units(units):
-            raise ValueError("%s: The units '%s' are invalid" % (self.msginfo, units))
+        if units is not None:
+            if not isinstance(units, str):
+                raise TypeError('%s: The units argument should be a str or None' % self.msginfo)
+            if not valid_units(units):
+                raise ValueError("%s: The units '%s' are invalid" % (self.msginfo, units))
 
         if tags is not None and not isinstance(tags, (str, set, list)):
             raise TypeError('The tags argument should be a str, set, or list')

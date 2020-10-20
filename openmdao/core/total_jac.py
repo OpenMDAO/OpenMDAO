@@ -155,17 +155,15 @@ class _TotalJacInfo(object):
         driver_wrt = list(driver._designvars)
         driver_of = driver._get_ordered_nl_responses()
 
-        # Convert of and wrt names from promoted to absolute
+        # In normal use, of and wrt always contain variable names. However, there are unit tests
+        # that don't specify them, so we need these here.
         if wrt is None:
-            if driver_wrt:
-                prom_wrt = driver_wrt
-            else:
-                raise RuntimeError("Driver is not providing any design variables "
-                                   "for compute_totals.")
-        else:
-            prom_wrt = wrt
+            wrt = driver_wrt
+        if of is None:
+            of = driver_of
 
         # Convert 'wrt' names from promoted to absolute
+        prom_wrt = wrt
         wrt = []
         self.ivc_print_names = {}
         for name in prom_wrt:
@@ -179,16 +177,8 @@ class _TotalJacInfo(object):
                 wrt_name = name
             wrt.append(wrt_name)
 
-        if of is None:
-            if driver_of:
-                prom_of = driver_of
-            else:
-                raise RuntimeError("Driver is not providing any response variables "
-                                   "for compute_totals.")
-        else:
-            prom_of = of
-
         # Convert 'of' names from promoted to absolute
+        prom_of = of
         of = []
         for name in prom_of:
             if name in prom2abs:
@@ -1378,10 +1368,14 @@ class _TotalJacInfo(object):
             vec_dresid[vec_name].set_val(0.0)
 
         # Linearize Model
+        ln_solver = model._linear_solver
         with model._scaled_context_all():
             model._linearize(model._assembled_jac,
-                             sub_do_ln=model._linear_solver._linearize_children())
-        model._linear_solver._linearize()
+                             sub_do_ln=ln_solver._linearize_children())
+        if ln_solver._assembled_jac is not None and \
+           ln_solver._assembled_jac._under_complex_step:
+            model.linear_solver._assembled_jac._update(model)
+        ln_solver._linearize()
         self.J[:] = 0.0
 
         # Main loop over columns (fwd) or rows (rev) of the jacobian
@@ -1443,7 +1437,7 @@ class _TotalJacInfo(object):
 
         return self.J_final
 
-    def compute_totals_approx(self, initialize=False):
+    def compute_totals_approx(self, initialize=False, progress_out_stream=None):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -1454,6 +1448,8 @@ class _TotalJacInfo(object):
         initialize : bool
             Set to True to re-initialize the FD in model. This is only needed when manually
             calling compute_totals on the problem.
+        progress_out_stream : None or file-like object
+            Where to send human readable output. None by default which suppresses the output.
 
         Returns
         -------
@@ -1486,8 +1482,12 @@ class _TotalJacInfo(object):
                 method = list(model._approx_schemes)[0]
                 kwargs = model._owns_approx_jac_meta
                 model.approx_totals(method=method, **kwargs)
+                if progress_out_stream is not None:
+                    model._approx_schemes[method]._progress_out = progress_out_stream
             else:
                 model.approx_totals(method='fd')
+                if progress_out_stream is not None:
+                    model._approx_schemes['fd']._progress_out = progress_out_stream
 
             model._setup_jacobians(recurse=False)
             model._setup_approx_partials()

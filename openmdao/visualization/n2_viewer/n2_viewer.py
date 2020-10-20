@@ -120,8 +120,7 @@ def _get_var_dict(system, typ, name):
 
     if is_discrete:
         if isinstance(meta['value'], (int, str, list, dict, complex, np.ndarray)):
-            val = meta['value']
-            var_dict['value'] = val
+            var_dict['value'] = default_noraise(meta['value'])
         else:
             var_dict['value'] = type(meta['value']).__name__
     else:
@@ -131,6 +130,34 @@ def _get_var_dict(system, typ, name):
             var_dict['value'] = None
 
     return var_dict
+
+
+def _serialize_single_option(option):
+    """
+    Return a json-safe equivalent of the option.
+
+    The default_noraise function performs the datatype serialization, while this function takes
+    care of attributes specific to options dicts.
+
+    Parameters
+    ----------
+    option : object
+        Option to be serialized.
+
+    Returns
+    -------
+    object
+       JSON-safe serialized object.
+    """
+    val = option['value']
+    if not option['recordable']:
+        serialized_option = 'Not Recordable'
+    elif val is _UNDEFINED:
+        serialized_option = str(val)
+    else:
+        serialized_option = default_noraise(val)
+
+    return serialized_option
 
 
 def _get_tree_dict(system, component_execution_orders, component_execution_index,
@@ -199,7 +226,8 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
             tree_dict['linear_solver_options'] = None
         elif system.linear_solver:
             tree_dict['linear_solver'] = system.linear_solver.SOLVER
-            options = {k: system.linear_solver.options[k] for k in system.linear_solver.options}
+            options = {k: _serialize_single_option(system.linear_solver.options._dict[k])
+                       for k in system.linear_solver.options}
             tree_dict['linear_solver_options'] = options
         else:
             tree_dict['linear_solver'] = ""
@@ -210,7 +238,7 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
             tree_dict['nonlinear_solver_options'] = None
         elif system.nonlinear_solver:
             tree_dict['nonlinear_solver'] = system.nonlinear_solver.SOLVER
-            options = {k: system.nonlinear_solver.options[k]
+            options = {k: _serialize_single_option(system.nonlinear_solver.options._dict[k])
                        for k in system.nonlinear_solver.options}
             tree_dict['nonlinear_solver_options'] = options
         else:
@@ -219,7 +247,8 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
     else:
         if system.linear_solver:
             tree_dict['linear_solver'] = system.linear_solver.SOLVER
-            options = {k: system.linear_solver.options[k] for k in system.linear_solver.options}
+            options = {k: _serialize_single_option(system.linear_solver.options._dict[k])
+                       for k in system.linear_solver.options}
             tree_dict['linear_solver_options'] = options
         else:
             tree_dict['linear_solver'] = ""
@@ -227,7 +256,7 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
 
         if system.nonlinear_solver:
             tree_dict['nonlinear_solver'] = system.nonlinear_solver.SOLVER
-            options = {k: system.nonlinear_solver.options[k]
+            options = {k: _serialize_single_option(system.nonlinear_solver.options._dict[k])
                        for k in system.nonlinear_solver.options}
             tree_dict['nonlinear_solver_options'] = options
 
@@ -245,13 +274,8 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
         if k in ['linear_solver', 'nonlinear_solver']:
             options[k] = system.options[k].SOLVER
         else:
-            val = system.options._dict[k]['value']
-            if not system.options._dict[k]['recordable']:
-                options[k] = default_noraise(val)
-            elif val is _UNDEFINED:
-                options[k] = str(val)
-            else:
-                options[k] = val
+            options[k] = _serialize_single_option(system.options._dict[k])
+
     tree_dict['options'] = options
 
     if not tree_dict['name']:
@@ -318,7 +342,8 @@ def _get_viewer_data(data_source):
         driver_name = driver.__class__.__name__
         driver_type = 'doe' if isinstance(driver, DOEDriver) else 'optimization'
 
-        driver_options = {key: val for key, val in driver.options.items()}
+        driver_options = {key: _serialize_single_option(driver.options._dict[key])
+                          for key in driver.options}
 
         if driver_type == 'optimization' and 'opt_settings' in dir(driver):
             driver_opt_settings = driver.opt_settings

@@ -391,7 +391,7 @@ class SqliteRecorder(CaseRecorder):
             var_settings.update(constraints)
             var_settings = self._cleanup_var_settings(var_settings)
             var_settings['execution_order'] = var_order
-            var_settings_json = json.dumps(var_settings)
+            var_settings_json = json.dumps(var_settings, default=default_noraise)
 
             with self.connection as c:
                 c.execute("UPDATE metadata SET " +
