@@ -477,6 +477,17 @@ class System(object):
         self._coloring_info = _DEFAULT_COLORING_META.copy()
         self._first_call_to_linearize = True   # will check in first call to _linearize
 
+    def __repr__(self):
+        """
+        Return a string representation.
+
+        Returns
+        -------
+        str
+            The string representation.
+        """
+        return self.msginfo
+
     @property
     def msginfo(self):
         """
@@ -1877,50 +1888,6 @@ class System(object):
                 else:
                     raise TypeError(f"when adding subsystem '{self.pathname}', entry '{key}'"
                                     " is not a string or tuple of size 2.")
-
-        def update_src_indices(name, tup):
-            """
-            Update metadata for promoted inputs that have had src_indices specified.
-
-            Parameters
-            ----------
-            name : str
-                Name of an input variable that may have associated src_indices.
-            tup : tuple
-                (name/rename, pattern/name, promotes_info).
-            """
-            _, _, prominfo = tup
-            if prominfo is not None:
-                src_indices, flat_src_indices, src_shape = prominfo
-
-                for abs_in in self._var_allprocs_prom2abs_list['input'][name]:
-                    meta = self._var_abs2meta['input'][abs_in]
-
-                    _, _, src_indices = ensure_compatible(name, meta['value'], meta['shape'],
-                                                          src_indices)
-
-                    is_array = isinstance(src_indices, np.ndarray)
-                    if is_array and 'src_indices' in meta and meta['src_indices'] is not None:
-                        if not np.array_equal(meta['src_indices'], src_indices):
-                            raise RuntimeError(f"{self.msginfo}: Trying to promote input '{name}' "
-                                               f"with src_indices {str(src_indices)},"
-                                               f" but src_indices have already been specified as "
-                                               f"{str(meta['src_indices'])}.")
-                    if 'flat_src_indices' in meta and meta['flat_src_indices'] is not None:
-                        if not meta['flat_src_indices'] == flat_src_indices:
-                            raise RuntimeError(f"{self.msginfo}: Trying to promote input '{name}' "
-                                               f"with flat_src_indices={str(flat_src_indices)} but "
-                                               f"flat_src_indices has already been specified as"
-                                               f" {str(meta['flat_src_indices'])}.")
-
-                    meta['src_indices'] = src_indices
-                    if _is_slicer_op(src_indices):
-                        meta['src_slice'] = src_indices
-                        if flat_src_indices is not None:
-                            simple_warning(f"{self.msginfo}: Input '{name}' was promoted with "
-                                           "slice src_indices, so flat_src_indices is ignored.")
-                        flat_src_indices = True
-                    meta['flat_src_indices'] = flat_src_indices
 
         def report_dup(io, matches, match_type, name, tup):
             """

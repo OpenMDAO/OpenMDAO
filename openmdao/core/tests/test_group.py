@@ -668,6 +668,7 @@ class TestGroup(unittest.TestCase):
 
         assert_near_equal(p['comp1.a'], [2, 2, 2])
 
+    def test_om_slice_in_promotes_flat(self):
         p = om.Problem()
 
         model = p.model
@@ -1838,7 +1839,7 @@ class TestGroupPromotes(unittest.TestCase):
             p.setup()
 
         self.assertEqual(str(cm.exception),
-            "Shape of indices does not match shape for 'a': Expected (5,) but got (3,).")
+            "<model> <class SimpleGroup>: The source indices [0 1 2] do not specify a valid shape for the connection '_auto_ivc.v0' to 'comp1.a'. The target shape is (5,) but indices are (3,).")
 
     def test_promotes_src_indices_different(self):
 
@@ -2026,8 +2027,7 @@ class TestGroupPromotes(unittest.TestCase):
             p.setup()
 
         self.assertEqual(str(cm.exception),
-            "'sub' <class SubGroup>: Trying to promote input 'a' with src_indices [0 1 2], "
-            "but src_indices have already been specified as [0 2 4].")
+            "Input 'sub.a' src_indices are [0 1 2] and indexing into those failed using src_indices [0 2 4] from input 'sub.comp.a'. Error was: index 4 is out of bounds for axis 0 with size 3.")
 
 
 class MyComp(om.ExplicitComponent):

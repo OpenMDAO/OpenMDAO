@@ -16,7 +16,7 @@ class Outer(om.Group):
         self.add_subsystem('inner', Inner())
     def configure(self):
         self.promotes('inner', inputs=[('comp.x', 'desvar_x')],
-                    src_indices=np.array([[0, 1], [0, 1], [0, 1]]), flat_src_indices=True)
+                      src_indices=np.array([[0, 1], [0, 1], [0, 1]]), flat_src_indices=True, src_shape=2)
 
 
 class SrcIndicesTestCase(unittest.TestCase):

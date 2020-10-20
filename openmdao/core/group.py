@@ -23,7 +23,7 @@ from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import array_connection_compatible, _flatten_src_indices, \
     shape_to_len
 from openmdao.utils.general_utils import ContainsAll, simple_warning, common_subpath, \
-    conditional_error, _is_slicer_op, ensure_compatible
+    conditional_error, _is_slicer_op, _slice_indices, ensure_compatible
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
@@ -55,6 +55,8 @@ class _PromotesInfo(object):
     __slots__ = ['src_indices', 'flat', 'src_shape']
 
     def __init__(self, src_indices=None, flat=None, src_shape=None):
+        if not _is_slicer_op(src_indices) and src_indices is not None:
+            src_indices = np.asarray(src_indices)
         self.src_indices = src_indices
         self.flat = flat
         self.src_shape = src_shape
@@ -67,17 +69,27 @@ class _PromotesInfo(object):
     def __repr__(self):
         return f"_PromotesInfo({self.src_indices}, {self.flat}, {self.src_shape})"
 
-    def conv_src_inds(self, src_indices):
+    def conv_src_inds(self, src_indices, src_shape):
         if src_indices is None:
             return self.src_indices
         elif self.src_indices is None:
             return src_indices
         # TODO: handle nonflat src_indices?
-        return src_indices.ravel()[self.src_indices]
+        if isinstance(self.src_indices, tuple):
+            ndims = len(self.src_indices)
+        elif isinstance(self.src_indices, np.ndarray):
+            ndims = self.src_indices.ndim
+        else:  # slice
+            ndims = 1
+        if ndims == 1:
+            return src_indices.ravel()[self.src_indices]
+        else:
+            return src_indices.reshape(src_shape)[self.src_indices]
 
 
 class _Node(object):
     __slots__ = ['data', 'children', 'src_shape', 'src_inds']
+
     def __init__(self, data, src_shape):
         self.data = data
         self.src_shape = src_shape  # src_shape set by set_input_defaults, if any
@@ -90,32 +102,11 @@ class _Node(object):
     def add(self, name):
         self.children.add(name)
 
-    def get_mismatched_shapes(self, dct, shape_name):
-        mismatched_shapes = []
-        if self.children:
-            if self.src_shape is None:
-                for c in self.children:
-                    shape_name = c
-                    break
-                src_shape = dct[shape_name].src_shape
-            else:
-                src_shape = self.src_shape
-            for name in self.children:
-                shape = dct[name].src_shape
-                if shape is not None and shape != src_shape:
-                    mismatched_shapes.append((shape_name, src_shape, name, shape))
-        return mismatched_shapes
-
     def set_src_inds(self, src_indices):
         if self.data is None:
             self.src_inds = src_indices
         else:
-            self.src_inds = self.data[2].conv_src_inds(src_indices)
-
-    def update_child_src_inds(self, dct):
-        for child in self.children:
-            node = dct[child]
-            node.set_src_inds(self.src_inds)
+            self.src_inds = self.data[2].conv_src_inds(src_indices, self.src_shape)
 
 
 class _Tree(object):
@@ -134,6 +125,42 @@ class _Tree(object):
     def add_child(self, parent, child):
         self.dct[parent].add(child)
 
+    def check_mismatched_shapes(self, system, parent_name):
+        mismatched_shapes = []
+        node = self[parent_name]
+        if node.children:
+            if node.src_shape is None:
+                for c in node.children:
+                    parent_name = c
+                    break
+                src_shape = self[parent_name].src_shape
+            else:
+                src_shape = node.src_shape
+            for name in node.children:
+                shape = self[name].src_shape
+                if shape is not None and shape != src_shape:
+                    mismatched_shapes.append((parent_name, src_shape, name, shape))
+
+        if mismatched_shapes:
+            shape1, name1 = mismatched_shapes[0][:2]
+            others = [(shp, n) for _, _, shp, n in mismatched_shapes]
+            raise RuntimeError(f"{system.msginfo}: src_shape {shape1} for '{name1}' "
+                               f"doesn't match src_shape(s) for {others}.")
+
+    def update_child_src_props(self, parent_name):
+        parent_node = self[parent_name]
+        for child in parent_node.children:
+            node = self[child]
+            if node.src_shape is None:
+                node.src_shape = parent_node.src_shape
+            try:
+                node.set_src_inds(parent_node.src_inds)
+            except Exception as err:
+                raise RuntimeError(f"Input '{parent_name}' src_indices "
+                                   f"are {parent_node.src_inds} and indexing into those failed "
+                                   f"using src_indices {node.data[2].src_indices} from input "
+                                   f"'{child}'. Error was: {err}.")
+
     def breadth_first_iter(self, start_name):
         queue = deque([start_name])
         while queue:
@@ -142,12 +169,16 @@ class _Tree(object):
             yield name, node
             queue.extend(node.children)
 
-    def dump(self, name, depth=0):
+    def dump(self, name, depth=0, final=True, outstream=sys.stdout):
         node = self.dct[name]
         ident = '   ' * depth + name
-        print(f"{ident}  inds={node.src_inds}  shape={node.src_shape}")
+        if final:
+            print(f"{ident}  inds={node.src_inds}  shape={node.src_shape}", file=outstream)
+        elif node.data:
+            print(f"{ident}  inds={node.data[2].src_indices}  shape={node.data[2].src_shape}",
+                  file=outstream)
         for child in node.children:
-            self.dump(child, depth + 1)
+            self.dump(child, depth + 1, final=final, outstream=outstream)
 
 
 class Group(System):
@@ -803,7 +834,7 @@ class Group(System):
                 src_parent = splt[0] if len(splt) > 2 else ''
                 start_src_inds = None
                 if src not in all_meta_out:
-                    continue
+                    continue  # src is discrete
                 start_src_shape = all_meta_out[src]['global_shape']
                 for tgt in tgts:
                     if tgt not in meta_in:
@@ -871,25 +902,24 @@ class Group(System):
 
                 for top in tops:
                     start_node = tree[top]
-                    if start_node.src_shape is None:
+                    if start_node.data[2].src_shape is None:
                         start_node.src_shape = start_src_shape
-                    if start_src_inds is None:
-                        start_node.set_src_inds(
-                            np.arange(all_meta_out[src]['global_size'], dtype=INT_DTYPE).reshape(start_node.src_shape))
                     else:
-                        start_node.set_src_inds(start_src_inds)
+                        start_node.src_shape = start_node.data[2].src_shape
+                    start_node.set_src_inds(start_src_inds)
 
                     for name, node in tree.breadth_first_iter(top):
-                        mismatches = node.get_mismatched_shapes(tree, name)
-                        if mismatches:
-                            shape1, name1 = mismatches[0][:2]
-                            others = [(shp, n) for _, _, shp, n in mismatches]
-                            raise RuntimeError(f"{self.msginfo}: src_shape {shape1} for '{name1}' "
-                                               f"doesn't match src_shape(s) for {others}.")
-
-                        node.update_child_src_inds(tree)
+                        tree.check_mismatched_shapes(self, name)
+                        tree.update_child_src_props(name)
                         if not node.children:  # this is a leaf node (absolute target)
                             meta = meta_in[name]
+
+                            # update the input metadata with the final src_indices and src_shape
+                            if _is_slicer_op(node.src_inds):
+                                node.src_inds = _slice_indices(node.src_inds,
+                                                               np.product(node.src_shape),
+                                                               node.src_shape)
+                                meta['flat_src_indices'] = True
                             meta['src_indices'] = node.src_inds
                             meta['src_shape'] = node.src_shape
 
@@ -1465,11 +1495,6 @@ class Group(System):
                 # if connection is contained in a subgroup, add to conns to pass down to subsystems.
                 if inparts[:nparts + 1] == outparts[:nparts + 1]:
                     new_conns[inparts[nparts]][abs_in] = abs_out
-
-            # if src_indices is not None:
-            #     if self.pathname not in self._problem_meta['conn_src_indices']:
-            #         self._problem_meta['conn_src_indices'][self.pathname] = {}
-            #     self._problem_meta['conn_src_indices'][self.pathname][prom_in] = (src_indices, flat)
 
         # Compute global_abs_in2out by first adding this group's contributions,
         # then adding contributions from systems above/below, then allgathering.
@@ -3451,48 +3476,3 @@ class Group(System):
                           f"to '{prom}', are connected but their metadata entries {meta}"
                           f" differ. Call <group>.set_input_defaults('{gprom}', {args}), "
                           f"where <group> is the {gname} to remove the ambiguity.")
-
-
-def update_src_indices(subsys, name, tup):
-    """
-    Update metadata for promoted inputs that have had src_indices specified.
-
-    Parameters
-    ----------
-    name : str
-        Name of an input variable that may have associated src_indices.
-    tup : tuple
-        (name/rename, pattern/name, promotes_info).
-    """
-    _, _, prominfo = tup
-    if prominfo is not None:
-        src_indices, flat_src_indices, src_shape = prominfo
-
-        for abs_in in subsys._var_allprocs_prom2abs_list['input'][name]:
-            meta = subsys._var_abs2meta['input'][abs_in]
-
-            _, _, src_indices = ensure_compatible(name, meta['value'], meta['shape'],
-                                                  src_indices)
-
-            is_array = isinstance(src_indices, np.ndarray)
-            if is_array and 'src_indices' in meta and meta['src_indices'] is not None:
-                if not np.array_equal(meta['src_indices'], src_indices):
-                    raise RuntimeError(f"{subsys.msginfo}: Trying to promote input '{name}' "
-                                       f"with src_indices {str(src_indices)},"
-                                       f" but src_indices have already been specified as "
-                                       f"{str(meta['src_indices'])}.")
-            if 'flat_src_indices' in meta and meta['flat_src_indices'] is not None:
-                if not meta['flat_src_indices'] == flat_src_indices:
-                    raise RuntimeError(f"{subsys.msginfo}: Trying to promote input '{name}' "
-                                       f"with flat_src_indices={str(flat_src_indices)} but "
-                                       f"flat_src_indices has already been specified as"
-                                       f" {str(meta['flat_src_indices'])}.")
-
-            meta['src_indices'] = src_indices
-            if _is_slicer_op(src_indices):
-                meta['src_slice'] = src_indices
-                if flat_src_indices is not None:
-                    simple_warning(f"{subsys.msginfo}: Input '{name}' was promoted with "
-                                   "slice src_indices, so flat_src_indices is ignored.")
-                flat_src_indices = True
-            meta['flat_src_indices'] = flat_src_indices
