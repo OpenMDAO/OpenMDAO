@@ -1,5 +1,6 @@
 """Define the Group class."""
 import os
+import sys
 from collections import Counter, OrderedDict, defaultdict, deque
 from collections.abc import Iterable
 
@@ -136,6 +137,7 @@ class _Tree(object):
                 src_shape = self[parent_name].src_shape
             else:
                 src_shape = node.src_shape
+            assert src_shape is not None
             for name in node.children:
                 shape = self[name].src_shape
                 if shape is not None and shape != src_shape:
@@ -922,6 +924,11 @@ class Group(System):
                                 meta['flat_src_indices'] = True
                             meta['src_indices'] = node.src_inds
                             meta['src_shape'] = node.src_shape
+
+                #     tree.dump(top, final=False)
+                #     print('------------')
+                #     tree.dump(top)
+                # print('=======')
 
     def _setup_var_data(self):
         """

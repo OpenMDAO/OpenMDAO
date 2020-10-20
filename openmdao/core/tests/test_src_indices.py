@@ -71,7 +71,7 @@ class SrcIndicesTestCase(unittest.TestCase):
         """
         p = om.Problem()
 
-        g1 = p.model.add_subsystem('g1', om.Group(), promotes_inputs=['a', 'b'])
+        g1 = p.model.add_subsystem('g1', om.Group(), promotes_inputs=['b'])
         # c1 contains scalar calculations
         c1 = g1.add_subsystem('c1', om.ExecComp('y = a0 + b', shape=(1,)),
                               promotes_inputs=[('a0', 'a'), 'b'], promotes_outputs=['y'])
@@ -81,11 +81,18 @@ class SrcIndicesTestCase(unittest.TestCase):
 
         g1.promotes('g2', inputs=['y'], src_indices=[0, 0, 0, 0], src_shape=(1,))
         g1.promotes('g2', inputs=['a'], src_indices=[0, 0, 0, 0], src_shape=(1,))
+
         p.model.promotes('g1', inputs=['a'], src_indices=[0], src_shape=(1,))
 
         p.setup()
+        
+        p['a'] = 99
+        p['b'] = 2
 
         p.run_model()
+        
+        assert_near_equal(p['g1.y'], 101.)
+        assert_near_equal(p['g1.g2.c2.z'], [9999.] * 4)
 
     def test_src_indices_nested_promotes(self):
         """
@@ -108,6 +115,14 @@ class SrcIndicesTestCase(unittest.TestCase):
         p.model.promotes('g1', inputs=['a'], src_indices=[0])
         
         p.setup()
+        
+        p['a'] = 99
+        p['b'] = 2
+        
+        p.run_model()
+
+        assert_near_equal(p['g1.y'], 101.)
+        assert_near_equal(p['g1.g2.c2.z'], [9999.] * 4)
 
 if __name__ == '__main__':
     unittest.main()
