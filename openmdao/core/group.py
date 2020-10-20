@@ -918,7 +918,9 @@ class Group(System):
                         if not node.children:  # this is a leaf node (absolute target)
                             meta = meta_in[name]
 
-                            # update the input metadata with the final src_indices and src_shape
+                            # update the input metadata with the final src_indices,
+                            # flat_src_indices and src_shape
+                            meta['flat_src_indices'] = node.data[2].flat
                             if _is_slicer_op(node.src_inds):
                                 node.src_inds = _slice_indices(node.src_inds,
                                                                np.product(node.src_shape),
@@ -2301,6 +2303,9 @@ class Group(System):
 
             prominfo = _PromotesInfo(src_indices, flat_src_indices, src_shape)
 
+            # print(f"{self.msginfo}: promotes: {subsys_name}, {any}, {inputs}, {outputs}")
+            # #flat={flat_src_indices}, shape={src_shape}, inds={src_indices}")
+
         subsys = getattr(self, subsys_name)
         if any:
             subsys._var_promotes['any'].extend((a, prominfo) for a in any)
@@ -2384,6 +2389,9 @@ class Group(System):
             raise RuntimeError("%s: Can't add subsystem '%s' because an attribute with that name "
                                "already exits." % (self.msginfo, name))
 
+        # print(f"{self.msginfo}: add_subsys: {name}, {promotes}, {promotes_inputs},
+        # {promotes_outputs}")
+
         match = namecheck_rgx.match(name)
         if match is None or match.group() != name:
             raise NameError("%s: '%s' is not a valid sub-system name." % (self.msginfo, name))
@@ -2463,12 +2471,16 @@ class Group(System):
 
         if src_indices is not None and not _is_slicer_op(src_indices):
             src_indices = np.atleast_1d(src_indices)
-
-        if isinstance(src_indices, np.ndarray):
             if not np.issubdtype(src_indices.dtype, np.integer):
                 raise TypeError("%s: src_indices must contain integers, but src_indices for "
                                 "connection from '%s' to '%s' is %s." %
                                 (self.msginfo, src_name, tgt_name, src_indices.dtype.type))
+            if src_indices.ndim == 1:
+                flat_src_indices = True
+
+        # if src_indices is not None:
+        #     print(f"{self.msginfo}: flat={flat_src_indices}, {src_name} -> {tgt_name},
+        # {src_indices.tolist()}")
 
         # target should not already be connected
         for manual_connections in [self._manual_connections, self._static_manual_connections]:
