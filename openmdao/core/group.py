@@ -70,6 +70,38 @@ class _PromotesInfo(object):
     def __repr__(self):
         return f"_PromotesInfo({self.src_indices}, {self.flat}, {self.src_shape})"
 
+    def compare(self, other):
+        """
+        Compare attributes in the two objects.
+
+        Two attributes are considered mismatched only if neither is None and their values
+        are unequal.
+
+        Returns
+        -------
+        list
+            List of unequal atrribute names.
+        """
+        mismatches = []
+
+        if self.flat != other.flat:
+            if self.flat is not None and other.flat is not None:
+                mismatches.append('flat_src_indices')
+
+        if self.src_shape != other.src_shape:
+            if self.src_shape is not None and other.src_shape is not None:
+                mismatches.append('src_shape')
+
+        if isinstance(self.src_indices, np.ndarray) and isinstance(other.src_indices, np.ndarray):
+            if (self.src_indices.shape != other.src_indices.shape or
+                    not np.all(self.src_indices == other.src_indices)):
+                mismatches.append('src_indices')
+        elif not (self.src_indices is None or other.src_indices is None):
+            if self.src_indices != other.src_indices:
+                mismatches.append('src_indices')
+
+        return mismatches
+
     def conv_src_inds(self, src_indices, src_shape):
         if src_indices is None:
             return self.src_indices
@@ -985,7 +1017,7 @@ class Group(System):
                 sub_loc_proms = subsys._var_abs2prom[io]
                 for sub_prom, sub_abs in subsys._var_allprocs_prom2abs_list[io].items():
                     if sub_prom in subprom2prom:
-                        prom_name, _, _ = subprom2prom[sub_prom]
+                        prom_name = subprom2prom[sub_prom][0]
                     else:
                         prom_name = sub_prefix + sub_prom
                     if prom_name not in allprocs_prom2abs_list[io]:
@@ -999,7 +1031,7 @@ class Group(System):
                 subprom2prom = var_maps['input']
                 for sub_prom, metalist in subsys._group_inputs.items():
                     if sub_prom in subprom2prom:
-                        key, _, _ = subprom2prom[sub_prom]
+                        key = subprom2prom[sub_prom][0]
                     else:
                         key = sub_prefix + sub_prom
                     if key not in self._group_inputs:
@@ -3234,31 +3266,44 @@ class Group(System):
         # all tgts are continuous variables
         info = []
         src_idx_found = []
+        abs2prom = self._var_allprocs_abs2prom['input']
+
         for tgt in tgts:
             all_meta = all_abs2meta_in[tgt]
-            dist = all_meta['distributed']
-            has_src_inds = all_meta['has_src_indices']
-
-            if dist:
+            if all_meta['distributed']:
                 # OpenMDAO currently can't create an automatic IndepVarComp for inputs on
                 # distributed components.
                 raise RuntimeError(f'Distributed component input "{tgt}" requires an IndepVarComp.')
-            elif tgt in vars_to_gather:  # remote somewhere
-                if self.comm.rank == vars_to_gather[tgt]:  # this rank owns the variable
-                    meta = abs2meta_in[tgt]
-                    val = meta['value']
-                    if has_src_inds:
-                        src_idx_found.append(tgt)
-                    else:
-                        info.append((tgt, meta['size'], val, False))
+
+            if tgt in vars_to_gather and self.comm.rank != vars_to_gather[tgt]:
+                info.append((tgt, 0, np.zeros(0), True))
+                continue
+
+            # if we get here, tgt is local
+            has_src_inds = all_meta['has_src_indices']
+            prom = abs2prom[tgt]
+            meta = abs2meta_in[tgt]
+            value = meta['value']
+            val = None
+            if prom in self._group_inputs:
+                src_shape = self._group_inputs[prom][0].get('src_shape')
+                if src_shape is not None:
+                    val = np.ones(src_shape)
+
+            if has_src_inds:
+                if val is None:
+                    src_idx_found.append(tgt)
                 else:
-                    info.append((tgt, 0, np.zeros(0), True))
-
-            elif has_src_inds:  # local with non-distrib src_indices
-                src_idx_found.append(tgt)
-
-            else:  # duplicated variable with no src_indices.  Overrides any other conn sizing.
-                return tgt, abs2meta_in[tgt]['size'], abs2meta_in[tgt]['value'], False
+                    val[meta['src_indices']] = value
+            else:
+                if val is None:
+                    val = value
+                else:
+                    val[:] = value
+                if tgt in vars_to_gather:
+                    info.append((tgt, meta['size'], val, False))
+                else:
+                    return tgt, meta['size'], val, False
 
         if src_idx_found:  # auto_ivc connected to local vars with src_indices
             raise RuntimeError(f"The following inputs {src_idx_found} are defined using "
@@ -3310,6 +3355,7 @@ class Group(System):
         for src, tgts in auto2tgt.items():
             tgt, _, val, remote = self._get_auto_ivc_out_val(tgts, vars2gather,
                                                              all_abs2meta, abs2meta)
+
             prom = abs2prom[tgt]
             if prom not in self._group_inputs:
                 self._group_inputs[prom] = [{'use_tgt': tgt}]
@@ -3321,6 +3367,7 @@ class Group(System):
                 units = gmeta['units']
             else:
                 units = all_abs2meta[tgt]['units']
+
             if not remote and 'value' in gmeta:
                 val = gmeta['value']
             relsrc = src.rsplit('.', 1)[-1]

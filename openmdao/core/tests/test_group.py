@@ -1651,11 +1651,9 @@ class TestGroupPromotes(unittest.TestCase):
 
         top = om.Problem(model=TopGroup())
 
-        with self.assertRaises(RuntimeError) as context:
+        msg = "'sub.comp1' <class ExecComp>: input variable 'bb', promoted using ('bb', 'xx'), was already promoted using 'b*'."
+        with assert_warning(UserWarning, msg):
             top.setup()
-
-        self.assertEqual(str(context.exception),
-                         "'sub.comp1' <class ExecComp>: Can't alias promoted input 'bb' to 'xx' because 'bb' has already been promoted.")
 
     def test_promotes_wildcard_name(self):
         class SubGroup(om.Group):
@@ -1674,7 +1672,7 @@ class TestGroupPromotes(unittest.TestCase):
 
         top = om.Problem(model=TopGroup())
 
-        msg = "'sub.comp1' <class ExecComp>: input variable 'bb' was already promoted."
+        msg = "'sub.comp1' <class ExecComp>: input variable 'bb', promoted using 'bb', was already promoted using 'b*'."
         with assert_warning(UserWarning, msg):
             top.setup()
 

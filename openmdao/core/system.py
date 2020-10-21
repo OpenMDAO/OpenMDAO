@@ -1889,7 +1889,7 @@ class System(object):
                     raise TypeError(f"when adding subsystem '{self.pathname}', entry '{key}'"
                                     " is not a string or tuple of size 2.")
 
-        def report_dup(io, matches, match_type, name, tup):
+        def _dup(io, matches, match_type, name, tup):
             """
             Report error or warning when attempting to promote a variable twice.
 
@@ -1901,21 +1901,41 @@ class System(object):
                 Indicates whether match is an explicit name, rename, or pattern match.
             name : str
                 Name of promoted variable that is specified multiple times.
-            tup : tuple (?, ?, _PromotesInfo)
-                First two entries can be names, renames, or patterns depending on the match type.
-            """
-            if match_type == _MatchType.RENAME:
-                raise RuntimeError(f"{self.msginfo}: Can't alias promoted {io} '{name}' to "
-                                   f"'{tup[0]}' because '{name}' has already been promoted.")
+            tup : tuple (?, _PromotesInfo)
+                First entry can be name, rename, or pattern depending on the match type.
 
-            old_key, _, old_info = matches[io][name]
-            if old_key != name and not ('*' in old_key or '?' in old_key or '[' in old_key):
-                # old promote was a rename, so new promote is an error
-                raise RuntimeError(f"{self.msginfo}: Can't promote {io} variable '{name}' via "
-                                   f"pattern '{tup[0]}' because '{name}' was previously aliased "
-                                   f"to '{old_key}'.")
+            Returns
+            -------
+            bool
+                If True, ignore the new match, else replace the old with the new.
+            """
+            old_name, old_key, old_info, old_match_type = matches[io][name]
+            _, info = tup
+            if old_match_type == _MatchType.RENAME:
+                old_key = (old_name, old_key)
             else:
-                simple_warning(f"{self.msginfo}: {io} variable '{name}' was already promoted.")
+                old_using = f"'{old_key}'"
+            if match_type == _MatchType.RENAME:
+                new_using = (name, tup[0])
+            else:
+                new_using = f"'{tup[0]}'"
+
+            mismatch = info.compare(old_info) if info is not None else ()
+            if mismatch:
+                raise RuntimeError(f"{self.msginfo}: {io} variable '{name}', promoted using "
+                                   f"{new_using}, was already promoted using {old_using} with "
+                                   f"different values for {mismatch}.")
+
+            if old_match_type != _MatchType.PATTERN:
+                if old_key != tup[0]:
+                    raise RuntimeError(f"{self.msginfo}: Can't alias promoted {io} '{name}' to "
+                                       f"'{tup[0]}' because '{name}' has already been promoted as "
+                                       f"'{old_key}'.")
+
+            simple_warning(f"{self.msginfo}: {io} variable '{name}', promoted using {new_using}, "
+                           f"was already promoted using {old_using}.")
+
+            return match_type == _MatchType.PATTERN
 
         def resolve(to_match, io_types, matches, proms):
             """
@@ -1937,15 +1957,14 @@ class System(object):
                         if io == 'output':
                             pinfo = None
                         if key == '*' and not matches[io]:  # special case. add everything
-                            matches[io] = pmap = {n: (n, key, pinfo) for n in proms[io]}
+                            matches[io] = pmap = {n: (n, key, pinfo, match_type) for n in proms[io]}
                         else:
                             pmap = matches[io]
                             nmatch = len(pmap)
                             for n in proms[io]:
                                 if fnmatchcase(n, key):
-                                    if n in pmap:
-                                        report_dup(io, matches, match_type, n, tup)
-                                    pmap[n] = (n, key, pinfo)
+                                    if not (n in pmap and _dup(io, matches, match_type, n, tup)):
+                                        pmap[n] = (n, key, pinfo, match_type)
                             if len(pmap) > nmatch:
                                 found.add(key)
                 else:  # NAME or RENAME
@@ -1955,8 +1974,8 @@ class System(object):
                         pmap = matches[io]
                         if key in proms[io]:
                             if key in pmap:
-                                report_dup(io, matches, match_type, key, tup)
-                            pmap[key] = (s, key, pinfo)
+                                _dup(io, matches, match_type, key, tup)
+                            pmap[key] = (s, key, pinfo, match_type)
                             if match_type == _MatchType.NAME:
                                 found.add(key)
                             else:

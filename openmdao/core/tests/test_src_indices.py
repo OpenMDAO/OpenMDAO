@@ -63,6 +63,8 @@ class SrcIndicesTestCase(unittest.TestCase):
 
         p.run_model()
 
+        assert_near_equal(p['g1.c2.z'], [20.] * 4)
+
     def test_multiple_inputs_different_src_indices(self):
         """
         When different variables get promoted to the same name, but have different src_indices, this
@@ -85,12 +87,12 @@ class SrcIndicesTestCase(unittest.TestCase):
         p.model.promotes('g1', inputs=['a'], src_indices=[0], src_shape=(1,))
 
         p.setup()
-        
+
         p['a'] = 99
         p['b'] = 2
 
         p.run_model()
-        
+
         assert_near_equal(p['g1.y'], 101.)
         assert_near_equal(p['g1.g2.c2.z'], [9999.] * 4)
 
@@ -100,7 +102,7 @@ class SrcIndicesTestCase(unittest.TestCase):
         """
         p = om.Problem()
 
-        g1 = p.model.add_subsystem('g1', om.Group(), promotes_inputs=['a', 'b'])
+        g1 = p.model.add_subsystem('g1', om.Group(), promotes_inputs=['b'])
         # c1 contains scalar calculations
         c1 = g1.add_subsystem('c1', om.ExecComp('y = a0 + b', shape=(1,)),
                               promotes_inputs=[('a0', 'a'), 'b'], promotes_outputs=['y'])
@@ -113,16 +115,37 @@ class SrcIndicesTestCase(unittest.TestCase):
         g1.promotes('g2', inputs=['y'], src_indices=[0, 0, 0, 0], src_shape=(1,))
 
         p.model.promotes('g1', inputs=['a'], src_indices=[0])
-        
+
         p.setup()
-        
+
         p['a'] = 99
         p['b'] = 2
-        
+
         p.run_model()
 
         assert_near_equal(p['g1.y'], 101.)
         assert_near_equal(p['g1.g2.c2.z'], [9999.] * 4)
+
+# class SrcIndicesMPITestCase(unittest.TestCase):
+#     N_PROCS = 2
+
+#     def test_multi_promotes_mpi(self):
+#         p = om.Problem()
+#         par = p.model.add_subsystem('par', om.ParallelGroup())
+#         g1 = par.add_subsystem('g1', om.Group())
+#         g2 = par.add_subsystem('g2', om.Group())
+#         g1.add_subsystem('C1', om.ExecComp('y = 3*x', shape=3))
+#         g2.add_subsystem('C2', om.ExecComp('y = 2*x', shape=2))
+#         g1.promotes('C1', inputs=['x'], src_indices=om.slicer[:, 1], src_shape=(3,2))
+#         g2.promotes('C2', inputs=['x'], src_indices=[0,-1], src_shape=(3,2), flat_src_indices=True)
+#         par.promotes('g1', inputs=['x'])
+#         par.promotes('g2', inputs=['x'])
+#         par.set_input_defaults('x', src_shape=(3,2))
+
+#         #import wingdbstub
+#         p.setup()
+#         p.run_model()
+
 
 if __name__ == '__main__':
     unittest.main()
