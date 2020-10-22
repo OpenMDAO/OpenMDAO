@@ -542,7 +542,7 @@ class TestMultiConns(unittest.TestCase):
             prob.setup()
 
         msg = "The following inputs ['c1.x', 'c2.x'] are defined using src_indices but the total source "
-        msg += "size is undetermined.  Please add an IndepVarComp as the source."
+        msg += "size is undetermined.  You can specify the src size by setting 'val' or 'src_shape' in a call to set_input_defaults, or by adding an IndepVarComp as the source."
 
         err_msg = str(context.exception).split(':')[-1]
         self.assertEqual(err_msg, msg)

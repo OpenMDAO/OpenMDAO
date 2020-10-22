@@ -1829,7 +1829,7 @@ class TestGroupPromotes(unittest.TestCase):
 
             def configure(self):
                 self.indep.add_output('a1', np.ones(3))
-                self.promotes('comp1', inputs=['a'], src_indices=[0, 1, 2])
+                self.promotes('comp1', inputs=['a'], src_indices=[0, 1, 2], src_shape=3)
 
         p = om.Problem(model=SimpleGroup())
 
@@ -2025,7 +2025,7 @@ class TestGroupPromotes(unittest.TestCase):
             p.setup()
 
         self.assertEqual(str(cm.exception),
-            "Input 'sub.a' src_indices are [0 1 2] and indexing into those failed using src_indices [0 2 4] from input 'sub.comp.a'. Error was: index 4 is out of bounds for axis 0 with size 3.")
+            "In connection from 'ind.a' to 'sub.comp.a', input 'sub.a' src_indices are [0 1 2] and indexing into those failed using src_indices [0 2 4] from input 'sub.comp.a'. Error was: index 4 is out of bounds for axis 0 with size 3.")
 
 
 class MyComp(om.ExplicitComponent):
@@ -3509,8 +3509,8 @@ class TestFeatureSrcIndices(unittest.TestCase):
         p.model.add_subsystem('G1', MyGroup(), promotes_inputs=['x'])
 
         p.setup()
-        p.set_val('x', np.array(range(5)))
-        inp = np.array(range(5))
+        inp = np.random.random(5)
+        p.set_val('x', inp)
         p.run_model()
 
         assert_near_equal(p.get_val('G1.comp1.x'), inp[:3])
@@ -3935,6 +3935,7 @@ class TestNaturalNamingMPI(unittest.TestCase):
         g4a = g3a.add_subsystem('g4', om.Group(), promotes=['*'])
         c1 = g4a.add_subsystem('c1', om.ExecComp('y=2.0*x', x=7., y=9.), promotes=['x','y'])
 
+        import wingdbstub
         p.setup()
 
         for gtop in ['par.g1', 'par.g1a']:

@@ -141,9 +141,11 @@ class _Node(object):
         else:
             return src_indices.reshape(src_shape)[my_src_inds]
 
+
 class _Tree(object):
-    def __init__(self):
+    def __init__(self, src):
         self.dct = {}
+        self.src = src
 
     def __contains__(self, name):
         return name in self.dct
@@ -179,12 +181,12 @@ class _Tree(object):
                         mismatched_shapes.append((parent_name, src_shape, name, shape))
 
         if mismatched_shapes:
-            shape1  = mismatched_shapes[0][:2]
+            shape1 = mismatched_shapes[0][:2]
             others = [(n, shp) for _, _, n, shp in mismatched_shapes]
             raise RuntimeError(f"{system.msginfo}: src_shape {shape1} "
                                f"doesn't match src_shape(s) for {others}.")
 
-    def update_child_src_props(self, parent_name):
+    def update_child_src_props(self, system, parent_name):
         parent_node = self[parent_name]
         for child, node in parent_node.children.items():
             if node.src_shape is None:
@@ -192,10 +194,11 @@ class _Tree(object):
             try:
                 node.set_src_inds(parent_node.src_inds)
             except Exception as err:
-                raise RuntimeError(f"Input '{parent_name}' src_indices "
-                                   f"are {parent_node.src_inds} and indexing into those failed "
-                                   f"using src_indices {node.data[2].src_indices} from input "
-                                   f"'{child}'. Error was: {err}.")
+                raise RuntimeError(f"In connection from '{self.src}' to '{child}', input "
+                                   f"'{parent_name}' src_indices are {parent_node.src_inds} and "
+                                   f"indexing into those failed using src_indices "
+                                   f"{node.data[2].src_indices} from input '{child}'. Error was: "
+                                   f"{err}.")
 
     def breadth_first_iter(self, start_name):
         queue = deque([start_name])
@@ -375,6 +378,13 @@ class Group(System):
         meta = {'prom': name}
         if val is not _UNDEFINED:
             meta['value'] = val
+            if src_shape is not None:
+                simple_warning(f"{self.msginfo}: value was set in set_input_defaults, so ignoring "
+                               f"value {src_shape} of src_shape.")
+            if isinstance(val, np.ndarray):
+                src_shape = val.shape
+            elif isinstance(val, Number):
+                src_shape = 1
         if units is not None:
             if not valid_units(units):
                 raise ValueError(f"{self.msginfo}: The units '{units}' are invalid.")
@@ -772,7 +782,7 @@ class Group(System):
                             if prom in t_prom2abs:
                                 t_prom2abs[prom].update(absnames)
                             else:
-                                t_prom2abs[prom] = absnames
+                                t_prom2abs[prom] = set(absnames)
 
                     for prom, absnames in t_prom2abs.items():
                         t_prom2abs[prom] = sorted(absnames)  # sort to keep order same on all procs
@@ -881,15 +891,15 @@ class Group(System):
                     self._resolve_src_indices(systems, src, tgts)
 
     def _resolve_src_indices(self, systems, src, tgts):
+        tree = _Tree(src)
         if src in self._var_allprocs_discrete['output']:
-            return  # no src_indices for discretes
+            return tree  # no src_indices for discretes
 
         sys2prom_src_inds = self._problem_meta['promotes_src_indices']
         meta_in = self._var_abs2meta['input']
         all_meta_in = self._var_allprocs_abs2meta['input']
         all_meta_out = self._var_allprocs_abs2meta['output']
 
-        tree = _Tree()
         tops = {}
         splt = src.rsplit('.', 2)
         src_parent = splt[0] if len(splt) > 2 else ''
@@ -897,7 +907,7 @@ class Group(System):
         for tgt in tgts:
             start_src_inds = None
             if tgt not in meta_in:
-                return  # either discrete or not local
+                continue  # either discrete or not local
             nodes = []
             snames = tgt.split('.')[:-1]
 
@@ -909,7 +919,7 @@ class Group(System):
             else:
                 if meta.get('add_input_src_indices'):
                     leaf_prom_info = _PromotesInfo(meta['src_indices'],
-                                                    meta['flat_src_indices'], None)
+                                                   meta['flat_src_indices'], None)
                 else:
                     start_src_inds = meta['src_indices']
                     leaf_prom_info = _PromotesInfo(None, meta['flat_src_indices'], None)
@@ -931,8 +941,7 @@ class Group(System):
                 if sysname in sys2prom_src_inds:
                     p2info = sys2prom_src_inds[sysname]
                     if pname in p2info:
-                        nodes.append(('.'.join((sysname, pname)), p2info[pname],
-                                        src_shape))
+                        nodes.append(('.'.join((sysname, pname)), p2info[pname], src_shape))
                 elif src_shape is not None:
                     nodes.append(('.'.join((sysname, pname)), None, src_shape))
 
@@ -969,7 +978,7 @@ class Group(System):
 
             for name, node in tree.breadth_first_iter(top):
                 tree.check_mismatched_shapes(self, name)
-                tree.update_child_src_props(name)
+                tree.update_child_src_props(self, name)
                 if not node.children:  # this is a leaf node (absolute target)
                     meta = meta_in[name]
 
@@ -979,11 +988,9 @@ class Group(System):
                     meta['src_indices'] = node.src_inds
                     meta['src_shape'] = node.src_shape
                     if _is_slicer_op(node.src_inds):
-                        #meta['flat_src_indices'] = True
                         meta['src_slice'] = node.src_inds
                         node.src_inds = _slice_indices(node.src_inds,
-                                                        np.product(node.src_shape),
-                                                        node.src_shape)
+                                                       np.product(node.src_shape), node.src_shape)
 
         #     tree.dump(top, final=False)
         #     print('------------')
@@ -3318,10 +3325,8 @@ class Group(System):
             prom = abs2prom[tgt]
             meta = abs2meta_in[tgt]
             size = meta['size']
-            if size <= max_size:
-                continue
-            max_size = size
-            has_src_inds = meta['src_indices'] is not None or (tgt in tree and tree[tgt].src_inds is not None)
+            has_src_inds = (meta['src_indices'] is not None or
+                            (tgt in tree and tree[tgt].src_inds is not None))
 
             value = meta['value']
             val = None
@@ -3337,10 +3342,22 @@ class Group(System):
                 if val is None:
                     src_idx_found.append(tgt)
                 else:
-                    if meta['flat_src_indices']:
-                        val.ravel()[meta['src_indices']] = value
-                    else:
-                        val[meta['src_indices']] = value
+                    try:
+                        if meta['flat_src_indices']:
+                            val.ravel()[meta['src_indices']] = value
+                        else:
+                            val[meta['src_indices']] = value
+                    except ValueError:
+                        src = self._conn_global_abs_in2out[tgt]
+                        src_indices = meta['src_indices']
+                        if _is_slicer_op(src_indices):
+                            src_indices = _slice_indices(src_indices, size, meta['shape'])
+                        msg = f"{self.msginfo}: The source indices " + \
+                              f"{src_indices} do not specify a " + \
+                              f"valid shape for the connection '{src}' to " + \
+                              f"'{tgt}'. The target shape is " + \
+                              f"{meta['shape']} but indices are {src_indices.shape}."
+                        raise ValueError(msg)
             else:
                 if val is None:
                     val = value
@@ -3350,11 +3367,15 @@ class Group(System):
                 if tgt not in vars_to_gather:
                     found_dup = True
 
-            info = (tgt, size, val, False)
+            if size > max_size:
+                max_size = size
+                info = (tgt, size, val, False)
 
         if src_idx_found and not found_dup:  # auto_ivc connected to local vars with src_indices
             raise RuntimeError(f"The following inputs {src_idx_found} are defined using "
-                               "src_indices but the total source size is undetermined.  Please add "
+                               "src_indices but the total source size is undetermined.  You can "
+                               "specify the src size by setting 'val' or 'src_shape' in "
+                               "a call to set_input_defaults, or by adding "
                                "an IndepVarComp as the source.")
 
         # return max sized (tgt, size, value, remote)

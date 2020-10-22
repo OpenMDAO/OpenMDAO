@@ -140,7 +140,7 @@ class SrcIndicesMPITestCase(unittest.TestCase):
         g2.promotes('C2', inputs=['x'], src_indices=[0,-1], src_shape=(3,2), flat_src_indices=True)
         par.promotes('g1', inputs=['x'])
         par.promotes('g2', inputs=['x'])
-        
+
         # we want the auto_ivc connected to x to have a shape of (3,2), which differs from the
         # shapes of either of the connected absolute inputs.
         par.set_input_defaults('x', src_shape=(3,2))
