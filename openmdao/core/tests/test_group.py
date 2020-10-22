@@ -3935,7 +3935,6 @@ class TestNaturalNamingMPI(unittest.TestCase):
         g4a = g3a.add_subsystem('g4', om.Group(), promotes=['*'])
         c1 = g4a.add_subsystem('c1', om.ExecComp('y=2.0*x', x=7., y=9.), promotes=['x','y'])
 
-        import wingdbstub
         p.setup()
 
         for gtop in ['par.g1', 'par.g1a']:

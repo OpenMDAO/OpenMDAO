@@ -744,8 +744,8 @@ class Group(System):
         """
         iotypes = ('input', 'output')
         if self.comm.size > 1:
-            prom2abs = {'input': {}, 'output': {}}
-            rem_prom2abs = {'input': {}, 'output': {}}
+            prom2abs = {'input': defaultdict(set), 'output': defaultdict(set)}
+            rem_prom2abs = {'input': defaultdict(set), 'output': defaultdict(set)}
             myrank = self.comm.rank
             vars_to_gather = self._vars_to_gather
 
@@ -758,20 +758,10 @@ class Group(System):
                     t_prom2abs = prom2abs[typ]
                     for prom, alist in s._var_allprocs_prom2abs_list[typ].items():
                         abs_names = [n for n in alist if n in sys_abs2prom]
-                        pname = prefix + prom
-                        if myrank == 0:
-                            if pname in t_prom2abs:
-                                t_prom2abs[pname].update(abs_names)
-                            else:
-                                t_prom2abs[pname] = set(abs_names)
-                        else:
-                            if pname in t_remprom2abs:
-                                vnames = [n for n in abs_names if n in vars_to_gather
-                                          and vars_to_gather[n] == myrank]
-                                if pname in t_remprom2abs:
-                                    t_remprom2abs[pname].update(vnames)
-                                else:
-                                    t_remprom2abs[pname] = set(vnames)
+                        t_prom2abs[prefix + prom].update(abs_names)
+                        t_remprom2abs[prefix + prom].update(n for n in abs_names
+                                                            if n in vars_to_gather
+                                                            and vars_to_gather[n] == myrank)
 
             all_proms = self.comm.gather(rem_prom2abs, root=0)
             if myrank == 0:
@@ -779,10 +769,7 @@ class Group(System):
                     t_prom2abs = prom2abs[typ]
                     for rankproms in all_proms:
                         for prom, absnames in rankproms[typ].items():
-                            if prom in t_prom2abs:
-                                t_prom2abs[prom].update(absnames)
-                            else:
-                                t_prom2abs[prom] = set(absnames)
+                            t_prom2abs[prom].update(absnames)
 
                     for prom, absnames in t_prom2abs.items():
                         t_prom2abs[prom] = sorted(absnames)  # sort to keep order same on all procs
@@ -791,7 +778,7 @@ class Group(System):
             else:
                 prom2abs = self.comm.bcast(None, root=0)
         else:  # serial
-            prom2abs = {'input': {}, 'output': {}}
+            prom2abs = {'input': defaultdict(list), 'output': defaultdict(list)}
             for s in self.system_iter(recurse=True):
                 prefix = s.pathname + '.' if s.pathname else ''
                 for typ in iotypes:

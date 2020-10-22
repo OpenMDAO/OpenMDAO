@@ -145,7 +145,6 @@ class SrcIndicesMPITestCase(unittest.TestCase):
         # shapes of either of the connected absolute inputs.
         par.set_input_defaults('x', src_shape=(3,2))
 
-        #import wingdbstub
         p.setup()
         p.run_model()
 
