@@ -16,9 +16,8 @@ from numbers import Integral
 import numpy as np
 import networkx as nx
 
-import openmdao
 from openmdao.core.configinfo import _ConfigInfo
-from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED, INT_DTYPE
+from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED, INT_DTYPE, INF_BOUND
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.vectors.vector import _full_slice
@@ -2528,11 +2527,11 @@ class System(object):
         adder, scaler = determine_adder_scaler(ref0, ref, adder, scaler)
 
         # Convert lower to ndarray/float as necessary
-        lower = format_as_float_or_array('lower', lower, val_if_none=-openmdao.INF_BOUND,
+        lower = format_as_float_or_array('lower', lower, val_if_none=-INF_BOUND,
                                          flatten=True)
 
         # Convert upper to ndarray/float as necessary
-        upper = format_as_float_or_array('upper', upper, val_if_none=openmdao.INF_BOUND,
+        upper = format_as_float_or_array('upper', upper, val_if_none=INF_BOUND,
                                          flatten=True)
 
         # Apply scaler/adder to lower and upper
@@ -2700,7 +2699,7 @@ class System(object):
 
             # Convert lower to ndarray/float as necessary
             try:
-                lower = format_as_float_or_array('lower', lower, val_if_none=-openmdao.INF_BOUND,
+                lower = format_as_float_or_array('lower', lower, val_if_none=-INF_BOUND,
                                                  flatten=True)
             except (TypeError, ValueError):
                 raise TypeError("Argument 'lower' can not be a string ('{}' given). You can not "
@@ -2709,7 +2708,7 @@ class System(object):
 
             # Convert upper to ndarray/float as necessary
             try:
-                upper = format_as_float_or_array('upper', upper, val_if_none=openmdao.INF_BOUND,
+                upper = format_as_float_or_array('upper', upper, val_if_none=INF_BOUND,
                                                  flatten=True)
             except (TypeError, ValueError):
                 raise TypeError("Argument 'upper' can not be a string ('{}' given). You can not "

@@ -20,9 +20,8 @@ import json
 import importlib
 
 import numpy as np
-import openmdao
 
-from openmdao.core.constants import INT_DTYPE
+from openmdao.core.constants import INT_DTYPE, INF_BOUND
 
 # Certain command line tools can make use of this to allow visualization of models when errors
 # are present that would normally cause setup to abort.
@@ -487,9 +486,9 @@ def format_as_float_or_array(name, values, val_if_none=0.0, flatten=False):
     elif values is None:
         values = val_if_none
     elif values == float('inf'):
-        values = openmdao.INF_BOUND
+        values = INF_BOUND
     elif values == -float('inf'):
-        values = -openmdao.INF_BOUND
+        values = -INF_BOUND
     elif isinstance(values, numbers.Number):
         values = float(values)
     else:
