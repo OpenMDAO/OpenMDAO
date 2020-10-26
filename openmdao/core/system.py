@@ -4399,11 +4399,13 @@ class System(object):
             return self._abs_get_val(src, get_remote, rank, vec_name, 'output', flat,
                                      from_root=True)
 
+        is_abs = name in self._var_allprocs_abs2meta['input']
+
         # if we have multiple promoted inputs that are explicitly connected to an output and units
         # have not been specified, look for group input to disambiguate
         if units is None and len(abs_ins) > 1:
             if abs_name not in self._var_allprocs_discrete['input']:
-                # can't get here unless self is a Group because len(abs_ins) always == 1 for comp
+                # can't get here unless Group because len(abs_ins) always == 1 for comp
                 if scope_sys is None:
                     scope_sys = self
                 try:
@@ -4425,11 +4427,12 @@ class System(object):
             src_indices = None  # FIXME: remote var could have src_indices
             has_src_indices = vmeta['has_src_indices']
             distrib = vmeta['distributed']
-            if distrib and get_remote is None:
-                raise RuntimeError(f"{self.msginfo}: Variable '{abs_name}' is a distributed "
-                                   "variable. You can retrieve values from all processes "
-                                   "using `get_val(<name>, get_remote=True)` or from the "
-                                   "local process using `get_val(<name>, get_remote=False)`.")
+
+        if distrib and get_remote is None:
+            raise RuntimeError(f"{self.msginfo}: Variable '{abs_name}' is a distributed "
+                               "variable. You can retrieve values from all processes "
+                               "using `get_val(<name>, get_remote=True)` or from the "
+                               "local process using `get_val(<name>, get_remote=False)`.")
 
         smeta = self._problem_meta['model_ref']()._var_allprocs_abs2meta['output'][src]
         sdistrib = smeta['distributed']
@@ -4442,7 +4445,7 @@ class System(object):
         # get value of the source
         val = self._abs_get_val(src, get_remote, rank, vec_name, 'output', flat, from_root=True)
 
-        if has_src_indices:
+        if has_src_indices and is_abs:
             if src_indices is None:  # input is remote
                 val = np.zeros(0)
             else:
@@ -4493,7 +4496,7 @@ class System(object):
                 val.shape = self._var_allprocs_abs2meta['input'][abs_name]['global_shape']
             elif val.size > 0:
                 val.shape = vmeta['shape']
-        else:
+        elif is_abs:
             val = val.reshape(vmeta['shape'])
 
         if indices is not None:

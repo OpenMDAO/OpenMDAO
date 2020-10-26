@@ -182,6 +182,7 @@ class ProbRemoteTestCase(unittest.TestCase):
                        "`get_val(<name>, get_remote=True)` or from the local "
                        "process using `get_val(<name>, get_remote=False)`.")
 
+        #import wingdbstub
         if prob.comm.rank == 0:
             #
             # get_remote=False
@@ -212,8 +213,7 @@ class ProbRemoteTestCase(unittest.TestCase):
             # get_remote=None
             #
 
-            # distributed should raise exception, except for input with from_src=True (the default)
-            assert_near_equal(prob['dst.x'], [7.])  # from src ('ivc.x')
+            assert_near_equal(prob.get_val('dst.x', get_remote=False), [7.])  # from src ('ivc.x')
 
             with self.assertRaises(RuntimeError) as cm:
                 assert_near_equal(prob.model.get_val('dst.x', get_remote=None, from_src=False), [7.])
@@ -270,7 +270,7 @@ class ProbRemoteTestCase(unittest.TestCase):
             #
 
             # distributed should raise exception, except for input with from_src=True (the default)
-            assert_near_equal(prob['dst.x'], [7.])  # from src ('ivc.x')
+            assert_near_equal(prob.get_val('dst.x', get_remote=False), [7.])  # from src ('ivc.x')
 
             with self.assertRaises(RuntimeError) as cm:
                 assert_near_equal(prob.model.get_val('dst.x', get_remote=None, from_src=False), [7.])

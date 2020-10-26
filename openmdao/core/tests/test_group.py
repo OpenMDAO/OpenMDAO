@@ -1456,7 +1456,7 @@ class TestGroupMPISlice(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(p['C1.x'], np.array([6, 22, 38, 54]))
+        assert_near_equal(p.get_val('C1.x', get_remote=False), np.array([6, 22, 38, 54]))
 
     def test_om_slice_4D_with_ellipsis_mpi(self):
 
@@ -1505,7 +1505,7 @@ class TestGroupMPISlice(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(p['C1.x'], np.array([4, 4, 4, 4]))
+        assert_near_equal(p.get_val('C1.x', get_remote=False), np.array([4, 4, 4, 4]))
 
 class TestGroupPromotes(unittest.TestCase):
 

@@ -519,12 +519,13 @@ class Problem(object):
             if model._outputs._contains_abs(abs_name):
                 model._outputs.set_var(abs_name, value, indices)
             elif abs_name in conns:  # input name given. Set value into output
+                is_abs = name in model._var_allprocs_abs2meta['input']
                 if model._outputs._contains_abs(src):  # src is local
                     if (model._outputs._abs_get_val(src).size == 0 and
                             src.rsplit('.', 1)[0] == '_auto_ivc' and
                             all_meta['output'][src]['distributed']):
                         pass  # special case, auto_ivc dist var with 0 local size
-                    elif tmeta['has_src_indices'] and n_proms < 2:
+                    elif is_abs and tmeta['has_src_indices']:  # and n_proms < 2:
                         if tlocmeta:  # target is local
                             src_indices = tlocmeta['src_indices']
                             if tmeta['distributed']:

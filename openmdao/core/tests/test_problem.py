@@ -1128,12 +1128,12 @@ class TestProblem(unittest.TestCase):
         prob.setup()
 
         # set G1.x to 2.0 m, based on the units we gave in the set_input_defaults call
-        prob['G1.x'] = 2.0
+        prob['G1.x'] = np.ones(3) * 2.0
 
         prob.run_model()
 
         # we gave 'G1.x' units of 'm' in the set_input_defaults call
-        assert_near_equal(prob['G1.x'], 2.0, 1e-6)
+        assert_near_equal(prob['G1.x'], np.ones(3) * 2.0, 1e-6)
 
         # using absolute value will give us the value of the input C1.x, in its units of 'cm'
         assert_near_equal(prob['G1.C1.x'], 200.0, 1e-6)

@@ -27,12 +27,14 @@ class SrcIndicesTestCase(unittest.TestCase):
         model.add_subsystem('outer', Outer())
         model.connect('src.y', 'outer.desvar_x', src_indices=[2, 4], flat_src_indices=True)
         prob.setup()
-        prob.set_val('src.x', np.array([1.0, 3.0, 5.0, 7.0, 9.0, 11.0, 13.0]))
+        srcval = np.array([1.0, 3.0, 5.0, 7.0, 9.0, 11.0, 13.0])
+        prob.set_val('src.x', srcval)
         prob.run_model()
+        assert_near_equal(prob.get_val('outer.desvar_x'), srcval * 3, 1e-6)
         expected = np.array([[15., 27.],
                              [15., 27.],
                              [15., 27.]])
-        assert_near_equal(prob.get_val('outer.desvar_x'), expected, 1e-6)
+        assert_near_equal(prob.get_val('outer.inner.comp.x'), expected, 1e-6)
 
     def test_broadcast_scalar_connection(self):
         """
@@ -126,6 +128,157 @@ class SrcIndicesTestCase(unittest.TestCase):
         assert_near_equal(p['g1.y'], 101.)
         assert_near_equal(p['g1.g2.c2.z'], [9999.] * 4)
 
+    def test_mixed_src_indices_no_src_indices(self):
+        class C1(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('diameter', 0.0, units='m', src_indices=[0])
+                self.add_output('z_start', 0.0, units='m')
+
+            def compute(self, inputs, outputs):
+                outputs['z_start'] = inputs['diameter'] * 2.
+
+
+        class C2(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_input('diameter', np.zeros(3), units='m')
+
+            def compute(self, inputs, outputs):
+                pass
+
+        # this test passes if setup doesn't raise an exception.
+        # C1 has src_indices and C2 doesn't.
+        prob = om.Problem()
+        prob.model.add_subsystem('C1', C1(), promotes=['diameter'])
+        prob.model.add_subsystem('C2', C2(), promotes=['diameter'])
+
+        prob.setup()
+
+        prob['diameter'] = np.ones(3) * 1.5
+
+        prob.run_model()
+
+        assert_near_equal(prob['C1.z_start'], 3.)
+        
+        assert_near_equal(prob['diameter'], np.ones(3) * 1.5)
+        assert_near_equal(prob['C1.diameter'], 1.5)
+        assert_near_equal(prob['C2.diameter'], np.ones(3) * 1.5)
+
+    def test_flat_src_inds_2_levels(self):
+        class Burn1(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', om.ExecComp(['y1=x*2'], y1=np.ones(4), x=np.ones(4)),
+                                promotes_outputs=['*'])
+
+                self.add_subsystem('comp2', om.ExecComp(['y2=x*3'], y2=np.ones(4), x=np.ones(4)),
+                                promotes_outputs=['*'])
+
+            def configure(self):
+                self.promotes('comp1', inputs=[('x', 'design:x')],
+                            src_indices=[0, 0, 0, 0], flat_src_indices=True)
+
+                self.set_input_defaults('design:x', 75.3)
+
+
+        class Traj(om.Group):
+            def setup(self):
+                self.add_subsystem('burn1', Burn1(),
+                                promotes_outputs=['*'])
+
+            def configure(self):
+                self.promotes('burn1', inputs=['design:x'],
+                            src_indices=[0, 0, 0, 0], flat_src_indices=True)
+
+        prob = om.Problem(model=Traj())
+
+        prob.setup()
+        prob.run_model()
+
+        assert_near_equal(prob['design:x'], 75.3)
+        assert_near_equal(prob['y1'], [75.3*2]*4)
+        assert_near_equal(prob['y2'], [1*3]*4)
+
+    def test_src_inds_2_subs(self):
+
+        class RHS(om.Group):
+
+            def initialize(self):
+                self.options.declare('size', 1)
+
+            def setup(self):
+                size = self.options['size']
+                self.add_subsystem('comp1', om.ExecComp(['y1=x*2'], y1=np.ones(size), x=np.ones(size)),
+                                promotes_inputs=['*'], promotes_outputs=['*'])
+
+                # test with second absolute path for 'x'
+                self.add_subsystem('comp2', om.ExecComp(['y2=x*3'], y2=np.ones(size), x=np.ones(size)),
+                                promotes_inputs=['*'], promotes_outputs=['*'])
+
+
+        class Phase(om.Group):
+            def setup(self):
+                self.add_subsystem('rhs', RHS(size=4))
+
+            def configure(self):
+                self.promotes('rhs', inputs=[('x', 'design:x')],
+                            src_indices=[0, 0, 0, 0], flat_src_indices=True)
+
+                # this doesn't set the value because it's connected to a non-auto_ivc that
+                # already has a value of 1.0 that overrides it.
+                self.set_input_defaults('design:x', 75.3)
+
+
+        class Traj(om.Group):
+            def setup(self):
+                self.add_subsystem('src', om.ExecComp(['q = b*3'], b=1.5))
+
+                self.add_subsystem('phase', Phase())
+
+                self.connect('src.q', 'phase.design:x')
+
+        prob = om.Problem(model=Traj())
+
+        prob.setup()
+        prob.run_model()
+
+        assert_near_equal(prob['phase.design:x'], 4.5)
+        assert_near_equal(prob['phase.rhs.y1'], [4.5*2]*4)
+        assert_near_equal(prob['phase.rhs.y2'], [4.5*3]*4)
+
+    def test_sub_sub_promotes(self):
+        class Burn1(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', om.ExecComp(['y1=x*2'], y1=np.ones(4), x=np.ones(4)),
+                                promotes_outputs=['*'])
+                self.add_subsystem('comp2', om.ExecComp(['y2=x*2'], y2=np.ones(4), x=np.ones(4)),
+                                promotes_outputs=['*'])
+
+            def configure(self):
+                self.promotes('comp1', inputs=[('x', 'design:x')], src_indices=[0, 0, 0, 0], flat_src_indices=True)
+                self.set_input_defaults('design:x', 75.3)
+
+        class Phases(om.ParallelGroup):
+            def setup(self):
+                self.add_subsystem('burn1', Burn1(), promotes_outputs=['*'])
+
+        class Traj(om.Group):
+            def setup(self):
+                self.add_subsystem('phases', Phases(), promotes_outputs=['*'])
+
+            def configure(self):
+                # this promotes was leaving a leftover entry in _group_inputs that resulted
+                # from an earlier _setup_var_data call where the input in question had a different
+                # promoted name.
+                self.phases.promotes('burn1', inputs=['design:x'])
+
+        prob = om.Problem(model=Traj())
+        prob.setup()
+        prob.run_model()
+
+        assert_near_equal(prob['phases.design:x'], 75.3)
+        assert_near_equal(prob['y1'], [75.3*2]*4)
+
+
 class SrcIndicesMPITestCase(unittest.TestCase):
     N_PROCS = 2
 
@@ -148,7 +301,6 @@ class SrcIndicesMPITestCase(unittest.TestCase):
         # we want the auto_ivc output to have a shape of (3,3)
         p.model.promotes('par', inputs=['x'], src_indices=om.slicer[:,:-1], src_shape=(3,3))
 
-        # import wingdbstub
         p.setup()
 
         inp = np.random.random((3,3))
