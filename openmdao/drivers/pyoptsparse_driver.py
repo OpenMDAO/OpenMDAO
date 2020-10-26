@@ -50,8 +50,10 @@ DEFAULT_OPT_SETTINGS['IPOPT'] = {
 }
 
 CITATIONS = """@article{Wu_pyoptsparse_2020,
-    author = {Neil Wu and Gaetan Kenway and Charles A. Mader and John Jasa and Joaquim R. R. A. Martins},
-    title = {{pyOptSparse:} A {Python} framework for large-scale constrained nonlinear optimization of sparse systems},
+    author = {Neil Wu and Gaetan Kenway and Charles A. Mader and John Jasa and
+     Joaquim R. R. A. Martins},
+    title = {{pyOptSparse:} A {Python} framework for large-scale constrained
+     nonlinear optimization of sparse systems},
     journal = {Journal of Open Source Software},
     volume = {5},
     number = {54},
