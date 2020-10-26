@@ -49,20 +49,33 @@ DEFAULT_OPT_SETTINGS['IPOPT'] = {
     'linear_solver': 'mumps'
 }
 
-CITATIONS = """@article{Hwang_maud_2018
- author = {Hwang, John T. and Martins, Joaquim R.R.A.},
- title = "{A Computational Architecture for Coupling Heterogeneous
-          Numerical Models and Computing Coupled Derivatives}",
- journal = "{ACM Trans. Math. Softw.}",
- volume = {44},
- number = {4},
- month = jun,
- year = {2018},
- pages = {37:1--37:39},
- articleno = {37},
- numpages = {39},
- doi = {10.1145/3182393},
- publisher = {ACM},
+CITATIONS = """@article{Wu_pyoptsparse_2020,
+    author = {Neil Wu and Gaetan Kenway and Charles A. Mader and John Jasa and Joaquim R. R. A. Martins},
+    title = {{pyOptSparse:} A {Python} framework for large-scale constrained nonlinear optimization of sparse systems},
+    journal = {Journal of Open Source Software},
+    volume = {5},
+    number = {54},
+    month = {October},
+    year = {2020},
+    pages = {2564},
+    doi = {10.21105/joss.02564},
+    publisher = {The Open Journal},
+}
+
+@article{Hwang_maud_2018
+    author = {Hwang, John T. and Martins, Joaquim R.R.A.},
+    title = "{A Computational Architecture for Coupling Heterogeneous
+             Numerical Models and Computing Coupled Derivatives}",
+    journal = "{ACM Trans. Math. Softw.}",
+    volume = {44},
+    number = {4},
+    month = jun,
+    year = {2018},
+    pages = {37:1--37:39},
+    articleno = {37},
+    numpages = {39},
+    doi = {10.1145/3182393},
+    publisher = {ACM},
 }
 """
 
