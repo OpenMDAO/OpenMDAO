@@ -118,17 +118,17 @@ class _Node(object):
     def add(self, name, node):
         self.children[name] = node
 
-    def set_src_inds(self, src_indices):
+    def set_src_inds(self, src_indices, src_shape):
         if self.data is None:
             self.src_inds = src_indices
         else:
-            self.src_inds = self.conv_src_inds(src_indices, self.src_shape)
+            self.src_inds = self.conv_src_inds(src_indices, src_shape)
 
-    def conv_src_inds(self, src_indices, src_shape):
-        if src_indices is None:
+    def conv_src_inds(self, parent_src_inds, parent_src_shape):
+        if parent_src_inds is None:
             return self.data[2].src_indices
         elif self.data[2].src_indices is None:
-            return src_indices
+            return parent_src_inds
         my_src_inds = self.data[2].src_indices
         if isinstance(my_src_inds, tuple):
             ndims = len(my_src_inds)
@@ -136,10 +136,13 @@ class _Node(object):
             ndims = my_src_inds.ndim
         else:  # slice
             ndims = 1
+        if _is_slicer_op(parent_src_inds):
+            parent_src_inds = _slice_indices(parent_src_inds, np.prod(parent_src_shape),
+                                             parent_src_shape)
         if ndims == 1:
-            return src_indices.ravel()[my_src_inds]
+            return parent_src_inds.ravel()[my_src_inds]
         else:
-            return src_indices.reshape(src_shape)[my_src_inds]
+            return parent_src_inds.reshape(self.src_shape)[my_src_inds]
 
 
 class _Tree(object):
@@ -190,9 +193,13 @@ class _Tree(object):
         parent_node = self[parent_name]
         for child, node in parent_node.children.items():
             if node.src_shape is None:
-                node.src_shape = parent_node.src_shape
+                inds = node.data[2].src_shape
+                if inds is None:
+                    node.src_shape = parent_node.src_shape
+                else:
+                    node.src_shape = inds
             try:
-                node.set_src_inds(parent_node.src_inds)
+                node.set_src_inds(parent_node.src_inds, parent_node.src_shape)
             except Exception as err:
                 raise RuntimeError(f"In connection from '{self.src}' to '{child}', input "
                                    f"'{parent_name}' src_indices are {parent_node.src_inds} and "
@@ -874,7 +881,7 @@ class Group(System):
 
         with multi_proc_exception_check(self.comm):
             for src, tgts in rev_conns.items():
-                if not src.startswith('_auto_ivc.'):
+                if not src.startswith('_auto_ivc.'):  # auto_ivc conns were done earlier
                     self._resolve_src_indices(systems, src, tgts)
 
     def _resolve_src_indices(self, systems, src, tgts):
@@ -961,7 +968,7 @@ class Group(System):
                 start_node.src_shape = start_src_shape
             else:
                 start_node.src_shape = start_node.data[2].src_shape
-            start_node.set_src_inds(start_src_inds)
+            start_node.set_src_inds(start_src_inds, start_node.src_shape)
 
             for name, node in tree.breadth_first_iter(top):
                 tree.check_mismatched_shapes(self, name)
@@ -974,6 +981,7 @@ class Group(System):
                     meta['flat_src_indices'] = node.data[2].flat
                     meta['src_indices'] = node.src_inds
                     meta['src_shape'] = node.src_shape
+                    meta['top_src_shape'] = start_node.src_shape
                     if _is_slicer_op(node.src_inds):
                         meta['src_slice'] = node.src_inds
                         node.src_inds = _slice_indices(node.src_inds,
@@ -3318,7 +3326,9 @@ class Group(System):
             value = meta['value']
             val = None
             src_shape = None
-            if prom in self._group_inputs:
+            if 'top_src_shape' in meta and meta['top_src_shape'] is not None:
+                src_shape = meta['top_src_shape']
+            elif prom in self._group_inputs:
                 src_shape = self._group_inputs[prom][0].get('src_shape')
             elif tgt in tree:
                 src_shape = tree[tgt].src_shape

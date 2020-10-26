@@ -136,17 +136,37 @@ class SrcIndicesMPITestCase(unittest.TestCase):
         g2 = par.add_subsystem('g2', om.Group())
         g1.add_subsystem('C1', om.ExecComp('y = 3*x', shape=3))
         g2.add_subsystem('C2', om.ExecComp('y = 2*x', shape=2))
-        g1.promotes('C1', inputs=['x'], src_indices=om.slicer[:, 1], src_shape=(3,2))
-        g2.promotes('C2', inputs=['x'], src_indices=[0,-1], src_shape=(3,2), flat_src_indices=True)
+        g1.promotes('C1', inputs=['x'], src_indices=om.slicer[:, 1], src_shape=(3,2), flat_src_indices=True)
+        g2.promotes('C2', inputs=['x'], src_indices=[1,5], src_shape=(3,2), flat_src_indices=True)
         par.promotes('g1', inputs=['x'])
         par.promotes('g2', inputs=['x'])
 
-        # we want the auto_ivc connected to x to have a shape of (3,2), which differs from the
+        # we want the connection to x to have a shape of (3,2), which differs from the
         # shapes of either of the connected absolute inputs.
         par.set_input_defaults('x', src_shape=(3,2))
 
+        # we want the auto_ivc output to have a shape of (3,3)
+        p.model.promotes('par', inputs=['x'], src_indices=om.slicer[:,:-1], src_shape=(3,3))
+
+        # import wingdbstub
         p.setup()
+
+        inp = np.random.random((3,3))
+        if p.comm.size > 1:
+            if p.comm.rank == 0:
+                p.comm.bcast(inp, root=0)
+            else:
+                inp = p.comm.bcast(None, root=0)
+
+        reduced_inp = inp[:, :-1]
+
+        p.set_val('_auto_ivc.v0', inp)
         p.run_model()
+
+        if p.comm.rank == 0:
+            assert_near_equal(p['par.g1.C1.y'], reduced_inp[:, 1]*3.)
+        else:
+            assert_near_equal(p['par.g2.C2.y'], reduced_inp.flatten()[[1,5]]*2.)
 
 
 if __name__ == '__main__':
