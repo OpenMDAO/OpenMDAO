@@ -131,7 +131,7 @@ class SrcIndicesTestCase(unittest.TestCase):
     def test_mixed_src_indices_no_src_indices(self):
         class C1(om.ExplicitComponent):
             def setup(self):
-                self.add_input('diameter', 0.0, units='m', src_indices=[0])
+                self.add_input('diameter', 0.0, units='m')
                 self.add_output('z_start', 0.0, units='m')
 
             def compute(self, inputs, outputs):
@@ -149,7 +149,8 @@ class SrcIndicesTestCase(unittest.TestCase):
         # this test passes if setup doesn't raise an exception.
         # C1 has src_indices and C2 doesn't.
         prob = om.Problem()
-        prob.model.add_subsystem('C1', C1(), promotes=['diameter'])
+        prob.model.add_subsystem('C1', C1())
+        prob.model.promotes('C1', inputs=['diameter'], src_indices=[0])
         prob.model.add_subsystem('C2', C2(), promotes=['diameter'])
 
         prob.setup()
@@ -159,7 +160,7 @@ class SrcIndicesTestCase(unittest.TestCase):
         prob.run_model()
 
         assert_near_equal(prob['C1.z_start'], 3.)
-        
+
         assert_near_equal(prob['diameter'], np.ones(3) * 1.5)
         assert_near_equal(prob['C1.diameter'], 1.5)
         assert_near_equal(prob['C2.diameter'], np.ones(3) * 1.5)
@@ -279,20 +280,59 @@ class SrcIndicesTestCase(unittest.TestCase):
         assert_near_equal(prob['y1'], [75.3*2]*4)
 
 
+class SrcIndicesFeatureTestCase(unittest.TestCase):
+    def test_multi_promotes(self):
+        import numpy as np
+        import openmdao.api as om
+
+        p = om.Problem()
+        G = p.model.add_subsystem('G', om.Group())
+
+        # At the top level, we assume that the source has a shape of (3,3), and after we
+        # slice it with [:,:-1], lower levels will see their source having a shape of (3,2)
+        p.model.promotes('G', inputs=['x'], src_indices=om.slicer[:,:-1], src_shape=(3,3))
+
+        # This specifies that G.x assumes a source shape of (3,2)
+        G.set_input_defaults('x', src_shape=(3,2))
+
+        g1 = G.add_subsystem('g1', om.Group(), promotes_inputs=['x'])
+        g1.add_subsystem('C1', om.ExecComp('y = 3*x', shape=3))
+
+        # C1.x has a shape of 3, so we apply a slice of [:, 1] to our source which has a shape
+        # of (3,2) to give us our final shape of 3.
+        g1.promotes('C1', inputs=['x'], src_indices=om.slicer[:, 1], src_shape=(3,2), flat_src_indices=True)
+
+        g2 = G.add_subsystem('g2', om.Group(), promotes_inputs=['x'])
+        g2.add_subsystem('C2', om.ExecComp('y = 2*x', shape=2))
+
+        # C2.x has a shape of 2, so we apply flat source indices of [1,5] to our source which has
+        # a shape of (3,2) to give us our final shape of 2.
+        g2.promotes('C2', inputs=['x'], src_indices=[1,5], src_shape=(3,2), flat_src_indices=True)
+
+        p.setup()
+
+        inp = np.arange(9).reshape((3,3)) + 1.
+
+        p.set_val('x', inp)
+        p.run_model()
+
+        assert_near_equal(p['x'], inp)
+        assert_near_equal(p['G.g1.C1.y'], inp[:, :-1][:, 1]*3.)
+        assert_near_equal(p['G.g2.C2.y'], inp[:, :-1].flatten()[[1,5]]*2.)
+
+
 class SrcIndicesMPITestCase(unittest.TestCase):
     N_PROCS = 2
 
     def test_multi_promotes_mpi(self):
         p = om.Problem()
         par = p.model.add_subsystem('par', om.ParallelGroup())
-        g1 = par.add_subsystem('g1', om.Group())
-        g2 = par.add_subsystem('g2', om.Group())
+        g1 = par.add_subsystem('g1', om.Group(), promotes_inputs=['x'])
+        g2 = par.add_subsystem('g2', om.Group(), promotes_inputs=['x'])
         g1.add_subsystem('C1', om.ExecComp('y = 3*x', shape=3))
         g2.add_subsystem('C2', om.ExecComp('y = 2*x', shape=2))
         g1.promotes('C1', inputs=['x'], src_indices=om.slicer[:, 1], src_shape=(3,2), flat_src_indices=True)
         g2.promotes('C2', inputs=['x'], src_indices=[1,5], src_shape=(3,2), flat_src_indices=True)
-        par.promotes('g1', inputs=['x'])
-        par.promotes('g2', inputs=['x'])
 
         # we want the connection to x to have a shape of (3,2), which differs from the
         # shapes of either of the connected absolute inputs.
@@ -303,8 +343,9 @@ class SrcIndicesMPITestCase(unittest.TestCase):
 
         p.setup()
 
+        commsize = p.comm.size
         inp = np.random.random((3,3))
-        if p.comm.size > 1:
+        if commsize > 1:
             if p.comm.rank == 0:
                 p.comm.bcast(inp, root=0)
             else:
@@ -312,12 +353,12 @@ class SrcIndicesMPITestCase(unittest.TestCase):
 
         reduced_inp = inp[:, :-1]
 
-        p.set_val('_auto_ivc.v0', inp)
+        p.set_val('x', inp)
         p.run_model()
 
-        if p.comm.rank == 0:
+        if commsize == 1 or p.comm.rank == 0:
             assert_near_equal(p['par.g1.C1.y'], reduced_inp[:, 1]*3.)
-        else:
+        elif commsize == 1 or p.comm.rank == 1:
             assert_near_equal(p['par.g2.C2.y'], reduced_inp.flatten()[[1,5]]*2.)
 
 

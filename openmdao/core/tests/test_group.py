@@ -3503,8 +3503,6 @@ class TestFeatureSrcIndices(unittest.TestCase):
 
         p = om.Problem()
 
-        # p.model.add_subsystem('indep', om.IndepVarComp('x', np.ones(5)),
-        #                       promotes_outputs=['x'])
         p.model.set_input_defaults('x', np.ones(5))
         p.model.add_subsystem('G1', MyGroup(), promotes_inputs=['x'])
 
