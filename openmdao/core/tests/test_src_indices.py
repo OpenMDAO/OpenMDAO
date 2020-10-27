@@ -279,6 +279,48 @@ class SrcIndicesTestCase(unittest.TestCase):
         assert_near_equal(prob['phases.design:x'], 75.3)
         assert_near_equal(prob['y1'], [75.3*2]*4)
 
+    def test_src_shape_mismatch(self):
+        p = om.Problem()
+        G = p.model.add_subsystem('G', om.Group(), promotes_inputs=['x'])
+
+        G.set_input_defaults('x', src_shape=(3,2))
+
+        g1 = G.add_subsystem('g1', om.Group(), promotes_inputs=['x'])
+        g1.add_subsystem('C1', om.ExecComp('y = 3*x', shape=3))
+
+        g1.promotes('C1', inputs=['x'], src_indices=om.slicer[:, 1], src_shape=(3,3), flat_src_indices=True)
+
+        g2 = G.add_subsystem('g2', om.Group(), promotes_inputs=['x'])
+        g2.add_subsystem('C2', om.ExecComp('y = 2*x', shape=2))
+
+        g2.promotes('C2', inputs=['x'], src_indices=[1,5], src_shape=(3,2), flat_src_indices=True)
+
+        with self.assertRaises(RuntimeError) as cm:
+            p.setup()
+
+        self.assertEqual(cm.exception.args[0], "<model> <class Group>: src_shape ('G.g1.C1.x', (3, 3)) doesn't match src_shape(s) for [('G.g2.C2.x', (3, 2))].")
+
+    def test_src_shape_mismatch2(self):
+        p = om.Problem()
+        G = p.model.add_subsystem('G', om.Group(), promotes_inputs=['x'])
+
+        G.set_input_defaults('x', src_shape=(3,2))
+
+        g1 = G.add_subsystem('g1', om.Group(), promotes_inputs=['x'])
+        g1.add_subsystem('C1', om.ExecComp('y = 3*x', shape=3))
+
+        g1.promotes('C1', inputs=['x'], src_indices=om.slicer[:, 1], src_shape=(3,3), flat_src_indices=True)
+
+        g2 = G.add_subsystem('g2', om.Group(), promotes_inputs=['x'])
+        g2.add_subsystem('C2', om.ExecComp('y = 2*x', shape=2))
+
+        g2.promotes('C2', inputs=['x'], src_indices=[1,5], src_shape=(3,3), flat_src_indices=True)
+
+        with self.assertRaises(RuntimeError) as cm:
+            p.setup()
+
+        self.assertEqual(cm.exception.args[0], "<model> <class Group>: src_shape ('G.x', (3, 2)) doesn't match src_shape(s) for [('G.g1.C1.x', (3, 3)), ('G.g2.C2.x', (3, 3))].")
+
 
 class SrcIndicesFeatureTestCase(unittest.TestCase):
     def test_multi_promotes(self):

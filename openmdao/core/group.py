@@ -928,7 +928,7 @@ class Group(System):
                 src_shape = None
                 if isinstance(s, Group) and s._group_inputs:
                     if pname in s._group_inputs:
-                        meta = s._group_inputs[pname]
+                        meta = s._group_inputs[pname][0]
                         if 'src_shape' in meta:
                             src_shape = meta['src_shape']
 
@@ -964,7 +964,7 @@ class Group(System):
 
         for top, start_src_inds in tops.items():
             start_node = tree[top]
-            if start_node.data[2].src_shape is None:
+            if start_node.data is None or start_node.data[2].src_shape is None:
                 start_node.src_shape = start_src_shape
             else:
                 start_node.src_shape = start_node.data[2].src_shape
