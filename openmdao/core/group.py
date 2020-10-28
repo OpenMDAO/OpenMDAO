@@ -193,11 +193,11 @@ class _Tree(object):
         parent_node = self[parent_name]
         for child, node in parent_node.children.items():
             if node.src_shape is None:
-                inds = node.data[2].src_shape
-                if inds is None:
+                shape = node.data[2].src_shape
+                if shape is None:
                     node.src_shape = parent_node.src_shape
                 else:
-                    node.src_shape = inds
+                    node.src_shape = shape
             try:
                 node.set_src_inds(parent_node.src_inds, parent_node.src_shape)
             except Exception as err:
@@ -218,9 +218,9 @@ class _Tree(object):
     def dump(self, name, depth=0, final=True, outstream=sys.stdout):
         node = self.dct[name]
         ident = '   ' * depth + name
-        if final:
+        if final or node.data is None:
             print(f"{ident}  inds={node.src_inds}  shape={node.src_shape}", file=outstream)
-        elif node.data:
+        else:
             print(f"{ident}  inds={node.data[2].src_indices}  shape={node.data[2].src_shape}",
                   file=outstream)
         for child in node.children:
@@ -897,6 +897,7 @@ class Group(System):
         tops = {}
         splt = src.rsplit('.', 2)
         src_parent = splt[0] if len(splt) > 2 else ''
+        # don't know start_shape for auto_ivc output because it hasn't been determined yet
         start_src_shape = all_meta_out[src]['global_shape'] if src in all_meta_out else None
         for tgt in tgts:
             start_src_inds = None
@@ -3340,7 +3341,7 @@ class Group(System):
                     src_idx_found.append(tgt)
                 else:
                     try:
-                        if meta['flat_src_indices']:
+                        if meta['flat_src_indices'] and not _is_slicer_op(meta['src_indices']):
                             val.ravel()[meta['src_indices']] = value
                         else:
                             val[meta['src_indices']] = value
