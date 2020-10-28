@@ -321,8 +321,7 @@ class ValueInfo {
     }
 
     update() {
-        this.container.select('.node-value-title')
-            .text(`${this.name} Initial Value`);
+        const titleSpan = this.container.select('.node-value-title');
 
         // Capture the width of the header before the table is created
         // We use this to limit how small the window can be as the user resizes
@@ -374,6 +373,9 @@ class ValueInfo {
         // larger than full size
         this.initial_width = parseInt(this.table.style('width'));
         this.initial_height = parseInt(this.table.style('height'));
+        
+        titleSpan.style('max-width', `${this.initial_width - 50}px`);
+        titleSpan.text(this.name);
     }
 
     /** Listen for the event to begin dragging the value window */
@@ -534,6 +536,8 @@ class NodeInfo {
     }
 
     pin() {
+        if (this.tbody.html() == '') return; // Was already pinned so is empty
+
         new PersistentNodeInfo(this);
         this.clear();
     }
@@ -551,10 +555,7 @@ class NodeInfo {
 
         this.clear();
 
-        // Put the name in the title
-        this.table.select('thead th')
-            .style('background-color', color)
-            .text(node.name);
+
 
         this.name = node.absPathName;
         this.table.select('tfoot th').style('background-color', color);
@@ -572,14 +573,23 @@ class NodeInfo {
             prop.addRow(this.tbody, node);
         }
 
+        const scrollWidth = this.table.node().scrollWidth,
+            scrollHeight = this.table.node().scrollHeight;
+
         // Solidify the size of the table after populating so that
         // it can be positioned reliably by move().
         this.table
-            .style('width', this.table.node().scrollWidth + 'px')
-            .style('height', this.table.node().scrollHeight + 'px')
+            .style('width', `${scrollWidth}px`)
+            .style('height', `${scrollHeight}px`)
+
+        // Put the name in the title
+        this.table.select('thead th')
+            .style('background-color', color)
+            .select('.node-info-title')
+            .style('max-width', `${scrollWidth - 100}px`)
+            .text(node.name);
 
         this.move(event);
-        // this.container.classed('info-hidden', true).classed('info-visible', true);
         this.container.classed('info-hidden', false).classed('info-visible', true);
     }
 
@@ -594,7 +604,8 @@ class NodeInfo {
 
         this.table
             .style('width', 'auto')
-            .style('height', 'auto');
+            .style('height', 'auto')
+            .select('thead th span').text('');
 
         this.dataDiv.html('');
         this.tbody.html('');
