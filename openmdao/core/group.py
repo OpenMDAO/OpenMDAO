@@ -106,7 +106,7 @@ class _PromotesInfo(object):
 class _Node(object):
     def __init__(self, data, src_shape):
         self.data = data
-        self.src_shape = src_shape  # src_shape set by set_input_defaults, if any
+        self.src_shape = src_shape  # src_shape set by set_input_defaults or higher level
         self.src_inds = None  # src_indices after mapping from higher level
         self.children = {}  # mapping of name to child nodes (system_path + prom_name)
         self.targets = set() # used for retrieving input shape data if necessary
@@ -173,6 +173,10 @@ class _Tree(object):
         mismatched_shapes = []
         node = self[parent_name]
 
+        if node.data is not None and node.data[2].src_shape is not None and node.src_shape != node.data[2].src_shape:
+            raise RuntimeError("FOO")
+        return
+
         shapes = [n.data[2].src_shape if n.data is not None else None for n in node.children.values()]
         if all(s is None for s in shapes):
             return  # allow for now if nobody declares src_shape
@@ -206,15 +210,29 @@ class _Tree(object):
             raise RuntimeError(f"{system.msginfo}: The following src_shapes don't match: "
                                f"{[(node_name, src_shape)] + mismatched_shapes}.")
 
-    def update_child_src_props(self, system, parent_name):
+    def update_shape(self, system, parent_name):
         parent_node = self[parent_name]
         for child, node in parent_node.children.items():
+            if parent_node.src_shape is not None and node.data is not None and node.data[2].src_shape is not None and parent_node.src_shape != node.data[2].src_shape:
+                msg = (f"{system.msginfo}: Promoted src_shape of {node.data[2].src_shape} for "
+                       f"'{child}' doesn't match the parent src_shape of {parent_node.src_shape}.")
+                raise RuntimeError(msg)
             if node.src_shape is None:
                 shape = node.data[2].src_shape
                 if shape is None:
                     node.src_shape = parent_node.src_shape
                 else:
                     node.src_shape = shape
+
+    def update_child_src_props(self, system, parent_name):
+        parent_node = self[parent_name]
+        for child, node in parent_node.children.items():
+            #if node.src_shape is None:
+                #shape = node.data[2].src_shape
+                #if shape is None:
+                    #node.src_shape = parent_node.src_shape
+                #else:
+                    #node.src_shape = shape
             try:
                 node.set_src_inds(parent_node.src_inds, parent_node.src_shape)
             except Exception as err:
@@ -993,13 +1011,15 @@ class Group(System):
 
         for top, start_src_inds in tops.items():
             start_node = tree[top]
-            if start_node.data is None or start_node.data[2].src_shape is None:
-                start_node.src_shape = start_src_shape
-            else:
-                start_node.src_shape = start_node.data[2].src_shape
+            if start_node.src_shape is None:
+                if start_node.data is None or start_node.data[2].src_shape is None:
+                    start_node.src_shape = start_src_shape
+                else:
+                    start_node.src_shape = start_node.data[2].src_shape
             start_node.set_src_inds(start_src_inds, start_node.src_shape)
 
             for name, node in tree.breadth_first_iter(top):
+                tree.update_shape(self, name)
                 tree.check_mismatched_shapes(self, name)
                 tree.update_child_src_props(self, name)
                 if not node.children:  # this is a leaf node (absolute target)
@@ -1007,7 +1027,8 @@ class Group(System):
 
                     # update the input metadata with the final src_indices,
                     # flat_src_indices and src_shape
-                    meta['flat_src_indices'] = node.data[2].flat
+                    if node.data is not None:
+                        meta['flat_src_indices'] = node.data[2].flat
                     meta['src_indices'] = node.src_inds
                     meta['src_shape'] = node.src_shape
                     meta['top_src_shape'] = start_node.src_shape
@@ -1016,10 +1037,11 @@ class Group(System):
                         node.src_inds = _slice_indices(node.src_inds,
                                                        np.product(node.src_shape), node.src_shape)
 
-            tree.dump(top, final=False)
-            print('------------')
-            tree.dump(top)
-        print('=======')
+        #     tree.dump(top, final=False)
+        #     print('------------')
+        #     tree.dump(top)
+        #     print('++++++++')
+        # print('=======')
         return tree
 
     def _setup_var_data(self):
