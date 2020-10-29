@@ -2008,11 +2008,6 @@ class System(object):
         else:
             resolve(self._var_promotes['any'], ('input', 'output'), maps, prom_names)
 
-        promotes_src_indices = {n: data for n, data in maps['input'].items()
-                                if data[2] is not None}
-        if promotes_src_indices:
-            self._problem_meta['promotes_src_indices'][self.pathname] = promotes_src_indices
-
         return maps
 
     def _get_scope(self):

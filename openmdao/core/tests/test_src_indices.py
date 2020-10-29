@@ -113,7 +113,7 @@ class SrcIndicesTestCase(unittest.TestCase):
         # c2 is vectorized calculations
         c2 = g2.add_subsystem('c2',  om.ExecComp('z = a * y', shape=(4,)), promotes_inputs=['a', 'y'])
 
-        g1.promotes('g2', inputs=['a'], src_indices=[0, 0, 0, 0], src_shape=(4,))
+        g1.promotes('g2', inputs=['a'], src_indices=[0, 0, 0, 0], src_shape=(1,))
         g1.promotes('g2', inputs=['y'], src_indices=[0, 0, 0, 0], src_shape=(1,))
 
         p.model.promotes('g1', inputs=['a'], src_indices=[0], src_shape=(1,))
@@ -298,7 +298,7 @@ class SrcIndicesTestCase(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             p.setup()
 
-        self.assertEqual(cm.exception.args[0], "<model> <class Group>: src_shape ('G.g1.C1.x', (3, 3)) doesn't match src_shape(s) for [('G.g2.C2.x', (3, 2))].")
+        self.assertEqual(cm.exception.args[0], "<model> <class Group>: The following src_shapes don't match: [('G.g1.C1.x', (3, 3)), ('G.g2.C2.x', (3, 2))].")
 
     def test_src_shape_mismatch2(self):
         p = om.Problem()

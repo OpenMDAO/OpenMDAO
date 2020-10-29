@@ -104,23 +104,30 @@ class _PromotesInfo(object):
 
 
 class _Node(object):
-    __slots__ = ['data', 'children', 'src_shape', 'src_inds']
-
     def __init__(self, data, src_shape):
         self.data = data
         self.src_shape = src_shape  # src_shape set by set_input_defaults, if any
         self.src_inds = None  # src_indices after mapping from higher level
         self.children = {}  # mapping of name to child nodes (system_path + prom_name)
+        self.targets = set() # used for retrieving input shape data if necessary
 
     def __repr__(self):
         return f"Node({self.data}, {self.src_shape}, {self.src_inds}, {sorted(self.children)})"
+
+    def add_target(self, tgt):
+        self.targets.add(tgt)
 
     def add(self, name, node):
         self.children[name] = node
 
     def set_src_inds(self, src_indices, src_shape):
         if self.data is None:
-            self.src_inds = src_indices
+            if self.src_shape is None:
+                self.src_inds = src_indices
+            elif src_indices is not None:
+                if _is_slicer_op(src_indices):
+                    src_indices = _slice_indices(src_indices, np.prod(src_shape), src_shape)
+                self.src_inds = src_indices.reshape(self.src_shape)
         else:
             self.src_inds = self.conv_src_inds(src_indices, src_shape)
 
@@ -165,29 +172,39 @@ class _Tree(object):
     def check_mismatched_shapes(self, system, parent_name):
         mismatched_shapes = []
         node = self[parent_name]
-        if node.children:
-            if node.src_shape is None:
-                for c, cnode in node.children.items():
-                    parent_name = c
-                    break
-                src_shape = cnode.src_shape
+
+        shapes = [n.data[2].src_shape if n.data is not None else None for n in node.children.values()]
+        if all(s is None for s in shapes):
+            return  # allow for now if nobody declares src_shape
+
+        for i, (name, cnode) in enumerate(node.children.items()):
+            shape = cnode.data[2].src_shape if cnode.data is not None else None
+            if shape is None:
+                meta = system._var_allprocs_abs2meta['input']
+                vshapes = [meta[n]['shape'] for n in cnode.targets]
+                shp0 = vshapes[0]
+                for shp in vshapes[1:]:
+                    if shp0 != shp:
+                        raise RuntimeError(f"{system.msginfo}: In children of parent node '{parent_name}', "
+                                           f"child '{name}' did not set 'src_shape', and it can't be inferred "
+                                           f"because '{name} maps to targets {cnode.targets} which have different "
+                                           f"shapes {vshapes}.")
+                shape = vshapes[0]
+
+            if isinstance(shape, tuple) and len(shape) == 1:
+                shape = shape[0]  # eliminate n != (n,) mismatches
+
+            if i == 0:
+                node_name = name
+                src_shape = shape
             else:
-                src_shape = node.src_shape
-            if isinstance(src_shape, tuple) and len(src_shape) == 1:
-                src_shape = src_shape[0]  # eliminate n != (n,) mismatches
-            for name, cnode in node.children.items():
-                shape = cnode.src_shape
                 if shape is not None:
-                    if isinstance(shape, tuple) and len(shape) == 1:
-                        shape = shape[0]
                     if shape != src_shape:
-                        mismatched_shapes.append((parent_name, src_shape, name, shape))
+                        mismatched_shapes.append((name, shape))
 
         if mismatched_shapes:
-            shape1 = mismatched_shapes[0][:2]
-            others = [(n, shp) for _, _, n, shp in mismatched_shapes]
-            raise RuntimeError(f"{system.msginfo}: src_shape {shape1} "
-                               f"doesn't match src_shape(s) for {others}.")
+            raise RuntimeError(f"{system.msginfo}: The following src_shapes don't match: "
+                               f"{[(node_name, src_shape)] + mismatched_shapes}.")
 
     def update_child_src_props(self, system, parent_name):
         parent_node = self[parent_name]
@@ -870,7 +887,7 @@ class Group(System):
         self._resolve_connected_src_indices()
 
     def _resolve_connected_src_indices(self):
-        systems = {s.pathname: s for s in self.system_iter(recurse=True)}
+        systems = {s.pathname: s for s in self.system_iter(include_self=True, recurse=True)}
 
         rev_conns = {}
         for tgt, src in self._conn_global_abs_in2out.items():
@@ -920,31 +937,35 @@ class Group(System):
                     leaf_prom_info = _PromotesInfo(None, meta['flat_src_indices'], None)
 
             # travel up the tree from tgt
-            while snames:
+            while True:
                 sysname = '.'.join(snames)
-                if sysname == src_parent:
-                    break
                 s = systems[sysname]
                 pname = s._var_abs2prom['input'][tgt]
-                src_shape = None
-                if isinstance(s, Group) and s._group_inputs:
-                    if pname in s._group_inputs:
-                        meta = s._group_inputs[pname][0]
-                        if 'src_shape' in meta:
-                            src_shape = meta['src_shape']
+                # src_shape = None
+                # if isinstance(s, Group) and s._group_inputs:
+                #     if pname in s._group_inputs:
+                #         meta = s._group_inputs[pname][0]
+                #         if 'src_shape' in meta:
+                #             src_shape = meta['src_shape']
 
                 if sysname in sys2prom_src_inds:
                     p2info = sys2prom_src_inds[sysname]
                     if pname in p2info:
-                        nodes.append(('.'.join((sysname, pname)), p2info[pname], src_shape))
-                elif src_shape is not None:
-                    nodes.append(('.'.join((sysname, pname)), None, src_shape))
+                        nodes.append(('.'.join((sysname, pname)).lstrip('.'), p2info[pname]))#,
+                                    #   src_shape))
+                # elif src_shape is not None:
+                #     nodes.append(('.'.join((sysname, pname)).lstrip('.'), (None, None, src_shape)))
+
+                if not snames or sysname == src_parent:
+                    break
 
                 snames.pop()
 
             if nodes:
                 # last node is the highest in the tree
-                name, info, src_shape = nodes[-1]
+                name, tup = nodes[-1]
+                info, targets, src_shape = tup
+
                 if name in tree:
                     parent = tree[name]
                 else:
@@ -952,15 +973,22 @@ class Group(System):
                     tree[name] = parent
                     tops[name] = start_src_inds
 
-                for name, info, src_shape in nodes[:-1][::-1]:
+                if targets:
+                    parent.targets.update(targets)
+
+                for name, tup in nodes[:-1][::-1]:
+                    info, tgts, src_shape = tup
                     if name not in tree:
-                        tree[name] = _Node(info, src_shape)
+                        tree[name] = n = _Node(info, src_shape)
+                    if targets:
+                        n.targets.update(targets)
                     parent.add(name, tree[name])
                     parent = tree[name]
 
                 if nodes[0][0] != tgt:  # add a node for tgt
                     pname = tgt.rsplit('.', 1)[1]
-                    tree[tgt] = _Node((pname, pname, leaf_prom_info), None)
+                    tree[tgt] = n = _Node((pname, pname, leaf_prom_info), None)
+                    n.add_target(tgt)
                     parent.add(tgt, tree[tgt])
 
         for top, start_src_inds in tops.items():
@@ -988,10 +1016,10 @@ class Group(System):
                         node.src_inds = _slice_indices(node.src_inds,
                                                        np.product(node.src_shape), node.src_shape)
 
-        #     tree.dump(top, final=False)
-        #     print('------------')
-        #     tree.dump(top)
-        # print('=======')
+            tree.dump(top, final=False)
+            print('------------')
+            tree.dump(top)
+        print('=======')
         return tree
 
     def _setup_var_data(self):
@@ -1030,6 +1058,7 @@ class Group(System):
                 self._has_distrib_vars |= subsys._has_distrib_vars
 
             var_maps = subsys._get_promotion_maps(subsys._var_allprocs_prom2abs_list)
+            promotes_src_indices = {}
 
             sub_prefix = subsys.name + '.'
 
@@ -1045,7 +1074,21 @@ class Group(System):
                 sub_loc_proms = subsys._var_abs2prom[io]
                 for sub_prom, sub_abs in subsys._var_allprocs_prom2abs_list[io].items():
                     if sub_prom in subprom2prom:
-                        prom_name = subprom2prom[sub_prom][0]
+                        data = subprom2prom[sub_prom]
+                        prom_name = data[0]
+                        if io == 'input':
+                            if data[2] is not None:
+                                # group inputs apply to the prom name at this level instead
+                                # of the subsystem level
+                                if prom_name in self._group_inputs:
+                                    src_shape = self._group_inputs[prom_name][0].get('src_shape')
+                                else:
+                                    src_shape = None
+                                promotes_src_indices[sub_prom] = (data, sub_abs, src_shape)
+                            elif prom_name in self._group_inputs:
+                                src_shape = self._group_inputs[prom_name][0].get('src_shape')
+                                if src_shape is not None:
+                                    promotes_src_indices[sub_prom] = (None, None, src_shape)
                     else:
                         prom_name = sub_prefix + sub_prom
                     if prom_name not in allprocs_prom2abs_list[io]:
@@ -1065,6 +1108,9 @@ class Group(System):
                     if key not in self._group_inputs:
                         self._group_inputs[key] = []
                     self._group_inputs[key].extend(metalist)
+
+            if promotes_src_indices:
+                self._problem_meta['promotes_src_indices'][subsys.pathname] = promotes_src_indices
 
         # If running in parallel, allgather
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
@@ -3421,7 +3467,7 @@ class Group(System):
 
         vars2gather = self._vars_to_gather
 
-        systems = {s.pathname: s for s in self.system_iter(recurse=True)}
+        systems = {s.pathname: s for s in self.system_iter(include_self=True, recurse=True)}
 
         for src, tgts in auto2tgt.items():
             tree = self._resolve_src_indices(systems, src, tgts)
