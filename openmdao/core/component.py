@@ -505,6 +505,9 @@ class Component(System):
             # value, shape: based on args, making sure they are compatible
             val, shape, src_indices = ensure_compatible(name, val, shape, src_indices)
 
+            if src_indices is not None and src_slice is None and src_indices.ndim == 1:
+                flat_src_indices = True
+
         if src_indices is not None:
             warn_deprecation(f"{self.msginfo}: Passing `src_indices` as an arg to `add_input` is"
                              "deprecated and will become an error in a future release.  Add "

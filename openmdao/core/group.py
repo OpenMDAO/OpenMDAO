@@ -974,14 +974,18 @@ class Group(System):
                     # flat_src_indices and src_shape
                     if node.data is not None:
                         meta['flat_src_indices'] = node.data[2].flat
-                    if node.src_inds is not None:
-                        meta['src_indices'] = node.src_inds
                     meta['src_shape'] = node.src_shape
                     meta['top_src_shape'] = start_node.src_shape
-                    if _is_slicer_op(node.src_inds):
-                        meta['src_slice'] = node.src_inds
-                        node.src_inds = _slice_indices(node.src_inds,
-                                                       np.product(node.src_shape), node.src_shape)
+                    if node.src_inds is not None:
+                        meta['src_indices'] = node.src_inds
+                        if _is_slicer_op(node.src_inds):
+                            meta['src_slice'] = node.src_inds
+                            node.src_inds = _slice_indices(node.src_inds,
+                                                           np.product(node.src_shape),
+                                                           node.src_shape)
+                        else:
+                            if node.src_inds.ndim == 1:
+                                meta['flat_src_indices'] = True
 
         #     tree.dump(top, final=False)
         #     print('------------')
@@ -3359,7 +3363,8 @@ class Group(System):
                             val.ravel()[meta['src_indices']] = value
                         else:
                             val[meta['src_indices']] = value
-                    except ValueError:
+                    except ValueError as err:
+                        print(err)
                         src = self._conn_global_abs_in2out[tgt]
                         src_indices = meta['src_indices']
                         if _is_slicer_op(src_indices):
@@ -3368,7 +3373,7 @@ class Group(System):
                               f"{src_indices} do not specify a " + \
                               f"valid shape for the connection '{src}' to " + \
                               f"'{tgt}'. The target shape is " + \
-                              f"{meta['shape']} but indices are {src_indices.shape}."
+                              f"{meta['shape']} but indices have shape {src_indices.shape}."
                         raise ValueError(msg)
             else:
                 if val is None:
