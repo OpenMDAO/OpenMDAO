@@ -109,7 +109,7 @@ class _Node(object):
         self.src_shape = src_shape  # src_shape set by set_input_defaults or higher level
         self.src_inds = None  # src_indices after mapping from higher level
         self.children = {}  # mapping of name to child nodes (system_path + prom_name)
-        self.targets = set() # used for retrieving input shape data if necessary
+        self.targets = set()  # used for retrieving input shape data if necessary
 
     def __repr__(self):
         return f"Node({self.data}, {self.src_shape}, {self.src_inds}, {sorted(self.children)})"
@@ -169,51 +169,12 @@ class _Tree(object):
     def add_child(self, parent_name, child_node):
         self.dct[parent_name].add(child_node)
 
-    def check_mismatched_shapes(self, system, parent_name):
-        mismatched_shapes = []
-        node = self[parent_name]
-
-        if node.data is not None and node.data[2].src_shape is not None and node.src_shape != node.data[2].src_shape:
-            raise RuntimeError("FOO")
-        return
-
-        shapes = [n.data[2].src_shape if n.data is not None else None for n in node.children.values()]
-        if all(s is None for s in shapes):
-            return  # allow for now if nobody declares src_shape
-
-        for i, (name, cnode) in enumerate(node.children.items()):
-            shape = cnode.data[2].src_shape if cnode.data is not None else None
-            if shape is None:
-                meta = system._var_allprocs_abs2meta['input']
-                vshapes = [meta[n]['shape'] for n in cnode.targets]
-                shp0 = vshapes[0]
-                for shp in vshapes[1:]:
-                    if shp0 != shp:
-                        raise RuntimeError(f"{system.msginfo}: In children of parent node '{parent_name}', "
-                                           f"child '{name}' did not set 'src_shape', and it can't be inferred "
-                                           f"because '{name} maps to targets {cnode.targets} which have different "
-                                           f"shapes {vshapes}.")
-                shape = vshapes[0]
-
-            if isinstance(shape, tuple) and len(shape) == 1:
-                shape = shape[0]  # eliminate n != (n,) mismatches
-
-            if i == 0:
-                node_name = name
-                src_shape = shape
-            else:
-                if shape is not None:
-                    if shape != src_shape:
-                        mismatched_shapes.append((name, shape))
-
-        if mismatched_shapes:
-            raise RuntimeError(f"{system.msginfo}: The following src_shapes don't match: "
-                               f"{[(node_name, src_shape)] + mismatched_shapes}.")
-
     def update_shape(self, system, parent_name):
         parent_node = self[parent_name]
         for child, node in parent_node.children.items():
-            if parent_node.src_shape is not None and node.data is not None and node.data[2].src_shape is not None and parent_node.src_shape != node.data[2].src_shape:
+            if (parent_node.src_shape is not None and node.data is not None and
+                    node.data[2].src_shape is not None and
+                    parent_node.src_shape != node.data[2].src_shape):
                 msg = (f"{system.msginfo}: Promoted src_shape of {node.data[2].src_shape} for "
                        f"'{child}' doesn't match the parent src_shape of {parent_node.src_shape}.")
                 raise RuntimeError(msg)
@@ -227,12 +188,6 @@ class _Tree(object):
     def update_child_src_props(self, system, parent_name):
         parent_node = self[parent_name]
         for child, node in parent_node.children.items():
-            #if node.src_shape is None:
-                #shape = node.data[2].src_shape
-                #if shape is None:
-                    #node.src_shape = parent_node.src_shape
-                #else:
-                    #node.src_shape = shape
             try:
                 node.set_src_inds(parent_node.src_inds, parent_node.src_shape)
             except Exception as err:
@@ -959,20 +914,11 @@ class Group(System):
                 sysname = '.'.join(snames)
                 s = systems[sysname]
                 pname = s._var_abs2prom['input'][tgt]
-                # src_shape = None
-                # if isinstance(s, Group) and s._group_inputs:
-                #     if pname in s._group_inputs:
-                #         meta = s._group_inputs[pname][0]
-                #         if 'src_shape' in meta:
-                #             src_shape = meta['src_shape']
 
                 if sysname in sys2prom_src_inds:
                     p2info = sys2prom_src_inds[sysname]
                     if pname in p2info:
-                        nodes.append(('.'.join((sysname, pname)).lstrip('.'), p2info[pname]))#,
-                                    #   src_shape))
-                # elif src_shape is not None:
-                #     nodes.append(('.'.join((sysname, pname)).lstrip('.'), (None, None, src_shape)))
+                        nodes.append(('.'.join((sysname, pname)).lstrip('.'), p2info[pname]))
 
                 if not snames or sysname == src_parent:
                     break
@@ -1020,7 +966,6 @@ class Group(System):
 
             for name, node in tree.breadth_first_iter(top):
                 tree.update_shape(self, name)
-                tree.check_mismatched_shapes(self, name)
                 tree.update_child_src_props(self, name)
                 if not node.children:  # this is a leaf node (absolute target)
                     meta = meta_in[name]
@@ -1029,7 +974,8 @@ class Group(System):
                     # flat_src_indices and src_shape
                     if node.data is not None:
                         meta['flat_src_indices'] = node.data[2].flat
-                    meta['src_indices'] = node.src_inds
+                    if node.src_inds is not None:
+                        meta['src_indices'] = node.src_inds
                     meta['src_shape'] = node.src_shape
                     meta['top_src_shape'] = start_node.src_shape
                     if _is_slicer_op(node.src_inds):

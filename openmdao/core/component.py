@@ -516,6 +516,7 @@ class Component(System):
             'size': shape_to_len(shape),
             'src_indices': src_indices,  # these will ultimately be converted to a flat index array
             'flat_src_indices': flat_src_indices,
+            'add_input_src_indices': src_indices is not None,
             'src_slice': src_slice,  # store slice def here, if any.  This is never overwritten
             'units': units,
             'desc': desc,
