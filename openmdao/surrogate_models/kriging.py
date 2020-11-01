@@ -77,7 +77,7 @@ class KrigingSurrogate(SurrogateModel):
         self.Y_std = np.zeros(0)
 
     def _declare_options(self):
-        """ 
+        """
         Declare options before kwargs are processed in the init method.
         """
         self.options.declare('eval_rmse', types=bool, default=False,
@@ -98,14 +98,17 @@ class KrigingSurrogate(SurrogateModel):
                                   "'gesvd' is the default.")
 
         self.options.declare('training_cache_output', types=str, default=None,
-                             desc="Cache the trained model to avoid repeating training and write it to the given file.")
+                             desc="Cache the trained model to avoid repeating "
+                                  "training and write it to the given file.")
 
         self.options.declare('training_cache_id', types=str, default=None,
                              desc="Unique identifier for this surrogate within the cache file. "
-                                  "Useful to avoid multiple file creation when caching several surrogate")
+                                  "Useful to avoid multiple file creation when "
+                                  "caching several surrogate")
 
         self.options.declare('training_cache_input', types=str, default=None,
-                             desc="Fetch the cached training weights to avoid repeating training from given file.")
+                             desc="Fetch the cached training weights to avoid "
+                                  "repeating training from given file.")
 
     def train(self, x, y):
         """
@@ -127,7 +130,8 @@ class KrigingSurrogate(SurrogateModel):
         if cache_input:
             if cache_id:
                 if cache_id in KrigingSurrogate._cache_input_identifiers:
-                    raise ValueError(f'The KrigingSurrogate Cache ID "{cache_id}" is already being loaded.')
+                    raise ValueError(f'The KrigingSurrogate Cache ID "{cache_id}" '
+                                     'is already being loaded.')
                 KrigingSurrogate._cache_input_identifiers.add(cache_id)
 
             with open(cache_input, 'r') as fh:
@@ -233,7 +237,8 @@ class KrigingSurrogate(SurrogateModel):
 
             if cache_id:
                 if cache_id in KrigingSurrogate._cache_output_identifiers:
-                    raise ValueError(f'The KrigingSurrogate Cache ID "{cache_id}" is already being saved.')
+                    raise ValueError(f'The KrigingSurrogate Cache ID "{cache_id}" '
+                                     'is already being saved.')
                 KrigingSurrogate._cache_output_identifiers.add(cache_id)
 
                 # If a cache id is given we need to fetch the current data to merge
