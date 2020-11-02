@@ -1,4 +1,5 @@
 """Base class used to define the interface for derivative approximation schemes."""
+import time
 from collections import defaultdict
 from itertools import chain
 from scipy.sparse import coo_matrix
@@ -6,6 +7,7 @@ import numpy as np
 
 from openmdao.utils.array_utils import sub2full_indices, get_input_idx_split
 import openmdao.utils.coloring as coloring_mod
+from openmdao.utils.general_utils import _convert_auto_ivc_to_conn_name
 from openmdao.utils.mpi import MPI
 from openmdao.jacobians.jacobian import Jacobian
 from openmdao.vectors.vector import _full_slice
@@ -33,6 +35,8 @@ class ApproximationScheme(object):
         Array of sizes of data chunks that make up _j_colored. (Used for MPI Allgatherv)
     _j_data_offsets : ndarray of int
         Array of offsets of each data chunk that makes up _j_colored. (Used for MPI Allgatherv)
+    _progress_out : None or file-like object
+        Attribute to output the progress of check_totals
     """
 
     def __init__(self):
@@ -46,6 +50,7 @@ class ApproximationScheme(object):
         self._j_data_offsets = None
         self._approx_groups_cached_under_cs = False
         self._exec_dict = defaultdict(list)
+        self._progress_out = None
 
     def __repr__(self):
         """
@@ -368,6 +373,9 @@ class ApproximationScheme(object):
 
         # now do uncolored solves
         for wrt, data, col_idxs, tmpJ, idx_info, nz_rows in approx_groups:
+            if self._progress_out:
+                start_time = time.time()
+
             J = tmpJ[wrt]
             full_idxs = J['loc_outvec_idxs']
             out_slices = tmpJ['@out_slices']
@@ -392,6 +400,14 @@ class ApproximationScheme(object):
                                             result[out_slices[of]][out_idxs]).copy()))
                     else:
                         J['data'][:, i_count] = self._transform_result(result[full_idxs])
+
+                if self._progress_out:
+                    end_time = time.time()
+                    prom_name = _convert_auto_ivc_to_conn_name(system._conn_global_abs_in2out, wrt)
+                    self._progress_out.write(f"{fd_count+1}/{len(full_idxs)}: Checking "
+                                             f"derivatives with respect to: "
+                                             f"'{prom_name} [{idxs}]' ... "
+                                             f"{round(end_time-start_time, 4)} seconds\n")
 
                 fd_count += 1
 

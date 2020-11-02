@@ -43,6 +43,8 @@ class DotProductComp(ExplicitComponent):
                          c_units=opt['c_units'], a_units=opt['a_units'], b_units=opt['b_units'],
                          vec_size=opt['vec_size'], length=opt['length'])
 
+        self._no_check_partials = True
+
     def initialize(self):
         """
         Declare options.

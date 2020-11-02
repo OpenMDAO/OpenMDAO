@@ -39,6 +39,8 @@ class VectorMagnitudeComp(ExplicitComponent):
         self.add_magnitude(mag_name=opt['mag_name'], in_name=opt['in_name'], units=opt['units'],
                            vec_size=opt['vec_size'], length=opt['length'])
 
+        self._no_check_partials = True
+
     def initialize(self):
         """
         Declare options.

@@ -51,6 +51,8 @@ class IndepVarComp(ExplicitComponent):
                 raise ValueError("IndepVarComp init: '%s' is not supported "
                                  "in IndepVarComp." % illegal)
 
+        self._no_check_partials = True
+
     def initialize(self):
         """
         Declare options.

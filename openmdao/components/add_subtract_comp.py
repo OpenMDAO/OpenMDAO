@@ -92,6 +92,8 @@ class AddSubtractComp(ExplicitComponent):
             raise ValueError(self.msginfo + ": first argument to adder init must be either of "
                              "type `str' or 'None'")
 
+        self._no_check_partials = True
+
     def initialize(self):
         """
         Declare options.

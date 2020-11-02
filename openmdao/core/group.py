@@ -25,7 +25,7 @@ from openmdao.utils.array_utils import array_connection_compatible, _flatten_src
 from openmdao.utils.general_utils import ContainsAll, simple_warning, common_subpath, \
     conditional_error, _is_slicer_op
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
-    _is_unitless
+    _is_unitless, valid_units
 from openmdao.utils.mpi import MPI, check_mpi_exceptions
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.array_utils import evenly_distrib_idxs
@@ -208,6 +208,8 @@ class Group(System):
         if val is not _UNDEFINED:
             meta['value'] = val
         if units is not None:
+            if not valid_units(units):
+                raise ValueError(f"{self.msginfo}: The units '{units}' are invalid.")
             meta['units'] = units
 
         if self._static_mode:
@@ -1835,6 +1837,16 @@ class Group(System):
                                 _flatten_src_indices(src_indices, in_shape,
                                                      all_abs_out['global_shape'],
                                                      all_abs_out['global_size'])
+
+            elif abs_in in abs2meta_in:
+                # Source is not local, but target is. We need to flatten the src_indices here too.
+                meta_in = abs2meta_in[abs_in]
+                src_indices = self._get_src_inds_array(abs_in)
+                if src_indices is not None:
+                    meta_in['src_indices'] = \
+                        _flatten_src_indices(src_indices, meta_in['shape'],
+                                             all_abs_out['global_shape'],
+                                             all_abs_out['global_size'])
 
     def _set_subsys_connection_errors(self, val=True):
         """

@@ -74,7 +74,6 @@ class ExecComp(ExplicitComponent):
         Default is None, which means units are provided for variables individually.
     complex_stepsize : double
         Step size used for complex step which is used for derivatives.
-
     """
 
     def initialize(self):
@@ -221,6 +220,8 @@ class ExecComp(ExplicitComponent):
         self._exprs = exprs[:]
         self._codes = None
         self._kwargs = kwargs
+
+        self._no_check_partials = True
 
     def setup(self):
         """
@@ -627,7 +628,7 @@ _import_functs(np, _expr_dict,
                       'e', 'pi',  # Constants
                       'isinf', 'isnan',  # Logic
                       'log', 'log10', 'log1p', 'power',  # Math operations
-                      'exp', 'expm1', 'fmax',
+                      'exp', 'expm1', 'fmax', 'min', 'max', 'diff',
                       'fmin', 'maximum', 'minimum',
                       'sum', 'dot', 'prod',  # Reductions
                       'tensordot', 'matmul',  # Linear algebra

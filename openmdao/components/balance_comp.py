@@ -144,6 +144,8 @@ class BalanceComp(ImplicitComponent):
             self.add_balance(name, eq_units, lhs_name, rhs_name, rhs_val,
                              use_mult, mult_name, mult_val, normalize, val, **kwargs)
 
+        self._no_check_partials = True
+
     def apply_nonlinear(self, inputs, outputs, residuals):
         """
         Calculate the residual for each balance.

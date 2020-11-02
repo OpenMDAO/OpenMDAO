@@ -101,6 +101,8 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
 
         self._static_input_sizes = nfi * [0]
 
+        self._no_check_partials = True
+
     def initialize(self):
         """
         Declare options.

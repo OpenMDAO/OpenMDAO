@@ -150,6 +150,8 @@ class KSComp(ExplicitComponent):
 
         self.cite = CITATIONS
 
+        self._no_check_partials = True
+
     def initialize(self):
         """
         Declare options.
