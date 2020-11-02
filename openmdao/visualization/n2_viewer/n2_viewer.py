@@ -120,12 +120,12 @@ def _get_var_dict(system, typ, name):
 
     if is_discrete:
         if isinstance(meta['value'], (int, str, list, dict, complex, np.ndarray)):
-            var_dict['value'] = default_noraise(meta['value'])
+            var_dict['value'] = default_noraise(system.get_val(name))
         else:
             var_dict['value'] = type(meta['value']).__name__
     else:
         if meta['value'].size < _MAX_ARRAY_SIZE_FOR_REPR_VAL:
-            var_dict['value'] = _convert_ndarray_to_support_nans_in_json(meta['value'])
+            var_dict['value'] = _convert_ndarray_to_support_nans_in_json(system.get_val(name))
         else:
             var_dict['value'] = None
 
