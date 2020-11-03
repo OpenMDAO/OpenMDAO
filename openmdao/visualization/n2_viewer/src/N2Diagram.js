@@ -11,7 +11,6 @@
  * @property {N2TreeNode} zoomedElementPrev Reference to last zoomedElement.
  * @property {Object} dom Container for references to web page elements.
  * @property {Object} dom.parentDiv The outermost div we work with.
- * @property {Object} dom.d3ContentDiv The div containing all of the diagram's content.
  * @property {Object} dom.svgDiv The div containing the SVG element.
  * @property {Object} dom.svg The SVG element.
  * @property {Object} dom.svgStyle Object where SVG style changes can be made.
@@ -157,7 +156,6 @@ class N2Diagram {
     _referenceD3Elements() {
         this.dom = {
             'parentDiv': document.getElementById("ptN2ContentDivId"),
-            'd3ContentDiv': parentDiv.querySelector("#d3_content_div"),
             'svgDiv': d3.select("#svgDiv"),
             'svg': d3.select("#svgId"),
             'svgStyle': d3.select("#svgId style"),
@@ -336,10 +334,7 @@ class N2Diagram {
             })
             .on("click", function (d) {
                 if (self.ui.nodeInfoBox.hidden) { self.ui.leftClick(d); } // Zoom if not in info panel mode
-                else { // Pin/unpin the info panel
-                    self.ui.nodeInfoBox.togglePin();
-                    self.ui.nodeInfoBox.update(d3.event, d, d3.select(this).select('rect').style('fill'));
-                }
+                else { self.ui.nodeInfoBox.pin(); } // Create a persistent panel
             })
             .on("contextmenu", function (d) {
                 self.ui.rightClick(d, this);
@@ -482,16 +477,13 @@ class N2Diagram {
             })
             .on("click", function (d) {
                 if (self.ui.nodeInfoBox.hidden) { self.ui.leftClick(d); } // Zoom if not in info panel mode
-                else { // Pin/unpin the info panel
-                    self.ui.nodeInfoBox.togglePin();
-                    self.ui.nodeInfoBox.update_solver(d3.event, d, d3.select(this).select('rect').style('fill'))
-                }
+                else { self.ui.nodeInfoBox.pin(); } // Create a persistent panel
             })
             .on("contextmenu", function (d) {
                 self.ui.rightClick(d, this);
             })
             .on("mouseover", function (d) {
-                self.ui.nodeInfoBox.update_solver(d3.event, d, d3.select(this).select('rect').style('fill'))
+                self.ui.nodeInfoBox.update(d3.event, d, d3.select(this).select('rect').style('fill'), true)
 
                 if (self.model.abs2prom != undefined) {
                     if (d.isInput()) {
@@ -809,9 +801,8 @@ class N2Diagram {
         if (this.ui.nodeInfoBox.hidden) { // If not in info-panel mode, pin/unpin arrows
             this.arrowMgr.togglePin(cell.id);
         }
-        else { // Pin/unpin the info panel
-            this.ui.nodeInfoBox.togglePin();
-            this.ui.nodeInfoBox.update(d3.event, cell.obj, cell.color());
+        else { // Make a persistent info panel
+            this.ui.nodeInfoBox.pin();
         }
     }
 

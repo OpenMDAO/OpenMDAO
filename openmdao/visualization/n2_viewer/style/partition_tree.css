@@ -129,7 +129,7 @@ body {
     /* Hidden by default */
     position: fixed;
     /* Stay in place */
-    z-index: 9999;
+    z-index: 999999;
     /* Sit on top */
     padding-top: 10px;
     /* Location of the box */
@@ -343,6 +343,6 @@ rect.outputHighlight {
     width: 100vw;
     height: 100vh;
     position: relative;
-    z-index: 99;
+    z-index: 999990;
     background: none;
 }

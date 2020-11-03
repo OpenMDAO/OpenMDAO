@@ -513,7 +513,6 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     }
     libs = read_files(lib_dct.values(), libs_dir, 'js')
     src_names = \
-        'modal', \
         'utils', \
         'SymbolType', \
         'N2TreeNode', \

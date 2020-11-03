@@ -1,6 +1,6 @@
 <div id="all_pt_n2_content_div" class="non-embedded-n2">
     <div id="ptN2ContentDivId">
-        <!-- The Model -->
+        <!-- Modal help view -->
         {{help}}
 
         <!-- Toolbar -->
@@ -204,28 +204,46 @@
             </div>
         </div>
         <div id="connectionId"></div>
+        <div id="node-info-container" class='info-panel info-hidden'>
+            <div class='node-info-data'></div>
+            <table class="node-info-table" cellpadding='0' cellspacing='0'>
+                <thead>
+                    <tr>
+                        <th scope='col' colspan='2'>
+                            <span class='node-info-title'>Name</span>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+                <tfoot>
+                    <tr>
+                        <th scope='col' colspan='2'>&nbsp;</th>
+                    </tr>
+                </tfoot>
+            </table>
+            <p id='node-info-pin' class='info-hidden'>&#x1F4CC;</p>
+        </div>
+        
+        <!-- all the node value containers and tables will be put inside this div -->
+        <div class="node-value" id="node-value-containers">
+            <div id='template' class='node-value-container node-value-hidden'>
+                <div class='node-value-header'>
+                    <span class='close-value-window-button'>x</span>
+                    <span class='node-value-title'></span>
+                </div>
+                <div class='node-value-table-div'>
+                    <table class='node-value-table'>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <div class='node-value-footer'></div>
+                <div class='node-value-resizer-box inactive-resizer-box'>
+                    <p class='node-value-resizer-handle inactive-resizer-handle'></p>
+                </div>
+            </div>
+        </div>
+
     </div>
-</div>
-
-<div id="node-info-container" class='info-hidden'>
-    <table id="node-info-table" cellpadding='0' cellspacing='0'>
-        <thead>
-            <tr>
-                <th scope='col' colspan='2'>Name</th>
-            </tr>
-        </thead>
-        <tbody></tbody>
-        <tfoot>
-            <tr>
-                <th scope='col' colspan='2'>&nbsp;</th>
-            </tr>
-        </tfoot>
-    </table>
-    <p id='node-info-pin' class='info-hidden'>&#x1F4CC;</p>
-</div>
-
-<!-- all the node value containers and tables will be put inside this div -->
-<div class="node-value" id="node-value-containers">
 </div>
 
 <!-- Need this off window element to put values that can then be put on the pastebuffer -->
@@ -242,7 +260,7 @@
 </div>
 
 {d3_lib} {awesomplete_lib} {vk_beautify_lib} {pako_inflate_lib}
-{{model_data}} {modal_lib}
+{{model_data}}
 {utils_lib} {symboltype_lib} {n2treenode_lib} {modeldata_lib} {n2style_lib}
 {n2layout_lib} {n2matrixcell_lib} {n2legend_lib} {n2matrix_lib} {n2arrow_lib}
 {n2search_lib} {n2toolbar_lib} {n2diagram_lib}
