@@ -1840,14 +1840,9 @@ class System(object):
         for abs_name, meta in self._var_abs2meta['output'].items():
             self._outputs.set_var(abs_name, meta['value'])
 
-    def _get_promotion_maps(self, prom_names):
+    def _get_promotion_maps(self):
         """
         Define variable maps based on promotes lists.
-
-        Parameters
-        ----------
-        prom_names : {'input': [], 'output': []}
-            Lists of promoted input and output names.
 
         Returns
         -------
@@ -1855,6 +1850,7 @@ class System(object):
             dictionary mapping input/output variable names
             to (promoted name, promotion_info) tuple.
         """
+        prom_names = self._var_allprocs_prom2abs_list
         gname = self.name + '.' if self.name else ''
 
         def split_list(lst):
@@ -4982,3 +4978,12 @@ class System(object):
         relevant['nonlinear'] = relevant['linear']
 
         return relevant
+
+    # def _resolve_src_indices(self, src, tgts):
+    #     rev_conns = {}
+    #     for tgt, src in self._conn_global_abs_in2out.items():
+    #         if src in rev_conns:
+    #             rev_conns[src].append(tgt)
+    #         else:
+    #             rev_conns[src] = [tgt]
+

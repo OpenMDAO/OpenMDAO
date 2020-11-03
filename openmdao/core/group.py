@@ -1032,7 +1032,7 @@ class Group(System):
             else:
                 self._has_distrib_vars |= subsys._has_distrib_vars
 
-            var_maps = subsys._get_promotion_maps(subsys._var_allprocs_prom2abs_list)
+            var_maps = subsys._get_promotion_maps()
             promotes_src_indices = {}
 
             sub_prefix = subsys.name + '.'
