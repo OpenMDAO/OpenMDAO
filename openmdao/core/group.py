@@ -157,6 +157,9 @@ class _Tree(object):
         self.dct = {}
         self.src = src
 
+    def __repr__(self):
+        return repr(self.dct)
+
     def __contains__(self, name):
         return name in self.dct
 
