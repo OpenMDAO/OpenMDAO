@@ -46,9 +46,6 @@ class KrigingSurrogate(SurrogateModel):
         Standard deviation of training model response values, normalized.
     """
 
-    _cache_input_identifiers = set()
-    _cache_output_identifiers = set()
-
     def __init__(self, **kwargs):
         """
         Initialize all attributes.
@@ -101,11 +98,6 @@ class KrigingSurrogate(SurrogateModel):
                              desc="Cache the trained model to avoid repeating "
                                   "training and write it to the given file.")
 
-        self.options.declare('training_cache_id', types=str, default=None,
-                             desc="Unique identifier for this surrogate within the cache file. "
-                                  "Useful to avoid multiple file creation when "
-                                  "caching several surrogate")
-
         self.options.declare('training_cache_input', types=str, default=None,
                              desc="Fetch the cached training weights to avoid "
                                   "repeating training from given file.")
@@ -124,44 +116,25 @@ class KrigingSurrogate(SurrogateModel):
         super().train(x, y)
         x, y = np.atleast_2d(x, y)
 
-        cache_id = self.options['training_cache_id']
         cache_input = self.options['training_cache_input']
 
         if cache_input:
-            if cache_id:
-                if cache_id in KrigingSurrogate._cache_input_identifiers:
-                    raise ValueError(f'The KrigingSurrogate Cache ID "{cache_id}" '
-                                     'is already being loaded.')
-                KrigingSurrogate._cache_input_identifiers.add(cache_id)
-
-            with open(cache_input, 'r') as fh:
-                cache_input = json.load(fh)
-
-            if cache_id:
-                if cache_id in cache_input:
-                    cache_input = cache_input[cache_id]
-                else:
-                    msg = ("KrigingSurrogate Cache ID \"%s\" was not found in given cache. "
-                           "Ignoring and training from scratch.")
-                    simple_warning(msg % cache_id)
-
-            # Actual cache loading
-            if cache_input:
+            with np.load(cache_input, allow_pickle=False) as data:
                 try:
-                    self.n_samples = cache_input['n_samples']
-                    self.n_dims = cache_input['n_dims']
-                    self.X = np.array(cache_input['X'])
-                    self.Y = np.array(cache_input['Y'])
-                    self.X_mean = np.array(cache_input['X_mean'])
-                    self.Y_mean = np.array(cache_input['Y_mean'])
-                    self.X_std = np.array(cache_input['X_std'])
-                    self.Y_std = np.array(cache_input['Y_std'])
-                    self.thetas = np.array(cache_input['thetas'])
-                    self.alpha = np.array(cache_input['alpha'])
-                    self.U = np.array(cache_input['U'])
-                    self.S_inv = np.array(cache_input['S_inv'])
-                    self.Vh = np.array(cache_input['Vh'])
-                    self.sigma2 = np.array(cache_input['sigma2'])
+                    self.n_samples = data['n_samples']
+                    self.n_dims = data['n_dims']
+                    self.X = np.array(data['X'])
+                    self.Y = np.array(data['Y'])
+                    self.X_mean = np.array(data['X_mean'])
+                    self.Y_mean = np.array(data['Y_mean'])
+                    self.X_std = np.array(data['X_std'])
+                    self.Y_std = np.array(data['Y_std'])
+                    self.thetas = np.array(data['thetas'])
+                    self.alpha = np.array(data['alpha'])
+                    self.U = np.array(data['U'])
+                    self.S_inv = np.array(data['S_inv'])
+                    self.Vh = np.array(data['Vh'])
+                    self.sigma2 = np.array(data['sigma2'])
                 except KeyError as e:
                     msg = ("An error occurred while loading KrigingSurrogate Cache: %s. "
                            "Ignoring and training from scratch.")
@@ -221,37 +194,22 @@ class KrigingSurrogate(SurrogateModel):
             data = {
                 'n_samples': self.n_samples,
                 'n_dims': self.n_dims,
-                'X': self.X.tolist(),
-                'Y': self.Y.tolist(),
-                'X_mean': self.X_mean.tolist(),
-                'Y_mean': self.Y_mean.tolist(),
-                'X_std': self.X_std.tolist(),
-                'Y_std': self.Y_std.tolist(),
-                'thetas': self.thetas.tolist(),
-                'alpha': self.alpha.tolist(),
-                'U': self.U.tolist(),
-                'S_inv': self.S_inv.tolist(),
-                'Vh': self.Vh.tolist(),
-                'sigma2': self.sigma2.tolist()
+                'X': self.X,
+                'Y': self.Y,
+                'X_mean': self.X_mean,
+                'Y_mean': self.Y_mean,
+                'X_std': self.X_std,
+                'Y_std': self.Y_std,
+                'thetas': self.thetas,
+                'alpha': self.alpha,
+                'U': self.U,
+                'S_inv': self.S_inv,
+                'Vh': self.Vh,
+                'sigma2': self.sigma2
             }
 
-            if cache_id:
-                if cache_id in KrigingSurrogate._cache_output_identifiers:
-                    raise ValueError(f'The KrigingSurrogate Cache ID "{cache_id}" '
-                                     'is already being saved.')
-                KrigingSurrogate._cache_output_identifiers.add(cache_id)
-
-                # If a cache id is given we need to fetch the current data to merge
-                full_data = {}
-                if os.path.exists(cache_output) and os.path.getsize(cache_output) > 0:
-                    with open(cache_output, 'r') as fh:
-                        full_data = json.load(fh)
-
-                full_data[cache_id] = data
-                data = full_data
-
-            with open(cache_output, 'w') as fh:
-                json.dump(data, fh)
+            with open(cache_output, 'wb') as f:
+                np.savez_compressed(f, **data)
 
     def _calculate_reduced_likelihood_params(self, thetas=None):
         """
