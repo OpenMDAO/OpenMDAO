@@ -3632,8 +3632,14 @@ class System(object):
 
         if implicit:
             if residuals_tol:
-                impl_outputs = {n: m for n, m in outputs.items() \
-                                if n in states and (n in states and m['resids'] != 0)}
+                for val in outputs.values():
+                    if not hasattr(val, "resids"):
+                        simple_warning("No residuals found, skipping residuals_tol")
+                        impl_outputs = {n: m for n, m in outputs.items() if n in states}
+                    else:
+                        impl_outputs = {n: m for n, m in outputs.items()
+                                        if n in states and
+                                        (n in states and m['resids'] != residuals_tol)}
             else:
                 impl_outputs = {n: m for n, m in outputs.items() if n in states}
             if out_stream:
