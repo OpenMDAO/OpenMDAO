@@ -1402,8 +1402,11 @@ class ListFeatureTestCase(unittest.TestCase):
 
         prob.run_model()
 
-        outputs = model.list_outputs(residuals_tol=0.01, residuals=True)
-        print(outputs)
+        stdout = StringIO()
+        outputs = model.list_outputs(residuals_tol=0.01, residuals=True, out_stream=stdout)
+        text = stdout.getvalue().split('\n')
+        self.assertEqual(text[14], 'd1')
+        self.assertEqual(text[16], 'd2')
 
 
 class CacheUsingComp(om.ImplicitComponent):

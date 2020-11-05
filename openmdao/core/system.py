@@ -3631,7 +3631,11 @@ class System(object):
                 expl_outputs = list(expl_outputs.items())
 
         if implicit:
-            impl_outputs = {n: m for n, m in outputs.items() if n in states}
+            if residuals_tol:
+                impl_outputs = {n: m for n, m in outputs.items() \
+                                if n in states and (n in states and m['resids'] != 0)}
+            else:
+                impl_outputs = {n: m for n, m in outputs.items() if n in states}
             if out_stream:
                 self._write_table('implicit', impl_outputs, hierarchical, print_arrays,
                                   all_procs, out_stream)
