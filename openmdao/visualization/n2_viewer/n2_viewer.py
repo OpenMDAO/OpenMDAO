@@ -119,7 +119,7 @@ def _get_var_dict(system, typ, name):
     var_dict['is_discrete'] = is_discrete
 
     if is_discrete:
-        if isinstance(meta['value'], (int, str, list, dict, complex, np.ndarray)) or MPI == None:
+        if isinstance(meta['value'], (int, str, list, dict, complex, np.ndarray)) or MPI is None:
             var_dict['value'] = default_noraise(system.get_val(name))
         else:
             var_dict['value'] = type(meta['value']).__name__
