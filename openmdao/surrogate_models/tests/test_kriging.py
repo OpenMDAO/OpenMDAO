@@ -171,7 +171,7 @@ class TestKrigingSurrogate(unittest.TestCase):
         assert_near_equal(mu, [[16.72]], 1e-1)
         assert_near_equal(sigma, [[15.27]], 1e-2)
 
-        # os.unlink('test_cache.npz')
+        os.unlink('test_cache.npz')
 
 
 if __name__ == "__main__":
