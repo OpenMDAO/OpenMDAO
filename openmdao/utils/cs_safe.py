@@ -42,9 +42,10 @@ def norm(x, axis=None):
     """
     return np.sqrt(np.sum(x**2, axis=axis))
 
+
 def arctan2(y, x):
     """
-    A numpy-compatible, complex-compatible arctan2 function for use with complex-step.
+    Numpy-compatible, complex-compatible arctan2 function for use with complex-step.
 
     Parameters
     ----------
@@ -55,7 +56,8 @@ def arctan2(y, x):
 
     Returns
     -------
-    The angle whose opposite side has length y and whose adjacent side has length x.
+    ndarray
+        The angle whose opposite side has length y and whose adjacent side has length x.
     """
     a = np.real(y)
     b = np.imag(y)
