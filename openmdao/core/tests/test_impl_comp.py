@@ -387,8 +387,10 @@ class ImplicitCompTestCase(unittest.TestCase):
         stdout = StringIO()
         outputs = model.list_outputs(residuals_tol=0.01, residuals=True, out_stream=stdout)
         text = stdout.getvalue().split('\n')
+        # P1 and D1 should not appear in the outputs section. This is being checked below
         self.assertEqual(text[14], 'd2')
         self.assertEqual(text[15], '  y2     [0.2323928]  [0.01679515]')
+        self.assertFalse('d1' in text)
         self.assertFalse('  y1     [-0.04648234]  [-3.78392516e-06]' in text)
 
 
