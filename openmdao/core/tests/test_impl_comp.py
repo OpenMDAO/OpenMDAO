@@ -363,6 +363,32 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.assertEqual(text.count('value'), 0)
         self.assertEqual(text.count('resids'), 1)
 
+    def test_list_residuals_with_tol(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 1.0))
+        model.add_subsystem('d1', SellarImplicitDis1())
+        model.add_subsystem('d2', SellarImplicitDis2())
+        model.connect('d1.y1', 'd2.y1')
+        model.connect('d2.y2', 'd1.y2')
+
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        model.nonlinear_solver.options['maxiter'] = 5
+        model.linear_solver = om.ScipyKrylov()
+        model.linear_solver.precon = om.LinearBlockGS()
+
+        prob.setup()
+        prob.set_solver_print(level=-1)
+
+        prob.run_model()
+
+        stdout = StringIO()
+        outputs = model.list_outputs(residuals_tol=0.01, residuals=True, out_stream=stdout)
+        text = stdout.getvalue().split('\n')
+        self.assertEqual(text[14], 'd1')
+        self.assertEqual(text[16], 'd2')
+
 
 class ImplicitCompGuessTestCase(unittest.TestCase):
 
@@ -1402,11 +1428,8 @@ class ListFeatureTestCase(unittest.TestCase):
 
         prob.run_model()
 
-        stdout = StringIO()
-        outputs = model.list_outputs(residuals_tol=0.01, residuals=True, out_stream=stdout)
-        text = stdout.getvalue().split('\n')
-        self.assertEqual(text[14], 'd1')
-        self.assertEqual(text[16], 'd2')
+        outputs = model.list_outputs(residuals_tol=0.01, residuals=True)
+        print(outputs)
 
 
 class CacheUsingComp(om.ImplicitComponent):
