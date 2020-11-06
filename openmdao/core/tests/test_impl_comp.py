@@ -387,8 +387,9 @@ class ImplicitCompTestCase(unittest.TestCase):
         stdout = StringIO()
         outputs = model.list_outputs(residuals_tol=0.01, residuals=True, out_stream=stdout)
         text = stdout.getvalue().split('\n')
-        self.assertEqual(text[14], 'd1')
-        self.assertEqual(text[16], 'd2')
+        self.assertEqual(text[14], 'd2')
+        self.assertEqual(text[15], '  y2     [0.2323928]  [0.01679515]')
+        self.assertFalse('  y1     [-0.04648234]  [-3.78392516e-06]' in text)
 
 
 class ImplicitCompGuessTestCase(unittest.TestCase):

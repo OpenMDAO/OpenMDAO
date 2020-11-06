@@ -3631,17 +3631,11 @@ class System(object):
                 expl_outputs = list(expl_outputs.items())
 
         if implicit:
+            impl_outputs = {}
             if residuals_tol:
-                for val in outputs.values():
-                    if not hasattr(val, "resids"):
-                        simple_warning("No residuals found, skipping residuals_tol")
-                        impl_outputs = {n: m for n, m in outputs.items() if n in states}
-                        break
-                    else:
-                        impl_outputs = {n: m for n, m in outputs.items()
-                                        if n in states and
-                                        (n in states and m['resids'] > residuals_tol)}
-                        break
+                for n, m in outputs.items():
+                    if "resids" in m and n in states and (n in states and m['resids'] > residuals_tol):
+                        impl_outputs[n] = m
             else:
                 impl_outputs = {n: m for n, m in outputs.items() if n in states}
             if out_stream:
