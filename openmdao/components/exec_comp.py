@@ -121,6 +121,7 @@ class ExecComp(ExplicitComponent):
         arcsin(x)                  Inverse sine of x
         arcsinh(x)                 Inverse hyperbolic sine of x
         arctan(x)                  Inverse tangent of x
+        arctan2(y, x)              4-quadrant arctangent function of y and x
         asin(x)                    Inverse sine of x
         asinh(x)                   Inverse hyperbolic sine of x
         atan(x)                    Inverse tangent of x

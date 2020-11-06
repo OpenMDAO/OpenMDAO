@@ -16,6 +16,7 @@ except ImportError:
 import openmdao.api as om
 from openmdao.components.exec_comp import _expr_dict
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_warning
+from openmdao.utils import cs_safe
 
 _ufunc_test_data = {
     'min': {
@@ -87,6 +88,12 @@ _ufunc_test_data = {
         'check_func': np.arctan,
         'args': {'f': {'value': np.zeros(6)},
                  'x': {'value': np.random.random(6)}}},
+    'arctan2': {
+        'str': 'f=arctan2(y, x)',
+        'check_val': np.array([-2.35619449, -0.78539816,  0.78539816,  2.35619449]),
+        'args': {'f': {'value': np.zeros(4)},
+                 'x': {'value': np.array([-1, +1, +1, -1])},
+                 'y': {'value': np.array([-1, -1, +1, +1])}}},
     'atan': {
         'str': 'f=atan(x)',
         'check_func': np.arctan,
