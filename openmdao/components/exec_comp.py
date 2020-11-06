@@ -670,6 +670,7 @@ else:
 # put any functions that need custom complex-safe versions here
 
 _expr_dict['abs'] = cs_safe.abs
+_expr_dict['arctan2'] = cs_safe.arctan2
 
 
 class _NumpyMsg(object):

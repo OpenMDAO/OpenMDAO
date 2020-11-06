@@ -771,6 +771,16 @@ class TestExecComp(unittest.TestCase):
         C1._linearize()
         assert_near_equal(C1._jacobian['y', 'x'], [[2.0]], 0.00001)
 
+    def test_abs_complex_step(self):
+        prob = om.Problem()
+        C1 = prob.model.add_subsystem('C1', om.ExecComp('y=2.0*arctan2(y, x)', x=np.array([1+2j]), y=1))
+
+        prob.setup()
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_near_equal(C1._outputs['y'], np.array([1.57079633]), 1e-8)
+
     def test_abs_array_complex_step(self):
         prob = om.Problem()
         C1 = prob.model.add_subsystem('C1', om.ExecComp('y=2.0*abs(x)',
