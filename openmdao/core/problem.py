@@ -32,7 +32,7 @@ from openmdao.recorders.recording_manager import RecordingManager, record_viewer
     record_system_options
 from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.general_utils import ContainsAll, pad_name, simple_warning, warn_deprecation, \
-    _is_slicer_op
+    _is_slicer_op, _slice_indices
 from openmdao.utils.mpi import FakeComm
 from openmdao.utils.mpi import MPI
 from openmdao.utils.name_maps import prom_name2abs_name, name2abs_names
@@ -519,28 +519,39 @@ class Problem(object):
             if model._outputs._contains_abs(abs_name):
                 model._outputs.set_var(abs_name, value, indices)
             elif abs_name in conns:  # input name given. Set value into output
-                is_abs = name in model._var_allprocs_abs2meta['input']
                 if model._outputs._contains_abs(src):  # src is local
                     if (model._outputs._abs_get_val(src).size == 0 and
                             src.rsplit('.', 1)[0] == '_auto_ivc' and
                             all_meta['output'][src]['distributed']):
                         pass  # special case, auto_ivc dist var with 0 local size
-                    elif is_abs and tmeta['has_src_indices']:  # and n_proms < 2:
+                    elif tmeta['has_src_indices']:  # and n_proms < 2:
                         if tlocmeta:  # target is local
                             src_indices = tlocmeta['src_indices']
-                            if tmeta['distributed']:
-                                ssizes = model._var_sizes['nonlinear']['output']
-                                sidx = model._var_allprocs_abs2idx['nonlinear'][src]
-                                ssize = ssizes[myrank, sidx]
-                                start = np.sum(ssizes[:myrank, sidx])
-                                end = start + ssize
-                                if np.any(src_indices < start) or np.any(src_indices >= end):
-                                    raise RuntimeError(f"{model.msginfo}: Can't set {name}: "
-                                                       "src_indices refer "
-                                                       "to out-of-process array entries.")
-                                if start > 0:
-                                    src_indices = src_indices - start
-                            model._outputs.set_var(src, value, src_indices[indices])
+                            flat = False
+                            if name in model._var_prom2inds:
+                                sshape, inds, flat = model._var_prom2inds[name]
+                                if inds is not None:
+                                    if _is_slicer_op(inds):
+                                        inds = _slice_indices(inds, np.prod(sshape), sshape).ravel()
+                                        value = value.ravel()
+                                        flat = True
+                                src_indices = inds
+                            if src_indices is None:
+                                model._outputs.set_var(src, value, None, flat)
+                            else:
+                                if tmeta['distributed']:
+                                    ssizes = model._var_sizes['nonlinear']['output']
+                                    sidx = model._var_allprocs_abs2idx['nonlinear'][src]
+                                    ssize = ssizes[myrank, sidx]
+                                    start = np.sum(ssizes[:myrank, sidx])
+                                    end = start + ssize
+                                    if np.any(src_indices < start) or np.any(src_indices >= end):
+                                        raise RuntimeError(f"{model.msginfo}: Can't set {name}: "
+                                                           "src_indices refer "
+                                                           "to out-of-process array entries.")
+                                    if start > 0:
+                                        src_indices = src_indices - start
+                                model._outputs.set_var(src, value, src_indices[indices], flat)
                         else:
                             raise RuntimeError(f"{model.msginfo}: Can't set {abs_name}: remote"
                                                " connected inputs with src_indices currently not"
@@ -888,7 +899,6 @@ class Problem(object):
             'lin_vec_names': None,  # names of linear vectors
             'model_ref': weakref.ref(model),  # ref to the model (needed to get out-of-scope
                                               # src data for inputs)
-            'promotes_src_indices': {},  # maps prom name to prom src_indices data per system
         }
         model._setup(model_comm, mode, self._metadata)
 

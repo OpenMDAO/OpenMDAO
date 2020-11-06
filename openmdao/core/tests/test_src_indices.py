@@ -30,7 +30,7 @@ class SrcIndicesTestCase(unittest.TestCase):
         srcval = np.array([1.0, 3.0, 5.0, 7.0, 9.0, 11.0, 13.0])
         prob.set_val('src.x', srcval)
         prob.run_model()
-        assert_near_equal(prob.get_val('outer.desvar_x'), srcval * 3, 1e-6)
+        assert_near_equal(prob.get_val('outer.desvar_x'), [15., 27.], 1e-6)
         expected = np.array([[15., 27.],
                              [15., 27.],
                              [15., 27.]])
@@ -53,12 +53,12 @@ class SrcIndicesTestCase(unittest.TestCase):
         c2 = g1.add_subsystem('c2', om.ExecComp('z = a * y', shape=(4,)))
 
         # The ultimate source of a and y may be scalar, or have some other arbitrary shape
-        g1.promotes('c2', inputs=['a', 'y'], src_indices=[0, 0, 0, 0], src_shape=(1,))
+        g1.promotes('c2', inputs=['a'], src_indices=[0, 0, 0, 0], src_shape=(1,))
+        g1.promotes('c2', inputs=['y'], src_indices=[0, 0, 0, 0], src_shape=(4,))
 
         p.model.connect('ivc.y', 'g1.y')
 
         # Now connect only a portion of some other output to a, which appears as a scalar input
-        # (This currently breaks because we're specifying the src_indices of an input twice.)
         p.model.connect('ivc.x', 'g1.a', src_indices=[-1])
 
         p.setup()
@@ -151,7 +151,7 @@ class SrcIndicesTestCase(unittest.TestCase):
         prob = om.Problem()
         prob.model.add_subsystem('C1', C1())
         prob.model.promotes('C1', inputs=['diameter'], src_indices=[0])
-        prob.model.add_subsystem('C2', C2(), promotes=['diameter'])
+        prob.model.add_subsystem('C2', C2(), promotes=['diameter'])  # size 3
 
         prob.setup()
 
@@ -195,7 +195,7 @@ class SrcIndicesTestCase(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_near_equal(prob['design:x'], 75.3)
+        assert_near_equal(prob['design:x'], [75.3]*4)
         assert_near_equal(prob['y1'], [75.3*2]*4)
         assert_near_equal(prob['y2'], [1*3]*4)
 
@@ -298,7 +298,7 @@ class SrcIndicesTestCase(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             p.setup()
 
-        self.assertEqual(cm.exception.args[0], "<model> <class Group>: Promoted src_shape of (3, 3) for 'G.g1.C1.x' doesn't match the parent src_shape of (3, 2).")
+        self.assertEqual(cm.exception.args[0], "'G.g1' <class Group>: Promoted src_shape of (3, 3) for 'x' in 'G.g1.C1' differs from src_shape (3, 2) for 'x' in 'G'.")
 
 
 class SrcIndicesFeatureTestCase(unittest.TestCase):
@@ -334,10 +334,10 @@ class SrcIndicesFeatureTestCase(unittest.TestCase):
 
         inp = np.arange(9).reshape((3,3)) + 1.
 
-        p.set_val('x', inp)
+        p.set_val('x', inp[:, :-1])
         p.run_model()
 
-        assert_near_equal(p['x'], inp)
+        assert_near_equal(p['x'], inp[:, :-1])
         assert_near_equal(p['G.g1.C1.y'], inp[:, :-1][:, 1]*3.)
         assert_near_equal(p['G.g2.C2.y'], inp[:, :-1].flatten()[[1,5]]*2.)
 
@@ -374,7 +374,7 @@ class SrcIndicesMPITestCase(unittest.TestCase):
 
         reduced_inp = inp[:, :-1]
 
-        p.set_val('x', inp)
+        p.set_val('x', reduced_inp)
         p.run_model()
 
         if commsize == 1 or p.comm.rank == 0:

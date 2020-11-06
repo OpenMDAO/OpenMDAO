@@ -647,7 +647,7 @@ class TestGroup(unittest.TestCase):
 
         p.model.add_subsystem('indep', om.IndepVarComp('x', arr_order_4x4))
         p.model.add_subsystem('C1', SlicerComp())
-        p.model.connect('indep.x', 'C1.x', src_indices=om.slicer[:, 1], flat_src_indices=True)
+        p.model.connect('indep.x', 'C1.x', src_indices=om.slicer[:, 1])
 
         p.setup()
         p.run_model()
@@ -2374,10 +2374,7 @@ class TestConnect(unittest.TestCase):
         self.sub.connect('src.x', 'arr.x', src_indices=[(2, -1, 2), (2, 2, 2)],
                          flat_src_indices=False)
 
-        msg = ("'sub' <class Group>: The source indices [[ 2 -1  2] [ 2  2  2]] do not specify a "
-               "valid shape for the connection 'sub.src.x' to 'sub.arr.x'. "
-               "The source has 2 dimensions but the indices expect 3.")
-
+        msg = "'sub' <class Group>: The source indices [[ 2 -1  2] [ 2  2  2]] do not specify a valid shape for the connection 'sub.src.x' to 'sub.arr.x'. The source has 2 dimensions but the indices expect 3."
         try:
             self.prob.setup()
         except ValueError as err:

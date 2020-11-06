@@ -28,7 +28,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.units import is_compatible, unit_conversion
 from openmdao.utils.variable_table import write_var_table
-from openmdao.utils.array_utils import evenly_distrib_idxs
+from openmdao.utils.array_utils import evenly_distrib_idxs, _flatten_src_indices
 from openmdao.utils.graph_utils import all_connected_nodes
 from openmdao.utils.name_maps import name2abs_name, name2abs_names
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
@@ -36,7 +36,7 @@ from openmdao.utils.coloring import _compute_coloring, Coloring, \
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, ContainsAll, all_ancestors, _slice_indices, \
-    simple_warning, make_set, ensure_compatible, match_prom_or_abs, _is_slicer_op
+    simple_warning, make_set, ensure_compatible, match_prom_or_abs, _is_slicer_op, shape_from_idx
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.utils.units import unit_conversion
@@ -394,6 +394,7 @@ class System(object):
         self._var_promotes = {'input': [], 'output': [], 'any': []}
 
         self._var_allprocs_prom2abs_list = None
+        self._var_prom2inds = {}
         self._var_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
@@ -1386,6 +1387,7 @@ class System(object):
         """
         Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
         """
+        self._var_prom2inds = {}
         self._var_allprocs_prom2abs_list = {'input': OrderedDict(), 'output': OrderedDict()}
         self._var_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2prom = {'input': {}, 'output': {}}
@@ -4390,8 +4392,6 @@ class System(object):
             return self._abs_get_val(src, get_remote, rank, vec_name, 'output', flat,
                                      from_root=True)
 
-        is_abs = name in self._var_allprocs_abs2meta['input']
-
         # if we have multiple promoted inputs that are explicitly connected to an output and units
         # have not been specified, look for group input to disambiguate
         if units is None and len(abs_ins) > 1:
@@ -4411,13 +4411,38 @@ class System(object):
         if abs_name in self._var_abs2meta['input']:  # input is local
             vmeta = self._var_abs2meta['input'][abs_name]
             src_indices = vmeta['src_indices']
-            has_src_indices = src_indices is not None
-            distrib = vmeta['distributed']
         else:
             vmeta = self._var_allprocs_abs2meta['input'][abs_name]
             src_indices = None  # FIXME: remote var could have src_indices
-            has_src_indices = vmeta['has_src_indices']
-            distrib = vmeta['distributed']
+
+        distrib = vmeta['distributed']
+        vshape = vmeta['shape']
+        has_src_indices = any(self._var_allprocs_abs2meta['input'][n]['has_src_indices'] for n in abs_ins)
+
+        # see if we have any 'intermediate' level src_indices when using a promoted name
+        if name in self._var_prom2inds:
+            src_shape, inds, flat = self._var_prom2inds[name]
+            if inds is None:
+                #if not(has_src_indices and vmeta['add_input_src_indices']):
+                if len(abs_ins) > 1 or name != abs_ins[0]:  # using a promoted lookup
+                    src_indices = None
+                    vshape = None
+                    has_src_indices = False
+                is_slice = _is_slicer_op(src_indices)
+            else:
+                is_slice = _is_slicer_op(inds)
+                shp = shape_from_idx(src_shape, inds, flat)
+                if not flat and not _is_slicer_op(inds):
+                    inds = _flatten_src_indices(inds, shp,
+                                                src_shape, np.product(src_shape))
+                src_indices = inds
+                has_src_indices = True
+                if len(abs_ins) > 1 or name != abs_name:
+                    vshape = shp
+        else:
+            is_slice = _is_slicer_op(src_indices)
+            shpname = 'global_shape' if get_remote else 'shape'
+            src_shape = self._var_allprocs_abs2meta['output'][src][shpname]
 
         if distrib and get_remote is None:
             raise RuntimeError(f"{self.msginfo}: Variable '{abs_name}' is a distributed "
@@ -4436,11 +4461,12 @@ class System(object):
         # get value of the source
         val = self._abs_get_val(src, get_remote, rank, vec_name, 'output', flat, from_root=True)
 
-        if has_src_indices and is_abs:
+        if has_src_indices:
             if src_indices is None:  # input is remote
                 val = np.zeros(0)
             else:
-                if _is_slicer_op(src_indices):
+                if is_slice:
+                    val.shape = src_shape
                     val = val[tuple(src_indices)].ravel()
                 elif distrib and (sdistrib or not slocal) and not get_remote:
                     var_idx = self._var_allprocs_abs2idx[vec_name][src]
@@ -4485,10 +4511,10 @@ class System(object):
 
             if distrib and get_remote:
                 val.shape = self._var_allprocs_abs2meta['input'][abs_name]['global_shape']
-            elif val.size > 0:
-                val.shape = vmeta['shape']
-        elif is_abs:
-            val = val.reshape(vmeta['shape'])
+            elif not flat and val.size > 0:
+                val.shape = vshape
+        elif vshape is not None:
+            val = val.reshape(vshape)
 
         if indices is not None:
             val = val[indices]
@@ -4509,7 +4535,7 @@ class System(object):
 
     def _get_src_inds_array(self, varname):
         """
-        Return the src_indices, if any, for input 'varname', converting from slice if needed.
+        Return src_indices, if any, for absolute input 'varname', converting from slice if needed.
 
         Parameters
         ----------
@@ -4979,11 +5005,5 @@ class System(object):
 
         return relevant
 
-    # def _resolve_src_indices(self, src, tgts):
-    #     rev_conns = {}
-    #     for tgt, src in self._conn_global_abs_in2out.items():
-    #         if src in rev_conns:
-    #             rev_conns[src].append(tgt)
-    #         else:
-    #             rev_conns[src] = [tgt]
-
+    def _resolve_src_inds_rec(self, rev_conns):
+        pass

@@ -512,7 +512,7 @@ class Vector(object):
         raise NotImplementedError('set_arr not defined for vector type %s' %
                                   type(self).__name__)
 
-    def set_var(self, name, val, idxs=_full_slice):
+    def set_var(self, name, val, idxs=_full_slice, flat=False):
         """
         Set the array view corresponding to the named variable, with optional indexing.
 
@@ -524,6 +524,8 @@ class Vector(object):
             Scalar or array to set data array to.
         idxs : int or slice or tuple of ints and/or slices.
             The locations where the data array should be updated.
+        flat :bool
+            If True, set into flattened variable.
         """
         abs_name = self._name2abs_name(name)
         if abs_name is None:
@@ -539,7 +541,10 @@ class Vector(object):
         value = np.asarray(val)
 
         try:
-            self._views[abs_name][idxs] = value
+            if flat:
+                 self._views_flat[abs_name][idxs] = value.flat
+            else:
+                self._views[abs_name][idxs] = value
         except Exception as err:
             try:
                 value = value.reshape(self._views[abs_name][idxs].shape)
