@@ -3640,7 +3640,7 @@ class System(object):
                     else:
                         impl_outputs = {n: m for n, m in outputs.items()
                                         if n in states and
-                                        (n in states and m['resids'] != residuals_tol)}
+                                        (n in states and m['resids'] > residuals_tol)}
                         break
             else:
                 impl_outputs = {n: m for n, m in outputs.items() if n in states}
