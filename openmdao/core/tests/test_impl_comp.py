@@ -7,6 +7,7 @@ import numpy as np
 
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.test_suite.components.sellar import SellarImplicitDis1, SellarImplicitDis2
 
 
 # Note: The following class definitions are used in feature docs
