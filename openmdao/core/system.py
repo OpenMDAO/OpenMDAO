@@ -4996,6 +4996,3 @@ class System(object):
         relevant['nonlinear'] = relevant['linear']
 
         return relevant
-
-    def _resolve_src_inds_rec(self, rev_conns):
-        pass

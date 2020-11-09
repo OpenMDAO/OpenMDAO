@@ -2390,9 +2390,6 @@ class Group(System):
             raise RuntimeError("%s: Can't add subsystem '%s' because an attribute with that name "
                                "already exits." % (self.msginfo, name))
 
-        # print(f"{self.msginfo}: add_subsys: {name}, {promotes}, {promotes_inputs},
-        # {promotes_outputs}")
-
         match = namecheck_rgx.match(name)
         if match is None or match.group() != name:
             raise NameError("%s: '%s' is not a valid sub-system name." % (self.msginfo, name))
