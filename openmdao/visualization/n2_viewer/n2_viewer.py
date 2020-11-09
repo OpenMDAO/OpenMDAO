@@ -119,13 +119,16 @@ def _get_var_dict(system, typ, name):
     var_dict['is_discrete'] = is_discrete
 
     if is_discrete:
-        if isinstance(meta['value'], (int, str, list, dict, complex, np.ndarray)):
-            var_dict['value'] = default_noraise(meta['value'])
+        if isinstance(meta['value'], (int, str, list, dict, complex, np.ndarray)) or MPI is None:
+            var_dict['value'] = default_noraise(system.get_val(name))
         else:
             var_dict['value'] = type(meta['value']).__name__
     else:
         if meta['value'].size < _MAX_ARRAY_SIZE_FOR_REPR_VAL:
-            var_dict['value'] = _convert_ndarray_to_support_nans_in_json(meta['value'])
+            if MPI:
+                var_dict['value'] = meta['value']
+            else:
+                var_dict['value'] = _convert_ndarray_to_support_nans_in_json(system.get_val(name))
         else:
             var_dict['value'] = None
 
@@ -513,7 +516,6 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     }
     libs = read_files(lib_dct.values(), libs_dir, 'js')
     src_names = \
-        'modal', \
         'utils', \
         'SymbolType', \
         'N2TreeNode', \
