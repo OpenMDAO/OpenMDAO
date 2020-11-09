@@ -2,6 +2,7 @@ from pprint import pprint
 import numpy as np
 import openmdao.api as om
 from mpi4py import MPI
+import wingdbstub
 
 from openmdao.utils.assert_utils import assert_near_equal
 

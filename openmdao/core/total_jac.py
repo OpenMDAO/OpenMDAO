@@ -794,13 +794,17 @@ class _TotalJacInfo(object):
         idx_map = {}
         start = 0
         end = 0
+        get_remote = True
 
         for name in names:
             if name in vois:
                 voi = vois[name]
                 # this 'size' already takes indices into account
                 if voi['distributed'] is True:
-                    size = voi['global_size']
+                    if get_remote:
+                        size = voi['size']
+                    else:
+                        size = voi['global_size']
                 else:
                     size = voi['size']
                 indices = vois[name]['indices']
@@ -1182,10 +1186,11 @@ class _TotalJacInfo(object):
         vecname, _, _ = self.in_idx_map[mode][i]
         deriv_idxs, jac_idxs, _ = self.sol2jac_map[mode]
         deriv_val = self.output_vec[mode][vecname]._data
+        self.J = self.J.flatten()
         if mode == 'fwd':
-            self.J[jac_idxs[vecname], i] = deriv_val[deriv_idxs[vecname]]
+            self.J[jac_idxs[vecname]] = deriv_val[deriv_idxs[vecname]]
         else:  # rev
-            self.J[i, jac_idxs[vecname]] = deriv_val[deriv_idxs[vecname]]
+            self.J[jac_idxs[vecname]] = deriv_val[deriv_idxs[vecname]]
 
     def _jac_setter_dist(self, i, mode):
         """
@@ -1224,8 +1229,8 @@ class _TotalJacInfo(object):
             Direction of derivative solution.
         """
         self.simple_single_jac_scatter(i, mode)
-        if self.comm.size > 1:
-            self._jac_setter_dist(i, mode)
+        #if self.comm.size > 1:
+            #self._jac_setter_dist(i, mode)
 
     def par_deriv_jac_setter(self, inds, mode):
         """
@@ -1423,8 +1428,13 @@ class _TotalJacInfo(object):
                     if debug_print:
                         print('Elapsed Time:', time.time() - t0, '\n', flush=True)
 
+                    #test = self.comm.Allgather(self.J, self.J)
                     jac_setter(inds, mode)
 
+        self.J = self.comm.allgather(self.J)
+        a = np.array(self.J[0])
+        b = np.array(self.J[1])
+        self.J = np.array([a,b])
         # Driver scaling.
         if self.has_scaling:
             self._do_driver_scaling(self.J_dict)

@@ -1560,7 +1560,7 @@ class Problem(object):
         return data['']
 
     def compute_totals(self, of=None, wrt=None, return_format='flat_dict', debug_print=False,
-                       driver_scaling=False, use_abs_names=False):
+                       driver_scaling=False, use_abs_names=False, get_remote=False):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
