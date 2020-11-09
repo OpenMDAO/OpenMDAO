@@ -524,7 +524,7 @@ class Problem(object):
                             src.rsplit('.', 1)[0] == '_auto_ivc' and
                             all_meta['output'][src]['distributed']):
                         pass  # special case, auto_ivc dist var with 0 local size
-                    elif tmeta['has_src_indices']:  # and n_proms < 2:
+                    elif tmeta['has_src_indices']:
                         if tlocmeta:  # target is local
                             src_indices = tlocmeta['src_indices']
                             flat = False

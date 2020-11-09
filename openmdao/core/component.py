@@ -529,9 +529,6 @@ class Component(System):
             'copy_shape': copy_shape,
         }
 
-        if src_indices is not None:
-            metadata['add_input_src_indices'] = True
-
         if self._static_mode:
             var_rel2meta = self._static_var_rel2meta
             var_rel_names = self._static_var_rel_names

@@ -182,7 +182,6 @@ class ProbRemoteTestCase(unittest.TestCase):
                        "`get_val(<name>, get_remote=True)` or from the local "
                        "process using `get_val(<name>, get_remote=False)`.")
 
-        #import wingdbstub
         if prob.comm.rank == 0:
             #
             # get_remote=False
