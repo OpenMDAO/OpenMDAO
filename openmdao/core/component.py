@@ -1510,8 +1510,6 @@ class Component(System):
 
         for tgt, (pinfo, parent_src_shape, oldprom, oldpath) in my_tdict.items():
             src_inds, flat_src_inds, src_shape = pinfo
-            meta = abs2meta_in[tgt]
-            meta['src_shape'] = src_shape
 
             # update the input metadata with the final src_indices,
             # flat_src_indices and src_shape
@@ -1521,6 +1519,8 @@ class Component(System):
                     del self._var_prom2inds[prom]
             else:
                 all_abs2meta_in[tgt]['has_src_indices'] = True
+                meta = abs2meta_in[tgt]
+                meta['src_shape'] = src_shape
                 if meta.get('add_input_src_indices'):
                     src_inds = convert_src_inds(src_inds, src_shape,
                                                 meta['src_indices'], src_shape)

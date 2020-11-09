@@ -974,6 +974,7 @@ class Group(System):
                         pinfo = pinfo.convert_from(oldinfo)
                     except Exception as err:
                         conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
+                        parinput = tprom if oldinfo.parent is None else oldinfo.prom_path()
                         if tgt in conns:
                             src = conns[tgt]
                             owner, sprom, tprom = get_connection_owner(self, tgt)
@@ -983,9 +984,12 @@ class Group(System):
                             else:
                                 msg = f"In connection from '{src}' to '{tgt}', "
 
-                            parinput = tprom if oldinfo.parent is None else oldinfo.prom_path()
-
                             raise RuntimeError(f"{msg}input '{parinput}' src_indices are "
+                                               f"{oldinfo.src_indices} and indexing into those "
+                                               f"failed using src_indices {pinfo.src_indices} from "
+                                               f"input '{pinfo.prom_path()}'. Error was: {err}.")
+                        else:
+                            raise RuntimeError(f"Input '{parinput}' src_indices are "
                                                f"{oldinfo.src_indices} and indexing into those "
                                                f"failed using src_indices {pinfo.src_indices} from "
                                                f"input '{pinfo.prom_path()}'. Error was: {err}.")
