@@ -1304,7 +1304,7 @@ def shape2tuple(shape):
 
     Parameters
     ----------
-    shape : int or slice or tuple
+    shape : int or tuple
         The given shape.
 
     Returns

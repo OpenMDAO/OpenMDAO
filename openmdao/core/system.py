@@ -480,17 +480,6 @@ class System(object):
         self._coloring_info = _DEFAULT_COLORING_META.copy()
         self._first_call_to_linearize = True   # will check in first call to _linearize
 
-    def __repr__(self):
-        """
-        Return a string representation.
-
-        Returns
-        -------
-        str
-            The string representation.
-        """
-        return self.msginfo
-
     @property
     def msginfo(self):
         """
@@ -501,13 +490,13 @@ class System(object):
         str
             Either our instance pathname or class name.
         """
-        if self.pathname == '':
-            return '<model> <class {}>'.format(type(self).__name__)
         if self.pathname is not None:
-            return "'{}' <class {}>".format(self.pathname, type(self).__name__)
+            if self.pathname == '':
+                return f"<model> <class {type(self).__name__}>"
+            return f"'{self.pathname}' <class {type(self).__name__}>"
         if self.name:
-            return "'{}' <class {}>".format(self.name, type(self).__name__)
-        return type(self).__name__
+            return f"'{self.name}' <class {type(self).__name__}>"
+        return f"<class {type(self).__name__}>"
 
     def _get_inst_id(self):
         return self.pathname
@@ -1932,8 +1921,9 @@ class System(object):
                                        f"'{tup[0]}' because '{name}' has already been promoted as "
                                        f"'{old_key}'.")
 
-            simple_warning(f"{self.msginfo}: {io} variable '{name}', promoted using {new_using}, "
-                           f"was already promoted using {old_using}.")
+            if old_key != '*':
+                simple_warning(f"{self.msginfo}: {io} variable '{name}', promoted using "
+                               f"{new_using}, was already promoted using {old_using}.")
 
             return match_type == _MatchType.PATTERN
 

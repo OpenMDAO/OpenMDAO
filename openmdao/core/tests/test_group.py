@@ -117,7 +117,7 @@ class TestGroup(unittest.TestCase):
         try:
             p.model.add_subsystem('comp', om.IndepVarComp)
         except TypeError as err:
-            self.assertEqual(str(err), "Group: Subsystem 'comp' should be an instance, "
+            self.assertEqual(str(err), "<class Group>: Subsystem 'comp' should be an instance, "
                                        "but a IndepVarComp class object was found.")
         else:
             self.fail('Exception expected.')
@@ -131,7 +131,7 @@ class TestGroup(unittest.TestCase):
         try:
             p.model.add_subsystem('comp2', om.ExecComp('b=2*a'))
         except Exception as err:
-            self.assertEqual(str(err), "Group: Subsystem name 'comp2' is already used.")
+            self.assertEqual(str(err), "<class Group>: Subsystem name 'comp2' is already used.")
         else:
             self.fail('Exception expected.')
 
@@ -250,7 +250,7 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as err:
             p.model.add_subsystem('_bad_name', om.Group())
         self.assertEqual(str(err.exception),
-                         "Group: '_bad_name' is not a valid sub-system name.")
+                         "<class Group>: '_bad_name' is not a valid sub-system name.")
 
     def test_subsys_attributes(self):
         p = om.Problem()
@@ -282,7 +282,7 @@ class TestGroup(unittest.TestCase):
             with self.assertRaises(Exception) as err:
                 p.model.add_subsystem(reserved, om.Group())
             self.assertEqual(str(err.exception),
-                             "Group: Can't add subsystem '%s' because an attribute with that name already exits." %
+                             "<class Group>: Can't add subsystem '%s' because an attribute with that name already exits." %
                              reserved)
 
     def test_group_promotes(self):
@@ -323,7 +323,7 @@ class TestGroup(unittest.TestCase):
             p.model.add_subsystem('comp1', om.IndepVarComp('x', 5.0),
                                   promotes_outputs='x')
         self.assertEqual(str(err.exception),
-                         "Group: promotes must be an iterator of strings and/or tuples.")
+                         "<class Group>: promotes must be an iterator of strings and/or tuples.")
 
     def test_group_renames_errors_not_found(self):
         p = om.Problem()
@@ -595,12 +595,12 @@ class TestGroup(unittest.TestCase):
 
         idxs = np.array([0, 2, 3], dtype=int)
 
-        p.model.connect('indep.x', 'row123_comp.x', src_indices=om.slicer[idxs, ...],
-                        flat_src_indices=True)
-
-        msg = "<model> <class Group>: Connection from 'indep.x' to 'row123_comp.x' was added with slice src_indices, so flat_src_indices is ignored."
+        msg = "<class Group>: Connection from 'indep.x' to 'row123_comp.x' was added with slice src_indices, so flat_src_indices is ignored."
         with assert_warning(UserWarning, msg):
-            p.setup()
+            p.model.connect('indep.x', 'row123_comp.x', src_indices=om.slicer[idxs, ...],
+                            flat_src_indices=True)
+
+        p.setup()
         p.run_model()
 
         assert_near_equal(p['row123_comp.x'], arr_large_4x4[(0, 2, 3), ...].ravel())

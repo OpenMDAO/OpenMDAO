@@ -2221,12 +2221,6 @@ class Group(System):
 
                     flat = meta_in['flat_src_indices']
 
-                    if has_slice:
-                        if flat is not None:
-                            simple_warning(f"{self.msginfo}: Connection from '{abs_out}' to "
-                                           f"'{abs_in}' was added with slice src_indices, so "
-                                           "flat_src_indices is ignored.")
-
                     if flat_array_slice_check:
                         # initial dimensions of indices shape must be same shape as target
                         for idx_d, inp_d in zip(src_indices.shape, in_shape):
@@ -2538,6 +2532,11 @@ class Group(System):
 
             prominfo = _PromotesInfo(src_indices, flat_src_indices, src_shape)
 
+            if flat_src_indices and _is_slicer_op(src_indices):
+                promoted = inputs if inputs else any
+                simple_warning(f"{self.msginfo}: When promoting {promoted}, slice src_indices were "
+                               "specified, so flat_src_indices is ignored.")
+
         subsys = getattr(self, subsys_name)
         if any:
             subsys._var_promotes['any'].extend((a, prominfo) for a in any)
@@ -2710,10 +2709,6 @@ class Group(System):
             if src_indices.ndim == 1:
                 flat_src_indices = True
 
-        # if src_indices is not None:
-        #     print(f"{self.msginfo}: flat={flat_src_indices}, {src_name} -> {tgt_name},
-        # {src_indices.tolist()}")
-
         # target should not already be connected
         for manual_connections in [self._manual_connections, self._static_manual_connections]:
             if tgt_name in manual_connections:
@@ -2726,6 +2721,11 @@ class Group(System):
             raise RuntimeError("{}: Output and input are in the same System for "
                                "connection from '{}' to '{}'.".format(self.msginfo,
                                                                       src_name, tgt_name))
+
+        if flat_src_indices and _is_slicer_op(src_indices):
+            simple_warning(f"{self.msginfo}: Connection from '{src_name}' to "
+                           f"'{tgt_name}' was added with slice src_indices, so "
+                           "flat_src_indices is ignored.")
 
         if self._static_mode:
             manual_connections = self._static_manual_connections

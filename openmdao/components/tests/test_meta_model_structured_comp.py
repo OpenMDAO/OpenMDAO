@@ -1310,7 +1310,7 @@ class TestMetaModelStructuredCompFeature(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             comp.add_input('x1', np.array([1.0, 2.0]))
 
-        msg = "MetaModelStructuredComp: Input x1 must either be scalar, or of length equal to vec_size."
+        msg = "<class MetaModelStructuredComp>: Input x1 must either be scalar, or of length equal to vec_size."
         self.assertEqual(str(cm.exception), msg)
 
         with self.assertRaises(ValueError) as cm:
@@ -1321,7 +1321,7 @@ class TestMetaModelStructuredCompFeature(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             comp.add_output('x1', np.array([1.0, 2.0]))
 
-        msg = "MetaModelStructuredComp: Output x1 must either be scalar, or of length equal to vec_size."
+        msg = "<class MetaModelStructuredComp>: Output x1 must either be scalar, or of length equal to vec_size."
         self.assertEqual(str(cm.exception), msg)
 
         with self.assertRaises(ValueError) as cm:

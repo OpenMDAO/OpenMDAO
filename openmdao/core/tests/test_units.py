@@ -926,7 +926,7 @@ class TestUnitConversion(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             p.model.set_input_defaults('comp.x', val=2., units='in**2')
 
-        msg = ("Group: The units 'in**2' are invalid.")
+        msg = ("<class Group>: The units 'in**2' are invalid.")
         self.assertEqual(cm.exception.args[0], msg)
 
 
