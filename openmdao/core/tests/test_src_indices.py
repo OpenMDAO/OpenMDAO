@@ -65,7 +65,9 @@ class SrcIndicesTestCase(unittest.TestCase):
 
         p.run_model()
 
-        assert_near_equal(p['g1.c2.z'], [20.] * 4)
+        assert_near_equal(p['g1.a'], 4.)
+        assert_near_equal(p['g1.y'], [5., 5., 5., 5.])
+        assert_near_equal(p['g1.c2.z'], [20., 20., 20., 20.])
 
     def test_multiple_inputs_different_src_indices(self):
         """
@@ -146,7 +148,6 @@ class SrcIndicesTestCase(unittest.TestCase):
             def compute(self, inputs, outputs):
                 pass
 
-        # this test passes if setup doesn't raise an exception.
         # C1 has src_indices and C2 doesn't.
         prob = om.Problem()
         prob.model.add_subsystem('C1', C1())
