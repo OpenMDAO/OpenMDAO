@@ -201,7 +201,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         # list_outputs on a component before running is okay
         c2_outputs = self.prob.model.comp2.list_outputs(out_stream=None)
         expected = {
-            'x': {'value': [0.]}
+            'x': {'value': np.array([0.])}
         }
         self.assertEqual(dict(c2_outputs), expected)
 
@@ -216,9 +216,10 @@ class ImplicitCompTestCase(unittest.TestCase):
         c2_outputs = self.prob.model.comp2.list_outputs(excludes='x', out_stream=None)
         self.assertEqual(dict(c2_outputs), {})
 
-        # specifying residuals_tol should not cause an error
+        # specifying residuals_tol should not cause an error. However this will be empty because
+        # of the residuals_tol
         c2_outputs = self.prob.model.comp2.list_outputs(residuals_tol=.01, out_stream=None)
-        self.assertEqual(dict(c2_outputs), expected)
+        self.assertEqual(dict(c2_outputs), {})
 
         # specifying prom_name should not cause an error
         c2_outputs = self.prob.model.comp2.list_outputs(prom_name=True, out_stream=None)
