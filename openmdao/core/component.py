@@ -499,7 +499,6 @@ class Component(System):
                     if flat_src_indices is not None:
                         simple_warning(f"{self.msginfo}: Input '{name}' was added with slice "
                                        "src_indices, so flat_src_indices is ignored.")
-                    #flat_src_indices = True
                 else:
                     src_indices = np.asarray(src_indices, dtype=INT_DTYPE)
 

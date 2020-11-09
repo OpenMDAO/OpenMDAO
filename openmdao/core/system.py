@@ -172,6 +172,8 @@ class System(object):
     _var_promotes : { 'any': [], 'input': [], 'output': [] }
         Dictionary of lists of variable names/wildcards specifying promotion
         (used to calculate promoted names)
+    _var_prom2inds : dict
+        Maps promoted name to src_indices in scope of system.
     _var_allprocs_prom2abs_list : {'input': dict, 'output': dict}
         Dictionary mapping promoted names to list of all absolute names.
         For outputs, the list will have length one since promoted output names are unique.
@@ -4417,13 +4419,13 @@ class System(object):
 
         distrib = vmeta['distributed']
         vshape = vmeta['shape']
-        has_src_indices = any(self._var_allprocs_abs2meta['input'][n]['has_src_indices'] for n in abs_ins)
+        has_src_indices = any(self._var_allprocs_abs2meta['input'][n]['has_src_indices']
+                              for n in abs_ins)
 
         # see if we have any 'intermediate' level src_indices when using a promoted name
         if name in self._var_prom2inds:
             src_shape, inds, flat = self._var_prom2inds[name]
             if inds is None:
-                #if not(has_src_indices and vmeta['add_input_src_indices']):
                 if len(abs_ins) > 1 or name != abs_ins[0]:  # using a promoted lookup
                     src_indices = None
                     vshape = None

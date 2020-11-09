@@ -524,7 +524,7 @@ class Vector(object):
             Scalar or array to set data array to.
         idxs : int or slice or tuple of ints and/or slices.
             The locations where the data array should be updated.
-        flat :bool
+        flat : bool
             If True, set into flattened variable.
         """
         abs_name = self._name2abs_name(name)
@@ -542,7 +542,7 @@ class Vector(object):
 
         try:
             if flat:
-                 self._views_flat[abs_name][idxs] = value.flat
+                self._views_flat[abs_name][idxs] = value.flat
             else:
                 self._views[abs_name][idxs] = value
         except Exception as err:

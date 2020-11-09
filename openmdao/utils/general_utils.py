@@ -1190,6 +1190,25 @@ def prom2ivc_src_dict(prom_dict):
 
 
 def convert_src_inds(parent_src_inds, parent_src_shape, my_src_inds, my_src_shape):
+    """
+    Compute lower level src_indices based on parent src_indices.
+
+    Parameters
+    ----------
+    parent_src_inds : ndarray
+        Parent src_indices.
+    parent_src_shape : tuple
+        Shape of source expected by parent.
+    my_src_inds : ndarray or fancy index
+        src_indices at the current system level, before conversion.
+    my_src_shape : tuple
+        Expected source shape at the current system level.
+
+    Returns
+    -------
+    ndarray
+        Final src_indices based on those of the parent.
+    """
     if parent_src_inds is None:
         return my_src_inds
     elif my_src_inds is None:
@@ -1211,7 +1230,21 @@ def convert_src_inds(parent_src_inds, parent_src_shape, my_src_inds, my_src_shap
 
 def shape_from_idx(src_shape, src_inds, flat_src_inds):
     """
-    Get the shape of the result if the given src_inds were applied to an array of the given shape
+    Get the shape of the result if the given src_inds were applied to an array of the given shape.
+
+    Parameters
+    ----------
+    src_shape : tuple
+        Expected shape of source variable.
+    src_inds : ndarray or fancy index
+        Indices into the source variable.
+    flat_src_inds : bool
+        If True, src_inds index into a flat array.
+
+    Returns
+    -------
+    tuple
+        Shape of the input.
     """
     if _is_slicer_op(src_inds):
         if isinstance(src_inds, slice):
@@ -1225,8 +1258,8 @@ def shape_from_idx(src_shape, src_inds, flat_src_inds):
                 return shp
 
         if len(src_inds) != len(src_shape):
-            raise ValueError(f"src_indices {src_inds} have the wrong number of dimensions, {len(src_inds)}, to "
-                             f"index into an array of shape {src_shape}")
+            raise ValueError(f"src_indices {src_inds} have the wrong number of dimensions, "
+                             f"{len(src_inds)}, to index into an array of shape {src_shape}")
 
         ret = []
         full_slice = slice(None)
@@ -1267,7 +1300,17 @@ def shape_from_idx(src_shape, src_inds, flat_src_inds):
 
 def shape2tuple(shape):
     """
-    Return shape as a tuple
+    Return shape as a tuple.
+
+    Parameters
+    ----------
+    shape : int or slice or tuple
+        The given shape.
+
+    Returns
+    -------
+    tuple
+        The shape as a tuple.
     """
     if isinstance(shape, Number):
         return (shape,)
@@ -1278,7 +1321,7 @@ def shape2tuple(shape):
 
 def get_connection_owner(system, tgt):
     """
-    Return (owner, promoted_src, promoted_tgt) for the given connected source and target
+    Return (owner, promoted_src, promoted_tgt) for the given connected source and target.
 
     Note: this is not speedy.  It's intended for use only in error messages.
 

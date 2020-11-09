@@ -917,7 +917,9 @@ class Group(System):
         tdict = {}
         for tgt, src in self._conn_global_abs_in2out.items():
             # skip remote vars, discretes and auto_ivcs
-            if tgt not in abs2meta_in or src.startswith('_auto_ivc.') or src not in all_abs2meta_out:
+            if tgt not in abs2meta_in or src.startswith('_auto_ivc.'):
+                continue
+            if src not in all_abs2meta_out:
                 continue
 
             src_inds = flat_src_inds = None
@@ -927,15 +929,6 @@ class Group(System):
             if not abs2meta_in[tgt].get('add_input_src_indices'):
                 src_inds = abs2meta_in[tgt]['src_indices']
                 flat_src_inds = abs2meta_in[tgt]['flat_src_indices']
-                #if src_inds is not None:
-                    #try:
-                        #parent_src_shape = shape_from_idx(src_shape, src_inds, flat_src_inds)
-                    #except ValueError as err:
-                        #msg = (f"For the connection between '{src}' and '{tgt}', {err}.")
-                        #if self._raise_connection_errors:
-                            #raise ValueError(msg)
-                        #else:
-                            #simple_warning(msg)
 
             tdict[tgt] = (_PromotesInfo(src_inds, flat_src_inds, shape2tuple(src_shape)),
                           shape2tuple(parent_src_shape), src, self.pathname)
@@ -959,20 +952,18 @@ class Group(System):
                 if parent_src_shape is not None and pinfo.src_shape is not None:
                     if parent_src_shape != pinfo.src_shape:
                         if oldinfo.src_indices is not None:
-                            parent_src_shape = shape_from_idx(parent_src_shape, oldinfo.src_indices, oldinfo.flat)
+                            parent_src_shape = shape_from_idx(parent_src_shape, oldinfo.src_indices,
+                                                              oldinfo.flat)
                             oldprom = prom
                             oldpath = self.pathname
                         if parent_src_shape != pinfo.src_shape:
                             msg = (f"{self.msginfo}: Promoted src_shape of {pinfo.src_shape} for "
-                                   f"'{subprom}' in '{'.'.join((self.pathname, subname)).lstrip('.')}' "
+                                   f"'{subprom}' in "
+                                   f"'{'.'.join((self.pathname, subname)).lstrip('.')}' "
                                    f"differs from src_shape {parent_src_shape} for '{oldprom}' in "
                                    f"'{oldpath}'.")
                             raise RuntimeError(msg)
-                #shape = parent_src_shape if parent_src_shape is not None else pinfo.src_shape
-                #if pinfo.src_indices is not None and shape is not None:
-                    #parent_src_shape = shape_from_idx(shape, pinfo.src_indices, pinfo.flat)
-                    #oldprom = prom
-                    #oldpath = self.pathname
+
                 if parent_src_shape is None:
                     parent_src_shape = pinfo.src_shape
                     oldprom = prom
@@ -987,16 +978,17 @@ class Group(System):
                             src = conns[tgt]
                             owner, sprom, tprom = get_connection_owner(self, tgt)
                             if owner is not None:
-                                msg = f"In connection from '{sprom}' to '{tprom}' in group '{owner}', "
+                                msg = (f"In connection from '{sprom}' to '{tprom}' in group "
+                                       f"'{owner}', ")
                             else:
                                 msg = f"In connection from '{src}' to '{tgt}', "
 
                             parinput = tprom if oldinfo.parent is None else oldinfo.prom_path()
 
                             raise RuntimeError(f"{msg}input '{parinput}' src_indices are "
-                                               f"{oldinfo.src_indices} and indexing into those failed "
-                                               f"using src_indices {pinfo.src_indices} from input "
-                                               f"'{pinfo.prom_path()}'. Error was: {err}.")
+                                               f"{oldinfo.src_indices} and indexing into those "
+                                               f"failed using src_indices {pinfo.src_indices} from "
+                                               f"input '{pinfo.prom_path()}'. Error was: {err}.")
             else:
                 pinfo = oldinfo.copy()
 
@@ -2234,7 +2226,6 @@ class Group(System):
                             simple_warning(f"{self.msginfo}: Connection from '{abs_out}' to "
                                            f"'{abs_in}' was added with slice src_indices, so "
                                            "flat_src_indices is ignored.")
-                        #meta_in['flat_src_indices'] = True
 
                     if flat_array_slice_check:
                         # initial dimensions of indices shape must be same shape as target
@@ -2546,9 +2537,6 @@ class Group(System):
                                    " 'any'. Note that src_indices only apply to matching inputs.")
 
             prominfo = _PromotesInfo(src_indices, flat_src_indices, src_shape)
-
-            # print(f"{self.msginfo}: promotes: {subsys_name}, {any}, {inputs}, {outputs}")
-            # #flat={flat_src_indices}, shape={src_shape}, inds={src_indices}")
 
         subsys = getattr(self, subsys_name)
         if any:
