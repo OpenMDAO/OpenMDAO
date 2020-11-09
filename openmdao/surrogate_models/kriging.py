@@ -2,8 +2,6 @@
 import numpy as np
 import scipy.linalg as linalg
 from scipy.optimize import minimize
-import json
-import os
 
 from openmdao.surrogate_models.surrogate_model import SurrogateModel
 from openmdao.utils.general_utils import simple_warning
