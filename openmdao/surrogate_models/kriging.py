@@ -117,6 +117,7 @@ class KrigingSurrogate(SurrogateModel):
         x, y = np.atleast_2d(x, y)
 
         cache_input = self.options['training_cache_input']
+        cache_output = self.options['training_cache_output']
 
         if cache_input:
             with np.load(cache_input, allow_pickle=False) as data:
@@ -173,8 +174,15 @@ class KrigingSurrogate(SurrogateModel):
 
         bounds = [(np.log(1e-5), np.log(1e5)) for _ in range(self.n_dims)]
 
+        options = {'eps': 1e-3}
+
+        if cache_output:
+            # Enable logging since we expect the model to take long to train
+            options['disp'] = True
+            options['iprint'] = 2
+
         optResult = minimize(_calcll, 1e-1 * np.ones(self.n_dims), method='slsqp',
-                             options={'eps': 1e-3},
+                             options=options,
                              bounds=bounds)
 
         if not optResult.success:
@@ -189,7 +197,6 @@ class KrigingSurrogate(SurrogateModel):
         self.sigma2 = params['sigma2']
 
         # Save data to cache if specified
-        cache_output = self.options['training_cache_output']
         if cache_output:
             data = {
                 'n_samples': self.n_samples,
