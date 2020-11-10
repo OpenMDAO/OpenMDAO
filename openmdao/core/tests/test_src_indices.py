@@ -66,7 +66,9 @@ class SrcIndicesTestCase(unittest.TestCase):
         p.run_model()
 
         assert_near_equal(p['g1.a'], 4.)
+        assert_near_equal(p.model.g1.get_val('a'), 4.)
         assert_near_equal(p['g1.y'], [5., 5., 5., 5.])
+        assert_near_equal(p.model.g1.get_val('y'), [5., 5., 5., 5.])
         assert_near_equal(p['g1.c2.z'], [20., 20., 20., 20.])
 
     def test_multiple_inputs_different_src_indices(self):
@@ -97,7 +99,22 @@ class SrcIndicesTestCase(unittest.TestCase):
 
         p.run_model()
 
+        assert_near_equal(p['a'], 99.)
+        assert_near_equal(p['b'], 2.)
+        assert_near_equal(p.model.get_val('a'), 99.)
+        assert_near_equal(p.model.get_val('b'), 2.)
         assert_near_equal(p['g1.y'], 101.)
+        assert_near_equal(p['g1.a'], 99.)
+        assert_near_equal(p.model.g1.get_val('y'), 101.)
+        assert_near_equal(p.model.g1.get_val('a'), 99.)
+        assert_near_equal(p['g1.c1.a0'], 99.)
+        assert_near_equal(p['g1.c1.b'], 2.)
+        assert_near_equal(p['g1.g2.y'], [101.] * 4)
+        assert_near_equal(p.model.g1.g2.get_val('y'), [101.] * 4)
+        assert_near_equal(p['g1.g2.a'], [99.] * 4)
+        assert_near_equal(p.model.g1.g2.get_val('a'), [99.] * 4)
+        assert_near_equal(p['g1.g2.c2.a'], [99.] * 4)
+        assert_near_equal(p['g1.g2.c2.y'], [101.] * 4)
         assert_near_equal(p['g1.g2.c2.z'], [9999.] * 4)
 
     def test_src_indices_nested_promotes(self):

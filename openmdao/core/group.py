@@ -906,7 +906,10 @@ class Group(System):
                     top._var_prom2inds[top_prom][0] = shape
 
             # store shape, indices info under the prom name
-            self._var_prom2inds[prom] = [shape, pinfo.src_indices, pinfo.flat]
+            if self.pathname == '':
+                self._var_prom2inds[prom] = [shape, pinfo.src_indices, pinfo.flat]
+            else:
+                self._var_prom2inds[prom] = [parent_src_shape, oldinfo.src_indices, oldinfo.flat]
 
         for s in self._subsystems_myproc:
             if s.name in tdict:

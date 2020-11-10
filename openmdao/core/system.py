@@ -4384,13 +4384,14 @@ class System(object):
             return self._abs_get_val(src, get_remote, rank, vec_name, 'output', flat,
                                      from_root=True)
 
+        if scope_sys is None:
+            scope_sys = self
+
         # if we have multiple promoted inputs that are explicitly connected to an output and units
         # have not been specified, look for group input to disambiguate
         if units is None and len(abs_ins) > 1:
             if abs_name not in self._var_allprocs_discrete['input']:
                 # can't get here unless Group because len(abs_ins) always == 1 for comp
-                if scope_sys is None:
-                    scope_sys = self
                 try:
                     units = scope_sys._group_inputs[name][0]['units']
                 except (KeyError, IndexError):
@@ -4413,8 +4414,8 @@ class System(object):
                               for n in abs_ins)
 
         # see if we have any 'intermediate' level src_indices when using a promoted name
-        if name in self._var_prom2inds:
-            src_shape, inds, flat = self._var_prom2inds[name]
+        if name in scope_sys._var_prom2inds:
+            src_shape, inds, flat = scope_sys._var_prom2inds[name]
             if inds is None:
                 if len(abs_ins) > 1 or name != abs_ins[0]:  # using a promoted lookup
                     src_indices = None
