@@ -742,8 +742,7 @@ class _TotalJacInfo(object):
                             dist_offset = np.sum(sizes[:myproc, var_idx])
                             inds.append(np.arange(slc.start / ncols, slc.stop / ncols,
                                                   dtype=INT_DTYPE))
-                            jac_inds.append(np.arange(jstart + dist_offset,
-                                            jstart + dist_offset + sizes[myproc, var_idx],
+                            jac_inds.append(np.arange(jstart, sizes[myproc, var_idx],
                                             dtype=INT_DTYPE))
                             if fwd:
                                 name2jinds[name] = jac_inds[-1]
@@ -1428,7 +1427,6 @@ class _TotalJacInfo(object):
                     if debug_print:
                         print('Elapsed Time:', time.time() - t0, '\n', flush=True)
 
-                    #test = self.comm.Allgather(self.J, self.J)
                     jac_setter(inds, mode)
 
         self.J = self.comm.allgather(self.J)
