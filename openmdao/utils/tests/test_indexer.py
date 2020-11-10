@@ -23,7 +23,11 @@ class IndexerTestCase(unittest.TestCase):
         ind = indexer[:]
         src = np.arange(10)
         assert_equal(src[ind()], src)
-        assert_equal(ind.shape(), (1,))
+        with self.assertRaises(RuntimeError) as cm:
+            ind.shape()
+        self.assertEqual(cm.exception.args[0], "indexer(slice(None, None, None)) does not have a known src_shape so can't compute its shape.")
+        ind.set_src_shape(10)
+        assert_equal(ind.shape(), (10,))
 
     def test_neg_start_slice(self):
         ind = indexer[-3:-6:-1]
@@ -31,7 +35,7 @@ class IndexerTestCase(unittest.TestCase):
         assert_equal(src[ind()], [7,6,5])
         with self.assertRaises(RuntimeError) as cm:
             ind(final=True)
-        self.assertEqual(cm.exception.args[0], "indexer(slice(-3, -6, -1)) source does not have a known src_shape.")
+        self.assertEqual(cm.exception.args[0], "indexer(slice(-3, -6, -1)) does not have a known src_shape so can't compute its shape.")
 
     def test_none_slice(self):
         pass
