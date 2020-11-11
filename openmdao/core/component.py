@@ -18,7 +18,8 @@ from openmdao.utils.units import valid_units
 from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key, rel_name2abs_name
 from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
-    find_matches, simple_warning, make_set, _is_slicer_op
+    find_matches, simple_warning, make_set, _is_slicer_op, warn_deprecation, convert_src_inds, \
+    _slice_indices
 import openmdao.utils.coloring as coloring_mod
 
 
@@ -498,12 +499,19 @@ class Component(System):
                     if flat_src_indices is not None:
                         simple_warning(f"{self.msginfo}: Input '{name}' was added with slice "
                                        "src_indices, so flat_src_indices is ignored.")
-                    flat_src_indices = True
                 else:
                     src_indices = np.asarray(src_indices, dtype=INT_DTYPE)
 
             # value, shape: based on args, making sure they are compatible
             val, shape, src_indices = ensure_compatible(name, val, shape, src_indices)
+
+            if src_indices is not None and src_slice is None and src_indices.ndim == 1:
+                flat_src_indices = True
+
+        if src_indices is not None:
+            warn_deprecation(f"{self.msginfo}: Passing `src_indices` as an arg to `add_input` is"
+                             "deprecated and will become an error in a future release.  Add "
+                             "`src_indices` to a `promotes` or `connect` call instead.")
 
         metadata = {
             'value': val,
@@ -511,6 +519,7 @@ class Component(System):
             'size': shape_to_len(shape),
             'src_indices': src_indices,  # these will ultimately be converted to a flat index array
             'flat_src_indices': flat_src_indices,
+            'add_input_src_indices': src_indices is not None,
             'src_slice': src_slice,  # store slice def here, if any.  This is never overwritten
             'units': units,
             'desc': desc,
@@ -1493,6 +1502,37 @@ class Component(System):
                     if not self._coloring_info['dynamic']:
                         coloring._check_config_partial(self)
                     self._update_subjac_sparsity(coloring.get_subjac_sparsity())
+
+    def _resolve_src_inds(self, my_tdict, top):
+        abs2meta_in = self._var_abs2meta['input']
+        all_abs2meta_in = self._var_allprocs_abs2meta['input']
+        abs2prom = self._var_allprocs_abs2prom['input']
+
+        for tgt, (pinfo, parent_src_shape, oldprom, oldpath) in my_tdict.items():
+            src_inds, flat_src_inds, src_shape = pinfo
+
+            # update the input metadata with the final src_indices,
+            # flat_src_indices and src_shape
+            if src_inds is None:
+                prom = abs2prom[tgt]
+                if prom in self._var_prom2inds:
+                    del self._var_prom2inds[prom]
+            else:
+                all_abs2meta_in[tgt]['has_src_indices'] = True
+                meta = abs2meta_in[tgt]
+                meta['src_shape'] = src_shape
+                if meta.get('add_input_src_indices'):
+                    src_inds = convert_src_inds(src_inds, src_shape,
+                                                meta['src_indices'], src_shape)
+                elif _is_slicer_op(src_inds):
+                    meta['src_slice'] = src_inds
+                    src_inds = _slice_indices(src_inds, np.prod(parent_src_shape), parent_src_shape)
+                    meta['flat_src_indices'] = True
+                elif src_inds.ndim == 1:
+                    meta['flat_src_indices'] = True
+                elif meta['flat_src_indices'] is None:
+                    meta['flat_src_indices'] = flat_src_inds
+                meta['src_indices'] = src_inds
 
 
 class _DictValues(object):

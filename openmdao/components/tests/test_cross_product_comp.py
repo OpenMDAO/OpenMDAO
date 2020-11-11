@@ -479,7 +479,7 @@ class TestMultipleErrors(unittest.TestCase):
         with self.assertRaises(NameError) as ctx:
             cpc.add_product('c')
 
-        self.assertEqual(str(ctx.exception), "CrossProductComp: "
+        self.assertEqual(str(ctx.exception), "<class CrossProductComp>: "
                          "Multiple definition of output 'c'.")
 
     def test_input_as_output(self):
@@ -488,7 +488,7 @@ class TestMultipleErrors(unittest.TestCase):
         with self.assertRaises(NameError) as ctx:
             cpc.add_product('a', 'b', 'c')
 
-        self.assertEqual(str(ctx.exception), "CrossProductComp: 'a' specified as "
+        self.assertEqual(str(ctx.exception), "<class CrossProductComp>: 'a' specified as "
                          "an output, but it has already been defined as an input.")
 
     def test_output_as_input_a(self):
@@ -497,7 +497,7 @@ class TestMultipleErrors(unittest.TestCase):
         with self.assertRaises(NameError) as ctx:
             cpc.add_product('z', 'c', 'b')
 
-        self.assertEqual(str(ctx.exception), "CrossProductComp: 'c' specified as "
+        self.assertEqual(str(ctx.exception), "<class CrossProductComp>: 'c' specified as "
                          "an input, but it has already been defined as an output.")
 
     def test_output_as_input_b(self):
@@ -506,7 +506,7 @@ class TestMultipleErrors(unittest.TestCase):
         with self.assertRaises(NameError) as ctx:
             cpc.add_product('z', 'a', 'c')
 
-        self.assertEqual(str(ctx.exception), "CrossProductComp: 'c' specified as "
+        self.assertEqual(str(ctx.exception), "<class CrossProductComp>: 'c' specified as "
                          "an input, but it has already been defined as an output.")
 
     def test_a_vec_size_mismatch(self):
@@ -515,7 +515,7 @@ class TestMultipleErrors(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             cpc.add_product('z', 'a', 'y', vec_size=42)
 
-        self.assertEqual(str(ctx.exception), "CrossProductComp: "
+        self.assertEqual(str(ctx.exception), "<class CrossProductComp>: "
                          "Conflicting vec_size=42 specified for input 'a', "
                          "which has already been defined with vec_size=7.")
 
@@ -525,7 +525,7 @@ class TestMultipleErrors(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             cpc.add_product('z', 'a', 'b',a_units='ft')
 
-        self.assertEqual(str(ctx.exception), "CrossProductComp: "
+        self.assertEqual(str(ctx.exception), "<class CrossProductComp>: "
                          "Conflicting units 'ft' specified for input 'a', "
                          "which has already been defined with units 'None'.")
 
@@ -535,7 +535,7 @@ class TestMultipleErrors(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             cpc.add_product('z', 'x', 'b', vec_size=10)
 
-        self.assertEqual(str(ctx.exception), "CrossProductComp: "
+        self.assertEqual(str(ctx.exception), "<class CrossProductComp>: "
                          "Conflicting vec_size=10 specified for input 'b', "
                          "which has already been defined with vec_size=1.")
 
@@ -545,7 +545,7 @@ class TestMultipleErrors(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             cpc.add_product('z', 'a', 'b', b_units='ft')
 
-        self.assertEqual(str(ctx.exception), "CrossProductComp: "
+        self.assertEqual(str(ctx.exception), "<class CrossProductComp>: "
                          "Conflicting units 'ft' specified for input 'b', "
                          "which has already been defined with units 'None'.")
 

@@ -28,12 +28,12 @@ class TestSystem(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             inputs, outputs, residuals = model.get_nonlinear_vectors()
         self.assertEqual(str(cm.exception),
-                         "Group: Cannot get vectors because setup has not yet been called.")
+                         "<class Group>: Cannot get vectors because setup has not yet been called.")
 
         with self.assertRaises(Exception) as cm:
             d_inputs, d_outputs, d_residuals = model.get_linear_vectors('vec')
         self.assertEqual(str(cm.exception),
-                         "Group: Cannot get vectors because setup has not yet been called.")
+                         "<class Group>: Cannot get vectors because setup has not yet been called.")
 
         p.setup()
         p.run_model()

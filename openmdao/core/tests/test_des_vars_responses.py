@@ -314,7 +314,7 @@ class TestDesvarOnModel(unittest.TestCase):
             prob.model.add_design_var(42, lower=-100, upper=100, ref0=-100.0,
                                       ref=100)
 
-        self.assertEqual(str(context.exception), 'SellarDerivatives: The name argument should '
+        self.assertEqual(str(context.exception), '<class SellarDerivatives>: The name argument should '
                                                  'be a string, got 42')
 
     def test_desvar_invalid_bounds(self):
@@ -431,7 +431,7 @@ class TestConstraintOnModel(unittest.TestCase):
             prob.model.add_design_var(42, lower=-100, upper=100, ref0=-100.0,
                                       ref=100)
 
-        self.assertEqual(str(context.exception), 'SellarDerivatives: The name argument should '
+        self.assertEqual(str(context.exception), '<class SellarDerivatives>: The name argument should '
                                                  'be a string, got 42')
 
     def test_constraint_invalid_bounds(self):
@@ -465,7 +465,7 @@ class TestConstraintOnModel(unittest.TestCase):
             prob.model.add_constraint(42, lower=-100, upper=100, ref0=-100.0,
                                       ref=100)
 
-        self.assertEqual(str(context.exception), 'SellarDerivatives: The name argument should '
+        self.assertEqual(str(context.exception), '<class SellarDerivatives>: The name argument should '
                                                  'be a string, got 42')
 
     def test_constraint_invalid_lower(self):
@@ -551,21 +551,21 @@ class TestConstraintOnModel(unittest.TestCase):
             prob.model.add_constraint('con1', lower=0.0, upper=5.0,
                                       indices='foo')
 
-        self.assertEqual(str(context.exception), 'SellarDerivatives: If specified, response indices must '
+        self.assertEqual(str(context.exception), '<class SellarDerivatives>: If specified, response indices must '
                                                  'be a sequence of integers.')
 
         with self.assertRaises(ValueError) as context:
             prob.model.add_constraint('con1', lower=0.0, upper=5.0,
                                       indices=1)
 
-        self.assertEqual(str(context.exception), 'SellarDerivatives: If specified, response indices must '
+        self.assertEqual(str(context.exception), '<class SellarDerivatives>: If specified, response indices must '
                                                  'be a sequence of integers.')
 
         with self.assertRaises(ValueError) as context:
             prob.model.add_constraint('con1', lower=0.0, upper=5.0,
                                       indices=[1, 'k'])
 
-        self.assertEqual(str(context.exception), 'SellarDerivatives: If specified, response indices must '
+        self.assertEqual(str(context.exception), '<class SellarDerivatives>: If specified, response indices must '
                                                  'be a sequence of integers.')
 
         # passing an iterator for indices should be valid
@@ -582,7 +582,7 @@ class TestConstraintOnModel(unittest.TestCase):
             prob.model.add_constraint('con1', lower=0.0, upper=5.0, equals=3.0,
                                       indices='foo')
 
-        msg = "SellarDerivatives: Constraint 'con1' cannot be both equality and inequality."
+        msg = "<class SellarDerivatives>: Constraint 'con1' cannot be both equality and inequality."
         self.assertEqual(str(context.exception), msg)
 
 
@@ -705,7 +705,7 @@ class TestObjectiveOnModel(unittest.TestCase):
             with self.assertRaises(Exception) as context:
                 prob.model.add_design_var('z', indices=[1], **args)
             self.assertEqual(str(context.exception),
-                             "SellarDerivatives: When adding design var 'z', %s should have size 1 but instead has size 2." % name)
+                             "<class SellarDerivatives>: When adding design var 'z', %s should have size 1 but instead has size 2." % name)
 
     def test_constraint_size_err(self):
 
@@ -719,7 +719,7 @@ class TestObjectiveOnModel(unittest.TestCase):
             with self.assertRaises(Exception) as context:
                 prob.model.add_constraint('z', indices=[1], **args)
             self.assertEqual(str(context.exception),
-                             "SellarDerivatives: When adding constraint 'z', %s should have size 1 but instead has size 2." % name)
+                             "<class SellarDerivatives>: When adding constraint 'z', %s should have size 1 but instead has size 2." % name)
 
     def test_objective_size_err(self):
 
@@ -733,7 +733,7 @@ class TestObjectiveOnModel(unittest.TestCase):
             with self.assertRaises(Exception) as context:
                 prob.model.add_objective('z', index=1, **args)
             self.assertEqual(str(context.exception),
-                             "SellarDerivatives: When adding objective 'z', %s should have size 1 but instead has size 2." % name)
+                             "<class SellarDerivatives>: When adding objective 'z', %s should have size 1 but instead has size 2." % name)
 
     def test_objective_invalid_name(self):
 
@@ -745,7 +745,7 @@ class TestObjectiveOnModel(unittest.TestCase):
         with self.assertRaises(TypeError) as context:
             prob.model.add_objective(42, ref0=-100.0, ref=100)
 
-        self.assertEqual(str(context.exception), 'SellarDerivatives: The name argument should '
+        self.assertEqual(str(context.exception), '<class SellarDerivatives>: The name argument should '
                                                  'be a string, got 42')
 
     def test_objective_invalid_index(self):
@@ -758,7 +758,7 @@ class TestObjectiveOnModel(unittest.TestCase):
         with self.assertRaises(TypeError) as context:
             prob.model.add_objective('obj', index='foo')
 
-        self.assertEqual(str(context.exception), 'SellarDerivatives: If specified, objective index must be an int.')
+        self.assertEqual(str(context.exception), '<class SellarDerivatives>: If specified, objective index must be an int.')
 
         prob.model.add_objective('obj', index=1)
 

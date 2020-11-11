@@ -117,7 +117,7 @@ class TestGroup(unittest.TestCase):
         try:
             p.model.add_subsystem('comp', om.IndepVarComp)
         except TypeError as err:
-            self.assertEqual(str(err), "Group: Subsystem 'comp' should be an instance, "
+            self.assertEqual(str(err), "<class Group>: Subsystem 'comp' should be an instance, "
                                        "but a IndepVarComp class object was found.")
         else:
             self.fail('Exception expected.')
@@ -131,7 +131,7 @@ class TestGroup(unittest.TestCase):
         try:
             p.model.add_subsystem('comp2', om.ExecComp('b=2*a'))
         except Exception as err:
-            self.assertEqual(str(err), "Group: Subsystem name 'comp2' is already used.")
+            self.assertEqual(str(err), "<class Group>: Subsystem name 'comp2' is already used.")
         else:
             self.fail('Exception expected.')
 
@@ -250,7 +250,7 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as err:
             p.model.add_subsystem('_bad_name', om.Group())
         self.assertEqual(str(err.exception),
-                         "Group: '_bad_name' is not a valid sub-system name.")
+                         "<class Group>: '_bad_name' is not a valid sub-system name.")
 
     def test_subsys_attributes(self):
         p = om.Problem()
@@ -282,7 +282,7 @@ class TestGroup(unittest.TestCase):
             with self.assertRaises(Exception) as err:
                 p.model.add_subsystem(reserved, om.Group())
             self.assertEqual(str(err.exception),
-                             "Group: Can't add subsystem '%s' because an attribute with that name already exits." %
+                             "<class Group>: Can't add subsystem '%s' because an attribute with that name already exits." %
                              reserved)
 
     def test_group_promotes(self):
@@ -323,7 +323,7 @@ class TestGroup(unittest.TestCase):
             p.model.add_subsystem('comp1', om.IndepVarComp('x', 5.0),
                                   promotes_outputs='x')
         self.assertEqual(str(err.exception),
-                         "Group: promotes must be an iterator of strings and/or tuples.")
+                         "<class Group>: promotes must be an iterator of strings and/or tuples.")
 
     def test_group_renames_errors_not_found(self):
         p = om.Problem()
@@ -335,7 +335,7 @@ class TestGroup(unittest.TestCase):
             p.setup()
         self.assertEqual(str(err.exception),
                          "'comp1' <class IndepVarComp>: 'promotes_outputs' failed to find any matches for "
-                         "the following names or patterns: ['xx'].")
+                         "the following names or patterns: [('xx', 'foo')].")
 
     def test_group_renames_errors_bad_tuple(self):
         p = om.Problem()
@@ -347,7 +347,7 @@ class TestGroup(unittest.TestCase):
             p.setup()
         self.assertEqual(str(err.exception),
                          "when adding subsystem 'comp1', entry '('x', 'foo', 'bar')' "
-                         "is not a string or tuple of size 2")
+                         "is not a string or tuple of size 2.")
 
     def test_group_promotes_multiple(self):
         """Promoting multiple variables."""
@@ -595,12 +595,12 @@ class TestGroup(unittest.TestCase):
 
         idxs = np.array([0, 2, 3], dtype=int)
 
-        p.model.connect('indep.x', 'row123_comp.x', src_indices=om.slicer[idxs, ...],
-                        flat_src_indices=True)
-
-        msg = "<model> <class Group>: Connection from 'indep.x' to 'row123_comp.x' was added with slice src_indices, so flat_src_indices is ignored."
+        msg = "<class Group>: Connection from 'indep.x' to 'row123_comp.x' was added with slice src_indices, so flat_src_indices is ignored."
         with assert_warning(UserWarning, msg):
-            p.setup()
+            p.model.connect('indep.x', 'row123_comp.x', src_indices=om.slicer[idxs, ...],
+                            flat_src_indices=True)
+
+        p.setup()
         p.run_model()
 
         assert_near_equal(p['row123_comp.x'], arr_large_4x4[(0, 2, 3), ...].ravel())
@@ -647,7 +647,7 @@ class TestGroup(unittest.TestCase):
 
         p.model.add_subsystem('indep', om.IndepVarComp('x', arr_order_4x4))
         p.model.add_subsystem('C1', SlicerComp())
-        p.model.connect('indep.x', 'C1.x', src_indices=om.slicer[:, 1], flat_src_indices=True)
+        p.model.connect('indep.x', 'C1.x', src_indices=om.slicer[:, 1])
 
         p.setup()
         p.run_model()
@@ -668,6 +668,7 @@ class TestGroup(unittest.TestCase):
 
         assert_near_equal(p['comp1.a'], [2, 2, 2])
 
+    def test_om_slice_in_promotes_flat(self):
         p = om.Problem()
 
         model = p.model
@@ -1043,7 +1044,7 @@ class TestGroup(unittest.TestCase):
             p.setup()
         self.assertEqual(str(context.exception),
                          "'C2' <class ExecComp>: 'promotes_outputs' failed to find any matches for the "
-                         "following pattern: 'x*'.")
+                         "following names or patterns: ['x*'].")
 
     def test_promote_not_found2(self):
         p = om.Problem()
@@ -1105,7 +1106,7 @@ class TestGroup(unittest.TestCase):
             p.setup()
         self.assertEqual(str(context.exception),
                          "'d1' <class ExecComp>: 'promotes_outputs' failed to find any matches for "
-                         "the following names or patterns: ['bar', 'blammo'].")
+                         "the following names or patterns: [('bar', 'blah'), 'blammo'].")
 
     def test_promote_src_indices_nonflat_to_scalars(self):
         class MyComp(om.ExplicitComponent):
@@ -1455,7 +1456,7 @@ class TestGroupMPISlice(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(p['C1.x'], np.array([6, 22, 38, 54]))
+        assert_near_equal(p.get_val('C1.x', get_remote=False), np.array([6, 22, 38, 54]))
 
     def test_om_slice_4D_with_ellipsis_mpi(self):
 
@@ -1504,7 +1505,7 @@ class TestGroupMPISlice(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(p['C1.x'], np.array([4, 4, 4, 4]))
+        assert_near_equal(p.get_val('C1.x', get_remote=False), np.array([4, 4, 4, 4]))
 
 class TestGroupPromotes(unittest.TestCase):
 
@@ -1650,12 +1651,9 @@ class TestGroupPromotes(unittest.TestCase):
 
         top = om.Problem(model=TopGroup())
 
-        with self.assertRaises(RuntimeError) as context:
+        msg = "'sub.comp1' <class ExecComp>: input variable 'bb', promoted using ('bb', 'xx'), was already promoted using 'b*'."
+        with assert_warning(UserWarning, msg):
             top.setup()
-
-        self.assertEqual(str(context.exception),
-                         "'sub.comp1' <class ExecComp>: promotes_inputs 'b*' matched 'bb' but 'bb' has been "
-                         "aliased to 'xx'.")
 
     def test_promotes_wildcard_name(self):
         class SubGroup(om.Group):
@@ -1674,7 +1672,9 @@ class TestGroupPromotes(unittest.TestCase):
 
         top = om.Problem(model=TopGroup())
 
-        top.setup()
+        msg = "'sub.comp1' <class ExecComp>: input variable 'bb', promoted using 'bb', was already promoted using 'b*'."
+        with assert_warning(UserWarning, msg):
+            top.setup()
 
     def test_multiple_promotes(self):
 
@@ -1829,7 +1829,7 @@ class TestGroupPromotes(unittest.TestCase):
 
             def configure(self):
                 self.indep.add_output('a1', np.ones(3))
-                self.promotes('comp1', inputs=['a'], src_indices=[0, 1, 2])
+                self.promotes('comp1', inputs=['a'], src_indices=[0, 1, 2], src_shape=3)
 
         p = om.Problem(model=SimpleGroup())
 
@@ -1837,7 +1837,7 @@ class TestGroupPromotes(unittest.TestCase):
             p.setup()
 
         self.assertEqual(str(cm.exception),
-            "Shape of indices does not match shape for 'a': Expected (5,) but got (3,).")
+            "<model> <class SimpleGroup>: The source indices [0 1 2] do not specify a valid shape for the connection '_auto_ivc.v0' to 'comp1.a'. The target shape is (5,) but indices have shape (3,).")
 
     def test_promotes_src_indices_different(self):
 
@@ -2025,8 +2025,7 @@ class TestGroupPromotes(unittest.TestCase):
             p.setup()
 
         self.assertEqual(str(cm.exception),
-            "'sub' <class SubGroup>: Trying to promote input 'a' with src_indices [0 1 2], "
-            "but src_indices have already been specified as [0 2 4].")
+            "In connection from 'ind.a' to 'sub.comp.a', input 'sub.a' src_indices are [0 1 2] and indexing into those failed using src_indices [0 2 4] from input 'sub.comp.a'. Error was: index 4 is out of bounds for axis 0 with size 3.")
 
 
 class MyComp(om.ExplicitComponent):
@@ -2223,8 +2222,6 @@ class TestConnect(unittest.TestCase):
         with assert_warning(UserWarning, msg):
             prob.setup()
 
-        self.prob.model._raise_connection_errors = False
-
         with assert_warning(UserWarning, msg):
             prob.setup()
 
@@ -2377,10 +2374,7 @@ class TestConnect(unittest.TestCase):
         self.sub.connect('src.x', 'arr.x', src_indices=[(2, -1, 2), (2, 2, 2)],
                          flat_src_indices=False)
 
-        msg = ("'sub' <class Group>: The source indices [[ 2 -1  2] [ 2  2  2]] do not specify a "
-               "valid shape for the connection 'sub.src.x' to 'sub.arr.x'. "
-               "The source has 2 dimensions but the indices expect 3.")
-
+        msg = "'sub' <class Group>: The source indices [[ 2 -1  2] [ 2  2  2]] do not specify a valid shape for the connection 'sub.src.x' to 'sub.arr.x'. The source has 2 dimensions but the indices expect 3."
         try:
             self.prob.setup()
         except ValueError as err:
@@ -3037,6 +3031,8 @@ class Test3Deep(unittest.TestCase):
         p.model.cfg.sub.add_config_prom('C4', ['y'])
         p.setup()
 
+        p.model._raise_connection_errors = False
+
         names = self.get_matching_var_setup_counts(p, 1)
         expected = {'', 'cfg', 'cfg.C1', 'cfg.C2', 'cfg.sub', 'cfg.sub.C3', 'cfg.sub.C4'}
         self.assertEqual(names, sorted(expected))
@@ -3504,14 +3500,12 @@ class TestFeatureSrcIndices(unittest.TestCase):
 
         p = om.Problem()
 
-        # p.model.add_subsystem('indep', om.IndepVarComp('x', np.ones(5)),
-        #                       promotes_outputs=['x'])
         p.model.set_input_defaults('x', np.ones(5))
         p.model.add_subsystem('G1', MyGroup(), promotes_inputs=['x'])
 
         p.setup()
-        p.set_val('x', np.array(range(5)))
-        inp = np.array(range(5))
+        inp = np.random.random(5)
+        p.set_val('x', inp)
         p.run_model()
 
         assert_near_equal(p.get_val('G1.comp1.x'), inp[:3])

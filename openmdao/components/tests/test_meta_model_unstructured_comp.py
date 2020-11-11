@@ -670,12 +670,12 @@ class MetaModelTestCase(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             mm.add_input('x', np.zeros(2))
         self.assertEqual(str(cm.exception),
-                         "MetaModelUnStructuredComp: First dimension of input 'x' must be 3")
+                         "<class MetaModelUnStructuredComp>: First dimension of input 'x' must be 3")
 
         with self.assertRaises(RuntimeError) as cm:
             mm.add_output('y', np.zeros(4))
         self.assertEqual(str(cm.exception),
-                         "MetaModelUnStructuredComp: First dimension of output 'y' must be 3")
+                         "<class MetaModelUnStructuredComp>: First dimension of output 'y' must be 3")
 
     def test_metamodel_subclass_optimize(self):
         class Trig(om.MetaModelUnStructuredComp):
