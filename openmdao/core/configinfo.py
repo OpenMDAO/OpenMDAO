@@ -91,7 +91,8 @@ class _ConfigInfo(object):
         len_prefix = len(group.pathname) + 1 if group.pathname else 0
 
         # sort into longest first order so the systems will get updated bottom up
-        for path, _ in sorted(_descendents(group, allpaths), key=lambda t: t[1], reverse=True):
+        for path, _ in sorted(_descendents(group, allpaths), key=lambda t: (t[1], t[0]),
+                              reverse=True):
             s = group._get_subsystem(path[len_prefix:])
             if s is not None and s._is_local:
                 yield s
