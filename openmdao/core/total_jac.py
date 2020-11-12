@@ -742,8 +742,11 @@ class _TotalJacInfo(object):
                             dist_offset = np.sum(sizes[:myproc, var_idx])
                             inds.append(np.arange(slc.start / ncols, slc.stop / ncols,
                                                   dtype=INT_DTYPE))
-                            jac_inds.append(np.arange(jstart, sizes[myproc, var_idx],
-                                            dtype=INT_DTYPE))
+                            jac_inds.append(np.arange(jstart, jstart + sizes[myproc, var_idx], 
+                                                      dtype=INT_DTYPE))                            
+                            #jac_inds.append(np.arange(jstart + dist_offset,
+                                            #jstart + dist_offset + sizes[myproc, var_idx],
+                                            #dtype=INT_DTYPE))
                             if fwd:
                                 name2jinds[name] = jac_inds[-1]
                     else:
@@ -793,7 +796,7 @@ class _TotalJacInfo(object):
         idx_map = {}
         start = 0
         end = 0
-        get_remote = True
+        get_remote = False
 
         for name in names:
             if name in vois:
@@ -801,9 +804,9 @@ class _TotalJacInfo(object):
                 # this 'size' already takes indices into account
                 if voi['distributed'] is True:
                     if get_remote:
-                        size = voi['size']
-                    else:
                         size = voi['global_size']
+                    else:
+                        size = voi['size']
                 else:
                     size = voi['size']
                 indices = vois[name]['indices']
@@ -1187,7 +1190,7 @@ class _TotalJacInfo(object):
         deriv_val = self.output_vec[mode][vecname]._data
         self.J = self.J.flatten()
         if mode == 'fwd':
-            self.J[jac_idxs[vecname]] = deriv_val[deriv_idxs[vecname]]
+            self.J[jac_idxs[vecname], i] = deriv_val[deriv_idxs[vecname]]
         else:  # rev
             self.J[jac_idxs[vecname]] = deriv_val[deriv_idxs[vecname]]
 
@@ -1228,8 +1231,11 @@ class _TotalJacInfo(object):
             Direction of derivative solution.
         """
         self.simple_single_jac_scatter(i, mode)
-        #if self.comm.size > 1:
-            #self._jac_setter_dist(i, mode)
+        if self.comm.size > 1 and self.get_remote:
+            self._jac_setter_dist(i, mode)
+        else:
+            scratch = self.jac_scratch['rev'][1]
+            scratch[:] = self.J[i]
 
     def par_deriv_jac_setter(self, inds, mode):
         """
@@ -1242,7 +1248,7 @@ class _TotalJacInfo(object):
         mode : str
             Direction of derivative solution.
         """
-        dist = self.comm.size > 1
+        dist = self.comm.size > 1 and self.get_remote
         for i in inds:
             self.simple_single_jac_scatter(i, mode)
             if dist:
@@ -1261,7 +1267,7 @@ class _TotalJacInfo(object):
         """
         row_col_map = self.simul_coloring.get_row_col_map(mode)
         fwd = mode == 'fwd'
-        dist = self.comm.size > 1
+        dist = self.comm.size > 1 and self.get_remote
 
         J = self.J
         deriv_idxs, jac_idxs, _ = self.sol2jac_map[mode]
@@ -1303,7 +1309,7 @@ class _TotalJacInfo(object):
         # so any relevance can be determined only once.
         vecname, _, _ = self.in_idx_map[mode][inds[0]]
         # ncol = self.output_vec[mode][vecname]._ncol
-        dist = self.comm.size > 1
+        dist = self.comm.size > 1 and self.get_remote
         fwd = mode == 'fwd'
         J = self.J
 
@@ -1344,7 +1350,7 @@ class _TotalJacInfo(object):
         for matmat_idxs in inds:
             self.matmat_jac_setter(matmat_idxs, mode)
 
-    def compute_totals(self):
+    def compute_totals(self, get_remote=True):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -1358,6 +1364,7 @@ class _TotalJacInfo(object):
         par_print = self.par_deriv_printnames
 
         has_lin_cons = self.has_lin_cons
+        self.get_remote = get_remote
 
         model = self.model
         vec_dinput = model._vectors['input']
@@ -1429,10 +1436,6 @@ class _TotalJacInfo(object):
 
                     jac_setter(inds, mode)
 
-        self.J = self.comm.allgather(self.J)
-        a = np.array(self.J[0])
-        b = np.array(self.J[1])
-        self.J = np.array([a,b])
         # Driver scaling.
         if self.has_scaling:
             self._do_driver_scaling(self.J_dict)
