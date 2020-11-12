@@ -1,4 +1,38 @@
 **********************************
+# Release Notes for OpenMDAO 3.4.1
+
+November 13, 2020
+
+OpenMDAO 3.4.1 contains mostly bug fixes, and adds a complex-compatible
+two-argument arctangent function.
+
+PR #1760 allows multiple sets of src_indices to be given to connections.
+Previously, if an input was promoted using some set of src_indices, one could not connect an output to it using another set of src_indices.
+This difference in behavior has been fixed.
+
+## Backwards Incompatible API Changes:
+
+- None
+
+## Backwards Incompatible NON-API Changes:
+
+- None
+
+## New Features:
+
+- src_indices can not be applied at multiple levels. #1760
+- Added complex safe arctan2 to utils.cs_safe and to the functions avaiable in ExecComp. #1759
+- Current value appears in N2 node info panel instead of initial value. #1755
+- Implemented non-modal, multi-capable node info panels in the N2 for viewing multiple data values at once. #1744
+
+## Bug Fixes:
+
+- Added residuals_tol logic to filter out by residual tolerance specified by the user in list_outputs. #1757
+
+## Miscellaneous:
+- None
+
+**********************************
 # Release Notes for OpenMDAO 3.4.0
 
 October 01, 2020
