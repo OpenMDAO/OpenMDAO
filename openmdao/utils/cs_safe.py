@@ -59,13 +59,11 @@ def arctan2(y, x):
     ndarray
         The angle whose opposite side has length y and whose adjacent side has length x.
     """
-    a = np.real(y)
-    b = np.imag(y)
-    c = np.real(x)
-    d = np.imag(x)
-
-    if np.any(np.iscomplex(x)) or np.any(np.iscomplex(y)):
-        res = np.arctan2(a, c) + 1j * (c * b - a * d) / (a**2 + c**2)
+    if np.any(np.iscomplexobj) or np.any(np.iscomplexobj):
+        a = np.real(y)
+        b = np.imag(y)
+        c = np.real(x)
+        d = np.imag(x)
+        return np.arctan2(a, c) + 1j * (c * b - a * d) / (a**2 + c**2)
     else:
-        res = np.arctan2(a, c)
-    return res
+        return np.arctan2(y, x)
