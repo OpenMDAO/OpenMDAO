@@ -3788,6 +3788,59 @@ class TestFeatureConfigure(unittest.TestCase):
         self.assertEqual(str(cm.exception), msg)
 
 
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestConfigureMPI(unittest.TestCase):
+    N_PROCS = 2
+
+    def test_sorting_bug(self):
+        class MyComp(om.ExplicitComponent):
+            def __init__(self, count, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self.count = count
+
+            def setup(self):
+                for i in range(self.count):
+                    self.add_input(f"x{i+1}", np.ones(i + 1))
+                    self.add_output(f"y{i+1}", np.ones(i + 1))
+
+            def compute(self, inputs, outputs):
+                pass
+
+        class MyGroup(om.Group):
+            def __init__(self, count, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self.count = count
+
+            def setup(self):
+                for i in range(self.count):
+                    self.add_subsystem(f"C{i+1}", MyComp(i + 1, distributed=True), promotes_inputs=['*'])
+
+            def configure(self):
+                for s in self._subsystems_myproc:
+                    s.add_output('b')
+
+        class MyGroupUpper(om.Group):
+            def setup(self):
+                self.add_subsystem("G1", MyGroup(1), promotes_inputs=['*'])
+                self.add_subsystem("G2", MyGroup(2), promotes_inputs=['*'])
+
+            def configure(self):
+                for s in self._subsystems_myproc:
+                    s.promotes('C1', inputs=['*'])
+
+        p = om.Problem()
+        indep = p.model.add_subsystem('indep', om.IndepVarComp(distributed=True))
+        indep.add_output("x1", np.ones(1))
+        indep.add_output("x2", np.ones(2))
+
+        p.model.add_subsystem('G', MyGroupUpper())
+
+        p.model.connect("indep.x1", "G.x1")
+        p.model.connect("indep.x2", "G.x2")
+
+        p.setup()
+
+
 class TestFeatureGuessNonlinear(unittest.TestCase):
 
     def test_guess_nonlinear(self):

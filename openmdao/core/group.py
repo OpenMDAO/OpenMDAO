@@ -1202,30 +1202,30 @@ class Group(System):
         dists = {}
 
         if self.comm.size > 1:
-            locality = {}
-            snames = {}
-            for io in ('input', 'output'):
-                # var order must be same on all procs
-                snames[io] = sorted(self._var_allprocs_abs2prom[io])
-                nvars = len(snames[io])
-                locality[io] = locs = np.zeros(nvars, dtype=bool)
-                abs2prom = self._var_abs2prom[io]
-                for i, name in enumerate(snames[io]):
-                    if name in abs2prom:
-                        locs[i] = True
+            myproc = self.comm.rank
+            nprocs = self.comm.size
 
-            proc_locs = self.comm.allgather(locality)
             for io in ('input', 'output'):
                 all_abs2prom = self._var_allprocs_abs2prom[io]
-                if proc_locs[0][io].size > 0:
-                    abs2meta = self._var_allprocs_abs2meta[io]
-                    locs = np.vstack([loc[io] for loc in proc_locs])
-                    for i, name in enumerate(snames[io]):
-                        nzs = np.nonzero(locs[:, i])[0]
-                        if name in abs2meta and abs2meta[name]['distributed']:
-                            dists[name] = nzs
-                        elif (nzs.size > 0 and nzs.size < locs.shape[0] and name in all_abs2prom):
-                            remote_vars[name] = nzs[0]
+                abs2prom = self._var_abs2prom[io]
+                abs2meta = self._var_allprocs_abs2meta[io]
+
+                # var order must be same on all procs
+                sorted_names = sorted(all_abs2prom)
+                locality = np.zeros((nprocs, len(sorted_names)), dtype=bool)
+                for i, name in enumerate(sorted_names):
+                    if name in abs2prom:
+                        locality[myproc, i] = True
+
+                my_loc = locality[myproc, :].copy()
+                self.comm.Allgather(my_loc, locality)
+
+                for i, name in enumerate(sorted_names):
+                    nzs = np.nonzero(locality[:, i])[0]
+                    if name in abs2meta and abs2meta[name]['distributed']:
+                        dists[name] = nzs
+                    elif 0 < nzs.size < nprocs:
+                        remote_vars[name] = nzs[0]
 
         return remote_vars, dists
 
