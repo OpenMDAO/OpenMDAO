@@ -2101,6 +2101,77 @@ class NestedProblemTestCase(unittest.TestCase):
         p.setup()
         p.run_model()
 
+    def test_cs_across_nested(self):
+
+        class NestedAnalysis(om.ExplicitComponent):
+
+            def __init__(self):
+                super().__init__()
+                self._problem = None
+                self._totals = None
+
+            def setup(self):
+                self.add_input('x', val=0.0)
+                self.add_input('y', val=0.0)
+
+                self.add_output('f_xy', val=0.0)
+
+            def setup_partials(self):
+                self.declare_partials(of='*', wrt='*')
+
+            def compute(self, inputs, outputs):
+                prob = self._problem
+                under_cs = self.under_complex_step
+
+                if prob is None:
+                    self._problem = prob = om.Problem()
+                    model = prob.model
+                    model.add_subsystem('parab', Paraboloid(), promotes=['*'])
+
+                    # If the parent problem has been allocated complex, then do it to our subproblem.
+                    prob.setup(force_alloc_complex=inputs._alloc_complex)
+
+                if under_cs:
+                    prob._set_complex_step_mode(True)
+
+                # Set inputs
+                prob.set_val('x', inputs['x'])
+                prob.set_val('y', inputs['y'])
+
+                # Run model
+                prob.run_model()
+
+                # Extract outputs
+                outputs['f_xy'] = prob.get_val('f_xy')
+
+                if under_cs:
+                    prob._set_complex_step_mode(False)
+
+                else:
+                    # Save total derivs.
+                    # Don't try to compute these when we are under complex step.
+                    self._totals = prob.compute_totals(of='f_xy', wrt=['x', 'y'])
+
+            def compute_partials(self, inputs, partials):
+                totals = self._totals
+                partials['f_xy', 'x'] = totals['f_xy', 'x']
+                partials['f_xy', 'y'] = totals['f_xy', 'y']
+
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('nested', NestedAnalysis(), promotes=['*'])
+
+        prob.setup(force_alloc_complex=True)
+
+        prob.set_val('x', 3.5)
+        prob.set_val('y', 1.5)
+
+        prob.run_model()
+
+        totals = prob.check_totals(of='f_xy', wrt=['x', 'y'], method='cs', out_stream=None)
+        for key, val in totals.items():
+            assert_near_equal(val['rel error'][0], 0.0, 1e-12)
+
 
 class SystemInTwoProblemsTestCase(unittest.TestCase):
     def test_2problems(self):

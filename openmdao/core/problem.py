@@ -1874,6 +1874,17 @@ class Problem(object):
             logger.info('checking %s' % c)
             _all_checks[c](self, logger)
 
+    def _set_complex_step_mode(self, active):
+        """
+        Turn on or off complex stepping mode.
+
+        Parameters
+        ----------
+        active : bool
+            Complex mode flag; set to True prior to commencing complex step.
+        """
+        self.model._set_complex_step_mode(active)
+
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
                               compact_print, system_list, global_options, totals=False,
