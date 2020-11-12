@@ -26,7 +26,7 @@ class IndexerTestCase(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             ind.shape()
         self.assertEqual(cm.exception.args[0], "indexer(slice(None, None, None)) does not have a known src_shape so can't compute its shape.")
-        ind.set_src_shape(10)
+        ind.src_shape = 10
         assert_equal(ind.shape(), (10,))
 
     def test_neg_start_slice(self):
