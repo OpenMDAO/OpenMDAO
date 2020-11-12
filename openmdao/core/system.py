@@ -3634,8 +3634,7 @@ class System(object):
             impl_outputs = {}
             if residuals_tol:
                 for n, m in outputs.items():
-                    if "resids" in m and n in states and (n in states
-                                                          and m['resids'] > residuals_tol):
+                    if "resids" in m and n in states and m['resids'] > residuals_tol:
                         impl_outputs[n] = m
             else:
                 impl_outputs = {n: m for n, m in outputs.items() if n in states}
