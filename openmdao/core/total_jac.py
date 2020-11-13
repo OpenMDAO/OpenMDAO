@@ -1193,6 +1193,10 @@ class _TotalJacInfo(object):
             self.J[jac_idxs[vecname], i] = deriv_val[deriv_idxs[vecname]]
         else:  # rev
             self.J[jac_idxs[vecname]] = deriv_val[deriv_idxs[vecname]]
+            if self.get_remote:   
+                gathered_J_vals = self.comm.gather(self.J, root = 0)
+                if gathered_J_vals:
+                    self.J_vals.append(gathered_J_vals[i])
 
     def _jac_setter_dist(self, i, mode):
         """
@@ -1217,7 +1221,6 @@ class _TotalJacInfo(object):
         else:  # rev
             scratch = self.jac_scratch['rev'][1]
             scratch[:] = self.J[i]
-            self.comm.Allreduce(scratch, self.J[i], op=MPI.SUM)
 
     def single_jac_setter(self, i, mode):
         """
@@ -1235,7 +1238,7 @@ class _TotalJacInfo(object):
             self._jac_setter_dist(i, mode)
         else:
             scratch = self.jac_scratch['rev'][1]
-            scratch[:] = self.J[i]
+            scratch[:] = self.J[i]        
 
     def par_deriv_jac_setter(self, inds, mode):
         """
@@ -1359,6 +1362,7 @@ class _TotalJacInfo(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
+        self.J_vals = []
         debug_print = self.debug_print
         par_deriv = self.par_deriv
         par_print = self.par_deriv_printnames
@@ -1436,6 +1440,8 @@ class _TotalJacInfo(object):
 
                     jac_setter(inds, mode)
 
+        self.J = self.comm.bcast(self.J_vals, root=0)
+
         # Driver scaling.
         if self.has_scaling:
             self._do_driver_scaling(self.J_dict)
@@ -1445,7 +1451,6 @@ class _TotalJacInfo(object):
             self._print_derivatives()
 
         # np.save("total_jac%d.npy" % self.comm.rank, self.J)
-
         return self.J_final
 
     def compute_totals_approx(self, initialize=False, progress_out_stream=None):
