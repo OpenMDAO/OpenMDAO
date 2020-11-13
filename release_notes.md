@@ -20,13 +20,14 @@ This difference in behavior has been fixed.
 
 ## New Features:
 
-- src_indices can not be applied at multiple levels. #1760
-- Added complex safe arctan2 to utils.cs_safe and to the functions avaiable in ExecComp. #1759
+- src_indices can now be applied at multiple levels. #1760
+- Added complex safe arctan2 to utils.cs_safe and to the functions available in ExecComp. #1759
 - Current value appears in N2 node info panel instead of initial value. #1755
 - Implemented non-modal, multi-capable node info panels in the N2 for viewing multiple data values at once. #1744
 
 ## Bug Fixes:
 
+- Fix for bug in parallel setup in version 3.4  #1765
 - Added residuals_tol logic to filter out by residual tolerance specified by the user in list_outputs. #1757
 
 ## Miscellaneous:
