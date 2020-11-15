@@ -23,7 +23,53 @@ def array2slice(arr):
 
 
 class Indexer(object):
-    def __init__(self, idxs):
+    def __init__(self):
+        self._src_shape = None
+        self._shape_dependent = True
+        self.min = self.max = self._shape = None
+        self._final_slice = None
+        self._final_arr = None
+
+    def as_array(self, final=False):
+        if final:
+            if self._final_arr is None:
+                self._final_arr = self.as_final_arr()
+            return self._final_arr
+        return
+
+
+class SliceIndexer(Indexer):
+    def __init__(self, slc):
+        self._slice = slc
+
+    def as_slice(self):
+        if self._final_slice is
+        return self._final_slice
+
+    def final_array(self):
+        pass
+
+
+class ArrayIndexer(Indexer):
+    def __init__(self, arr):
+        self.arr = arr
+
+    def final_array(self):
+        pass
+
+
+    def as_slice(self):
+        if self._final_slice is None:
+            self._final_slice = array2slice(self.final_array())
+
+        if self._final_slice is None:
+            raise ValueError(f"array index cannot be converted to a slice.")
+
+        return self._final_slice
+
+
+class MultiIndexer(Indexer):
+    def __init__(self, tup):
         # if original idxs is a slice or fancy index (tuple of index arrays/slices),
         #    self.tup is not None
         # if original idxs is an array, self.arr is not None
