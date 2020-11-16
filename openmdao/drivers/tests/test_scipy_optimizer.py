@@ -137,6 +137,8 @@ class TestMPIScatter(unittest.TestCase):
 
         prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP')
 
+        import wingdbstub
+        
         prob.setup(force_alloc_complex=True)
 
         prob.run_driver()

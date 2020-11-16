@@ -315,7 +315,7 @@ class BroydenSolver(NonlinearSolver):
         # to trigger reconvergence, so nudge the outputs slightly so that we always get at least
         # one iteration of Broyden.
         if system.under_complex_step and self.options['cs_reconverge']:
-            system._outputs._data += np.linalg.norm(system._outputs._data) * 1e-10
+            system._outputs += np.linalg.norm(system._outputs._get_data()) * 1e-10
 
         # Start with initial states.
         self.xm = self.get_vector(system._outputs)
@@ -347,7 +347,7 @@ class BroydenSolver(NonlinearSolver):
         self.fxm = fxm = self.get_vector(self._system()._residuals)
         if not self._full_inverse:
             # Use full model residual for driving the main loop convergence.
-            fxm = self._system()._residuals._data
+            fxm = self._system()._residuals._get_data()
 
         return self.compute_norm(fxm)
 

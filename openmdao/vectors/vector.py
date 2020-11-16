@@ -55,13 +55,6 @@ class Vector(object):
         Actual allocated data.
     _slices : dict
         Mapping of var name to slice.
-    _cplx_data : ndarray
-        Actual allocated data under complex step.
-    _cplx_views : dict
-        Dictionary mapping absolute variable names to the ndarray views under complex step.
-    _cplx_views_flat : dict
-        Dictionary mapping absolute variable names to the flattened ndarray views under complex
-        step.
     _under_complex_step : bool
         When True, this vector is under complex step, and data is swapped with the complex data.
     _ncol : int
@@ -75,8 +68,6 @@ class Vector(object):
         Contains scale factors to convert data arrays.
     read_only : bool
         When True, values in the vector cannot be changed via the user __setitem__ API.
-    _under_complex_step : bool
-        When True, self._data is replaced with self._cplx_data.
     _len : int
         Total length of data vector (including shared memory parts).
     """
@@ -125,10 +116,12 @@ class Vector(object):
 
         # Support for Complex Step
         self._alloc_complex = alloc_complex
-        self._cplx_data = None
-        self._cplx_views = {}
-        self._cplx_views_flat = {}
         self._under_complex_step = False
+
+        if alloc_complex:
+            self._get_data = self._get_data_cs
+        else:
+            self._get_data = self._get_data_real
 
         self._do_scaling = ((kind == 'input' and system._has_input_scaling) or
                             (kind == 'output' and system._has_output_scaling) or
@@ -168,6 +161,14 @@ class Vector(object):
         """
         return self._len
 
+    def _get_data_real(self):
+        return self._data
+
+    def _get_data_cs(self):
+        if self._under_complex_step:
+            return self._data
+        return self._data.real
+
     def _copy_views(self):
         """
         Return a dictionary containing just the views.
@@ -199,7 +200,11 @@ class Vector(object):
         list
             the variable values.
         """
-        return [v for n, v in self._views.items() if n in self._names]
+        if self._under_complex_step:
+            return [v for n, v in self._views.items() if n in self._names]
+        else:
+            return [v.real for n, v in self._views.items() if n in self._names]
+
 
     def _name2abs_name(self, name):
         """
@@ -254,8 +259,12 @@ class Vector(object):
         """
         arrs = self._views_flat if flat else self._views
 
-        for name, val in arrs.items():
-            yield name, val
+        if self._under_complex_step:
+            for name, val in arrs.items():
+                yield name, val
+        else:
+            for name, val in arrs.items():
+                yield name, val.real
 
     def _abs_iter(self):
         """
@@ -313,11 +322,15 @@ class Vector(object):
         abs_name = self._name2abs_name(name)
         if abs_name is not None:
             if self._icol is None:
-                return self._views[abs_name]
+                val = self._views[abs_name]
             else:
-                return self._views[abs_name][:, self._icol]
+                val = self._views[abs_name][:, self._icol]
         else:
             raise KeyError(f"{self._system().msginfo}: Variable name '{name}' not found.")
+
+        if self._under_complex_step:
+            return val
+        return val.real
 
     def _abs_get_val(self, name, flat=True):
         """
@@ -338,8 +351,13 @@ class Vector(object):
             variable value.
         """
         if flat:
-            return self._views_flat[name]
-        return self._views[name]
+            val = self._views_flat[name]
+        else:
+            val = self._views[name]
+
+        if self._under_complex_step:
+            return val
+        return val.real
 
     def __setitem__(self, name, value):
         """
@@ -541,17 +559,26 @@ class Vector(object):
         value = np.asarray(val)
 
         try:
-            if flat:
-                self._views_flat[abs_name][idxs] = value.flat
+            if self._under_complex_step:
+                if flat:
+                    self._views_flat[abs_name][idxs] = value.flat
+                else:
+                    self._views[abs_name][idxs] = value
             else:
-                self._views[abs_name][idxs] = value
+                if flat:
+                    self._views_flat[abs_name][idxs].real = value.flat
+                else:
+                    self._views[abs_name][idxs].real = value
         except Exception as err:
             try:
                 value = value.reshape(self._views[abs_name][idxs].shape)
             except Exception:
                 raise ValueError(f"{self._system().msginfo}: Failed to set value of "
                                  f"'{name}': {str(err)}.")
-            self._views[abs_name][idxs] = value
+            if self._under_complex_step:
+                self._views[abs_name][idxs] = value
+            else:
+                self._views[abs_name][idxs].real = value
 
     def dot(self, vec):
         """
@@ -605,17 +632,16 @@ class Vector(object):
             When this flag is True, keep the real value when turning off complex step. You only
             need to do this when temporarily disabling complex step for guess_nonlinear.
         """
-        if active:
-            arr = self._data
-        elif keep_real:
-            arr = self._data.real
-        else:
-            arr = None
+        # if active:
+        #     arr = self._data
+        # elif keep_real:
+        #     arr = self._data.real
+        # else:
+        #     arr = None
 
-        self._data, self._cplx_data = self._cplx_data, self._data
-        self._views, self._cplx_views = self._cplx_views, self._views
-        self._views_flat, self._cplx_views_flat = self._cplx_views_flat, self._views_flat
         self._under_complex_step = active
+        if not active:
+            self._data.imag[:] = 0.0
 
-        if arr is not None:
-            self.set_val(arr)
+        # if arr is not None:
+        #     self.set_val(arr)

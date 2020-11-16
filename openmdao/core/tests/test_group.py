@@ -1294,7 +1294,7 @@ class TestGroup(unittest.TestCase):
 
             def guess_nonlinear(self, inputs, outputs, residuals):
 
-                if outputs._data.dtype == np.complex:
+                if outputs._get_data().dtype == np.complex:
                     raise RuntimeError('Vector should not be complex when guess_nonlinear is called.')
 
                 # inputs are addressed using full path name, regardless of promotion

@@ -2636,8 +2636,7 @@ class Group(System):
 
             # The Group outputs vector contains imaginary numbers from other components, so we need
             # to save a cache and restore it later.
-            imag_cache = np.empty(len(self._outputs._data))
-            imag_cache[:] = self._outputs._data.imag
+            imag_cache = self._outputs._data.imag.copy()
             self._outputs.set_complex_step_mode(False, keep_real=True)
 
         if self._discrete_inputs or self._discrete_outputs:

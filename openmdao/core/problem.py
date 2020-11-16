@@ -723,7 +723,8 @@ class Problem(object):
 
         # We apply a -1 here because the derivative of the output is minus the derivative of
         # the residual in openmdao.
-        rvec._data *= -1.
+        data = rvec._get_data()
+        data *= -1.
 
         self.model.run_solve_linear(['linear'], mode)
 
