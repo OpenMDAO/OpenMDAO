@@ -1193,7 +1193,7 @@ class _TotalJacInfo(object):
             self.J[jac_idxs[vecname], i] = deriv_val[deriv_idxs[vecname]]
         else:  # rev
             self.J[jac_idxs[vecname]] = deriv_val[deriv_idxs[vecname]]
-            if self.get_remote:   
+            if self.get_remote:
                 gathered_J_vals = self.comm.gather(self.J, root = 0)
                 if gathered_J_vals:
                     self.J_vals.append(gathered_J_vals[i])
@@ -1440,7 +1440,8 @@ class _TotalJacInfo(object):
 
                     jac_setter(inds, mode)
 
-        self.J = self.comm.bcast(self.J_vals, root=0)
+        if self.get_remote:
+            self.J = self.comm.bcast(self.J_vals, root=0)
 
         # Driver scaling.
         if self.has_scaling:
