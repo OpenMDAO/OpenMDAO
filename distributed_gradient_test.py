@@ -69,7 +69,7 @@ if __name__ == "__main__":
     dv_vals = p.driver.get_design_var_values(get_remote=False)
 
     # Compute totals and check the length of the gradient array on each proc
-    objcongrad = p.compute_totals(get_remote=True)
+    objcongrad = p.compute_totals(get_remote=False)
     print("Rank {0}: Length of dy/dx = {1}".format(comm.rank, len(objcongrad[('dp.y', 'distrib_ivc.x')][0])))
     print("Rank {0}: Length of dy/dx should be = {1}".format(comm.rank, ndvs))
 

@@ -93,7 +93,7 @@ class _TotalJacInfo(object):
     """
 
     def __init__(self, problem, of, wrt, use_abs_names, return_format, approx=False,
-                 debug_print=False, driver_scaling=True):
+                 debug_print=False, driver_scaling=True, get_remote=True):
         """
         Initialize object.
 
@@ -136,6 +136,7 @@ class _TotalJacInfo(object):
         self.debug_print = debug_print
         self.par_deriv = {}
         self.par_deriv_printnames = {}
+        self.get_remote = get_remote
 
         if isinstance(wrt, str):
             wrt = [wrt]
@@ -277,7 +278,7 @@ class _TotalJacInfo(object):
         # create scratch array for jac scatters
         self.jac_scratch = None
 
-        if self.comm.size > 1:
+        if self.comm.size > 1 and self.get_remote:
             # need 2 scratch vectors of the same size here
             scratch = np.zeros(max(J.shape), dtype=J.dtype)
             scratch2 = scratch.copy()
@@ -301,7 +302,7 @@ class _TotalJacInfo(object):
             if 'fwd' in modes:
                 self._compute_jac_scatters('fwd', J.shape[0])
 
-            if 'rev' in modes:
+            if 'rev' in modes and self.get_remote:
                 self._compute_jac_scatters('rev', J.shape[1])
 
         # for dict type return formats, map var names to views of the Jacobian array.
@@ -507,7 +508,10 @@ class _TotalJacInfo(object):
                 # a constraint or an objective.
                 meta = vois[name]
                 if meta['distributed'] is True:
-                    end += meta['global_size']
+                    if self.get_remote:
+                        end += meta['global_size']
+                    else:
+                        end += meta['size']
                 else:
                     end += meta['size']
 
@@ -535,15 +539,25 @@ class _TotalJacInfo(object):
 
                 if in_idxs is None:
                     # if the var is not distributed, global_size == local size
-                    irange = np.arange(in_var_meta['global_size'], dtype=INT_DTYPE)
+                    if self.get_remote:
+                        irange = np.arange(in_var_meta['global_size'], dtype=INT_DTYPE)
+                    else:
+                        irange = np.arange(in_var_meta['size'], dtype=INT_DTYPE)
                 else:
                     irange = in_idxs.copy()
                     # correct for any negative indices
-                    irange[in_idxs < 0] += in_var_meta['global_size']
+                    if self.get_remote:
+                        irange[in_idxs < 0] += in_var_meta['global_size']
+                    else:
+                        irange[in_idxs < 0] += in_var_meta['size']
 
             else:  # name is not a design var or response  (should only happen during testing)
-                end += in_var_meta['global_size']
-                irange = np.arange(in_var_meta['global_size'], dtype=INT_DTYPE)
+                if self.get_remote:
+                    end += in_var_meta['global_size']
+                    irange = np.arange(in_var_meta['global_size'], dtype=INT_DTYPE)
+                else:
+                    end += in_var_meta['size']
+                    irange = np.arange(in_var_meta['size'], dtype=INT_DTYPE)                    
                 in_idxs = parallel_deriv_color = matmat = None
                 cache_lin_sol = False
 
@@ -720,7 +734,10 @@ class _TotalJacInfo(object):
                 if indices is not None:
                     sz = len(indices)
                 else:
-                    sz = meta['global_size']
+                    if self.get_remote:
+                        sz = meta['global_size']
+                    else:
+                        sz = meta['size']
 
                 if name in abs2idx and name in slices:
                     var_idx = abs2idx[name]
@@ -1221,6 +1238,7 @@ class _TotalJacInfo(object):
         else:  # rev
             scratch = self.jac_scratch['rev'][1]
             scratch[:] = self.J[i]
+            self.comm.Allreduce(scratch, self.J[i], op=MPI.SUM)
 
     def single_jac_setter(self, i, mode):
         """
@@ -1236,9 +1254,10 @@ class _TotalJacInfo(object):
         self.simple_single_jac_scatter(i, mode)
         if self.comm.size > 1 and self.get_remote:
             self._jac_setter_dist(i, mode)
-        else:
-            scratch = self.jac_scratch['rev'][1]
-            scratch[:] = self.J[i]        
+
+        #else:
+            #scratch = self.jac_scratch['rev'][1]
+            #scratch[:] = self.J[i]               
 
     def par_deriv_jac_setter(self, inds, mode):
         """
@@ -1353,7 +1372,7 @@ class _TotalJacInfo(object):
         for matmat_idxs in inds:
             self.matmat_jac_setter(matmat_idxs, mode)
 
-    def compute_totals(self, get_remote=True):
+    def compute_totals(self):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -1368,7 +1387,6 @@ class _TotalJacInfo(object):
         par_print = self.par_deriv_printnames
 
         has_lin_cons = self.has_lin_cons
-        self.get_remote = get_remote
 
         model = self.model
         vec_dinput = model._vectors['input']
@@ -1440,8 +1458,8 @@ class _TotalJacInfo(object):
 
                     jac_setter(inds, mode)
 
-        if self.get_remote:
-            self.J = self.comm.bcast(self.J_vals, root=0)
+        #if self.get_remote:
+            #self.J = self.comm.bcast(self.J_vals, root=0)
 
         # Driver scaling.
         if self.has_scaling:

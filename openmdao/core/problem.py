@@ -1612,8 +1612,9 @@ class Problem(object):
             return total_info.compute_totals_approx(initialize=True)
         else:
             total_info = _TotalJacInfo(self, of, wrt, use_abs_names, return_format,
-                                       debug_print=debug_print, driver_scaling=driver_scaling)
-            return total_info.compute_totals(get_remote=get_remote)
+                                       debug_print=debug_print, driver_scaling=driver_scaling, 
+                                       get_remote=get_remote)
+            return total_info.compute_totals()
 
     def set_solver_print(self, level=2, depth=1e99, type_='all'):
         """
