@@ -2,7 +2,6 @@ from pprint import pprint
 import numpy as np
 import openmdao.api as om
 from mpi4py import MPI
-import wingdbstub
 
 from openmdao.utils.assert_utils import assert_near_equal
 
@@ -62,6 +61,7 @@ if __name__ == "__main__":
     p.model.add_design_var('x', lower=-100, upper=100)
     p.model.add_objective('y')
 
+    #import wingdbstub
 
     p.setup()
     p.run_model()

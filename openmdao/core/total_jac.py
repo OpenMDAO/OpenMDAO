@@ -263,10 +263,16 @@ class _TotalJacInfo(object):
             self.in_loc_idxs = {}
             self.idx_iter_dict = {}
             self.seeds = {}
+            self.loc_jac_idxs = {}
 
             for mode in modes:
                 self.in_idx_map[mode], self.in_loc_idxs[mode], self.idx_iter_dict[mode], \
                     self.seeds[mode] = self._create_in_idx_map(mode)
+                if not self.get_remote:
+                    locs = np.nonzero(self.in_loc_idxs[mode] != -1)[0]
+                    arr = np.full(self.in_loc_idxs[mode].size, -1.0, dtype=INT_DTYPE)
+                    arr[locs] = np.arange(locs.size, dtype=INT_DTYPE)
+                    self.loc_jac_idxs[mode] = arr
 
         self.of_meta, self.of_size = self._get_tuple_map(of, responses, abs2meta_out)
         self.wrt_meta, self.wrt_size = self._get_tuple_map(wrt, design_vars, abs2meta_out)
@@ -299,7 +305,7 @@ class _TotalJacInfo(object):
             self.jac_scatters = {}
             self.tgt_petsc = {n: {} for n in modes}
             self.src_petsc = {n: {} for n in modes}
-            if 'fwd' in modes:
+            if 'fwd' in modes and self.get_remote:
                 self._compute_jac_scatters('fwd', J.shape[0])
 
             if 'rev' in modes and self.get_remote:
@@ -759,8 +765,6 @@ class _TotalJacInfo(object):
                             dist_offset = np.sum(sizes[:myproc, var_idx])
                             inds.append(np.arange(slc.start / ncols, slc.stop / ncols,
                                                   dtype=INT_DTYPE))
-                            # jac_inds.append(np.arange(jstart, jstart + sizes[myproc, var_idx],
-                            #                           dtype=INT_DTYPE))
                             jac_inds.append(np.arange(jstart + dist_offset,
                                             jstart + dist_offset + sizes[myproc, var_idx],
                                             dtype=INT_DTYPE))
@@ -813,7 +817,7 @@ class _TotalJacInfo(object):
         idx_map = {}
         start = 0
         end = 0
-        get_remote = False
+        get_remote = self.get_remote
 
         for name in names:
             if name in vois:
@@ -1205,15 +1209,16 @@ class _TotalJacInfo(object):
         vecname, _, _ = self.in_idx_map[mode][i]
         deriv_idxs, jac_idxs, _ = self.sol2jac_map[mode]
         deriv_val = self.output_vec[mode][vecname]._data
-        #self.J = self.J.flatten()
+        if not self.get_remote:
+            loc_idx = self.loc_jac_idxs[mode][i]
+            if loc_idx >= 0:
+                i = loc_idx
+            else:
+                return
         if mode == 'fwd':
             self.J[jac_idxs[vecname], i] = deriv_val[deriv_idxs[vecname]]
         else:  # rev
             self.J[i, jac_idxs[vecname]] = deriv_val[deriv_idxs[vecname]]
-            # if self.get_remote:
-            #     gathered_J_vals = self.comm.gather(self.J, root = 0)
-            #     if gathered_J_vals:
-            #         self.J_vals.append(gathered_J_vals[i])
 
     def _jac_setter_dist(self, i, mode):
         """
@@ -1254,10 +1259,6 @@ class _TotalJacInfo(object):
         self.simple_single_jac_scatter(i, mode)
         if self.comm.size > 1 and self.get_remote:
             self._jac_setter_dist(i, mode)
-
-        #else:
-            #scratch = self.jac_scratch['rev'][1]
-            #scratch[:] = self.J[i]
 
     def par_deriv_jac_setter(self, inds, mode):
         """
@@ -1381,7 +1382,6 @@ class _TotalJacInfo(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
-        self.J_vals = []
         debug_print = self.debug_print
         par_deriv = self.par_deriv
         par_print = self.par_deriv_printnames
@@ -1458,9 +1458,6 @@ class _TotalJacInfo(object):
 
                     jac_setter(inds, mode)
 
-        #if self.get_remote:
-            #self.J = self.comm.bcast(self.J_vals, root=0)
-
         # Driver scaling.
         if self.has_scaling:
             self._do_driver_scaling(self.J_dict)
@@ -1470,6 +1467,7 @@ class _TotalJacInfo(object):
             self._print_derivatives()
 
         # np.save("total_jac%d.npy" % self.comm.rank, self.J)
+
         return self.J_final
 
     def compute_totals_approx(self, initialize=False, progress_out_stream=None):
