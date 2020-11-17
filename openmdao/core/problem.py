@@ -1560,7 +1560,7 @@ class Problem(object):
         return data['']
 
     def compute_totals(self, of=None, wrt=None, return_format='flat_dict', debug_print=False,
-                       driver_scaling=False, use_abs_names=False, get_remote=False):
+                       driver_scaling=False, use_abs_names=False, get_remote=True):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -1612,7 +1612,7 @@ class Problem(object):
             return total_info.compute_totals_approx(initialize=True)
         else:
             total_info = _TotalJacInfo(self, of, wrt, use_abs_names, return_format,
-                                       debug_print=debug_print, driver_scaling=driver_scaling, 
+                                       debug_print=debug_print, driver_scaling=driver_scaling,
                                        get_remote=get_remote)
             return total_info.compute_totals()
 

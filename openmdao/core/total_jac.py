@@ -1228,7 +1228,7 @@ class _TotalJacInfo(object):
         ----------
         i : int
             Total jacobian row or column index.
-        mode : str
+        mode : str 
             Direction of derivative solution.
         """
         if mode == 'fwd':

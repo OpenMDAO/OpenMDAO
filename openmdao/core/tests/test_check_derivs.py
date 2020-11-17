@@ -2325,10 +2325,7 @@ class TestProblemComputeTotals(unittest.TestCase):
 
     N_PROCS = 2
 
-
-    def test_compute_totals(self):
-        #import wingdbstub
-        
+    def test_compute_totals(self):        
         comm = MPI.COMM_WORLD
 
         p = om.Problem()
